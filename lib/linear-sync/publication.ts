@@ -4,6 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { issueDocuments, issues, linearIssueLinks, linearIssuePublications, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { requireTaskWorkspace } from '@/lib/task-workspace'
 
 export interface OutboxFence { id: string; claimToken: string; scopeVersion: number }
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -20,7 +21,8 @@ export class RetiredPublicationError extends Error {
 export async function reserveLinearPublication(issueId: string, fence?: OutboxFence, expectedScopeVersion = fence?.scopeVersion) {
   return db.transaction(async tx => {
     const [issue] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
-    if (!issue || issue.linearSyncBlocked || issue.scope !== 'workspace' || readIssueMetadata(issue.content).deletedAt || (expectedScopeVersion !== undefined && issue.scopeVersion !== expectedScopeVersion)) return null
+    if (!issue || !issue.workspaceId || issue.ownershipState !== 'bound' || issue.linearSyncBlocked || issue.linearSyncPolicy !== 'explicit' || readIssueMetadata(issue.content).deletedAt || (expectedScopeVersion !== undefined && issue.scopeVersion !== expectedScopeVersion)) return null
+    await requireTaskWorkspace(issue.userId, issue.workspaceId)
     if (fence && !await claimCurrent(fence, tx)) return null
     const [linked] = await tx.select({ link: linearIssueLinks, team: linearTeamSyncs }).from(linearIssueLinks)
       .innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId)).where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1)
@@ -29,7 +31,7 @@ export async function reserveLinearPublication(issueId: string, fence?: OutboxFe
     // not prove the user selected that external destination for this task.
     if (!linked) throw new LinearTargetNotVerifiedError()
     const team = linked.team
-    if (!team.active || linked.link.remoteRemovedAt) return null
+    if (!team.active || team.workspaceId !== issue.workspaceId || linked.link.remoteRemovedAt) return null
     let [publication] = await tx.select().from(linearIssuePublications).where(and(eq(linearIssuePublications.issueId, issue.id), eq(linearIssuePublications.scopeVersion, issue.scopeVersion))).limit(1)
     if (!publication) {
       ;[publication] = await tx.insert(linearIssuePublications).values({
@@ -53,9 +55,11 @@ async function claimCurrent(fence: OutboxFence, executor: Reader) {
 }
 
 export async function requireCurrentPublication(snapshot: Publication, executor: Reader = db) {
+  if (!snapshot.issue.workspaceId || snapshot.team.workspaceId !== snapshot.issue.workspaceId) throw new RetiredPublicationError()
+  await requireTaskWorkspace(snapshot.issue.userId, snapshot.issue.workspaceId)
   const [row] = await executor.select({ id: issues.id }).from(issues)
     .innerJoin(linearIssuePublications, eq(linearIssuePublications.issueId, issues.id))
-    .where(and(eq(issues.id, snapshot.issue.id), eq(issues.userId, snapshot.issue.userId), eq(issues.scope, 'workspace'), eq(issues.linearSyncBlocked, false), eq(issues.scopeVersion, snapshot.publication.scopeVersion),
+    .where(and(eq(issues.id, snapshot.issue.id), eq(issues.userId, snapshot.issue.userId), eq(issues.workspaceId, snapshot.issue.workspaceId), eq(issues.ownershipState, 'bound'), eq(issues.linearSyncPolicy, 'explicit'), eq(issues.linearSyncBlocked, false), eq(issues.scopeVersion, snapshot.publication.scopeVersion),
       eq(linearIssuePublications.id, snapshot.publication.id), isNull(linearIssuePublications.retiredAt))).limit(1)
   const [verified] = await executor.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, snapshot.issue.id), eq(linearIssueLinks.ownerId, snapshot.issue.userId), eq(linearIssueLinks.linearIssueId, snapshot.publication.linearIssueId), eq(linearIssueLinks.teamSyncId, snapshot.publication.teamSyncId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1)
   if (!row || !verified || (snapshot.fence && !await claimCurrent(snapshot.fence, executor))) throw new RetiredPublicationError()

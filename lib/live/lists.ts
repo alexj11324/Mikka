@@ -41,19 +41,15 @@ export async function runListTargets(database: Database, workspaceDatabase: Data
   return ownerListTargets(workspaceDatabase, run.userId, previewOnly || !run.issueId ? ['thread_list'] : ['thread_list', 'task_run_list'])
 }
 
-type IssueScope = { id: string; userId: string; scope: string }
+type IssueScope = { id: string; userId: string; scope: string; workspaceId: string | null }
 
 async function issueListScopes(workspaceDatabase: Database, issue: IssueScope): Promise<LiveScope[]> {
-  const { rows: [link] } = issue.scope === 'workspace'
-    ? await workspaceDatabase.query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_team_issues WHERE "issueId"=$1', [issue.id])
-    : { rows: [] }
-  return link ? workspaceScopes(workspaceDatabase, link.workspaceId) : [await ownerLiveScope(workspaceDatabase, issue.userId)].filter((scope): scope is LiveScope => scope !== null)
+  return issue.workspaceId ? workspaceScopes(workspaceDatabase, issue.workspaceId) : []
 }
 
-/** Personal and unlinked issues remain visible to their owner in every page's
- * selected workspace. Linked workspace issues use actual active membership. */
+/** A task invalidates only its immutable tenant's active members. */
 export async function issueListTargets(database: Database, workspaceDatabase: Database, issueId: string, titleChanged = false): Promise<Target[]> {
-  const { rows: [issue] } = await database.query<IssueScope>('SELECT id,"userId",scope FROM issues WHERE id=$1', [issueId])
+  const { rows: [issue] } = await database.query<IssueScope>(`SELECT id,"userId",scope,"workspaceId" FROM issues WHERE id=$1 AND "ownershipState"='bound'`, [issueId])
   if (!issue) return []
   const scopes = await issueListScopes(workspaceDatabase, issue)
   const targets = scopes.map(scope => target(scope, ['issue_list']))
@@ -146,11 +142,11 @@ export const workspaceListChanged = (executor: object, workspaceId: string, kind
  * list. Refresh only the owner's actual issue scopes, with no issue IDs on the
  * wire, when that persisted display metadata changes. */
 export const ownerIssueListsChanged = (executor: object, ownerId: string) => changed(executor, `owner-issues:${ownerId}`, async (database, workspace) => {
-  const { rows: issues } = await database.query<{ id: string }>('SELECT id FROM issues WHERE "userId"=$1 AND scope=\'workspace\'', [ownerId])
-  const { rows: scopes } = issues.length ? await workspace.query<LiveScope>(`SELECT DISTINCT m."userId" AS "ownerId",w.id AS "workspaceId"
-    FROM mikka_team_issues i JOIN mikka_workspaces w ON w.id=i."workspaceId"
+  const { rows: tasks } = await database.query<{ workspaceId: string }>(`SELECT DISTINCT "workspaceId" FROM issues WHERE "userId"=$1 AND "ownershipState"='bound'`, [ownerId])
+  const { rows: scopes } = tasks.length ? await workspace.query<LiveScope>(`SELECT DISTINCT m."userId" AS "ownerId",w.id AS "workspaceId"
+    FROM mikka_workspaces w
     JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m.status='active'
-    WHERE i."issueId"=ANY($1::uuid[])`, [issues.map(issue => issue.id)]) : { rows: [] }
+    WHERE w.id=ANY($1::uuid[])`, [tasks.map(task => task.workspaceId)]) : { rows: [] }
   const home = await ownerLiveScope(workspace, ownerId)
   return mergeTargets([...scopes, ...(home ? [home] : [])].map(scope => target(scope, ['issue_list'])))
 })

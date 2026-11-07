@@ -41,8 +41,8 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
     if (current?.version === parsed.known) return { version: current.version, workspaceId }
   }
   const result = await db.transaction(async tx => {
-    const [locked] = await tx.select({ id: issues.id, userId: issues.userId, scopeVersion: issues.scopeVersion, content: issues.content, scope: issues.scope, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
-    requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+    const [locked] = await tx.select({ id: issues.id, userId: issues.userId, scopeVersion: issues.scopeVersion, workspaceId: issues.workspaceId, content: issues.content, scope: issues.scope, linearSyncPolicy: issues.linearSyncPolicy, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
+    requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
     const [stored] = await tx.select().from(issueDocuments).where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
     const doc = new Y.Doc()
     try {
@@ -66,7 +66,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
         await documentChanged(tx, issue.id)
         await issueListChanged(tx, issue.id)
       }
-      const [link] = locked.scope === 'workspace' && !locked.linearSyncBlocked ? await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, locked.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
+      const [link] = locked.linearSyncPolicy === 'explicit' && !locked.linearSyncBlocked ? await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, locked.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
       return { changed, syncEligible: Boolean(link), version: documentVersion(state), update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
     } finally { doc.destroy() }
   })
@@ -76,8 +76,8 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
 export async function listMembers(id: string) {
   const { issue, user } = await requireIssueAccess(id)
   const result = await db.transaction(async tx => {
-  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
-  requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
+  requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   const members = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image, createdAt: issueMembers.createdAt }).from(issueMembers)
     .innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId))).orderBy(issueMembers.createdAt, users.id)
   const [owner] = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image }).from(issues)
@@ -118,7 +118,7 @@ export async function removeMember(id: string, memberId: string): Promise<Action
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, { ...metadata, assignee: null }), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, user.id))).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: user.id, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
         await issueListChanged(tx, id)
-        if (saved.scope !== 'workspace' || saved.linearSyncBlocked) return false
+        if (saved.linearSyncPolicy !== 'explicit' || saved.linearSyncBlocked) return false
         const [link] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, saved.id), eq(linearIssueLinks.ownerId, saved.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1)
         return Boolean(link)
       }

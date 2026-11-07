@@ -11,8 +11,9 @@ import {
 } from './policy'
 
 type Query = Pick<PoolClient, 'query'>
+export type HostedQuotaLease = { limit: number; close(): Promise<void> }
 export class HostedUsageStore {
-  constructor(readonly pool: Pool) {}
+  constructor(readonly pool: Pool, private readonly quota?: (workspaceId: string) => Promise<HostedQuotaLease>) {}
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>) {
     const tx = await this.pool.connect()
     try {
@@ -172,12 +173,16 @@ export class HostedUsageStore {
     env: Record<string, string | undefined> = process.env,
     estimate = HOSTED_CALL_HOLD_MICRO_USD,
   ) {
-    return this.transaction(async (tx) => {
+    let quota: HostedQuotaLease | undefined
+    try { return await this.transaction(async (tx) => {
       // One short platform admission lock; no SQL lock spans provider I/O.
       await tx.query(
         "SELECT pg_advisory_xact_lock(hashtextextended('hosted-free-budget',0))",
       )
       await this.lock(tx, workspaceId)
+      // APP admission locks first, then a short shared plan lease through COMMIT.
+      // Product concurrency never grants spending authority or a free allowance.
+      quota = await this.quota?.(workspaceId)
       // Release an abandoned reservation so one stuck call never keeps its hold.
       // A hosted call runs at most HOSTED_CALL_TIMEOUT_MS; a pending row past a
       // wide margin crashed before settling, and an unknown row with no
@@ -195,7 +200,7 @@ export class HostedUsageStore {
       const available = balance.free + balance.purchased
       if (trial === null && available <= 0) throw new PaidResourceError('free_allowance_used')
       const flight = await this.inFlight(tx, workspaceId)
-      if (flight.calls >= HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE)
+      if (flight.calls >= (quota?.limit ?? HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE))
         throw new PaidResourceError('usage_concurrency_limit')
       // Concurrent calls must fit the balance together. A lone call is admitted
       // on any positive balance, as before, so the last cents stay usable.
@@ -217,7 +222,7 @@ export class HostedUsageStore {
         [id, workspaceId, model, estimate],
       )
       return { id, workspaceId }
-    })
+    }) } finally { await quota?.close() }
   }
   /** Persist the upstream lookup identity before exposing its first content. */
   async recordGeneration(id: string, generationId: string) {
@@ -313,6 +318,8 @@ export class HostedUsageStore {
     workspaceId: string,
     env: Record<string, string | undefined> = process.env,
   ) {
+    const quota = await this.quota?.(workspaceId)
+    try {
     const balance = await this.balance(workspaceId)
     const flight = await this.inFlight(this.pool, workspaceId)
     const spent = Number(
@@ -331,7 +338,7 @@ export class HostedUsageStore {
       ? 'verification_required'
       : available <= 0
         ? 'free_allowance_used'
-        : flight.calls >= HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE
+        : flight.calls >= (quota?.limit ?? HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE)
           ? 'usage_concurrency_limit'
           : flight.held > 0 && available - flight.held < HOSTED_CALL_HOLD_MICRO_USD
             ? 'free_allowance_used'
@@ -339,6 +346,7 @@ export class HostedUsageStore {
               ? 'platform_paused'
               : 'ready'
     return { state, balance, trialLeft: trial === null ? null : Math.max(0, trial) }
+    } finally { await quota?.close() }
   }
   async recent(workspaceId: string) {
     return (

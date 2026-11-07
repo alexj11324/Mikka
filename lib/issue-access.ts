@@ -11,6 +11,8 @@ import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tokenWorkspace } from '@/lib/tokens/principal'
+import { taskReaderScope } from '@/lib/task-workspace'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 
 export async function requireUser() {
   const user = await currentUser()
@@ -20,7 +22,8 @@ export async function requireUser() {
 
 export async function requireIssueAccess(id: string, includeDeleted = false) {
   const user = await requireUser()
-  const issue = await findIssueForUser(user, id, includeDeleted)
+  const workspaceId = taskReaderScope(user).workspaceId ?? (await (await import('@/lib/workspace-access')).loadWorkspaceContext(undefined, user)).workspace.id
+  const issue = await findIssueForUser({ ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal] }, id, includeDeleted)
   if (!issue) throw new ActionFailureError('issueNotFound')
   return { ...issue, user }
 }
@@ -32,7 +35,8 @@ export async function requireIssueAccess(id: string, includeDeleted = false) {
  */
 export async function requireIssueAccessWithoutBody(id: string) {
   const user = await requireUser()
-  const issue = await findIssueForUser(user, id, false, db, true)
+  const workspaceId = taskReaderScope(user).workspaceId ?? (await (await import('@/lib/workspace-access')).loadWorkspaceContext(undefined, user)).workspace.id
+  const issue = await findIssueForUser({ ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal] }, id, false, db, true)
   if (!issue) throw new ActionFailureError('issueNotFound')
   return { ...issue, user }
 }
@@ -53,7 +57,8 @@ async function findIssueForUser(reader: IssueReader, id: string, includeDeleted:
     : await executor.select({ issue: issues }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null
   // A workspace token reads its owner's workspace tasks only in that workspace, as its task list does.
-  if (workspaceId && row.issue.scope === 'workspace' && access?.linked && access.workspaceId !== workspaceId) return null
+  if (workspaceId && row.issue.workspaceId !== workspaceId) return null
+  if (access?.linked && access.workspaceId !== row.issue.workspaceId) return null
   return { issue: row.issue, teamId: access?.teamId ?? null }
 }
 

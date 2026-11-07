@@ -8,6 +8,7 @@ import { intersectRunPolicy } from '../run-assignment-policy'
 import type { MailboxTransactionLease, MailboxTransactionGuard } from '@/lib/mailbox-transaction-guard'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { requireTaskWorkspace } from '@/lib/task-workspace'
 
 /** Derived from the stored task and its trusted workspace relation, never a tool argument. */
 export interface CliTaskScope { issueId: string; scopeVersion: number; workspaceId: string | null; hierarchy?: CliHierarchy }
@@ -21,7 +22,12 @@ async function lockCliHierarchy(tx: PoolClient, userId: string, runId: string, t
   if (!run) throw new Error('agentPolicyUnavailable')
   const { workspacePool } = await import('@/lib/workspace-db')
   const { rows: [team] } = await workspacePool.query<{ teamId: string }>(`SELECT l."teamId" FROM mikka_team_issues l JOIN mikka_teams t ON t.id=l."teamId" AND t."workspaceId"=l."workspaceId" WHERE l."issueId"=$1 AND l."workspaceId"=$2`,[task.issueId,task.workspaceId])
-  if (!team) throw new Error('agentPolicyUnavailable')
+  // Teams are optional grouping inside the tenant. Removing a previously
+  // frozen policy hierarchy still requires a fresh admission.
+  if (!team) {
+    if (run.hierarchy != null) throw new Error('agentPolicyChanged')
+    return undefined
+  }
   const { rows: projects } = await workspacePool.query<{ id: string }>(`SELECT DISTINCT p.id FROM workspace_projects p JOIN mikka_team_projects l ON l."projectId"=p.id WHERE p."issueIds" ? $1 AND l."teamId"=$2 AND l."workspaceId"=$3`,[task.issueId,team.teamId,task.workspaceId])
   if (projects.length > 1) throw new Error('agentPolicyUnavailable')
   const hierarchy = hierarchySchema.parse({ workspaceId: task.workspaceId,teamId:team.teamId,projectId:projects[0]?.id ?? null })
@@ -38,18 +44,12 @@ async function lockCliHierarchy(tx: PoolClient, userId: string, runId: string, t
 export async function lockCliTaskScope(tx: PoolClient, userId: string, issueId: string): Promise<CliTaskScope> {
   // Authority needs the complete metadata schema, never the document body.
   // Preserve non-object roots so malformed/null content keeps its old behavior.
-  const { rows: [task] } = await tx.query<{ userId: string; scope: string; scopeVersion: number; content: JSONContent }>(`SELECT "userId",scope,"scopeVersion",
+  const { rows: [task] } = await tx.query<{ workspaceId: string | null; ownershipState: string; scopeVersion: number; content: JSONContent }>(`SELECT "workspaceId","ownershipState","scopeVersion",
     CASE WHEN jsonb_typeof(content)='object' THEN jsonb_build_object('attrs',content->'attrs') ELSE content END AS content
     FROM issues WHERE id=$1`, [issueId])
-  if (!task || readIssueMetadata(task.content).deletedAt) throw new Error('agentPolicyUnavailable')
-  if (task.scope === 'personal') {
-    if (task.userId !== userId) throw new Error('agentPolicyUnavailable')
-    return { issueId, scopeVersion: task.scopeVersion, workspaceId: null }
-  }
-  const { workspacePool } = await import('@/lib/workspace-db')
-  const { rows: [link] } = await workspacePool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_team_issues WHERE "issueId"=$1', [issueId])
-  if (task.scope !== 'workspace' || !link) throw new Error('agentPolicyUnavailable')
-  return { issueId, scopeVersion: task.scopeVersion, workspaceId: link.workspaceId }
+  if (!task || task.ownershipState !== 'bound' || !task.workspaceId || readIssueMetadata(task.content).deletedAt) throw new Error('agentPolicyUnavailable')
+  await requireTaskWorkspace(userId, task.workspaceId)
+  return { issueId, scopeVersion: task.scopeVersion, workspaceId: task.workspaceId }
 }
 
 export type CliMembershipGuard = (workspaceId: string, userId: string, signal: AbortSignal) => Promise<MailboxTransactionLease>
@@ -75,6 +75,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     if (!bot.rows[0]) throw new Error('agentPolicyUnavailable')
     workspaceId = bot.rows[0].workspaceId
   }
+  if (workspaceId && task?.workspaceId && workspaceId !== task.workspaceId) throw new Error('agentPolicyUnavailable')
   const scope = { botId, workspaceId, agentId }
   const workspaceIds = [...new Set([workspaceId, task?.workspaceId].filter((id): id is string => !!id))].sort()
   const primaryWorkspaceId = workspaceId ?? task?.workspaceId ?? null
@@ -140,8 +141,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     defaults = mergeCliPolicyValues(defaults, layer.defaults)
     defaultSources.push({ scope, scopeId, defaults: layer.defaults })
   }
-  // Locks/revisions keep UUID order. Inheritance instead follows specificity:
-  // the task workspace overrides its Bot's workspace, then its team/project.
+  // The Bot and task share one tenant; optional team/project policies narrow it.
   for (const id of new Set([workspaceId, task?.workspaceId].filter((id): id is string => !!id))) inherit('workspace', id, workspaceById.get(id))
   if (hierarchy) {
     inherit('team', hierarchy.teamId, scopeLayers.team)
@@ -167,7 +167,7 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
     policy.permissions.write_outside_repo = 'deny'
     policy.permissions.git_push = 'deny'
   }
-  const revision = createHash('sha256').update(JSON.stringify(['sandbox-task-policy-v2',deviceKind,userId,scope.botId,scope.workspaceId,scope.agentId,agentRow.rows[0].generation,agentVersion,workerRow.rows[0].generation,workerVersion,workspaceVersions,scopeVersions,task ?? null])).digest('hex')
+  const revision = createHash('sha256').update(JSON.stringify(['sandbox-task-policy-v2',deviceKind,userId,scope.botId,scope.workspaceId,scope.agentId,agentRow.rows[0].generation,agentVersion,workerRow.rows[0].generation,workerVersion,workspaceVersions,scopeVersions,task ? { issueId: task.issueId, workspaceId: task.workspaceId, hierarchy: task.hierarchy } : null])).digest('hex')
   return { policy, revision, workspaceId: primaryWorkspaceId, workspaceIds, hierarchy, defaults, defaultSources, policySnapshotRequired: [...workspaceLayers, ...scopedLayers].some(layer => Object.keys(layer).length > 0), layers: { agent, worker, workspace, ...scopeLayers } }
 }
 

@@ -38,11 +38,15 @@ import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
 import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 import { cacheReadAction } from '@/lib/cache-read-action'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { tokenWorkspace } from '@/lib/tokens/principal'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
+import { actAs } from '@/lib/acting-user'
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user
+  return { ...session.user, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
 }
 
 async function getUserId(): Promise<string> {
@@ -59,14 +63,15 @@ const botIdSchema = z.uuid().nullable()
  * Coordinator's bot row when the caller names none (the Coordinator's entry
  * in the bot list).
  */
-async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string | null | undefined): Promise<{ id: string; name: string; coordinator: boolean }> {
+async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string | null | undefined): Promise<{ id: string; name: string; coordinator: boolean; workspaceId: string }> {
   const userId = user.id
   const parsed = botIdSchema.safeParse(botId ?? null)
   if (!parsed.success) throw new ActionFailureError('validationGeneric')
   // No bot named: the Coordinator of the workspace the person has open.
+  const context = await loadWorkspaceContext(undefined, user)
   const id = await openChatBotId(user, parsed.data)
-  const [bot] = await db.select({ id: bots.id, name: bots.name, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
-    .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId))).limit(1)
+  const [bot] = await db.select({ id: bots.id, name: bots.name, workspaceId: bots.workspaceId, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
+    .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId), eq(bots.workspaceId, context.workspace.id))).limit(1)
   if (!bot) throw new ActionFailureError('botNotFound')
   return bot
 }
@@ -141,8 +146,8 @@ async function readCoordinatorChat(botId: string | null, known?: string, continu
   return refreshChatMetadata(shared, previous, async ({ sourceIds, artifactIds }) => {
     const { artifactSummaries } = await import('@/lib/artifacts/store')
     const [sources, artifacts] = await Promise.all([
-      citationSources(user.id, sourceIds.map(id => `[[issue:${id}]] [[run:${id}]]`)),
-      artifactSummaries(user.id, artifactIds),
+      citationSources({ ...user, [tokenWorkspace]: bot.workspaceId }, sourceIds.map(id => `[[issue:${id}]] [[run:${id}]]`)),
+      artifactSummaries({ ...user, [tokenWorkspace]: bot.workspaceId }, artifactIds),
     ])
     return { sources, artifacts }
   })
@@ -181,7 +186,9 @@ const citedIdsSchema = z.array(z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-
 export async function coordinatorCitationSources(ids: readonly string[]): Promise<Record<string, CitationSource>> {
   const parsed = citedIdsSchema.safeParse(ids)
   if (!parsed.success) return {}
-  return citationSources(await getUserId(), [parsed.data.join(' ')])
+  const user = await getUser()
+  const context = await loadWorkspaceContext(undefined, user)
+  return citationSources({ ...user, [tokenWorkspace]: context.workspace.id }, [parsed.data.join(' ')])
 }
 
 const reasoningPositionsSchema = z.array(z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)).min(1).max(50)
@@ -202,7 +209,9 @@ export async function coordinatorReasoning(botId: string | null, positions: read
 
 /** Each bot's latest line and whether it is answering, for the bot list. */
 export async function botChatSummaries(): Promise<Record<string, BotChatSummary>> {
-  return botChats(await getUserId())
+  const user = await getUser()
+  const context = await loadWorkspaceContext(undefined, user)
+  return botChats({ ...user, [tokenWorkspace]: context.workspace.id })
 }
 
 /** Same owner-wide summaries, including the actual working-state deadline. */
@@ -211,9 +220,11 @@ export async function pollBotChatSummaries() {
 }
 
 async function readBotChatSummaries() {
-  const ownerId = await getUserId()
+  const user = await getUser()
+  const ownerId = user.id
+  const context = await loadWorkspaceContext(undefined, user)
   const begun = await beginOwnerListRead(ownerId, ['bot_chat_list'])
-  const snapshot = await chatStore.botChatSnapshot(ownerId)
+  const snapshot = await chatStore.botChatSnapshot({ ...user, [tokenWorkspace]: context.workspace.id })
   return { items: snapshot.items, live: await ownerListRead(ownerId, snapshot.expiries, snapshot.observedAt, begun) }
 }
 
@@ -265,7 +276,8 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     const message = withQuote(withNotes, quoted?.data)
     // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
     if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
-    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) })
+    const reader = { id: userId, [tokenWorkspace]: bot.workspaceId, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
+    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
     try {
       // Already retried (a double click, two sends at once): nothing more is sent.
       if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }

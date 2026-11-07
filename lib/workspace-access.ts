@@ -3,7 +3,7 @@ import { getLocale } from 'next-intl/server'
 import 'server-only'
 import { cache } from 'react'
 import { cookies } from 'next/headers'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
@@ -14,6 +14,8 @@ import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-
 import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-workspace'
 import type { ListLiveRead } from '@/lib/live/list-read'
 import { ownerLiveScope } from '@/lib/live/owner-scope'
+import { requireEnterpriseWorkspace } from '@/lib/enterprise/access'
+import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 
 function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
@@ -25,13 +27,14 @@ export { WorkspaceError }
 export type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 type AuthenticatedUser = Awaited<ReturnType<typeof requireUser>>
 
-export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: string, userId: string, admin = false) {
+export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: string, userId: string, admin = false, principal?: EnterprisePrincipal) {
   z.uuid().parse(workspaceId)
   const [row] = await tx.select({ workspace: workspaces, membership: workspaceMembers }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(and(eq(workspaces.id, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
     .for('update').limit(1)
   if (!row || (admin && row.membership.role !== 'admin')) throw new WorkspaceError('workspaceAccessDenied')
+  await requireEnterpriseWorkspace(userId, workspaceId, principal, tx)
   return row
 }
 
@@ -41,6 +44,7 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
   const patWorkspace = (user as typeof user & { [tokenWorkspace]?: string })[tokenWorkspace]
   if (patWorkspace && requestedId && requestedId !== patWorkspace) throw new WorkspaceError('workspaceAccessDenied')
   const context = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? '', locale)
+  await requireEnterpriseWorkspace(user.id, context.workspace.id, (user as typeof user & { [enterprisePrincipal]?: EnterprisePrincipal })[enterprisePrincipal])
   return patWorkspace ? { ...context, choices: context.choices.filter(choice => choice.id === patWorkspace) } : context
 }
 
@@ -51,7 +55,8 @@ const readWorkspaceContext = cache(async (userId: string, email: string, name: s
   const cookieStore = await cookies()
   const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, role: workspaceMembers.role }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
-    .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'))).orderBy(asc(workspaces.createdAt))
+    .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'),
+      or(eq(workspaces.kind, 'team'), eq(workspaces.userId, user.id)))).orderBy(asc(workspaces.createdAt))
 
   let choices = await readChoices()
   // Every person has one personal workspace, including people whose first workspace came from an invite.

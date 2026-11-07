@@ -67,7 +67,7 @@ test("legacy and unlinked workspace issues never collapse into a personal-owner 
     monitorWorkspacePartition(base),
     monitorWorkspacePartition({ ...base, issueId: "issue-b" }),
   );
-  assert.notEqual(
+  assert.equal(
     monitorWorkspacePartition({ ...base, linearTeamSyncId: "team-a" }),
     monitorWorkspacePartition({ ...base, linearTeamSyncId: "team-b" }),
   );
@@ -77,7 +77,7 @@ test("legacy and unlinked workspace issues never collapse into a personal-owner 
   );
   assert.equal(
     monitorWorkspacePartition({ ...base, issueScope: "personal" }),
-    "personal:owner",
+    "unresolved-issue:issue-a",
   );
 });
 

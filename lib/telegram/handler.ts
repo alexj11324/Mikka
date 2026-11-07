@@ -14,6 +14,7 @@ import { userMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { issueMembers, issues, linearIssueLinks, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
+import { withTaskWorkspace } from '@/lib/task-workspace'
 import { userActor } from '@/lib/activity-actor'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
@@ -124,7 +125,7 @@ function statusLabel(status: string, t: Translator) {
   }
 }
 
-async function findAccessibleIssues(tx: Transaction, userId: string, match?: { id: string } | { identifier: string; number: number }) {
+async function findAccessibleIssues(tx: Transaction, userId: string, workspaceId: string, match?: { id: string } | { identifier: string; number: number }) {
   const metadata = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')`
   const condition = match && 'id' in match
     ? eq(issues.id, match.id)
@@ -135,7 +136,7 @@ async function findAccessibleIssues(tx: Transaction, userId: string, match?: { i
   const rows = await tx.select({ issue: issues }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(
-      (await issueVisibility(userId)).predicate,
+      (await issueVisibility(userId, false, workspaceId)).predicate,
       condition,
       sql`${metadata}->>'deletedAt' is null`,
     ))
@@ -149,7 +150,7 @@ async function findAccessibleIssues(tx: Transaction, userId: string, match?: { i
   )
 }
 
-async function handleCommand(tx: Transaction, conversation: typeof telegramConversations.$inferSelect, userId: string, command: { name: string; args: string }, t: Translator): Promise<string | { reply: string; issueId: string }> {
+async function handleCommand(tx: Transaction, conversation: typeof telegramConversations.$inferSelect, userId: string, workspaceId: string, command: { name: string; args: string }, t: Translator): Promise<string | { reply: string; issueId: string }> {
   switch (command.name) {
     case 'help':
     case 'start':
@@ -177,7 +178,7 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
         content: issueContent(conversation.draftDescription),
         status: 'backlog',
         priority: 'normal',
-      }, userActor(userId))
+      }, userActor(userId), { workspaceId })
       if (!issue) return t('draftInvalid')
       await tx.update(telegramConversations).set({
         issueId: issue.id,
@@ -188,7 +189,7 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
       return { reply: t('created', { issue: await issueLabel(tx, issue), title: issue.title }), issueId: issue.id }
     }
     case 'issues': {
-      const visible = await findAccessibleIssues(tx, userId)
+      const visible = await findAccessibleIssues(tx, userId, workspaceId)
       if (!visible.length) return t('noTasks')
       const labels = await issueLabels(tx, visible)
       return visible.map(issue => t('issueLine', {
@@ -204,7 +205,7 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
       const number = typed.match(/^(?:[A-Z]+-|#)([1-9]\d*)$/)
       const issueNumber = number ? Number(number[1]) : null
       if (!id.success && (!issueNumber || !Number.isSafeInteger(issueNumber))) return t('linkUsage')
-      const candidates = await findAccessibleIssues(tx, userId, id.success ? { id: id.data } : { identifier: typed, number: issueNumber! })
+      const candidates = await findAccessibleIssues(tx, userId, workspaceId, id.success ? { id: id.data } : { identifier: typed, number: issueNumber! })
       const labels = await issueLabels(tx, candidates)
       const matches = id.success ? candidates : candidates.filter(issue => labels.get(issue.id)?.toUpperCase() === typed)
       if (!matches.length) return t('taskUnavailable')
@@ -216,7 +217,7 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
     }
     case 'status': {
       if (!conversation.issueId) return t('notLinked')
-      const [issue] = await findAccessibleIssues(tx, userId, { id: conversation.issueId })
+      const [issue] = await findAccessibleIssues(tx, userId, workspaceId, { id: conversation.issueId })
       if (!issue) {
         await tx.update(telegramConversations).set({ issueId: null, updatedAt: new Date() })
           .where(eq(telegramConversations.threadId, conversation.threadId))
@@ -281,10 +282,10 @@ async function handleTelegramMessage(input: {
   }
   // A Telegram message enters the person's Coordinator chat: its bot row is resolved here, before the transaction.
   // A Telegram link names a person and no workspace, so it is the personal workspace's Coordinator.
-  const coordinator = command ? null : (await coordinatorBot(link.userId, null)).botId
-  const result = await db.transaction(async tx => {
+  const coordinator = await coordinatorBot(link.userId, null)
+  const result = await withTaskWorkspace(link.userId, coordinator.workspaceId, () => db.transaction(async tx => {
     const conversation = await ensureConversation(tx, input.threadId, link.userId)
-    if (command) return handleCommand(tx, conversation, link.userId, command, t)
+    if (command) return handleCommand(tx, conversation, link.userId, coordinator.workspaceId, command, t)
     const detail = input.text.trim()
     if (conversation.draftTitle) {
       if (!detail) return t('textDetailsRequired')
@@ -299,12 +300,12 @@ async function handleTelegramMessage(input: {
     if (!coordinatorEnabled()) return t('coordinatorUnavailable')
     if (input.messageId === null) return t('messageUnavailable')
     await recordCoordinatorEvent(tx, userMessageEvent(link.userId, detail, {
-      botId: coordinator!,
+      botId: coordinator.botId,
       issueId: conversation.issueId,
       telegram: { threadId: conversation.threadId, telegramUserId, messageId: input.messageId },
     }))
     return { coordinator: true as const }
-  })
+  }))
   if (typeof result !== 'string') {
     if ('coordinator' in result) {
       await wakeCoordinator(link.userId)

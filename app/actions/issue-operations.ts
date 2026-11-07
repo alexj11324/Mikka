@@ -18,6 +18,7 @@ import { createsIssueCycle } from '@/lib/issue-relations'
 import { dispatchLinearIssueSync, dispatchLinearWork } from '@/lib/linear-sync/dispatch'
 import { activityActor } from '@/lib/activity-actor'
 import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
+import { withTaskWorkspace } from '@/lib/task-workspace'
 
 const relationSchema = z.object({ id: z.uuid(), revision: z.number().int().positive(), targetId: z.uuid().nullable(), kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']), remove: z.boolean().default(false) })
 
@@ -44,8 +45,8 @@ export async function listIssueConnections(id: string) {
 async function issueConnections(id: string, reach: 'linked' | 'all') {
   const { issue, user } = await requireIssueAccessWithoutBody(id)
   return db.transaction(async tx => {
-  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
-  requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
+  requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   let candidates: string[] | undefined
   if (reach === 'linked') {
     const own = readIssueMetadata(locked.content)
@@ -59,9 +60,9 @@ async function issueConnections(id: string, reach: 'linked' | 'all') {
       or(eq(issues.id, id), named.length ? inArray(issues.id, named) : undefined, namesTask('mikka'), namesTask('orvilo'))))).map(row => row.id)
   }
   // Only each row's metadata is used: read the body's attrs, never every task's whole body.
-  const rows = await tx.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
+  const rows = await tx.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
-    .where(and(eq(issues.userId, issue.userId), candidates ? inArray(issues.id, candidates) : undefined, (await issueVisibility(user.id, false, undefined, db, candidates ? { onlyIssueIds: candidates } : {})).predicate)).orderBy(desc(issues.updatedAt))
+    .where(and(eq(issues.userId, issue.userId), candidates ? inArray(issues.id, candidates) : undefined, (await issueVisibility(user.id, false, issue.workspaceId!, db, candidates ? { onlyIssueIds: candidates } : {})).predicate)).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
   const identifiers = await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
   return live.map(({ content, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
@@ -76,6 +77,7 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
     const { issue, user } = await requireIssueAccess(value.id)
     const target = value.targetId ? (await requireIssueAccess(value.targetId)).issue : null
     if (target?.id === issue.id) return { error: 'issueSelfLink' }
+    if (target && target.workspaceId !== issue.workspaceId) return { error: 'issueTargetUnavailable' }
     if (target && target.userId !== issue.userId) return { error: 'issueCrossOwner' }
     if (!target && value.kind !== 'parent') return { error: 'issueTargetRequired' }
     try {
@@ -87,8 +89,8 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
         const rows = await tx.select().from(issues).where(and(eq(issues.userId, issue.userId), inArray(issues.id, [issue.id, ...(target ? [target.id] : [])]))).orderBy(issues.id).for('update')
         const current = rows.find(row => row.id === issue.id)
         const other = rows.find(row => row.id === target?.id)
-        requireLockedIssueScope(current, user.id, issue.scopeVersion)
-        if (target) requireLockedIssueScope(other, user.id, target.scopeVersion)
+        requireLockedIssueScope(current, user.id, issue.scopeVersion, issue.workspaceId)
+        if (target) requireLockedIssueScope(other, user.id, target.scopeVersion, target.workspaceId)
         if (!current || current.revision !== value.revision || readIssueMetadata(current.content).deletedAt) return { error: 'issueOutdated' }
         if (target && (!other || readIssueMetadata(other.content).deletedAt)) return { error: 'issueTargetUnavailable' }
         if (user.id !== issue.userId) {
@@ -156,12 +158,13 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
     if (!parsed.success) return { error: 'issueTitleInvalid' }
     const t = await getTranslations('IssueDetail')
     const { issue, user } = await requireIssueAccess(input.id)
+    if (!issue.workspaceId || issue.ownershipState !== 'bound') throw new ActionFailureError('workspaceAccessDenied')
     const accessible = input.includeSubissues ? await issueConnections(issue.id, 'all') : []
     try {
-      const result = await db.transaction(async tx => {
+      const result = await withTaskWorkspace(user, issue.workspaceId, workspace => db.transaction(async tx => {
         for (const owner of [...new Set([issue.userId, user.id])].sort()) await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${owner}, 0))`)
         const [source] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
-        requireLockedIssueScope(source, user.id, issue.scopeVersion)
+        requireLockedIssueScope(source, user.id, issue.scopeVersion, issue.workspaceId)
         if (!source || source.revision !== input.revision || readIssueMetadata(source.content).deletedAt) return { error: 'issueOutdated' }
         const metadata = readIssueMetadata(source.content)
         const child = input.kind === 'child'
@@ -173,7 +176,8 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
         }
         const number = await allocateIssueNumbers(tx, ownerId)
         const newMetadata = { ...metadata, number, parentId: child ? source.id : null, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: child || source.userId === user.id ? metadata.assignee : null }
-        const [created] = await tx.insert(issues).values({ id: crypto.randomUUID(), userId: ownerId, title: parsed.data.title ?? t('defaultDuplicateTitle', { title: source.title.slice(0, 195) }), content: withIssueMetadata(child ? { type: 'doc', content: [{ type: 'paragraph' }] } : source.content, newMetadata), status: 'todo', priority: source.priority, revision: 1 }).returning()
+        const ownership = { workspaceId: workspace.id, ownershipState: 'bound' as const, scope: workspace.kind === 'personal' ? 'personal' as const : 'workspace' as const, scopeSetBy: 'user' as const, linearSyncPolicy: 'disabled' as const, linearSyncBlocked: true }
+        const [created] = await tx.insert(issues).values({ id: crypto.randomUUID(), userId: ownerId, ...ownership, title: parsed.data.title ?? t('defaultDuplicateTitle', { title: source.title.slice(0, 195) }), content: withIssueMetadata(child ? { type: 'doc', content: [{ type: 'paragraph' }] } : source.content, newMetadata), status: 'todo', priority: source.priority, revision: 1 }).returning()
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: created.id, userId: ownerId, revision: 1, title: created.title, content: created.content, status: created.status, priority: created.priority, ...activityActor(user.id) })
         await issueListChanged(tx, created.id)
         await issueRelationsChanged(tx, [created.id, source.id])
@@ -187,12 +191,12 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
             const parentId = queue.shift()!
             for (const item of accessible.filter(row => row.metadata.parentId === parentId && !mapping.has(row.id))) {
               const [original] = await tx.select().from(issues).where(and(eq(issues.id, item.id), eq(issues.userId, source.userId))).for('update')
-              if (!original || (original.userId !== user.id && (original.scope !== 'workspace' || original.scopeVersion !== item.scopeVersion))) continue
+              if (!original || original.workspaceId !== workspace.id || original.ownershipState !== 'bound' || original.scopeVersion !== item.scopeVersion) continue
               const currentMetadata = readIssueMetadata(original.content)
               if (currentMetadata.deletedAt || currentMetadata.parentId !== parentId) continue
               const id = crypto.randomUUID()
               const copyMetadata = { ...currentMetadata, number: await allocateIssueNumbers(tx, ownerId), parentId: mapping.get(parentId)!, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: source.userId === user.id ? currentMetadata.assignee : null }
-              const [copy] = await tx.insert(issues).values({ id, userId: ownerId, title: original.title, content: withIssueMetadata(original.content, copyMetadata), status: 'todo', priority: original.priority, revision: 1 }).returning()
+              const [copy] = await tx.insert(issues).values({ id, userId: ownerId, ...ownership, title: original.title, content: withIssueMetadata(original.content, copyMetadata), status: 'todo', priority: original.priority, revision: 1 }).returning()
               await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: 1, title: copy.title, content: copy.content, status: copy.status, priority: copy.priority, ...activityActor(user.id) })
               await issueListChanged(tx, copy.id)
               mapping.set(item.id, id); queue.push(item.id)
@@ -200,7 +204,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
           }
         }
         return { issue: await issueView(created, tx) }
-      })
+      }))
       if ('issue' in result) scheduleLinearWork()
       return result
     } catch (error) {
@@ -218,7 +222,7 @@ export async function toggleIssuePreference(input: { id: string; kind: 'favorite
     try {
       return await db.transaction(async tx => {
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
-        requireLockedIssueScope(latest, user.id, issue.scopeVersion)
+        requireLockedIssueScope(latest, user.id, issue.scopeVersion, issue.workspaceId)
         if (!latest || readIssueMetadata(latest.content).deletedAt) return { error: 'issueUnavailable' }
         const metadata = readIssueMetadata(latest.content)
         const key = input.kind === 'favorite' ? 'favoriteUserIds' : 'subscriberUserIds'

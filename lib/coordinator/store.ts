@@ -6,7 +6,7 @@ import { threadNamePrompt } from '@/lib/run-bot-name'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
 import { issuesForUser } from '@/lib/issues-for-user'
-import { issueVisibility } from '@/lib/issue-visibility'
+import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import 'server-only'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
@@ -16,7 +16,7 @@ import { coordinatorSessionChanged } from '@/lib/live/coordinator-session'
 import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 import { wakeCoordinatorSoon } from './wake-after-commit'
 import { COORDINATOR_LEASE_CHANNEL } from '@/lib/db/listen'
-import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
@@ -40,6 +40,9 @@ import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
 import { botChatChanged } from '../live/chats'
+import { tokenWorkspace } from '@/lib/tokens/principal'
+import { activeTaskWorkspaces, requireTaskWorkspace } from '@/lib/task-workspace'
+import { ActionFailureError } from '@/lib/action-error'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -58,6 +61,13 @@ type Executor = Pick<typeof db, 'select' | 'insert' | 'execute'>
 const sessionOf = (userId: string, botId: string) => and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))
 const messagesOf = (userId: string, botId: string) => and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId))
 const eventsOf = (userId: string, botId: string) => and(eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.botId, botId))
+
+async function chatReader(userId: string, botId: string): Promise<IssueReader> {
+  const [bot] = await db.select({ workspaceId: bots.workspaceId }).from(bots).where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1)
+  if (!bot) throw new ActionFailureError('botNotFound')
+  await requireTaskWorkspace(userId, bot.workspaceId)
+  return { id: userId, [tokenWorkspace]: bot.workspaceId }
+}
 
 async function nextPosition(executor: Executor, userId: string, botId: string): Promise<number> {
   await executor.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bot-chat:${userId}:${botId}`},0))`)
@@ -239,6 +249,7 @@ export async function releaseLease(userId: string, holder: string, botId: string
  * back to original creation time. Trying a slow event advances the durable
  * cursor instead of repeatedly hiding all events after the oldest batch. */
 export async function untriagedEvents(userId: string, botId: string) {
+  const reader = await chatReader(userId, botId)
   const retryBefore = new Date(Date.now() - TRIAGE_RETRY_COOLDOWN_MS)
   const events = await db.select().from(coordinatorEvents)
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier),
@@ -246,7 +257,7 @@ export async function untriagedEvents(userId: string, botId: string) {
     .orderBy(desc(eq(coordinatorEvents.kind, 'user_message')), asc(sql`coalesce(${coordinatorEvents.lastTriageAttemptAt}, ${coordinatorEvents.createdAt})`), asc(coordinatorEvents.id)).limit(INBOX_BATCH)
   const runIds = [...new Set(events.flatMap(event => event.runId ? [event.runId] : []))]
   // Reuse the existing visibility gate; teammate projections stay restricted.
-  const observed = new Map((runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length, brief: true }) : [])
+  const observed = new Map((runIds.length ? await visibleRuns(reader, { runIds, limit: runIds.length, brief: true }) : [])
     .map(run => [run.id, { id: run.id, status: run.status, finishedAt: run.finishedAt }]))
   return events.map(event => ({ ...event, observedRun: event.runId ? observed.get(event.runId) ?? null : null }))
 }
@@ -476,6 +487,7 @@ export interface ChatView {
 
 /** The reasoning text of this person's stored messages at `positions` in one chat, in order; stored messages are already masked (appendMessages). */
 export async function storedReasoning(userId: string, botId: string, positions: readonly number[]): Promise<string[]> {
+  await chatReader(userId, botId)
   if (!positions.length) return []
   const rows = await db.select({ message: coordinatorMessages.message }).from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), inArray(coordinatorMessages.position, [...positions]))).orderBy(asc(coordinatorMessages.position))
@@ -485,7 +497,8 @@ export async function storedReasoning(userId: string, botId: string, positions: 
 }
 
 /** Looks up the issues and runs cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
-export async function citationSources(userId: string, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
+export async function citationSources(reader: IssueReader, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
+  const userId = typeof reader === 'string' ? reader : reader.id
   const cited = citedIds(texts)
   const issueIds = cited.issueIds
   const runIds = [...new Set([...cited.runIds, ...threads])]
@@ -496,9 +509,9 @@ export async function citationSources(userId: string, texts: readonly string[], 
   const teams = await (await import('@/lib/team-access')).accessibleTeamScopes(userId)
   const issueRows = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate)) : []
+    .where(and(inArray(issues.id, issueIds), (await issueVisibility(reader, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
-  const runs = runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length, brief: true, teams }) : []
+  const runs = runIds.length ? await visibleRuns(reader, { runIds, limit: runIds.length, brief: true, teams }) : []
   // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
   const ownIds = runs.filter(row => row.agentId).map(row => row.id)
   const runIssueIds = [...new Set(runs.flatMap(row => row.issueId ? [row.issueId] : []))]
@@ -508,7 +521,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
     ownIds.length ? db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
       .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId)
       .then(rows => new Map(rows.map(row => [row.runId, Number(row.count)]))) : new Map<string, number>(),
-    issuesForUser(userId, runIssueIds, false, db, { withoutBody: true, teams }),
+    issuesForUser(reader, runIssueIds, false, db, { withoutBody: true, teams }),
   ])
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
@@ -540,7 +553,8 @@ export async function citationSources(userId: string, texts: readonly string[], 
  * nothing more (no identifiers, reports, steps or pull requests). The bot
  * list's preview line reads this on every poll.
  */
-export async function citationNames(userId: string, texts: readonly string[]): Promise<Record<string, CitationName>> {
+export async function citationNames(reader: IssueReader, texts: readonly string[]): Promise<Record<string, CitationName>> {
+  const userId = typeof reader === 'string' ? reader : reader.id
   const { issueIds, runIds } = citedIds(texts)
   const names: Record<string, CitationName> = {}
   if (!issueIds.length && !runIds.length) return names
@@ -548,10 +562,10 @@ export async function citationNames(userId: string, texts: readonly string[]): P
   const [tasks, runs] = await Promise.all([
     issueIds.length ? (async () => db.selectDistinct({ id: issues.id, title: issues.title }).from(issues)
       .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate,
+      .where(and(inArray(issues.id, issueIds), (await issueVisibility(reader, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate,
         sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)))() : [],
     // Loaded here: unit tests stub agent-runs with the names the store's other callers use.
-    runIds.length ? import('@/lib/agent-runs').then(runs => runs.visibleRunNames(userId, [...new Set(runIds)], teams)) : [],
+    runIds.length ? import('@/lib/agent-runs').then(runs => runs.visibleRunNames(reader, [...new Set(runIds)], teams)) : [],
   ])
   for (const task of tasks) names[task.id] = { kind: 'issue', title: task.title }
   // A teammate's thread is named by its harness, as its bare projection (workspaceRunView) is.
@@ -582,6 +596,7 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
 
 /** Full readers sharing the live chat cache need its deadline, without a second version/body read. */
 export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<{ chat: ChatView } & ChatReadObservation> {
+  const reader = await chatReader(userId, botId)
   const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
   const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
@@ -611,9 +626,9 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting, now, lastMessage),
     // An event line names its thread or task as a chip (C1); its stored text is the model's, never shown.
-    sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
+    sources: await citationSources(reader, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
       ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
-    artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
+    artifacts: await artifactSummaries(reader, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
     continuation: { after, prefix: await chatPrefix(userId, botId, after), cursor: last },
     ...(hasMore && rows[0] ? { historyBefore: rows[0].position } : {}),
   }
@@ -688,6 +703,7 @@ export async function chatVersion(userId: string, limit = 200, botId: string): P
 }
 
 export async function chatVersionState(userId: string, limit = 200, botId: string): Promise<ChatVersionState> {
+  await chatReader(userId, botId)
   const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message })
     .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(limit).as('latest')
@@ -720,19 +736,24 @@ export interface BotChatSummary {
 }
 
 /** Each of the person's own bots' latest line and state, for the bot list (the Coordinator's comes with its chat). */
-export async function botChats(userId: string): Promise<Record<string, BotChatSummary>> {
-  return (await botChatSnapshot(userId)).items
+export async function botChats(reader: IssueReader): Promise<Record<string, BotChatSummary>> {
+  return (await botChatSnapshot(reader)).items
 }
 
 /** The same summaries plus actual lease expiries that can change working
  * without another persistent write. This never renews a turn or wake lease. */
-export async function botChatSnapshot(userId: string) {
+export async function botChatSnapshot(reader: IssueReader) {
+  const userId = typeof reader === 'string' ? reader : reader.id
+  const workspaces = await activeTaskWorkspaces(reader)
+  const readableBots = workspaces.length ? await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
+  if (!readableBots.length) return { items: {} as Record<string, BotChatSummary>, expiries: [] as Date[], observedAt: Date.now() }
+  const botIds = readableBots.map(bot => bot.id)
   const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), isNotNull(coordinatorMessages.botId), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), inArray(coordinatorMessages.botId, botIds), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
-  const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNotNull(coordinatorSessions.botId)))
+  const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), inArray(coordinatorSessions.botId, botIds)))
   const waiting = await db.select({ botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError })
-    .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNotNull(coordinatorEvents.botId), isNull(coordinatorEvents.deliveredAt)))
+    .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), inArray(coordinatorEvents.botId, botIds), isNull(coordinatorEvents.deliveredAt)))
   const now = new Date()
   const expiries = [
     ...sessions.flatMap(session => coordinatorLeaseActive(session, now) && session.leaseUntil ? [session.leaseUntil] : []),
@@ -755,7 +776,7 @@ export async function botChatSnapshot(userId: string) {
     return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })
   // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
-  const sources = await citationNames(userId, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
+  const sources = await citationNames(reader, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
   for (const line of lines) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
     result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }

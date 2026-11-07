@@ -22,6 +22,7 @@ const access = async () => ({ issue: { id: ISSUE, userId: 'owner', scopeVersion:
 mock.module(new URL('./issue-access.ts', import.meta.url).href, { namedExports: { requireIssueAccess: access, requireIssueAccessWithoutBody: access } })
 mock.module(new URL('./issue-scope-authorization.ts', import.meta.url).href, { namedExports: { requireLockedIssueScope: () => {} } })
 mock.module(new URL('./issue-numbering.ts', import.meta.url).href, { namedExports: { allocateIssueNumbers: async () => { throw new Error('not reached') } } })
+mock.module(new URL('./task-workspace.ts', import.meta.url).href, { namedExports: { requireTaskWorkspace: async () => { throw new Error('not reached') } } })
 mock.module(new URL('./task-identifier-server.ts', import.meta.url).href, { namedExports: { issueView: () => { throw new Error('not reached') } } })
 mock.module(new URL('./linear-sync/dispatch.ts', import.meta.url).href, { namedExports: { dispatchLinearIssueSync: () => {} } })
 const exchangeDocument: typeof import('../app/actions/collaboration').exchangeDocument = async input => (await import('../app/actions/collaboration')).exchangeDocument(input)
@@ -47,7 +48,7 @@ test('valid issues.content with no issue_documents row still seeds and persists'
 
 test('issue creation rejects content the editor schema cannot render', async () => {
   const { createIssueForUserInTransaction } = await import('./issue-create')
-  const created = await createIssueForUserInTransaction(tx as never, 'owner', { title: 'T', content: { type: 'doc', content: [{ type: 'mystery' }] }, status: 'todo', priority: 'normal' }, { kind: 'user', id: 'owner' } as never)
+  const created = await createIssueForUserInTransaction(tx as never, 'owner', { title: 'T', content: { type: 'doc', content: [{ type: 'mystery' }] }, status: 'todo', priority: 'normal' }, { kind: 'user', id: 'owner' } as never, { workspaceId: '6a1f6f4e-6d2c-4a3c-9a52-6a3f2f0d0c22' })
   assert.equal(created, null)
   assert.deepEqual(state.writes, ['issue_documents', 'issues.content'])
 })

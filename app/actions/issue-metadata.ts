@@ -33,7 +33,7 @@ export async function getIssuePropertyOptions(id: string) {
   const { issue, user } = await requireIssueAccess(id)
   return db.transaction(async tx => {
   const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
-  requireLockedIssueScope(locked, user.id, issue.scopeVersion)
+  requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   const [owner] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, issue.userId))
   const members = await tx.select({ id: users.id, name: users.name, image: users.image }).from(issueMembers).innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId)))
   const choices = await issuePropertyChoices(user.id)
@@ -58,7 +58,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
     try {
       const result = await db.transaction(async tx => {
         const [latest] = await tx.select().from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
-        requireLockedIssueScope(latest, user.id, issue.scopeVersion)
+        requireLockedIssueScope(latest, user.id, issue.scopeVersion, issue.workspaceId)
         if (!latest || latest.revision !== parsed.data.revision) return { error: 'issueOutdated' }
         if (user.id !== issue.userId) {
           const [membership] = await tx.select({ id: issueMembers.memberId }).from(issueMembers).where(and(eq(issueMembers.issueId, issue.id), eq(issueMembers.userId, issue.userId), eq(issueMembers.memberId, user.id)))
@@ -102,7 +102,7 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         await issueRelationsChanged(tx, [saved.id, ...relationIds(latest.content), ...relationIds(saved.content)])
         return { issue: await issueView(saved, tx) }
       })
-      if ('issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
+      if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       return result
     } catch (error) {
       if (error instanceof ActionFailureError) throw error

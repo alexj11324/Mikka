@@ -378,10 +378,10 @@ export function createFactoryMonitor(
           [userId, scope, keys.fingerprint],
         );
         if (original) {
-          let current: FactoryIssueScope & { taskScopeVersion: number | null } | undefined;
+          let current: FactoryIssueScope & { taskScopeVersion: number | null; taskWorkspaceId: string | null } | undefined;
           try {
-            ({ rows: [current] } = await tx.query<FactoryIssueScope & { taskScopeVersion: number | null }>(
-              'SELECT i."userId",i.scope,i."scopeVersion",t."scopeVersion" AS "taskScopeVersion" FROM issues i JOIN factory_tasks t ON t."issueId"=i.id AND t.id=$2 AND t."userId"=$3 WHERE i.id=$1 FOR UPDATE OF i NOWAIT',
+            ({ rows: [current] } = await tx.query<FactoryIssueScope & { taskScopeVersion: number | null; taskWorkspaceId: string | null }>(
+              'SELECT i."userId",i.scope,i."scopeVersion",i."workspaceId",i."ownershipState",t."scopeVersion" AS "taskScopeVersion",t."workspaceId" AS "taskWorkspaceId" FROM issues i JOIN factory_tasks t ON t."issueId"=i.id AND t.id=$2 AND t."userId"=$3 WHERE i.id=$1 FOR UPDATE OF i NOWAIT',
               [original.issueId, original.taskId, userId],
             ));
           } catch (error) {
@@ -391,7 +391,7 @@ export function createFactoryMonitor(
             if (error && typeof error === "object" && "code" in error && error.code === "55P03") fail("factoryStale");
             throw error;
           }
-          if (!current || !factoryScopeAllows({ userId, scopeVersion: current.taskScopeVersion }, current)
+          if (!current || !factoryScopeAllows({ userId, workspaceId: current.taskWorkspaceId }, current)
             || !await authorize(userId, original.issueId, tx)
             || await workspaceKey(userId, original.issueId, tx) !== scope) fail("factoryNotFound");
         }

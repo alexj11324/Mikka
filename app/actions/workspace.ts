@@ -12,11 +12,15 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaceInvitations, workspaces } from '@/lib/db/workspace-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { slugIsReserved } from '@/lib/workspace-admin/general'
-import { releaseDepartingMember, restoreReturningMember, transferOnSuspend } from '@/lib/workspace-admin/members'
+import { transferOnSuspend } from '@/lib/workspace-admin/members'
 import { auditRequestContext } from '@/lib/audit/record'
 import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 import { ensurePersonalWorkspace } from '@/lib/personal-workspace'
 import { ownerWorkspaceListsChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '@/lib/live/lists'
+import { assertActiveHumanAdmission } from '@/lib/governance/entitlements'
+import { GovernanceError } from '@/lib/governance/errors'
+import { drainMemberLifecycleOutbox, enqueueMemberLifecycle } from '@/lib/governance/member-outbox'
+import { organizationMembers } from '@/lib/db/governance-schema'
 
 const roleSchema = z.enum(['admin', 'member'])
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/)
@@ -27,6 +31,10 @@ async function result<T>(operation: () => Promise<T>) {
   try {
     return { ok: true as const, data: await operation() }
   } catch (error) {
+    if (error instanceof GovernanceError) {
+      const t = await getTranslations('RunErrors.governance_denied')
+      return { ok: false as const, error: t(error.detail ?? 'default') }
+    }
     const t = await getTranslations('Errors')
     if (error instanceof WorkspaceError) {
       return { ok: false as const, error: t.has(error.code as never) ? t(error.code as never) : error.message }
@@ -143,6 +151,7 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
       await requireWorkspace(tx, input.workspaceId, user.id, true)
       const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).limit(1)
       if (!target) throw new WorkspaceError('workspaceMemberNotFound')
+      if (target.status === 'suspended' && status === 'active') await assertActiveHumanAdmission(tx, input.workspaceId, input.userId)
       if (target.role === 'admin' && target.status === 'active' && (role !== 'admin' || status !== 'active')) {
         const others = await tx.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), ne(workspaceMembers.userId, input.userId), eq(workspaceMembers.role, 'admin'), eq(workspaceMembers.status, 'active'))).limit(1)
         if (!others.length) throw new WorkspaceError('workspaceLastAdmin')
@@ -153,12 +162,12 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
       if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
       const before = await workspaceListScopesBeforeChange(tx, input.workspaceId)
       await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))
+      if (target.status !== status) await enqueueMemberLifecycle(tx, input.workspaceId, input.userId, status === 'suspended' ? 'suspend' : 'restore')
       if (target.role !== role || target.status !== status) await workspaceListScopeChanged(tx, input.workspaceId, before)
       return target.status
     })
     // §8.3: a suspended member's share and bots leave with them; reactivation brings their bots back.
-    if (previous !== 'suspended' && status === 'suspended') await releaseDepartingMember(input.workspaceId, input.userId)
-    if (previous === 'suspended' && status === 'active') await restoreReturningMember(input.workspaceId, input.userId)
+    if (previous !== status) await drainMemberLifecycleOutbox(input.workspaceId, input.userId)
   })
 }
 
@@ -192,7 +201,9 @@ async function acceptWorkspaceInvitationBody(token: string) {
       const [existing] = await tx.select({ status: workspaceMembers.status }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, candidate.workspaceId), eq(workspaceMembers.userId, user.id))).limit(1)
       if (existing?.status === 'suspended') throw new WorkspaceError('workspaceMembershipSuspended')
       if (!existing) {
+        const admission = await assertActiveHumanAdmission(tx, candidate.workspaceId, user.id)
         await tx.insert(workspaceMembers).values({ workspaceId: candidate.workspaceId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: invitation.role })
+        if (admission.organizationId) await tx.insert(organizationMembers).values({ organizationId: admission.organizationId, userId: user.id, name: user.name, email: user.email.toLowerCase(), role: 'member' }).onConflictDoNothing()
         await enqueueWorkspaceAudit(tx, { workspaceId: candidate.workspaceId, actor: { type: 'user', id: user.id, name: user.name }, action: 'member.joined', target: { type: 'member', id: user.id }, metadata: { role: invitation.role }, ...request })
       }
       await tx.update(workspaceInvitations).set({ status: 'accepted' }).where(and(eq(workspaceInvitations.id, invitation.id), eq(workspaceInvitations.workspaceId, candidate.workspaceId), eq(workspaceInvitations.email, user.email.toLowerCase())))

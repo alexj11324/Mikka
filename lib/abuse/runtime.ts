@@ -2,7 +2,8 @@ import 'server-only'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { HostedUsageStore } from './store'
-export const hostedUsage = new HostedUsageStore(pool)
+import { acquireHostedQuota } from '@/lib/governance/hosted-quota'
+export const hostedUsage = new HostedUsageStore(pool, acquireHostedQuota)
 /**
  * The legacy snapshot lives with workspaces, not in the application's DB.
  * Verification also belongs to the person (decision 2026-10-31-2225): a

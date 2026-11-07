@@ -1,7 +1,7 @@
 import { ActionFailureError } from './action-error'
 
-/** Recheck after locking, in addition to the entry ACL. An old workspace
- * authorization cannot grant the owner’s private data or a later publication. */
-export function requireLockedIssueScope<T extends { userId: string; scope: string; scopeVersion: number }>(row: T | undefined, userId: string, observedScopeVersion: number): asserts row is T {
-  if (!row || (row.userId !== userId && (row.scope !== 'workspace' || row.scopeVersion !== observedScopeVersion))) throw new ActionFailureError('issueNotFound')
+/** Recheck the exact authorized tenant and publication generation after locking.
+ * Creator identity and the legacy scope label never bypass the entry ACL. */
+export function requireLockedIssueScope<T extends { workspaceId: string | null; scopeVersion: number }>(row: T | undefined, _userId: string, observedScopeVersion: number, observedWorkspaceId: string | null): asserts row is T {
+  if (!row || !observedWorkspaceId || row.workspaceId !== observedWorkspaceId || row.scopeVersion !== observedScopeVersion) throw new ActionFailureError('issueNotFound')
 }

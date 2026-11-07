@@ -6,11 +6,8 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 /** An API session user; a personal access token pins it to one workspace. */
 type ApiUser = { id: string; [tokenWorkspace]?: string }
 
-// The workspace is the tenant: a workspace token reaches only its owner's records that
-// belong to its workspace. A record belongs to the workspaces its Bot, group or task name;
-// one that names none (older rows, an OAuth client's artifact) belongs to the owner's
-// personal workspace, so only a token for that workspace reaches it. Without a token
-// nothing is excluded, so browser sessions keep their owner-only checks.
+// A workspace token only narrows ordinary ACL. Task, thread and artifact tenants
+// are persisted; unresolved historical records grant no access to any token.
 
 type Scope = { workspaceId: string; personal: () => Promise<boolean> }
 
@@ -36,24 +33,14 @@ async function outside(scope: Scope, named: readonly (string | null | undefined)
   return workspaces.length ? workspaces.some(id => id !== scope.workspaceId) : !await scope.personal()
 }
 
-async function issueWorkspaces(issueIds: readonly (string | null)[]) {
-  const ids = [...new Set(issueIds.filter((id): id is string => Boolean(id)))]
-  if (!ids.length) return new Map<string, string>()
-  const { rows } = await workspacePool.query<{ issueId: string; workspaceId: string }>('SELECT "issueId","workspaceId" FROM mikka_team_issues WHERE "issueId"=ANY($1::uuid[])', [ids])
-  return new Map(rows.map(row => [row.issueId, row.workspaceId]))
-}
-
-/** The runs, of these, outside the token's workspace: by their Bot, cloud computer binding or task. */
+/** Thread tenant is immutable even after its source links are removed. */
 export async function runsOutsideToken(user: ApiUser, runIds: readonly string[]): Promise<Set<string>> {
   const scope = tokenScope(user)
   if (!scope || !runIds.length) return new Set()
-  const { rows } = await pool.query<{ id: string; issueId: string | null; botWorkspace: string | null; bindingWorkspace: string | null }>(
-    `SELECT r.id, r."issueId", b."workspaceId" AS "botWorkspace", c."workspaceId" AS "bindingWorkspace" FROM agent_runs r
-     LEFT JOIN bots b ON b.id=r."botId" LEFT JOIN computer_run_bindings c ON c."runId"=r.id WHERE r.id=ANY($1::uuid[])`, [runIds])
-  const tasks = await issueWorkspaces(rows.map(row => row.issueId))
+  const { rows } = await pool.query<{ id: string; workspaceId: string | null }>('SELECT id,"workspaceId" FROM agent_runs WHERE id=ANY($1::uuid[])', [runIds])
   const result = new Set<string>()
   for (const row of rows) {
-    if (await outside(scope, [row.botWorkspace, row.bindingWorkspace, row.issueId && tasks.get(row.issueId)])) result.add(row.id)
+    if (!row.workspaceId || row.workspaceId !== scope.workspaceId) result.add(row.id)
   }
   return result
 }
@@ -88,14 +75,13 @@ export async function captureOutsideToken(user: ApiUser, captureId: string) {
   return capture ? runOutsideToken(user, capture.runId) : false
 }
 
-/** An artifact belongs to the run that made it, else to its task. */
+/** Provenance can be retired; the artifact keeps its immutable tenant. */
 export async function artifactOutsideToken(user: ApiUser, artifactId: string) {
   const scope = tokenScope(user)
   if (!scope) return false
-  const { rows: [artifact] } = await pool.query<{ runId: string | null; issueId: string | null }>('SELECT "runId","issueId" FROM artifacts WHERE id=$1', [artifactId])
+  const { rows: [artifact] } = await pool.query<{ workspaceId: string | null }>('SELECT "workspaceId" FROM artifacts WHERE id=$1', [artifactId])
   if (!artifact) return false
-  if (artifact.runId) return runOutsideToken(user, artifact.runId)
-  return outside(scope, [artifact.issueId && (await issueWorkspaces([artifact.issueId])).get(artifact.issueId)])
+  return !artifact.workspaceId || outside(scope, [artifact.workspaceId])
 }
 
 /** The proposals, of these pending actions, outside the token's workspace: by the Bot that made them. */

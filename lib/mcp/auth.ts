@@ -5,6 +5,7 @@ import type { AuthInfo } from '@modelcontextprotocol/server'
 import { db } from '@/lib/db'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
 import { mcpAuthActor, type ActivityActor } from '@/lib/activity-actor'
+import type { EnterprisePrincipal } from '@/lib/enterprise/principal'
 
 /** Prefix the OAuth provider puts on access tokens (lib/auth.ts); it is not stored. */
 const ACCESS_TOKEN_PREFIX = 'mka_'
@@ -14,6 +15,14 @@ export function mcpUserId(authInfo: AuthInfo | undefined): string {
   const userId = authInfo?.extra?.userId
   if (typeof userId !== 'string') throw new Error('MCP request is not authenticated')
   return userId
+}
+
+/** The verifier supplies the persisted credential id, never a tool argument. */
+export function mcpEnterprisePrincipal(authInfo: AuthInfo | undefined): EnterprisePrincipal | undefined {
+  const extra = authInfo?.extra
+  if (typeof extra?.credentialId !== 'string' || (extra.credentialKind !== 'oauth' && extra.credentialKind !== 'run')) return undefined
+  return { kind: 'delegation', credentialId: extra.credentialId, credentialKind: extra.credentialKind,
+    ...(typeof extra.workspaceId === 'string' ? { workspaceId: extra.workspaceId } : {}) }
 }
 
 /** Who issue history records for an MCP write: the run's agents.id for a run token, otherwise the OAuth client id. */
@@ -30,8 +39,8 @@ export function mcpActor(authInfo: AuthInfo | undefined): ActivityActor {
 export async function verifyMcpToken(_request: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
   if (!bearerToken?.startsWith(ACCESS_TOKEN_PREFIX)) return undefined
   const hash = createHash('sha256').update(bearerToken.slice(ACCESS_TOKEN_PREFIX.length)).digest('base64url')
-  const { rows } = await db.execute<{ userId: string; clientId: string; scopes: string[]; expiresAt: Date }>(sql`
-    select t."userId", t."clientId", t.scopes, t."expiresAt"
+  const { rows } = await db.execute<{ credentialId: string; userId: string; clientId: string; scopes: string[]; expiresAt: Date }>(sql`
+    select t.id AS "credentialId", t."userId", t."clientId", t.scopes, t."expiresAt"
     from "oauthAccessToken" t
     join "oauthClient" c on c."clientId" = t."clientId"
     left join "session" s on s.id = t."sessionId"
@@ -44,6 +53,6 @@ export async function verifyMcpToken(_request: Request, bearerToken?: string): P
   return {
     token: bearerToken, clientId: row.clientId, scopes: row.scopes,
     expiresAt: Math.floor(new Date(row.expiresAt).getTime() / 1000),
-    extra: { userId: row.userId },
+    extra: { userId: row.userId, credentialId: row.credentialId, credentialKind: 'oauth' },
   }
 }

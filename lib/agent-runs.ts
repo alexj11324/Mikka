@@ -19,7 +19,7 @@ import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runWaitingDeviceId } from '@/lib/run-waiting-for'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
-import { issueVisibility } from '@/lib/issue-visibility'
+import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
@@ -31,6 +31,7 @@ import { sendOwnedRunMessage, stopOwnedRun } from '@/lib/run-control'
 import { resolveStopTargets } from '@/lib/run-chain'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { runBotName, threadNameHead } from '@/lib/run-bot-name'
+import { requireTaskWorkspace } from '@/lib/task-workspace'
 
 // Run operations for one person, by user id. The agent actions call these
 // with the session's user; the Coordinator calls them with its owner's.
@@ -143,7 +144,7 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
         JOIN factory_attempts a ON a."taskId"=t.id AND a.id=t."attemptId"
         WHERE e.id=$1 AND e."userId"=$2 AND (e."issueId" IS NULL OR e."issueId"=$3) AND e."botId" IS NOT DISTINCT FROM $4::uuid
           AND e.kind='user_message' AND t."issueId"=$3 AND a.id=$5 AND t.status NOT IN ('cancelled','revoked')
-          AND (i."userId"=t."userId" OR (i.scope='workspace' AND t."scopeVersion" IS NOT NULL AND t."scopeVersion"=i."scopeVersion"))`, [context.sourceEventId, userId, parsed.data.issueId, botId, context.attemptId])
+          AND i."ownershipState"='bound' AND t."workspaceId"=i."workspaceId"`, [context.sourceEventId, userId, parsed.data.issueId, botId, context.attemptId])
       if (!event) throw new ActionFailureError('runInvalid')
       profileStage = event.stage
       // The public Factory tool shares this queue with host-selected stages.
@@ -323,14 +324,16 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 }
 
 /** Which runs `userId` may see: their own (on no task or a visible task) and teammates' runs on shared visible tasks. */
-async function runVisibilityPredicate(userId: string, input: { issueId?: string; runIds?: string[]; teams?: readonly TeamScope[] }) {
+async function runVisibilityPredicate(reader: IssueReader, input: { issueId?: string; runIds?: string[]; teams?: readonly TeamScope[] }) {
+  const userId = typeof reader === 'string' ? reader : reader.id
   // Asked about one task or known runs: only their tasks' team links are read.
   const onlyIssueIds = input.issueId ? [input.issueId]
     : input.runIds ? [...new Set((await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, input.runIds))).flatMap(row => row.issueId ? [row.issueId] : []))]
     : undefined
-  const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds, teams: input.teams })
-  const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
-  return or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), visibility.predicate)), and(visibility.predicate, shared))
+  const visibility = await issueVisibility(reader, false, undefined, db, { onlyIssueIds, teams: input.teams })
+  const tenant = visibility.workspaceIds.length ? inArray(agentRuns.workspaceId, visibility.workspaceIds) : sql`false`
+  const task = and(visibility.predicate, eq(agentRuns.workspaceId, issues.workspaceId))
+  return and(tenant, or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), task)), task))
 }
 
 /**
@@ -339,9 +342,10 @@ async function runVisibilityPredicate(userId: string, input: { issueId?: string;
  * `threadName` reads (`threadNameHead`), and a teammate's run named by its harness
  * as `workspaceRunView` does. No report, error or provenance.
  */
-export async function visibleRunNames(userId: string, runIds: string[], teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
+export async function visibleRunNames(reader: IssueReader, runIds: string[], teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
+  const userId = typeof reader === 'string' ? reader : reader.id
   if (!runIds.length || runIds.some(id => !z.uuid().safeParse(id).success)) return []
-  const visible = await runVisibilityPredicate(userId, { runIds, teams })
+  const visible = await runVisibilityPredicate(reader, { runIds, teams })
   const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, agentName: runBotName, harness: runViewColumns.harness,
     promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end` }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
@@ -352,10 +356,11 @@ export async function visibleRunNames(userId: string, runIds: string[], teams?: 
 /** Every surface uses this gate. Workspace membership never grants run control,
  * personal agent/session access, or raw transcript access.
  * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
-export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
+export async function visibleRuns(reader: IssueReader, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
+  const userId = typeof reader === 'string' ? reader : reader.id
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
-  const visible = await runVisibilityPredicate(userId, input)
+  const visible = await runVisibilityPredicate(reader, input)
   const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns), ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
@@ -396,6 +401,10 @@ export async function addRunMessage(
     .object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) })
     .safeParse(input)
   if (!parsed.success) throw new ActionFailureError('messageRequired')
+  const [authorized] = await db.select({ workspaceId: agentRuns.workspaceId }).from(agentRuns)
+    .where(and(eq(agentRuns.id, parsed.data.runId), eq(agentRuns.userId, userId))).limit(1)
+  if (!authorized?.workspaceId) throw new ActionFailureError('runNotFound')
+  await requireTaskWorkspace(userId, authorized.workspaceId)
   // Ordinary user/peer traffic keeps main's single locked owner/state check.
   // Only a host-attested browser session may enter ended Factory questions.
   if (typeof source === 'string' || source.source === 'orchestrator')
@@ -471,6 +480,10 @@ export async function addRunMessage(
 export async function requestRunStop(userId: string, runId: string): Promise<{ stoppedRunIds: string[] }> {
   const parsed = z.uuid().safeParse(runId)
   if (!parsed.success) throw new ActionFailureError('runNotFound')
+  const [authorized] = await db.select({ workspaceId: agentRuns.workspaceId }).from(agentRuns)
+    .where(and(eq(agentRuns.id, parsed.data), eq(agentRuns.userId, userId))).limit(1)
+  if (!authorized?.workspaceId) throw new ActionFailureError('runNotFound')
+  await requireTaskWorkspace(userId, authorized.workspaceId)
   // BE-18 (Tech Lead): stop acts on the requested run and every later attempt of its chain
   // (question continuations and retryOf reruns, same owner + issue only; lib/run-chain.ts).
   // Each still-unfinished one is stopped; a queued one ends here, so it is finalized with
