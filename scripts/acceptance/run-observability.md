@@ -15,8 +15,10 @@ Node 24 is sufficient; no package installation is required.
     node scripts/acceptance/run-observability.mjs --execute --prepare
     MIKKA_OBSERVABILITY_MODEL_CASE=claude node scripts/acceptance/run-observability.mjs --execute --prepare --browser-submit
 
-The second command is a read-only business preflight. Sign-in and sign-out create
-and close only its own authentication session. The third command is the explicit
+The second command checks business readiness without submitting model work.
+Sign-in and sign-out create and close its own authentication session. The normal
+model-order API can discover and persist a missing subscription catalogue; that
+directory discovery performs no inference. The third command is the explicit
 execution boundary; without that flag it submits no messages or tasks.
 Both optional flags require --execute. --browser-submit also requires exactly
 one selected case, claude or codex; all is rejected before authentication.
@@ -140,8 +142,11 @@ harness, cloud destination, expiresAt, and the code-generated input and Artifact
 bytes. This fixed acceptance input is deliberately public fixture text; it is
 not copied from account messages or settings. The final report omits the text.
 
-Use the independently signed-in browser in the reported workspace. Refresh the
-page to the deployed revision, then open New task outside a project page.
+Use the independently signed-in browser with the official Cloud backend selected,
+then select the reported workspace. Confirm the backend selection separately:
+`/api/version` always identifies the official browser shell, including when its
+business requests target a selected self-hosted backend. Refresh the page to the
+deployed revision, then open New task outside a project page.
 Choose its Coordinator, explicitly choose Mikka Cloud,
 select the temporary Profile named by marker, paste input unchanged, and click
 Send once before expiresAt. The deadline includes this waiting time. The driver

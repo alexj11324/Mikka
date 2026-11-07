@@ -13,7 +13,7 @@ const discovery = { name: 'Acme', version: 'v1', edition: 'community', basePath:
 const session = (id: string, token = 't'.repeat(40)) => ({ token, user: { id, name: id, email: `${id}@example.test`, image: null, emailVerified: true }, session: { id: `session-${id}` } })
 const code = 'c'.repeat(43)
 
-function fixture() {
+function fixture(wrapFetch: (fetch: WebFetch) => WebFetch = fetch => fetch) {
   const storage = new Storage(), sessionStorage = new Storage(), calls: Request[] = []
   const users = new Map([['https://a.test', 'a'], ['https://b.test', 'b']])
   let hold: ((response: Response) => void) | undefined
@@ -28,7 +28,7 @@ function fixture() {
     if (url.pathname.endsWith('/hold')) return new Promise(resolve => { hold = resolve })
     return Response.json({ ok: true })
   }
-  const directory = new WebServerDirectory({ appUrl: 'https://app.aspectlylabs.com/mikka', fetch, storage, sessionStorage })
+  const directory = new WebServerDirectory({ appUrl: 'https://app.aspectlylabs.com/mikka', fetch: wrapFetch(fetch), storage, sessionStorage })
   const signIn = async (host = 'a') => {
     const result = await directory.addServer(`https://${host}.test`)
     assert.equal(result.status, 'ok')
@@ -150,3 +150,53 @@ test('official renderer version checks stay anonymous and cloud-bound when a sel
   assert.equal(request.headers.has('x-deployment-id'), false)
   assert.equal(request.credentials, 'omit')
 })
+
+// Mirrors PostHog's host check and three header writes without loading its SDK
+// or making network calls. The real directory runs inside/outside this layer.
+const cloudCorrelationHeaders = {
+  'x-posthog-session-id': 'synthetic-cloud-session',
+  'x-posthog-window-id': 'synthetic-cloud-window',
+  'x-posthog-distinct-id': 'synthetic-cloud-person',
+}
+function cloudTracing(fetch: WebFetch): WebFetch {
+  return (input, init) => {
+    const request = new Request(input, init)
+    if (new URL(request.url).hostname === 'app.aspectlylabs.com') {
+      for (const [name, value] of Object.entries(cloudCorrelationHeaders)) request.headers.set(name, value)
+    }
+    return fetch(request)
+  }
+}
+
+for (const order of ['before', 'after'] as const) {
+  test(`official correlation stays cloud-bound when tracing is installed ${order} the directory`, async () => {
+    const f = fixture(order === 'before' ? cloudTracing : undefined)
+    await f.signIn()
+    const fetch = order === 'after' ? cloudTracing(f.directory.fetch) : f.directory.fetch
+    const controller = new AbortController()
+    await fetch('https://app.aspectlylabs.com/mikka/api/rpc', {
+      method: 'POST', signal: controller.signal,
+      headers: { 'content-type': 'application/json', 'x-mikka-locale': 'en', 'x-mikka-stream-key': 'synthetic-stream' },
+      body: '{"synthetic":true}',
+    })
+    const remote = f.calls.at(-1)!
+    assert.equal(remote.url, 'https://a.test/mikka/api/desktop/rpc')
+    for (const name of Object.keys(cloudCorrelationHeaders)) assert.equal(remote.headers.get(name), null, name)
+    assert.equal(remote.headers.get('authorization'), `Bearer ${'t'.repeat(40)}`)
+    assert.equal(remote.headers.get('x-mikka-desktop-protocol'), '1')
+    assert.equal(remote.headers.get('content-type'), 'application/json')
+    assert.equal(remote.headers.get('x-mikka-locale'), 'en')
+    assert.equal(remote.headers.get('x-mikka-stream-key'), 'synthetic-stream')
+    assert.equal(remote.method, 'POST')
+    assert.equal(await remote.text(), '{"synthetic":true}')
+    controller.abort()
+    assert.equal(remote.signal.aborted, true)
+
+    await f.directory.switchServer(null)
+    await fetch('https://app.aspectlylabs.com/mikka/api/rpc', { method: 'POST', body: '{}' })
+    const cloud = f.calls.at(-1)!
+    assert.equal(cloud.url, 'https://app.aspectlylabs.com/mikka/api/rpc')
+    for (const [name, value] of Object.entries(cloudCorrelationHeaders)) assert.equal(cloud.headers.get(name), value, name)
+    assert.equal(cloud.headers.has('authorization'), false)
+  })
+}

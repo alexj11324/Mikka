@@ -231,6 +231,11 @@ export class WebServerDirectory {
     const source = new Request(input instanceof Request ? input : url, init)
     const headers = new Headers(source.headers)
     for (const name of ['cookie', 'authorization', 'x-mikka-session-cache', 'x-mikka-session-token', 'x-deployment-id', 'x-mikka-rpc']) headers.delete(name)
+    // A late cloud tracing wrapper can decorate the official URL before this
+    // adapter selects another origin. Its person/session IDs stay on the cloud.
+    if (remote.origin !== this.app.origin) {
+      for (const name of ['x-posthog-session-id', 'x-posthog-window-id', 'x-posthog-distinct-id']) headers.delete(name)
+    }
     headers.set('authorization', `Bearer ${account.token}`)
     if (path === '/api/desktop/rpc') headers.set('x-mikka-desktop-protocol', '1')
     const version = this.generation
