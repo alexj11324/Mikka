@@ -5310,6 +5310,7 @@
       "concurrency": "Hosted model calls at once: {count}",
       "features": "Team features",
       "usageExport": "Team usage report and CSV export",
+      "approvalTemplatesName": "Approval templates",
       "approvalTemplates": "Approval templates (up to {count})",
       "included": "Included",
       "notIncluded": "Not included",

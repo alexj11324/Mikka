@@ -5310,6 +5310,7 @@
       "concurrency": "托管模型同时运行上限：{count}",
       "features": "团队功能",
       "usageExport": "团队用量报告与 CSV 导出",
+      "approvalTemplatesName": "审批模板",
       "approvalTemplates": "审批模板（最多 {count} 个）",
       "included": "已包含",
       "notIncluded": "不包含",
