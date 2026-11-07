@@ -16,6 +16,10 @@ jobs:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    concurrency:
+      group: web-deploy-production
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       id-token: write
