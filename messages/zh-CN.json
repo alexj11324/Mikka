@@ -3437,7 +3437,7 @@
         "update_issue": "改任务",
         "list_issues": "查看任务",
         "get_issue": "查看任务",
-        "dispatch_run": "派发线程",
+        "dispatch_run": "派发任务",
         "dispatch_bot_computer": "派到电脑",
         "list_runs": "查看线程",
         "get_run": "查看线程",
@@ -3466,7 +3466,7 @@
         "append_notion_paragraph": "写 Notion",
         "list_drive_files": "查看 Drive",
         "dispatch_factory_task": "派发 Factory 任务",
-        "dispatch_factory_run": "派发线程",
+        "dispatch_factory_run": "派发任务",
         "get_factory_task": "查看 Factory 任务",
         "list_factory_requests": "查看 Factory 请求",
         "list_factory_questions": "查看 Factory 提问",
@@ -4182,9 +4182,9 @@
       "unconfirmed": "群聊创建状态未确认",
       "reviewGroups": "查看群聊"
     },
-    "searchPlaceholder": "搜索 Bot、对话、群聊、任务、线程和项目",
+    "searchPlaceholder": "搜索 Bot、对话、群聊、任务和项目",
     "searchLabel": "全局搜索",
-    "searchDescription": "搜索对话、群聊、任务、线程和项目，用方向键选择，按 Enter 打开。",
+    "searchDescription": "搜索对话、群聊、任务和项目，用方向键选择，按 Enter 打开。",
     "searchEmpty": "没有匹配的结果",
     "groups": {
       "bots": "Bot",
@@ -4269,7 +4269,31 @@
         "commentOnPage": "在任务页评论",
         "loadFailed": "任务加载失败",
         "retry": "重试",
-        "notFound": "这个任务不在你的列表里"
+        "notFound": "这个任务不在你的列表里",
+        "reason": {
+          "needsReply": "等你回复",
+          "confirm": "等你确认",
+          "review": "待审阅",
+          "failed": "失败",
+          "blocked": "受阻",
+          "paused": "已暂停",
+          "notStarted": "还没开始",
+          "idle": "暂不处理",
+          "canceled": "已取消",
+          "duplicate": "重复",
+          "merged": "PR 已合并"
+        },
+        "result": {
+          "running": "进行中",
+          "needsReply": "等你回复",
+          "paused": "已暂停",
+          "failed": "失败",
+          "blocked": "受阻",
+          "replaced": "已替换",
+          "done": "完成",
+          "idle": "暂不处理",
+          "ended": "已结束"
+        }
       },
       "prs": "PR",
       "computer": "电脑",
