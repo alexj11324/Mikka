@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/gitguardian-37068506',
-  base: '70a20ae59a5ef62c1ac9c4a1d82998310e9d2b7e',
+  base: '9773f52979eb7b81d30c06118350014b14beb20e',
   workspace: 837165, incident: 37068506,
   source: '518b9d32eb9315656173ae7a074c920546fdcb70',
   file: 'docker-compose.yml', blob: '80bf3b1e101f3f8fc34ae95640f2f3017a708ce8',
@@ -16,7 +16,7 @@ export const TARGET = Object.freeze({
 const API = 'https://api.gitguardian.com'
 const INCIDENT = `/v1/incidents/secrets/${TARGET.incident}`
 export const ROUTES = Object.freeze({
-  publicExpression: '/v1/occurrences/secrets/310917415/content', token: '/v1/api_tokens/self', incident: `${INCIDENT}?with_occurrences=0`,
+  token: '/v1/api_tokens/self', incident: `${INCIDENT}?with_occurrences=0`,
   occurrences: `/v1/occurrences/secrets?incident_id=${TARGET.incident}&per_page=4`,
   inspectionOccurrences: `/v1/occurrences/secrets?incident_id=${TARGET.incident}&per_page=5`,
   ignore: `${INCIDENT}/ignore`, reopen: `${INCIDENT}/reopen`,
@@ -183,13 +183,13 @@ export function validateOccurrences(rows, headers) {
 export function guardianClient(token, fetcher = fetch, record = () => {}) {
   requireThat(typeof token === 'string' && token.length > 0, 'TOKEN_MISSING')
   return async function request(route, method = 'GET') {
-    requireThat((method === 'GET' && [ROUTES.token, ROUTES.incident, ROUTES.occurrences, ROUTES.inspectionOccurrences,ROUTES.publicExpression].includes(route))
+    requireThat((method === 'GET' && [ROUTES.token, ROUTES.incident, ROUTES.occurrences, ROUTES.inspectionOccurrences].includes(route))
       || (method === 'POST' && [ROUTES.ignore, ROUTES.reopen].includes(route)), 'API_ROUTE')
     let response
     try {
       response = await fetcher(`${API}${route}`, {
         method, redirect: 'error', signal: AbortSignal.timeout(15000),
-        headers: { authorization: `Token ${token}`, accept: 'application/json', 'content-type': 'application/json', 'x-privacy-mode': route===ROUTES.publicExpression?'false':'true' },
+        headers: { authorization: `Token ${token}`, accept: 'application/json', 'content-type': 'application/json', 'x-privacy-mode': 'true' },
         ...(method === 'POST' && route === ROUTES.ignore ? { body: JSON.stringify({ ignore_reason: 'false_positive' }) } : {}),
       })
     } catch { throw new GuardError('API_TRANSPORT') }
@@ -263,20 +263,13 @@ async function main() {
     secretContentRequested: false, scannerConfigurationChanged: false, checkRunEditedOrSkipped: false }
   try {
     // This diagnostic revision deliberately has no CLI disposition entry point.
-    requireThat(process.argv.length === 3 && ['--preflight', '--inspect', '--restore-cordy', '--scoped-rules','--inspect-mikka-expression'].includes(process.argv[2]), 'MODE')
+    requireThat(process.argv.length === 3 && ['--preflight', '--inspect', '--restore-cordy', '--scoped-rules'].includes(process.argv[2]), 'MODE')
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
     report.execution = validateExecution({ env: process.env, event, head: git('rev-parse', 'HEAD'),
       parent: git('rev-parse', 'HEAD^'), changed: git('diff', '--name-only', 'HEAD^', 'HEAD').split('\n').filter(Boolean) })
     report.source = validateSource(execFileSync('git', ['show', `${TARGET.source}:${TARGET.file}`], { stdio: ['ignore', 'pipe', 'pipe'] }))
     if (process.argv[2] === '--preflight') report.result = 'source_verified'
-    else if(process.argv[2]==='--inspect-mikka-expression') {
- const request=guardianClient(process.env.GITGUARDIAN_API_TOKEN,fetch,row=>report.requests.push(row));await inspect({request,report});
- requireThat(report.occurrenceInspection.rows.some(r=>r.id===310917415 && r.repoNumericMatches && r.repoNameMatches && r.filePath===TARGET.file && r.sha===TARGET.source),'PUBLIC_EXPRESSION_SOURCE');
- const content=(await request(ROUTES.publicExpression)).data;requireThat(typeof content.value==='string' && content.value.includes('${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}') && Array.isArray(content.matches) && content.matches.length===1,'PUBLIC_EXPRESSION_CONTENT');
- const part=content.matches[0];requireThat(part.post_line_start===14 && part.post_line_end===14 && Number.isInteger(part.indice_start) && Number.isInteger(part.indice_end),'PUBLIC_EXPRESSION_RANGE');
- const value=content.value.slice(part.indice_start,part.indice_end);report.publicExpressionMatch={length:value.length,kind:value==='.env'?'DOT_ENV':value==='Set '?'SET_SPACE':value==='.env}'?'DOT_ENV_CLOSING_BRACE':'OTHER'};report.publicMikkaExpressionContentRead=true;report.CordyContentRead=false;
- }
- else if(process.argv[2]==='--scoped-rules') await inspectScopedRules({token:process.env.GITGUARDIAN_API_TOKEN,report})
+    else if(process.argv[2]==='--scoped-rules') await inspectScopedRules({token:process.env.GITGUARDIAN_API_TOKEN,report})
     else await (process.argv[2] === '--restore-cordy' ? restoreCordy : inspect)({ request: guardianClient(process.env.GITGUARDIAN_API_TOKEN, fetch, row => report.requests.push(row)), report })
   } catch (error) {
     report.error = error instanceof GuardError ? error.code : 'DISPOSITION_FAILED'

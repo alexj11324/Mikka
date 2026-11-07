@@ -376,3 +376,5 @@ test('scoped rule access readback contains no provider values', async () => {
 // GitGuardian occurrence offsets use indice_start and indice_end.
 
 // Only fixed Mikka occurrence310917415 can read its already-public Compose expression; Cordy never can.
+
+// Exclusion coverage is verified against the immutable public git hunk, without content API access.
