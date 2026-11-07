@@ -17,7 +17,7 @@ const details = new Map<string, Detail | null>()
 const texts = new Map<string, string | null>()
 const failures = new Map<string, Error>()
 const reads: string[] = []
-const notices = new Map<string, { action?: { onClick: () => void } }>()
+const notices = new Map<string, { action?: { onClick: (event: Event) => void } }>()
 const detailKey = (id = ARTIFACT) => `detail:${id}`
 const textKey = (version = 2, id = ARTIFACT) => `text:${id}:${version}`
 async function getArtifact(id: string) {
@@ -33,7 +33,7 @@ async function getArtifactText(id: string, version: number) {
 const translate = (key: string) => key
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'now' }) } })
 mock.module('sonner', { namedExports: { toast: {
-  error: (_message: string, options: { id: string; action?: { onClick: () => void } }) => { notices.set(options.id, options) },
+  error: (_message: string, options: { id: string; action?: { onClick: (event: Event) => void } }) => { notices.set(options.id, options) },
   dismiss: (id: string) => { notices.delete(id) },
 } } })
 mock.module('@/app/actions/artifacts', { namedExports: { getArtifact, getArtifactText } })
@@ -132,7 +132,7 @@ test('a failed background detail read retains the real document, selection, scro
   const notice = [...notices.values()][0]
   assert.ok(notice?.action)
   failures.delete(detailKey())
-  await act(async () => notice.action!.onClick())
+  await act(async () => notice.action!.onClick(new Event('click', { cancelable: true })))
   await until(() => !notices.size)
   assert.ok(documentBody() === body)
   assert.equal(scroll.scrollTop, 380)
@@ -162,7 +162,7 @@ test('a background text retry refreshes the selected version without replacing i
   assert.ok(notice?.action)
   const before = reads.filter(key => key === textKey(1)).length
   failures.delete(textKey(1))
-  await act(async () => notice.action!.onClick())
+  await act(async () => notice.action!.onClick(new Event('click', { cancelable: true })))
   await until(() => !notices.size)
   assert.ok(reads.filter(key => key === textKey(1)).length > before, 'Retry must revalidate the current artifact-text key')
   assert.ok(documentBody() === body)
