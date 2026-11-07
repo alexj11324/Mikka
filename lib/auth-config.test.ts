@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth } from 'better-auth'
 import { bearer, oAuthProxy } from 'better-auth/plugins'
+import { humanSessionHeaders } from './desktop-rpc/handler'
+import { readFreshSessionsInScope, withFreshSession, SESSION_OPTIONS } from './fresh-session'
 import { authOAuthProxyOptions as configuredAuthOAuthProxyOptions, authTrustedOrigins as configuredAuthTrustedOrigins, authEffectiveTrustedOrigins, resolveAppOrigin } from './auth-config'
 
 // Existing hosted behavior remains strict; a community deployment is tested separately.
@@ -69,6 +71,39 @@ test('community email sessions authenticate locally and foreign browser origins 
     method: 'POST', headers: { origin: 'https://attacker.example', cookie: response.headers.getSetCookie().map(value => value.split(';')[0]).join('; '), 'content-type': 'application/json' }, body: '{}',
   }))
   assert.equal(denied.status, 403)
+})
+
+test('real SDK signed native sessions pass human REST freshness and retain revocation and cookie isolation', async () => {
+  const origin = 'https://native-human.example.test'
+  const auth = betterAuth({ baseURL: origin, basePath: '/mikka/api/auth',
+    secret: 'fixture-native-human-secret-with-sufficient-entropy', trustedOrigins: [origin],
+    emailAndPassword: { enabled: true }, plugins: [bearer()], session: SESSION_OPTIONS, logger: { disabled: true } })
+  const response = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-up/email`, {
+    method: 'POST', headers: { origin, 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Fixture', email: 'native-human@example.test', password: 'fixture-password-123' }),
+  }))
+  assert.equal(response.status, 200)
+  const user = (await response.json()).user
+  const token = response.headers.get('set-auth-token')!
+  assert.ok(token?.endsWith('='), 'the real SDK emits a padded signed bearer')
+  const cookie = response.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
+  const request = (authorization: string) => new Request(`${origin}/mikka/api/integrations/mcp/shares`, {
+    method: 'PATCH', headers: { origin, authorization, cookie }, body: '{}',
+  })
+  const headers = humanSessionHeaders(request(`Bearer ${token}`))
+  assert.ok(headers, 'human REST must admit the SDK signed bearer format')
+  assert.equal(headers.has('cookie'), false)
+  readFreshSessionsInScope(auth.api, { cookieName: async () => (await auth.$context).authCookies.sessionData.name })
+  const read = (input: Headers) => withFreshSession(() => auth.api.getSession({ headers: input }))
+  assert.equal((await read(headers))?.user.id, user.id)
+  const tampered = humanSessionHeaders(request(`Bearer ${token.slice(0, -3)}xxx`))!
+  assert.equal(await read(tampered), null, 'an invalid signature cannot borrow the browser cookie')
+  for (const prefix of ['mkp_', 'mka_', 'mkr_']) assert.equal(humanSessionHeaders(request(`Bearer ${prefix}${'a'.repeat(43)}`)), null)
+  const logout = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-out`, {
+    method: 'POST', headers: { origin, authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}',
+  }))
+  assert.equal(logout.status, 200)
+  assert.equal(await read(headers), null, 'the fresh human boundary observes actual session revocation')
 })
 
 test('community production permits its exact loopback origin without allowing cleartext network origins', () => {
