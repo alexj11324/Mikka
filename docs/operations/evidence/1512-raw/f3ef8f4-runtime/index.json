@@ -1,0 +1,32 @@
+[
+  {
+    "path": "docs/operations/evidence/1512-raw/ci/ci-53a-final.json",
+    "bytes": 22187,
+    "sha256": "51d260dbe7731afa591235e963d739193c8bbc52061cea174683a879ee14b29a"
+  },
+  {
+    "path": "docs/operations/evidence/1512-raw/f3ef8f4-runtime/README.md",
+    "bytes": 1233,
+    "sha256": "e0c39701e3d4e0e1dd59c6f19d4dff736070a0ca930cdec155f1c29d11bbe452"
+  },
+  {
+    "path": "docs/operations/evidence/1512-raw/f3ef8f4-runtime/cleanup-read.json",
+    "bytes": 425,
+    "sha256": "248aaadc747de859031b404042b62529f1056980b794db45a5de80def0496641"
+  },
+  {
+    "path": "docs/operations/evidence/1512-raw/f3ef8f4-runtime/cleanup-read.sql",
+    "bytes": 814,
+    "sha256": "8aa3e2030d0c9fdf50f291e035b546e81fd3bc75d56461a1161c5c2efd9e323a"
+  },
+  {
+    "path": "docs/operations/evidence/1512-raw/f3ef8f4-runtime/release-cleanup.from-job-log.json",
+    "bytes": 489,
+    "sha256": "ca301bb64c4b504219af1d58a558fdf2ae5857df0cf78cfdb73bcc58a1f36554"
+  },
+  {
+    "path": "docs/operations/evidence/1512-raw/f3ef8f4-runtime/subscription-diagnostics.json",
+    "bytes": 591,
+    "sha256": "c713717aef4988a5bba0d745b4f656558bd928aff7a28d90a3754eeb02bdce14"
+  }
+]

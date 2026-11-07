@@ -1,0 +1,18 @@
+{
+  "purpose": "historical_exact_device_cleanup_readback",
+  "readOnly": true,
+  "rows": [
+    {
+      "cleanup": {
+        "asOf": "2026-11-07T05:36:38.797429+00:00",
+        "enabled": false,
+        "deviceId": "66139361-5785-48f6-be1f-1dcf3300535c",
+        "removedAt": "2026-11-07T05:36:28.117362+00:00",
+        "activeRuns": 0,
+        "activeBoundTokens": 0,
+        "activeAssociatedTokens": 0
+      }
+    }
+  ]
+}
+
