@@ -38,6 +38,7 @@ A missing directory, or one outside the repository, fails the build.
 | `settings-notifications` | 通知 body (push switches, when to push) | `SettingsNotificationsProps` in `components/slots/settings-notifications-contract.ts` | `NotificationSettings` from `@/components/settings/notifications-settings` |
 | `settings-preferences` | 偏好设置 body (appearance, language, task prefix, replay onboarding) | `SettingsPreferencesProps` in `components/slots/settings-preferences-contract.ts` | `SettingsView` |
 | `settings-privacy` | 数据与隐私 body (data export, shared links) | `SettingsPrivacyProps` in `components/slots/settings-privacy-contract.ts` | `PrivacySettings` from `@/components/settings/privacy-settings` |
+| `settings-secrets` | 密钥与登录 / 密钥与环境 body (my secrets and logins, workspace secrets) | `SettingsSecretsProps` in `components/slots/settings-secrets-contract.ts` | `SecretsPage` from `@/components/settings/secrets-page` |
 | `settings-security` | 安全 body (password, signed-in devices, Google sign-in) | `SettingsSecurityProps` in `components/slots/settings-security-contract.ts` | `SettingsView` |
 
 A slot changes how something looks, never what it does. Data, state and
