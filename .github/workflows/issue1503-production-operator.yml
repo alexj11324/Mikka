@@ -40,6 +40,19 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
+      - name: Import optional own-VM diagnostic key
+        continue-on-error: true
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          recursive: false
+          include-imports: false
       - name: Exercise explicit cloud task creation and full delivery on Claude Code
         id: claude_delivery
         if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' }}

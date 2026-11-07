@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /** #1503 production acceptance through the ordinary smoke-owner HTTP APIs.
- * Run with Node 24 + tsx. No SQL, synthetic sessions, provider credentials,
- * manual pushes/PRs, state repair, or timer-based business-data polling.
+ * Run with Node 24 + tsx. No SQL, synthetic sessions, manual pushes/PRs,
+ * state repair, or timer-based business-data polling. A failure-only E2B
+ * observer may read a closed diagnostic from this case's own running VM.
  */
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -12,6 +13,7 @@ import { encode, decode } from '../../../lib/desktop-rpc/wire.ts'
 import { ACTION_ERROR_CODES } from '../../../lib/action-result.ts'
 import { explicitNewTaskArguments, explicitNewTaskComplete, explicitNewTaskEvidence, explicitNewTaskCleanupReceipts } from './explicit-submission.mjs'
 import { codexQuestionConfirmation, confirmationQuestionReference, confirmationRunEvidence, confirmationAnswerReceipt } from './question-confirmation.mjs'
+import { createOwnVmDiagnostic } from './own-vm-diagnostic.mjs'
 
 const uuid = value => typeof value === 'string' && /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(value)
 const sha = value => typeof value === 'string' && /^[a-f\d]{40}$/.test(value)
@@ -332,6 +334,7 @@ export async function runDeliveryAcceptance(env = process.env) {
   const report = { issue: 1503, phase: 'delivery', startedAt: new Date().toISOString(), expectedSha, workspaceId, teamId,
     marker, submissionMode, codexQuestion, selectedHarnesses: cases.map(item => item.harness), repository: REPOSITORY, cases: [], cleanup: [], status: 'running' }
   let session, live, chatLive, originalOrder, currentOrder, profile, activeCase, project, originalVerification, explicitSubmission
+  let vmDiagnostic
   const chatLiveCounts = { messages: 0, reconnects: 0 }
   const closeChatLive = () => {
     if (!chatLive) return
@@ -341,6 +344,12 @@ export async function runDeliveryAcceptance(env = process.env) {
   const installedVerificationCommands = new Set()
   const reportPath = resolve(env.MIKKA_1503_REPORT ?? 'issue1503-report/delivery.json')
   const checkpoint = async () => { await mkdir(resolve(reportPath, '..'), { recursive: true }); await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 }) }
+  const diagnoseOwnRun = async runId => {
+    const item = activeCase
+    if (!item || !vmDiagnostic || !uuid(item.issueId) || !uuid(runId)) return
+    item.vmDiagnostic = await vmDiagnostic.collect({ runId, issueId: item.issueId, workspaceId,
+      sinceMs: Date.parse(report.startedAt), untilMs: Date.now() + 5000 })
+  }
   const rememberExplicitReceipts = async chat => {
     if (!explicitSubmission) return
     check(chat?.botId === activeCase.botId && chat.live?.ownerId === SMOKE_ID, 'chat_live_scope_missing')
@@ -426,6 +435,7 @@ export async function runDeliveryAcceptance(env = process.env) {
       const { initial: initialText, revised: revisedText } = specification
       const verifyCommand = repositoryVerifyCommand(specifications, specification.path)
       activeCase = { harness: definition.harness, model: definition.model, status: 'running', filePath: specification.path, runs: [] }
+      vmDiagnostic = createOwnVmDiagnostic({ apiKey: env.E2B_API_KEY })
       if (confirmation) activeCase.questionConfirmation = { required: true, questionSha256: digest(confirmation.question), answerAttempted: false }
       explicitSubmission = null
       report.cases.push(activeCase)
@@ -572,6 +582,11 @@ export async function runDeliveryAcceptance(env = process.env) {
         activeCase.lastState = { stage: state.task.stage, status: state.task.status, revision: state.task.revision }
         activeCase.threadRunId ??= state.attempts.find(item => item.stage === 'execute' && uuid(item.runId))?.runId
         activeCase.runIdsSeen = [...new Set([...(activeCase.runIdsSeen ?? []), ...state.attempts.map(item => item.runId).filter(uuid)])]
+        // Observe the first failed execute attempt while its VM may still be
+        // running, even when Factory has already adopted a normal retry. This
+        // does not change the task, retry policy or any acceptance assertion.
+        const failedExecute = state.attempts.find(item => item.stage === 'execute' && item.status === 'failed' && uuid(item.runId))
+        if (failedExecute) await diagnoseOwnRun(failedExecute.runId)
         if (['failed', 'blocked', 'cancelled', 'revoked'].includes(state.task.status)) {
           activeCase.failedAttempt = state.attempts.filter(item => item.id === state.task.attemptId).map(item => ({ id: item.id, runId: item.runId, stage: item.stage, status: item.status,
             ...(typeof item.output?.reasonCode === 'string' && /^[a-zA-Z0-9_]{1,100}$/.test(item.output.reasonCode) ? { reasonCode: item.output.reasonCode } : {}) }))[0]
@@ -750,7 +765,11 @@ export async function runDeliveryAcceptance(env = process.env) {
     report.status = 'failed'
     report.code = /^issue1503_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'issue1503_delivery_failed'
     if (activeCase) activeCase.status = 'failed'
+    await diagnoseOwnRun(activeCase?.threadRunId)
   } finally {
+    // A live timeout can settle while its read callback is still awaiting the
+    // probe. Join the same hard-bounded child before the first cleanup write.
+    await vmDiagnostic?.settled()
     closeChatLive()
     live?.close()
     let cleanupState
