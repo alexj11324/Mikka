@@ -28,6 +28,7 @@ import { createRequestDatabaseScope } from "../db";
 import { hostedBillingScope } from "../abuse/context";
 import { HostedUsageStore } from "../abuse/store";
 import { exerciseFactoryRecoveryEntry } from "../../tests/support/factory-recovery-entry-fixture";
+import { bindFixtureWorkspaceDatabase } from "../../tests/helpers/workspace-database";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
 import { claimLocalRun } from "../computer/claim";
@@ -92,6 +93,7 @@ test(
     const database = `factory193_consumers_${randomUUID().replaceAll("-", "")}_e2e`;
     let pool: Pool | undefined;
     let modelDatabase: ReturnType<typeof createRequestDatabaseScope> | undefined;
+    let closeWorkspaceDatabase: (() => Promise<void>) | undefined;
     let installedGatewayFixture = false;
     try {
       assert.equal(
@@ -116,6 +118,7 @@ test(
       });
       const db = pool;
       modelDatabase = createRequestDatabaseScope(isolated.toString());
+      closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(db);
       const directory = new URL("../../drizzle/", import.meta.url);
       for (const file of orderMigrations(
         (await readdir(directory)).filter((f) => f.endsWith(".sql")),
@@ -3052,12 +3055,12 @@ test(
         assert.deepEqual([receipt.reservedFree,receipt.reservedPurchased,receipt.reservedUnpaid].map(Number),[0,0,0]);
         assert.equal((await usage.balance(billingWorkspaceId)).free,Number(allowance.remaining)-1);
       });
-      await exerciseFactoryRecoveryEntry(t, {
+      await modelDatabase!.run(() => exerciseFactoryRecoveryEntry(t, {
         db, botId: coordinatorBot, failedReview, png, sha, modelInvoke,
         callCount: () => modelCalls,
         chooseRetry: () => { chosenAction = "retry_check"; },
         latestRequest: () => networkRequests.at(-1),
-      });
+      }));
       await t.test(
         "unavailable model calls exhaust only their invocation budget, with no fixed recovery",
         async () => {
@@ -3097,7 +3100,7 @@ test(
         const { addApiKey } = await import('../model-api-keys');
         const { changeOrder } = await import('../model-order');
         const { workspacePool } = await import('../workspace-db');
-        assert.equal(workspacePool.options.connectionString, url, 'membership uses the same validated loopback service');
+        assert.equal(workspacePool.options.connectionString, isolated.toString(), 'membership uses this suite\'s isolated loopback database');
         let membershipFixture: { userId: string; workspaceId: string } | undefined;
         const taskCreate = threadMachineProvider.create;
         const createdTaskRuns: string[] = [];
@@ -3117,13 +3120,11 @@ test(
             const userId = `fresh-check-${randomUUID()}`, workspaceId = randomUUID(), botId = randomUUID();
             const actor = { userId, workspaceId }, scope = { ownerId: userId, workspaceId, botId };
             membershipFixture = { userId, workspaceId };
-            // App scope is this suite's fresh database; the normal workspace
-            // adapter has its own real loopback PG pool, not the app ALS scope.
-            for (const target of [db, workspacePool]) {
-              await target.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fresh check',$2,true,now(),now())`, [userId, `${userId}@example.invalid`]);
-              await target.query('INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,$2,\'Fresh check\',$3)', [workspaceId, userId, `fresh-${workspaceId}`]);
-              await target.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,'Fresh check',$3,'admin','active')`, [workspaceId, userId, `${userId}@example.invalid`]);
-            }
+            // APP and Workspace use independent real pools against this one
+            // isolated database, so authority rows are inserted exactly once.
+            await db.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fresh check',$2,true,now(),now())`, [userId, `${userId}@example.invalid`]);
+            await db.query('INSERT INTO mikka_workspaces(id,"userId",name,slug) VALUES($1,$2,\'Fresh check\',$3)', [workspaceId, userId, `fresh-${workspaceId}`]);
+            await db.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,'Fresh check',$3,'admin','active')`, [workspaceId, userId, `${userId}@example.invalid`]);
             await db.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Fresh task Bot\')', [botId, workspaceId, userId]);
             await setE2BKey(userId, workspaceId, { apiKey: `e2b-offline-fixture-${randomUUID()}` }, { verify: async () => ({ ok: true }) });
             const key = await addApiKey(db, userId, { provider: 'deepseek', apiKey: `sk-offline-fixture-${randomUUID()}` },
@@ -3266,7 +3267,6 @@ test(
             await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1', [membershipFixture.workspaceId]);
             await workspacePool.query('DELETE FROM "user" WHERE id=$1', [membershipFixture.userId]);
           }
-          await workspacePool.end();
           for (const name of names) { const value = saved.get(name); if (value === undefined) delete process.env[name]; else process.env[name] = value; }
         }
       });
@@ -3294,6 +3294,7 @@ test(
     } finally {
       if (installedGatewayFixture) delete process.env.AI_GATEWAY_API_KEY;
       await modelDatabase?.close();
+      await closeWorkspaceDatabase?.();
       await pool?.end();
       await (await import("../db")).pool.end();
       // Retain this database. Closing clients does not delete the database.

@@ -918,7 +918,7 @@ dbTest('structured failures survive a fresh chat read, retain the lease fence, a
     const context = await store.loadConversation(owner, botId)
     assert.ok(context.messages.every(row => !('mikkaFailureDetails' in row.message)))
     assert.doesNotMatch(JSON.stringify(await store.botChats(owner)), /providerMessage|The provider does not support/)
-    assert.equal((await store.chatView('another-owner', 200, botId)).failureDetails, undefined)
+    await assert.rejects(store.chatView('another-owner', 200, botId), { code: 'botNotFound' }, 'a foreign owner is refused before any failure details can be read')
     const altered = { ...chat.failureDetails!, occurredAt: new Date(Date.parse(chat.failureDetails!.occurredAt) + 1000).toISOString() }
     await db.update(schema.coordinatorSessions).set({ lastFailure: altered }).where(eq(schema.coordinatorSessions.botId, botId))
     assert.notEqual((await store.chatVersion(owner, 200, botId)).version, version, 'details alone change the existing snapshot hash')
