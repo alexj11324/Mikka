@@ -95,10 +95,12 @@ export class OfficialCliTimingCollector {
     if (typeof candidate !== "string" || !EVENTS.has(candidate as EventName) || !candidate.startsWith(`${this.harness}.`)) { this.ignoredRecords++; return }
     const name = candidate as EventName, durationMs = number(fields.duration_ms, 86_400_000)
     if (durationMs === null) { this.invalidEvents++; return }
-    const nanos = typeof record?.timeUnixNano === "string" && /^\d{1,20}$/.test(record.timeUnixNano) ? record.timeUnixNano : null
+    // OTLP LogRecord uses zero for unknown time, not an event timestamp or identity.
+    const nanos = typeof record?.timeUnixNano === "string" && /^\d{1,20}$/.test(record.timeUnixNano)
+      && Number(record.timeUnixNano) > 0 ? record.timeUnixNano : null
     const timestamp = typeof fields["event.timestamp"] === "string" && /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(fields["event.timestamp"])
       ? Date.parse(fields["event.timestamp"]) : NaN
-    const eventAt = Number.isFinite(timestamp) ? timestamp : nanos ? Number(nanos) / 1_000_000 : null
+    const eventAt = Number.isFinite(timestamp) && timestamp > 0 ? timestamp : nanos ? Number(nanos) / 1_000_000 : null
     const sequence = number(fields["event.sequence"], Number.MAX_SAFE_INTEGER)
     const identity = nanos || sequence !== null ? `${name}:${nanos}:${sequence}` : null
     if (identity && this.seen.has(identity)) { this.duplicates++; return }
@@ -123,7 +125,7 @@ export class OfficialCliTimingCollector {
   }
 }
 
-/** Call only for an explicitly configured acceptance task. The receiver is
+/** Called by a trusted cloud host or an explicitly configured diagnostic task. The receiver is
  * loopback-only and adds no remote I/O or provider interception. Configuration
  * is per child process; no official CLI file or config file is modified.
  * Sources: code.claude.com/docs/en/monitoring-usage and
@@ -167,11 +169,12 @@ export async function startCliTimingCollector({ runId, harness, remoteMcpServerC
   server.on("error", () => { collector.reject(); mcpCollector.reject() })
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const endpoint = `${origin}${path}`
-  // Leave compression unset: Codex 0.166.0 rejects "none" during initialization.
+  // Codex requires compression unset; preserve the validated Claude configuration.
   const env: Record<string, string> = {
     OTEL_METRICS_EXPORTER: "none", OTEL_TRACES_EXPORTER: "none", OTEL_LOGS_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/json", OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: endpoint,
     OTEL_EXPORTER_OTLP_LOGS_HEADERS: "", OTEL_EXPORTER_OTLP_HEADERS: "",
+    ...(harness === "claude_code" ? { OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: "none" } : {}),
     OTEL_LOGS_EXPORT_INTERVAL: "1000", OTEL_BLRP_SCHEDULE_DELAY: "1000",
     OTEL_LOG_USER_PROMPTS: "0", OTEL_LOG_ASSISTANT_RESPONSES: "0", OTEL_LOG_TOOL_DETAILS: "0", OTEL_LOG_TOOL_CONTENT: "0", OTEL_LOG_RAW_API_BODIES: "0",
     ...(harness === "claude_code" ? { CLAUDE_CODE_ENABLE_TELEMETRY: "1" } : {}),
@@ -179,10 +182,14 @@ export async function startCliTimingCollector({ runId, harness, remoteMcpServerC
   const args = harness === "codex" ? ["-c", `otel.exporter={otlp-http={endpoint=${JSON.stringify(endpoint)},protocol="json",headers={}}}`,
     "-c", "otel.trace_exporter=\"none\"", "-c", "otel.metrics_exporter=\"none\"", "-c", "otel.log_user_prompt=false",
     "-c", "otel.log_agent_responses=false", "-c", "otel.log_guardian_assessments=false"] : []
+  // Rust OTLP accepts only gzip/zstd strings; both env fallbacks must be absent
+  // for its default uncompressed JSON. Apply after merging the machine env.
+  const unsetEnv = harness === "codex"
+    ? ["OTEL_EXPORTER_OTLP_LOGS_COMPRESSION", "OTEL_EXPORTER_OTLP_COMPRESSION"] : []
   let closed: Promise<void> | undefined
   // Only the Mikka MCP child's private environment receives this URL. It is
   // not an authorization token and is never placed in the task or CLI env.
-  return { env, args, mcpHttpObservationUrl: `${origin}${mcpPath}`,
+  return { env, args, unsetEnv, mcpHttpObservationUrl: `${origin}${mcpPath}`,
     close: ({ cliExitObserved = false }: { cliExitObserved?: boolean } = {}) => closed ??= (async () => {
     await new Promise<void>(resolve => {
       const timer = setTimeout(() => { collector.truncate(); mcpCollector.truncate(); server.closeAllConnections() }, 1000)

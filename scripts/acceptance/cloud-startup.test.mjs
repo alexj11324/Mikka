@@ -482,6 +482,38 @@ test('trusted candidate timing still refuses missing official CLI or MCP observa
   }
 })
 
+test('member production acceptance observes the cloud host without reading or writing workspace secrets', async () => {
+  for (const harness of ['claude_code', 'codex']) for (const timingSecret of [false, true]) {
+    const io = fixture({ runtime: true, timingSecret })
+    const report = await runCloudStartup(options(['--mode', 'acceptance', '--runs', '3', '--harness', harness,
+      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40)]), { env, ...io })
+    assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
+    assert.deepEqual(report.officialTiming, { enabled: true, source: 'trusted_host', scope: 'cloud_task', variableCreated: false, cleaned: true })
+    assert.equal(report.samples.length, 3)
+    assert.ok(report.samples.every(sample => sample.requireOfficialTiming && sample.requireRuntimeReceipt
+      && sample.runtimeEvidence?.status === 'passed' && sample.cleanup.status === 'passed'))
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
+test('trusted cloud timing refuses missing CLI/MCP observations and extra remote authorization', async () => {
+  for (const field of ['officialCliTiming', 'mcpHttpTiming', 'extraAuth']) {
+    const io = fixture({ runtime: true, extraAuth: field === 'extraAuth' })
+    io.onDetail = (_sample, detail) => {
+      for (const item of detail.chunks) if (item.chunk?.messageMetadata?.mikkaRuntimeTiming && field !== 'extraAuth')
+        delete item.chunk.messageMetadata.mikkaRuntimeTiming[field]
+    }
+    const report = await runCloudStartup(options(['--mode', 'acceptance', '--runs', '3', '--harness', 'codex',
+      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40)]), { env, ...io })
+    assert.equal(report.status, 'failed')
+    assert.equal(report.samples.length, 3)
+    assert.ok(report.samples.every(sample => sample.error === 'startup_runtime_evidence_failed' && sample.cleanup.status === 'passed'))
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+  }
+})
+
 test('trusted candidate timing cannot claim a host without a pinned device and agent', async () => {
   const io = fixture({ candidate: true, runtime: true })
   const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
@@ -660,6 +692,34 @@ test('candidate cleanup retains both original and queued continuation IDs when n
   assert.equal(io.calls.some(call => call.action === 'issue-operations.setIssueDeleted'), false)
   assert.equal(io.calls.filter(call => call.action === 'agents.stopRun').length, 1)
   assert.ok(io.sockets.every(socket => socket.closed))
+})
+
+test('cleanup retains its fixture when Factory cancellation loses its revision fence', async () => {
+  const runId = id(80), issueId = id(81), taskId = id(82)
+  const record = { runId, issueId, title: '测试 1505 failed Factory cancellation' }
+  let deleted = false
+  const client = {
+    async json(path, init) {
+      if (path === `/api/factory/tasks?issueId=${issueId}`) return { issueId, tasks: [{ id: taskId, issueId }] }
+      assert.equal(path, `/api/factory/tasks/${taskId}`)
+      if (!init) return { task: { id: taskId, issueId, status: 'running', revision: 5 }, attempts: [{ runId }] }
+      const body = JSON.parse(init.body)
+      assert.deepEqual(body.binding, { taskId, revision: 5 })
+      assert.equal(body.action, 'cancel')
+      throw new Error('startup_http_409')
+    },
+    async rpc(action, args) {
+      if (action === 'agents.getIssueThread') { assert.deepEqual(args, [issueId, runId]); return { thread: { id: runId, status: 'failed', latestRunId: runId, attempts: [{ runId, status: 'failed' }] } } }
+      if (action === 'issues.getIssue') return { issue: { id: issueId, title: record.title, revision: 2 } }
+      assert.equal(action, 'issue-operations.setIssueDeleted')
+      deleted = true
+    },
+  }
+  await cleanupCase(client, record, 'device')
+  assert.equal(deleted, false, 'a producer that could still create an attempt must keep its issue recoverable')
+  assert.equal(record.cleanup.status, 'failed')
+  assert.deepEqual(record.cleanup.errors, [{ step: 'factoryCancelled', code: 'startup_http_409' }])
+  assert.deepEqual(record.cleanup.retainedFixture, { issueId, runIds: [runId] })
 })
 
 test('wrong provenance or cleanup failure fails and still signs out; completed stop races are confirmed', async () => {
