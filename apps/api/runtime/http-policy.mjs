@@ -31,7 +31,11 @@ export function securityHeaders(pathname, current = undefined) {
   return headers
 }
 export function applySecurityHeaders(request, response) {
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers: securityHeaders(new URL(request.url).pathname, response.headers) })
+  const secured = new Response(response.body, { status: response.status, statusText: response.statusText, headers: securityHeaders(new URL(request.url).pathname, response.headers) })
+  // Nitro's upgrade adapter resolves these hooks after the HTTP fetch chain.
+  // Preserve route hooks and authority-rejection hooks across header wrapping.
+  if (response.crossws) secured.crossws = response.crossws
+  return secured
 }
 
 /** Next's default trailingSlash:false redirect runs before every route. Work
@@ -43,7 +47,7 @@ export function trailingSlashRedirect(request) {
   return new Response(null, { status: 308, headers: { location: url.href } })
 }
 
-export function pageRedirect(request, { production = process.env.NODE_ENV === 'production' } = {}) {
+export function pageRedirect(request, { production = process.env.NODE_ENV === 'production', legacyHost = process.env.MIKKA_LEGACY_APP_HOST, origin = process.env.BETTER_AUTH_URL } = {}) {
   const canonical = trailingSlashRedirect(request)
   if (canonical) return canonical
   const url = new URL(request.url), path = url.pathname
@@ -51,8 +55,8 @@ export function pageRedirect(request, { production = process.env.NODE_ENV === 'p
     const target = new URL(url); target.pathname = pathname; if (reset) target.search = ''
     return new Response(null, { status, headers: { location: target.href } })
   }
-  if (url.hostname === 'mikka.aspectlylabs.com') {
-    const target = new URL(url); target.host = 'app.aspectlylabs.com'; target.protocol = 'https:'; target.pathname = `/mikka${path === '/' ? '' : path}`
+  if (legacyHost && origin && url.host === legacyHost) {
+    const target = new URL(origin); target.pathname = `/mikka${path === '/' ? '' : path}`; target.search = url.search
     return new Response(null, { status: 308, headers: { location: target.href } })
   }
   if (path === '/') return redirect('/mikka')

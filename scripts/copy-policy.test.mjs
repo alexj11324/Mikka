@@ -44,7 +44,7 @@ test('negative examples are caught', () => {
 })
 
 test('the brand, identifiers and the decision log stay allowed', () => {
-  for (const sample of ['Mikka Cloud', 'Agents on Mikka Cloud', '在 Mikka Cloud 上运行', 'MIKKA_CLOUD_COMPUTER_TASKS=1', "cloudComputer: 'mikka-cloud-computer',", '--name mikka-cloud-desktop-NEW_VERSION'])
+  for (const sample of ['Mikka 云服务', '连接 Mikka 云服务', 'Mikka Cloud', 'Agents on Mikka Cloud', '在 Mikka Cloud 上运行', 'MIKKA_CLOUD_COMPUTER_TASKS=1', "cloudComputer: 'mikka-cloud-computer',", '--name mikka-cloud-desktop-NEW_VERSION'])
     assert.deepEqual(bannedHits(sample), [], sample)
   assert.ok(allowedPaths.includes('docs/design/decisions.md'))
 })

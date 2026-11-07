@@ -50,6 +50,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  MIKKA_EDITION: cloud
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
   # to a normal install, which outlasts the short jobs' own timeouts.

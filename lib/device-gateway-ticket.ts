@@ -12,10 +12,10 @@ export function deviceGatewayTicket(deviceId: string, secret: string, now = Date
 }
 
 export function bearerMatches(header: string | null, secret: string) {
-  const got = header ?? ''
-  const want = `Bearer ${secret}`
+  const got = Buffer.from(header ?? '')
+  const want = Buffer.from(`Bearer ${secret}`)
   if (!secret || got.length !== want.length) return false
-  return timingSafeEqual(Buffer.from(got), Buffer.from(want))
+  return timingSafeEqual(got, want)
 }
 
 /** Accepts the protocol the daemon offered. Expired or swapped device ids fail. */

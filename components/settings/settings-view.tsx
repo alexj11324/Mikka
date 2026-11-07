@@ -57,20 +57,23 @@ interface SettingsViewProps {
 export function SettingsView({ user, userKey, googleEnabled = false, onRail, onSignOut, signingOut, accountError, activeSection, initialSection, inviteInitially = false, workspaceId, selectedTeamId, children, linearNotice = null, preview = false }: SettingsViewProps) {
   const t = useTranslations('Settings')
   const [localSection, setSection] = useState<SettingsSectionId>(activeSection ?? initialSection ?? 'preferences')
-  const section = activeSection ?? localSection
   const { data: workspace, error: workspaceError } = useWorkspace(userKey ?? user.email, workspaceId)
+  const requestedSection = activeSection ?? localSection
+  const billing = workspace !== undefined && workspace.edition !== 'community'
+  const section = requestedSection === 'billing' && !billing ? 'preferences' : requestedSection
   const admin = workspace?.role === 'admin'
   const personal = workspace?.workspace.kind === 'personal'
   // Team settings show once the workspace is known to be a team, as admin-only ones wait for the role.
   const team = workspace !== undefined && !personal
   const router = useRouter()
   // A personal workspace has no team settings (decision 2026-11-01-2310); an old link to one opens 偏好设置 instead.
-  const teamOnly = personal && TEAM_ONLY_SECTIONS.has(activeSection ?? localSection)
+  const teamOnly = personal && TEAM_ONLY_SECTIONS.has(requestedSection)
+  const unavailableBilling = workspace?.edition === 'community' && requestedSection === 'billing'
   useEffect(() => {
-    if (!teamOnly) return
+    if (!teamOnly && !unavailableBilling) return
     if (activeSection) router.replace(settingsHref('preferences', workspaceId ?? workspace?.workspace.id))
     else setSection('preferences')
-  }, [teamOnly, activeSection, router, workspaceId, workspace?.workspace.id])
+  }, [teamOnly, unavailableBilling, activeSection, router, workspaceId, workspace?.workspace.id])
   const { cache, mutate } = useSWRConfig()
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
@@ -89,7 +92,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const enter = switched.current ? 'animate-in fade-in-0 duration-150 motion-reduce:animate-none' : undefined
 
   return <>
-    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />
+    <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} billing={billing} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview && (next !== 'billing' || billing)) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />
     <SettingsContentFrame parent={t('title')} title={title}>
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
