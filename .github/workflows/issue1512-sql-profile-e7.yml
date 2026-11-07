@@ -1,0 +1,121 @@
+name: Issue 1512 isolated SQL decomposition for e7
+on:
+  push:
+    branches: [ops/1512-git-transport]
+    paths:
+      - .github/workflows/issue1512-sql-profile-e7.yml
+      - .github/issue1512-sql-profile-e7/**
+permissions:
+  contents: read
+concurrency:
+  group: issue1512-isolated-sql-decomposition
+  cancel-in-progress: false
+jobs:
+  profile:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-git-transport' && startsWith(github.event.head_commit.message, 'issue1512:profile-e7 ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Read the exact reviewed diagnostic
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          persist-credentials: false
+      - name: Read the source used by the successful Linux API artifact
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 383da169d23b9cb6bfae1951ef862f43919a89c8
+          path: source
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+          package_json_file: source/package.json
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
+      - name: Check the closed request and cleanup contracts without services
+        run: node --test ops/.github/issue1512-sql-profile-e7/driver.test.mjs ops/.github/issue1512-sql-profile-e7/projection.test.mjs
+      - name: Verify and reuse the immutable successful compiled API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node ops/.github/issue1512-sql-profile-e7/artifact.mjs "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/evidence"
+      - name: Install pinned dependencies without any browser runtime
+        working-directory: source
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: pnpm install --frozen-lockfile
+      - name: Decompose normal authentication and read requests on disposable PostgreSQL
+        env:
+          E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+        run: node ops/.github/issue1512-sql-profile-e7/driver.mjs --source "$GITHUB_WORKSPACE/source" --artifact-zip "$RUNNER_TEMP/desktop-api-build.zip" --output "$GITHUB_WORKSPACE/evidence/desktop-query-decomposition.json"
+      - name: Remove the exact diagnostic download and retain safe runner provenance
+        if: always()
+        run: |
+          node --input-type=module - <<'JS'
+          import { mkdir, rm, writeFile } from 'node:fs/promises'
+          import { join } from 'node:path'
+          import { createHash } from 'node:crypto'
+          import { readFileSync } from 'node:fs'
+          const directory = join(process.env.GITHUB_WORKSPACE, 'evidence')
+          await mkdir(directory, { recursive: true, mode: 0o700 })
+          const owned = ['desktop-api-build.zip', 'desktop-api-build.tar.gz']
+          let removed = true
+          for (const name of owned) { try { await rm(join(process.env.RUNNER_TEMP, name), { force: true }) } catch { removed = false } }
+          const scripts = ['driver.mjs', 'artifact.mjs', 'reads.mjs', 'projection.mjs', 'driver.test.mjs', 'projection.test.mjs', 'closed-labels.json', 'metrics-provenance.json', 'metrics/db-metrics.cjs', 'metrics/db-query-operations.cjs', 'metrics/db-query-unattributed-sources.cjs', 'metrics/lifecycle-query-counts.mjs']
+          const hashes = Object.fromEntries(scripts.map(name => [name, createHash('sha256').update(readFileSync(join(process.env.GITHUB_WORKSPACE, 'ops/.github/issue1512-sql-profile-e7', name))).digest('hex')]))
+          await writeFile(join(directory, 'runner-receipt.json'), JSON.stringify({ version: 1, runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT, operationRevision: process.env.GITHUB_SHA, sourceRevision: '383da169d23b9cb6bfae1951ef862f43919a89c8',
+            temporaryDownloadsRemoved: removed, scripts: hashes, externalModelCalls: 0, externalVirtualMachines: 0,
+            postgres: { scope: 'fresh job-local GitHub Actions service', teardown: 'pending workflow-owned Stop containers step' }, recordedAt: new Date().toISOString(), productionAcceptance: false }, null, 2) + '\n', { mode: 0o600 })
+          if (!removed) process.exitCode = 1
+          JS
+      - name: Check only the explicitly safe reports before upload
+        if: always()
+        id: audit
+        run: |
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict'
+          import { readFile, readdir } from 'node:fs/promises'
+          const allowed = new Set(['artifact-receipt.json', 'desktop-query-decomposition.json', 'runner-receipt.json'])
+          const names = await readdir('evidence')
+          assert.ok(names.length > 0 && names.every(name => allowed.has(name)))
+          for (const name of names) {
+            const text = await readFile(`evidence/${name}`, 'utf8')
+            assert.ok(Buffer.byteLength(text) < 256 * 1024)
+            JSON.parse(text)
+            assert.ok(!/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text))
+            assert.ok(!/(?:phx_|phc_|ghp_|github_pat_|sk-)[A-Za-z0-9_-]{12,}|Bearer\s+[A-Za-z0-9._~-]{12,}|BEGIN [A-Z ]*PRIVATE KEY|[?&](?:sig|Signature|X-Amz-Signature)=/.test(text))
+          }
+          console.log(JSON.stringify({ audited: true, files: names.length, rawLogsUploaded: false }))
+          JS
+      - name: Preserve only safe diagnostic JSON
+        if: always() && steps.audit.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-sql-decomposition-e7-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/*.json
+          retention-days: 7
+          if-no-files-found: error

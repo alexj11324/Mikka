@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "status": "prepared_not_executed",
+  "source": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "compiledSource": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+  "closedLabelsSha256": "dd352c9f91b3a1588d989ce974fbf5959c2107b790c234382364e03653812017",
+  "sourceCatalogSha256": "2c2571b81600657c179e2d02960e0336fdbbf7d433750a00d7a5987e30d93b86",
+  "labels": 301,
+  "unattributedLabels": 287,
+  "originalUnattributedLabels": 71,
+  "metricsBodyMaxBytes": 32768,
+  "files": [
+    {
+      "path": "metrics/db-metrics.cjs",
+      "sourcePath": "apps/desktop/test/db-metrics.cjs",
+      "sourceBytes": 8336,
+      "sourceSha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+      "bytes": 8336,
+      "sha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+      "changes": []
+    },
+    {
+      "path": "metrics/db-query-operations.cjs",
+      "sourcePath": "apps/desktop/test/db-query-operations.cjs",
+      "sourceBytes": 529,
+      "sourceSha256": "03632f635faceb39a1e764f5680680d0829ce98635e17d49276957a684e9d575",
+      "bytes": 529,
+      "sha256": "03632f635faceb39a1e764f5680680d0829ce98635e17d49276957a684e9d575",
+      "changes": []
+    },
+    {
+      "path": "metrics/db-query-unattributed-sources.cjs",
+      "sourcePath": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "sourceBytes": 2585,
+      "sourceSha256": "1bbc59ef965e6c658eec19ea11ea9a6df3b2693a4443a4e1952532fd2a692dd4",
+      "bytes": 9513,
+      "sha256": "90e770a1c7d0fc2d4b504fb0761db98bbd3ba4db70d7edf8d4ad9578efb8d176",
+      "changes": [
+        "replace 71-label array with approved 287-label source-owned array; preserve otherScoped/noScope"
+      ]
+    },
+    {
+      "path": "metrics/lifecycle-query-counts.mjs",
+      "sourcePath": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "sourceBytes": 21791,
+      "sourceSha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+      "bytes": 21882,
+      "sha256": "3133e8a475c7efd1613a0d53f0a72a28318e2725e2fdd16520995ba4f65a7c38",
+      "changes": [
+        "metrics HTTP body limit only: 8192 to 32768 bytes; descriptor and raw-log limits unchanged; original projection/monotonic/conservation semantics unchanged",
+        "require both complete operation/source maps; missing refinement fails rather than omits"
+      ]
+    }
+  ],
+  "productOutputModified": false,
+  "historyReclassified": false,
+  "productionAcceptance": false
+}
