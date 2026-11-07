@@ -47,7 +47,7 @@ stub('../request-log.ts',{noteLogRpcAction:()=>{},noteLogUser:()=>{},withRequest
 stub('./wake.ts',{coordinatorEnabled:()=>false,wakeCoordinator:forbidden})
 stub('./coordinator-bot.ts',{chatBotId:async(_owner:string,botId:string|null|undefined)=>botId??COORDINATOR_BOT,openChatBotId:async(_user:unknown,botId:string|null|undefined)=>botId??COORDINATOR_BOT})
 stub('../agent-runs.ts',{visibleRuns:forbidden,addRunMessage:forbidden,queueRun:forbidden,queueFactoryRun:forbidden,readRun:forbidden,requestRunStop:forbidden})
-stub('../issue-access.ts',{issueForUser:forbidden})
+stub('../issue-access.ts',{issueForUser:forbidden,requireUser:forbidden})
 stub('../issue-visibility.ts',{issueVisibility:forbidden})
 stub('../task-identifier-server.ts',{taskIdentifiers:forbidden,issueView:forbidden})
 stub('../artifacts/store.ts',{artifactSummaries:forbidden})
