@@ -279,7 +279,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(listed.status, 200)
     const body = await listed.json()
     assert.ok(body.tasks.some((row: { id: string }) => row.id === issueId))
-    assert.ok(!body.tasks.some((row: { id: string }) => [personalTask, secondTask].includes(row.id)))
+    assert.ok(!body.tasks.some((row: { id: string }) => row.id === personalTask || row.id === secondTask))
     assert.equal((await request(personalTask, mixed)).status, 404)
     assert.equal((await request(secondTask, mixed)).status, 404)
     for (const workspaceId of [own.id, secondWorkspace.id]) {
