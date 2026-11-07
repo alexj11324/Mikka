@@ -1,7 +1,7 @@
 import type { ModelMessage, ToolSet } from 'ai'
 import { selectRegisteredTools } from './registry'
 
-export type ToolOutcome = 'ok' | 'error' | 'approval_pending'
+export type ToolOutcome = 'ok' | 'error' | 'approval_pending' | 'stopped'
 export function toolOutcome(output: unknown): ToolOutcome {
   if (output && typeof output === 'object') {
     if ('error' in output && output.error) return 'error'
@@ -10,7 +10,7 @@ export function toolOutcome(output: unknown): ToolOutcome {
   }
   return 'ok'
 }
-interface ToolContext { toolCallId: string; messages: ModelMessage[] }
+interface ToolContext { toolCallId: string; messages: ModelMessage[]; abortSignal?: AbortSignal }
 
 /** Hooks observe a host-controlled call; they cannot replace the authorized implementation. */
 export function instrumentTools(registry: ToolSet, requested: readonly string[], hooks: {
@@ -23,6 +23,12 @@ export function instrumentTools(registry: ToolSet, requested: readonly string[],
     const execute = definition.execute as (input: unknown, context: ToolContext) => unknown
     return [name, { ...definition, execute:async (input: unknown, context: ToolContext) => {
       await hooks.before(context.toolCallId,name)
+      // The audit can be a durable step. A stop during it must not start the
+      // underlying effect, and its already-started audit still needs an end.
+      if (context.abortSignal?.aborted) {
+        await hooks.after(context.toolCallId,name,'stopped')
+        return { error: 'stopped' }
+      }
       let output: unknown
       try {
         output = await execute(input,context)

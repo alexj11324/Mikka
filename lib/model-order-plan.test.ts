@@ -273,3 +273,52 @@ test('a place in the 运行位置 chain says why it cannot take a run: 参与调
   assert.equal(placeStage(device('mac'), [], 'claude_code'), 'ready')
   assert.equal(placeStage(device('box', { harnesses: [] }), [], 'claude_code'), 'notInstalled')
 })
+
+test('order view serializes supplied heartbeat times without changing its display snapshot', async t => {
+  t.mock.module('./execution-settings.ts', { namedExports: { ExecutionSettings: class { async modelCandidates() { return [] } } } })
+  t.mock.module('./personal-policy.ts', { namedExports: { pooledOwners: async () => [] } })
+  t.mock.module('./subscription-runtime.ts', { namedExports: { authorizeSubscriptionWorkspace: async () => {} } })
+  t.mock.module('./model-api-keys.ts', { namedExports: { usableApiKeys: async () => [] } })
+  t.mock.module('./model-provider-health.ts', { namedExports: { providerHealthStates: async () => new Map(), providerSourceKey: () => '' } })
+  t.mock.module('./cloud-template-models.ts', { namedExports: { cloudModelSupport: () => 'unknown' } })
+  t.mock.module('./device-presence.ts', { namedExports: { deviceOnlineStates: () => { throw new Error('unexpected device reread') } } })
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('unexpected network read') })
+  const { orderView } = await import('./model-order')
+  const time = 1_800_000_000_000
+  const future = 4_102_444_800_000
+  const cases: { id: string; input: PoolDevice['lastSeenAt']; expected: number | null }[] = [
+    { id: 'date', input: new Date(time), expected: time },
+    { id: 'iso', input: new Date(time).toISOString(), expected: time },
+    { id: 'number', input: time, expected: time },
+    { id: 'zero', input: 0, expected: 0 },
+    { id: 'future', input: future, expected: future },
+    { id: 'null', input: null, expected: null },
+    { id: 'missing', input: undefined, expected: null },
+    { id: 'invalid-date', input: new Date(NaN), expected: null },
+    { id: 'invalid-string', input: 'not-a-time', expected: null },
+    { id: 'nan', input: NaN, expected: null },
+    { id: 'infinity', input: Infinity, expected: null },
+    { id: 'negative-infinity', input: -Infinity, expected: null },
+  ]
+  const devices = cases.map(row => Object.freeze(device(row.id, { lastSeenAt: row.input, online: false })))
+  Object.freeze(devices)
+  const queryKinds: string[] = []
+  const query = { async query(sql: string) {
+    if (sql.includes('FROM model_order_settings')) {
+      queryKinds.push('settings')
+      return { rows: [{ location: 'local', customized: false, preferredHarness: 'claude_code', autoModelRouting: true }] }
+    }
+    if (sql.includes('FROM byos_connections WHERE "ownerId"=$1 AND state=\'connected\'')) {
+      queryKinds.push('connections')
+      return { rows: [] }
+    }
+    throw new Error(`unexpected query: ${sql}`)
+  } }
+  let deviceReads = 0
+  const view = await orderView(query as unknown as Parameters<typeof orderView>[0], { ownerId: 'owner-1', workspaceId: 'workspace-1' }, async () => { deviceReads++; return devices })
+  assert.deepEqual(Object.fromEntries(view.places.devices.map(row => [row.id, row.lastSeenAt])), Object.fromEntries(cases.map(row => [row.id, row.expected])))
+  assert.equal(deviceReads, 1, 'the projection reuses exactly one supplied device snapshot')
+  assert.deepEqual(queryKinds, ['settings', 'connections'], 'timestamp serialization adds no database reads')
+  assert.equal(view.dispatchOrder?.find(row => row.id === 'future')?.presenceReason, 'future_heartbeat')
+  for (const [index, row] of devices.entries()) assert.ok(Object.is(row.lastSeenAt, cases[index].input), 'the scheduling input retains its original timestamp')
+})

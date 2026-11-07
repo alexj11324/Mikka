@@ -41,8 +41,29 @@ export type GroupRuntime = {
 export const GROUP_TURN_STOPPED = 'stopped'
 /** How often a generation checks whether the turn was stopped when no stop push is available. */
 const STOP_CHECK_MS = 1000
-/** With the stop push (LISTEN on the worker's own session), only a slow check for a lost notification. */
+/** Slow fallback for best-effort subscriptions or a failed reliable-push read. */
 export const STOP_FALLBACK_MS = 15_000
+
+type GroupGenerationCounts = { started: number; settled: number; aborted: number }
+
+/** Counts the host's awaited generator, not a remote provider's billing or I/O. */
+export async function trackGroupGeneration<T>(counts: GroupGenerationCounts, signal: AbortSignal | undefined, generate: () => Promise<T>): Promise<T> {
+  counts.started++
+  try { return await generate() }
+  finally { counts.settled++; if (signal?.aborted) counts.aborted++ }
+}
+
+/** Only a successfully closed worker can attest that its awaited work ended. */
+export async function closeGroupTurnSession(session: { isLost(): boolean; close(): Promise<void> }, scope: { conversationId: string; messageId?: string }, counts: GroupGenerationCounts,
+  log: (line: string) => void = line => console.info(line), now: () => number = Date.now) {
+  const sessionLost = session.isLost()
+  await session.close()
+  if (!scope.messageId || !counts.started) return
+  try {
+    log(JSON.stringify({ event: 'group_turn_terminal', conversationId: scope.conversationId, messageId: scope.messageId,
+      started: counts.started, settled: counts.settled, aborted: counts.aborted, sessionLost, endedAt: now() }))
+  } catch { /* Diagnostics never replace the worker's result or original error. */ }
+}
 
 /** Finite diagnostics only: provider errors may contain private prompts, URLs and credentials. */
 export function groupGenerationFailure(error: unknown) {
@@ -105,6 +126,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
   const { client } = session
   let locked = false
   let messageId: string | undefined
+  const generations: GroupGenerationCounts = { started: 0, settled: 0, aborted: 0 }
   try {
     const acquired = await client.query(`SELECT pg_try_advisory_lock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0)) AS acquired`, [conversationId])
     session.assertHeld()
@@ -219,13 +241,13 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
           session.assertHeld()
           return runtime.delegate!({ userId:root.userId, workspaceId:root.workspaceId, conversationId, messageId:messageId!, reporter, text:input.text, delegation },client)
         } : undefined,
-        generate: (agent, input) => untilStopped(stopped, { subscribe: stopPushed }, async signal => {
+        generate: (agent, input) => untilStopped(stopped, { subscribe: stopPushed, reliable: !!stopPushed }, async signal => {
           session.assertHeld()
           input = { ...input, signal, attachmentContext: { userId: root.userId, conversationId } }
           const generate = async (value: typeof input) => {
             const eventId = `generate:${++generationCount}`
             await recordGroupTraceEvent(client, messageId!, { id: eventId, type: 'generate', memberId: agent.id })
-            const reply = await runtime.generate(agent, value)
+            const reply = await trackGroupGeneration(generations, value.signal, () => runtime.generate(agent, value))
             if (addsNothing(reply.text) || !reply.text.trim()) await recordGroupTraceEvent(client, messageId!, { id: `silent:${eventId}`, type: 'silent', memberId: agent.id })
             return reply
           }
@@ -338,26 +360,47 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
   } finally {
     try { if (locked) await client.query(`SELECT pg_advisory_unlock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0))`, [conversationId]) }
     catch { /* A lost physical session has already released its locks. */ }
-    finally { await session.close() }
+    finally { await closeGroupTurnSession(session, { conversationId, messageId }, generations) }
   }
 }
 
 /** Runs `work` with a signal that aborts once `stopped()` says the turn was
- * stopped. A stop push (`subscribe`) triggers that check at once; then the
- * timer is only a slow fallback for a lost notification (STOP_FALLBACK_MS).
- * Without a push it checks every STOP_CHECK_MS, as before. */
-export async function untilStopped<T>(stopped: () => Promise<boolean>, options: { subscribe?: (wake: () => void) => () => void; every?: number }, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+ * stopped. Only a latched listener on the held session, including its loss
+ * notification, is reliable. It reads on pushes alone unless a read fails;
+ * a successful read clears that temporary fallback. Other subscriptions keep
+ * STOP_FALLBACK_MS, and no subscription keeps STOP_CHECK_MS. */
+export async function untilStopped<T>(stopped: () => Promise<boolean>, options: { subscribe?: (wake: () => void) => () => void; reliable?: boolean; every?: number }, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController()
-  let checking = false, again = false
+  const reliable = !!options.subscribe && options.reliable === true
+  let checking = false, again = false, closed = false
+  let timer: ReturnType<typeof setInterval> | undefined
+  const clearFallback = () => { clearInterval(timer); timer = undefined }
+  const startFallback = () => {
+    if (!closed && !controller.signal.aborted && timer === undefined)
+      timer = setInterval(check, options.every ?? (options.subscribe ? STOP_FALLBACK_MS : STOP_CHECK_MS))
+  }
   const check = () => {
+    if (closed || controller.signal.aborted) return
     if (checking) { again = true; return }
     checking = true
-    void stopped().then(yes => { if (yes) controller.abort(new Error(GROUP_TURN_STOPPED)) }, () => undefined)
-      .finally(() => { checking = false; if (again && !controller.signal.aborted) { again = false; check() } })
+    void (async () => {
+      try {
+        const yes = await stopped()
+        if (closed) return
+        if (reliable || yes) clearFallback()
+        if (yes) controller.abort(new Error(GROUP_TURN_STOPPED))
+      } catch {
+        if (reliable) startFallback()
+      } finally {
+        checking = false
+        if (again) { again = false; check() }
+      }
+    })()
   }
   const unsubscribe = options.subscribe?.(check) ?? (() => {})
-  const timer = setInterval(check, options.every ?? (options.subscribe ? STOP_FALLBACK_MS : STOP_CHECK_MS))
-  try { return await work(controller.signal) } finally { clearInterval(timer); unsubscribe() }
+  if (!reliable) startFallback()
+  try { return await work(controller.signal) }
+  finally { closed = true; again = false; clearFallback(); unsubscribe() }
 }
 
 /** Pure serial round engine, shared by the real adapter and scripted CI. */

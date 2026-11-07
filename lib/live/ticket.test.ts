@@ -8,6 +8,7 @@ const second = 'e4ec7f73-0a59-4ad4-8b3c-41f8cd510c6d'
 const secret = 'local-browser-ticket-test-secret'
 let owner: string | null = null
 const memberships = new Set<string>()
+const personalHomes = new Set<string>()
 const membershipReads: unknown[][] = []
 let sessionHeaders: Headers | undefined
 let route: typeof import('../../app/api/live/ticket/route')
@@ -23,7 +24,8 @@ before(async () => {
   } } } } })
   mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: { query: async (_sql: string, values: unknown[]) => {
     membershipReads.push(values)
-    return { rowCount: memberships.has(`${values[1]}:${values[0]}`) ? 1 : 0, rows: [] }
+    const key = `${values[1]}:${values[0]}`
+    return { rowCount: memberships.has(key) ? 1 : 0, rows: memberships.has(key) ? [{ personalHome: personalHomes.has(key) }] : [] }
   } } } })
   mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_name: string, handler: (request: Request) => Promise<Response>) => handler } })
   route = await import('../../app/api/live/ticket/route')
@@ -81,4 +83,21 @@ test('native session bearer uses the same membership boundary without trusting a
   assert.equal((await request(workspace, { authorization })).status, 403)
   owner = null
   assert.equal((await request(workspace, { authorization })).status, 401)
+})
+
+test('only the actual personal home receives a bounded routing proof from the existing single membership read', async () => {
+  owner = 'scope-owner'; memberships.add(`${owner}:${workspace}`); memberships.add(`${owner}:${second}`)
+  personalHomes.add(`${owner}:${workspace}`)
+  const before = membershipReads.length
+  const home = await (await request()).json()
+  assert.ok(home.homeScope)
+  assert.equal(home.homeScope.ownerId, owner)
+  assert.equal(home.homeScope.workspaceId, workspace)
+  assert.equal(home.homeScope.expiresAt, home.expiresAt)
+  assert.match(home.homeScope.token, /^[A-Za-z0-9_-]+\.[a-f0-9]{64}$/)
+  assert.equal(membershipReads.length, before + 1)
+  const team = await (await request(second)).json()
+  assert.equal(typeof team.protocol, 'string')
+  assert.equal(team.homeScope, undefined)
+  assert.equal(membershipReads.length, before + 2)
 })

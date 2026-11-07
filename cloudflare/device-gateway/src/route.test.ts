@@ -12,6 +12,9 @@ function env(stub: Partial<DeviceSessionStub>): GatewayEnv {
     notifyLive: async () => {},
     status: async () => ({ online: false, lastSeenAt: null }),
     fetch: async () => new Response(null),
+    watchPresence: async () => ({ accepted: true, changed: false }),
+    unwatchPresence: async () => {},
+    presenceChanged: async () => [],
     ...stub,
   }
   return { GATEWAY_PUSH_SECRET: secret, DEVICE_SESSION: { getByName: () => session } }

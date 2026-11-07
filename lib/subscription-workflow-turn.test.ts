@@ -102,6 +102,30 @@ test('after 停止 a tool call that has not started does not run; one already ru
   assert.deepEqual(timings.map(timing => timing.tool), ['dispatch_run'])
 })
 
+test('停止 while the before-tool audit waits prevents the tool body and closes its audit as stopped', async () => {
+  const { timedTools } = await import('./subscription-workflow-turn')
+  const { instrumentTools } = await import('./agent-kit/instrument')
+  const stop = new AbortController()
+  const events: string[] = []
+  let bodyCalls = 0, release!: () => void, entered!: () => void
+  const pending = new Promise<void>(resolve => { release = resolve })
+  const begun = new Promise<void>(resolve => { entered = resolve })
+  const instrumented = instrumentTools({ web_search: { inputSchema: {} as never, execute: async () => { bodyCalls++; return { found: true } } } }, ['web_search'], {
+    before: async () => { events.push('start'); entered(); await pending },
+    after: async (_call, _name, outcome) => { events.push(outcome) },
+  })
+  const tools = timedTools(instrumented, [], () => 0, stop.signal)
+  // WorkflowAgent passes its effective abort signal through the execute context.
+  const context = { toolCallId: 'call-stopped', messages: [], abortSignal: stop.signal }
+  const execute = tools.web_search.execute as unknown as (input: unknown, options: typeof context) => Promise<unknown>
+  const run = execute({}, context)
+  await begun
+  stop.abort(); release()
+  assert.deepEqual(await run, { error: 'stopped' })
+  assert.equal(bodyCalls, 0)
+  assert.deepEqual(events, ['start', 'stopped'])
+})
+
 const usage={inputTokens:{total:1,noCache:1,cacheRead:0,cacheWrite:0},outputTokens:{total:1,text:1,reasoning:0}}
 
 /** Actual installed SDK parser and loop with our constructed model/tools;

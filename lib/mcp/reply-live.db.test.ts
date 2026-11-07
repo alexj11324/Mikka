@@ -17,6 +17,7 @@ import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { coordinatorSessionScope } from '../live/coordinator-session'
 import { liveReady } from '../live/events'
+import { presenceReply } from '../live/presence'
 import { ScheduleStore, type WorkspaceGuard } from '../schedules/store'
 import { ScheduleError, type Definition } from '../schedules/contract'
 
@@ -93,6 +94,8 @@ test('MCP waits use real PostgreSQL writers and the existing workerd channel', {
         if (value?.type === 'live_ready') {
           assert.deepEqual(value, liveReady(2), 'the deployed Worker explicitly supports the reply kind, and the revision keys this channel asked for')
           state.ready = true
+        } else if (presenceReply(value)?.type === 'presence_ready') {
+          assert.equal(new URL(String(url)).searchParams.get('presence'), '1', 'only an explicitly negotiated presence capability is transport metadata')
         } else state.received.push(value)
       })
       const close = this.close.bind(this)
