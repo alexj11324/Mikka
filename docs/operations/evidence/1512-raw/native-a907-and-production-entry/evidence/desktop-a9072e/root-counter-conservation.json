@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "kind": "root-independent-native-counter-conservation",
+  "source": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+  "sourceArtifactSha256": "a61adcbb1b48f46f262ea2fe0d2139f3c3a8093f2ce8b11d839e59fa9f5c2bac",
+  "snapshotCount": 12,
+  "segmentCount": 8,
+  "totalCount": 4,
+  "verifiedRows": 24,
+  "pid": 24177,
+  "epoch": 1794081621278,
+  "windows": [
+    {
+      "name": "webLogin",
+      "queries": 188,
+      "phases": [
+        19,
+        0,
+        169
+      ],
+      "startedAt": "2026-11-07T20:04:43.135Z",
+      "finishedAt": "2026-11-07T20:04:45.101Z"
+    },
+    {
+      "name": "nativeLogin",
+      "queries": 210,
+      "phases": [
+        19,
+        16,
+        175
+      ],
+      "startedAt": "2026-11-07T20:04:46.027Z",
+      "finishedAt": "2026-11-07T20:04:48.369Z"
+    },
+    {
+      "name": "startup-bundled",
+      "queries": 179,
+      "phases": [
+        179
+      ],
+      "startedAt": "2026-11-07T20:04:58.716Z",
+      "finishedAt": "2026-11-07T20:05:01.359Z"
+    },
+    {
+      "name": "startup-hosted",
+      "queries": 199,
+      "phases": [
+        199
+      ],
+      "startedAt": "2026-11-07T20:05:01.695Z",
+      "finishedAt": "2026-11-07T20:05:03.515Z"
+    }
+  ],
+  "rows": [
+    {
+      "path": "webLogin/checkpoint/0",
+      "queryCalls": 25860,
+      "unattributed": 7804,
+      "otherScoped": 5496,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "webLogin/checkpoint/1",
+      "queryCalls": 25879,
+      "unattributed": 7804,
+      "otherScoped": 5496,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "webLogin/segment/0",
+      "queryCalls": 19,
+      "unattributed": 0,
+      "otherScoped": 0,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "webLogin/checkpoint/2",
+      "queryCalls": 25879,
+      "unattributed": 7804,
+      "otherScoped": 5496,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "webLogin/segment/1",
+      "queryCalls": 0,
+      "unattributed": 0,
+      "otherScoped": 0,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "webLogin/checkpoint/3",
+      "queryCalls": 26048,
+      "unattributed": 7828,
+      "otherScoped": 5509,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "webLogin/segment/2",
+      "queryCalls": 169,
+      "unattributed": 24,
+      "otherScoped": 13,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "webLogin/total",
+      "queryCalls": 188,
+      "unattributed": 24,
+      "otherScoped": 13,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "nativeLogin/checkpoint/0",
+      "queryCalls": 26048,
+      "unattributed": 7828,
+      "otherScoped": 5509,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "nativeLogin/checkpoint/1",
+      "queryCalls": 26067,
+      "unattributed": 7828,
+      "otherScoped": 5509,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "nativeLogin/segment/0",
+      "queryCalls": 19,
+      "unattributed": 0,
+      "otherScoped": 0,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "nativeLogin/checkpoint/2",
+      "queryCalls": 26083,
+      "unattributed": 7828,
+      "otherScoped": 5509,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "nativeLogin/segment/1",
+      "queryCalls": 16,
+      "unattributed": 0,
+      "otherScoped": 0,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "nativeLogin/checkpoint/3",
+      "queryCalls": 26258,
+      "unattributed": 7877,
+      "otherScoped": 5539,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "nativeLogin/segment/2",
+      "queryCalls": 175,
+      "unattributed": 49,
+      "otherScoped": 30,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "nativeLogin/total",
+      "queryCalls": 210,
+      "unattributed": 49,
+      "otherScoped": 30,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "startup-bundled/checkpoint/0",
+      "queryCalls": 26663,
+      "unattributed": 8132,
+      "otherScoped": 5569,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "startup-bundled/checkpoint/1",
+      "queryCalls": 26842,
+      "unattributed": 8183,
+      "otherScoped": 5599,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "startup-bundled/segment/0",
+      "queryCalls": 179,
+      "unattributed": 51,
+      "otherScoped": 30,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "startup-bundled/total",
+      "queryCalls": 179,
+      "unattributed": 51,
+      "otherScoped": 30,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "startup-hosted/checkpoint/0",
+      "queryCalls": 26842,
+      "unattributed": 8183,
+      "otherScoped": 5599,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "startup-hosted/checkpoint/1",
+      "queryCalls": 27041,
+      "unattributed": 8233,
+      "otherScoped": 5630,
+      "noScope": 2,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "startup-hosted/segment/0",
+      "queryCalls": 199,
+      "unattributed": 50,
+      "otherScoped": 31,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    },
+    {
+      "path": "startup-hosted/total",
+      "queryCalls": 199,
+      "unattributed": 50,
+      "otherScoped": 31,
+      "noScope": 0,
+      "operationCount": 17,
+      "sourceCount": 75,
+      "conserved": true
+    }
+  ],
+  "allConserved": true,
+  "loginBudgetPassed": false,
+  "startupBudgetPassedThisRun": true,
+  "productionAcceptancePassed": false
+}

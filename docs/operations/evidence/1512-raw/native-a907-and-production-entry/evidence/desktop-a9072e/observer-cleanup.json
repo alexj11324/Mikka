@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "kind": "native_artifact_observer_cleanup",
+  "sessionId": "sbx_xIvmBWvZ93L1hxcIiIDtITMXq7AJ",
+  "createdAt": "2026-11-07T20:09:17.680Z",
+  "stoppedAt": "2026-11-07T20:12:24.058Z",
+  "durationMs": 186378,
+  "resource": {
+    "vcpus": 1,
+    "memoryMB": 2048,
+    "ttlMs": 600000,
+    "persistent": false,
+    "ports": [],
+    "downloadHosts": [
+      "sdmntpreastus3.oaiusercontent.com"
+    ]
+  },
+  "explicitStop": true,
+  "stopStatus": "stopped",
+  "readbackStatus": "stopped",
+  "allSixOriginalsAndNineDerivedFilesRecoveredBeforeStop": true,
+  "zipDigestsVerified": 3,
+  "originalFiles": 6,
+  "zipFilesPersisted": 0,
+  "signedUrlsPersisted": 0,
+  "signedUrlsPrinted": false,
+  "rawLogsSaved": false,
+  "imagesSaved": false,
+  "compiledBundleSaved": false,
+  "compiledManifestOnly": true,
+  "providerOrModelCalls": 0,
+  "newCITriggered": false,
+  "productionCredentialsLoaded": false,
+  "readerExitCodes": [
+    0,
+    0,
+    0
+  ],
+  "sourceScripts": {
+    "downloadSha256": "7eb3baacd3a409f90d6433afef9d6afca1d012e762f45f5db0b84d90ca76f204",
+    "readerSha256": "e996c9780c8e632602345ac3fc41e19bce474639b6bbf609ba77fdc9bb337645",
+    "packSha256": "edcbb274209d337b05a2e5aaef7c85eba9269d9d1cf3290613a22e3369bc479e"
+  },
+  "doesNotReplaceNativeLifecycleCleanupEvidence": true
+}

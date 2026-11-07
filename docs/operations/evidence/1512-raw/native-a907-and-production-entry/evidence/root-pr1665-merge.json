@@ -1,0 +1,417 @@
+{
+  "version": 1,
+  "kind": "issue1512-pr1665-merge-source-and-deployment-gates",
+  "observedAtUtc": "2026-11-07T20:42:28Z",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1665,
+  "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+  "priorMain": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+  "actualCiMergeSource": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+  "actualCiTree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7",
+  "mergedSource": "afae721f6730434ded6be932a7f9dd585c22ee49",
+  "mergedTree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7",
+  "mergedParents": [
+    "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+    "a9072e5835a1f7e14aae0af0033d1b682433651f"
+  ],
+  "exactCiTreeEqualsMergedTree": true,
+  "prWorkflows": [
+    {
+      "id": 42407923970,
+      "name": "Browser gate",
+      "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:47:55Z"
+    },
+    {
+      "id": 42407923913,
+      "name": "E2B additive runtime release",
+      "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:48:00Z"
+    },
+    {
+      "id": 42407923826,
+      "name": "Device gateway",
+      "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:50:01Z"
+    },
+    {
+      "id": 42407923738,
+      "name": "E2B subscription custody",
+      "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:51:55Z"
+    },
+    {
+      "id": 42407923793,
+      "name": "Read cache API acceptance",
+      "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:51:32Z"
+    },
+    {
+      "id": 42407923839,
+      "name": "Analytics SSR",
+      "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:53:18Z"
+    },
+    {
+      "id": 42407923900,
+      "name": "CI",
+      "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:56:19Z"
+    },
+    {
+      "id": 42407923840,
+      "name": "Self-hosted image",
+      "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T20:02:52Z"
+    },
+    {
+      "id": 42407923882,
+      "name": "Desktop shell",
+      "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T20:07:55Z"
+    }
+  ],
+  "priorMainWriters": [
+    {
+      "id": 42411812581,
+      "name": "Production smoke",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "updatedAt": "2026-11-07T20:37:34Z"
+    },
+    {
+      "id": 42411686261,
+      "name": "Task VM question-resume evidence",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "failure",
+      "updatedAt": "2026-11-07T20:39:32Z"
+    },
+    {
+      "id": 42411472966,
+      "name": "Task VM question-resume evidence",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T20:31:36Z"
+    },
+    {
+      "id": 42409798987,
+      "name": "Production smoke",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "failure",
+      "updatedAt": "2026-11-07T20:12:03Z"
+    },
+    {
+      "id": 42409660063,
+      "name": "Project decisions production acceptance",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "updatedAt": "2026-11-07T20:09:30Z"
+    },
+    {
+      "id": 42409660080,
+      "name": "Mikka cloud core compatibility",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "updatedAt": "2026-11-07T20:09:20Z"
+    },
+    {
+      "id": 42409660170,
+      "name": "Issue 1225 model provider acceptance",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "updatedAt": "2026-11-07T20:10:58Z"
+    },
+    {
+      "id": 42409660060,
+      "name": "Read cache production acceptance",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T20:11:46Z"
+    },
+    {
+      "id": 42409181752,
+      "name": "Task VM question-resume evidence",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T20:03:34Z"
+    },
+    {
+      "id": 42408816033,
+      "name": "Task VM question-resume evidence",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T19:59:16Z"
+    },
+    {
+      "id": 42408374712,
+      "name": "Task VM question-resume evidence",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T19:53:25Z"
+    },
+    {
+      "id": 42408159509,
+      "name": "Task VM question-resume evidence",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T19:50:40Z"
+    },
+    {
+      "id": 42408000255,
+      "name": "Mikka cloud core compatibility",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "updatedAt": "2026-11-07T19:48:41Z"
+    },
+    {
+      "id": 42408000076,
+      "name": "Issue 1225 model provider acceptance",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T19:48:41Z"
+    },
+    {
+      "id": 42408000027,
+      "name": "Project decisions production acceptance",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T19:48:40Z"
+    },
+    {
+      "id": 42408000223,
+      "name": "Read cache production acceptance",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T19:48:41Z"
+    },
+    {
+      "id": 42407950500,
+      "name": "Task VM question-resume evidence",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T19:48:10Z"
+    },
+    {
+      "id": 42407770500,
+      "name": "Self-hosted image",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T20:07:24Z"
+    },
+    {
+      "id": 42407770408,
+      "name": "CI",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T20:00:11Z"
+    },
+    {
+      "id": 42407770442,
+      "name": "Web deploy",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T20:09:17Z"
+    },
+    {
+      "id": 42407770430,
+      "name": "E2B additive runtime release",
+      "head": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T20:34:09Z"
+    },
+    {
+      "id": 42407640270,
+      "name": "Task VM question-resume evidence",
+      "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+      "event": "workflow_run",
+      "status": "completed",
+      "conclusion": "skipped",
+      "updatedAt": "2026-11-07T19:44:07Z"
+    },
+    {
+      "id": 42407154380,
+      "name": "Web deploy",
+      "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "updatedAt": "2026-11-07T19:48:38Z"
+    },
+    {
+      "id": 42407154384,
+      "name": "CI",
+      "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:51:32Z"
+    },
+    {
+      "id": 42407154447,
+      "name": "Self-hosted image",
+      "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:52:50Z"
+    },
+    {
+      "id": 42407154433,
+      "name": "E2B additive runtime release",
+      "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "updatedAt": "2026-11-07T19:53:23Z"
+    },
+    {
+      "id": 42407154408,
+      "name": "Publish daemon",
+      "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:56:18Z"
+    },
+    {
+      "id": 42407154375,
+      "name": "Mobile OTA update",
+      "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T19:42:06Z"
+    },
+    {
+      "id": 42407154336,
+      "name": "Device gateway",
+      "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T20:08:57Z"
+    },
+    {
+      "id": 42407154397,
+      "name": "Desktop release",
+      "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T20:21:09Z"
+    }
+  ],
+  "mainActiveBeforeMerge": 0,
+  "mainQueuedBeforeMerge": 0,
+  "priorMainVercel": {
+    "id": "dpl_A4ZXwJMayk8B93Rap6f9knv49QjR",
+    "url": "mikka-fm16z8103-mikka-dev.vercel.app",
+    "readyState": "READY",
+    "state": "READY",
+    "createdAt": 1794083164911,
+    "ready": 1794083614971,
+    "target": "production",
+    "sha": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+    "alias": [
+      "app.aspectlylabs.com",
+      "mikka.aspectlylabs.com",
+      "new-base-nova-project-ten.vercel.app",
+      "mikka-mikka-dev.vercel.app"
+    ],
+    "aliasError": null
+  },
+  "nativeSameTree": {
+    "runId": 42407923882,
+    "login": {
+      "native": 210,
+      "web": 188,
+      "passes": false
+    },
+    "startup": {
+      "native": 179,
+      "hostedElectron": 199,
+      "passesThisRun": true
+    },
+    "overallBudgetPass": false,
+    "perInvocationTimestampsAvailable": false,
+    "otherScopedDelta17Attributed": false
+  },
+  "productionBrowserExecuted": false,
+  "productionAcceptancePassed": false,
+  "issueState": "open",
+  "caveats": [
+    "The latest production deployment in this receipt is priorMain ce67, not the newly merged afae revision.",
+    "Successful merge and green functional workflows do not satisfy the Native login or production trace/Replay acceptance criteria.",
+    "A newer production deployment must serve exact afae before the main-only browser workflow is dispatched."
+  ],
+  "credentialsOrRawRequestContentSaved": false
+}

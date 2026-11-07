@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "type": "e2b-release-terminal-readonly",
+  "observedAt": "2026-11-07T20:38:04.597Z",
+  "run": {
+    "id": 42407770430,
+    "name": "E2B additive runtime release",
+    "path": ".github/workflows/e2b-official-runtime.yml",
+    "event": "push",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+    "created_at": "2026-11-07T19:45:44Z",
+    "updated_at": "2026-11-07T20:34:09Z",
+    "run_started_at": "2026-11-07T19:45:44Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42407770430"
+  },
+  "jobs": [
+    {
+      "id": 128510912668,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T19:53:36Z",
+      "completedAt": "2026-11-07T19:53:51Z"
+    },
+    {
+      "id": 128511023698,
+      "name": "check",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T19:55:10Z",
+      "completedAt": "2026-11-07T19:55:23Z"
+    },
+    {
+      "id": 128511389593,
+      "name": "validate / build",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T19:55:40Z",
+      "completedAt": "2026-11-07T20:03:55Z"
+    },
+    {
+      "id": 128513467215,
+      "name": "await-web",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:04:05Z",
+      "completedAt": "2026-11-07T20:09:31Z"
+    },
+    {
+      "id": 128514884847,
+      "name": "subscriptions",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:09:33Z",
+      "completedAt": "2026-11-07T20:12:56Z"
+    },
+    {
+      "id": 128515760832,
+      "name": "publish / deploy",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:12:59Z",
+      "completedAt": "2026-11-07T20:33:49Z"
+    },
+    {
+      "id": 128520896574,
+      "name": "cleanup",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T20:33:51Z",
+      "completedAt": "2026-11-07T20:34:08Z"
+    }
+  ],
+  "checks": {
+    "allJobsTerminal": true,
+    "allJobsSuccessful": true,
+    "jobCount": 7,
+    "metadataPaginationComplete": true
+  },
+  "publish": {
+    "jobId": 128515760832,
+    "checkouts": [
+      {
+        "sha": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+        "repository": "Mikka"
+      },
+      {
+        "sha": "ca99cf4719a890c214d187c146c07406ffebfba2",
+        "repository": "private_ui"
+      }
+    ],
+    "publicVersion": {
+      "stepNumber": 26,
+      "startedAt": "2026-11-07T20:33:44Z",
+      "completedAt": "2026-11-07T20:33:45Z",
+      "conclusion": "success",
+      "expectedMikkaBuild": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "sourceCondition": "verifyProductionBuild returns only when public build equals GITHUB_SHA",
+      "rawEventReadable": false,
+      "rawEventLimitation": "GITHUB_LOG_MASKING_MALFORMED_JSON",
+      "unmaskedEventBuildIndependentlyObserved": false
+    },
+    "rawMixedLogPersisted": false
+  },
+  "cleanup": {
+    "jobId": 128520896574,
+    "sourceCommit": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+    "runId": "42407770430",
+    "templates": [
+      {
+        "kind": "desktop",
+        "templateId": "a9les5psny6lyrqsvq39",
+        "status": "retained_public"
+      },
+      {
+        "kind": "claude",
+        "templateId": "ap5s6lgfjlf4gnb8n49v",
+        "status": "retained_public"
+      },
+      {
+        "kind": "codex",
+        "templateId": "t323mqsiy91e0hydifnh",
+        "status": "retained_public"
+      }
+    ],
+    "sandboxes": [],
+    "errorsCount": 0,
+    "receiptSource": "closed projection from exact job log",
+    "exactCheckout": true,
+    "privateCandidateDeletionRequired": false,
+    "publicTemplatesIntentionallyRetained": true
+  },
+  "scope": {
+    "actionsTaken": "read_only_github_metadata_and_closed_log_projection",
+    "reruns": 0,
+    "cancellations": 0,
+    "providerApiCalls": 0,
+    "manualResourcesActive": 0,
+    "nativeBudgetAcceptance": false,
+    "issue1512OverallAcceptance": false
+  },
+  "sourceFiles": [
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "ref": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "bytes": 11003,
+      "sha256": "c67beddae6ae4c6088b5fdff3bb0863ce253818e5bea97a37f2abae2c73cbaf9"
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "ref": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "bytes": 17814,
+      "sha256": "aa07b297d8a8a0788e99c21580492f28ff6547844044fb40ca7be8246ce77fec"
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "ref": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "bytes": 18864,
+      "sha256": "d74dbdea0d92b8ac305d2bd42bbdba2bcc29198af14d04cfabd2b6b076a17650"
+    },
+    {
+      "path": "scripts/e2b/cleanup-template-candidates.py",
+      "ref": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "bytes": 7437,
+      "sha256": "893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d"
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "ref": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "bytes": 52122,
+      "sha256": "506a779375e088a62b3a795862228f9e606443e09d468efd4a2047c8e1c72dae"
+    }
+  ]
+}

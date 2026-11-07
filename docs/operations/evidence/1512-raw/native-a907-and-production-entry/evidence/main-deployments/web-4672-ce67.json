@@ -1,0 +1,572 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "main_web_publication_readonly",
+  "status": "success",
+  "previous": {
+    "head": "4672c4188c8468d9be5109181d2397c4d0910099",
+    "runId": 42407154380,
+    "attempt": 1,
+    "job": {
+      "id": 128507207704,
+      "name": "deploy",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T19:40:33Z",
+      "completedAt": "2026-11-07T19:48:37Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:35Z",
+          "completedAt": "2026-11-07T19:40:36Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:37Z",
+          "completedAt": "2026-11-07T19:40:45Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:45Z",
+          "completedAt": "2026-11-07T19:40:47Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:47Z",
+          "completedAt": "2026-11-07T19:40:50Z"
+        },
+        {
+          "number": 5,
+          "name": "Refuse an obsolete source before release work",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:50Z",
+          "completedAt": "2026-11-07T19:40:50Z"
+        },
+        {
+          "number": 6,
+          "name": "Require one immutable runtime release artifact reference",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:40:50Z",
+          "completedAt": "2026-11-07T19:40:50Z"
+        },
+        {
+          "number": 7,
+          "name": "Download the complete verified runtime release report",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:40:50Z",
+          "completedAt": "2026-11-07T19:40:50Z"
+        },
+        {
+          "number": 8,
+          "name": "Bind the release bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:40:50Z",
+          "completedAt": "2026-11-07T19:40:50Z"
+        },
+        {
+          "number": 9,
+          "name": "Read the Vercel deploy token",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:50Z",
+          "completedAt": "2026-11-07T19:40:51Z"
+        },
+        {
+          "number": 10,
+          "name": "Skip documentation-only changes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:51Z",
+          "completedAt": "2026-11-07T19:40:51Z"
+        },
+        {
+          "number": 11,
+          "name": "Read the private UI checkout credential",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:51Z",
+          "completedAt": "2026-11-07T19:40:52Z"
+        },
+        {
+          "number": 12,
+          "name": "Check out the private UI",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:52Z",
+          "completedAt": "2026-11-07T19:40:55Z"
+        },
+        {
+          "number": 13,
+          "name": "Pin the private UI revision",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:55Z",
+          "completedAt": "2026-11-07T19:40:55Z"
+        },
+        {
+          "number": 14,
+          "name": "Read the existing Vercel runtime release token",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:40:55Z",
+          "completedAt": "2026-11-07T19:40:55Z"
+        },
+        {
+          "number": 15,
+          "name": "Publish the verified additive runtime pair inside the deployment queue",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:40:55Z",
+          "completedAt": "2026-11-07T19:40:55Z"
+        },
+        {
+          "number": 16,
+          "name": "Read the production values Vercel withholds from `vercel pull`",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:55Z",
+          "completedAt": "2026-11-07T19:40:56Z"
+        },
+        {
+          "number": 17,
+          "name": "Pull the production project settings and environment",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:40:56Z",
+          "completedAt": "2026-11-07T19:41:14Z"
+        },
+        {
+          "number": 18,
+          "name": "Fill build-time values",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:41:14Z",
+          "completedAt": "2026-11-07T19:41:14Z"
+        },
+        {
+          "number": 19,
+          "name": "Choose the deployment id",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:41:14Z",
+          "completedAt": "2026-11-07T19:41:14Z"
+        },
+        {
+          "number": 20,
+          "name": "Install the pinned workspace dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:41:14Z",
+          "completedAt": "2026-11-07T19:41:47Z"
+        },
+        {
+          "number": 21,
+          "name": "Install private UI runtime dependencies without license scripts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:41:47Z",
+          "completedAt": "2026-11-07T19:41:54Z"
+        },
+        {
+          "number": 22,
+          "name": "Verify the official runtime stays on the cloud edition",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:41:54Z",
+          "completedAt": "2026-11-07T19:41:55Z"
+        },
+        {
+          "number": 23,
+          "name": "Build (runs migrations last, as the Vercel build did)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:41:55Z",
+          "completedAt": "2026-11-07T19:48:32Z"
+        },
+        {
+          "number": 24,
+          "name": "Audit the public output for source and source maps",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:32Z",
+          "completedAt": "2026-11-07T19:48:33Z"
+        },
+        {
+          "number": 25,
+          "name": "Upload the prebuilt output to production",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T19:48:33Z",
+          "completedAt": "2026-11-07T19:48:33Z"
+        },
+        {
+          "number": 26,
+          "name": "Verify the public production version before releasing the deployment queue",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:48:33Z",
+          "completedAt": "2026-11-07T19:48:33Z"
+        },
+        {
+          "number": 49,
+          "name": "Post Check out the private UI",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:33Z",
+          "completedAt": "2026-11-07T19:48:33Z"
+        },
+        {
+          "number": 50,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:48:33Z",
+          "completedAt": "2026-11-07T19:48:33Z"
+        },
+        {
+          "number": 51,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:33Z",
+          "completedAt": "2026-11-07T19:48:34Z"
+        },
+        {
+          "number": 52,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:34Z",
+          "completedAt": "2026-11-07T19:48:34Z"
+        },
+        {
+          "number": 53,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:34Z",
+          "completedAt": "2026-11-07T19:48:34Z"
+        }
+      ]
+    },
+    "closedCodes": [
+      "webDeploy:mainChanged"
+    ],
+    "mainAtDiagnosis": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+    "log": {
+      "bytes": 345187,
+      "sha256": "68f8a9971acc4e09df98a454e02d4a41c524c5b43de7fd9c6cfe9919bea7c0ae",
+      "retained": "memory_only"
+    },
+    "publicVersionVerified": false
+  },
+  "current": {
+    "run": {
+      "id": 42407770442,
+      "name": "Web deploy",
+      "event": "push",
+      "headSha": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T19:45:44Z",
+      "updatedAt": "2026-11-07T20:09:17Z"
+    },
+    "job": {
+      "id": 128509076747,
+      "name": "deploy",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T19:50:01Z",
+      "completedAt": "2026-11-07T20:09:16Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:02Z",
+          "completedAt": "2026-11-07T19:50:03Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:03Z",
+          "completedAt": "2026-11-07T19:50:10Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:10Z",
+          "completedAt": "2026-11-07T19:50:11Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:11Z",
+          "completedAt": "2026-11-07T19:50:11Z"
+        },
+        {
+          "number": 5,
+          "name": "Refuse an obsolete source before release work",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:11Z",
+          "completedAt": "2026-11-07T19:50:12Z"
+        },
+        {
+          "number": 6,
+          "name": "Require one immutable runtime release artifact reference",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:50:12Z",
+          "completedAt": "2026-11-07T19:50:12Z"
+        },
+        {
+          "number": 7,
+          "name": "Download the complete verified runtime release report",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:50:12Z",
+          "completedAt": "2026-11-07T19:50:12Z"
+        },
+        {
+          "number": 8,
+          "name": "Bind the release bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:50:12Z",
+          "completedAt": "2026-11-07T19:50:12Z"
+        },
+        {
+          "number": 9,
+          "name": "Read the Vercel deploy token",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:12Z",
+          "completedAt": "2026-11-07T19:50:12Z"
+        },
+        {
+          "number": 10,
+          "name": "Skip documentation-only changes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:12Z",
+          "completedAt": "2026-11-07T19:50:12Z"
+        },
+        {
+          "number": 11,
+          "name": "Read the private UI checkout credential",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:12Z",
+          "completedAt": "2026-11-07T19:50:13Z"
+        },
+        {
+          "number": 12,
+          "name": "Check out the private UI",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:13Z",
+          "completedAt": "2026-11-07T19:50:14Z"
+        },
+        {
+          "number": 13,
+          "name": "Pin the private UI revision",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:14Z",
+          "completedAt": "2026-11-07T19:50:14Z"
+        },
+        {
+          "number": 14,
+          "name": "Read the existing Vercel runtime release token",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:50:14Z",
+          "completedAt": "2026-11-07T19:50:14Z"
+        },
+        {
+          "number": 15,
+          "name": "Publish the verified additive runtime pair inside the deployment queue",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T19:50:14Z",
+          "completedAt": "2026-11-07T19:50:14Z"
+        },
+        {
+          "number": 16,
+          "name": "Read the production values Vercel withholds from `vercel pull`",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:14Z",
+          "completedAt": "2026-11-07T19:50:15Z"
+        },
+        {
+          "number": 17,
+          "name": "Pull the production project settings and environment",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:15Z",
+          "completedAt": "2026-11-07T19:50:29Z"
+        },
+        {
+          "number": 18,
+          "name": "Fill build-time values",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:29Z",
+          "completedAt": "2026-11-07T19:50:29Z"
+        },
+        {
+          "number": 19,
+          "name": "Choose the deployment id",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:29Z",
+          "completedAt": "2026-11-07T19:50:29Z"
+        },
+        {
+          "number": 20,
+          "name": "Install the pinned workspace dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:29Z",
+          "completedAt": "2026-11-07T19:50:59Z"
+        },
+        {
+          "number": 21,
+          "name": "Install private UI runtime dependencies without license scripts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:59Z",
+          "completedAt": "2026-11-07T19:51:09Z"
+        },
+        {
+          "number": 22,
+          "name": "Verify the official runtime stays on the cloud edition",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:09Z",
+          "completedAt": "2026-11-07T19:51:10Z"
+        },
+        {
+          "number": 23,
+          "name": "Build (runs migrations last, as the Vercel build did)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:10Z",
+          "completedAt": "2026-11-07T19:55:41Z"
+        },
+        {
+          "number": 24,
+          "name": "Audit the public output for source and source maps",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:55:41Z",
+          "completedAt": "2026-11-07T19:55:41Z"
+        },
+        {
+          "number": 25,
+          "name": "Upload the prebuilt output to production",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:55:41Z",
+          "completedAt": "2026-11-07T20:09:12Z"
+        },
+        {
+          "number": 26,
+          "name": "Verify the public production version before releasing the deployment queue",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T20:09:12Z",
+          "completedAt": "2026-11-07T20:09:13Z"
+        },
+        {
+          "number": 49,
+          "name": "Post Check out the private UI",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T20:09:13Z",
+          "completedAt": "2026-11-07T20:09:13Z"
+        },
+        {
+          "number": 50,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T20:09:13Z",
+          "completedAt": "2026-11-07T20:09:13Z"
+        },
+        {
+          "number": 51,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T20:09:13Z",
+          "completedAt": "2026-11-07T20:09:14Z"
+        },
+        {
+          "number": 52,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T20:09:14Z",
+          "completedAt": "2026-11-07T20:09:14Z"
+        },
+        {
+          "number": 53,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T20:09:14Z",
+          "completedAt": "2026-11-07T20:09:14Z"
+        }
+      ]
+    },
+    "sourceCommit": {
+      "sha": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "parents": [
+        "4672c4188c8468d9be5109181d2397c4d0910099",
+        "a78f98eb002da0f12f9d73ac8639c2c885231cce"
+      ],
+      "tree": "f6b538c3c4f04c6ac67100f1dbcf78f473e0a3d4",
+      "mergedPr": 1664
+    },
+    "publicVersion": {
+      "source": "successful workflow step 26",
+      "status": "verified_by_workflow",
+      "independentHttpReadByThisAgent": false
+    },
+    "rawLogsRead": false
+  },
+  "boundaries": [
+    "The previous 4672 attempt failed with webDeploy:mainChanged and its public-version verification was skipped; that history is preserved.",
+    "The current success is based on exact-head GitHub run and job/step metadata. Its raw logs were not downloaded.",
+    "Vercel READY and the formal domain alias are independently checked by root; this receipt does not substitute for that readback.",
+    "E2B subscription/runtime publication and PR1665 acceptance are separate gates and are not claimed by this Web receipt.",
+    "No rerun, cancellation, deployment mutation or source/ref change was performed by this reviewer."
+  ]
+}

@@ -1,0 +1,449 @@
+{
+  "version": 1,
+  "kind": "issue1512_pr1665_a907_native_evidence",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": 1665,
+  "runId": 42407923882,
+  "attempt": 1,
+  "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+  "source": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+  "tree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7",
+  "parents": [
+    "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+    "a9072e5835a1f7e14aae0af0033d1b682433651f"
+  ],
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "status": "login_budget_failed_startup_passed",
+  "workflowConclusion": "success",
+  "jobsPassed": 4,
+  "actualNativeStep": {
+    "startedAt": "2026-11-07T20:00:20Z",
+    "completedAt": "2026-11-07T20:05:43Z",
+    "conclusion": "success"
+  },
+  "budgets": {
+    "loginNativeVsWeb": {
+      "first": 210,
+      "second": 188,
+      "difference": 22,
+      "firstNotAboveSecond": false
+    },
+    "startupBundledVsHosted": {
+      "first": 179,
+      "second": 199,
+      "difference": -20,
+      "firstNotAboveSecond": true
+    }
+  },
+  "phases": {
+    "nativeLogin": {
+      "status": "complete",
+      "queryCalls": 210,
+      "unknownReadings": 0,
+      "valid": true,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 16,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 175,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "webLogin": {
+      "status": "complete",
+      "queryCalls": 188,
+      "unknownReadings": 0,
+      "valid": true,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 169,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "startup-bundled": {
+      "status": "complete",
+      "queryCalls": 179,
+      "unknownReadings": 0,
+      "pair": 1,
+      "valid": true,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 179,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "startup-hosted": {
+      "status": "complete",
+      "queryCalls": 199,
+      "unknownReadings": 0,
+      "pair": 1,
+      "valid": true,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 199,
+          "unknownReadings": 0
+        }
+      ]
+    }
+  },
+  "counterIntegrity": {
+    "expectedCheckpointCount": 12,
+    "observedCheckpointCount": 12,
+    "pid": 24177,
+    "pidConsistent": true,
+    "processStartConsistent": true,
+    "runtimeConsistent": true,
+    "cumulativeQueriesNondecreasing": true,
+    "unknownReadingsAllZero": true
+  },
+  "partitions": {
+    "operations": 17,
+    "unattributedSources": 75,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "allConserve": true
+  },
+  "rpcTotals": {
+    "physical": {
+      "nativeLogin": {
+        "startedInWindow": 7,
+        "completedInWindow": 7,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 7,
+        "completedInWindow": 7,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    },
+    "logical": {
+      "nativeLogin": {
+        "startedInWindow": 20,
+        "completedInWindow": 20,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    }
+  },
+  "rpcBoundary": {
+    "allFourWindowsCrossesStart": 0,
+    "allFourWindowsCrossesEnd": 0,
+    "unknownActions": 0,
+    "unpairedCompletions": 0,
+    "physicalDuplicateRecords": 0,
+    "logicalDuplicateRecords": 0,
+    "physicalConflicts": 0,
+    "logicalConflicts": 0,
+    "countsNotConvertedToSql": true,
+    "windowTotalsNotAdjusted": true
+  },
+  "extraLoginLogicalOccurrences": [
+    {
+      "action": "task-runs.pollTaskRuns",
+      "first": {
+        "started": 2,
+        "completed": 2,
+        "crossesEnd": 0
+      },
+      "second": {
+        "started": 0,
+        "completed": 0,
+        "crossesEnd": 0
+      },
+      "startedDifference": 2
+    },
+    {
+      "action": "desktop.session",
+      "first": {
+        "started": 1,
+        "completed": 1,
+        "crossesEnd": 0
+      },
+      "second": {
+        "started": 0,
+        "completed": 0,
+        "crossesEnd": 0
+      },
+      "startedDifference": 1
+    }
+  ],
+  "loginPhaseTimelineFile": "integration-difference.json",
+  "individualRequestTimestampsAvailable": false,
+  "unknownOtherScopedNotAssignedToEndpoints": true,
+  "functional": {
+    "lifecycleChecks": 8,
+    "parityChecks": 100,
+    "smokeChecks": 10,
+    "cryptoProcesses": 3,
+    "recordedChecksPassed": true
+  },
+  "cleanup": {
+    "recordedStagesPassed": true,
+    "nativeCleaned": true,
+    "lifecycleAndSmokeLease": "released",
+    "lifecycleAndSmokeOwnerPeerAfterBaseline": true,
+    "parityAccountObservation": "unknown",
+    "absentAggregateCleanup": "unknown"
+  },
+  "rawOriginals": 6,
+  "originalBytesPreservedBeforeAndAfterReaders": true,
+  "zipDigestsVerified": 3,
+  "compiledManifestSourceIdentityVerified": true,
+  "compiledManifestDoesNotProveNativeBinaryByteIdentity": true,
+  "privacyFindings": 0,
+  "rawLogsSaved": false,
+  "imagesSaved": false,
+  "signedUrlsPersisted": false,
+  "observerSandbox": {
+    "id": "sbx_xIvmBWvZ93L1hxcIiIDtITMXq7AJ",
+    "status": "stopped",
+    "explicitStop": true,
+    "readbackVerified": true,
+    "durationMs": 186378
+  },
+  "readers": {
+    "desktop-native-summary.mjs": {
+      "gitBlob": "dad196c96077ab1504fd8858343d31b00cf0da3a",
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b"
+    },
+    "desktop-query-operations-summary.mjs": {
+      "gitBlob": "17a54954b618fc3373715dbc73fa86669c2aa739",
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2"
+    },
+    "desktop-1bd4-unattributed-sources-summary.mjs": {
+      "gitBlob": "28f3a63f0b9c4604b79f935dd82420f9994a9e4a",
+      "sha256": "0d10210d5403a8e1efa6539a382872025d773fdbf949a1b6e4965dca952ab4f4"
+    },
+    "desktop-1bd4-query-sources.cjs": {
+      "gitBlob": "d470c1d71454dff12f60cf7e0dd373624bd8b314",
+      "sha256": "0eeb18be931fdc4d8ddb908dff9a0b4a94a6596a992fcc9a1c5fd635a935a0bb"
+    }
+  },
+  "readerExitCodes": [
+    0,
+    0,
+    0
+  ],
+  "payloadCount": 20,
+  "payloadBytes": 599952,
+  "files": [
+    {
+      "path": "evidence/desktop-a9072e/lifecycle.json",
+      "bytes": 264045,
+      "sha256": "a61adcbb1b48f46f262ea2fe0d2139f3c3a8093f2ce8b11d839e59fa9f5c2bac",
+      "gitBlob": "3eeb55b077759ea4f6ba49d13deeb23ef190de44",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/parity/parity.json",
+      "bytes": 106740,
+      "sha256": "9b8a185788f3054e47991d7d5f15e645d2803c04849aa9940f764aff1fc3c2bd",
+      "gitBlob": "e5c1b7ab14266d5c2f8e55d5d62b06c4e8869f04",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/smoke.json",
+      "bytes": 3105,
+      "sha256": "834f2e8e6a48c9bc2f51fd87e0d730f206260cc6103356b104b9a22ada550786",
+      "gitBlob": "5195ddfe70d844fd7ada69b418c32a8e75469eef",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "0e3f76b0e687303c08ff1397864adfdab8566523ed7852c0711dff48311b09d1",
+      "gitBlob": "2f223985e69143bc97e2829dedcc8def88711e5a",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "953c982e04f76aefebaa4d17a6d5261c61cee379e7257a8e117d551cf8302617",
+      "gitBlob": "dd74ec150fee76cf2bf5755bc94fed8733114ce0",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/compiled/mikka-build.json",
+      "bytes": 8431,
+      "sha256": "505f58941c8ca3e1068dd2420a04b0c146430ce6bdce074824616c4819e4f6f8",
+      "gitBlob": "1b1b069122b3277610d710fd77e9e71efed5415c",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/download-validation.json",
+      "bytes": 3826,
+      "sha256": "8454aa19f08517bed9d88a00dfb7e63e9f5c1e8ad2ab862480e9d5f400013286",
+      "gitBlob": "7216fa550e5b76deb9f138d37e070b45c72084de",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/privacy.json",
+      "bytes": 1516,
+      "sha256": "b0fa728b425345058c61fe581409232a8f0ccd7fc689ffc0c45219c93ed524a9",
+      "gitBlob": "c8a3f25c9ab6703af9a8fbdd3de34eea1946b34e",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/summary.json",
+      "bytes": 99543,
+      "sha256": "dbf1d16689006d8f138facfd1f029d879aa0df8a67593edcd191f9513d4f8e2c",
+      "gitBlob": "219a6f09717cc08a293ba15500e13229032a7ddc",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/query-operations.json",
+      "bytes": 14796,
+      "sha256": "3bc0a5dc7c398c55798831eaa4f28aae19295c7bdf5c53e7c0bd0c046cbb0a43",
+      "gitBlob": "6e40969c69109041bd88a0cd178566277d34be1a",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/unattributed-sources.json",
+      "bytes": 13278,
+      "sha256": "8503f275c3124e927e4b58128681a73739ca57a6afe21978669cfb444df47e51",
+      "gitBlob": "f7f8899f03a1cc2a6dd4c1f2a4558d6edf20adcf",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/summary.stdout.json",
+      "bytes": 589,
+      "sha256": "d0f6817a8303d3a69d73e97445d114de96b41f9cff87ec5571c34ad19303d448",
+      "gitBlob": "0f4f05cc161442667961b3c7886c83ecdff2e934",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/query-operations.stdout.json",
+      "bytes": 404,
+      "sha256": "c928ed5eb5ae92c55a355e16ece9d7be294ca7e54c81c6275d4d9e0bb3bb01a2",
+      "gitBlob": "abed039950578b7b32ab910e6e83619139328ad5",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/unattributed-sources.stdout.json",
+      "bytes": 423,
+      "sha256": "aec042abf44c7c69beaf1626eb597c0d7020263096dcfeb33b2124a10e23bc48",
+      "gitBlob": "3c4782a0378591cb0ef9cfeefe2b9cf18a0fece6",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/closed-diagnostic.json",
+      "bytes": 8273,
+      "sha256": "19a9cb80a38975ad9426637bc21e6938021c20714a513dfd339adaa4c7d3b733",
+      "gitBlob": "b32482f5f4a25be22f1906b7c82b103df255fd60",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/source-binding.json",
+      "bytes": 5087,
+      "sha256": "82a1ac9163974d8357ce884dab9df1781058931665a65e036b94aa6f26753269",
+      "gitBlob": "6a018d913598eca9da2ce85f9e2e1713ec4119f6",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/ci-final.json",
+      "bytes": 22439,
+      "sha256": "6bfc96d4c7ddffb3b49ba57647397806ca1eef9e267d7e3bfaf3637c0ed0db2d",
+      "gitBlob": "96aa4f581ff72156eef4a33916bad62c839260d2",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/integration-difference.json",
+      "bytes": 39593,
+      "sha256": "4a80c4d0eb33a2a845874db76bb1f2edba974a95a19ec4a6686190afa7936213",
+      "gitBlob": "436d3b0b18d5d5e13144c076af93d8c87d281cb0",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/observer-cleanup.json",
+      "bytes": 1301,
+      "sha256": "e730f50f876c291470b724a3769730a651d96893a315a952e9a1f1a73f0d594a",
+      "gitBlob": "80e59dcaef947ea7a3531cb9802a9a0c6d28cb07",
+      "exactRemoteReadback": true
+    },
+    {
+      "path": "evidence/desktop-a9072e/original-post-reader-identity.json",
+      "bytes": 2738,
+      "sha256": "ec2f0938146be2cf0a462435cf92965ed9a020d44c433ac6ec235c0a1d5ced2e",
+      "gitBlob": "49268f806349a114d1dff09f0e99428b11ecc323",
+      "exactRemoteReadback": true
+    }
+  ],
+  "productionAcceptance": null,
+  "doesNotApplyToLaterRevisions": true,
+  "createdAsUnreferencedBlobsOnly": true,
+  "gitRefsModified": false
+}

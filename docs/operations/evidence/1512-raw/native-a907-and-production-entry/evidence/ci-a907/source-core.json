@@ -1,0 +1,1489 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "pr1665_a907_owned_source_core_ci",
+  "candidate": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+  "run": {
+    "id": 42407923900,
+    "attempt": 1,
+    "event": "pull_request"
+  },
+  "scope": "Source checks and Core unit checks only; other workflow/jobs are independently monitored",
+  "status": "owned_jobs_success",
+  "productionAcceptance": false,
+  "checkout": {
+    "source": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+    "core": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+    "tree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7",
+    "parents": [
+      "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+      "a9072e5835a1f7e14aae0af0033d1b682433651f"
+    ],
+    "basis": "each actual job checkout line plus immutable Git commit metadata"
+  },
+  "jobs": [
+    {
+      "id": 128509689739,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T19:48:56Z",
+      "completedAt": "2026-11-07T19:51:29Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:57Z",
+          "completedAt": "2026-11-07T19:48:57Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:57Z",
+          "completedAt": "2026-11-07T19:49:01Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:49:01Z",
+          "completedAt": "2026-11-07T19:49:53Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm check:cloud-boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:49:53Z",
+          "completedAt": "2026-11-07T19:50:01Z"
+        },
+        {
+          "number": 5,
+          "name": "Verify all production release credentials use existing Infisical OIDC",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:01Z",
+          "completedAt": "2026-11-07T19:50:01Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm lint:code",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:01Z",
+          "completedAt": "2026-11-07T19:50:03Z"
+        },
+        {
+          "number": 7,
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:03Z",
+          "completedAt": "2026-11-07T19:50:04Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm lint:runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:04Z",
+          "completedAt": "2026-11-07T19:50:04Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm test:api",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:04Z",
+          "completedAt": "2026-11-07T19:50:17Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/frontend test",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:17Z",
+          "completedAt": "2026-11-07T19:50:43Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:43Z",
+          "completedAt": "2026-11-07T19:51:19Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:19Z",
+          "completedAt": "2026-11-07T19:51:20Z"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm --filter @mikka/mobile typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:20Z",
+          "completedAt": "2026-11-07T19:51:27Z"
+        },
+        {
+          "number": 25,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:27Z",
+          "completedAt": "2026-11-07T19:51:27Z"
+        },
+        {
+          "number": 26,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:27Z",
+          "completedAt": "2026-11-07T19:51:27Z"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:27Z",
+          "completedAt": "2026-11-07T19:51:27Z"
+        }
+      ]
+    },
+    {
+      "id": 128509689736,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T19:48:46Z",
+      "completedAt": "2026-11-07T19:56:13Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:46Z",
+          "completedAt": "2026-11-07T19:48:47Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:47Z",
+          "completedAt": "2026-11-07T19:48:50Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:48:50Z",
+          "completedAt": "2026-11-07T19:49:41Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm test:factory-check-independence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:49:41Z",
+          "completedAt": "2026-11-07T19:49:41Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm test:factory-check-recovery",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:49:41Z",
+          "completedAt": "2026-11-07T19:49:43Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm test:factory-routing",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:49:43Z",
+          "completedAt": "2026-11-07T19:49:55Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:self-improvement-semantic-source",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:49:55Z",
+          "completedAt": "2026-11-07T19:49:57Z"
+        },
+        {
+          "number": 8,
+          "name": "Run node --test scripts/ci-docs-only.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:49:57Z",
+          "completedAt": "2026-11-07T19:49:58Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm test:ui-policy",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:49:58Z",
+          "completedAt": "2026-11-07T19:50:08Z"
+        },
+        {
+          "number": 10,
+          "name": "Idle request budget (main pages, no browser)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:08Z",
+          "completedAt": "2026-11-07T19:50:16Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:motion",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:16Z",
+          "completedAt": "2026-11-07T19:50:17Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm test:i18n",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:17Z",
+          "completedAt": "2026-11-07T19:50:17Z"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm i18n:check",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:17Z",
+          "completedAt": "2026-11-07T19:50:21Z"
+        },
+        {
+          "number": 14,
+          "name": "Run pnpm test:ssh-target",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:21Z",
+          "completedAt": "2026-11-07T19:50:21Z"
+        },
+        {
+          "number": 15,
+          "name": "Run pnpm test:linear-sync",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:21Z",
+          "completedAt": "2026-11-07T19:50:24Z"
+        },
+        {
+          "number": 16,
+          "name": "Run pnpm check:agent-definitions",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:24Z",
+          "completedAt": "2026-11-07T19:50:25Z"
+        },
+        {
+          "number": 17,
+          "name": "Release identity, vulnerability policy and artifact tamper regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:25Z",
+          "completedAt": "2026-11-07T19:50:26Z"
+        },
+        {
+          "number": 18,
+          "name": "Run pnpm test:mailbox-verification",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:26Z",
+          "completedAt": "2026-11-07T19:50:27Z"
+        },
+        {
+          "number": 19,
+          "name": "Run pnpm test:factory-approval",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:27Z",
+          "completedAt": "2026-11-07T19:50:28Z"
+        },
+        {
+          "number": 20,
+          "name": "Run pnpm test:personal-mailbox-core",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:28Z",
+          "completedAt": "2026-11-07T19:50:35Z"
+        },
+        {
+          "number": 21,
+          "name": "Run pnpm test:factory-monitor",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:35Z",
+          "completedAt": "2026-11-07T19:50:36Z"
+        },
+        {
+          "number": 22,
+          "name": "Run pnpm test:execution-rules",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:36Z",
+          "completedAt": "2026-11-07T19:50:46Z"
+        },
+        {
+          "number": 23,
+          "name": "Run pnpm test:abuse",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:46Z",
+          "completedAt": "2026-11-07T19:50:50Z"
+        },
+        {
+          "number": 24,
+          "name": "Run pnpm test:self-hosting",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:50Z",
+          "completedAt": "2026-11-07T19:50:51Z"
+        },
+        {
+          "number": 25,
+          "name": "Run pnpm test:self-hosted-byok",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:51Z",
+          "completedAt": "2026-11-07T19:50:53Z"
+        },
+        {
+          "number": 26,
+          "name": "Run pnpm test:cloud-services",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:53Z",
+          "completedAt": "2026-11-07T19:50:55Z"
+        },
+        {
+          "number": 27,
+          "name": "Run pnpm test:hosted-usage",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:55Z",
+          "completedAt": "2026-11-07T19:50:56Z"
+        },
+        {
+          "number": 28,
+          "name": "Run pnpm test:model-admission",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:56Z",
+          "completedAt": "2026-11-07T19:50:59Z"
+        },
+        {
+          "number": 29,
+          "name": "Run pnpm test:audit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:50:59Z",
+          "completedAt": "2026-11-07T19:51:00Z"
+        },
+        {
+          "number": 30,
+          "name": "Run pnpm test:agent-kit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:00Z",
+          "completedAt": "2026-11-07T19:51:01Z"
+        },
+        {
+          "number": 31,
+          "name": "Run pnpm test:agent-kit-compat",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:01Z",
+          "completedAt": "2026-11-07T19:51:19Z"
+        },
+        {
+          "number": 32,
+          "name": "Run pnpm test:approved-writes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:19Z",
+          "completedAt": "2026-11-07T19:51:42Z"
+        },
+        {
+          "number": 33,
+          "name": "Run pnpm test:coordinator-events",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:51:42Z",
+          "completedAt": "2026-11-07T19:52:17Z"
+        },
+        {
+          "number": 34,
+          "name": "Run pnpm test:schedules",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:52:17Z",
+          "completedAt": "2026-11-07T19:52:19Z"
+        },
+        {
+          "number": 35,
+          "name": "Run pnpm test:run-recovery",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:52:19Z",
+          "completedAt": "2026-11-07T19:52:20Z"
+        },
+        {
+          "number": 36,
+          "name": "Run pnpm test:mvp-fixtures",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:52:20Z",
+          "completedAt": "2026-11-07T19:52:26Z"
+        },
+        {
+          "number": 37,
+          "name": "Run pnpm test:credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:52:26Z",
+          "completedAt": "2026-11-07T19:52:28Z"
+        },
+        {
+          "number": 38,
+          "name": "Run pnpm test:run-publication",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:52:28Z",
+          "completedAt": "2026-11-07T19:52:31Z"
+        },
+        {
+          "number": 39,
+          "name": "Run pnpm test:workflow-wakes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:52:31Z",
+          "completedAt": "2026-11-07T19:52:34Z"
+        },
+        {
+          "number": 40,
+          "name": "Factory daemon check regressions and shared report contract",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:52:34Z",
+          "completedAt": "2026-11-07T19:52:57Z"
+        },
+        {
+          "number": 41,
+          "name": "Run pnpm test:mobile-push",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:52:57Z",
+          "completedAt": "2026-11-07T19:52:59Z"
+        },
+        {
+          "number": 42,
+          "name": "Run pnpm test:mobile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:52:59Z",
+          "completedAt": "2026-11-07T19:53:08Z"
+        },
+        {
+          "number": 43,
+          "name": "Run pnpm test:coordinator-native-relay",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:08Z",
+          "completedAt": "2026-11-07T19:53:09Z"
+        },
+        {
+          "number": 44,
+          "name": "Run pnpm test:coordinator-native-scope",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:09Z",
+          "completedAt": "2026-11-07T19:53:12Z"
+        },
+        {
+          "number": 45,
+          "name": "Run pnpm test:coordinator-issue-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:12Z",
+          "completedAt": "2026-11-07T19:53:25Z"
+        },
+        {
+          "number": 46,
+          "name": "Run pnpm test:signup-turnstile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:25Z",
+          "completedAt": "2026-11-07T19:53:26Z"
+        },
+        {
+          "number": 47,
+          "name": "Run pnpm test:cloud-limits",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:26Z",
+          "completedAt": "2026-11-07T19:53:30Z"
+        },
+        {
+          "number": 48,
+          "name": "Run pnpm test:analytics",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:30Z",
+          "completedAt": "2026-11-07T19:53:30Z"
+        },
+        {
+          "number": 49,
+          "name": "Run pnpm test:artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:30Z",
+          "completedAt": "2026-11-07T19:53:41Z"
+        },
+        {
+          "number": 50,
+          "name": "Run pnpm test:factory-config",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:41Z",
+          "completedAt": "2026-11-07T19:53:42Z"
+        },
+        {
+          "number": 51,
+          "name": "Run pnpm test:user-message-text",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:42Z",
+          "completedAt": "2026-11-07T19:53:43Z"
+        },
+        {
+          "number": 52,
+          "name": "Run pnpm test:run-info",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:43Z",
+          "completedAt": "2026-11-07T19:53:44Z"
+        },
+        {
+          "number": 53,
+          "name": "Run pnpm test:thread-changes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:44Z",
+          "completedAt": "2026-11-07T19:53:45Z"
+        },
+        {
+          "number": 54,
+          "name": "Run pnpm check:agent-ui",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:45Z",
+          "completedAt": "2026-11-07T19:53:47Z"
+        },
+        {
+          "number": 55,
+          "name": "Run pnpm test:dev-local",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:47Z",
+          "completedAt": "2026-11-07T19:53:50Z"
+        },
+        {
+          "number": 56,
+          "name": "Run pnpm test:lib-units",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:53:50Z",
+          "completedAt": "2026-11-07T19:55:40Z"
+        },
+        {
+          "number": 57,
+          "name": "Run pnpm test:project-decisions",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:55:40Z",
+          "completedAt": "2026-11-07T19:55:43Z"
+        },
+        {
+          "number": 58,
+          "name": "Run pnpm test:unread",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:55:43Z",
+          "completedAt": "2026-11-07T19:55:43Z"
+        },
+        {
+          "number": 59,
+          "name": "Run pnpm test:issue-readonly-dom",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:55:43Z",
+          "completedAt": "2026-11-07T19:56:10Z"
+        },
+        {
+          "number": 117,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:56:10Z",
+          "completedAt": "2026-11-07T19:56:10Z"
+        },
+        {
+          "number": 118,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:56:10Z",
+          "completedAt": "2026-11-07T19:56:11Z"
+        },
+        {
+          "number": 119,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T19:56:11Z",
+          "completedAt": "2026-11-07T19:56:11Z"
+        }
+      ]
+    }
+  ],
+  "sourceProjection": {
+    "actualCheckout": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+    "node": "v24.22.2",
+    "api": [
+      {
+        "tests": 84,
+        "suites": 0,
+        "pass": 84,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4181.593158
+      },
+      {
+        "tests": 58,
+        "suites": 0,
+        "pass": 58,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 8275.333993
+      }
+    ],
+    "frontend": [
+      {
+        "tests": 45,
+        "suites": 0,
+        "pass": 45,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 26039.647191
+      }
+    ],
+    "aliasSubtests": [
+      {
+        "name": "native step imports compile workspace protocol and keep API adapters and package singletons across rebuilds",
+        "passed": true
+      },
+      {
+        "name": "the actual Workflow LocalBuilder output loads natively and answers GET/HEAD health after the API alias pass",
+        "passed": true
+      },
+      {
+        "name": "production builds register no extra pass; dev registers after both SDK build phases",
+        "passed": true
+      }
+    ],
+    "lintClosedLines": [
+      "Found 0 warnings and 0 errors."
+    ],
+    "typechecks": [
+      {
+        "step": "Run pnpm typecheck",
+        "conclusion": "success"
+      },
+      {
+        "step": "Run pnpm --filter @mikka/protocol typecheck",
+        "conclusion": "success"
+      },
+      {
+        "step": "Run pnpm --filter @mikka/mobile typecheck",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "coreProjection": {
+    "actualCheckout": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+    "groups": [
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "expected": 26,
+        "passed": 26,
+        "duplicate": [],
+        "missing": []
+      },
+      {
+        "path": "scripts/acceptance/run-observability-workflow.test.mjs",
+        "expected": 13,
+        "passed": 13,
+        "duplicate": [],
+        "missing": []
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "expected": 30,
+        "passed": 30,
+        "duplicate": [],
+        "missing": []
+      }
+    ],
+    "summary": [
+      "ℹ tests 134",
+      "ℹ suites 0",
+      "ℹ pass 134",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0",
+      "ℹ duration_ms 2094.281138",
+      "ℹ tests 9",
+      "ℹ suites 0",
+      "ℹ pass 9",
+      "ℹ fail 0",
+      "ℹ cancelled 0",
+      "ℹ skipped 0",
+      "ℹ todo 0",
+      "ℹ duration_ms 291.717273"
+    ],
+    "live": {
+      "path": "lib/live/channel.test.ts",
+      "expected": 59,
+      "passed": 59,
+      "missing": [],
+      "duplicate": [],
+      "inventory": "50 literal cases plus exact source parameter sets of 4+3+2",
+      "step": "Run pnpm test:lib-units",
+      "packageEntry": "test:device-gateway"
+    }
+  },
+  "observedTargetCases": [
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "expected": 26,
+      "passed": 26,
+      "cases": [
+        {
+          "name": "preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "a default team switches only this login session to its verified personal workspace before reading Coordinator",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "workspace selection rejects ambiguous choices, teams and another account personal membership before switching",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "unsafe configuration blocks before any model call and reports only closed failure codes",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "successful terminal runs close only their own machines and retain task evidence",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "a missing machine requires a fresh owned run and an explicit null machine read",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "machine failures never turn a completed task green and do not prevent closing another owned machine",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "legacy Factory tasks still require review and verify before the normal deliverable acceptance",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "missing, failed or stale Factory checks never reach approval, including legacy verify",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "deliverable approval requires its receipt, never accepts a repository and never retries a lost response",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "uncertain mutation responses never resubmit and still reconcile own temporary settings",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "wrong provider/model and an extra native attempt stop the case without retrying",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "pure source and budget guards reject shared credentials, inherited model choices and retries",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "cleanup preserves a concurrent model edit and reports incomplete restoration",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "prepare is explicit, requires execution and restores only its acknowledged settings",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "prepare refuses owner-wide activity and inherited model choices without changing settings",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "a blocked case does not prevent preparation and execution of another available model",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "preparation failures restore acknowledged writes but never guess after a lost response",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "restoration failures and concurrent edits remain visible without overwriting them",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "browser submission requires one executed case and does not authenticate on invalid options",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "browser mode publishes readiness then observes the real-shaped UI click through push without an API submission",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "browser waiting times out or blocks changed UI text without sending or repeating a task",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports",
+          "occurrences": 1,
+          "outcome": "passed"
+        }
+      ]
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.test.mjs",
+      "expected": 13,
+      "passed": 13,
+      "cases": [
+        {
+          "name": "fixed progress bridge posts verified fixture once and keeps every token alias out of the driver",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "flags, single-case binding and missing token reject before any child or network request",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "modified or expanded readiness never becomes an external comment or console content",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "one failed or uncertain POST sends SIGTERM, waits for cleanup and is never retried",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "duplicate readiness cannot post twice and preserves a nonzero driver exit",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "ordinary preflight passes safe stdout through without GitHub access and forwards termination for cleanup",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "runner mode rejects non-main, mismatched revision and incomplete mode flags before starting anything",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "runner gets only validated readiness and token-free child env, with its flag removed from the driver",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "runner continues consuming readiness while the actor starts and aborts a duplicate without a second actor",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "runner startup failure stops the driver, waits for its cleanup and exports no error text",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "runner cleanup failure cannot be hidden by a successful driver return or replace a nonzero exit",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "driver exit aborts pending actor startup and still awaits the late owned browser close",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "runner never starts after invalid readiness or a failed progress POST and cannot pass with missing readiness",
+          "occurrences": 1,
+          "outcome": "passed"
+        }
+      ]
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "expected": 30,
+      "passed": 30,
+      "cases": [
+        {
+          "name": "one actual UI submit stays open, uses no API submission, and closes its own session once",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "refuses actions before launching or typing credentials",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "refuses event before launching or typing credentials",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "refuses repository before launching or typing credentials",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "refuses ref before launching or typing credentials",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "refuses sha before launching or typing credentials",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "refuses expiry before launching or typing credentials",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "refuses fixture before launching or typing credentials",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "refuses extra-ready before launching or typing credentials",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "refuses debug before launching or typing credentials",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "workspace switch waits for the new HOME document, not the old HOME URL or hidden menu",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "rejects ambiguousWorkspace without submitting and closes allocated resources",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "rejects otherOwner without submitting and closes allocated resources",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "rejects ambiguousProfile without submitting and closes allocated resources",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "rejects disabledSubmit without submitting and closes allocated resources",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "rejects buildChange without submitting and closes allocated resources",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "rejects foreignSignIn without submitting and closes allocated resources",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "rejects foreignBusiness without submitting and closes allocated resources",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "checks expireBeforeSubmit after filling but before the paid side effect",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "checks abortBeforeSubmit after filling but before the paid side effect",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "no renderer business response cannot be replaced by the independent version API check",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "an already aborted signal creates no browser or session",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "never retries a submission with submitThrows and retains its unknown outcome",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "never retries a submission with submitUnknown and retains its unknown outcome",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "abort cancels a pending actionable click before any logout await",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "logout failure still closes every owned resource and makes idempotent close fail",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "report sink failure does not leak a page, context or browser",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "a resource that arrives after bounded abort cleanup is closed, never reported as already closed",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "a page-close failure stops the browser before any further cleanup wait can release a late click",
+          "occurrences": 1,
+          "outcome": "passed"
+        },
+        {
+          "name": "the actual workflow awaits actual actor session cleanup with no progress token in its environment",
+          "occurrences": 1,
+          "outcome": "passed"
+        }
+      ]
+    }
+  ],
+  "observedLiveCases": {
+    "path": "lib/live/channel.test.ts",
+    "sourceHash": "591ca7d47e4af01661817bac8466fdaeaac240858dc5cf1bac42ba3aa5da3baa",
+    "expected": 59,
+    "passed": 59,
+    "cases": [
+      {
+        "name": "presence support alone retains fallback; only the exact acknowledged watch makes idle reads stop",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "old Workers, missing and oversized proofs preserve the existing minute fallback",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "unknown, expired or overlong acknowledgements and explicit rejection cannot claim coverage",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "watch expiry does not fetch or renew a ticket; it resumes the existing slow fallback",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "duplicate subscriptions refcount one watch and the last exit unregisters while other live keys stay open",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "changing the proof replaces only its watch, ignores stale acknowledgements and makes no data read",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "hidden, disconnected and replaced sockets lose watch coverage and cannot accept a late old acknowledgement",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "watch bounds keep only uncovered keys on fallback and a freed slot admits the remaining subscription",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "duplicate badges share a connection and one revalidation per SWR key",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a supported late subscription uses the continuous ready boundary instead of its registration time",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a late subscription cannot replace a newer pending deadline boundary with older continuous coverage",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "live observations describe received, skipped and read keys without changing reads",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "online idle channels send pings and perform no polling reads",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "focus coverage follows this key, live capabilities and disconnects",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "duplicate visible events skip healthy live reads while a real hidden interval still catches up",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "unsupported live kinds keep visibility catch-up even while their socket is connected",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "offline fallback waits at least 60 seconds; hidden tabs make no requests",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a reconnect reconciles missed changes immediately and resets the offline fallback",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "unknown ids, kinds and payload fields cannot trigger revalidation",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "workspace teardown aborts a pending ticket and discards late events",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "ticket renewal reauthenticates and catches up without keeping an expired subscription",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a late ticket cannot open a socket after the tab becomes hidden",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a half-open socket becomes offline when pongs stop",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a healthy socket catches a lost invalidation at the full ticket lifetime",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a hung renewal still reconciles a lost invalidation after one offline fallback interval",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "stream bursts retain the last change without reading more often than the old two-second cadence",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "semantic changes bypass a pending stream delay and deduplicate the same SWR key",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a change during an in-flight read gets one trailing read after it settles",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "hidden documents discard delayed reads and reconcile the current document on visibility return",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "teardown during a read cannot schedule an old owner or workspace trailing read",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a server question deadline performs one catch-up read and never becomes a poll",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "hidden question deadlines make no reads; visibility and teardown reconcile or discard them",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a subscriber joining an already healthy channel reconciles a read that started before its subscription",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a pending shared-key catch-up uses a remaining subscriber when the last reader unmounts",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a new client on an old Worker keeps the sixty-second fallback despite healthy auto-pongs",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "capabilities are per-kind, including subscriptions added after the channel is ready",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "malformed readiness cannot suppress fallback, and a verified readiness stops only supported-key fallback",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "approval expiry still triggers one authoritative read when the old Worker has no capability announcement",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "moving the browser wall clock backwards cannot postpone a server-derived approval expiry",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a backward wall-clock correction cannot postpone a pushed key beyond its existing pacing interval",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "updating or clearing a deadline retains the same subscription and cannot restart the same expiry",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "timing updates while hidden do not read, and updates after teardown cannot revive a subscription",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "updating read pacing retains the connection and applies the new spacing to subsequent pushes",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "only a newer real observation can rearm the same fired deadline, and an active deadline is never postponed",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a fresh server-future observation whose conservative remaining time is zero gets only one immediate recheck",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "one coalesced read requires the highest pushed revision of every entity behind its key",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "an unversioned flush retains a higher revision from another active consumer of the same key",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a version 2 channel asks for revisions and skips a push its data already holds, reading every newer or unknown one",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a revision never skips a key it does not cover, a version 1 Worker, or a kind the Worker did not list",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "an unconditional push merged with a covered one still reads",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a late read keeps exact coverage after other-kind",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a late read keeps exact coverage after own-kind",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a late read keeps exact coverage after reconnect",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a late read keeps exact coverage after before-open",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a late subscription without capabilities coverage retains its new read boundary",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a late subscription without kind coverage retains its new read boundary",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a late subscription without presence coverage retains its new read boundary",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a unversioned event for an unsubscribed key advances continuous coverage",
+        "occurrences": 1,
+        "outcome": "passed"
+      },
+      {
+        "name": "a versioned event for an unsubscribed key advances continuous coverage",
+        "occurrences": 1,
+        "outcome": "passed"
+      }
+    ]
+  },
+  "originalLogs": {
+    "source": {
+      "bytes": 111557,
+      "sha256": "b4da6c62f02b060ddb7829853a6d71aa8ced55073cf7d62d0afb7c9849317c7d",
+      "published": false
+    },
+    "core": {
+      "bytes": 923115,
+      "sha256": "2e175e62fd53c2b96c57f70595449e0bd766d6ba3f8b4868c49cd3f91aa61ef3",
+      "published": false
+    },
+    "policy": "kept only in functions memory; no mixed logs or credential-bearing data published"
+  },
+  "priorFailure": {
+    "candidate": "58089592b806caba919fd0f5184ea3f8499419fa",
+    "receiptBlob": "90eecf5f09f90ad61253947685a8ae97e7b90a29",
+    "clarificationBlob": "4570c5622f7cfcf9b6861fa3ccb02f871245cb29",
+    "preserved": true
+  },
+  "boundaries": [
+    "The 69 acceptance-driver/helper/actor cases run with offline fixtures; they do not demonstrate a production browser submission or model execution.",
+    "The 59 Live cases are exact source case names, including its three finite parameter sets; they do not alter real Native query budgets.",
+    "No results from the older 580 candidate or local offline verification were substituted.",
+    "No rerun, cancellation, ref change or production setting mutation was performed by this reviewer."
+  ]
+}

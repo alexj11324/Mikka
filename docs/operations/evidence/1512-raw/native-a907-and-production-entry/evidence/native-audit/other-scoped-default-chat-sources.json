@@ -1,0 +1,281 @@
+{
+  "version": 1,
+  "kind": "desktop_other_scoped_source_audit",
+  "status": "read_only_source_audit_complete_runtime_attribution_unknown",
+  "candidateHead": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+  "actualSource": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+  "actualTree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7",
+  "desktopRunId": 42407923882,
+  "harnessSha256": "adc8ec517885a397cdbdbf9d8504e009b28cc4504f4ec17f7db4a72b30093db2",
+  "sourceVocabulary": {
+    "keys": 75,
+    "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+    "gitBlob": "d470c1d71454dff12f60cf7e0dd373624bd8b314",
+    "sha256": "0eeb18be931fdc4d8ddb908dff9a0b4a94a6596a992fcc9a1c5fd635a935a0bb"
+  },
+  "runtimeEvidence": {
+    "indexGitBlob": "6ded68fe80c6a547fe85f1e0e3d74088f3803ef2",
+    "integrationGitBlob": "436d3b0b18d5d5e13144c076af93d8c87d281cb0",
+    "login": {
+      "native": 210,
+      "web": 188,
+      "passed": false
+    },
+    "workspaceUnattributed": {
+      "native": 49,
+      "web": 24
+    },
+    "workspaceOtherScoped": {
+      "native": 30,
+      "web": 13
+    },
+    "workspaceNoScope": {
+      "native": 0,
+      "web": 0
+    },
+    "attributedContributionOfCandidates": null,
+    "perRestInvocationCountsAvailable": false
+  },
+  "counterSemantics": {
+    "countAt": "pg.Client.prototype.query",
+    "incrementsPerInvocation": 1,
+    "protectedOperationKeys": 17,
+    "refinementScope": "Only queryOperations.unattributed",
+    "otherScoped": "Exact non-null scope not contained in either closed vocabulary; arbitrary scope value is not retained.",
+    "noScope": "Only null/undefined or unavailable scope.",
+    "workflowFallbackConsulted": false,
+    "allExistingTotalsAndWindowsRemainUnchanged": true
+  },
+  "writerFamilies": [
+    {
+      "path": "apps/api/runtime/request-trace.ts",
+      "call": "routeScope.run(generatedTemplate, callback)"
+    },
+    {
+      "path": "lib/request-log.ts",
+      "call": "routeScope.run(fixedRoute, handler)"
+    },
+    {
+      "path": "lib/db/egress-sample.ts",
+      "call": "routeScope.run(operation, read)"
+    },
+    {
+      "path": "lib/tracing/jobs.ts",
+      "call": "routeScope.run(jobLabel, work)",
+      "labelsFrom": "lib/background.ts"
+    }
+  ],
+  "candidates": [
+    {
+      "scope": "/api/approved-writes",
+      "sharedBy": "native_and_web",
+      "trigger": "CoordinatorChat -> PendingActions -> ApprovedWriteActions; availability=true and viewer/session ready -> useSWRInfinite -> loadUnresolvedWrites -> POST op=list",
+      "sourceLocations": [
+        "components/coordinator/coordinator-chat.tsx:574",
+        "components/coordinator/pending-actions.tsx:99",
+        "components/coordinator/approved-write-actions.tsx:69-83",
+        "lib/operations/write-client.ts:36-40"
+      ],
+      "databaseEvidence": [
+        "lib/operations/write-http.ts:26,36",
+        "lib/operations/write-discovery.ts:32-40"
+      ],
+      "boundary": "GET availability itself does not query PG. The actual observed run has no retained per-REST event evidence proving POST count or per-route SQL contribution."
+    },
+    {
+      "scope": "/api/conversations/[id]/read",
+      "sharedBy": "native_and_web",
+      "trigger": "CoordinatorChat unconditionally mounts useUnreadIndicators. Hook initial get reads current position; visible stored messages may mark position and teardown may beacon.",
+      "sourceLocations": [
+        "components/coordinator/coordinator-chat.tsx:370",
+        "lib/hooks/use-unread-indicators.ts:33-38,48,57",
+        "lib/conversation-reads.ts:38-56"
+      ],
+      "databaseEvidence": [
+        "app/api/conversations/[id]/read/route.ts:16-31",
+        "lib/conversation-reads-store.ts:87-110,130-143"
+      ],
+      "boundary": "GET and POST share the same fixed generated scope. The label counts DB operations, not requests or repeated effects. Does not prove which calls fell within the old window."
+    },
+    {
+      "scope": "/api/mobile/reactions",
+      "sharedBy": "native_and_web",
+      "trigger": "CoordinatorChat -> useMessageReactions -> reactionUrls for valid stored UUIDs (deduplicated, 100 per request) -> GET",
+      "sourceLocations": [
+        "components/coordinator/coordinator-chat.tsx:369",
+        "components/workspace/message-reactions.tsx:9-12",
+        "lib/message-reactions.ts:16-20"
+      ],
+      "databaseEvidence": [
+        "app/api/mobile/reactions/route.ts:31-43",
+        "lib/mobile-api.ts:16-17",
+        "lib/reactions.ts:43-50"
+      ],
+      "boundary": "Route name mobile does not imply mobile-only use. Native/Web actual call count and cost remain unobserved."
+    }
+  ],
+  "exclusions": [
+    {
+      "claim": "Generic /mikka prefix or Hono colon template mismatch",
+      "result": "Not supported",
+      "evidence": "apps/api/src/application.ts uses matched.route.template. Fixed generated templates use /api and [parameter] names, matching the counter."
+    },
+    {
+      "claim": "All unknown queries lost their request scope",
+      "result": "Contradicted by noScope=0; otherScoped is non-null unlisted scope."
+    },
+    {
+      "claim": "Native live presence automatically contributes",
+      "result": "Not established; peer source audit found Native MainSocket only ping and revisions=1, no presence subscription."
+    },
+    {
+      "claim": "Desktop finish endpoint itself queries PG",
+      "result": "Fixed handler only returns handoff HTML; its script calls exchange/auth endpoints already classified."
+    },
+    {
+      "claim": "Settings generic label covers every expanded read",
+      "result": "False; inner withDatabaseOperation replaces /api/settings/[read] with /api/settings/<read>. Nineteen legal expansions are currently omitted, but default login reachability was not established."
+    },
+    {
+      "claim": "Missing thread-detail operation labels explain this login",
+      "result": "Not established; actual retained logical action list does not show those detail actions."
+    }
+  ],
+  "minimalProposal": {
+    "sourceKeysToAdd": [
+      "/api/approved-writes",
+      "/api/conversations/[id]/read",
+      "/api/mobile/reactions"
+    ],
+    "newKeyCount": 78,
+    "noCounterTimingOrTotalsChange": true,
+    "noAdditionalRequestsOrPolling": true,
+    "valuesRemainCountsOnly": true,
+    "unknownFallbackRetained": true,
+    "original75ReportsRemainUnchanged": true,
+    "historicalReader": "Keep frozen 75-key reader; use explicitly new vocabulary-bound reader for 78-key reports. Never fill old missing labels with 0 or subtract guessed contributions from otherScoped.",
+    "binding": "Bind next exact compiled revision, harness revision, counter/source-table bytes and SHA256. Existing 12-file parity harness hash alone does not include source table/counter helper.",
+    "bodySizeAssessment": {
+      "snapshots": 12,
+      "bodyLimit": 8192,
+      "originalWireShapeMax": 3279,
+      "additionWireShapeMax": 3363,
+      "maximumIntegerShapeMax": 4841,
+      "additionalBytes": 84,
+      "method": "Offline sizing of exact fixed counter snapshot fields plus three proposed keys. Does not amend or classify original data and is not a server execution."
+    },
+    "focusedVerificationSuggested": [
+      "Known new fixed scope increments only its refinement; total/unattributed still conserve.",
+      "Arbitrary/private or concrete-id scope remains otherScoped with no retained value.",
+      "All four windows and 12 checkpoint boundaries unchanged; before/after deltas remain monotonic and conserved.",
+      "Old absent or 75-key evidence stays explicitly historical/unknown, not reclassified."
+    ],
+    "requestCountLimitation": "Adding SQL labels alone cannot prove duplicate HTTP invocations; a subsequent existing run can identify per-route SQL contribution, while precise request duplication requires existing or separately authorized closed REST invocation evidence."
+  },
+  "primarySources": [
+    {
+      "path": "apps/desktop/test/db-metrics.cjs",
+      "bytes": 8336,
+      "sha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+      "gitBlob": "340cf961029e706e76a6f3f0ccf08eb8cfc84cd9"
+    },
+    {
+      "path": "apps/api/src/application.ts",
+      "bytes": 5366,
+      "sha256": "3f7f1cec43009acd2778dcfdbb0557f4956de0a0e49ea930861caa2a97c3d315",
+      "gitBlob": "6fe5ed716899e34c0860e69295ecbec99669b293"
+    },
+    {
+      "path": "apps/api/runtime/request-trace.ts",
+      "bytes": 2883,
+      "sha256": "a7c9c6bcb0b5e68dfebb96d7841171f4dc07c09061d0889404482d2594124ca9",
+      "gitBlob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b"
+    },
+    {
+      "path": "lib/request-log.ts",
+      "bytes": 9890,
+      "sha256": "d0a529fd0696397afc89e36c5b07015c33785367e14ce6c9fbf07891d747d054",
+      "gitBlob": "3e6a99e4b6e63a5e491e44d4ad2379cf9d0e75a7"
+    },
+    {
+      "path": "lib/db/egress-sample.ts",
+      "bytes": 4294,
+      "sha256": "eb2628088a55ba1141e1b49390629f3e9e01850ef3e197838e1e7ac06ea5764c",
+      "gitBlob": "7d3a1bff16a85646cd0716635efd77e1a99c29e7"
+    },
+    {
+      "path": "lib/tracing/jobs.ts",
+      "bytes": 2650,
+      "sha256": "6ea794db16ebd2020c31c338d4856c4909b4009a618b97a2d4eb5092a30bb8f1",
+      "gitBlob": "6cec226926da96c89acc06479a6b6c13902b0470"
+    },
+    {
+      "path": "app/api/settings/[read]/route.ts",
+      "bytes": 5533,
+      "sha256": "17806db00cdde5941c101a2d7b50fbf056fd14703166786fd04245818dc33d8e",
+      "gitBlob": "2735cd2f2ed63b4c755554cdfb5c002dc6be38e4"
+    },
+    {
+      "path": "components/coordinator/coordinator-chat.tsx",
+      "bytes": 47370,
+      "sha256": "53ff7f4491b9749d0c0cfa6f4b2b55c49d0af8441be2e336331489963a684473",
+      "gitBlob": "80c0cc690e25be20e36ce8bb58f813e6bdbc1dc5"
+    },
+    {
+      "path": "components/coordinator/approved-write-actions.tsx",
+      "bytes": 10354,
+      "sha256": "f59a16c7f936dd004d83de28f01fd4a0c17427ceaaf94ef3d183cb816054bf55",
+      "gitBlob": "dc5a691004f8344162a7d90343ba0c0dffc753dc"
+    },
+    {
+      "path": "components/coordinator/pending-actions.tsx",
+      "bytes": 7165,
+      "sha256": "bb74f90977f83f676a5effe1e9c0d747b8e79bc1679d27ed88be8510c892e723",
+      "gitBlob": "5bbc469d621346ffcf9e46991fde34d3c024cc53"
+    },
+    {
+      "path": "lib/message-reactions.ts",
+      "bytes": 1834,
+      "sha256": "cbdb6b6bbd0db34098e078b06ac6fb8fcefb863b5bf82cf0bbad916d8af4c722",
+      "gitBlob": "03506913bbdcfb1790a4ff15f7d22aa7e069313d"
+    },
+    {
+      "path": "app/api/mobile/reactions/route.ts",
+      "bytes": 2053,
+      "sha256": "1bcb27533a05aaf1d15ec8cf46d50648953ca90a1ece0939d7958e5850081477",
+      "gitBlob": "0518da76151f8e8f5029c4425ac9546f90790d63"
+    },
+    {
+      "path": "lib/hooks/use-unread-indicators.ts",
+      "bytes": 8387,
+      "sha256": "9dc93b02c54016eace59ff479aa2f91edb297334bcb1bb294bdb63a2fc5e7024",
+      "gitBlob": "3756bedc1019bea73e83a6effb6b51e69362cc2a"
+    },
+    {
+      "path": "app/api/conversations/[id]/read/route.ts",
+      "bytes": 1881,
+      "sha256": "f4021a167ab0f9968a18a93e1377968447d32e5655b4b8b6c17427610d48e868",
+      "gitBlob": "5d8b2af7eec1fb29183c84dc7d1f326a37192dd4"
+    },
+    {
+      "path": "lib/operations/write-http.ts",
+      "bytes": 4435,
+      "sha256": "b242ba9cbaf7da3762e36a5d73c108b2c253de7af8d0e4e689aa421b6d8f9afd",
+      "gitBlob": "0838b7de6b02b87fea00b7b7a9d3e89995a76b65"
+    },
+    {
+      "path": "lib/operations/write-discovery.ts",
+      "bytes": 5580,
+      "sha256": "649d7b39300d2498d02c03db8000b8f38e5bfdbacd683d3dd1ad87c4926fc9e0",
+      "gitBlob": "6182b6fd2761dbbd703dc4e3ee99d0d57b2b667c"
+    }
+  ],
+  "actions": {
+    "sourceEdits": false,
+    "refsChanged": false,
+    "remoteWrites": false,
+    "serverOrModelRequests": false,
+    "resourcesStarted": false,
+    "nativeRerun": false
+  }
+}

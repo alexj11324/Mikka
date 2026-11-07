@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "kind": "bounded_desktop_artifact_download",
+  "runId": 42407923882,
+  "attempt": 1,
+  "head": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+  "source": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+  "artifacts": [
+    {
+      "kind": "native",
+      "id": 13587994179,
+      "name": "desktop-native-evidence-052740cf37c4788853eb98df9d66ea7c646ea0c2",
+      "bytes": 14885506,
+      "sha256": "6f7cb7c2824cf469f015f0087710bc22e584489c73e3ee4d8ce740d1a571f55c",
+      "headSha": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "runId": 42407923882
+    },
+    {
+      "kind": "package",
+      "id": 13587954372,
+      "name": "desktop-package-evidence-052740cf37c4788853eb98df9d66ea7c646ea0c2",
+      "bytes": 1598,
+      "sha256": "1bdd958f417f96652a820cf33a52c9cc5e70ce966ee7c21337eab01562b1ab81",
+      "headSha": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "runId": 42407923882
+    },
+    {
+      "kind": "compiled",
+      "id": 13588760289,
+      "name": "desktop-api-build-052740cf37c4788853eb98df9d66ea7c646ea0c2",
+      "bytes": 48178447,
+      "sha256": "ccb45dc2ba75544b3d6e2e3ae722ce4be111cfbe0cd4f4b015c527b980ed2464",
+      "headSha": "a9072e5835a1f7e14aae0af0033d1b682433651f",
+      "runId": 42407923882
+    }
+  ],
+  "files": [
+    {
+      "path": "lifecycle.json",
+      "bytes": 264045,
+      "sha256": "a61adcbb1b48f46f262ea2fe0d2139f3c3a8093f2ce8b11d839e59fa9f5c2bac",
+      "gitBlob": "3eeb55b077759ea4f6ba49d13deeb23ef190de44"
+    },
+    {
+      "path": "parity/parity.json",
+      "bytes": 106740,
+      "sha256": "9b8a185788f3054e47991d7d5f15e645d2803c04849aa9940f764aff1fc3c2bd",
+      "gitBlob": "e5c1b7ab14266d5c2f8e55d5d62b06c4e8869f04"
+    },
+    {
+      "path": "smoke.json",
+      "bytes": 3105,
+      "sha256": "834f2e8e6a48c9bc2f51fd87e0d730f206260cc6103356b104b9a22ada550786",
+      "gitBlob": "5195ddfe70d844fd7ada69b418c32a8e75469eef"
+    },
+    {
+      "path": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "0e3f76b0e687303c08ff1397864adfdab8566523ed7852c0711dff48311b09d1",
+      "gitBlob": "2f223985e69143bc97e2829dedcc8def88711e5a"
+    },
+    {
+      "path": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "953c982e04f76aefebaa4d17a6d5261c61cee379e7257a8e117d551cf8302617",
+      "gitBlob": "dd74ec150fee76cf2bf5755bc94fed8733114ce0"
+    },
+    {
+      "path": "compiled/mikka-build.json",
+      "bytes": 8431,
+      "sha256": "505f58941c8ca3e1068dd2420a04b0c146430ce6bdce074824616c4819e4f6f8",
+      "gitBlob": "1b1b069122b3277610d710fd77e9e71efed5415c"
+    }
+  ],
+  "zipDigestsVerified": 3,
+  "privacyBeforePersistence": true,
+  "privacyFindings": 0,
+  "zipFilesPersisted": 0,
+  "signedUrlsPersisted": 0,
+  "signedUrlsPrinted": false,
+  "extractedOnlyAllowedJson": true,
+  "helperFiles": {
+    "desktop-native-summary.mjs": {
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b",
+      "gitBlob": "dad196c96077ab1504fd8858343d31b00cf0da3a"
+    },
+    "desktop-query-operations-summary.mjs": {
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2",
+      "gitBlob": "17a54954b618fc3373715dbc73fa86669c2aa739"
+    },
+    "desktop-1bd4-unattributed-sources-summary.mjs": {
+      "sha256": "0d10210d5403a8e1efa6539a382872025d773fdbf949a1b6e4965dca952ab4f4",
+      "gitBlob": "28f3a63f0b9c4604b79f935dd82420f9994a9e4a"
+    },
+    "desktop-1bd4-query-sources.cjs": {
+      "sha256": "0eeb18be931fdc4d8ddb908dff9a0b4a94a6596a992fcc9a1c5fd635a935a0bb",
+      "gitBlob": "d470c1d71454dff12f60cf7e0dd373624bd8b314"
+    }
+  },
+  "compiledManifestKeys": [
+    "appBuild",
+    "basePath",
+    "docker",
+    "functions",
+    "lockSha256",
+    "node",
+    "preset",
+    "resources",
+    "revision",
+    "routesSha256",
+    "testDeploymentSha",
+    "tracingSha256",
+    "version"
+  ]
+}

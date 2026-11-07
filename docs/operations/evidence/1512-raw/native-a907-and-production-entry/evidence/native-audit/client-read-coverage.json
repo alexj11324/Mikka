@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "kind": "native-login-live-readonly-review",
+  "source": {
+    "commit": "052740cf37c4788853eb98df9d66ea7c646ea0c2",
+    "tree": "f26ed2aef4dee31f8d7e17fba6a5d2ad74cb93d7",
+    "candidate": "a9072e5835a1f7e14aae0af0033d1b682433651f"
+  },
+  "evidence": {
+    "blob": "436d3b0b18d5d5e13144c076af93d8c87d281cb0",
+    "bytes": 39593,
+    "sha256": "4a80c4d0eb33a2a845874db76bb1f2edba974a95a19ec4a6686190afa7936213",
+    "perInvocationTimestampsAvailable": false,
+    "productionAcceptance": null
+  },
+  "findings": [
+    {
+      "id": "common_rpc_counts_equal",
+      "status": "observed",
+      "detail": "All common logical actions have equal counts; Native alone has pollTaskRuns twice and desktop.session once. Phase-level aggregates cannot determine per-read WS/HTTP ordering."
+    },
+    {
+      "id": "native_task_read_needed",
+      "status": "source_proven",
+      "detail": "DesktopIntegration reads the owner-wide task list for badge and completion notifications even without local enrollment. Initial result seeds notification history without replaying existing terminal runs."
+    },
+    {
+      "id": "catchup_not_proven_redundant",
+      "status": "source_proven_with_runtime_order_unknown",
+      "detail": "UNRESOLVED creates no real ticket; first result supplies validated personal home. onopen creates a fresh catch-up obligation. A read begun before that boundary cannot prove coverage; already-ready same-kind coverage and committed exact-cache proof are already reusable."
+    },
+    {
+      "id": "thread_not_equivalent",
+      "status": "source_proven",
+      "detail": "Task list chooses latest run per issue for up to 200 issues, while thread list chooses up to 200 runs and has different fields. It cannot substitute without loss."
+    },
+    {
+      "id": "bootstrap_has_no_home",
+      "status": "source_proven",
+      "detail": "cacheWorkspace is a selected membership with id and role. Safe session contains user and session id only. Vault workspace is a selected workspace cookie, not a fresh personal-home assertion."
+    },
+    {
+      "id": "existing_workspace_home",
+      "status": "source_proven",
+      "detail": "Existing successful /api/workspace response has live.homeWorkspaceId from ownerLiveScope. This value arrives in a parallel read and is distinct from selected workspace; using it cannot certify coverage of an earlier task read by itself."
+    },
+    {
+      "id": "presence_not_this_native_trigger",
+      "status": "source_proven",
+      "detail": "Native BundledLive asks only for revisions and bridge send accepts ping only. Presence acknowledgement barrier cannot be assumed as the cause of this Native startup."
+    },
+    {
+      "id": "conservative_dispatch_boundary",
+      "status": "candidate_only",
+      "detail": "Current SWR read start is before hydration and posted-task batching. A request actually dispatched after an obligation may still be conservatively revalidated. No per-invocation evidence proves that schedule in this run; any refinement requires exact per-read identity and real dispatch proof, retaining SWR commit/revision/error/owner fences."
+    }
+  ],
+  "safety": {
+    "noProductChanges": true,
+    "noRefChanges": true,
+    "noExternalQueries": true,
+    "noNewResources": true,
+    "noTestsRerun": true,
+    "noWindowChanges": true,
+    "noWebWorkAdded": true,
+    "noCatchupDeleted": true,
+    "noAuthorizationCacheAdded": true,
+    "totalLoginStillFailed": true,
+    "noClaimMapFixExplainsBudget": true,
+    "noClaimSecondTaskReadRedundant": true,
+    "otherScopedUnresolved": true
+  },
+  "suggestedRegressions": [
+    "Real SWR first poll -> owner-home reply -> a server write before socket opens -> open/ready must still produce a second read and latest badge.",
+    "Already-ready same-owner home channel + read begun after coverage + exact committed cache object + late task subscriber should remain one read under existing proof.",
+    "Candidate only: fetcher is queued before Live obligation but its actual native HTTP dispatch is after; exact dispatch proof may permit one read, while a pre-obligation send must still reread.",
+    "Retain higher/unversioned push, discarded or comparator-retained result, callback failure, hidden view and owner/cache/connection retirement regressions."
+  ],
+  "sourceFiles": [
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "sha256": "c4337fa756eca07687808f9251e2316a02b2fee5df840f52335305e2476a3153",
+      "chars": 4771
+    },
+    {
+      "path": "lib/platform/desktop-notifications.ts",
+      "sha256": "cc63d7b2623f71dd854ba4da9aceb6ce13f40b954b9d8616912e95926e52bb31",
+      "chars": 3769
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+      "chars": 9682
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+      "chars": 8050
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede",
+      "chars": 24031
+    },
+    {
+      "path": "lib/live/channels.ts",
+      "sha256": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8",
+      "chars": 1580
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "sha256": "04fe899da917838e25ff414de7412341b9fc72062e9870fcb7266d4a91bd39e2",
+      "chars": 3229
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+      "chars": 4604
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+      "chars": 4433
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8",
+      "chars": 13678
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "sha256": "62107abf2e2364cb9e552b0e81d299b0728fe14eed74a7d10a0fe0339809fd18",
+      "chars": 5484
+    },
+    {
+      "path": "apps/desktop/src/renderer/live-runtime.ts",
+      "sha256": "d2561036b5b90c671a5061bc12cc3d0f7e8dcc1d509efbb578dee3ed56f35a61",
+      "chars": 3537
+    },
+    {
+      "path": "apps/desktop/src/main/bundled-live.ts",
+      "sha256": "1939c5027728aad455b58c1cac209f6474b291cdad8054a2be68634c43c71c4b",
+      "chars": 4582
+    },
+    {
+      "path": "lib/desktop-rpc/bootstrap.ts",
+      "sha256": "813567b1df80383b08c855b098e0ecc42657f5d1042fde28024b515ea71e7a3d",
+      "chars": 2551
+    },
+    {
+      "path": "lib/desktop-rpc/session.ts",
+      "sha256": "9a9083622b42034d00f5e425319561397ea28e3c8b2220f1a0ed93b43b969103",
+      "chars": 2969
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "chars": 5364
+    },
+    {
+      "path": "lib/swr/cache-scope.ts",
+      "sha256": "2b6ea0143688bc5f80fd4d2b4984d4843991972c10dea5e4586a0949a5d3b2f2",
+      "chars": 1246
+    },
+    {
+      "path": "apps/desktop/src/main/session-vault.ts",
+      "sha256": "4e0f2692955ed10ba26f84856b218ba417b793817be48208015a1635af2d1e2a",
+      "chars": 11301
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "sha256": "d2d6129d164b5d80bd040bff8878a6e73d974e48c71e8920c8fd3649ec07582a",
+      "chars": 7873
+    },
+    {
+      "path": "apps/desktop/src/renderer/workspace.tsx",
+      "sha256": "2307562ffbbb8c4e95a693f8b234987649bdbb746ded23137d8a8ca37772016c",
+      "chars": 2569
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "sha256": "0b62211c66eb5a229e81ac81f2cad50a785172631c73ceccc69d7907ba026979",
+      "chars": 53571
+    },
+    {
+      "path": "lib/live/channel.test.ts",
+      "sha256": "591ca7d47e4af01661817bac8466fdaeaac240858dc5cf1bac42ba3aa5da3baa",
+      "chars": 45859
+    }
+  ]
+}
