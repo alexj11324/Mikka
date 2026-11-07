@@ -6,6 +6,8 @@ import { execFileSync } from 'node:child_process'
 const report: Record<string, unknown> = { issues: [1515, 1517], startedAt: new Date().toISOString(), status: 'started' }
 function check(condition: unknown, code: string): asserts condition { if (!condition) throw new Error(code) }
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+let stage = 'scope'
+const sqlstate = (error: unknown) => { const code = (error as { code?: unknown })?.code; return typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code) ? code : null }
 let close: (() => Promise<unknown>) | undefined
 
 try {
@@ -54,12 +56,15 @@ try {
 
   // Use the production expiry function in a transaction. Its unrelated rows
   // must compare equal before COMMIT; a mismatch rolls this sweep back.
+  stage = 'subscription_connect'
   const client = await pool.connect()
   try {
+    stage = 'subscription_begin'
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
     await client.query("SET LOCAL statement_timeout='30s'")
+    stage = 'subscription_targets'
     const targetRows = (await client.query(`SELECT c.id FROM byos_connections c WHERE c."removedAt" IS NULL
-      AND c.state IN ('pending','reconnect_required','disconnected') AND c."updatedAt"<now()-interval '1 hour'
+      AND c.state='pending' AND c."updatedAt"<now()-interval '1 hour'
       AND (c."operationDeadline" IS NULL OR c."operationDeadline"<now())
       AND c."providerSubject" IS NULL AND c."accountLabel" IS NULL
       AND c."secretName" IS NULL AND c."secretDigest" IS NULL AND c."accessSecretName" IS NULL AND c."accessDigest" IS NULL
@@ -70,11 +75,14 @@ try {
       ORDER BY c.id`)).rows
     const ids = targetRows.map(row => row.id as string)
     const protectedRows = async () => (await client.query(`SELECT c.id,md5(to_jsonb(c)::text) AS digest FROM byos_connections c WHERE NOT (c.id::text=ANY($1::text[])) ORDER BY c.id`, [ids])).rows
+    stage = 'subscription_protected_snapshot'
     const protectedBefore = await protectedRows()
     report.emptyConnectionsBefore = ids.length
     // Exercise the exact normal expiry in dry-run too, then ROLLBACK. This
     // exposes extra candidates or skipped locks before any durable cleanup.
+    stage = 'subscription_expire'
     const result = await expireSubscriptionAcquisitions(client)
+    stage = 'subscription_validate'
     check(result.expired === ids.length, 'cleanup_subscription_count_mismatch')
     check(same(protectedBefore, await protectedRows()), 'cleanup_protected_subscription_changed')
     const remaining = (await client.query(`SELECT count(*)::int AS n FROM byos_connections WHERE id::text=ANY($1::text[]) AND (state<>'disconnected' OR "removedAt" IS NULL)`, [ids])).rows[0].n
@@ -91,10 +99,14 @@ try {
       report.subscriptionTransactionRolledBack = true
     }
   } catch (error) {
-    await client.query('ROLLBACK')
+    report.failedStage = stage
+    report.sqlstate = sqlstate(error)
+    try { await client.query('ROLLBACK'); report.subscriptionTransactionRolledBack = true }
+    catch (rollbackError) { report.subscriptionTransactionRolledBack = false; report.rollbackSqlstate = sqlstate(rollbackError) }
     throw error
   } finally { client.release() }
 
+  stage = 'device_apply'
   if (mode === 'apply') {
     const applied = await removeDemoDevices(true)
     report.devicesApplied = applied
@@ -113,6 +125,8 @@ try {
   report.status = 'complete'
 } catch (error) {
   report.status = 'failed'
+  report.failedStage ??= stage
+  report.sqlstate ??= sqlstate(error)
   report.error = error instanceof Error && /^cleanup_[a-z_]+$/.test(error.message) ? error.message : 'cleanup_step_failed'
   process.exitCode = 1
 } finally {

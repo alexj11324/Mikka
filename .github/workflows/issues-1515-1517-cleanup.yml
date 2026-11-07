@@ -1,5 +1,6 @@
 name: Issues 1515-1517 production cleanup
 on:
+  workflow_dispatch:
   push:
     branches: [ops/1515-1517-acceptance]
     paths:
@@ -11,7 +12,7 @@ permissions:
   contents: read
 jobs:
   runtime-candidates:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-acceptance'
+    if: false && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-acceptance'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -19,7 +20,7 @@ jobs:
       actions: read
       id-token: write
     env:
-      APPLICATION_SHA: bcf82a2e058779fc308a8eea19d036fb5b9467e7
+      APPLICATION_SHA: f7225f3eb1e38762dfdecde0395792c85b81ec22
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -63,7 +64,7 @@ jobs:
       contents: read
       id-token: write
     env:
-      APPLICATION_SHA: bcf82a2e058779fc308a8eea19d036fb5b9467e7
+      APPLICATION_SHA: f7225f3eb1e38762dfdecde0395792c85b81ec22
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -171,6 +172,7 @@ jobs:
           fi
           exit "$result"
       - name: Authorized cleanup apply with counts-only output
+        if: false
         env:
           CLEANUP_MODE: apply
         run: |
