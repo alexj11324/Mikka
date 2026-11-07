@@ -78,7 +78,7 @@ export const INSIGHTS = [
     description: 'Latest snapshot within one hour must be healthy and contain supplier hour/day fields. Missing or failed collection returns unhealthy.',
     query: hogql(sql('heartbeat'), single) },
   { key: 'alert-source-anomaly', shortId: 'k3M88Rs8', name: '[1324] Mikka 来源数据库小时异常', tags: ['mikka', 'issue-1324', 'observability', 'source-alerts'],
-    description: 'Weighted DB queries/JSON bytes > max(3×7d median,2,000 queries/10MB). Weight=1/sample_rate; legacy missing=0.1. Warmup 24 full observed hours; byte coverage ≥95% weighted queries now and baseline. No current telemetry→NULL.',
+    description: 'Weighted DB queries/JSON bytes > max(3×7d median,2,000 queries/10MB). Weight=1/sample_rate; legacy missing=0.1. Warmup 24 covered full hours after each route first appears; bytes require ≥95% weighted coverage. Alert includes top authenticated user hashes / registered RPC actions and unattributed counts; same-request enrichment only. No current telemetry→NULL.',
     query: hogql(sql('alert-source-anomaly'), { display: 'ActionsTable' }) },
   { key: 'alert-daily-pace', shortId: 'E08gP1zi', name: '[1324] Mikka 日速率外推超过500GB月额度', tags: ['mikka', 'issue-1324', 'observability', 'source-alerts'],
     description: 'UTC today bytes / elapsed hours through reported bucket ×24×month days vs 500GB. ≥3h; same UTC day; healthy snapshot≤60m/provider≤180m. Assumes complete provider day cumulative. Daily pace equivalent, not billing-period forecast; monthly 50% retained.',

@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import test from 'node:test'
+import { EventEmitter } from 'node:events'
+import { createLifecycleQueryCounter, projectQuerySnapshot, queryCountDelta } from './lifecycle-query-counts.mjs'
 
 const require = createRequire(import.meta.url)
 const run = promisify(execFile)
@@ -164,4 +166,71 @@ test('Nitro cannot fall back to source PG when its traced dependency is absent o
       timeout: 5_000, maxBuffer: 8192,
     }), error => error.code === 1 && error.stderr.includes('DESKTOP_METRICS_PG_TARGET_MISMATCH'))
   }
+})
+
+const counterIdentity = { pid: 123, runtime: 'nitro' }
+const counterSample = (overrides = {}) => ({
+  version: 1, ...counterIdentity, startedAt: 1000, endedAt: 2000, instrumentedClients: 1,
+  queryCalls: 5, pgProtocolReceiveBytes: 100, pgProtocolSendBytes: 40,
+  activeConnections: 1, closedConnections: 0, unknownReadings: 0,
+  measurement: 'all_pg_client_calls_and_connection_protocol_bytes', ...overrides,
+})
+
+test('lifecycle query windows retain exact counter deltas and omit unrelated content', () => {
+  const before = projectQuerySnapshot(counterSample({ secret: 'counter-private-canary' }), counterIdentity)
+  const after = projectQuerySnapshot(counterSample({ endedAt: 2500, queryCalls: 9, pgProtocolReceiveBytes: 180,
+    pgProtocolSendBytes: 70, activeConnections: 0, closedConnections: 1 }), counterIdentity)
+  assert.deepEqual(queryCountDelta(before, after), { startedAt: new Date(2000).toISOString(), finishedAt: new Date(2500).toISOString(),
+    durationMs: 500, queryCalls: 4, pgProtocolReceiveBytes: 80, pgProtocolSendBytes: 30, closedConnections: 1, unknownReadings: 0 })
+  assert.equal(JSON.stringify(before).includes('counter-private-canary'), false)
+})
+
+test('lifecycle query windows refuse a changed process, reset, missing driver and unknown readings', () => {
+  const before = projectQuerySnapshot(counterSample(), counterIdentity)
+  for (const change of [{ pid: 456 }, { runtime: 'next' }, { instrumentedClients: 0 }, { queryCalls: null }, { queryCalls: -1 }]) {
+    assert.throws(() => projectQuerySnapshot(counterSample(change), counterIdentity), /LIFECYCLE_QUERY_COUNTER_SNAPSHOT_INVALID/)
+  }
+  for (const change of [{ pid: 456 }, { runtime: 'next' }, { startedAt: 2000 }, { endedAt: 1999 }, { queryCalls: 4 }, { pgProtocolReceiveBytes: 99 }]) {
+    assert.throws(() => queryCountDelta(before, { ...before, ...change }), /LIFECYCLE_QUERY_COUNTER_CHANGED/)
+  }
+  assert.throws(() => queryCountDelta(before, { ...before, unknownReadings: 1 }), /LIFECYCLE_QUERY_COUNTER_UNKNOWN/)
+})
+
+test('lifecycle reads only the attested primary metric socket, with bounded closed errors', async () => {
+  const revision = 'a'.repeat(40), origin = 'http://localhost:3000'
+  const descriptor = { revision, origin, bundled: { ...counterIdentity, port: 3000, socket: '/tmp/mikka-bundled-44.sock' },
+    hosted: { pid: 456, port: 3001, socket: '/tmp/mikka-hosted-44.sock' } }
+  let body = JSON.stringify(counterSample()), calls = 0
+  const dependencies = {
+    read: async () => JSON.stringify(descriptor),
+    httpRequest(options, callback) {
+      calls++
+      assert.equal(options.socketPath, descriptor.bundled.socket)
+      assert.equal(options.path, '/metrics')
+      assert.equal(options.method, 'GET')
+      assert.ok(options.signal instanceof AbortSignal)
+      const req = new EventEmitter()
+      req.destroy = error => req.emit('error', error)
+      req.end = () => queueMicrotask(() => {
+        const response = Object.assign(new EventEmitter(), { statusCode: 200 })
+        callback(response)
+        response.emit('data', Buffer.from(body))
+        response.emit('end')
+      })
+      return req
+    },
+  }
+  const counter = await createLifecycleQueryCounter({ revision, origin }, dependencies)
+  assert.equal((await counter.snapshot()).pid, counterIdentity.pid)
+  for (const value of ['{"private-canary": invalid}', 'x'.repeat(8193)]) {
+    body = value
+    await assert.rejects(counter.snapshot(), error => error.message === 'LIFECYCLE_QUERY_COUNTER_READ_FAILED' && !error.message.includes('private-canary'))
+  }
+  const completedCalls = calls
+  for (const change of [{ revision: 'b'.repeat(40) }, { origin: 'http://localhost:3001' },
+    { bundled: descriptor.hosted }, { bundled: { ...descriptor.bundled, socket: 'https://example.invalid/counter' } }]) {
+    await assert.rejects(createLifecycleQueryCounter({ revision, origin }, { ...dependencies, read: async () => JSON.stringify({ ...descriptor, ...change }) }),
+      /LIFECYCLE_QUERY_COUNTER_RUNTIME_MISMATCH/)
+  }
+  assert.equal(calls, completedCalls, 'a mismatched counter must not be queried')
 })

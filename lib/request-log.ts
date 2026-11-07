@@ -8,10 +8,18 @@ import { withNativeSessionCache } from './desktop-rpc/session-cache-context.ts'
 // cookies, tokens, bodies, query strings or emails. The user is a sha256 hash.
 
 export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
-type Store = { userId?: string; outcome?: RequestLogOutcome }
+type RequestMetadata = { requestId: string; userIdHash?: string; rpcAction?: string }
+type Store = { userId?: string; outcome?: RequestLogOutcome; metadata: RequestMetadata }
 const requestScope = new AsyncLocalStorage<Store>()
 const requestClientChannel = channel('mikka.request.client')
 const requestErrorChannel = channel('mikka.request.error')
+const requestMetadataChannel = channel('mikka.request.metadata')
+
+function publishMetadata(metadata: RequestMetadata) {
+  if (requestMetadataChannel.hasSubscribers) {
+    try { requestMetadataChannel.publish(metadata) } catch { /* attribution never breaks a request */ }
+  }
+}
 
 /** Attribution only, never authentication. Ignore headers on machine-only routes. */
 export function requestClientAttributes(request: Request, route: string): Record<string, string> {
@@ -30,7 +38,21 @@ const routeScope: AsyncLocalStorage<string> = ((globalThis as Record<symbol, unk
 /** Records the signed-in user for the current request's log line. */
 export function noteLogUser(userId: string | null | undefined) {
   const store = requestScope.getStore()
-  if (store && userId) store.userId = userId
+  if (store && userId && store.userId !== userId) {
+    const hash = hashUserId(userId)
+    store.userId = userId
+    store.metadata.userIdHash = hash
+    publishMetadata(store.metadata)
+  }
+}
+
+/** Call only after the RPC registry's own-property check; never pass arguments. */
+export function noteLogRpcAction(action: string) {
+  const store = requestScope.getStore()
+  if (store && store.metadata.rpcAction !== action && action.length <= 120 && /^[a-z][\w-]*\.[a-z]\w*$/i.test(action)) {
+    store.metadata.rpcAction = action
+    publishMetadata(store.metadata)
+  }
 }
 
 /** Marks the authenticated business branch without logging response or request data. */
@@ -61,6 +83,7 @@ export type RequestLogEntry = {
   status: number
   durationMs: number
   userIdHash: string | null
+  rpcAction?: string
   outcome?: RequestLogOutcome
   error?: string
 }
@@ -89,13 +112,16 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
 ): (request: R, ...rest: A) => Promise<T> {
   return async (request, ...rest) => {
     const started = performance.now()
-    const store: Store = {}
+    const requestId = requestIdFor(request), invocationId = randomUUID()
+    // This internal UUID is available before authentication SQL. External request
+    // headers remain log context and never become the telemetry attribution key.
+    const store: Store = { metadata: { requestId: invocationId } }
+    publishMetadata(store.metadata)
     // A built-in diagnostic channel keeps plain-Node ops scripts independent of the tracing SDK.
     // Its only subscriber stamps the active Next span; requests work identically with tracing off.
     if (requestClientChannel.hasSubscribers) {
       try { requestClientChannel.publish(requestClientAttributes(request, route)) } catch { /* best effort */ }
     }
-    const requestId = requestIdFor(request), invocationId = randomUUID()
     // A missing completion remains observable when a handler/process is killed.
     try { sink(JSON.stringify({ level: 'info', msg: 'api_request_started', timestamp: new Date().toISOString(),
       requestId, invocationId, route, method: request.method }), 'info') } catch { /* best effort */ }
@@ -109,7 +135,8 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
         method: request.method,
         status,
         durationMs: Math.round(performance.now() - started),
-        userIdHash: store.userId ? hashUserId(store.userId) : null,
+        userIdHash: store.metadata.userIdHash ?? null,
+        ...(store.metadata.rpcAction ? { rpcAction: store.metadata.rpcAction } : {}),
         ...(store.outcome ? { outcome: store.outcome } : {}),
       }
       // Error class name only: messages can echo user input or secrets.
