@@ -4257,11 +4257,10 @@
     },
     "board": {
       "toolbar": "Board toolbar",
-      "scopeLabel": "Task scope",
-      "scope": {
-        "all": "All",
-        "workspace": "Workspace",
-        "personal": "Personal"
+      "team": {
+        "label": "Team",
+        "all": "All teams",
+        "none": "No team"
       },
       "filter": "Filter",
       "filterField": {

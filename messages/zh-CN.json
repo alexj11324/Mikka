@@ -4257,11 +4257,10 @@
     },
     "board": {
       "toolbar": "看板工具栏",
-      "scopeLabel": "任务范围",
-      "scope": {
-        "all": "全部",
-        "workspace": "工作区",
-        "personal": "个人"
+      "team": {
+        "label": "团队",
+        "all": "全部团队",
+        "none": "无团队"
       },
       "filter": "筛选",
       "filterField": {

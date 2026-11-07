@@ -6,9 +6,10 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { Box, Check, CircleUserRound, UserRoundPen, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
+import { Box, Check, CircleUserRound, Users, UserRoundPen, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
+import { listTeams } from '@/app/actions/teams'
 import { useLiveTaskRunList } from '@/hooks/use-live-lists'
 import { useListExpiry } from '@/hooks/use-list-expiry'
 import { getLinearBoardSync } from '@/app/actions/linear-sync'
@@ -39,7 +40,6 @@ import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
-type Scope = 'all' | 'workspace' | 'personal'
 type FilterField = 'status' | 'priority' | 'assignee' | 'creator' | 'labels' | 'project' | 'agentState'
 type Filters = Partial<Record<FilterField, string[]>>
 type Sort = 'priority' | 'updated' | 'created'
@@ -53,7 +53,8 @@ const ME = 'me'
 const NONE = 'none'
 const DEFAULT_DISPLAY: Display = { sort: 'priority', completed: 'week', showEmpty: true, properties: DEFAULT_CARD_PROPERTIES, hidden: DEFAULT_HIDDEN_COLUMNS }
 const DEFAULT_FILTERS: Filters = { assignee: [ME] }
-const DEFAULT_SETTINGS = { scope: 'all' as Scope, view: 'board' as 'board' | 'list', display: DEFAULT_DISPLAY }
+const TEAM_ALL = 'all'
+const DEFAULT_SETTINGS = { view: 'board' as 'board' | 'list', display: DEFAULT_DISPLAY }
 /** A 显示 chip: checked and tinted when on, plain grey when off. */
 const DISPLAY_CHIP = 'h-7 rounded-md px-2 text-xs font-normal text-muted-foreground aria-pressed:bg-sidebar-primary/10 aria-pressed:text-sidebar-primary'
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
@@ -100,7 +101,7 @@ function useStoredFlag(key: string, fallback: boolean) {
 }
 
 /**
- * The board page, v2 (Figma 77:2): scope segment, filters, Linear sync, board
+ * The board page, v2 (Figma 77:2): team picker, filters, Linear sync, board
  * or list, 显示 options and 新建任务 (described in a sentence, created by the
  * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
@@ -120,8 +121,13 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const [settings, update] = useBoardSettings()
-  const { scope, view, display } = settings
+  const { view, display } = settings
   const [filters, setFilters] = useViewState<Filters>('board:filters', DEFAULT_FILTERS)
+  // 团队 replaces the old 全部/工作区/个人 segment: scope no longer decides a task's owner (#1636),
+  // the team it is grouped under does. Kept with the view's filters, so another workspace's team never carries over.
+  const [teamFilter, setTeamFilter] = useViewState<string>('board:team', TEAM_ALL)
+  const { data: teams = [] } = useSWR('teams', listTeams)
+  const team = teamFilter === TEAM_ALL || teamFilter === NONE || teams.some(item => item.id === teamFilter) ? teamFilter : TEAM_ALL
   useListExpiry(display.completed === 'all' ? [] : issues.filter(issue => issue.status === 'done')
     .map(issue => new Date(issue.updatedAt).getTime() + COMPLETED_DAYS[display.completed] * 86_400_000))
   const listScroll = useViewScroll<HTMLDivElement>(`${stateKey}:list`, view === 'list')
@@ -190,7 +196,7 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   }
   const now = Date.now()
   const shown = issues
-    .filter(issue => scope === 'all' || issue.scope === scope)
+    .filter(issue => team === TEAM_ALL || (issue.teamId ?? NONE) === team)
     .filter(issue => Object.entries(filters).every(([field, values]) => !values?.length || valuesOf(issue, field as FilterField).some(value => values.includes(value))))
     .filter(issue => issue.status !== 'done' || now - new Date(issue.updatedAt).getTime() <= COMPLETED_DAYS[display.completed] * 86400000)
     .toSorted((a, b) => display.sort === 'priority' ? (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9) || +new Date(b.updatedAt) - +new Date(a.updatedAt)
@@ -224,9 +230,14 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <h1 id={titleId} className="sr-only">{t('title')}</h1>
       <div role="toolbar" aria-label={t('toolbar')} className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 px-5 py-3">
-        <ToggleGroup aria-label={t('scopeLabel')} variant="segment" size="sm" spacing={0.5} value={[scope]} onValueChange={values => { const next = values[0] as Scope | undefined; if (next) update({ scope: next }) }}>
-          {(['all', 'workspace', 'personal'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`scope.${value}`)}</ToggleGroupItem>)}
-        </ToggleGroup>
+        <Select value={team} onValueChange={value => { if (value) setTeamFilter(value) }} items={[{ value: TEAM_ALL, label: t('team.all') }, { value: NONE, label: t('team.none') }, ...teams.map(item => ({ value: item.id, label: `${item.identifier} · ${item.name}` }))]}>
+          <SelectTrigger size="sm" className="h-7 min-w-28 max-w-56" aria-label={t('team.label')}><Users data-icon="inline-start" className="text-muted-foreground" /><SelectValue className="min-w-0 truncate" /></SelectTrigger>
+          <SelectContent align="start" alignItemWithTrigger={false} className="min-w-48"><SelectGroup>
+            <SelectItem value={TEAM_ALL}>{t('team.all')}</SelectItem>
+            <SelectItem value={NONE}>{t('team.none')}</SelectItem>
+            {teams.map(item => <SelectItem key={item.id} value={item.id}><span className="truncate">{item.identifier} · {item.name}</span></SelectItem>)}
+          </SelectGroup></SelectContent>
+        </Select>
         <Separator orientation="vertical" className="mx-1 h-5" />
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}><ListFilter data-icon="inline-start" />{t('filter')}</DropdownMenuTrigger>
@@ -286,7 +297,7 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
       </div>
       {view === 'board'
         ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
-        : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} blocks={blocks} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
+        : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} blocks={blocks} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || team !== TEAM_ALL} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
