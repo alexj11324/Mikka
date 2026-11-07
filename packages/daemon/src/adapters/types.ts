@@ -171,6 +171,13 @@ export interface AgentSession {
   detach?(): Promise<void>
 }
 
+/** One run's already-starting native session, with no task input released. */
+export interface PreparedAgentStart {
+  readonly ready: Promise<void>
+  start(options: StartOptions): Promise<AgentSession>
+  cancel(): Promise<void>
+}
+
 export interface AgentAdapter {
   readonly harness: Harness
   readonly capabilities: AgentCapabilities

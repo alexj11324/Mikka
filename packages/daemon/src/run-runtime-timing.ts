@@ -52,6 +52,13 @@ const METHODS = new Set(["GET", "POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIO
 const ms = (value: number) => Math.max(0, Math.round(value * 1_000) / 1_000)
 const NOOP = () => {}
 
+/** One opt-in covers every added persisted diagnostic, including startup phases.
+ * The trusted candidate launcher may enable it; ordinary runs need an explicit
+ * assignment variable. Never inherit it from another run or the process env. */
+export function runDiagnosticsEnabled(taskEnv: Record<string, string> | undefined, hostOptIn?: boolean): boolean {
+  return hostOptIn === true || taskEnv?.CLOUD_STARTUP_TIMING === '1'
+}
+
 function classify(tail: string, body: unknown): Endpoint {
   const operation = body && typeof body === "object" ? body as { action?: unknown; operation?: unknown } : undefined
   if (tail === "policy-snapshot") return "policy_snapshot"
