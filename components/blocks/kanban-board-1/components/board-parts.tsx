@@ -30,7 +30,7 @@ export function BoardHiddenLaneView({ label, columns }: BoardHiddenLaneProps) {
 }
 
 /** Figma 看板/任务卡片: filled, no stroke (R-31); radius 8, padding 12, rows 8 apart. */
-export function BoardCardView({ title, fullTitle, identifier, done, personal, status, assignee, hasAssignee, chips, createdAt, overlay, editors }: Omit<BoardCardProps, 'runState'> & Partial<Pick<BoardCardProps, 'runState'>>) {
+export function BoardCardView({ title, fullTitle, identifier, done, personal, status, assignee, hasAssignee, chips, createdAt, overlay, editors }: Omit<BoardCardProps, 'runState' | 'block'> & Partial<Pick<BoardCardProps, 'runState' | 'block'>>) {
   return <div className={cn('group/card flex flex-col gap-2 rounded-md bg-card p-3 text-card-foreground shadow-xs transition-colors hover:bg-muted/50', overlay && 'pointer-events-none rotate-2 shadow-lg')}>
     <div className="flex h-5 min-w-0 items-center gap-1.5">
       {/* No placeholder while the task has no number (Linear sync off): the row starts with what is there (R-25, R-40). */}
