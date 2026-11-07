@@ -18,7 +18,8 @@ async function sourceScopes(workspaceDatabase: Database, sources: Source[]): Pro
     `SELECT s.id,s."userId" AS "ownerId",w.id AS "workspaceId"
      FROM jsonb_to_recordset($1::jsonb) AS s(id uuid,"userId" text,"issueId" uuid,"botId" uuid,scope text,"workspaceId" uuid)
      JOIN mikka_workspaces w ON w.id=s."workspaceId"
-     JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=s."userId" AND m.status='active'`,
+     JOIN mikka_workspace_members m ON m."workspaceId"=w.id AND m."userId"=s."userId" AND m.status='active'
+     WHERE w.kind='team' OR w."userId"=s."userId"`,
     [JSON.stringify(sources)],
   )
   return new Map(rows.map(row => [row.id, { ownerId: row.ownerId, workspaceId: row.workspaceId }]))

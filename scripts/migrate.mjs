@@ -91,7 +91,7 @@ try {
   }
   const application = states.find(state => state.target === 'MIKKA_DATABASE_URL')?.pool
   const workspace = states.find(state => state.target === 'DATABASE_URL')?.pool
-  if (application && workspace && files.includes('20261107050000_task_workspace_ownership.sql')) {
+  if (application && workspace && files.includes('20261107121000_task_workspace_ownership.sql')) {
     const { backfillTaskWorkspaces } = await import('./task-workspace-backfill.mjs')
     const ownership = await backfillTaskWorkspaces(application, workspace)
     console.log(`migrate: task workspace ownership bound=${ownership.bound} pending=${ownership.pending}`)

@@ -8,7 +8,6 @@
 //
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
-  governance_denied: ["access_denied", "seat_limit", "feature_unavailable", "last_owner", "workspace_attached", "personal_workspace", "invalid_request", "template_limit", "not_found"],
   installer_failed: ["node_required", "unsupported_os", "npm_permission", "npm_cache_permission", "cancelled", "timeout", "service_failed", "connection_failed", "command_failed"],
   model_tool_unavailable: [],
   desktop_client_update_required: [],

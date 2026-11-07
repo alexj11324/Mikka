@@ -30,7 +30,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const migrations = orderMigrations((await readdir(directory)).filter(file => file.endsWith('.sql')))
-    const boundary = '20261107050000_task_workspace_ownership.sql'
+    const boundary = '20261107121000_task_workspace_ownership.sql'
     for (const pool of [app, workspace]) await pool.query('CREATE TABLE schema_migrations (name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
     const migrate = async (names: string[]) => {
       for (const name of names) {
@@ -51,7 +51,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
     const botA = randomUUID(), botB = randomUUID(), agent = randomUUID(), runA = randomUUID(), runConflict = randomUUID(), artifact = randomUUID()
     for (const id of [owner, member, stranger]) await app.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$1||\'@governance.example.invalid\',true,now(),now())', [id])
     for (const [id, kind] of [[alpha, 'team'], [beta, 'team'], [personal, 'personal']]) {
-      await workspace.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,$1,$3)', [id, owner, kind])
+      await workspace.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'Governance fixture\',$3)', [id, owner, kind])
       await workspace.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,\'admin\',\'active\')', [id, owner])
     }
     await workspace.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,\'member\',\'active\')', [alpha, member])

@@ -27,7 +27,7 @@ export async function factoryIssueLiveScope(database: Database, workspaceDatabas
 export async function factoryLiveScopes(database: Database, workspaceDatabase: Database, taskId: string, ownerId: string | null) {
   const { rows: [source] } = await database.query<{ userId: string; issueId: string; botId: string | null; workspaceId: string | null; botWorkspaceId: string | null }>(
     `SELECT t."userId",t."issueId",t."botId",i."workspaceId",b."workspaceId" AS "botWorkspaceId" FROM factory_tasks t JOIN issues i ON i.id=t."issueId"
-      LEFT JOIN bots b ON b.id=t."botId" AND b."ownerId"=t."userId" WHERE t.id=$1 AND i."ownershipState"='bound' AND ($2::text IS NULL OR t."userId"=$2)`,
+      LEFT JOIN bots b ON b.id=t."botId" AND b."ownerId"=t."userId" WHERE t.id=$1 AND i."ownershipState"='bound' AND t."workspaceId"=i."workspaceId" AND ($2::text IS NULL OR t."userId"=$2)`,
     [taskId, ownerId],
   )
   if (!source?.workspaceId || (source.botId && source.botWorkspaceId !== source.workspaceId)) return null
