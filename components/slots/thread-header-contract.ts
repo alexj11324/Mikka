@@ -46,4 +46,9 @@ export type ThreadStatusLineProps = {
   startedAt: string
   /** The Bot that dispatched it; null when unknown. */
   dispatchedBy: string | null
+  /**
+   * Its place in its task's one conversation (task-conversation slot): the attempt's number and Agent, whether it is
+   * the first (which carries the dispatch: the Bot's instruction, its prompt), and the task's title. Absent alone.
+   */
+  attempt?: { n: number; first: boolean; harness: string | null; prompt: string | null; taskTitle?: string }
 }

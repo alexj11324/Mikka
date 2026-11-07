@@ -4268,6 +4268,7 @@
         "attempt": "第 {n} 次尝试",
         "created": "创建了任务",
         "createdBy": "{name} 创建了任务",
+        "dispatchedTask": "{bot} 派出了这个任务 · {time}",
         "divider": "第 {n} 次尝试{outcome} · 换 {agent} 再试",
         "dividerOutcome": {
           "failed": "失败",

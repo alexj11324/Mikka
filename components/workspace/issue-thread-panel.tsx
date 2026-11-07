@@ -95,7 +95,7 @@ function ThreadInstructions({ issueId, runId, mine }: { issueId: string | null; 
  * the bot that dispatched it.
  */
 type ThreadTab = 'chat' | 'changes' | 'acceptance'
-type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest; /** A task's earlier attempts, drawn above this one's transcript in the same scroll (the task-conversation slot). */ before?: ReactNode; /** Scroll to this attempt's section of `before` when it appears. */ focusRunId?: string; /** Only the transcript, for an earlier attempt inside another panel's `before`: no header, scroll, composer or acceptance. */ transcriptOnly?: boolean }
+type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest; /** A task's earlier attempts, drawn above this one's transcript in the same scroll (the task-conversation slot). */ before?: ReactNode; /** Scroll to this attempt's section of `before` when it appears. */ focusRunId?: string; /** Only the transcript, for an earlier attempt inside another panel's `before`: no header, scroll, composer or acceptance. */ transcriptOnly?: boolean; /** Its place in its task's one conversation: the status line names the attempt, and the dispatch is not a person's bubble. */ attempt?: { n: number; first: boolean; taskTitle?: string } }
 
 export type ThreadChangeRequest = { label: string; onSend: (note: string) => Promise<boolean>; onCancel: () => void }
 
@@ -104,7 +104,7 @@ export function IssueThreadPanel(props: IssueThreadPanelProps) {
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest, before, focusRunId, transcriptOnly = false }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest, before, focusRunId, transcriptOnly = false, attempt }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const runErrorText = useRunErrorText()
   const format = useFormatter()
@@ -281,8 +281,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {error && !data ? <InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
-          <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null} />
-          {data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
+          <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
+            {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} />
+          {/* In a task's one conversation the dispatch is the status line's, not a person's bubble (#1681). */}
+          {!attempt && data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
             {items.map(item => <li key={item.id} className="group/message flex flex-col gap-1">
               {item.kind === 'agent' && <>

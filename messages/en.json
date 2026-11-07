@@ -4268,6 +4268,7 @@
         "attempt": "Attempt {n}",
         "created": "Created the task",
         "createdBy": "{name} created the task",
+        "dispatchedTask": "{bot} dispatched this task · {time}",
         "divider": "Attempt {n} {outcome} · retrying with {agent}",
         "dividerOutcome": {
           "failed": "failed",
