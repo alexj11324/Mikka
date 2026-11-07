@@ -2,6 +2,10 @@
 // source-owned templates/job labels; never retain an arbitrary scope value.
 // The last two keys distinguish an absent scope from any unlisted scope.
 module.exports = Object.freeze([
+  '/api/agent/sessions',
+  '/api/computer/events',
+  '/api/conversations',
+  '/api/pending-actions',
   '/api/settings/preferences',
   '/api/settings/model-order',
   '/api/settings/[read]',

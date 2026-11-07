@@ -436,8 +436,9 @@ bytes are not allocated to individual operations. Historical reports without thi
 partition remain unavailable for this breakdown, rather than acquiring zeroes.
 
 `unattributedSources` refines only that existing `unattributed` bucket. Its
-test-only list names exact source-owned settings, device, daemon and background
-job templates; `otherScoped` and `noScope` retain every remaining call without
+test-only list names exact source-owned agent history, computer events,
+conversations, pending actions, settings, device, daemon and background job
+templates; `otherScoped` and `noScope` retain every remaining call without
 exporting the underlying label. Its counts must sum to `queryOperations.unattributed`
 at every snapshot and delta, while the original operation buckets and total stay
 unchanged. Missing historical refinements are unavailable, and a mixed or invalid
