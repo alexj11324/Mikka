@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { assertConservation, currentWorkerSha, pairEnv, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { assertConservation, assertReleaseEvidence, currentWorkerSha, pairEnv, publicationInputFromFile, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
+import { reportDigest, templateModelsDigest } from './runtime-report.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
 
 const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
@@ -46,6 +49,29 @@ const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
 const OLD_STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: OTHER, sourceCommit: OTHER, models: MODELS }).map(row => [row.key, row.value]))
 OLD_STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = OTHER
+
+test('publication reads complete file evidence and retains independently bound models, templates and all gates', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'publication-report-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const path = join(dir, 'release.json'), evidence = structuredClone(EVIDENCE)
+  for (const [kind, row] of Object.entries(evidence.templates)) row.name = `mikka-${COMMIT.slice(0, 12)}-123-2-${kind}`
+  const bytes = Buffer.from(JSON.stringify(evidence) + '\n')
+  writeFileSync(path, bytes)
+  const expected = { sha256: reportDigest(bytes), modelsSha256: templateModelsDigest(evidence), templates: TEMPLATES,
+    sourceSha: SHA, sourceCommit: COMMIT, runId: '123', runAttempt: '2' }
+  const input = publicationInputFromFile(path, expected)
+  assert.deepEqual(input.releaseEvidence, evidence)
+  assert.deepEqual(input.models, MODELS)
+  assert.doesNotThrow(() => assertReleaseEvidence(input))
+  assert.throws(() => publicationInputFromFile(path, { ...expected, modelsSha256: 'a'.repeat(64) }), /models_digest_mismatch/)
+  assert.throws(() => publicationInputFromFile(path, { ...expected, runAttempt: '3' }), /attempt_mismatch/)
+  assert.throws(() => publicationInputFromFile(path, { ...expected, sha256: 'c'.repeat(64) }), /digest_mismatch/)
+  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, templates: { ...TEMPLATES, codex: 'other' } })), /template_invalid/)
+  delete evidence.subscriptionAcceptance.claude
+  const invalid = Buffer.from(JSON.stringify(evidence))
+  writeFileSync(path, invalid)
+  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /subscription_missing/)
+})
 
 test('conservation requires both strict installation and exact provider-only finalization changes', () => {
   const proof = conservation('claude')
