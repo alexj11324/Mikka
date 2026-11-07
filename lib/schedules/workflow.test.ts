@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
+import { WORKFLOW_SERIALIZE } from '@workflow/serde'
+import type { ModelCallStreamPart } from '@ai-sdk/workflow'
 import { turnWarning } from '../coordinator/model'
+import { ScopedCoordinatorWritable } from '../coordinator/scoped-stream'
+import type { CoordinatorWorkflowStreamPart } from '../coordinator/stream'
 import type { NativeToolScope } from '../../workflows/coordinator/tool-scope'
 
 const calls:Array<{name:string;args:unknown[]}>=[]
@@ -11,11 +15,18 @@ const COORDINATOR_BOT='f2000000-0000-4000-8000-0000000c0de1'
 const scheduledRead={occurrenceId:'f2000000-0000-4000-8000-000000000001',leaseToken:'f2000000-0000-4000-8000-000000000002',allowedActions:['get_issue'],prompt:'Read the task status'}
 const result={text:'Actual task status is todo',finishReason:'stop',responseMessages:[{role:'assistant',content:'Actual task status is todo'}]}
 const stub=(path:string,exports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports:exports})
-const writable=new WritableStream()
+const modelPart:ModelCallStreamPart={type:'text-delta',id:'scheduled-text',text:result.text}
+const written:CoordinatorWorkflowStreamPart[]=[]
+const writable=new WritableStream<CoordinatorWorkflowStreamPart>({write(part){written.push(part)}})
 mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'existing-workflow'}),getWritable:()=>writable,createHook:()=>({async *[Symbol.asyncIterator](){}})}})
 stub('../coordinator/model.ts',{coordinatorStep:()=>({}),turnWarning})
 stub('../attention/handoff.ts',{QUIET_REPLY:'__quiet__'})
-stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unknown[])=>{record('hosted')(...args);return result}})
+stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unknown[])=>{
+ record('hosted')(...args)
+ const writer=(args[2] as {writable:WritableStream<ModelCallStreamPart>}).writable.getWriter()
+ try{await writer.write(modelPart)}finally{writer.releaseLock()}
+ return result
+}})
 stub('../../workflows/coordinator/native-steps.ts',{runtime:async()=>({harness:native?'codex':'ai_sdk'})})
 stub('../../workflows/coordinator/native-turn.ts',{nativeCoordinatorTurn:async(...args:unknown[])=>{
  record('native')(...args)
@@ -44,7 +55,7 @@ stub('../../workflows/coordinator/steps.ts',{
 })
 let coordinatorTurn:typeof import('../../workflows/coordinator/workflow').coordinatorTurn
 before(async()=>{({coordinatorTurn}=await import('../../workflows/coordinator/workflow'))})
-beforeEach(()=>{calls.length=0;taken=false;denied=false;native=false;result.finishReason='stop'})
+beforeEach(()=>{calls.length=0;written.length=0;taken=false;denied=false;native=false;result.finishReason='stop'})
 test('scheduled SDK turn uses the existing runtime with host-only scope and read catalog',async()=>{
  await coordinatorTurn('owner',COORDINATOR_BOT)
  const toolCall=calls.find(c=>c.name==='tools')!
@@ -54,8 +65,11 @@ test('scheduled SDK turn uses the existing runtime with host-only scope and read
  assert.equal(calls.find(c=>c.name==='hosted')?.args[0] && (calls.find(c=>c.name==='hosted')!.args[0] as {model:string}).model,'existing-configured-model')
  assert.deepEqual(calls.find(c=>c.name==='complete')?.args,['owner',COORDINATOR_BOT,scheduledRead,result.text,'existing-workflow:0'])
  const hosted=calls.find(c=>c.name==='hosted')!.args[2] as {writable:unknown;preventClose:boolean}
- assert.equal(hosted.writable,writable);assert.equal(hosted.preventClose,true)
- assert.deepEqual(calls.filter(c=>c.name==='stream').map(c=>c.args[1]),[{type:'coordinator-turn-start',id:'existing-workflow:0',quietEligible:false},{type:'coordinator-turn-committed',id:'existing-workflow:0',through:7,quiet:false}])
+ assert.ok(hosted.writable instanceof ScopedCoordinatorWritable)
+ const serialized=ScopedCoordinatorWritable[WORKFLOW_SERIALIZE](hosted.writable)
+ assert.equal(serialized.writable,writable);assert.equal(serialized.id,'existing-workflow:0');assert.equal(hosted.preventClose,true)
+ assert.deepEqual(written,[{type:'coordinator-model-part',id:'existing-workflow:0',part:modelPart}])
+ assert.deepEqual(calls.filter(c=>c.name==='stream').map(c=>c.args[1]),[{type:'coordinator-turn-start',id:'existing-workflow:0',quietEligible:false,modelStream:'scoped-v1'},{type:'coordinator-turn-committed',id:'existing-workflow:0',through:7,quiet:false}])
  assert.ok(calls.findIndex(c=>c.name==='complete') < calls.findIndex(c=>c.name==='stream' && (c.args[1] as {type:string}).type==='coordinator-turn-committed'))
  assert.ok(!JSON.stringify(calls.find(c=>c.name==='hosted')!.args[2]).includes(scheduledRead.leaseToken))
 })
