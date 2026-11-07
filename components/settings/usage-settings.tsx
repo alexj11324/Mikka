@@ -6,6 +6,7 @@ import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import type { getUsage } from '@/app/actions/usage'
 import { settingsRead } from '@/lib/settings-read'
+import { ReadResponseError } from '@/lib/swr/retry'
 import { creditBillingKey } from '@/components/billing/balance-section'
 import { getCreditBilling } from '@/lib/billing/verification-client'
 import { usageRows } from '@/components/settings/usage-view'
@@ -49,7 +50,7 @@ export function UsageSettings({ workspaceId, personal = false }: { workspaceId: 
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  const errorCode = usage.data?.error ?? (usage.error ? `usage_read_failed (${usage.error instanceof Error ? usage.error.name : 'unknown'})` : null)
+  const errorCode = usage.data?.error ?? (usage.error ? `usage_read_failed (${usage.error instanceof ReadResponseError ? `http_${usage.error.status}` : usage.error instanceof Error ? usage.error.name : 'unknown'})` : null)
 
   return <>
     <UsagePage month={month} months={months} onMonthChange={setMonth} view={view} onViewChange={setView} usage={data ?? undefined}
