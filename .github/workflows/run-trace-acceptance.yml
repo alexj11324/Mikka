@@ -23,7 +23,7 @@ on:
         type: boolean
         default: false
       browser-submit:
-        description: Prepare one model case and wait for a real browser New task submission
+        description: Submit one model case once through the runner's real browser New task UI
         type: boolean
         default: false
       export-target:
@@ -85,7 +85,25 @@ jobs:
           assert.ok(!process.env.REPLAY_SESSION_ID && !process.env.REPLAY_TRACE_ID)
           JS
       - name: Verify the acceptance guards before loading credentials
-        run: node --test scripts/acceptance/run-observability.test.mjs scripts/acceptance/run-observability-workflow.test.mjs
+        run: node --test scripts/acceptance/run-observability.test.mjs scripts/acceptance/run-observability-workflow.test.mjs scripts/acceptance/run-observability-browser.test.mjs
+      - name: Set up the pinned package manager for the optional browser
+        if: inputs.browser-submit
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - name: Install locked Chromium before loading account credentials
+        if: inputs.browser-submit
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict'
+          import { createRequire } from 'node:module'
+          const require = createRequire(import.meta.url)
+          assert.equal(require('@playwright/test/package.json').version, '1.64.1')
+          JS
+          pnpm exec playwright install --with-deps chromium
       - name: Read the existing production acceptance account
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
@@ -117,14 +135,16 @@ jobs:
             args+=(--execute)
           fi
           if [ "$ACCEPTANCE_PREPARE" = true ]; then args+=(--prepare); fi
-          if [ "$ACCEPTANCE_BROWSER_SUBMIT" = true ]; then args+=(--browser-submit); fi
+          if [ "$ACCEPTANCE_BROWSER_SUBMIT" = true ]; then args+=(--browser-submit --runner-browser); fi
           node scripts/acceptance/run-observability-workflow.mjs "${args[@]}"
       - name: Preserve only the safe acceptance report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: run-trace-acceptance-${{ github.run_id }}
-          path: production-run-observability-report/report.json
+          path: |
+            production-run-observability-report/report.json
+            production-run-observability-report/browser-actor.receipt.json
           retention-days: 7
           if-no-files-found: warn
   export:
