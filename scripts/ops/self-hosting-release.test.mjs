@@ -27,12 +27,15 @@ test('a configured native Sync can be read back without organization connection 
  else if(u.pathname==='/api/v4/secrets')body={secrets:metadata}
  else if(u.pathname==='/api/v2/folders')body={folders:[{path:TARGET.path}]}
  else if(u.pathname==='/api/v1/secret-syncs/vercel')body={secretSyncs:[{id:'existing',connection:{id:TARGET.connection},folder:{path:TARGET.path},environment:{slug:'prod'},syncOptions:{disableSecretDeletion:true,includeAllSubFolders:false},destinationConfig:{app:TARGET.app,env:'production'}}]}
- else if(u.pathname.startsWith('/v10/projects/'))body={envs:[]}
+ else if(u.pathname.startsWith('/v10/projects/'))body={envs:u.pathname.includes(TARGET.publicApp)?['DATABASE_URL','DATABASE_URL_UNPOOLED'].map(key=>({id:'fixture_'+key,key,target:['production'],configurationId:'fixture-neon-integration'})):[]}
+ else if(u.pathname.startsWith('/v1/projects/'+TARGET.publicApp+'/env/'))body={key:u.pathname.split('/').at(-1).replace('fixture_',''),value:'postgresql://fixture:isolated@fixture.aws.neon.tech/test?sslmode=require'}
+ else if(u.pathname.startsWith('/api/v4/secrets/'))body={secret:{secretKey:u.pathname.split('/').at(-1),secretValue:'postgresql://fixture:isolated@fixture.aws.neon.tech/test?sslmode=require'}}
  else if(u.pathname==='/v1/integrations/configurations')body={configurations:[]}
+ else if(u.pathname==='/v1/storage/stores')body={stores:[]}
  else assert.fail('unexpected route')
  return new Response(JSON.stringify(body),{headers:{'content-type':'application/json'}})
  }
- await prepare({env:{ACTIONS_ID_TOKEN_REQUEST_URL:'https://pipelines.actions.githubusercontent.com/opaque',ACTIONS_ID_TOKEN_REQUEST_TOKEN:'synthetic',VERCEL_TEAM_TOKEN:'synthetic'},fetcher,report});assert.equal(report.result,'source_and_sync_prepared');assert.equal(report.connectionConnectRequired,false);assert.deepEqual(report.createdKeys,[]);assert.equal(report.syncId,'existing')
+ await prepare({env:{ACTIONS_ID_TOKEN_REQUEST_URL:'https://pipelines.actions.githubusercontent.com/opaque',ACTIONS_ID_TOKEN_REQUEST_TOKEN:'synthetic',VERCEL_TEAM_TOKEN:'synthetic'},fetcher,report});assert.equal(report.result,'source_and_sync_prepared');assert.equal(report.connectionConnectRequired,false);assert.deepEqual(report.createdKeys,[]);assert.equal(report.syncId,'existing');assert.ok(report.neonSnapshotChecks.every(x=>x.matchesLiveProvider));assert.deepEqual(report.refreshedPrivateDatabaseKeys,[]);assert.ok(!JSON.stringify(report).includes('fixture:isolated'))
 })
 
 test('production readiness uses only the shared account and logs closed capability metadata',async()=>{
