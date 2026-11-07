@@ -18,13 +18,13 @@ concurrency:
 
 jobs:
   observe:
-    if: ${{ false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506' }}
+    if: ${{ github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506' }}
     runs-on: ubuntu-latest
     # The business deadline is 240s; bounded cleanup remains outside that
     # deadline and must have time to finish after a transport failure.
     timeout-minutes: 12
     env:
-      MIKKA_ACCEPTANCE_SHA: '' # Only the verified final production application SHA.
+      MIKKA_ACCEPTANCE_SHA: '26ef4de15129e22503e152258ee9cb2e4aeae8bd' # Only the verified final production application SHA.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
