@@ -12,6 +12,8 @@ import { publishedActions } from '../acceptance/read-action-transport.mjs'
 import { assertCurrentMain, waitForWebDeployment } from '../release/web-deploy.mjs'
 import { DeployedTargetError, deployedTargetGuard, assertDeployedTarget, publicTargetFailure } from '../acceptance/deployed-target.mjs'
 import { TeamWorkspaceError, selectTeamWorkspace, isTeamWorkspaceReadPath, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure } from '../acceptance/team-workspace.mjs'
+import { CORE_MODE, CoreProductionError, coreProductionGuard, assertCoreProductionTarget, coreTargetFailure } from '../acceptance/self-hosted-production-target.mjs'
+import { CORE_RPC_ACTIONS, CoreProbeError, readCoreCapabilities, coreLiveSocket, coreDeviceSocket } from '../acceptance/self-hosted-production-probes.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
 const BASE = '/mikka'
@@ -39,6 +41,11 @@ const deviceIdentity = device => JSON.stringify([device.id, device.name, device.
   device.hostname, device.platform, device.arch, device.harnesses])
 
 export function proofConfiguration(env, event) {
+  if (env.MIKKA_ACCEPTANCE_TARGET_MODE === CORE_MODE) {
+    const binding = coreProductionGuard(env, event)
+    check(isSmokeAccountEmail(env.SMOKE_OWNER_EMAIL) && Boolean(env.SMOKE_OWNER_PASSWORD), 'configuration_invalid')
+    return binding
+  }
   if (env.MIKKA_ACCEPTANCE_TARGET_MODE === 'deployed-target') {
     const binding = deployedTargetGuard(env, event)
     check(isSmokeAccountEmail(env.SMOKE_OWNER_EMAIL) && Boolean(env.SMOKE_OWNER_PASSWORD), 'configuration_invalid')
@@ -87,7 +94,8 @@ async function normalDeploymentGate({ env, fetchImpl }) {
 }
 
 export async function runMobileDaemonProof({ env = process.env, event, attestation, fetchImpl = fetch, now = Date.now,
-  wait = delay, clientLoader = repositoryClient, deploymentGate = normalDeploymentGate } = {}) {
+  wait = delay, clientLoader = repositoryClient, deploymentGate = normalDeploymentGate, socketFactory } = {}) {
+  const core = env.MIKKA_ACCEPTANCE_TARGET_MODE === CORE_MODE
   const report = { version: 1, scope: 'production-mobile-and-source-daemon-http', status: 'fail',
     applicationSha: SHA.test(env.APPLICATION_SHA ?? '') ? env.APPLICATION_SHA : null,
     runnerSha: SHA.test(env.GITHUB_SHA ?? '') ? env.GITHUB_SHA : null,
@@ -100,18 +108,37 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     cleanup: { credentialRevoked: false, oldCredentialRejected: false, deviceRemoved: false,
       originalDevicesPreserved: false, originalCredentialsPreserved: false, sessionClosed: false },
     requests: { owner: 0, device: 0 }, errors: [] }
+  if (core) {
+    report.scope = 'mikka-cloud-core-compatibility'
+    Object.assign(report.checks, { discoveryAndFlags: false, liveHandshake: false, liveDeviceList: false, deviceGateway: false })
+    Object.assign(report.cleanup, { liveSocketClosed: true, deviceSocketClosed: true })
+    report.boundaries = { modelRequestsByDriver: 0, cloudComputerBoots: 0, databaseAccessByDriver: false,
+      browserExercised: false, providerLoginExercised: false, quotaEnforcementExercised: false, settlementExercised: false }
+  }
   const jar = responseCookieJar(now)
-  const marker = 'm1415-wire-' + randomUUID()
+  const marker = (core ? 'selfhost-core-' : 'm1415-wire-') + randomUUID()
   const unusedDeviceId = randomUUID()
-  let phase = 'configuration', ownerId, teamWorkspaceId, tokenId, credential, deviceId, client, contract
+  let phase = 'configuration', ownerId, teamWorkspaceId, teamRole, ownerLiveWorkspaceId, tokenId, credential, deviceId, client, contract
+  let liveSocket, deviceSocket
   let beforeTokens, beforeDevices, registrationAttempted = false, signInStarted = false, signedIn = false, primaryPassed = false
   let targetProof = attestation
   const error = cause => {
     if (cause instanceof DeployedTargetError) report.targetFailure = publicTargetFailure(cause)
     if (cause instanceof TeamWorkspaceError) report.teamFailure = publicTeamWorkspaceFailure(cause)
-    report.errors.push({ phase, code: cause instanceof DeployedTargetError ? cause.code : failureCode(cause) })
+    if (cause instanceof CoreProductionError) report.targetFailure = coreTargetFailure(cause)
+    report.errors.push({ phase, ...(cause instanceof CoreProductionError || cause instanceof CoreProbeError
+      ? { code: cause.code, detail: cause.detail } : { code: cause instanceof DeployedTargetError ? cause.code : failureCode(cause) }) })
   }
   const verifyDeployment = async () => {
+    if (core) {
+      targetProof = await assertCoreProductionTarget({ env, event, attestation: targetProof, fetchImpl, now })
+      Object.assign(report, { targetMode: CORE_MODE, applicationSha: targetProof.applicationSha,
+        driverRevision: targetProof.driverRevision, driverRunId: targetProof.driverRunId, driverRunAttempt: targetProof.driverRunAttempt,
+        webDeployRunId: targetProof.webDeployRunId, webAttempt: targetProof.webAttempt, webDeployJobId: targetProof.webDeployJobId,
+        openIssues: targetProof.openIssues })
+      report.client.sourceRevision = targetProof.driverRevision
+      return
+    }
     if (env.MIKKA_ACCEPTANCE_TARGET_MODE !== 'deployed-target') return deploymentGate({ env, fetchImpl })
     const proof = await assertDeployedTarget({ env, event, attestation: targetProof, fetchImpl, now })
     targetProof = proof
@@ -132,7 +159,9 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     const known = new Set(['/api/auth/sign-in/email', '/api/auth/sign-out',
       '/api/auth/get-session?disableCookieCache=true', '/api/auth/get-session', '/api/workspace', '/api/mobile/home',
       '/api/device-tokens', '/api/devices/enrollment', '/api/rpc', '/renderer-manifest.json'])
-    check(known.has(path) || (method === 'GET' && body === undefined && isTeamWorkspaceReadPath(BASE + path))
+    check(known.has(path) || (core && method === 'GET' && body === undefined && (path === '/api/desktop/discovery'
+      || ownerLiveWorkspaceId && path === '/api/live/ticket?workspace=' + ownerLiveWorkspaceId))
+      || (method === 'GET' && body === undefined && isTeamWorkspaceReadPath(BASE + path))
       || (tokenId && path === '/api/device-tokens/' + tokenId + '/revoke'),
       'request_rejected')
     const url = new URL(BASE + path, ORIGIN)
@@ -151,7 +180,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     return { status: response.status, body: await json(response) }
   }
   async function rpc(action, args = []) {
-    check(ACTIONS.includes(action), 'request_rejected')
+    check(ACTIONS.includes(action) || core && CORE_RPC_ACTIONS.includes(action), 'request_rejected')
     const response = await owner('/api/rpc', 'POST', { version: DESKTOP_RPC_VERSION, action, args: encode(args) })
     check(response.status === 200 && response.body?.version === DESKTOP_RPC_VERSION
       && response.body.ok === true && Object.hasOwn(response.body, 'result') && !response.body.error, 'response_invalid')
@@ -172,6 +201,11 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       && typeof row.name === 'string' && typeof row.enabled === 'boolean'
       && typeof row.online === 'boolean' && Array.isArray(row.harnesses))
       && new Set(data.devices.map(row => row.id)).size === data.devices.length, 'resource_baseline_invalid')
+    if (core) {
+      check(data.live?.ownerId === ownerId && isUuid(data.live.workspaceId)
+        && (!ownerLiveWorkspaceId || ownerLiveWorkspaceId === data.live.workspaceId), 'resource_baseline_invalid')
+      ownerLiveWorkspaceId = data.live.workspaceId
+    }
     return data.devices
   }
   async function deviceFetch(input, init = {}) {
@@ -181,6 +215,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     check(url.origin === ORIGIN && !url.search && !url.hash
       && ((method === 'POST' && url.pathname === BASE + '/v1/devices/register')
         || (method === 'POST' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/heartbeat')
+        || (core && method === 'GET' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/gateway')
         || (method === 'GET' && url.pathname === BASE + '/v1/devices/' + target + '/repos'))
       && headers.get('authorization') === 'Bearer ' + credential && !headers.has('cookie')
       && headers.get('x-mikka-client-version') === contract.version, 'request_rejected')
@@ -233,7 +268,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
         : path === BASE + '/api/rpc' && isTeamWorkspaceSwitchRequest(body), 'request_rejected')
       const response = await owner(path.slice(BASE.length), body === undefined ? 'GET' : 'POST', body)
       check(response.status === 200, 'response_invalid')
-      if (path === BASE + '/api/workspace') teamWorkspaceId = response.body?.workspace?.id
+      if (path === BASE + '/api/workspace') { teamWorkspaceId = response.body?.workspace?.id; teamRole = response.body?.role }
       return response.body
     } }))
     phase = 'mobile-home'
@@ -246,6 +281,12 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       && home.body.live?.ownerId === ownerId
       && (home.body.live.workspaceId === null || isUuid(home.body.live.workspaceId)), 'mobile_home_failed')
     report.checks.mobileHomeOwner = true
+    if (core) {
+      phase = 'core-capabilities'
+      report.core = await readCoreCapabilities({ owner, rpc, ownerId, workspaceId: teamWorkspaceId, role: teamRole,
+        applicationSha: report.applicationSha })
+      report.checks.discoveryAndFlags = true
+    }
     phase = 'resource-baseline'
     const manifest = await owner('/renderer-manifest.json')
     check(manifest.status === 200, 'manifest_unavailable')
@@ -256,6 +297,15 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     check(beforeTokens.length < 100, 'resource_baseline_invalid')
     beforeDevices = await devices()
     check(!beforeDevices.some(row => row.name === marker || row.id === unusedDeviceId), 'resource_baseline_invalid')
+    if (core) {
+      phase = 'core-live-handshake'
+      const response = await owner('/api/live/ticket?workspace=' + ownerLiveWorkspaceId)
+      check(response.status === 200, 'response_invalid')
+      liveSocket = coreLiveSocket(response.body, { ownerId, workspaceId: ownerLiveWorkspaceId, now, socketFactory })
+      report.cleanup.liveSocketClosed = false
+      await liveSocket.ready()
+      report.checks.liveHandshake = true
+    }
     phase = 'enrollment'
     report.resources.enrollmentAttempts++
     const enrollment = await owner('/api/devices/enrollment', 'POST')
@@ -279,6 +329,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     phase = 'credential-identity'
     tokenId = newEnrollmentCredential(beforeTokens, await tokens())
     phase = 'register'
+    const liveReceipt = liveSocket?.expectDeviceList()
     registrationAttempted = true
     const registered = await client.registerDevice(credential, {
       name: marker, hostname: marker, platform: process.platform, arch: process.arch,
@@ -292,11 +343,24 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     const own = (await locateDevice()).find(row => row.id === deviceId)
     check(own?.name === marker && own.harnesses.length === 0, 'device_identity')
     report.checks.deviceOwner = true
+    if (core) {
+      phase = 'core-live-device-list'
+      await liveReceipt()
+      report.checks.liveDeviceList = true
+    }
     phase = 'disable-scheduling'
     const disabled = await rpc('agents.setDeviceEnabled', [{ deviceId, enabled: false }])
     check(disabled.success === true && (await devices()).find(row => row.id === deviceId)?.enabled === false,
       'device_disable_failed')
     report.checks.schedulingDisabled = true
+    if (core) {
+      phase = 'core-device-gateway'
+      const ticket = await client.deviceGateway(deviceId)
+      deviceSocket = coreDeviceSocket(ticket, { deviceId, now, socketFactory })
+      report.cleanup.deviceSocketClosed = false
+      await deviceSocket.ping()
+      report.checks.deviceGateway = true
+    }
     phase = 'heartbeat'
     const beat = await client.heartbeat(deviceId, { harnesses: [], runs: [], worktreeDiskBytes: 0,
       computerUse: { installed: false, version: null }, deviceType: 'server' })
@@ -309,6 +373,11 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     primaryPassed = true
   } catch (cause) { error(cause) }
   finally {
+    for (const [socket, key] of [[deviceSocket, 'deviceSocketClosed'], [liveSocket, 'liveSocketClosed']]) {
+      if (!socket) continue
+      try { phase = 'cleanup-socket'; await socket.close(); report.cleanup[key] = true }
+      catch (cause) { error(cause) }
+    }
     // No mutation is replayed. A lost register reply is reconciled only against
     // this nonce and the complete pre-existing owner-visible device snapshot.
     if (signedIn && beforeTokens && report.resources.credentialExchangeAttempts) {
@@ -389,7 +458,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     jar.clear()
     credential = undefined
   }
-  if (env.MIKKA_ACCEPTANCE_TARGET_MODE === 'deployed-target' && report.checks.deployment) {
+  if ((core || env.MIKKA_ACCEPTANCE_TARGET_MODE === 'deployed-target') && report.checks.deployment) {
     // Failure attribution needs an actual after-observation too. This never
     // suppresses the original business or cleanup errors, nor repeats a mutation.
     try {
@@ -398,7 +467,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       report.checks.finalDeployment = true
       report.targetAfter = { verified: true, status: 'ready' }
     } catch (cause) {
-      const failure = publicTargetFailure(cause)
+      const failure = core ? coreTargetFailure(cause) : publicTargetFailure(cause)
       report.targetAfter = { verified: false, ...failure }
       report.targetFailure ??= failure
       error(cause)
@@ -407,7 +476,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   if (primaryPassed && !report.errors.length) {
     try {
       phase = 'final-deployment'
-      if (env.MIKKA_ACCEPTANCE_TARGET_MODE !== 'deployed-target') {
+      if (!core && env.MIKKA_ACCEPTANCE_TARGET_MODE !== 'deployed-target') {
         await verifyDeployment()
         report.checks.finalDeployment = true
       }

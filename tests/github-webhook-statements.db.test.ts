@@ -6,15 +6,18 @@
 // notification costs after a model answers is the model path's own budget.
 import assert from 'node:assert/strict'
 import { createHmac, randomUUID } from 'node:crypto'
-import { before, mock, test } from 'node:test'
+import { after, before, mock, test } from 'node:test'
 import pg from 'pg'
 import { isE2eTarget } from './helpers/e2e-target.mjs'
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 
 const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('GitHub webhook statement tests require matching isolated loopback _e2e URLs')
 
 const secret = 'statement-count-webhook-secret'
+const originalEdition = process.env.MIKKA_EDITION
+after(() => { if (originalEdition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = originalEdition })
 const callbacks: Array<() => unknown> = []
 mock.module('next/server', { namedExports: { after: (callback: () => unknown) => { callbacks.push(callback) } } })
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: {
@@ -49,6 +52,9 @@ let POST: typeof import('../app/api/webhooks/github/route')['POST']
 let pool: pg.Pool
 before(async () => {
   if (!valid) return
+  // This suite measures the official App's existing webhook path. Community
+  // installations load their own encrypted App in the manifest DB suite.
+  process.env.MIKKA_EDITION = 'cloud'
   process.env.GITHUB_WEBHOOK_SECRET = secret
   ;({ POST } = await import('../app/api/webhooks/github/route'))
   ;({ pool } = await import('../lib/db'))
@@ -82,10 +88,11 @@ test('one GitHub delivery stays within its statement budget', { skip: !valid, ti
   const issueId = randomUUID(), agentId = randomUUID(), runId = randomUUID(), number = 1000 + Math.floor(Math.random() * 100_000)
   const delivered = `https://github.com/o/r/pull/${number}`, unrelated = `https://github.com/o/r/pull/${number + 1}`
   await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'O',$2,true,now(),now())`, [owner, `${owner}@example.invalid`])
+  const workspaceId = await seedFixtureWorkspace(pool, owner)
   await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubId, owner])
   await pool.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,'Coder','codex')`, [agentId, owner])
-  await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Delivered',$3,'review','normal')`,
-    [issueId, owner, JSON.stringify({ type: 'doc', attrs: { mikka: { pullRequests: [{ url: delivered, state: 'open' }] } }, content: [] })])
+  await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId") VALUES ($1,$2,'Delivered',$3,'review','normal',$4)`,
+    [issueId, owner, JSON.stringify({ type: 'doc', attrs: { mikka: { pullRequests: [{ url: delivered, state: 'open' }] } }, content: [] }), workspaceId])
   await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId",status,prompt) VALUES ($1,$2,$3,$4,'succeeded','Fix it')`, [runId, owner, issueId, agentId])
   await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") VALUES ($1,$2,$3,'https://github.com/o/r','o/r','published',$4)`,
     [runId, owner, issueId, JSON.stringify({ url: delivered, state: 'open' })])

@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 import { launchElectron } from './electron-launch.mjs'
-import { observeNativeNavigation, waitForBundledRootDocument } from './native-document.mjs'
+import { observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const directory = await mkdtemp(join(tmpdir(), 'mikka-native-document-'))
@@ -83,12 +83,29 @@ try {
   // initial document still waits on its parser-blocking script. Its next DOM
   // event therefore cannot prove an authentication-return navigation happened.
   const oldReturned = page.waitForEvent('domcontentloaded')
-  const initialReady = waitForBundledRootDocument(page, { timeout: 15_000 })
+  const initialReady = waitForBundledDocument(page, { timeout: 15_000 })
   await application.evaluate(() => globalThis.__documentProbe.release())
   await oldReturned
   report.oldWaiterDocument = await page.title()
   assert.equal(report.oldWaiterDocument, 'initial')
   await initialReady
+
+  // A normal SPA auth redirect changes the main-frame URL, but retains this
+  // document and its already-fired DCL. No new response or navigation is needed.
+  const timeOrigin = await page.evaluate(() => performance.timeOrigin)
+  const beforeHistory = report.events.filter(event => event.event === 'domcontentloaded').length
+  for (const path of ['/mikka/sign-in', '/mikka/en/sign-in?next=%2F']) {
+    await page.evaluate(path => history.replaceState(null, '', path), path)
+    await waitForBundledDocument(page, { timeout: 15_000 })
+    assert.equal(await page.evaluate(() => performance.timeOrigin), timeOrigin)
+    assert.equal(await page.title(), 'initial')
+  }
+  report.historyAuthRoutesReady = 2
+  report.historyRetainedDocument = true
+  report.historyExtraDOMContentLoaded = report.events.filter(event => event.event === 'domcontentloaded').length - beforeHistory
+  report.oldExactRootMatchesAuthRoute = page.url() === 'mikka://app/mikka'
+  assert.equal(report.historyExtraDOMContentLoaded, 0)
+  assert.equal(report.oldExactRootMatchesAuthRoute, false)
 
   const realReturned = page.waitForEvent('domcontentloaded')
   // Hold an ordinary renderer evaluation across the real second navigation.
@@ -99,7 +116,7 @@ try {
   await page.waitForFunction(() => globalThis.__evaluationPending === true)
   await application.evaluate(() => globalThis.__documentProbe.returned())
   await realReturned
-  await waitForBundledRootDocument(page, { timeout: 15_000 })
+  await waitForBundledDocument(page, { timeout: 15_000 })
   report.correctWaiterDocument = await page.title()
   report.pendingEvaluationLostContext = await bounded(lostEvaluation, 15_000)
   report.bridgeStillPresent = await page.evaluate(() => typeof window.mikka?.bundled === 'object')

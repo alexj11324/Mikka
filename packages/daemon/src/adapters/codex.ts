@@ -1,3 +1,4 @@
+import { captureRunFailure, failureFrom, type RunFailure, type RunFailureContext } from "@mikka/protocol/run-failure"
 import { codexFailureInfo, codexFailureMessage, type CodexFailureInfo, type CodexFailurePhase } from "./codex-failure"
 import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } from "../runs/quota-exhausted"
 // Codex adapter (ADR 0003): the user's own signed-in `codex app-server`,
@@ -11,6 +12,9 @@ import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } 
 import { delimiter, dirname, isAbsolute, join, relative } from "node:path"
 import { mkdirSync } from "node:fs"
 import { daemonTracer, runIdHash } from "../tracing"
+import { CodexGenerationMetrics } from './generation-metrics'
+import { codexGenerationReceiptAttributes, codexTraceEnvironment, startCodexGenerationCollector } from '../codex-generation-telemetry'
+import type { GenerationMetrics } from '../tracing-ai'
 import { runRuntimeTimings } from '../run-runtime-timing'
 
 import type { MessageConnection } from "vscode-jsonrpc/node"
@@ -79,6 +83,8 @@ export interface CodexAdapterOptions {
   ensureBinary?: () => Promise<string>
   /** Trusted hosted transport, retaining the existing app-server adapter. */
   spawnCli?: typeof spawnCli
+  /** Trusted acceptance-only logs configuration, applied before native traces. */
+  cliTiming?: { env: Record<string, string>; args: string[] }
   /** Persist an owner-bound session before any prompt can execute. */
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
@@ -178,6 +184,34 @@ export function codexProviderFailure(error: unknown): ProviderFailure | undefine
     code: category,
     ...(bodyStart >= 0 && bodyEnd >= bodyStart ? { responseBody: diagnostic.slice(bodyStart, bodyEnd + 1) } : {}),
   })
+}
+
+/** Turn errors are a trusted CLI boundary; arbitrary messages elsewhere are not. */
+export function captureCodexRunFailure(error: unknown, context: RunFailureContext): RunFailure {
+  if (failureFrom(error)) return captureRunFailure(error, context)
+  if (!error || typeof error !== "object") return captureRunFailure(error, context)
+  const outer = error as Record<string, unknown>
+  const data = outer.data && typeof outer.data === "object" ? outer.data as Record<string, unknown> : undefined
+  const value = data && "codexErrorInfo" in data ? { ...data, message: typeof data.message === "string" ? data.message : outer.message } : outer
+  const info = codexFailureInfo(value)
+  const codes: Partial<Record<CodexFailureInfo["category"], string>> = {
+    unauthorized: "authentication_failed", usageLimitExceeded: "usage_limit_exceeded", contextWindowExceeded: "context_window_exceeded",
+    rateLimitExceeded: "rate_limit", serverOverloaded: "overloaded", flexUnavailable: "overloaded", internalServerError: "server_error",
+    httpConnectionFailed: "connection_error", responseStreamConnectionFailed: "connection_error", responseStreamDisconnected: "connection_error", responseTooManyFailedAttempts: "connection_error",
+  }
+  const diagnostic = typeof value.message === "string" ? value.message : ""
+  const prefix = /^(?:stream disconnected before completion:\s*)?(?:unexpected status|HTTP status|API [Ee]rror:)\s*([45]\d{2})\b[ :,-]*([\s\S]*)$/i.exec(diagnostic)
+  const status = info.httpStatus ?? (prefix ? Number(prefix[1]) : undefined)
+  const body = prefix?.[2]
+  const start = body?.indexOf("{") ?? -1, end = body?.lastIndexOf("}") ?? -1
+  return captureRunFailure({
+    provider: "codex", ...(status === undefined ? {} : { status }),
+    // A concrete HTTP refusal takes precedence over generic connection labels.
+    ...(codes[info.category] && !(status !== undefined && codes[info.category] === "connection_error") ? { code: codes[info.category] } : {}),
+    ...(prefix ? { message: `API Error: ${prefix[1]} ${body}` } : {}),
+    ...(body && start >= 0 && end >= start ? { responseBody: body.slice(start, end + 1) } : {}),
+    cause: error,
+  }, context)
 }
 
 /** Codex thread items as UI message chunks, at item start and completion. */
@@ -416,6 +450,16 @@ export class CodexAdapter implements AgentAdapter {
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
     const mcp = ctx.mcpServer()
+    const traceContext = options.traceContext ?? daemonTracer.capture()
+    let nativeGenerations: Awaited<ReturnType<typeof startCodexGenerationCollector>> | undefined
+    let nativeUnavailableReason: GenerationMetrics['nativeUnavailableReason']
+    const closeNativeGenerations = (cliExitObserved: boolean) => {
+      if (!nativeGenerations) return
+      const drain = nativeGenerations.close(cliExitObserved).then(receipt =>
+        daemonTracer.span('daemon.ai.collection', { 'mikka.harness': 'codex', ...codexGenerationReceiptAttributes(receipt) }, async () => {}, { traceContext }))
+      daemonTracer.registerGenerationDrain(drain)
+      void drain.then(() => daemonTracer.flush()).catch(() => {})
+    }
     const argv = [
       binary,
       "app-server",
@@ -453,15 +497,40 @@ export class CodexAdapter implements AgentAdapter {
         "-c",
         `shell_environment_policy.set.${key}=${toml(value)}`,
       ]),
+      ...(this.options.cliTiming?.args ?? []),
     ]
     const spawnOptions = {
       cwd: ctx.worktree,
-      env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...ctx.decisionMcpEnv(), ...credential.env, CODEX_HOME: codexHome.home },
+      env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...ctx.decisionMcpEnv(), ...credential.env, CODEX_HOME: codexHome.home,
+        ...this.options.cliTiming?.env },
       policy: ctx.policy(),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
     }
-    const child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
+    if (daemonTracer.generationsEnabled && traceContext) {
+      const bypass = codexTraceEnvironment(spawnOptions.env)
+      if (!bypass) {
+        nativeUnavailableReason = 'platform_proxy_unverified'
+        void daemonTracer.span('daemon.ai.collection', { 'mikka.harness': 'codex', 'mikka.ai.native_unavailable_reason': nativeUnavailableReason },
+          async () => {}, { traceContext }).catch(() => {})
+      } else {
+        try {
+          nativeGenerations = await startCodexGenerationCollector(metrics => daemonTracer.generation(metrics, traceContext))
+          argv.push(...nativeGenerations.args)
+          Object.assign(spawnOptions.env, nativeGenerations.env, bypass)
+        } catch (error) {
+          nativeUnavailableReason = 'receiver_start_failed'
+          void daemonTracer.span('daemon.ai.collection', { 'mikka.harness': 'codex', 'mikka.ai.rejected_batches': 1, 'mikka.ai.native_flush_confirmed': false,
+            'mikka.ai.native_unavailable_reason': nativeUnavailableReason }, async span => { span.fail(error) }, { traceContext }).catch(() => {})
+        }
+      }
+    }
+    let child: Awaited<ReturnType<typeof spawnCli>>
+    try { child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions) }
+    catch (error) { closeNativeGenerations(false); throw error }
+    // Existing owned-child shutdown determines the deadline. The receiver
+    // stays live through native exporter shutdown and drains in the background.
+    void child.exited.then(() => closeNativeGenerations(true))
     // A revoked run gate stops the CLI (no sandbox launcher owns it any more).
     const off = options.toolApproval!.onRevoke(() => { void child.kill().catch(() => undefined) })
     void child.exited.finally(off)
@@ -478,6 +547,9 @@ export class CodexAdapter implements AgentAdapter {
     let pendingTurnStart: Promise<void> | null = null
     let ending = false
     let cancelling = false
+    const sensitiveText = [firstMessage, options.prompt ?? "", options.continueSession?.message ?? "", options.credential?.key ?? "", options.apps?.token ?? ""]
+    const capture = (error: unknown) => captureCodexRunFailure(error, { runId: options.runId, appVersion: DAEMON_VERSION, provider: "codex", credential: options.credential ? "api_key" : "subscription", sensitiveText })
+    let failureDetails: RunFailure | undefined
     let lastError: string | undefined
     let lastFailure: CodexFailureInfo | undefined
     let providerFailure: ProviderFailure | undefined
@@ -491,6 +563,9 @@ export class CodexAdapter implements AgentAdapter {
     let quota: QuotaSignal | undefined
     let rateLimits: CodexRateLimits | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
+    const generations = new CodexGenerationMetrics(metrics => nativeGenerations
+      ? nativeGenerations.collector.observeFallback(metrics, sessionId)
+      : daemonTracer.generation({ ...metrics, nativeUnavailableReason }, traceContext))
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
     // Match the host-created MCP server's advertised capabilities. A fixed
     // check may inspect its artifact, but cannot select another repository.
@@ -525,7 +600,10 @@ export class CodexAdapter implements AgentAdapter {
         )
       rpc.dispose()
       await child.kill()
-      if (event) queue.exit(event)
+      if (event) {
+        const { failureDetails: supplied, ...terminal } = event
+        queue.exit({ ...terminal, ...(event.outcome === "failed" && (supplied ?? failureDetails) ? { failureDetails: supplied ?? failureDetails } : {}) })
+      }
     }
 
     // Native requests retain their active turn identity and live run gate;
@@ -567,10 +645,10 @@ export class CodexAdapter implements AgentAdapter {
           throw new Error(SUBSCRIPTION_AUTH_ERROR)
         }
         try {
-          return subscriptionTokens(
-            await externalAuth.token(true),
-            externalAuth.accountId
-          )
+          const auth = subscriptionTokens(await externalAuth.token(true), externalAuth.accountId)
+          sensitiveText.push(auth.accessToken)
+          options.onCredential?.("SUBSCRIPTION_ACCESS_TOKEN", auth.accessToken)
+          return auth
         } catch (error) {
           void finish({ outcome: "failed", error: SUBSCRIPTION_AUTH_ERROR })
           throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error })
@@ -645,7 +723,10 @@ export class CodexAdapter implements AgentAdapter {
           if (!options.mailbox) activeTurn = (params as TurnNotification).turn.id
           return
         case "thread/tokenUsage/updated": {
-          const { total } = (params as TokenUsageNotification).tokenUsage
+          const notification = params as TokenUsageNotification
+          if (notification.threadId !== sessionId) return
+          const { total } = notification.tokenUsage
+          generations.observe(notification.tokenUsage, runtimeModel)
           usage = {
             inputTokens: total.inputTokens,
             outputTokens: total.outputTokens,
@@ -660,6 +741,7 @@ export class CodexAdapter implements AgentAdapter {
           if (errorThread && errorThread !== sessionId) return
           if (!willRetry) quota = mergeQuota(quota, codexQuotaSignal(error, rateLimits))
           if (!willRetry) {
+            failureDetails = capture(error)
             lastFailure = codexFailureInfo(error)
             providerFailure = codexProviderFailure(error)
             lastError = managedAuth
@@ -688,6 +770,7 @@ export class CodexAdapter implements AgentAdapter {
     rpc.listen()
 
     const turnCompleted = async (turn: TurnNotification["turn"]) => {
+      generations.endTurn()
       for (const [id,item] of pendingMcp) if (item.turnId === turn.id) pendingMcp.delete(id)
       queue.chunk({
         type: "data-usage",
@@ -703,6 +786,7 @@ export class CodexAdapter implements AgentAdapter {
       const handoff = ctx.readHandoff(log)
       if (handoff) return finish(handoff)
       if (turn.status === "failed" || lastError) {
+        if (turn.error) failureDetails = capture(turn.error)
         providerFailure = codexProviderFailure(turn.error) ?? providerFailure
         if (providerFailure) {
           quota = mergeQuota(quota, codexQuotaSignal(turn.error, rateLimits))
@@ -747,6 +831,8 @@ export class CodexAdapter implements AgentAdapter {
     let sessionId = threadId ?? ""
     let runtimeModel: string | null = null
     const startTurn = async (message: string) => {
+      sensitiveText.push(message)
+      failureDetails = undefined
       lastError = undefined
       lastFailure = undefined
       providerFailure = undefined
@@ -756,17 +842,19 @@ export class CodexAdapter implements AgentAdapter {
       if (verify) {
         try { await daemonTracer.span("daemon.adapter.account_check", { "mikka.harness": "codex", "mikka.run.id_hash": runIdHash(options.runId) }, () => verify()) } catch (error) { throw new Error(SUBSCRIPTION_AUTH_ERROR, { cause: error }) }
       }
+      generations.startTurn()
       const result = rpc.sendRequest<{ turn: { id: string } }>("turn/start", {
         threadId: sessionId,
         input: text(message),
         ...(options.effort ? { effort: options.effort } : {}),
       })
       const response = result.catch((error: unknown) => {
+        failureDetails = capture(error)
         providerFailure = codexProviderFailure(error)
         if (managedAuth) turnStartFailure = subscriptionFailure('turn_start', codexFailureInfo(error))
-        if (providerFailure) throw new ProviderFailureError(providerFailure)
-        if (managedAuth) throw new Error(turnStartFailure)
-        throw error
+        if (providerFailure) throw Object.assign(new ProviderFailureError(providerFailure), { failureDetails, cause: error })
+        if (managedAuth) throw Object.assign(new Error(turnStartFailure, { cause: error }), { failureDetails })
+        throw Object.assign(error instanceof Error ? error : new Error(errorMessage(error), { cause: error }), { failureDetails })
       })
       if (options.mailbox) {
         pendingTurnStart = response.then(({ turn }) => { if (!ending) activeTurn = turn.id })
@@ -784,6 +872,7 @@ export class CodexAdapter implements AgentAdapter {
       if (handoff) return queue.exit(handoff)
       queue.exit({
         outcome: "failed",
+        failureDetails: failureDetails ?? capture(new Error("codex_cli_exited_early")),
         ...(providerFailure ? { providerFailure } : {}),
         ...(quota ? { quota } : {}),
         error: managedAuth
@@ -819,6 +908,8 @@ export class CodexAdapter implements AgentAdapter {
             await daemonTracer.span("daemon.adapter.auth.token", traceAttributes, () => externalAuth.token(false)),
             externalAuth.accountId
           )
+          sensitiveText.push(auth.accessToken)
+          options.onCredential?.("SUBSCRIPTION_ACCESS_TOKEN", auth.accessToken)
           const loggedIn = await daemonTracer.span("daemon.adapter.account_check.login", traceAttributes, () => ready(
             rpc.sendRequest<{ type: string }>("account/login/start", {
               type: "chatgptAuthTokens",
@@ -900,6 +991,7 @@ export class CodexAdapter implements AgentAdapter {
       runtimeModel,
       events: () => queue.drain(),
       async send(message) {
+        sensitiveText.push(message)
         if (ending) throw new Error("The Codex session already ended")
         if (activeTurn) {
           try {

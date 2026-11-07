@@ -2,6 +2,7 @@ import 'server-only'
 import { generateText, streamText, type ModelMessage } from 'ai'
 import { resolveFrozenHostedModel, type HostedModelDependencies, type HostedModelScope, type HostedRuntimeSnapshot } from '../subscription-model-snapshot'
 import { SUMMARY_INSTRUCTIONS } from './context'
+import { withAiMetadata } from '../tracing/ai'
 
 /** Compression is part of the same execution, not a separate default-model
  * task. Resolution/auth errors propagate before a summary can be saved. */
@@ -12,7 +13,7 @@ export async function compactWithFrozenModel(scope: HostedModelScope, runtime: H
   const options = { ...summaryOptions, model, maxRetries: 0, abortSignal: budget, messages, onError: () => { failed = true } }
   // The existing subscription worker supports streaming only. There is no
   // catch/default gateway fallback, including after partial output or refusal.
-  const result = runtime.modelSelection ? streamText(options) : await generateText(options)
+  const result = await withAiMetadata({ operation: 'compaction' }, () => runtime.modelSelection ? streamText(options) : generateText(options))
   const text = await result.text
   const finishReason = await result.finishReason
   budget.throwIfAborted()

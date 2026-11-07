@@ -37,7 +37,7 @@ test("atomic monitor incident concurrency/replay/recovery on the tracked ledger"
     const other = await f.prepare(), otherRun = randomUUID();
     await f.pool.query('UPDATE factory_tasks SET "userId"=\'other\' WHERE id=$1',[other.task.id]);
     await f.pool.query('UPDATE issues SET "userId"=\'other\' WHERE id=$1',[other.task.issueId]);
-    await f.pool.query('INSERT INTO agent_runs(id,"userId","issueId","sessionId",status) VALUES($1,\'other\',$2,\'other-monitor\',\'succeeded\')',[otherRun,other.task.issueId]);
+    await f.pool.query('INSERT INTO agent_runs(id,"userId","issueId","workspaceId","sessionId",status) VALUES($1,\'other\',$2,$3,\'other-monitor\',\'succeeded\')',[otherRun,other.task.issueId,other.task.workspaceId]);
     const foreign=await write({...base,ownerId:"other",issueId:other.task.issueId,candidateId:other.task.candidateId!,runId:otherRun}); assert.notEqual(foreign.incidentId,row.id);
     await assert.rejects(()=>write({...base,eventId:"unknown-health",fingerprint:"b".repeat(64),outcome:"healthy"}),/IncidentRequired/);
     const tx=await f.pool.connect(); try { await tx.query("BEGIN"); await recordMonitorIncident(tx,{...base,eventId:"rollback"}); await tx.query("ROLLBACK"); } finally {tx.release();}

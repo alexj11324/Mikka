@@ -76,13 +76,13 @@ test('an issue thread list key reaches every member who can see the issue, after
     }
     const issue = async (workspace: string | null) => {
       const id = randomUUID()
-      await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2)`, [id, workspace ? 'workspace' : 'personal'])
+      await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,$3)`, [id, workspace ? 'workspace' : 'personal', workspace ?? home])
       if (workspace) await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, randomUUID(), workspace])
       return id
     }
     const run = async (issueId: string | null, owner = 'owner') => {
       const id = randomUUID()
-      await database.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt) VALUES ($1,$2,$3,$4,'running','Fixture')`, [id, owner, issueId, agents.get(owner)])
+      await database.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt,"workspaceId") VALUES ($1,$2,$3,$4,'running','Fixture',$5)`, [id, owner, issueId, agents.get(owner), issueId ? null : home])
       return id
     }
     const teamIssue = await issue(team), personalIssue = await issue(null)
@@ -134,7 +134,7 @@ test('an issue thread list key reaches every member who can see the issue, after
     await t.test('a newly covered writer (unclaimed startup failure) wakes the thread list once', async () => {
       const { failUnclaimedCloudStart } = await import('../run-leases')
       const { coordinatorEnabled } = await import('../coordinator/wake')
-      assert.equal(coordinatorEnabled(), false, 'this isolated writer regression must not start model work')
+      assert.equal(await coordinatorEnabled(), false, 'this isolated writer regression must not start model work')
       const bot = randomUUID(), id = randomUUID(), definition = { schemaVersion: 1, harness: 'codex', model: 'gpt-6-luna' }
       await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Startup fixture')`, [bot, home])
       await database.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","botId",status,prompt,"agentDefinition") VALUES($1,'owner',$2,$3,$4,'queued','Startup fixture',$5)`, [id, personalIssue, agents.get('owner'), bot, definition])

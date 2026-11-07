@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -63,17 +64,16 @@ test('monitor mappings use actual owner/scope authorization, GitHub readback and
   })
   const routes=await import('../app/api/factory/monitor-incidents/[incidentId]/links/route')
   const urlFor=(number=7)=>`https://github.com/mikka-ci/followup/issues/${number}`
-  async function seed(workspace=false,imported?:{id:string;workspaceKey:string}){
+  async function seed(workspace=false,imported?:{id:string;workspaceKey:string;workspaceId:string}){
     const issueId=imported?.id??randomUUID(),taskId=randomUUID(),attemptId=randomUUID(),candidateId=randomUUID()
-    const workspaceId=workspace?randomUUID():null
+    const workspaceId=imported?.workspaceId??await seedFixtureWorkspace(pool,workspace?peer:owner,workspace?'team':'personal')
+    if(workspace)await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'member\',\'active\')',[workspaceId,owner,`${owner}@example.invalid`])
     const tx=await pool.connect()
     try{
       await tx.query('BEGIN')
-      if(!imported)await tx.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Completed delivery\',\'{"type":"doc","content":[]}\',\'done\',\'normal\',$3)',[issueId,workspace?peer:owner,workspace?'workspace':'personal'])
+      if(!imported)await tx.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") VALUES($1,$2,\'Completed delivery\',\'{"type":"doc","content":[]}\',\'done\',\'normal\',$3,$4,\'bound\')',[issueId,workspace?peer:owner,workspace?'workspace':'personal',workspaceId])
       if(workspace){
         const team=randomUUID()
-        await tx.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,\'Monitor fixture\')',[workspaceId,peer])
-        for(const user of [owner,peer])await tx.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'member\',\'active\')',[workspaceId,user,`${user}@example.invalid`])
         await tx.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$3,\'Monitor fixture\',\'MM\')',[team,workspaceId,peer])
         await tx.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)',[issueId,team,workspaceId,peer])
       }
@@ -81,7 +81,7 @@ test('monitor mappings use actual owner/scope authorization, GitHub readback and
       await tx.query('INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId") VALUES($1,$2,repeat(\'a\',40),\'https://github.com/mikka-ci/followup.git\',\'device:fixture\',\'fixture\',$3)',[candidateId,taskId,randomUUID()])
       await tx.query('INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"candidateId",reason) VALUES($1,$2,\'monitor\',1,1,\'running\',$3,\'Trusted monitor fixture\')',[attemptId,taskId,candidateId])
       await tx.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1',[taskId,candidateId])
-      const incident=await recordMonitorIncidentState(tx,{ownerId:owner,workspaceKey:imported?.workspaceKey??(workspaceId?`workspace:${workspaceId}`:`personal:${owner}`),fingerprint:createHash('sha256').update(randomUUID()).digest('hex'),checkKey:'c'.repeat(64),issueId,taskId,candidateId,outcome:'unhealthy'})
+      const incident=await recordMonitorIncidentState(tx,{ownerId:owner,workspaceKey:imported?.workspaceKey??(workspace?`workspace:${workspaceId}`:`personal:${owner}`),fingerprint:createHash('sha256').update(randomUUID()).digest('hex'),checkKey:'c'.repeat(64),issueId,taskId,candidateId,outcome:'unhealthy'})
       await tx.query('COMMIT')
       return {incidentId:String(incident.id),sourceIssueId:issueId,issueId:String(incident.followupIssueId??incident.issueId),workspaceId,taskId}
     }catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
@@ -134,22 +134,27 @@ test('monitor mappings use actual owner/scope authorization, GitHub readback and
   await t.test('an existing verified Linear target and explicit GitHub issue map to the same logical issue',async()=>{
     const {seal}=await import('../lib/linear-sync/crypto')
     const teamSyncId=randomUUID(),linearTeamId=randomUUID(),remoteId=randomUUID()
-    const {rows:[team]}=await pool.query('INSERT INTO linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName") VALUES($1,$2,$3,\'MAP\',\'Monitor fixture\') RETURNING *',[teamSyncId,owner,linearTeamId])
+    const workspaceId=await seedFixtureWorkspace(pool,owner,'team')
+    const {rows:[team]}=await pool.query('INSERT INTO linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName","workspaceId") VALUES($1,$2,$3,\'MAP\',\'Monitor fixture\',$4) RETURNING *',[teamSyncId,owner,linearTeamId,workspaceId])
     await pool.query('INSERT INTO linear_connections("userId","linearUserId","organizationId","organizationName","accessToken","refreshToken","expiresAt") VALUES($1,\'fixture\',\'fixture\',\'Fixture\',$2,$3,now()+interval \'1 day\')',[owner,seal(randomUUID()),seal(randomUUID())])
     const {createAppIssueFromLinear}=await import('../lib/linear-sync/issue-sync')
     const {withDatabaseClient}=await import('../lib/db')
+    let localIssueId:string
     const tx=await pool.connect()
     try{
       const imported=await withDatabaseClient(tx,()=>createAppIssueFromLinear(team,{id:remoteId,identifier:'MAP-195',title:'Monitored bug',description:'',dueDate:null,priority:0,url:'https://linear.app/fixture/issue/MAP-195',updatedAt:new Date().toISOString(),state:null,team:{id:linearTeamId,key:'MAP',name:'Fixture'},assignee:null,labels:[]}))
       assert.ok(imported)
+      localIssueId=imported.id
+      assert.notEqual(localIssueId,remoteId,'provider IDs remain distinct from local issue IDs')
+      assert.equal(imported.workspaceId,workspaceId)
     }finally{tx.release()}
-    const f=await seed(false,{id:remoteId,workspaceKey:`linear-team:${teamSyncId}`})
+    const f=await seed(false,{id:localIssueId!,workspaceKey:`linear-team:${teamSyncId}`,workspaceId})
     const response=await call(f.incidentId,'POST',{url:urlFor(9)})
     assert.equal(response.status,200)
     const body=await response.json()
-    assert.equal(body.issueId,remoteId);assert.equal(body.github.githubIssueId,'1009');assert.equal(body.linear.linearIssueId,remoteId)
+    assert.equal(body.issueId,localIssueId!);assert.equal(body.github.githubIssueId,'1009');assert.equal(body.linear.linearIssueId,remoteId)
     assert.equal(body.linear.linearIdentifier,'MAP-195')
-    assert.equal((await pool.query('SELECT count(*)::int n FROM linear_sync_outbox WHERE "issueId"=$1',[remoteId])).rows[0].n,0)
+    assert.equal((await pool.query('SELECT count(*)::int n FROM linear_sync_outbox WHERE "issueId"=$1',[localIssueId!])).rows[0].n,0)
     await pool.query('UPDATE linear_connections SET "revokedAt"=now() WHERE "userId"=$1',[owner])
     assert.equal((await(await call(f.incidentId)).json()).linear.status,'unmapped')
   })

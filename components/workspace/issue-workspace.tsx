@@ -18,7 +18,7 @@ import { Onboarding, type E2BKeyResult, type OnboardingComputer } from '@/compon
 import type { LegacyChatRequest } from './legacy-chat-archive'
 import { TeamHome } from '@/components/teams/team-home'
 import { AppFrame, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
-import { OWN_SETTINGS_FRAME, SettingsFrame } from '@ui-slot/settings-frame'
+import * as settingsFrameSlot from '@ui-slot/settings-frame'
 import { IssueList } from './issue-list'
 import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
@@ -61,7 +61,7 @@ import { PluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
 import { backToTaskOrigin, dropQueryKeys, goTo, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
-import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest } from '@/lib/settings-navigation'
+import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest, appHrefBeforeSettings, rememberAppHref } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
 import { fetchSettingsData } from '@/lib/settings-data'
@@ -97,6 +97,9 @@ const TaskDetail = dynamic(() => import('./task-detail').then(module => module.T
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
 const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })
 // Settings chunks load inside the persistent frame, leaving its navigation and providers mounted.
+// OWN_SETTINGS_FRAME is optional (lib/ui-overlay.mjs UI_SLOT_EXPORTS): a layer without it keeps the workspace frame.
+const ownSettingsFrame = (settingsFrameSlot as { OWN_SETTINGS_FRAME?: boolean }).OWN_SETTINGS_FRAME === true
+const { SettingsFrame } = settingsFrameSlot
 const SettingsRouteContent = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsRouteContent), { loading: WorkspaceContentLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
@@ -156,6 +159,9 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // While Settings is shown these reads are not on screen. Paused, they cannot queue
   // server actions ahead of a settings save (Next runs a page's actions one at a time).
   const settingsShown = settingsOpen || pathname.startsWith('/settings')
+  // The app page last shown outside Settings, for Settings' way back (backFromSettings).
+  const appQuery = params.toString()
+  useEffect(() => { if (!settingsShown) rememberAppHref(`${pathname}${appQuery ? `?${appQuery}` : ''}`) }, [settingsShown, pathname, appQuery])
   const inSettings = useRef(settingsShown)
   inSettings.current = settingsShown
   const whileSettings = { isPaused: () => inSettings.current }
@@ -536,6 +542,16 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     if (pathname.startsWith('/settings') && !pushSettingsHistory('/')) { router.push('/'); return }
     openRail(destination)
   }
+  // ← in a Settings frame returns to the app page shown before Settings opened, or home.
+  const backFromSettings = () => {
+    const href = appHrefBeforeSettings()
+    if (!href) { leaveSettings('chats'); return }
+    closeSettings()
+    if (!pathname.startsWith('/settings')) return
+    // A workspace remounted under Settings shows the address it is given, as for any in-app move.
+    if (pushSettingsHistory(href)) window.dispatchEvent(new Event(NAVIGATE_EVENT))
+    else router.push(href)
+  }
   const searchFromBar = () => {
     if (boardBusy) return
     if (settingsShown) closeSettings()
@@ -552,8 +568,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     : <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
   // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
   // the default keeps the workspace frame mounted around settings (#1603).
-  if (settingsShown && OWN_SETTINGS_FRAME) return <SignOutBoundary pending={signingOut}><SettingsFrame user={user} onRail={leaveSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame></SignOutBoundary>
-  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider><AppFrame settings={settingsShown}
+  // Both visual frames share the workspace's pending notes and computer registry.
+  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
+    ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
+    : <AppFrame settings={settingsShown}
     bar={<WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
     rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} />}>
     {settingsShown ? settingsContent
@@ -595,5 +613,5 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     {artifactId && <ArtifactWindow artifactId={artifactId} />}
     </>}
     {dialogs}
-  </AppFrame></BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
+  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
 }

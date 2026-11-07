@@ -1,3 +1,4 @@
+import { actingContext } from '@/lib/activity-actor';
 import { remoteKey } from "@mikka/protocol/repository";
 import { factoryChanged } from "../../live/factory";
 import { runChanged } from "../../live/panels";
@@ -169,12 +170,13 @@ export function createFactoryQuestions(
       tx.release();
     }
   }
-  async function ownedTask(tx: PoolClient, userId: string, taskId: string, lock = true) {
-    return lock ? store.lockTask(tx, userId, taskId) : store.readTask(tx, userId, taskId);
+  async function ownedTask(tx: PoolClient, userId: string, taskId: string, lock = true, readScope: "bot" | "user" = "bot") {
+    return lock ? store.lockTask(tx, userId, taskId)
+      : readScope === "user" ? store.readTaskForUser(tx, userId, taskId) : store.readTask(tx, userId, taskId);
   }
 
   /** lock=false for GETs (pending/read/list): no FOR UPDATE on the task or question. */
-  async function owned(tx: PoolClient, userId: string, questionId: string, lock = true) {
+  async function owned(tx: PoolClient, userId: string, questionId: string, lock = true, readScope: "bot" | "user" = "bot") {
     if (!z.uuid().safeParse(questionId).success) fail("factoryInvalid");
     const {
       rows: [identity],
@@ -183,7 +185,7 @@ export function createFactoryQuestions(
       [questionId, userId],
     );
     if (!identity) fail("factoryNotFound");
-    const task = await ownedTask(tx, userId, identity.taskId, lock);
+    const task = await ownedTask(tx, userId, identity.taskId, lock, readScope);
     const {
       rows: [q],
     } = await tx.query<FactoryQuestion>(
@@ -274,18 +276,27 @@ export function createFactoryQuestions(
         : null };
   }
   return {
-    /** Newest 50 pending questions of this user; `runId` (origin or continuation) is filtered in SQL, before the cap. */
-    async pending(userId: string, runId?: string) {
+    /** The tenant and optional run are filtered in SQL before the newest-50 cap. */
+    async pending(userId: string, runId?: string, readScope: "bot" | "user" = "bot") {
+      const actor = actingContext.getStore();
+      const workspaceId = actor?.userId === userId ? actor.tokenWorkspaceId : undefined;
       const { rows } = await pool.query(
-        "SELECT id FROM factory_questions WHERE \"userId\"=$1 AND status IN ('open','waiting_user','resuming','blocked') AND NOT (status IN ('open','waiting_user') AND \"expiresAt\" IS NOT NULL AND \"expiresAt\"<=clock_timestamp()) AND ($2::uuid IS NULL OR \"originRunId\"=$2::uuid OR \"continuationRunId\"=$2::uuid) ORDER BY \"createdAt\" DESC, id DESC LIMIT 50",
-        [userId, runId ?? null],
+        `SELECT q.id FROM factory_questions q
+          JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId" AND t."issueId"=q."issueId"
+          JOIN issues i ON i.id=t."issueId" AND i."ownershipState"='bound' AND i."workspaceId"=t."workspaceId"
+          WHERE q."userId"=$1 AND q.status IN ('open','waiting_user','resuming','blocked')
+            AND NOT (q.status IN ('open','waiting_user') AND q."expiresAt" IS NOT NULL AND q."expiresAt"<=clock_timestamp())
+            AND ($2::uuid IS NULL OR q."originRunId"=$2::uuid OR q."continuationRunId"=$2::uuid)
+            AND ($3::uuid IS NULL OR t."workspaceId"=$3::uuid)
+          ORDER BY q."createdAt" DESC, q.id DESC LIMIT 50`,
+        [userId, runId ?? null, workspaceId ?? null],
       );
       const result = [];
       for (const row of rows) {
         try {
           result.push(
             await transaction(async (tx) => {
-              const { task, q } = await owned(tx, userId, row.id, false);
+              const { task, q } = await owned(tx, userId, row.id, false, readScope);
               return currentView(tx, task, q, false);
             }),
           );
@@ -305,9 +316,9 @@ export function createFactoryQuestions(
         return currentView(tx, task, q, false);
       });
     },
-    async list(userId: string, taskId: string) {
+    async list(userId: string, taskId: string, readScope: "bot" | "user" = "bot") {
       return transaction(async (tx) => {
-        const task = await ownedTask(tx, userId, taskId, false);
+        const task = await ownedTask(tx, userId, taskId, false, readScope);
         const { rows } = await tx.query<FactoryQuestion>(
           'SELECT * FROM factory_questions WHERE "taskId"=$1 AND "userId"=$2 ORDER BY "createdAt" DESC, id DESC LIMIT 50',
           [taskId, userId],

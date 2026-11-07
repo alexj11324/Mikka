@@ -4,6 +4,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { assertConservation, assertReleaseEvidence, currentWorkerSha, pairEnv, publicationInputFromFile, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
 import { reportDigest, templateModelsDigest } from './runtime-report.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
@@ -79,6 +81,19 @@ test('publication reads complete file evidence and retains independently bound m
   const invalid = Buffer.from(JSON.stringify(evidence))
   writeFileSync(path, invalid)
   assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /runtime_release_shared_scope_invalid claude/)
+})
+
+test('the publisher CLI reports a closed parse error without printing the report cause', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'publication-report-invalid-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const path = join(dir, 'release.json'), bytes = Buffer.from('{"CANARY_REPORT_CONTENT":invalid}')
+  writeFileSync(path, bytes)
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('./publish-template-env.mjs', import.meta.url)), path], {
+    encoding: 'utf8', env: { PATH: process.env.PATH, RUNTIME_REPORT_SHA256: reportDigest(bytes) },
+  })
+  assert.equal(result.status, 1)
+  assert.equal(result.stderr.trim(), 'runtime_report_json_invalid')
+  assert.doesNotMatch(result.stdout + result.stderr, /CANARY|release\.json/)
 })
 
 test('conservation requires both strict installation and exact provider-only finalization changes', () => {

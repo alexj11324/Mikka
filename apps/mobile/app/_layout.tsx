@@ -1,6 +1,6 @@
 import '../global.css'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Platform, useColorScheme, View } from 'react-native'
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -11,11 +11,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { Spinner } from '@/components/icons'
 import { SignIn } from '@/components/SignIn'
 import { StartupGate } from '@/components/StartupGate'
+import { ServerGate } from '@/components/ServerGate'
+import { Text } from '@/components/Text'
+import { CardButton } from '@/components/cards'
 import { authClient } from '@/lib/auth'
 import { apiCache } from '@/lib/api-cache'
 import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
+import { currentAccount, servers } from '@/lib/config'
+import { serverCopy as copy } from '@/lib/server-copy'
 
 /** HeroUI Native draws product content (DESIGN.md). Mikka has no toasts: a state shows in place. */
 const HERO_UI = { toast: false, devInfo: { stylingPrinciples: false } } as const
@@ -31,9 +36,7 @@ export default function RootLayout() {
         <KeyboardProvider>
           <HeroUINativeProvider config={HERO_UI}>
             <StatusBar style="auto" />
-            <StartupGate>
-              <SessionGate />
-            </StartupGate>
+            <ServerGate>{id => <StartupGate key={id}><SessionGate /></StartupGate>}</ServerGate>
           </HeroUINativeProvider>
         </KeyboardProvider>
       </SafeAreaProvider>
@@ -45,10 +48,22 @@ export default function RootLayout() {
 /** Signed out: the sign-in screen. Signed in: the app, and this phone's pushes (PushSetup). */
 function SessionGate() {
   const { data, isPending } = authClient.useSession()
+  const account = currentAccount()
+  const [saveFailed, setSaveFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let live = true
+    setSaveFailed(false)
+    if (data?.user) void servers.remember(account.id, { id: data.user.id, name: data.user.name, email: data.user.email }).catch(() => { if (live) setSaveFailed(true) })
+    return () => { live = false }
+  }, [account.id, data?.user?.id, data?.user?.name, data?.user?.email, attempt])
   // Establish the identity boundary before any child can read a cached answer.
-  apiCache.setIdentity(data?.user?.id ?? null)
+  apiCache.setIdentity(data?.user ? `${account.id}:${data.user.id}` : null, data?.user?.id ?? null)
   if (isPending && !data) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.page }}><Spinner size={22} /></View>
   if (!data?.user) return <SignIn />
+  if (account.user?.id !== data.user.id) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.page }}>
+    {saveFailed ? <><Text accessibilityRole="alert">{copy.saveFailed}</Text><CardButton label={copy.retry} onPress={() => setAttempt(value => value + 1)} /></> : <Spinner size={22} />}
+  </View>
   return (
     <HomeProvider key={data.user.id}>
       <PushSetup />

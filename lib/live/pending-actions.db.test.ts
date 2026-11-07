@@ -118,13 +118,11 @@ test('legacy pending producers invalidate only their committed owner-personal li
       assert.ok('actionId' in result && typeof result.actionId === 'string'); await drain(); const before = sent.length
       await assert.rejects(decidePendingAction(other, result.actionId, false), /pendingActionUnavailable/)
       assert.equal((await decidePendingAction(owner, result.actionId, false)).status, 'declined')
-      // The decision also records its action_decided Coordinator event, which refreshes the owner's bot chat list.
-      const chatList = { path: expected(owner).path, events: [{ id: homes.get(owner)!, kind: 'bot_chat_list' }] }
-      // The two pushes are sent concurrently, so compare them without depending on arrival order.
-      const byKind = (items: typeof sent) => [...items].sort((a, b) => JSON.stringify(a.events).localeCompare(JSON.stringify(b.events)))
-      await drain(); assert.deepEqual(byKind(sent.slice(before)), byKind([expected(owner), chatList]))
+      // A legacy account event without a Bot cannot fabricate a Bot tenant or
+      // send a chat key. The committed owner-personal pending list still updates.
+      await drain(); assert.deepEqual(sent.slice(before), [expected(owner)])
       await assert.rejects(decidePendingAction(owner, result.actionId, false), /pendingActionUnavailable/)
-      await drain(); assert.equal(sent.length, before + 2); assert.equal(externalCalls, 0)
+      await drain(); assert.equal(sent.length, before + 1); assert.equal(externalCalls, 0)
       assert.equal((await listPendingActions(owner)).some(item => item.id === result.actionId), false)
     })
 

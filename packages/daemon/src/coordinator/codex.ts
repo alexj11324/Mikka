@@ -1,3 +1,6 @@
+import { captureCodexRunFailure } from "../adapters/codex"
+import { failureFrom, RunFailureError } from "@mikka/protocol/run-failure"
+import { DAEMON_VERSION } from "../paths"
 import type { MessageConnection } from "vscode-jsonrpc/node"
 import { z } from "zod"
 import { coordinatorDeadline, coordinatorSystemPrompt, CoordinatorToolHost, COORDINATOR_DEFAULT_TOOL_LIMIT, validateCoordinatorReply, type CoordinatorInput, type CoordinatorReply, type CoordinatorTool } from "./contract"
@@ -7,6 +10,7 @@ export const CODEX_COORDINATOR_APPROVAL_POLICY = "on-request" as const
 
 /** A fresh isolated app-server connection. Closing it must kill its process group. */
 export interface CodexCoordinatorHost {
+  runId?: string
   cwd: string
   tools: readonly CoordinatorTool[]
   connect(signal: AbortSignal): Promise<{ rpc: MessageConnection; close(): Promise<void> }>
@@ -36,6 +40,7 @@ const toolRequest = z.object({ threadId: z.string(), turnId: z.string(), callId:
 export async function runCodexCoordinator(input: CoordinatorInput, host: CodexCoordinatorHost): Promise<CoordinatorReply> {
   const deadline = coordinatorDeadline(input)
   const signal = deadline.controller.signal
+  const capture = (error: unknown) => captureCodexRunFailure(error, { runId: host.runId, appVersion: DAEMON_VERSION, provider: "codex", credential: "subscription", sensitiveText: [input.instructions, input.context] })
   let transport: Awaited<ReturnType<CodexCoordinatorHost["connect"]>> | undefined
   let threadId: string | undefined
   let turnId: string | undefined
@@ -92,12 +97,12 @@ export async function runCodexCoordinator(input: CoordinatorInput, host: CodexCo
       }
     })
     rpc.onNotification("turn/completed", (raw: unknown) => {
-      const parsed = z.object({ threadId: z.string(), turn: z.object({ id: z.string(), status: z.string() }) }).safeParse(raw)
+      const parsed = z.object({ threadId: z.string(), turn: z.object({ id: z.string(), status: z.string(), error: z.unknown().optional() }) }).safeParse(raw)
       if (!parsed.success || parsed.data.threadId !== threadId || (turnId && parsed.data.turn.id !== turnId)) return
       turnId ??= parsed.data.turn.id
       acceptingTools = false
       if (parsed.data.turn.status === "completed") resolveEnd()
-      else rejectEnd(new Error("coordinatorCodexTurnFailed"))
+      else rejectEnd(new RunFailureError(capture(parsed.data.turn.error ?? new Error("coordinatorCodexTurnFailed"))))
     })
     rpc.listen()
     const request = <T>(method: string, params: unknown) => Promise.race([rpc.sendRequest<T>(method, params), cancellation, ended.then(() => new Promise<never>(() => undefined))])
@@ -116,6 +121,9 @@ export async function runCodexCoordinator(input: CoordinatorInput, host: CodexCo
     const final = items.filter(item => item.phase === "final_answer")
     const text = final.length ? final.map(item => item.text).join("\n") : items.filter(item => !item.phase).at(-1)?.text ?? ""
     return { text: validateCoordinatorReply(text), nativeSessionId: threadId, toolCalls: tools.toolCalls }
+  } catch (error) {
+    if (signal.aborted || failureFrom(error)) throw error
+    throw new RunFailureError(capture(error), { cause: error })
   } finally {
     acceptingTools = false
     signal.removeEventListener("abort", aborted)

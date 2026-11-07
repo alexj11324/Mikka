@@ -60,7 +60,7 @@ test('no match returns the GitHub install option and dispatches nothing', async 
     card: { title: '已授权的仓库里没有叫 nothing-here 的', options: [{ value: 'githubInstall', label: '在 GitHub 上授权更多仓库', action: 'githubInstall' }] },
   })
   assert.equal(dispatch.mock.callCount(), 0)
-  assert.equal(GITHUB_APP_INSTALL_URL, 'https://github.com/apps/mikka-github/installations/new')
+  assert.match(GITHUB_APP_INSTALL_URL, /\/api\/integrations\/github\/install$/)
 })
 
 test('another user\'s repositories are never matched', async () => {

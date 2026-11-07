@@ -18,13 +18,13 @@ let reads = 0
 const mutate = async () => { reads++; return pages }
 const sent: { group: string; body: string }[] = []
 let post: (id: string, body: string) => Promise<GroupMessage>
-const notices = new Map<string, { message: string; action?: { label: string; onClick: () => void } }>()
+const notices = new Map<string, { message: string; action?: { label: string; onClick: (event: Event) => void } }>()
 mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ AgentCopy: {} }), useFormatter: () => ({}) } })
 mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module('swr/infinite', { defaultExport: () => ({ data: pages, error: readError, size: 1, setSize: async () => {}, mutate, isValidating: false }), namedExports: { unstable_serialize: (getKey: (index: number, previous: null) => unknown) => '$inf$' + JSON.stringify(getKey(0, null)) } })
 mock.module('@/lib/group-messages', { namedExports: { ...groupMessages, postGroupMessage: async (id: string, body: string) => { sent.push({ group: id, body }); return post(id, body) } } })
 mock.module('sonner', { namedExports: { toast: {
-  error: (message: string, options?: { id?: string; action?: { label: string; onClick: () => void } }) => { notices.set(options?.id ?? message, { message, action: options?.action }) },
+  error: (message: string, options?: { id?: string; action?: { label: string; onClick: (event: Event) => void } }) => { notices.set(options?.id ?? message, { message, action: options?.action }) },
   dismiss: (id: string) => { notices.delete(id) },
 } } })
 mock.module('@/hooks/use-live-key', { namedExports: { useLiveKey: nothing } })
@@ -155,7 +155,7 @@ test('a background read failure keeps the mounted history, failed send, draft, s
   assert.deepEqual([textarea.selectionStart, textarea.selectionEnd, scroller.scrollTop], [5, 11, 640])
   const notice = [...notices.values()].find(item => item.message === 'loadError')
   assert.ok(notice?.action, 'the retained history still needs a visible retry action')
-  await act(async () => notice.action!.onClick())
+  await act(async () => notice.action!.onClick(new Event('click', { cancelable: true })))
   assert.equal(reads, 1)
   readError = undefined
   await render()

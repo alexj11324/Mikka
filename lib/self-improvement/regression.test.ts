@@ -104,7 +104,7 @@ function bridgeFixture() {
     if(sql.includes('FROM improvement_skill_receipts'))return {rows:[{userId,receipt,artifact:BASELINE_ARTIFACT,markdown:BASELINE_MARKDOWN}]}
     return {rows:[]}
   },release(){}}
-  const pool={connect:async()=>tx} as unknown as Parameters<typeof createImprovementFactoryBridge>[0]
+  const pool={query:tx.query.bind(tx),connect:async()=>tx} as unknown as Parameters<typeof createImprovementFactoryBridge>[0]
   const factory={lockForDispatch:async()=>({stage:'execute'})} as unknown as Parameters<typeof createImprovementFactoryBridge>[1]
   const dispatch:Parameters<typeof createImprovementFactoryBridge>[2]=async(_userId,input)=>{
     state.notes.push(input.note!)
@@ -115,7 +115,12 @@ function bridgeFixture() {
           missingInformation:[],missingPermissions:[],needsSpec:false}},attempts:[],candidates:[]}
   }
   const assignments={} as Parameters<typeof createImprovementFactoryBridge>[3]
-  const bridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments,provider)
+  // This unit fixture verifies generation/provenance only. The real tenant
+  // lease and transaction ordering are exercised by the Factory PG suite.
+  const bridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments,provider,async(actor,taskId,work)=>{
+    assert.equal(actor,userId); assert.equal(taskId,binding.taskId)
+    return work()
+  })
   return {state,request,call:()=>bridge.handoff(userId,request)}
 }
 

@@ -13,6 +13,9 @@ let trace: string[] = [], errors: unknown[][] = [], claimed: DeadlineWakeClaim |
 let resumed: WakeDeadlineResult = { kind: 'obsolete' }
 let turnThrows = false, deadlineThrows = false, claimThrows = false, failureThrows = false
 let failureGate: Promise<void> | undefined
+let defaultAvailable = true, ownModelReady = true
+let dueScopes: Array<typeof scope> = []
+const readinessCalls: Array<[string, string | null]> = []
 const originalVercel = process.env.VERCEL, originalConsole = console.error
 const coordinatorTurn = () => {}, deadlineWorkflow = () => {}
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
@@ -27,6 +30,9 @@ stub('./triage-batch.ts', { TRIAGE_BATCH_BUDGET_MS: 1000, runTriageBatch: async 
 stub('./run-completion-delivery.ts', { deliverRunCompletion: async () => {} })
 stub('./push-decision.ts', { pushByDecision: async () => {} })
 stub('../run-test-fixture.ts', { runTestFixture: () => undefined })
+stub('../default-model.ts', { defaultModelAvailable: async () => defaultAvailable })
+stub('./model-ready.ts', { botModelReady: async (owner: string, bot: string | null) => { readinessCalls.push([owner, bot]); return ownModelReady } })
+stub('./interrupted-turns.ts', { recoverInterruptedTurns: async () => ({ recovered: 0 }) })
 stub('../abuse/context.ts', { hostedBillingScope: { run: (_scope: unknown, run: () => unknown) => run() } })
 stub('../execution-settings.ts', { executionWorkspace: async () => 'synthetic-workspace' })
 stub('../../workflows/coordinator/workflow.ts', { coordinatorTurn })
@@ -35,7 +41,7 @@ stub('./wake-recovery.ts', { deliverWake, createWakeRecovery: () => ({
   claim: async () => { trace.push('claim'); if (claimThrows) throw Object.assign(new Error('private database text'), { code: 'P0001' }); trace.push('claim-committed'); return claimed },
   resume: async (ticket: WakeDeadlineTicket) => { assert.deepEqual(ticket, makeTicket()); trace.push('resume'); return resumed },
   failed: async () => { trace.push('failed-write'); if (failureGate) await failureGate; if (failureThrows) throw new Error('private database text'); trace.push('failed-committed'); return makeTicket(1, retryAt, null) },
-  due: async () => [], exhausted: async () => 0, replay: async () => false,
+  due: async () => dueScopes, exhausted: async () => 0, replay: async () => false,
 }) })
 mock.module('workflow/api', { namedExports: { start: async (workflow: unknown, args: unknown[]) => {
   if (workflow === coordinatorTurn) { assert.deepEqual(args, [scope.userId, scope.botId]); trace.push('turn-start'); if (turnThrows) throw new Error('private provider error'); return { runId: 'synthetic-turn' } }
@@ -49,12 +55,37 @@ mock.module('workflow/api', { namedExports: { start: async (workflow: unknown, a
 } } })
 let wake: typeof import('./wake')
 before(async () => { process.env.VERCEL = '1'; console.error = (...args) => { errors.push(args) }; wake = await import('./wake') })
-beforeEach(() => { trace = []; errors = []; claimed = makeClaim(); resumed = { kind: 'obsolete' }; turnThrows = deadlineThrows = claimThrows = failureThrows = false; failureGate = undefined })
+beforeEach(() => { trace = []; errors = []; claimed = makeClaim(); resumed = { kind: 'obsolete' }; turnThrows = deadlineThrows = claimThrows = failureThrows = false; failureGate = undefined; defaultAvailable = ownModelReady = true; readinessCalls.length = 0; dueScopes = [] })
 after(() => { if (originalVercel === undefined) delete process.env.VERCEL; else process.env.VERCEL = originalVercel; console.error = originalConsole })
 
 test('normal immediate delivery arms one deadline only after its committed claim', async () => {
   await wake.wakeCoordinator(scope.userId)
   assert.deepEqual(trace, ['claim', 'claim-committed', 'triage', 'turn-start', 'deadline-start'])
+})
+
+test('a personal subscription wakes its own bot without a server default, and a withdrawn credential does not', async () => {
+  defaultAvailable = false
+  assert.equal(await wake.coordinatorEnabled(), false, 'no global readiness without a configured default')
+  await wake.wakeCoordinator(scope.userId)
+  assert.deepEqual(readinessCalls, [[scope.userId, scope.botId]])
+  assert.ok(trace.includes('turn-start'))
+  trace = []; ownModelReady = false
+  await wake.wakeCoordinator(scope.userId)
+  assert.deepEqual(trace, [], 'no claim, workflow or deadline starts without this bot\'s model')
+  assert.equal(await wake.recoverWakeDeadline(makeTicket()), null)
+  assert.deepEqual(readinessCalls.at(-1), [scope.userId, scope.botId], 'durable recovery checks the same bot')
+})
+
+test('the existing retry sweep considers subscription-backed bots without a global model or cloud connection', async () => {
+  defaultAvailable = false; dueScopes = [scope]
+  const outcome = await wake.retryCoordinatorWakes()
+  assert.equal(outcome.due, 1); assert.equal(outcome.started, 1)
+  assert.deepEqual(readinessCalls, [[scope.userId, scope.botId]])
+  assert.ok(trace.includes('turn-start'))
+  trace = []; ownModelReady = false
+  const unavailable = await wake.retryCoordinatorWakes()
+  assert.equal(unavailable.started, 0); assert.equal(unavailable.deferred, 1)
+  assert.deepEqual(trace, [])
 })
 
 test('a failed delivery cannot arm its persisted backoff before the failure transaction commits', async () => {

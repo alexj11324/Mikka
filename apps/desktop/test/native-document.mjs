@@ -1,14 +1,23 @@
 import assert from 'node:assert/strict'
 
-const ROOT = 'mikka://app/mikka'
+function bundledDocument(url) {
+  if (url.protocol !== 'mikka:' || url.host !== 'app' || url.username || url.password) return false
+  let path
+  try { path = decodeURIComponent(url.pathname) } catch { return false }
+  return (path === '/mikka' || path.startsWith('/mikka/'))
+    && !/^\/mikka\/(?:api|assets)(?:\/|$)/.test(path)
+    && !/%(?:2e|2f|5c|00|25)/i.test(url.pathname) && !path.includes('\\')
+    && !path.split('/').some(part => part === '.' || part === '..')
+}
 
 /** The first Electron window can still expose about:blank's completed load
  * state. Bind readiness to the actual local document before arming a later
  * authentication-return DOMContentLoaded event; preload availability alone
- * precedes the target document's DOMContentLoaded. */
-export async function waitForBundledRootDocument(page, { timeout = 60_000 } = {}) {
+ * precedes the target document's DOMContentLoaded. The SPA can already have
+ * replaced its URL with /sign-in without creating a new document. */
+export async function waitForBundledDocument(page, { timeout = 60_000 } = {}) {
   assert.ok(Number.isFinite(timeout) && timeout > 0)
-  await page.waitForURL(ROOT, { waitUntil: 'domcontentloaded', timeout })
+  await page.waitForURL(bundledDocument, { waitUntil: 'domcontentloaded', timeout })
   await page.waitForFunction(() => Boolean(window.mikka?.bundled), undefined, { timeout })
 }
 
@@ -16,20 +25,21 @@ const route = value => {
   if (value === 'about:blank') return 'blank'
   try {
     const url = new URL(value)
-    return url.protocol === 'mikka:' && url.host === 'app' && url.pathname === '/mikka' ? 'bundled-root' : 'other'
+    return bundledDocument(url) ? url.pathname === '/mikka' ? 'bundled-root' : 'bundled-route' : 'other'
   } catch { return 'other' }
 }
 
-/** Observe only main-document lifecycle events. No URL, query, identity or
- * renderer value is retained, and observation never adds a backend request. */
+/** Observe only main-frame events. The retained `document` field is a
+ * framenavigated-event ordinal, including History changes, not a DOM document
+ * identity. No URL, query, identity or renderer value is retained. */
 export function observeNativeNavigation(page, record, { now = Date.now, limit = 64 } = {}) {
   const started = now()
-  let document = 0
+  let navigation = 0
   const add = event => {
     if (record.events.length >= limit) { record.overflow = true; return }
-    record.events.push({ event, document, route: route(page.url()), elapsedMs: now() - started })
+    record.events.push({ event, document: navigation, route: route(page.url()), elapsedMs: now() - started })
   }
-  page.on('framenavigated', frame => { if (frame === page.mainFrame()) { document++; add('committed') } })
+  page.on('framenavigated', frame => { if (frame === page.mainFrame()) { navigation++; add('committed') } })
   page.on('domcontentloaded', () => add('domcontentloaded'))
 }
 

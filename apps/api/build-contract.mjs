@@ -10,6 +10,7 @@ export const nodeRuntimePackages = [
   // it loses that metadata and makes initDataDir reject the fallback 'bundled'.
   '@workflow/world-local',
   '@opentelemetry/api', '@opentelemetry/core', '@opentelemetry/exporter-trace-otlp-proto',
+  '@opentelemetry/api-logs', '@opentelemetry/sdk-logs', '@opentelemetry/exporter-logs-otlp-proto',
   '@opentelemetry/instrumentation', '@opentelemetry/instrumentation-pg', '@opentelemetry/resources',
   '@opentelemetry/sdk-trace-base', '@opentelemetry/sdk-trace-node', '@opentelemetry/semantic-conventions',
 ]
@@ -51,7 +52,8 @@ export async function routeFunctionRules(root) {
     // rou3 treats `*` as a catch-all and rejects more than one per route.
     // Named parameters retain each dynamic segment's original one-part bound.
     const pattern = route.path.replace(/\[\[?\.\.\.[^\]]+\]\]?/g, '**').replace(/\[([^\]]+)\]/g, ':$1')
-    rules[pattern] = { maxDuration: route.maxDuration, ...(route.template === '/api/coordinator/stream' ? { supportsCancellation: true } : {}) }
+    const supportsCancellation = route.template === '/api/coordinator/stream' || route.template === '/api/mcp'
+    rules[pattern] = { maxDuration: route.maxDuration, ...(supportsCancellation ? { supportsCancellation: true } : {}) }
   }
   return rules
 }

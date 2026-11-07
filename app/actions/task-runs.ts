@@ -1,26 +1,28 @@
 'use server'
 
 import { singleFlight } from '@/lib/single-flight'
+import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
 
 import { createHash } from 'node:crypto'
 import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
 import { headers } from 'next/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { deviceOnlineStates } from '@/lib/device-presence'
+import { gatewayConfig } from '@/lib/builtin-gateway/config'
 import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { agents, agentRuns, bots, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
 import { runAgentName, runBotId, runBotName, runTaskPrompt } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
-import { queryVersion } from '@/lib/db/query-version'
+import { queryVersionWithExpiry } from '@/lib/db/query-version'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { withDevicePresence } from '@/lib/live/presence-read'
 import type { PresenceDevice } from '@/lib/live/presence'
 import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
-import { beginOwnerListRead } from '@/lib/live/revision-read'
+import { beginWorkspaceListRead } from '@/lib/live/revision-read'
 import { issueShortTitle } from '@/lib/short-title-sql'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueVisibility } from '@/lib/issue-visibility'
@@ -36,6 +38,7 @@ export interface TaskRun {
   status: RunStatus
   /** How it came out once it ended, as the decision model judged it; null while running or not judged yet (R-52). */
   outcome: RunOutcome | null
+  failureDetails?: CompactRunFailure | null
   /** The Bot that owns the task's newest thread, with its own bloub look (R-25); null for the Coordinator's own work. */
   bot: { id: string; name: string; color: string; shape: string } | null
   /** The coding agents (harnesses) of the task's threads, newest first: the board card's agent marks. */
@@ -57,23 +60,28 @@ async function readTaskRuns() {
   const context = await loadWorkspaceContext(undefined, session.user)
   const visibility = await issueVisibility(session.user, false, context.workspace.id)
   const observedAt = Date.now()
-  const begun = await beginOwnerListRead(session.user.id, ['task_run_list'])
+  const begun = await beginWorkspaceListRead(session.user.id, context.workspace.id, ['task_run_list'])
   // A run whose device went offline is retried (or lands in 等你) by the minute
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
-  const rows = await db.selectDistinctOn([agentRuns.issueId], {
+  const latest = db.selectDistinctOn([agentRuns.issueId], {
     // A thread's name: its task's short title while the task keeps the title it was written from (lib/short-title.ts).
-    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`, agentName: runAgentName,
-    status: agentRuns.status, outcome: agentRuns.outcome,
-    botId: runBotId,
-    expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt">now()-interval '30 days')`,
-    harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`,
+    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`.as('issueTitle'), agentName: runAgentName.as('agentName'),
+    status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
+    botId: runBotId.as('botId'),
+    expiresAt: sql<Date | null>`(select min(r."createdAt")+interval '30 days' from agent_runs r where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt">now()-interval '30 days')`.as('expiresAt'),
+    harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r."agentId" where r."issueId"=${agentRuns.issueId} and r."userId"=${agentRuns.userId} and r."workspaceId"=${agentRuns.workspaceId} and r."createdAt" > now() - interval '30 days' group by a.harness order by max(r."createdAt") desc)`.as('harnesses'),
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).innerJoin(issues, eq(issues.id, agentRuns.issueId))
     .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), visibility.predicate, isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
-    .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
-  const botIds = [...new Set(rows.flatMap(row => row.botId ? [row.botId] : []))]
-  const looks = botIds.length ? await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots).where(and(eq(bots.ownerId, session.user.id), inArray(bots.id, botIds))) : []
+    .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200).as('latest_task_runs')
+  // Select the same 200 issues first. Bot decoration is a one-to-one join in
+  // this database; a missing or foreign bot cannot remove or duplicate a task.
+  const rows = await db.select({
+    issueId: latest.issueId, runId: latest.runId, issueTitle: latest.issueTitle, agentName: latest.agentName,
+    status: latest.status, outcome: latest.outcome, failureDetails: latest.failureDetails, expiresAt: latest.expiresAt, harnesses: latest.harnesses,
+    bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape },
+  }).from(latest).leftJoin(bots, and(eq(bots.id, latest.botId), eq(bots.ownerId, session.user.id), eq(bots.workspaceId, context.workspace.id))).orderBy(latest.issueId)
   const live = await ownerListRead(session.user.id, rows.map(row => row.expiresAt), observedAt, begun)
-  const items: TaskRun[] = rows.map(({ botId, expiresAt: _expiresAt, ...row }) => ({ ...row, issueId: row.issueId!, bot: looks.find(look => look.id === botId) ?? null }))
+  const items: TaskRun[] = rows.map(({ expiresAt: _expiresAt, ...row }) => ({ ...row, failureDetails: readCompactRunFailure(row.failureDetails), issueId: row.issueId! }))
   return { items, live }
 }
 
@@ -97,6 +105,7 @@ export interface Thread {
   lastReplyAt: string | null
   /** How it came out once it ended, as the decision model judged it; null while running or not judged yet (R-52). */
   outcome: RunOutcome | null
+  failureDetails?: CompactRunFailure | null
   /** The coding agent running it (claude_code, codex…); its mark is the thread's icon (R-78). */
   harness: string | null
   waitingFor?: { deviceId: string; deviceName: string; deviceType: 'laptop' | 'server'; harness: string }
@@ -124,10 +133,10 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     if (!session?.user) throw new ActionFailureError('authRequired')
     const context = await loadWorkspaceContext(undefined, session.user)
     const observedAt = Date.now()
-    const begun = await beginOwnerListRead(session.user.id, ['thread_list'])
+    const begun = await beginWorkspaceListRead(session.user.id, context.workspace.id, ['thread_list'])
     // Only queued local work can show "waiting for device". Ask the gateway
     // on this user read, so an idle socket affects both the view and its hash.
-    const queuedDevices = process.env.DEVICE_GATEWAY_URL && process.env.DEVICE_GATEWAY_PUSH_SECRET
+    const queuedDevices = gatewayConfig()
       ? await db.selectDistinct({ id: devices.id, lastSeenAt: devices.lastSeenAt }).from(devices)
         .innerJoin(agentRuns, eq(agentRuns.deviceId, devices.id))
         .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), eq(devices.ownerId, session.user.id),
@@ -153,15 +162,14 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       deviceType: sql<'laptop' | 'server' | null>`case when ${waitingForDevice} then ${devices.deviceType} end`.as('deviceType'),
       waitingForDevice: waitingForDevice.as('waitingForDevice'),
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
-      outcome: agentRuns.outcome,
+      outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
       .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)
-    const signature = await queryVersion(snapshot)
-    const version = createHash('sha256').update(JSON.stringify([session.user.id, context.workspace.id, signature])).digest('hex').slice(0, 32)
+    const signature = await queryVersionWithExpiry(snapshot, sql`min(snapshot."createdAt")+interval '30 days'`)
+    const version = createHash('sha256').update(JSON.stringify([session.user.id, context.workspace.id, signature.version])).digest('hex').slice(0, 32)
     const visible = snapshot.as('thread_list_expiry')
-    const [expiry] = await db.select({ at: sql<Date | null>`min(${visible.createdAt})+interval '30 days'` }).from(visible)
-    const live = withDevicePresence(await ownerListRead(session.user.id, [expiry?.at], observedAt, begun), presenceDevices, process.env, observedAt)
+    const live = withDevicePresence(await ownerListRead(session.user.id, [signature.expiresAt], observedAt, begun), presenceDevices, process.env, observedAt)
     // Device presence has its own bounded watcher prerequisite. Until that
     // route is ready, queued local work retains the shared slow fallback.
     const presenceFallback = queuedDevices.length > 0
@@ -180,7 +188,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
         // A cloud run waits on its own sandbox, never on a machine the person can turn on.
         ...(waitingForDevice && deviceId && deviceName !== null && deviceType
           ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
-        ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+        ...row, failureDetails: readCompactRunFailure(row.failureDetails), harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
         lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
       }))
       return { version, items, positions, ...(previous ? { delta: true as const } : {}), live, presenceFallback }

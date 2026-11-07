@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { agentRuns } from '@/lib/db/schema'
+import { runFailureBrief } from './run-failure-projection'
 import { runBotName, runTaskPrompt } from '@/lib/run-bot-name'
 
 // The same whitespace set as JavaScript trim/\s, including NBSP and BOM.
@@ -32,6 +33,7 @@ const summary = sql<string | null>`coalesce(
 /** List-only text; teammate rows never transfer their private prompt, report or error. */
 export function issueThreadListText(viewerId: string) {
   return {
+    failureDetails: runFailureBrief,
     name: sql<string>`case when ${agentRuns.userId}=${viewerId} then coalesce(${title}, ${runBotName}) else '' end`,
     summary: sql<string | null>`case when ${agentRuns.userId}=${viewerId} then ${summary} end`,
   }

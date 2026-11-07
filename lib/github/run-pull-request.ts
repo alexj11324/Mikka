@@ -8,14 +8,16 @@ export { PublicationError, PUBLICATION_ERRORS, type PublicationErrorCode, type P
 /** What the person's own token reads back about the repository; never a token. */
 export interface GitHubRepositoryBinding {
   repositoryId: number
-  githubAccountId: string
+  githubAccountId: string | null
   defaultBranch: string
 }
 type Options = {
   remoteKey: string
   /** The run owner's own GitHub user token (lib/github/user-access.ts), and the GitHub account it must belong to. */
   token: string
-  githubAccountId: string
+  githubAccountId?: string
+  /** Host-issued cloud installation authority. Never read from agent-supplied publication input. */
+  installationId?: string
   fetcher?: typeof fetch
 }
 
@@ -80,15 +82,19 @@ function api(fetcher: typeof fetch) {
 /** The token must be the person's own: GitHub's /user is the linked account. */
 async function repositoryAccess(options: Options) {
   const repo = githubRepository(options.remoteKey)
-  if (!options.token || !/^[1-9][0-9]*$/.test(options.githubAccountId)) throw new PublicationError('github_identity_required')
+  if (!options.token || !(options.installationId ? /^[1-9][0-9]*$/.test(options.installationId) : /^[1-9][0-9]*$/.test(options.githubAccountId ?? ''))) throw new PublicationError('github_identity_required')
   const request = api(options.fetcher ?? fetch)
-  const [githubUser, repository] = await Promise.all([
-    request('/user', options.token).then(value => parse(userSchema, value)),
+  const [credentialIdentity, repository] = await Promise.all([
+    options.installationId
+      ? request('/installation/repositories?per_page=100', options.token).then(value => parse(z.object({ repositories: z.array(repositorySchema) }), value))
+      : request('/user', options.token).then(value => parse(userSchema, value)),
     request(repo.path, options.token, { missing: 'github_access_denied' }).then(value => parse(repositorySchema, value)),
   ])
-  if (String(githubUser.id) !== options.githubAccountId) throw new PublicationError('github_reconnect_required')
+  if ('repositories' in credentialIdentity) {
+    if (!credentialIdentity.repositories.some(item => item.id === repository.id && item.full_name.toLowerCase() === repository.full_name.toLowerCase())) throw new PublicationError('github_access_denied')
+  } else if (String(credentialIdentity.id) !== options.githubAccountId) throw new PublicationError('github_reconnect_required')
   if (repository.full_name.toLowerCase() !== `${repo.owner}/${repo.repo}`.toLowerCase()) throw new PublicationError('github_access_denied')
-  const binding: GitHubRepositoryBinding = { repositoryId: repository.id, githubAccountId: options.githubAccountId, defaultBranch: repository.default_branch }
+  const binding: GitHubRepositoryBinding = { repositoryId: repository.id, githubAccountId: options.githubAccountId ?? null, defaultBranch: repository.default_branch }
   return { ...repo, request, token: options.token, binding }
 }
 

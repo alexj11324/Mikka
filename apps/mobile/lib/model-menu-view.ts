@@ -1,4 +1,5 @@
 import { HOSTED_CHOICE, type BotModelCurrent, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '../../../lib/bot-model-menu-view'
+import messages from '../../../messages/zh-CN.json'
 
 export { HOSTED_CHOICE }
 export type ModelOption = BotModelMenuOption
@@ -16,7 +17,7 @@ export function groupTitle(group: ModelGroup) {
   }
 }
 export function groupTag(group: ModelGroup) {
-  if (group.kind === 'hosted') return '点数'
+  if (group.kind === 'hosted') return group.hostedSource === 'cloud' ? messages.Coordinator.modelPicker.cloudCredits : group.hostedSource === 'self-hosted' ? messages.Coordinator.modelPicker.ownProvider : '点数'
   if (group.kind === 'apiKey') return '按量'
   if (group.kind === 'shared' && group.owner) return `${group.owner}的 Key`
   return null
@@ -51,7 +52,7 @@ export function modelMenuLabel(current: BotModelCurrent, _running = false) {
 export function modelSourceLabel(current: BotModelCurrent) {
   const metered = current.kind === 'apiKey' || current.kind === 'shared'
   const status = current.availability === 'checking' ? '待检查' : !current.available ? '不可用' : null
-  return [optionName(current), current.credentialLabel, metered ? '按量' : null, current.fallback ? '已切换' : null, status].filter(Boolean).join(' · ')
+  return [optionName(current), current.hostedSource === 'cloud' ? messages.Coordinator.modelPicker.cloudCredits : null, current.credentialLabel, metered ? '按量' : null, current.fallback ? '已切换' : null, status].filter(Boolean).join(' · ')
 }
 export const modelMenuReadLabel = (busy: boolean) => busy ? '正在读取模型' : '模型加载失败，重试'
 /**

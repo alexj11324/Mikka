@@ -1,6 +1,8 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { withActivitySession } from './fixtures/activity-runtime.mjs'
 import { measured, readMetrics } from './helpers/read-metrics'
@@ -16,9 +18,12 @@ test('quiet thread polls return only a version; visible changes and online state
   const device = randomUUID(), agent = randomUUID(), ids = Array.from({ length: 119 }, () => randomUUID())
   const poll = (known?: string, positions?: readonly ListPosition[]): ReturnType<typeof actions.pollThreads> => withActivitySession(owner, () => actions.pollThreads(known, positions))
   try {
+    for (const user of [owner, peer]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, `${user}@example.invalid`])
+    const workspaceId = await seedFixtureWorkspace(pool, owner)
+    await seedFixtureWorkspace(pool, peer)
     await pool.query('INSERT INTO devices(id,"ownerId",name,"lastSeenAt") VALUES($1,$2,$3,now())', [device, owner, 'Fixture machine'])
     await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,$3,$4)', [agent, owner, 'Fixture bot', 'codex'])
-    for (const [index, id] of ids.entries()) await pool.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId",prompt,"lastReply",status) VALUES($1,$2,$3,$4,$5,$6,$7)', [id, owner, agent, device, `Fixture ${index} ` + 'p'.repeat(200), 'r'.repeat(240), 'queued'])
+    for (const [index, id] of ids.entries()) await pool.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId",prompt,"lastReply",status,"workspaceId") VALUES($1,$2,$3,$4,$5,$6,$7,$8)', [id, owner, agent, device, `Fixture ${index} ` + 'p'.repeat(200), 'r'.repeat(240), 'queued', workspaceId])
     await poll() // Warm pool connections; cold below means no browser snapshot.
     const cold = await measured(() => poll()), first = cold.value, fullBytes = cold.bytes
     assert.equal(first.items?.length, 119)
@@ -60,6 +65,21 @@ test('quiet thread polls return only a version; visible changes and online state
     const foreign = await withActivitySession(peer, () => actions.pollThreads(renamed.version, renamed.positions))
     assert.deepEqual(foreign.items, []); assert.notEqual(foreign.version, renamed.version)
     await assert.rejects(actions.pollThreads(renamed.version), /authRequired/)
+    const failureDetails: RunFailure = { schemaVersion: 1, code: 'run_api_key_invalid', category: 'api_key', provider: 'openai', status: 401,
+      providerMessage: 'Private provider response that lists must omit', causes: [{ name: 'APIError' }],
+      runId: ids[2], appVersion: 'test', occurredAt: '2026-11-07T12:00:00.000Z' }
+    await pool.query('UPDATE agent_runs SET "failureDetails"=$2 WHERE id=$1', [ids[2], JSON.stringify(failureDetails)])
+    const failureDelta = await measured(() => poll(renamed.version, renamed.positions))
+    assert.notEqual(failureDelta.value.version, renamed.version, 'diagnostic changes without a timestamp invalidate the same snapshot')
+    assert.deepEqual(failureDelta.value.items?.map(row => row.id), [ids[2]])
+    assert.equal(failureDelta.value.items?.[0].failureDetails?.code, 'run_api_key_invalid')
+    assert.doesNotMatch(JSON.stringify(failureDelta.value.items), /Private provider response|APIError/)
+    assert.equal(failureDelta.statements, delta.statements, 'diagnostic deltas keep the existing query count')
+    await pool.query('UPDATE agent_runs SET "failureDetails"=$2 WHERE id=$1', [ids[2], JSON.stringify({ ...failureDetails, providerMessage: 'Changed private text only' })])
+    const privateOnly = await poll(failureDelta.value.version, failureDelta.value.positions)
+    assert.ok('unchanged' in privateOnly && privateOnly.unchanged, 'unexposed text does not invalidate a compact list')
+    await pool.query('UPDATE agent_runs SET "failureDetails"=null WHERE id=$1', [ids[2]])
+    assert.equal((await poll(renamed.version, renamed.positions)).items, undefined)
     await pool.query('DELETE FROM agent_runs WHERE id=$1', [ids[0]])
     const deletion = await measured(() => poll(renamed.version, renamed.positions))
     assert.equal(deletion.value.items?.length, 0)
@@ -75,6 +95,9 @@ test('quiet thread polls return only a version; visible changes and online state
     await pool.query('DELETE FROM agent_runs WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM agents WHERE id=$1', [agent])
     await pool.query('DELETE FROM devices WHERE id=$1', [device])
+    await pool.query('DELETE FROM mikka_workspace_members WHERE "userId"=ANY($1::text[])', [[owner, peer]])
+    await pool.query('DELETE FROM mikka_workspaces WHERE "userId"=ANY($1::text[])', [[owner, peer]])
+    await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
     await pool.end()
   }
 })

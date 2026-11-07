@@ -10,6 +10,7 @@ import {makeSnapshot} from './definition'
 import { overrideDeploymentSwitch } from '../deployment-switches'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
+const otherWorkspace=randomUUID()
 const binding={id:randomUUID(),ownerId:owner,workspaceId:workspace,consumerId:agentId,connectionId:randomUUID(),connectionRevision:1,route:'codex_cli',modelId:'frozen-model'}
 const frozen=()=>freezeWorkerDefinition({harness:'codex',instructions:'Review only',prompt:'task',parent:null,executionId:null,subscription:binding})
 let definition: ReturnType<typeof frozen>|null=null
@@ -43,14 +44,52 @@ function identityFixtureQuery(sql: string) {
 stub('../device-route.ts',{withDeviceRoute:<T>(handler:T)=>handler})
 let selectIndex=0
 let mismatch: string|undefined
-let currentRun: {id:string;userId:string;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;baseBranch:null;kind:string;prompt:string;agentDefinition:ReturnType<typeof frozen>|null;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}
-let stopDuringToken=false
+let currentRun: {id:string;userId:string;workspaceId:string|null;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;baseBranch:null;kind:string;prompt:string;agentDefinition:ReturnType<typeof frozen>|null;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}
+let requestedRunId=randomUUID()
+let stopDuringToken=false,revokeDuringToken=false,memberActive=true,memberLease=false
 const lockOrder:string[]=[]
-const tx={select(){let table='';const query={from(value:Record<symbol,unknown>){table=String(value[Object.getOwnPropertySymbols(value).find(key=>key.description==='drizzle:Name')!]);return query},innerJoin(){return query},where(){return query},async for(){lockOrder.push(table);return table==='issues'?[{id:issueId,userId:owner,scope:'personal',content:{type:'doc'}}]:[{run:{...currentRun},enabled:true}]}};return query}}
-const db={select:()=>({from:()=>({where:()=>({limit:async()=>{
- if(selectIndex++===0){currentRun={id:randomUUID(),userId:mismatch==='run'?'other-owner':owner,agentId,deviceId,deviceRepoId:repoId,issueId,baseBranch:null,kind:'implement',prompt:'task',agentDefinition:definition,status:'queued',stopRequestedAt:null,leaseExpiresAt:null};return [{...currentRun}]}
- return selectIndex===2?[{id:agentId,userId:mismatch==='agent'?'other-owner':owner,deviceId:randomUUID(),harness:'claude_code'}]:[{id:repoId,userId:mismatch==='repo'?'other-owner':owner,deviceId:mismatch==='device'?randomUUID():deviceId,baseBranch:'main',repoPath:mismatch==='legacy-key'?'github.com/example/repo':'v2/github.com/example/repo',remoteUrl:mismatch==='repo-url'?'https://github.com:8443/example/repo.git':'https://github.com/example/repo.git'}]
-}})})}),update:()=>({set:()=>({where:async()=>undefined})}),transaction:async<T>(run:(value:typeof tx)=>Promise<T>)=>run(tx)}
+const tableName=(value:Record<symbol,unknown>)=>String(value[Object.getOwnPropertySymbols(value).find(key=>key.description==='drizzle:Name')!])
+const issueFixture=()=>({id:issueId,userId:owner,workspaceId:mismatch==='issue-workspace'?otherWorkspace:workspace,ownershipState:mismatch==='unresolved-issue'?'unresolved':'bound',scope:'personal',content:{type:'doc'}})
+const tx={select(){let table='';const query={from(value:Record<symbol,unknown>){table=tableName(value);return query},innerJoin(){return query},where(){return query},async for(){lockOrder.push(table);return table==='issues'?[issueFixture()]:[{run:{...currentRun},enabled:true}]}};return query}}
+const db={select:()=>{let table='';const query={from(value:Record<symbol,unknown>){table=tableName(value);return query},where(){return query},async limit(){
+ if(selectIndex++===0)currentRun={id:requestedRunId,userId:mismatch==='run'?'other-owner':owner,workspaceId:mismatch==='unresolved-run'?null:mismatch==='run-workspace'?otherWorkspace:workspace,agentId,deviceId,deviceRepoId:repoId,issueId,baseBranch:null,kind:'implement',prompt:'task',agentDefinition:definition,status:'queued',stopRequestedAt:null,leaseExpiresAt:null}
+ if(table==='agent_runs')return [{...currentRun}]
+ if(table==='agents')return [{id:agentId,userId:mismatch==='agent'?'other-owner':owner,deviceId:randomUUID(),harness:'claude_code'}]
+ if(table==='device_repos')return [{id:repoId,userId:mismatch==='repo'?'other-owner':owner,deviceId:mismatch==='device'?randomUUID():deviceId,baseBranch:'main',repoPath:mismatch==='legacy-key'?'github.com/example/repo':'v2/github.com/example/repo',remoteUrl:mismatch==='repo-url'?'https://github.com:8443/example/repo.git':'https://github.com/example/repo.git'}]
+ throw new Error(`Unexpected compatibility read: ${table}`)
+ }};return query},update:()=>({set:()=>({where:async()=>undefined})}),transaction:async<T>(run:(value:typeof tx)=>Promise<T>)=>{assert.equal(memberLease,true,'claim response locks workspace/member before APP rows');return run(tx)}}
+// Keep the real withTaskWorkspace/requireTaskWorkspace/claim-response code.
+// This fixture supplies their small DB projections and checks selected ids;
+// PostgreSQL row-lock and revocation behavior belongs to the DB suites.
+type SqlChunk={queryChunks?:SqlChunk[];table?:Record<symbol,unknown>;name?:string;value?:unknown}
+function equalities(node:SqlChunk,found:[string,string,unknown][]=[]){
+ const chunks=node.queryChunks??[]
+ chunks.forEach((chunk,index)=>{
+  if(chunk.queryChunks)equalities(chunk,found)
+  else if(chunk.table&&chunk.name&&String((chunks[index+1] as {value?:unknown[]})?.value?.[0]).trim()==='=')found.push([tableName(chunk.table),chunk.name,chunks[index+2]?.value])
+ })
+ return found
+}
+function workspaceSelect(){
+ let table='',filters:[string,string,unknown][]=[]
+ const matches=(source:string,column:string,value:unknown)=>filters.some(([name,key,expected])=>name===source&&key===column&&expected===value)
+ const query={from(value:Record<symbol,unknown>){table=tableName(value);return query},innerJoin(){return query},where(predicate:SqlChunk){filters=equalities(predicate);return query},
+  async for(){
+   lockOrder.push(table)
+   if(table==='mikka_workspaces')return matches(table,'id',workspace)?[{id:workspace,kind:'team',ownerId:owner}]:[]
+   if(table==='mikka_workspace_members'){
+    memberLease=memberActive&&matches(table,'workspaceId',workspace)&&matches(table,'userId',owner)&&matches(table,'status','active')
+    return memberLease?[{id:owner}]:[]
+   }
+   throw new Error(`Unexpected workspace lock: ${table}`)
+  },
+  async orderBy(){return memberActive&&matches('mikka_workspaces','id',workspace)&&matches('mikka_workspace_members','userId',owner)&&matches('mikka_workspace_members','status','active')?[{id:workspace,kind:'team'}]:[]},
+  // oxlint-disable-next-line unicorn/no-thenable -- Match an awaited Drizzle selection.
+  then(resolve:(rows:unknown)=>unknown,reject:(error:unknown)=>unknown){return query.orderBy().then(resolve,reject)},
+ }
+ return query
+}
+const workspaceFixture={select:workspaceSelect,transaction:async<T>(operation:(value:{select:typeof workspaceSelect})=>Promise<T>)=>{try{return await operation({select:workspaceSelect})}finally{memberLease=false}}}
 let cloud=false,localCapable=false
 let protocolVersion=3
 stub('../db/index.ts',{db,pool:{}})
@@ -60,10 +99,12 @@ stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDevice
 const modelAdmissionCheck=mock.fn(async(_scope:{workspaceId:string;ownerId:string},_model:string,_signal?:AbortSignal)=>undefined)
 stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck})
 stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64),workspaceIds:[workspace]})})
-stub('../mcp/worker.ts',{issueRunToken:async()=>{if(stopDuringToken)currentRun.stopRequestedAt=new Date();return {token:'synthetic-only'}}})
+stub('../mcp/worker.ts',{issueRunToken:async()=>{if(stopDuringToken)currentRun.stopRequestedAt=new Date();if(revokeDuringToken)memberActive=false;return {token:'synthetic-only'}}})
+stub('../personal-mailbox-runtime.ts',{personalWorkerMailboxAdvertised:async()=>[]})
+stub('../app-tools-server.ts',{runAppToolkits:async()=>[]})
 // Task visibility is a separate boundary; do not initialize auth/MCP services
 // in the claim snapshot fixture. Revoked access has source and PG regressions.
-stub('../issue-access.ts',{issueForUser:async(userId:string,id:string)=>userId===owner&&id===issueId?{id:issueId,userId:owner,scope:'personal',content:{type:'doc'}}:null})
+stub('../issue-access.ts',{issueForUser:async(userId:string,id:string)=>userId===owner&&id===issueId?issueFixture():null})
 stub('../issue-team-access.ts',{issueTeamAccess:async()=>{throw Error('owner claim must not query team membership')}})
 stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../device-repositories.ts',{readRepositorySettings:async()=>null})
@@ -71,6 +112,12 @@ stub('../run-publications.ts',{prepareRunPublication:prepared,persistRunCompleti
 stub('../run-leases.ts',{latestCheckpoint:async()=>null,failRunForDaemonUpgrade:async()=>false,failQueuedSubscriptionRuntime:async()=>{throw Error('Healthy claim fixture must not fail its subscription runtime')}})
 let githubAccount:string|null=null
 stub('../github/repository-installation.ts',{linkedGitHubAccountId:async()=>githubAccount})
+// This legacy daemon fixture receives only the existing credential endpoint.
+// Keep the current machine boundary isolated from real auth/cloud providers;
+// native token issuance is covered by the GitHub credential suites.
+const githubConfigured=mock.fn(async(userId:string)=>{assert.equal(userId,owner);return Boolean(githubAccount)})
+const githubCredential=mock.fn(async()=>{throw Error('Legacy claim fixture must not read native GitHub credentials')})
+stub('../github/machine-credential.ts',{githubMachineConfigured:githubConfigured,githubMachineCredential:githubCredential})
 stub('../computer/local-authority.ts',{localComputerAuthority:async()=>({botId,ownerId:owner,workspaceId:workspace,policyVersion:3,permission:'allow'})})
 stub('../computer/claim.ts',{claimLocalRun:claimed,claimCloudRun:cloudClaimed})
 stub('../computer/native-run-binding.ts',{nativeRunBinding:scopedBinding})
@@ -88,9 +135,9 @@ stub('../self-improvement/server.ts',{
 stub('../subscription-runtime.ts',{subscriptionRuntime:()=>({repository:{binding:bindingById,nativeBinding:latestBinding}})})
 let claim: typeof import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route').POST
 let queue: typeof import('../computer/queue-run').queueCloudRun
-before(async()=>{const workspaceModule = await import('../workspace-db');stub('../workspace-db.ts', { ...workspaceModule, workspacePool: { query: async () => ({ rows: [{ userId: owner }] }) } });claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
-beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;cliPolicy.permissions.git_push='deny';publicationPolicy.permissions.git_push='allow';computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;stopDuringToken=false;lockOrder.length=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [modelAdmissionCheck,bindingById,latestBinding,scopedBinding,claimed,cloudClaimed,prepared,completed])fn.mock.resetCalls()})
-const request=()=>claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+randomUUID()+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1'}}),{params:Promise.resolve({deviceId,runId:randomUUID()})})
+before(async()=>{const workspaceModule = await import('../workspace-db');stub('../workspace-db.ts', { ...workspaceModule, workspaceDb:workspaceFixture, workspacePool: { query: async () => ({ rows: memberActive?[{ userId: owner }]:[] }) } });claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
+beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;cliPolicy.permissions.git_push='deny';publicationPolicy.permissions.git_push='allow';computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;stopDuringToken=false;githubAccount=null;revokeDuringToken=false;memberActive=true;memberLease=false;lockOrder.length=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [modelAdmissionCheck,bindingById,latestBinding,scopedBinding,claimed,cloudClaimed,prepared,completed,githubConfigured,githubCredential])fn.mock.resetCalls()})
+const request=()=>{requestedRunId=randomUUID();return claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+requestedRunId+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1'}}),{params:Promise.resolve({deviceId,runId:requestedRunId})})}
 const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
 test('local claim uses frozen harness and exact subscription despite Agent edits',async()=>{
  definition={...frozen(),model:'frozen-model',cliModelSelection:'explicit'}
@@ -98,6 +145,7 @@ test('local claim uses frozen harness and exact subscription despite Agent edits
  assert.deepEqual(modelAdmissionCheck.mock.calls[0].arguments.slice(0,2),[{workspaceId:workspace,ownerId:owner},'frozen-model'])
  assert.equal(modelAdmissionCheck.mock.calls[0].arguments[2],binding.route)
  assert.equal(prepared.mock.callCount(),1)
+ assert.equal(body.mcp.token,'synthetic-only','a successful response includes the prepared credential before testing final-fence denials')
  assert.equal(body.policy.permissions.git_push,'allow','a stored CLI git_push deny no longer withholds the task branch push (decision 2026-11-02-1600)')
  const [run,remoteUrl]=prepared.mock.calls[0].arguments
  assert.equal(run.userId,owner);assert.equal(run.issueId,issueId);assert.equal(run.baseBranch,null);assert.equal(remoteUrl,'https://github.com/example/repo.git')
@@ -117,6 +165,7 @@ test('claim refuses cross-owner or cross-device records even without a subscript
  for(const target of ['run','agent','repo','device']){mismatch=target;selectIndex=0;assert.equal((await request()).status,409)}
  assert.equal(claimed.mock.callCount(),0);assert.equal(cloudClaimed.mock.callCount(),0)
  assert.equal(prepared.mock.callCount(),0)
+ assert.equal(githubConfigured.mock.callCount(),0);assert.equal(githubCredential.mock.callCount(),0)
 })
 test('claim refuses legacy or endpoint-mismatched repository bindings before taking a lease',async()=>{
  for(const target of ['legacy-key','repo-url']){mismatch=target;selectIndex=0;assert.equal((await request()).status,409)}
@@ -134,7 +183,13 @@ test('cloud assignment takes computer allow from trusted claim, never a request 
  cloud=true;computerPermission='allow';const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.policy.permissions.computer_use,'allow');assert.equal(body.computer.ownerId,owner);assert.equal(body.computer.policyVersion,1);assertCliPolicy(body)
 })
 test('frozen local and cloud claims still withhold credentials and prompt after owner STOP',async()=>{
- for(const cloudRun of [false,true]){cloud=cloudRun;selectIndex=0;stopDuringToken=true;lockOrder.length=0;const response=await request();assert.equal(response.status,409);const text=await response.text();for(const field of ['prompt','synthetic-only','subscriptionBinding'])assert.equal(text.includes(field),false);assert.deepEqual(lockOrder,['issues','agent_runs'])}
+ for(const cloudRun of [false,true]){cloud=cloudRun;selectIndex=0;stopDuringToken=true;lockOrder.length=0;const response=await request();assert.equal(response.status,409);const text=await response.text();for(const field of ['prompt','synthetic-only','subscriptionBinding'])assert.equal(text.includes(field),false);assert.deepEqual(lockOrder,['mikka_workspaces','mikka_workspace_members','issues','agent_runs'])}
+})
+test('local and cloud claim responses withhold secrets when owner membership is revoked during token preparation',async()=>{
+ for(const cloudRun of [false,true]){cloud=cloudRun;selectIndex=0;memberActive=true;revokeDuringToken=true;lockOrder.length=0;const response=await request();assert.equal(response.status,409);const text=await response.text();for(const field of ['prompt','synthetic-only','subscriptionBinding'])assert.equal(text.includes(field),false);assert.deepEqual(lockOrder,['mikka_workspaces','mikka_workspace_members']);assert.equal(memberLease,false)}
+})
+test('claim responses require a resolved run tenant and the same bound issue tenant',async()=>{
+ for(const target of ['unresolved-run','run-workspace','issue-workspace','unresolved-issue']){mismatch=target;selectIndex=0;const response=await request();assert.equal(response.status,409,target);const text=await response.text();for(const field of ['prompt','synthetic-only','subscriptionBinding'])assert.equal(text.includes(field),false,`${target}: ${field}`)}
 })
 test('missing, substituted or disabled pinned subscription refuses before claim without fallback',async()=>{
  for(const change of ['missing','model','consumer','disabled']){
@@ -199,6 +254,7 @@ test('persisted computer grants retain the trusted CLI read-only restriction',as
 
 test('a scoped device credential cannot claim a different device even for the same owner',async()=>{
  const otherDevice=randomUUID();const response=await claim(new Request('https://example.test/claim',{method:'POST'}),{params:Promise.resolve({deviceId:otherDevice,runId:randomUUID()})});assert.equal(response.status,404);assert.equal(selectIndex,0);assert.equal(claimed.mock.callCount(),0);assert.equal(cloudClaimed.mock.callCount(),0)
+ assert.equal(githubConfigured.mock.callCount(),0);assert.equal(githubCredential.mock.callCount(),0)
 })
 
 
@@ -239,5 +295,6 @@ test('a read-only local run gets no push branch and a read-only policy, but the 
   const connected=await (await request()).json()
   assert.ok(connected.mcp,'the run token is issued')
   assert.equal(connected.github?.repository,'example/repo');assert.equal(connected.github?.branch,undefined)
+  assert.equal(githubConfigured.mock.callCount(),2);assert.equal(githubCredential.mock.callCount(),0)
  } finally { githubAccount=null;overrideDeploymentSwitch('personalMailbox', undefined) }
 })

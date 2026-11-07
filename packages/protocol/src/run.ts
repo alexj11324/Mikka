@@ -8,6 +8,7 @@
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
 import { providerFailureSchema } from "./provider-failure"
+import { runFailureSchema } from "./run-failure"
 
 export const RUN_QUESTION_KINDS = [
   "context",
@@ -259,6 +260,7 @@ export const RUN_COMPLETE_ROUTE = "/v1/runs/:runId/complete"
 export const runCompletion = z.object({
   stopReason: runStopReason,
   report: runReport,
+  failureDetails: runFailureSchema.optional(),
 })
 export type RunCompletion = z.infer<typeof runCompletion>
 
@@ -267,7 +269,7 @@ export type RunCompletion = z.infer<typeof runCompletion>
  * result decides whether it reaches review); other endings may omit it.
  */
 export const runCompleteRequest = z
-  .object({ stopReason: runStopReason, report: runReport.optional() })
+  .object({ stopReason: runStopReason, report: runReport.optional(), failureDetails: runFailureSchema.optional() })
   .refine((body) => body.stopReason !== "submitted" || body.report, {
     message: "A submitted run needs a report.",
     path: ["report"],

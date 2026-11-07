@@ -71,12 +71,12 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
       [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
-    const issueId = await seedIssue(pool, id)
+    const issueId = await seedIssue(pool, id, ws.id)
     // A numbered task gets a publication branch; each person's own number keeps the branches apart.
     await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1000 + users.length } } })])
     const deviceId = await computer(id, 'MacBook')
     const botId = await chatBotId(id, null, ws.id)
-    return { id, issueId, botId, deviceId }
+    return { id, issueId, botId, deviceId, workspaceId: ws.id }
   }
   /** One of the person's computers; `takesPart: false` is 参与调度 off. */
   /** `old`: its Mikka cannot take a subscription run (no subscriptionBroker). */
@@ -452,7 +452,11 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const b = await person()
     const bAgent = (await pool.query('SELECT id FROM agents WHERE "deviceId"=$1', [b.deviceId])).rows[0].id as string
     const { dispatchRun: mcpDispatch } = await import('../lib/mcp/actions')
-    const viaMcp = await mcpDispatch(b.id, { issueId: b.issueId, agentId: bAgent, repo: 'octo/repo' }) as { runId?: string; error?: string }
+    const { actAs } = await import('../lib/acting-user')
+    const { tokenWorkspace } = await import('../lib/tokens/principal')
+    const request = { issueId: b.issueId, agentId: bAgent, repo: 'octo/repo' }
+    assert.deepEqual(await mcpDispatch(b.id, request), { error: 'issueNotFound' }, 'an MCP request without an authenticated workspace cannot dispatch')
+    const viaMcp = await actAs({ id: b.id, [tokenWorkspace]: b.workspaceId }, () => mcpDispatch(b.id, request)) as { runId?: string; error?: string }
     assert.ok(viaMcp.runId, JSON.stringify(viaMcp))
     assert.deepEqual([(await model(viaMcp.runId!)).model, (await model(viaMcp.runId!)).cliModelSelection], ['gpt-5', 'explicit'])
   })

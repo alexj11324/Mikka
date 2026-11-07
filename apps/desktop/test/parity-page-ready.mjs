@@ -137,8 +137,16 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
   } else if (name === 'artifact-library') {
     await text(fixture.artifactTitle)
     await text(fixture.htmlTitle)
-  } else if (name === 'artifact-html') {
-    await page.getByRole('dialog').frameLocator('iframe').getByRole('heading', { name: 'Desktop review', exact: true }).waitFor()
+  } else if (name === 'artifact-markdown' || name === 'artifact-html') {
+    const dialog = page.getByRole('dialog')
+    if (name === 'artifact-html') await dialog.frameLocator('iframe').getByRole('heading', { name: 'Desktop review', exact: true }).waitFor()
+    const thread = dialog.locator('aside')
+    await thread.getByText('The review is complete. Conversations, task details and artifacts are ready.', { exact: true }).waitFor()
+    // The reader's document can finish before the thread's separate artifact
+    // read. That read renders nothing while pending, so skeleton checks miss it.
+    const cards = thread.locator('[data-slot="thread-artifacts"] [data-slot="artifact-card"]')
+    await cards.getByText(fixture.artifactTitle, { exact: true }).waitFor()
+    await cards.getByText(fixture.htmlTitle, { exact: true }).waitFor()
   } else if (name === 'task' || name === 'task-thread') {
     // The nested thread has the same accessible name. Only the task region
     // contains the editable title, so its independent reads gate this capture.

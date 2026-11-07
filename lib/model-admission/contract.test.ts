@@ -54,3 +54,15 @@ test('the default model\'s ZeroCat route pins its endpoint and is not a Gateway 
   for (const changed of [{ endpoint: 'https://proxy.invalid/v1' }, { servingProviders: ['deepseek'] }])
     assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, ...changed }] }), denied('modelPolicyInvalid'))
 })
+
+
+test('self-hosted admission pins the administrator endpoint and actual provider model', () => {
+  const route = { provider: 'openai-compatible', endpoint: 'https://models.example.test/v1', model: 'local-model', servingProviders: ['openai-compatible'], principalIds: ['alice'], dataRegions: ['unknown'] }
+  const policy = parseModelAdmissionPolicy({ schemaVersion: 1, routes: [route] })
+  const request = { provider: 'openai-compatible', endpoint: route.endpoint, model: route.model, ownerId: 'alice' }
+  assert.equal(admitModelRoute(policy, request).model, 'local-model')
+  for (const other of [{ ...request, endpoint: 'https://other.example.test/v1' }, { ...request, model: 'different-model' }, { ...request, ownerId: 'bob' }]) {
+    assert.throws(() => admitModelRoute(policy, other), { code: 'modelRouteDenied' })
+  }
+  assert.throws(() => parseModelAdmissionPolicy({ schemaVersion: 1, routes: [{ ...route, endpoint: 'https://key@models.example.test/v1' }] }))
+})

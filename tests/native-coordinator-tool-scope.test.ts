@@ -4,6 +4,9 @@ import { NativeCoordinatorError } from '../lib/coordinator/native-store'
 import type { RunDetail } from '../lib/agent-runs'
 import { workspaceRunView } from '../lib/run-visibility'
 import { FactoryError } from '../lib/factory/contract'
+import { actingContext } from '../lib/activity-actor'
+
+const WORKSPACE = '40100000-0000-4000-8000-000000000001'
 
 let appAllowed = true
 const policyChecks = mock.fn(async () => appAllowed)
@@ -12,7 +15,11 @@ let uncertain = false
 const checks = mock.fn(async () => { if (revoked) throw new NativeCoordinatorError(409,'coordinatorExpiredOrLeaseLost') })
 const effect = mock.fn(async () => { if (uncertain) throw new Error('retryable transport failure'); return {ok:true} })
 let runDetail: RunDetail | null = null
-const readRunResult = mock.fn(async (_userId: string, _runId: string) => runDetail)
+const readRunResult = mock.fn(async (userId: string, _runId: string) => {
+  assert.equal(actingContext.getStore()?.userId, userId)
+  assert.equal(actingContext.getStore()?.tokenWorkspaceId, WORKSPACE)
+  return runDetail
+})
 const publicTaskView = { contractVersion: 2, task: { version: 2, id: 'task', revision: 99, stage: 'handoff', needsYou: { kind: 'pr_review', since: '2026-11-05T00:00:00Z' } },
   binding: { taskId: 'task', issueId: 'issue', attemptId: 'attempt', candidateId: 'candidate', revision: 99 }, attempts: [], candidates: [] }
 const readPublicTask = mock.fn(async (..._args: unknown[]) => publicTaskView)
@@ -42,9 +49,14 @@ const readUserEvent = mock.fn(async () => {
   return [{payload:{text:eventText}}]
 })
 const stub = (path: string, namedExports: Record<string,unknown>) => mock.module(new URL(path,import.meta.url).href,{namedExports})
+stub('../lib/auth.ts', { auth: { api: { getSession: () => assert.fail('native tools use the host principal') } } })
 stub('../lib/coordinator/native.ts',{nativeCoordinatorStore:{assertToolActive:checks}})
 stub('../lib/coordinator/store.ts',{editMemory:effect})
 stub('../lib/coordinator/issue-create.ts',{createIssueFromRequest:effect})
+stub('../lib/coordinator/issue-team.ts', { coordinatorTaskWorkspace: async (ownerId: string, botId: string) => {
+  assert.equal(ownerId, user); assert.equal(botId, COORDINATOR_BOT)
+  return { id: WORKSPACE, kind: 'team' }
+} })
 stub('../lib/issue-visibility.ts',{issueVisibility:effect})
 stub('../lib/factory/queue-local.ts',{queueTaskRun:effect})
 stub('../lib/factory/queue-cloud.ts',{queueFactoryCloudRun:effect})
@@ -128,7 +140,7 @@ const calls = {
   forget:()=>steps.forget(user,{text:'preference'},scope,COORDINATOR_BOT),
   composioAction:()=>steps.composioAction(user,'fetch_recent_gmail',{query:'is:unread'},scope),
   accountWrite:()=>steps.accountWrite(user,'send_email',{},scope),
-  listIssues:()=>steps.listIssues(user,{},scope),
+  listIssues:()=>steps.listIssues(user,{},scope,COORDINATOR_BOT),
   getIssue:()=>steps.getIssue(user,{issueId:'issue'},scope,COORDINATOR_BOT),
   createIssue:()=>steps.createIssue(user,{title:'Task'},'tool-call',scope,COORDINATOR_BOT),
   updateIssue:()=>steps.updateIssue(user,{issueId:'issue',title:'Updated'},'tool-call',scope,COORDINATOR_BOT),
@@ -144,10 +156,10 @@ const calls = {
   listBotSubscriptions:()=>steps.listBotSubscriptions(user,{botId:'bot'},scope),
   bindComputerSubscription:()=>steps.bindComputerSubscription(user,{botId:'bot',connectionId:'connection',revision:1,harness:'codex',modelId:'model'},'tool-call',scope),
   dispatchComputerTask:()=>steps.dispatchComputerTask(user,{botId:'bot',issueId:'issue',harness:'codex',model:'model'},'tool-call',scope),
-  listRuns:()=>steps.listRuns(user,{},scope),
-  getRun:()=>steps.getRun(user,{runId:'run'},scope),
-  sendToRun:()=>steps.sendToRun(user,{runId:'run',text:'message'},scope),
-  stopRun:()=>steps.stopRun(user,{runId:'run'},scope),
+  listRuns:()=>steps.listRuns(user,{},scope,COORDINATOR_BOT),
+  getRun:()=>steps.getRun(user,{runId:'run'},scope,COORDINATOR_BOT),
+  sendToRun:()=>steps.sendToRun(user,{runId:'run',text:'message'},scope,COORDINATOR_BOT),
+  stopRun:()=>steps.stopRun(user,{runId:'run'},scope,COORDINATOR_BOT),
   webSearchStep:()=>steps.webSearchStep(user,{query:'query'},scope),
   recordAttention:()=>steps.recordAttention(user,{matterId:'matter',decision:'notify'},scope),
 }
@@ -316,7 +328,7 @@ const hostReport = {
 
 test('getRun exposes exact persisted host evidence for a stopped owned run',async()=>{
   runDetail={run:{...stoppedRun,report:hostReport},chunks:[],messages:[]}
-  const result=await steps.getRun(user,{runId:'run'},scope)
+  const result=await steps.getRun(user,{runId:'run'},scope,COORDINATOR_BOT)
   assert.ok('id' in result)
   assert.deepEqual({sourceCommit:result.sourceCommit,skillMount:result.skillMount,runtime:result.runtime,verify:result.verify},
     {sourceCommit:hostReport.sourceCommit,skillMount:hostReport.skillMount,runtime:hostReport.runtime,verify:hostReport.verify})
@@ -329,7 +341,7 @@ test('getRun exposes exact persisted host evidence for a stopped owned run',asyn
 test('getRun leaves missing host evidence null instead of inferring it from a summary',async()=>{
   for (const report of [null,{summary:JSON.stringify(hostReport)}]) {
     runDetail={run:{...stoppedRun,report},chunks:[],messages:[]}
-    const result=await steps.getRun(user,{runId:'run'})
+    const result=await steps.getRun(user,{runId:'run'},undefined,COORDINATOR_BOT)
     assert.ok('id' in result)
     assert.deepEqual([result.sourceCommit,result.skillMount,result.runtime,result.verify],[null,null,null,null])
   }
@@ -337,7 +349,7 @@ test('getRun leaves missing host evidence null instead of inferring it from a su
 
 test('getRun preserves the restricted teammate projection with no host evidence',async()=>{
   runDetail={run:workspaceRunView({...stoppedRun,report:hostReport}),chunks:[],messages:[]}
-  const result=await steps.getRun(user,{runId:'run'})
+  const result=await steps.getRun(user,{runId:'run'},undefined,COORDINATOR_BOT)
   assert.ok('id' in result)
   assert.deepEqual([result.summary,result.sourceCommit,result.skillMount,result.runtime,result.verify],[null,null,null,null,null])
   assert.equal(JSON.stringify(result).includes('requested-model'),false)

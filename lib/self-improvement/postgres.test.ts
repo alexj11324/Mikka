@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -68,7 +69,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → immu
   const owner = `synthetic-${randomUUID()}`
   const other = `synthetic-${randomUUID()}`
   const issueId = randomUUID(), agentId = randomUUID(), deviceId = randomUUID(), repoId = randomUUID()
-  await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'synthetic report','{}','todo','normal')`, [issueId, owner])
+  await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'synthetic report','{}','todo','normal')`, [issueId, owner, await seedFixtureWorkspace(pool, owner)])
   await pool.query(`INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,'synthetic-device')`, [deviceId, owner])
   await pool.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'codex','synthetic-agent',$3)`, [agentId, owner, deviceId])
   await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,$3,'/synthetic/report')`, [repoId, deviceId, owner])
@@ -159,7 +160,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → immu
     const anotherAgent = randomUUID(), anotherRepo = randomUUID(), anotherIssue = randomUUID()
     await pool.query(`INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,'codex','synthetic-other-agent')`, [anotherAgent, owner])
     await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,$3,'/synthetic/other')`, [anotherRepo, deviceId, owner])
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'synthetic-other','{}','todo','normal')`, [anotherIssue, owner])
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'synthetic-other','{}','todo','normal')`, [anotherIssue, owner, await seedFixtureWorkspace(pool, owner)])
     const a = await makeRun({ agent: anotherAgent }), b = await makeRun({ repo: anotherRepo }), c = await makeRun({ issue: anotherIssue })
     await store.recordFeedback(owner, feedback(a)); await store.recordFeedback(owner, feedback(b))
     assert.equal((await post(feedback(c))).status, 404)
@@ -276,7 +277,7 @@ test('actual PG17 and HTTP: immutable feedback → scores → aggregate → immu
     const moved = await makeRun(), destination = randomUUID()
     const input = feedback(moved)
     await store.recordFeedback(owner, input)
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'synthetic-destination','{}','todo','normal')`, [destination, owner])
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'synthetic-destination','{}','todo','normal')`, [destination, owner, await seedFixtureWorkspace(pool, owner)])
     await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [moved, destination])
     authorizedIssues.add(destination)
     assert.equal((await store.read(owner, moved)).scores.length, 0)

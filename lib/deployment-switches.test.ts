@@ -35,7 +35,8 @@ test('a switch whose flag exists decides by PostHog and its default only; its ol
     for (const value of ['0', '1', 'false', '']) assert.equal(deploymentSwitch(name, { [variable]: value }), true, `${variable}=${value}`)
   }
   // On in production but off by default: keeps its variable so a fresh process does not turn it off.
-  assert.equal(deploymentSwitch('byosEnrollment', {}), false)
+  assert.equal(deploymentSwitch('byosEnrollment', { MIKKA_EDITION: 'cloud' }), false)
+  assert.equal(deploymentSwitch('byosEnrollment', {}), true, 'community uses the deployed enrollment default without PostHog')
   assert.equal(deploymentSwitch('byosEnrollment', { MIKKA_BYOS_ENROLLMENT_ENABLED: '1' }), true)
 })
 
