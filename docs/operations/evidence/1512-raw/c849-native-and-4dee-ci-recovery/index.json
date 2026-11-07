@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "kind": "immutable_issue1512_evidence_index",
+  "createdAt": "2026-11-07T18:23:29Z",
+  "baseEvidenceCommit": "5d4b558c855683076bef621d5a2b48d05db22c7b",
+  "sourceParent": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+  "payloadFiles": 26,
+  "payloadBytes": 919923,
+  "productionAcceptance": null,
+  "entries": [
+    {
+      "path": "native-c849/compiled/mikka-build.json",
+      "category": "original-native-artifact",
+      "bytes": 8431,
+      "sha256": "5382ddcad7ea7bd985164b373227e859d0de9d008603926723b8c812e7368fbd",
+      "gitBlobSha1": "eb79477ee377625b3d12d11a144e8173ac47542f"
+    },
+    {
+      "path": "native-c849/lifecycle.json",
+      "category": "original-native-artifact",
+      "bytes": 267901,
+      "sha256": "295480731e1105dccec00d188739e71008d6cacbb73bde627b8aaefd48517760",
+      "gitBlobSha1": "e273a6ecccfa1eab0e954405287a4e8e2e0ca580"
+    },
+    {
+      "path": "native-c849/mac-acceptance-package.json",
+      "category": "original-native-artifact",
+      "bytes": 957,
+      "sha256": "e5463d5ac8fe264fc7b152de30766b74aede0409107c340b70611f7744e72b2c",
+      "gitBlobSha1": "505ce7c01694ea746828dcf0c54b254e7261410f"
+    },
+    {
+      "path": "native-c849/native-crypto.json",
+      "category": "original-native-artifact",
+      "bytes": 2868,
+      "sha256": "16e5e9c8eac5d03081db130d81afcb20faeb0119a360ea815bcddffa25a4ea43",
+      "gitBlobSha1": "3642d37fe94167e9cb4fda17310ef91b73b0df7f"
+    },
+    {
+      "path": "native-c849/parity/parity.json",
+      "category": "original-native-artifact",
+      "bytes": 106335,
+      "sha256": "afbfb5f5d02f584004259f18c0d7a12debc9d286392aad860fba7ad16e5ea3f6",
+      "gitBlobSha1": "99c54eb696df138b126d023bb3379a8696f19a3b"
+    },
+    {
+      "path": "native-c849/smoke.json",
+      "category": "original-native-artifact",
+      "bytes": 3105,
+      "sha256": "c59fd220b0f532a3fb6f1af37f7794ec649e50787bbd49346076c6f106958fe5",
+      "gitBlobSha1": "78cfaad76b0e78d78bf049405760e0a84cd1072d"
+    },
+    {
+      "path": "native-c849/restoration-receipt.json",
+      "category": "artifact-restoration-receipt",
+      "bytes": 2670,
+      "sha256": "ce4afc2227a50e8d98a8361bf53e3d25579a417dfc202d2e362f6d312c727cd0",
+      "gitBlobSha1": "ed697f3224eac4fca748636577325af830c81e5f"
+    },
+    {
+      "path": "native-c849/summary.json",
+      "category": "regenerated-closed-projection",
+      "bytes": 100845,
+      "sha256": "0c438451027015fd4acb0e9abfd8b9399fc10cc464957adf769951a8bf7f68c2",
+      "gitBlobSha1": "677c20312697847e2f487ffd4f8b8a7f9d5336e6"
+    },
+    {
+      "path": "native-c849/summary.stdout.json",
+      "category": "regenerated-closed-projection",
+      "bytes": 588,
+      "sha256": "aaacda5604ad4bafb4093e622647afcdf4c29e069bbc51c18f59ddbf6614449a",
+      "gitBlobSha1": "5a41db6a61dbc0367a976ef5f82cb8841ab84288"
+    },
+    {
+      "path": "native-c849/query-operations.json",
+      "category": "regenerated-closed-projection",
+      "bytes": 14792,
+      "sha256": "8d22846f61e5eb41f7dba181fe4f0b4bb6d9a67b531d340ab4d0265effddd2dc",
+      "gitBlobSha1": "8df07437217648f240f4c00dff64f2ef1b4ee999"
+    },
+    {
+      "path": "native-c849/query-operations.stdout.json",
+      "category": "regenerated-closed-projection",
+      "bytes": 401,
+      "sha256": "7c816846857c888f0be6ef764dfb293e11be5deddc0837c7ae0b6c8b162f19f8",
+      "gitBlobSha1": "db53b4babf1f86a120ea880cfc55f63e4a4ce575"
+    },
+    {
+      "path": "native-c849/unattributed-sources.json",
+      "category": "regenerated-closed-projection",
+      "bytes": 13489,
+      "sha256": "508fa6935ebbc60186c3c0522450f241195213e871179118c0e5ce92b083e8c7",
+      "gitBlobSha1": "7045040b7a664372ca07e89b5cf7378b368481e8"
+    },
+    {
+      "path": "native-c849/unattributed-sources.stdout.json",
+      "category": "regenerated-closed-projection",
+      "bytes": 423,
+      "sha256": "cbc5ff91e6dc23810c200e521f9ac701dc864c1012bfa8af0d445f8d61e2c034",
+      "gitBlobSha1": "a66ed2c7a17c56197427fa5453d1c9bbfc0e8be8"
+    },
+    {
+      "path": "native-c849/closed-diagnostic.json",
+      "category": "regenerated-closed-projection",
+      "bytes": 10613,
+      "sha256": "675a3f4c76b2d5206ed8118f5f501c904b525a19325a89f31259e984b903c0b0",
+      "gitBlobSha1": "b9ceb58918e3394c86afe484ddb561644e42ee6a"
+    },
+    {
+      "path": "ci-c849-owned-final.json",
+      "category": "ci-safe-final-receipt",
+      "bytes": 162620,
+      "sha256": "138a106e75e420556d6edf131c12289648a5ed880a09ca43ce1e1e8be228e148",
+      "gitBlobSha1": "9683b89c4d4d3c3c19f886767690a91d143a5e74"
+    },
+    {
+      "path": "api-ci-c849/workflow-development-aliases.test.mjs",
+      "category": "historical-local-source-or-tap",
+      "bytes": 6868,
+      "sha256": "1db8226a7a15d47e385d971c0f59fea93bd22677dcd1752c9a502b52743abefd",
+      "gitBlobSha1": "4bbc2b791f4aef326810ec9e2db4916fc505e06e"
+    },
+    {
+      "path": "api-ci-c849/repro-baseline.tap",
+      "category": "historical-local-source-or-tap",
+      "bytes": 988,
+      "sha256": "f9274dcc9d7599caca3963a24e26553922156875d40d61cb8db5cb17314802c3",
+      "gitBlobSha1": "553324c0b05bc672f1ea53214838a8d3eb65f628"
+    },
+    {
+      "path": "ci-4dee10cc-owned-final.json",
+      "category": "ci-safe-final-receipt",
+      "bytes": 160783,
+      "sha256": "0291e300d9edffe0e1616fb5630fd41d151bb5871ecf51cafbfd4431cb7e5c6c",
+      "gitBlobSha1": "3d185121b8056b258b8d00ac16a67a1ff331ec5c"
+    },
+    {
+      "path": "readers/desktop-native-summary.mjs",
+      "category": "unchanged-archived-reader",
+      "bytes": 19258,
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b",
+      "gitBlobSha1": "dad196c96077ab1504fd8858343d31b00cf0da3a"
+    },
+    {
+      "path": "readers/desktop-query-operations-summary.mjs",
+      "category": "unchanged-archived-reader",
+      "bytes": 7134,
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2",
+      "gitBlobSha1": "17a54954b618fc3373715dbc73fa86669c2aa739"
+    },
+    {
+      "path": "readers/desktop-1bd4-unattributed-sources-summary.mjs",
+      "category": "unchanged-archived-reader",
+      "bytes": 14948,
+      "sha256": "0d10210d5403a8e1efa6539a382872025d773fdbf949a1b6e4965dca952ab4f4",
+      "gitBlobSha1": "28f3a63f0b9c4604b79f935dd82420f9994a9e4a"
+    },
+    {
+      "path": "readers/desktop-1bd4-query-sources.cjs",
+      "category": "unchanged-archived-reader",
+      "bytes": 2686,
+      "sha256": "0eeb18be931fdc4d8ddb908dff9a0b4a94a6596a992fcc9a1c5fd635a935a0bb",
+      "gitBlobSha1": "d470c1d71454dff12f60cf7e0dd373624bd8b314"
+    },
+    {
+      "path": "readers/evidence/desktop-1bd4-reader-validation.json",
+      "category": "unchanged-archived-reader",
+      "bytes": 2850,
+      "sha256": "a229b4f766c4f0d271dbd02e8b5d91e5ee670633ce82d219d5156a43454608d1",
+      "gitBlobSha1": "47cb1e27e654d313f73eebec06b74dc27c7098bc"
+    },
+    {
+      "path": "source-recovery.json",
+      "category": "recovery-provenance-and-limitations",
+      "bytes": 5518,
+      "sha256": "67028413d15b8f4987df7abad701d35127b4fdc395f80cdffdb2cc4ffe0f4352",
+      "gitBlobSha1": "497056004699ce2db0d9bc6ceab81f043d13b0d9"
+    },
+    {
+      "path": "privacy-audit.json",
+      "category": "archive-privacy-audit",
+      "bytes": 727,
+      "sha256": "048cee11fc4c75ec8c331252eb5c1b6f4127ebd7f512d779bac08c67644d79ba",
+      "gitBlobSha1": "6cdf096c16c797946c994901e0187acd6bba200b"
+    },
+    {
+      "path": "README.md",
+      "category": "archive-scope-documentation",
+      "bytes": 2125,
+      "sha256": "39c368d3728a16a9f29fe8ebd7f5540e8b877c946842dbc1c9e7732ce7382dbb",
+      "gitBlobSha1": "a4718e9e664c587c47edec86ca2c9b5d1f7e5fd6"
+    }
+  ],
+  "limitations": [
+    "Observed local hash/exit metadata does not reconstruct unavailable original logs.",
+    "Historical c849 Native results do not validate main687 or current4dee.",
+    "The c849 startup window includes three physical RPCs crossing its end; totals are not a complete-work reduction claim.",
+    "Both c849 and4dee CI failed at a file process; the exact root cause is not yet established.",
+    "Production acceptance has not begun and issue1512 remains open."
+  ]
+}

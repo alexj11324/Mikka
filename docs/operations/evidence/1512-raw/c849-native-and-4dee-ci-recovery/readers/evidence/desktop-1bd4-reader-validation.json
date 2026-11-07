@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "kind": "native_evidence_reader_preparation",
+  "createdAt": "2026-11-07T16:29:06.738571+00:00",
+  "runId": 42391049816,
+  "candidate": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "expectedSynthetic": "49d93ce3feb348fdfb05bd30e9d0ae114066da25",
+  "syntheticEvidence": "Git commit object tree67262992599d8de8a0aa04d35bbee3b98add277d and parents d75/1bd; actual native checkout and artifacts pending.",
+  "sourceTable": {
+    "sourceCommit": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+    "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+    "keys": 75,
+    "newLabels": [
+      "/api/agent/sessions",
+      "/api/computer/events",
+      "/api/conversations",
+      "/api/pending-actions"
+    ]
+  },
+  "changes": "A separate fixed-vocabulary reader copy preserves all prior vector/UUID/time/PID/delta/privacy logic. Only source table and its key-count/hash metadata changed; downloader copy changes exact run/head/source/output directory constants only.",
+  "offlineValidation": {
+    "tests": 9,
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "servicesStarted": 0
+  },
+  "historicalReportsReclassified": false,
+  "previousFilesUnchanged": [
+    {
+      "path": "desktop-unattributed-sources-summary.mjs",
+      "bytes": 14761,
+      "sha256": "9cbb7cb5492723591260f004eb75d1f31f2bc8ae1152f044ae7fcaa051dc3aae"
+    },
+    {
+      "path": "desktop-unattributed-sources-summary.test.mjs",
+      "bytes": 9815,
+      "sha256": "18743033dcb8cda930b6b714100f6da4404a42a27cc9dcb36400ff849f924ea4"
+    },
+    {
+      "path": "evidence/desktop-e7a1/lifecycle.json",
+      "bytes": 261085,
+      "sha256": "760d0d704d564eb2a040b6d600499d8fc01973772c2832ef3f35f4837f08897f"
+    },
+    {
+      "path": "evidence/desktop-e7a1/unattributed-sources.json",
+      "bytes": 9848,
+      "sha256": "3d1cafacb3bd234164349054712e157ceaf9bc5184f3541f8d38a945e76e6553"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "desktop-1bd4-query-sources.cjs",
+      "bytes": 2686,
+      "sha256": "0eeb18be931fdc4d8ddb908dff9a0b4a94a6596a992fcc9a1c5fd635a935a0bb"
+    },
+    {
+      "path": "desktop-1bd4-unattributed-sources-summary.mjs",
+      "bytes": 14948,
+      "sha256": "0d10210d5403a8e1efa6539a382872025d773fdbf949a1b6e4965dca952ab4f4"
+    },
+    {
+      "path": "desktop-1bd4-unattributed-sources-summary.test.mjs",
+      "bytes": 9825,
+      "sha256": "fad45fda19728fa6e88ed7cbd7e41abb8df42aaa279673d1fec6858eeb0abaf7"
+    },
+    {
+      "path": "desktop-1bd4-unattributed-sources-summary-tests.tap",
+      "bytes": 2252,
+      "sha256": "726175fbe633d01832de496db4fc3933b0f3dcf639d15d3a62bd509fe090a75e"
+    },
+    {
+      "path": "desktop-1bd4-download.py",
+      "bytes": 8900,
+      "sha256": "332efde26646d96313eb331fadcc3c76814adee47f98e422fe6b43b6bd52e969"
+    }
+  ],
+  "productionAcceptance": null
+}

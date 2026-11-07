@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "kind": "c849_artifact_restoration",
+  "status": "verified",
+  "runId": 42396413807,
+  "candidate": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+  "source": "d93368760b73fdc353654f1405303c7957379aa6",
+  "artifacts": [
+    {
+      "id": 13583754497,
+      "kind": "native",
+      "bytes": 14890200,
+      "sha256": "f29475387f5f4b872b689732f84408c8a8a0c17367893f1181513966bda6a2a4",
+      "digestVerified": true
+    },
+    {
+      "id": 13584148435,
+      "kind": "package",
+      "bytes": 1599,
+      "sha256": "9f4fb03153c9b87905b265effc61eb4e6fac62c7aaa5aa08ddeefb04a29c5190",
+      "digestVerified": true
+    },
+    {
+      "id": 13583976083,
+      "kind": "compiled",
+      "bytes": 48057292,
+      "sha256": "23b04d679329d61887193747f675b49745fbc5a32a83a1f80cc9b3adb752f660",
+      "digestVerified": true
+    }
+  ],
+  "files": [
+    {
+      "path": "compiled/mikka-build.json",
+      "bytes": 8431,
+      "sha256": "5382ddcad7ea7bd985164b373227e859d0de9d008603926723b8c812e7368fbd",
+      "gitBlob": "eb79477ee377625b3d12d11a144e8173ac47542f",
+      "privacyPatternMatches": 0,
+      "sensitiveStringFields": 0
+    },
+    {
+      "path": "lifecycle.json",
+      "bytes": 267901,
+      "sha256": "295480731e1105dccec00d188739e71008d6cacbb73bde627b8aaefd48517760",
+      "gitBlob": "e273a6ecccfa1eab0e954405287a4e8e2e0ca580",
+      "privacyPatternMatches": 0,
+      "sensitiveStringFields": 0
+    },
+    {
+      "path": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "e5463d5ac8fe264fc7b152de30766b74aede0409107c340b70611f7744e72b2c",
+      "gitBlob": "505ce7c01694ea746828dcf0c54b254e7261410f",
+      "privacyPatternMatches": 0,
+      "sensitiveStringFields": 0
+    },
+    {
+      "path": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "16e5e9c8eac5d03081db130d81afcb20faeb0119a360ea815bcddffa25a4ea43",
+      "gitBlob": "3642d37fe94167e9cb4fda17310ef91b73b0df7f",
+      "privacyPatternMatches": 0,
+      "sensitiveStringFields": 0
+    },
+    {
+      "path": "parity/parity.json",
+      "bytes": 106335,
+      "sha256": "afbfb5f5d02f584004259f18c0d7a12debc9d286392aad860fba7ad16e5ea3f6",
+      "gitBlob": "99c54eb696df138b126d023bb3379a8696f19a3b",
+      "privacyPatternMatches": 0,
+      "sensitiveStringFields": 0
+    },
+    {
+      "path": "smoke.json",
+      "bytes": 3105,
+      "sha256": "c59fd220b0f532a3fb6f1af37f7794ec649e50787bbd49346076c6f106958fe5",
+      "gitBlob": "78cfaad76b0e78d78bf049405760e0a84cd1072d",
+      "privacyPatternMatches": 0,
+      "sensitiveStringFields": 0
+    }
+  ],
+  "originalBytesMatched": true,
+  "zipRetained": false,
+  "signedUrlsPersisted": false,
+  "pngExtracted": false
+}

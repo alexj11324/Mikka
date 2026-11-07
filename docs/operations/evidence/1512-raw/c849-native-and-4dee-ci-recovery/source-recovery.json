@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "kind": "source_and_artifact_recovery_after_executor_disconnect",
+  "recordedAt": "2026-11-07T18:23:29Z",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pr": 1518,
+  "executor": {
+    "state": "unavailable",
+    "originalWorkspace": "/workspace/scratch/812e3b7d6d45/Mikka",
+    "originalRamRoot": "/dev/shm/issue1512-ops-812e3b7d6d45",
+    "originalBytesLossNotEstablished": true,
+    "unavailableDoesNotMeanDeleted": true,
+    "lossStatus": "unknown"
+  },
+  "source": {
+    "localUnpublishedCommit": "725dddbb9cd47f32589ed90fa5ba66035e78c803",
+    "localCommitRemoteQuery": "404",
+    "expectedTreeFromObservedLocalGitOutput": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+    "recoveredRemoteCommit": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+    "recoveredRemoteTree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+    "sameTree": true,
+    "localMainMergeTree": "8e7ffd2ea6c063ae73ceaf7e8199d5cf3aca6636",
+    "recoveredMainMergeCommit": "4104be7efd84bd269fce6b970b17f2ee986b7ec4",
+    "recoveredMainMergeTree": "8e7ffd2ea6c063ae73ceaf7e8199d5cf3aca6636",
+    "mainMerged": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+    "workflowCheckpoint": "df53871ce8c3203f46b663735fd4867900b389ee",
+    "copyCommit": "7089c70ccbc268200fc6679bd69d803b6491f2f6",
+    "finalParents": [
+      "7089c70ccbc268200fc6679bd69d803b6491f2f6",
+      "df53871ce8c3203f46b663735fd4867900b389ee"
+    ],
+    "ownerConnectorUsed": true,
+    "sourceImporterUsedForRecoveredCommit": false,
+    "guardChanges": false,
+    "mainPush": false,
+    "forcePush": false,
+    "rebase": false,
+    "sourceRef": "ops/1512-source-objects",
+    "featureRef": "feat/1512-run-observability",
+    "bothRefsVerifiedAtRecoveredCommit": true
+  },
+  "localCompletedChecksWhoseOriginalOutputIsCurrentlyUnavailable": [
+    {
+      "check": "full-api",
+      "exitCode": 0,
+      "observedBytes": 16026,
+      "observedSha256": "c817a8da47823b0a31acf4ae0a9764ba50013570bfc15217fbecaa29d4fda403",
+      "originalOutputAvailableInThisArchive": false
+    },
+    {
+      "check": "self-hosting",
+      "exitCode": 0,
+      "observedBytes": 1652,
+      "observedSha256": "cb6cc24b0b87260a9ab2ae163471fb802c2f676d722e38922da20f2cd9b31f60",
+      "originalOutputAvailableInThisArchive": false
+    },
+    {
+      "check": "locale-navigation",
+      "exitCode": 0,
+      "observedBytes": 555,
+      "observedSha256": "34f2acf5fa184408affb210daa81ab69d7ea43351cc363b926770a3b2013bd96",
+      "originalOutputAvailableInThisArchive": false
+    },
+    {
+      "check": "full-types-4096mb",
+      "exitCode": 0,
+      "observedBytes": 289,
+      "observedSha256": "f2eaa7542b5c0c3e76881ea0954a639b6a53716a41ddf0052d074d5c06f1aaeb",
+      "originalOutputAvailableInThisArchive": false
+    },
+    {
+      "check": "full-lint-clean-worktree",
+      "exitCode": 0,
+      "observedBytes": 6535,
+      "observedSha256": "bfbca671f27a6582d1139d01625b9a2435738702231f007c30770338e387cf1b",
+      "originalOutputAvailableInThisArchive": false
+    },
+    {
+      "check": "runtime-lint",
+      "exitCode": 0,
+      "observedBytes": 335,
+      "observedSha256": "3d8799b5e11d062e91a5ac5a41399e9cdf17efb3a496ad52168b77c50f9a2eab",
+      "originalOutputAvailableInThisArchive": false
+    }
+  ],
+  "additionalUnavailableOriginals": [
+    {
+      "path": "main-687-auth-only-fixture-fix.json",
+      "bytes": 5179,
+      "sha256": "a458ddd43be13ba8d05a4003f59952d2c88c7704c691dc83fdbb87dddf10a865"
+    },
+    {
+      "path": "main-687-observability-compatibility-review.json",
+      "bytes": 19863,
+      "sha256": "3397e5008aa37aa6d09944580ea8dec600fea4f91831296973efc1ae1a9a63d0"
+    },
+    {
+      "path": "main-a65-publication-terminal.json",
+      "bytes": 56841,
+      "sha256": "640a6350cd8ba689d5bfdd0048c4adc98cb6b8d9f8f768189c427c7c5adfc8d4"
+    }
+  ],
+  "artifactRecovery": {
+    "runId": 42396413807,
+    "originalJsonFiles": 6,
+    "allOriginalSha256Matched": true,
+    "allOriginalGitBlobSha1Matched": true,
+    "allRemoteDecodedContentsMatched": true,
+    "regeneratedReaderOutputs": 7,
+    "readersUnchangedFromArchive": "4f61acf2243d6b7f23025f77b8c282b594bcbe71",
+    "derivedOutputIsNotOriginalLocalReceipt": true,
+    "zipRetained": false,
+    "signedUrlsArchived": false
+  },
+  "correctedDerivedDiagnostic": {
+    "unpublishedDraftBlob": "5533d4b913f51db1cc3964ed86a79779cfe80544",
+    "replacementBlob": "b9ceb58918e3394c86afe484ddb561644e42ee6a",
+    "reason": "The original report field is rpcAction, not action. Both physical and logical nativeLogin rows contain an explicit null rpcAction. The corrected projection preserves null and does not classify it as a rejected registered action.",
+    "originalReportsChanged": false,
+    "readerOutputsChanged": false
+  },
+  "resourceCleanup": {
+    "sandboxId": "sbx_4yMh0FOeA4zocedYtYRKLGW6kPjx",
+    "status": "stopped",
+    "persistent": false,
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "durationMs": 532789,
+    "activeCpuDurationMs": 8256,
+    "portsExposed": 0
+  },
+  "limitations": [
+    "Observed local hash/exit metadata does not reconstruct unavailable original logs.",
+    "Historical c849 Native results do not validate main687 or current4dee.",
+    "The c849 startup window includes three physical RPCs crossing its end; totals are not a complete-work reduction claim.",
+    "Both c849 and4dee CI failed at a file process; the exact root cause is not yet established.",
+    "Production acceptance has not begun and issue1512 remains open."
+  ],
+  "productionAcceptance": null
+}

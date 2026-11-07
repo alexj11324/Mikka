@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "kind": "bounded_evidence_archive_privacy_audit",
+  "recordedAt": "2026-11-07T18:23:29Z",
+  "filesInspected": 24,
+  "scope": "Exact retained UTF-8 payloads only; mixed raw CI logs and signed artifact URLs excluded.",
+  "patterns": [
+    "email",
+    "GitHub/API/PostHog token-shaped values",
+    "private key delimiters",
+    "long Bearer credential values",
+    "signed URL query parameters"
+  ],
+  "patternMatches": 0,
+  "unclassifiedMatches": 0,
+  "originalNativeSensitiveStringFields": 0,
+  "readerProjectionSensitiveStringFields": 0,
+  "rawMixedLogsArchived": false,
+  "signedUrlsArchived": false,
+  "productionCredentialsAccessedForThisRecovery": false,
+  "privateFileContentsArchived": false
+}
