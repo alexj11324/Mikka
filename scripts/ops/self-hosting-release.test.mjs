@@ -47,3 +47,5 @@ test('production readiness uses only the shared account and logs closed capabili
 test('readiness refuses a non-smoke account before any network request',async()=>{const {readiness}=await import('./self-hosting-release.mjs');let calls=0;await assert.rejects(readiness({env:{SMOKE_OWNER_EMAIL:'alex@example.test',SMOKE_OWNER_PASSWORD:'synthetic'},fetcher:async()=>{calls++},report:{http:[]}}),/SHARED_SMOKE_ACCOUNT_REQUIRED/);assert.equal(calls,0)})
 
 // Production readiness also reads fixed project/alias metadata inside the runner.
+
+test('runtime log summaries expose only closed causes and public package names',async()=>{const {runtimeLogSummary}=await import('./self-hosting-release.mjs');const raw="Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'server-only' imported from /private/source.ts\nBearer private-secret-value";const v=runtimeLogSummary(raw);assert.deepEqual(v.missingPackages,['server-only']);assert.deepEqual(v.codes,['ERR_MODULE_NOT_FOUND','MODULE_NOT_FOUND']);assert.ok(!JSON.stringify(v).includes('private-secret'));assert.ok(!JSON.stringify(v).includes('/private/source'))})

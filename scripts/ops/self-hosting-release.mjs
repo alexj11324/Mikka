@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto'
 import { readFile, appendFile } from 'node:fs/promises'
-import { execFileSync } from 'node:child_process'
+import { execFileSync,execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
-export const TARGET = { base: '4350b2602ee00297a7580264edac36e1b9b67180', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+export const TARGET = { base: 'fbe1e81a27c3b1536e2fa1c1f84a261473531a0a', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
 const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
@@ -79,6 +80,14 @@ export async function prepare({env=process.env,fetcher=fetch,report}) {
  report.integrationMetadata=(installations.configurations??installations.installations??[]).map(x=>({id:x.id,slug:x.slug??x.integration?.slug,projectIds:x.projects,resources:(x.resources??[]).map(r=>({id:r.id,name:r.name}))}))
  const cfg=report.neonVariables[0]?.configurationId;if(cfg){const stores=await ver('/v1/storage/stores?projectId='+TARGET.publicApp+'&teamId='+TARGET.team);report.storeMetadataKeys=Object.keys(stores);report.neonResources=(stores.stores??stores.items??[]).map(r=>({id:r.id,name:r.name,type:r.type,projectIds:r.projects?.map(p=>p.projectId??p.id)}))}
 }
+export function runtimeLogSummary(text) {
+ const codes=['ERR_MODULE_NOT_FOUND','MODULE_NOT_FOUND','ERR_REQUIRE_ESM','ReferenceError','TypeError','SyntaxError','28P01','42P01','ENOTFOUND','ECONNREFUSED'];const missing=[...text.matchAll(/Cannot find (?:package|module) ['"]([^'"\n]+)['"]/g)].map(x=>x[1]).filter(x=>/^(?:@[a-z0-9_.-]+\/)?[a-z0-9_.-]+$/.test(x));return {codes:codes.filter(c=>text.includes(c)),missingPackages:[...new Set(missing)],requireUnavailable:text.includes('require is not defined'),dataKeyInvalid:text.includes('MIKKA_CLOUD_DATA_KEY must be'),cloudEditionRequired:text.includes('CLOUD_EDITION_REQUIRED'),lineCount:text.split('\n').filter(Boolean).length}
+}
+async function runtimeDiagnostics(env, id, report) {
+ demand(/^dpl_[A-Za-z0-9]+$/.test(id),'RUNTIME_LOG_DEPLOYMENT_SCOPE')
+ try {const {stdout}=await promisify(execFile)('npx',['--yes','vercel@65.4.0','logs','--project',TARGET.app,'--deployment',id,'--json','--since','30m','--limit','30','--query','level:error','--scope',TARGET.team,'--token',env.VERCEL_TEAM_TOKEN],{env:{...env,VERCEL_TELEMETRY_DISABLED:'1'},encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:60000,maxBuffer:8*1024*1024});report.runtimeLogs=runtimeLogSummary(stdout);report.runtimeLogs.status='read'}catch{report.runtimeLogs={status:'unavailable'}}
+}
+
 export async function readiness({env=process.env,fetcher=fetch,report}) {
  const email=env.SMOKE_OWNER_EMAIL,password=env.SMOKE_OWNER_PASSWORD
  demand(typeof email==='string' && /^[^@\s]+\+mikka-smoke(?:-[a-z0-9]+)*@[^@\s]+$/i.test(email) && password,'SHARED_SMOKE_ACCOUNT_REQUIRED')
@@ -87,6 +96,7 @@ export async function readiness({env=process.env,fetcher=fetch,report}) {
   const ver=async path=>{const r=await fetcher('https://api.vercel.com'+path,{headers:{authorization:'Bearer '+env.VERCEL_TEAM_TOKEN},redirect:'error',signal:AbortSignal.timeout(20000)});report.requests.push({operation:'private_deployment_metadata',status:r.status});demand(r.ok,'READINESS_VERCEL_METADATA');return r.json()}
   const p=await ver('/v9/projects/'+TARGET.app+'?teamId='+TARGET.team);demand(p.id===TARGET.app&&p.accountId===TARGET.team,'READINESS_VERCEL_TARGET');const d=p.targets?.production;report.privateDeployment={id:d?.id??null,source:d?.meta?.githubCommitSha??null,state:d?.readyState??null,url:d?.url??null,ssoDeploymentType:p.ssoProtection?.deploymentType??null,passwordProtectionEnabled:!!p.passwordProtection};
   const a=await ver('/v4/aliases/mikka-cloud.vercel.app?teamId='+TARGET.team);report.privateAlias={projectMatches:(a.projectId??a.project?.id)===TARGET.app,deploymentId:a.deploymentId??a.deployment?.id??null}
+  if(d?.id)await runtimeDiagnostics(env,d.id,report)
  }
 
  const request=async(operation,origin,path,body)=>{demand([publicOrigin,privateOrigin].includes(origin) && path.startsWith('/mikka/'),'READINESS_REQUEST_SCOPE');let r
