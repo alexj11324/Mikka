@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { withBasePath } from '@/lib/base-path'
-import { resetOnboarding } from '@/app/actions/onboarding'
+import { useReplayOnboarding } from '@/hooks/settings/use-preferences-page'
 import { useActionError } from '@/lib/use-action-error'
 import { usePresence, type PresenceProps } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
@@ -177,21 +177,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
 export function ReplayOnboarding() {
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
-  const actionError = useActionError()
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function replay() {
-    setPending(true)
-    setError(null)
-    try {
-      await resetOnboarding()
-      window.location.assign(withBasePath('/'))
-    } catch {
-      setError(actionError())
-      setPending(false)
-    }
-  }
+  const { pending, error, replay } = useReplayOnboarding()
 
   return <>
     <SettingsSection id="workspace-onboarding">
