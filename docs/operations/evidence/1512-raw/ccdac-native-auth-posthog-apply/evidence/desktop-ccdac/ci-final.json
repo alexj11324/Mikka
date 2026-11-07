@@ -1,0 +1,1196 @@
+{
+  "version": 1,
+  "kind": "desktop_workflow_metadata_projection",
+  "recordedAt": "2026-11-07T14:39:52.225Z",
+  "repository": "alexj11324/Mikka",
+  "run": {
+    "id": 42380585478,
+    "name": "Desktop shell",
+    "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+    "attempt": 1,
+    "event": "pull_request",
+    "path": ".github/workflows/desktop.yml",
+    "status": "completed",
+    "conclusion": "success",
+    "startedAt": "2026-11-07T14:13:24Z",
+    "createdAt": "2026-11-07T14:13:24Z",
+    "updatedAt": "2026-11-07T14:34:22Z"
+  },
+  "jobs": [
+    {
+      "id": 128427158720,
+      "name": "icon",
+      "head_sha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-07T14:14:07Z",
+      "completed_at": "2026-11-07T14:14:26Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-07T14:14:07Z",
+          "completed_at": "2026-11-07T14:14:08Z"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-07T14:14:08Z",
+          "completed_at": "2026-11-07T14:14:12Z"
+        },
+        {
+          "name": "Select Xcode 26 for actool",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-07T14:14:12Z",
+          "completed_at": "2026-11-07T14:14:17Z"
+        },
+        {
+          "name": "Compile build/icon.icon as electron-builder does",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-07T14:14:17Z",
+          "completed_at": "2026-11-07T14:14:20Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-07T14:14:20Z",
+          "completed_at": "2026-11-07T14:14:22Z"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-07T14:14:22Z",
+          "completed_at": "2026-11-07T14:14:23Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-07T14:14:23Z",
+          "completed_at": "2026-11-07T14:14:24Z"
+        }
+      ]
+    },
+    {
+      "id": 128427158793,
+      "name": "smoke",
+      "head_sha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-07T14:13:30Z",
+      "completed_at": "2026-11-07T14:18:31Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-07T14:13:31Z",
+          "completed_at": "2026-11-07T14:13:32Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-07T14:13:32Z",
+          "completed_at": "2026-11-07T14:13:44Z"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-07T14:13:44Z",
+          "completed_at": "2026-11-07T14:13:46Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-07T14:13:46Z",
+          "completed_at": "2026-11-07T14:13:48Z"
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-07T14:13:48Z",
+          "completed_at": "2026-11-07T14:14:06Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-07T14:14:06Z",
+          "completed_at": "2026-11-07T14:14:19Z"
+        },
+        {
+          "name": "Install Chromium system dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-07T14:14:19Z",
+          "completed_at": "2026-11-07T14:14:40Z"
+        },
+        {
+          "name": "Run sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-07T14:14:40Z",
+          "completed_at": "2026-11-07T14:14:47Z"
+        },
+        {
+          "name": "Install the pinned Electron runtime and its Linux sandbox helper",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-07T14:14:47Z",
+          "completed_at": "2026-11-07T14:14:50Z"
+        },
+        {
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-07T14:14:50Z",
+          "completed_at": "2026-11-07T14:14:50Z"
+        },
+        {
+          "name": "Apply tracked migrations to the disposable database",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-07T14:14:50Z",
+          "completed_at": "2026-11-07T14:14:51Z"
+        },
+        {
+          "name": "Prepare the isolated E2E schema",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-07T14:14:51Z",
+          "completed_at": "2026-11-07T14:14:53Z"
+        },
+        {
+          "name": "Build the production web backend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-11-07T14:14:53Z",
+          "completed_at": "2026-11-07T14:17:28Z"
+        },
+        {
+          "name": "Archive the compiled Linux backend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-11-07T14:17:28Z",
+          "completed_at": "2026-11-07T14:17:34Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-07T14:17:34Z",
+          "completed_at": "2026-11-07T14:17:36Z"
+        },
+        {
+          "name": "Build the dev Electron shell",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-11-07T14:17:36Z",
+          "completed_at": "2026-11-07T14:17:47Z"
+        },
+        {
+          "name": "Isolated Electron authentication and runtime acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-11-07T14:17:47Z",
+          "completed_at": "2026-11-07T14:18:27Z"
+        },
+        {
+          "name": "Audit runtime evidence before upload",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-11-07T14:18:27Z",
+          "completed_at": "2026-11-07T14:18:27Z"
+        },
+        {
+          "name": "Keep audited Electron evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-11-07T14:18:27Z",
+          "completed_at": "2026-11-07T14:18:28Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35,
+          "started_at": "2026-11-07T14:18:28Z",
+          "completed_at": "2026-11-07T14:18:29Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 36,
+          "started_at": "2026-11-07T14:18:29Z",
+          "completed_at": "2026-11-07T14:18:29Z"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-11-07T14:18:29Z",
+          "completed_at": "2026-11-07T14:18:29Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 38,
+          "started_at": "2026-11-07T14:18:29Z",
+          "completed_at": "2026-11-07T14:18:29Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 39,
+          "started_at": "2026-11-07T14:18:29Z",
+          "completed_at": "2026-11-07T14:18:29Z"
+        }
+      ]
+    },
+    {
+      "id": 128427158907,
+      "name": "checks",
+      "head_sha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-07T14:14:21Z",
+      "completed_at": "2026-11-07T14:16:39Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-07T14:14:22Z",
+          "completed_at": "2026-11-07T14:14:22Z"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-07T14:14:22Z",
+          "completed_at": "2026-11-07T14:14:25Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-07T14:14:25Z",
+          "completed_at": "2026-11-07T14:14:26Z"
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-07T14:14:26Z",
+          "completed_at": "2026-11-07T14:14:44Z"
+        },
+        {
+          "name": "Install dependencies without the Electron runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-07T14:14:44Z",
+          "completed_at": "2026-11-07T14:14:57Z"
+        },
+        {
+          "name": "Run pnpm --filter @mikka/desktop typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-07T14:14:57Z",
+          "completed_at": "2026-11-07T14:15:40Z"
+        },
+        {
+          "name": "Run pnpm --filter @mikka/desktop lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-07T14:15:40Z",
+          "completed_at": "2026-11-07T14:15:40Z"
+        },
+        {
+          "name": "Run pnpm --filter @mikka/desktop test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-07T14:15:40Z",
+          "completed_at": "2026-11-07T14:16:02Z"
+        },
+        {
+          "name": "Run pnpm --filter @mikka/desktop build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-07T14:16:02Z",
+          "completed_at": "2026-11-07T14:16:13Z"
+        },
+        {
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-07T14:16:13Z",
+          "completed_at": "2026-11-07T14:16:14Z"
+        },
+        {
+          "name": "Run pnpm test:platform",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-07T14:16:14Z",
+          "completed_at": "2026-11-07T14:16:17Z"
+        },
+        {
+          "name": "Run pnpm test:idle-budget",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-07T14:16:17Z",
+          "completed_at": "2026-11-07T14:16:27Z"
+        },
+        {
+          "name": "Run pnpm lint:ui",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-11-07T14:16:27Z",
+          "completed_at": "2026-11-07T14:16:37Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-11-07T14:16:37Z",
+          "completed_at": "2026-11-07T14:16:37Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-11-07T14:16:37Z",
+          "completed_at": "2026-11-07T14:16:37Z"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-11-07T14:16:37Z",
+          "completed_at": "2026-11-07T14:16:38Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-11-07T14:16:38Z",
+          "completed_at": "2026-11-07T14:16:38Z"
+        }
+      ]
+    },
+    {
+      "id": 128428338343,
+      "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "head_sha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-07T14:18:33Z",
+      "completed_at": "2026-11-07T14:34:21Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-07T14:18:34Z",
+          "completed_at": "2026-11-07T14:18:36Z"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-07T14:18:36Z",
+          "completed_at": "2026-11-07T14:18:42Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-07T14:18:42Z",
+          "completed_at": "2026-11-07T14:18:44Z"
+        },
+        {
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-07T14:18:44Z",
+          "completed_at": "2026-11-07T14:19:50Z"
+        },
+        {
+          "name": "Run test \"$(uname -m)\" = arm64",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-07T14:19:50Z",
+          "completed_at": "2026-11-07T14:19:50Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-07T14:19:50Z",
+          "completed_at": "2026-11-07T14:21:26Z"
+        },
+        {
+          "name": "Keep setup-node 24 in the native installer login shell",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-07T14:21:26Z",
+          "completed_at": "2026-11-07T14:21:27Z"
+        },
+        {
+          "name": "Run pnpm exec playwright install chromium",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-07T14:21:27Z",
+          "completed_at": "2026-11-07T14:21:41Z"
+        },
+        {
+          "name": "Start an independent local PostgreSQL",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-07T14:21:41Z",
+          "completed_at": "2026-11-07T14:22:00Z"
+        },
+        {
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-07T14:22:00Z",
+          "completed_at": "2026-11-07T14:22:00Z"
+        },
+        {
+          "name": "Run pnpm migrate && pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-07T14:22:00Z",
+          "completed_at": "2026-11-07T14:22:04Z"
+        },
+        {
+          "name": "Build the production API for the native ARM64 runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-07T14:22:04Z",
+          "completed_at": "2026-11-07T14:24:50Z"
+        },
+        {
+          "name": "Select Xcode 26",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-11-07T14:24:50Z",
+          "completed_at": "2026-11-07T14:24:50Z"
+        },
+        {
+          "name": "Package an inspector-enabled harness input",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-11-07T14:24:50Z",
+          "completed_at": "2026-11-07T14:25:42Z"
+        },
+        {
+          "name": "Real Keychain encryption across three independent packaged processes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-07T14:25:42Z",
+          "completed_at": "2026-11-07T14:25:53Z"
+        },
+        {
+          "name": "Real packaged Apple Silicon native acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-11-07T14:25:53Z",
+          "completed_at": "2026-11-07T14:34:12Z"
+        },
+        {
+          "name": "Keep final package integrity evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-11-07T14:34:12Z",
+          "completed_at": "2026-11-07T14:34:12Z"
+        },
+        {
+          "name": "Audit closed package and crypto reports",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-11-07T14:34:12Z",
+          "completed_at": "2026-11-07T14:34:13Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-11-07T14:34:13Z",
+          "completed_at": "2026-11-07T14:34:14Z"
+        },
+        {
+          "name": "Audit native evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-11-07T14:34:14Z",
+          "completed_at": "2026-11-07T14:34:15Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-11-07T14:34:15Z",
+          "completed_at": "2026-11-07T14:34:17Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 40,
+          "started_at": "2026-11-07T14:34:17Z",
+          "completed_at": "2026-11-07T14:34:18Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 41,
+          "started_at": "2026-11-07T14:34:18Z",
+          "completed_at": "2026-11-07T14:34:18Z"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 42,
+          "started_at": "2026-11-07T14:34:18Z",
+          "completed_at": "2026-11-07T14:34:18Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 43,
+          "started_at": "2026-11-07T14:34:18Z",
+          "completed_at": "2026-11-07T14:34:20Z"
+        }
+      ]
+    }
+  ],
+  "artifacts": {
+    "total": 5,
+    "artifacts": [
+      {
+        "id": 13578480230,
+        "name": "desktop-native-evidence-c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+        "sizeBytes": 14887712,
+        "digest": "sha256:f7541f682fe77b520e57257a60663620f3ca6458dab31f23cd5439298acbc873",
+        "expired": false,
+        "createdAt": "2026-11-07T14:34:17Z",
+        "runId": 42380585478,
+        "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525"
+      },
+      {
+        "id": 13577846797,
+        "name": "desktop-api-build-c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+        "sizeBytes": 47872527,
+        "digest": "sha256:5e7d6f5e7c3f2dd5afc15fd7b64b664ada2f1b41eeeeab831a1630d71483bce5",
+        "expired": false,
+        "createdAt": "2026-11-07T14:17:36Z",
+        "runId": 42380585478,
+        "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525"
+      },
+      {
+        "id": 13577079743,
+        "name": "desktop-package-evidence-c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+        "sizeBytes": 1594,
+        "digest": "sha256:e0daaaa6ae8752f04e3c58da476f50ef0d584ae6344100a736c573332ff47c17",
+        "expired": false,
+        "createdAt": "2026-11-07T14:34:14Z",
+        "runId": 42380585478,
+        "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525"
+      },
+      {
+        "id": 13576884107,
+        "name": "desktop-smoke-c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+        "sizeBytes": 100734,
+        "digest": "sha256:d8780a8750c774b4724951a63e8bff3592b817b03c95e5322462d8a256e106ed",
+        "expired": false,
+        "createdAt": "2026-11-07T14:18:28Z",
+        "runId": 42380585478,
+        "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525"
+      },
+      {
+        "id": 13576664330,
+        "name": "desktop-icon",
+        "sizeBytes": 1753539,
+        "digest": "sha256:d23482d2d45b1272c913c538d7a7213d20b3e799de702d020a4a35974af13cc7",
+        "expired": false,
+        "createdAt": "2026-11-07T14:14:23Z",
+        "runId": 42380585478,
+        "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525"
+      }
+    ]
+  },
+  "history": [
+    {
+      "observedAt": "2026-11-07T14:14:46.161Z",
+      "run": {
+        "id": 42380585478,
+        "attempt": 1,
+        "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+        "event": "pull_request",
+        "status": "in_progress",
+        "conclusion": null,
+        "createdAt": "2026-11-07T14:13:24Z"
+      },
+      "total": 3,
+      "jobs": [
+        {
+          "id": 128427158720,
+          "name": "icon",
+          "status": "completed",
+          "conclusion": "success",
+          "active": [],
+          "startedAt": "2026-11-07T14:14:07Z"
+        },
+        {
+          "id": 128427158793,
+          "name": "smoke",
+          "status": "in_progress",
+          "conclusion": null,
+          "active": [
+            {
+              "number": 7,
+              "name": "Install Chromium system dependencies"
+            }
+          ],
+          "startedAt": "2026-11-07T14:13:30Z"
+        },
+        {
+          "id": 128427158907,
+          "name": "checks",
+          "status": "in_progress",
+          "conclusion": null,
+          "active": [
+            {
+              "number": 4,
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020"
+            }
+          ],
+          "startedAt": "2026-11-07T14:14:21Z"
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-07T14:17:28.588Z",
+      "total": 3,
+      "jobs": [
+        {
+          "id": 128427158720,
+          "name": "icon",
+          "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:07Z",
+          "completedAt": "2026-11-07T14:14:26Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158793,
+          "name": "smoke",
+          "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+          "attempt": 1,
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-07T14:13:30Z",
+          "completedAt": null,
+          "active": [
+            {
+              "number": 13,
+              "name": "Build the production web backend"
+            }
+          ],
+          "failed": []
+        },
+        {
+          "id": 128427158907,
+          "name": "checks",
+          "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:21Z",
+          "completedAt": "2026-11-07T14:16:39Z",
+          "active": [],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-07T14:19:57.347Z",
+      "total": 4,
+      "jobs": [
+        {
+          "id": 128427158720,
+          "name": "icon",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:07Z",
+          "completedAt": "2026-11-07T14:14:26Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158793,
+          "name": "smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:13:30Z",
+          "completedAt": "2026-11-07T14:18:31Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158907,
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:21Z",
+          "completedAt": "2026-11-07T14:16:39Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128428338343,
+          "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-07T14:18:33Z",
+          "completedAt": null,
+          "active": [
+            {
+              "number": 6,
+              "name": "Run pnpm install --frozen-lockfile"
+            }
+          ],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-07T14:22:50.457Z",
+      "total": 4,
+      "jobs": [
+        {
+          "id": 128427158720,
+          "name": "icon",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:07Z",
+          "completedAt": "2026-11-07T14:14:26Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158793,
+          "name": "smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:13:30Z",
+          "completedAt": "2026-11-07T14:18:31Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158907,
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:21Z",
+          "completedAt": "2026-11-07T14:16:39Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128428338343,
+          "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-07T14:18:33Z",
+          "completedAt": null,
+          "active": [
+            {
+              "number": 12,
+              "name": "Build the production API for the native ARM64 runtime"
+            }
+          ],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-07T14:24:57.366Z",
+      "total": 4,
+      "jobs": [
+        {
+          "id": 128427158720,
+          "name": "icon",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:07Z",
+          "completedAt": "2026-11-07T14:14:26Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158793,
+          "name": "smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:13:30Z",
+          "completedAt": "2026-11-07T14:18:31Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158907,
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:21Z",
+          "completedAt": "2026-11-07T14:16:39Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128428338343,
+          "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-07T14:18:33Z",
+          "completedAt": null,
+          "active": [
+            {
+              "number": 14,
+              "name": "Package an inspector-enabled harness input"
+            }
+          ],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-07T14:27:25.731Z",
+      "total": 4,
+      "jobs": [
+        {
+          "id": 128427158720,
+          "name": "icon",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:07Z",
+          "completedAt": "2026-11-07T14:14:26Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158793,
+          "name": "smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:13:30Z",
+          "completedAt": "2026-11-07T14:18:31Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158907,
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:21Z",
+          "completedAt": "2026-11-07T14:16:39Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128428338343,
+          "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-07T14:18:33Z",
+          "completedAt": null,
+          "active": [
+            {
+              "number": 16,
+              "name": "Real packaged Apple Silicon native acceptance"
+            }
+          ],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-07T14:29:56.514Z",
+      "total": 4,
+      "jobs": [
+        {
+          "id": 128427158720,
+          "name": "icon",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:07Z",
+          "completedAt": "2026-11-07T14:14:26Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158793,
+          "name": "smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:13:30Z",
+          "completedAt": "2026-11-07T14:18:31Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158907,
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:21Z",
+          "completedAt": "2026-11-07T14:16:39Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128428338343,
+          "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-07T14:18:33Z",
+          "completedAt": null,
+          "active": [
+            {
+              "number": 16,
+              "name": "Real packaged Apple Silicon native acceptance"
+            }
+          ],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-07T14:32:33.576Z",
+      "total": 4,
+      "jobs": [
+        {
+          "id": 128427158720,
+          "name": "icon",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:07Z",
+          "completedAt": "2026-11-07T14:14:26Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158793,
+          "name": "smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:13:30Z",
+          "completedAt": "2026-11-07T14:18:31Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158907,
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:21Z",
+          "completedAt": "2026-11-07T14:16:39Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128428338343,
+          "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-07T14:18:33Z",
+          "completedAt": null,
+          "active": [
+            {
+              "number": 16,
+              "name": "Real packaged Apple Silicon native acceptance"
+            }
+          ],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-07T14:35:25.652Z",
+      "total": 4,
+      "jobs": [
+        {
+          "id": 128427158720,
+          "name": "icon",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:07Z",
+          "completedAt": "2026-11-07T14:14:26Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158793,
+          "name": "smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:13:30Z",
+          "completedAt": "2026-11-07T14:18:31Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128427158907,
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:14:21Z",
+          "completedAt": "2026-11-07T14:16:39Z",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 128428338343,
+          "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T14:18:33Z",
+          "completedAt": "2026-11-07T14:34:21Z",
+          "active": [],
+          "failed": []
+        }
+      ]
+    }
+  ],
+  "identity": {
+    "candidate": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+    "compiledSource": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+    "tree": "dc7b347b327fb69fd730a46a5cd9f4b1d4343c4c",
+    "parents": [
+      "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5",
+      "ccdac744d0ae0745c5f75aef08e1298077f53525"
+    ],
+    "sourceTreeEqualsCandidate": true,
+    "observedCheckoutJobs": [
+      128427158907,
+      128427158793,
+      128428338343
+    ],
+    "compiledManifestRevision": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+    "checkoutProjection": "exact git log -1 --format=%H in each named job; raw job logs not retained"
+  },
+  "pagination": {
+    "jobs": {
+      "total": 4,
+      "returned": 4,
+      "pageSize": 100,
+      "pages": 1
+    },
+    "artifacts": {
+      "total": 5,
+      "returned": 5,
+      "pageSize": 100,
+      "pages": 1
+    }
+  },
+  "scope": {
+    "workflowOnly": true,
+    "otherWorkflowsNotRepresented": true,
+    "rawLogsRetained": false,
+    "downloadUrlsRetained": false,
+    "productionAcceptance": null
+  }
+}

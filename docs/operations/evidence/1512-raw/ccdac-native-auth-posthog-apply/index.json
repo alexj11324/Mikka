@@ -1,0 +1,1190 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "pr": 1518,
+  "recordedAt": "2026-11-07T14:46:02.945840+00:00",
+  "kind": "ccdac actual Native login budget failure; single-statement auth source and PostgreSQL proof; targeted PostHog error-insight deployment",
+  "archivePreparation": {
+    "state": "frozen_for_root_review_no_remote_write",
+    "repository": "alexj11324/Mikka",
+    "branch": "evidence/1512-observability",
+    "expectedEvidenceHead": "c0d533f692c724b4157528a074e596bf5f1f9030",
+    "expectedEvidenceTree": "2772f1399995c1a856983c4022d791c42ea57f1c",
+    "additionalParent": "9ff0476d94e9730261b97ecafc6d6e632816ab9d",
+    "force": false,
+    "remoteObjectsCreated": false,
+    "approvedForPreparationOnly": true
+  },
+  "sourceBindings": {
+    "candidate": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+    "tree": "dc7b347b327fb69fd730a46a5cd9f4b1d4343c4c",
+    "actualNativeSourceAndHarness": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+    "actualParents": [
+      "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5",
+      "ccdac744d0ae0745c5f75aef08e1298077f53525"
+    ],
+    "sourceImportRun": 42380542147,
+    "ownedCiRun": 42380585447,
+    "desktopRun": 42380585478,
+    "attempt": 1,
+    "reviewedMainAtCandidate": "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5",
+    "laterDocumentationOnlyMain": "0dee82a7737d29297186b77360370832cfcc3f5d"
+  },
+  "sourceImport": {
+    "receipt": "evidence/source-integration-ccdac744.json",
+    "verificationLog": "source-ccdac744-verify.log",
+    "bundleSha256": "3b7d0433644034ed0e86c5976ace58269038bfff8a2aefd4297963bfba5ac41d",
+    "bundleOriginalBytesVerifiedButNotArchived": true
+  },
+  "authSourceRegression": {
+    "rootReceipt": "evidence/auth-root-integration-ccdac744.json",
+    "sourceReceipt": "evidence/native-exchange-single-statement-source.json",
+    "localRed": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-exchange-single-statement-red.tap",
+      "bytes": 4557,
+      "sha256": "311d6183b851b657f4b95eab5781c57ac02e53791a668c16cb2c9da56ab68ab0",
+      "exitCode": 1,
+      "tests": 7,
+      "pass": 2,
+      "fail": 5,
+      "skipped": 0,
+      "failingLeafAssertions": 4,
+      "cause": "database-calls-2-instead-of-1"
+    },
+    "localGreen": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-exchange-single-statement-green.tap",
+      "bytes": 1174,
+      "sha256": "39d474fb27a18308451ee65aeb088eaf0c3745b759ed802bfa4a43701e991dfd",
+      "exitCode": 0,
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0
+    },
+    "rootAuthTests": {
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "skip": 0
+    },
+    "relatedMainTests": {
+      "tests": 48,
+      "pass": 48,
+      "fail": 0,
+      "skip": 0
+    },
+    "rootChecks": [
+      {
+        "path": "native-exchange-root-integration.tap",
+        "bytes": 2149,
+        "sha256": "a8f019569353f0bda5395cf482c808fd3908bb11d8f28bc39e3d68a4a18f704f",
+        "exitCode": 0,
+        "exitObservedFromExecSession": true
+      },
+      {
+        "path": "main-ad224-related-tests.tap",
+        "bytes": 5202,
+        "sha256": "0eb1c2541a98eada73e25961a5b29d16497c3b5e1012f3497f90b59d428f15e0",
+        "exitCode": 0,
+        "exitObservedFromExecSession": true
+      },
+      {
+        "path": "auth-final-root-types.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exitCode": 0,
+        "exitObservedFromExecSession": true
+      },
+      {
+        "path": "auth-final-api-types.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exitCode": 0,
+        "exitObservedFromExecSession": true
+      },
+      {
+        "path": "auth-final-frontend-types.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exitCode": 0,
+        "exitObservedFromExecSession": true
+      },
+      {
+        "path": "auth-final-renderer-types.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exitCode": 0,
+        "exitObservedFromExecSession": true
+      },
+      {
+        "path": "auth-final-lint.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "exitCode": 0,
+        "exitObservedFromExecSession": true
+      }
+    ],
+    "localDatabaseDeferred": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-exchange-database-deferred.tap",
+      "bytes": 1053,
+      "sha256": "1aa2d6681b66fe60388670157ec31b8e4d1088a64be449f0a5cb813738237b75",
+      "exitCode": 0,
+      "tests": 8,
+      "pass": 0,
+      "fail": 0,
+      "skipped": 8,
+      "databaseSemanticsValidated": false
+    },
+    "sdkMechanism": "evidence/native-auth-rate-limit-proof.json",
+    "sdkReproduction": "native-auth-rate-limit-proof.mjs",
+    "boundary": "Historical source receipts retain their original uncommitted/pending/8-skipped statuses. Later exact-source CI/Native receipts provide the separately dated real PostgreSQL evidence. The rate-limit SDK mechanism is not an attribution of the remaining Native query difference."
+  },
+  "ownedCi": {
+    "receipt": "evidence/ci-ccdac-owned-final.json",
+    "run": {
+      "id": 42380585447,
+      "attempt": 1,
+      "event": "pull_request",
+      "workflow": "CI",
+      "path": ".github/workflows/ui-policy.yml",
+      "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+      "headBranch": "feat/1512-run-observability",
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T14:13:24Z",
+      "updatedAt": "2026-11-07T14:22:44Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42380585447"
+    },
+    "totals": {
+      "jobs": 12,
+      "success": 11,
+      "skipped": 1,
+      "failure": 0,
+      "cancelled": 0
+    },
+    "boundary": "This receipt covers the owned CI workflow (12 jobs: 11 success, 1 skipped), not a substitute for the independent Native query-budget target or production model acceptance."
+  },
+  "nativeActual": {
+    "status": "actual_budget_failed",
+    "sourceIndex": "evidence/desktop-ccdac/index.json",
+    "all22IndexPayloadsAndIndexPreserved": true,
+    "originalIndexPayloadBytes": 599718,
+    "login": {
+      "first": 187,
+      "second": 162,
+      "difference": 25,
+      "firstNotAboveSecond": false
+    },
+    "startupFirstPair": {
+      "first": 162,
+      "second": 186,
+      "difference": -24,
+      "firstNotAboveSecond": true
+    },
+    "attributedLogin": {
+      "native": 138,
+      "web": 138
+    },
+    "unattributedLogin": {
+      "native": 49,
+      "web": 24,
+      "difference": 25,
+      "attribution": "unknown; included in the unchanged whole-process windows"
+    },
+    "subtractPkceOrBackground": false,
+    "functional": {
+      "lifecycle": "passed",
+      "lifecycleChecks": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "unknown": 0
+      },
+      "parity": {
+        "result": "passed",
+        "total": 100,
+        "passed": 100,
+        "pageErrorCount": 0
+      },
+      "crypto": {
+        "passed": true,
+        "sameImmutablePackage": true,
+        "distinctProcesses": 3,
+        "cleanup": "passed"
+      },
+      "package": {
+        "passed": true,
+        "signatureVerifiedStrictDeep": true
+      }
+    },
+    "cleanup": {
+      "result": "unknown",
+      "stages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "fixtures",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "nativeCleaned": true,
+      "reportedResourceCounts": {
+        "desktop_auth_requests": 2,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      },
+      "workspaceName": {
+        "captured": true,
+        "restored": false,
+        "ownerMatchesSealedBaseline": true,
+        "peerMatchesSealedBaseline": true
+      },
+      "accountObservation": {
+        "observed": true,
+        "state": "released",
+        "blocked": false,
+        "ownerBeforeMatchesBaseline": false,
+        "ownerAfterMatchesBaseline": true,
+        "peerBeforeMatchesBaseline": false,
+        "peerAfterMatchesBaseline": true
+      }
+    },
+    "nativePostgresExplicitTeardown": "not separately attested by native job step metadata; job completed successfully",
+    "realPostgresRegression": {
+      "jobId": 128427158793,
+      "desktopHandoffCasesPassed": 8,
+      "desktopHandoffCasesSkipped": 0,
+      "actualBetterAuthOneTimeSessionExchangePassed": true,
+      "allTargetsPassed": true,
+      "rawLogRetained": false,
+      "projection": "postgres-smoke-projection.json"
+    },
+    "projectionAttempts": [
+      {
+        "tool": "desktop-native-summary.mjs",
+        "expectedSource": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+        "exitCode": 1,
+        "closedCode": "SOURCE_IDENTITY_MISMATCH"
+      },
+      {
+        "tool": "desktop-query-operations-summary.mjs",
+        "expectedSource": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+        "exitCode": 1,
+        "closedCode": "OPERATIONS_PROJECTION_FAILED"
+      },
+      {
+        "tool": "desktop-native-summary.mjs",
+        "expectedSource": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+        "exitCode": 0
+      },
+      {
+        "tool": "desktop-query-operations-summary.mjs",
+        "expectedSource": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+        "exitCode": 0
+      }
+    ],
+    "productionAcceptance": null,
+    "important": "Workflow success does not change Native login 187>162 into a pass. Startup first pair 162<=186 passed. Remaining unattributed SQL is not explained by physical RPC counts; no cache, auth work, polling, or measurement interval is subtracted. Correcting the projection source to actual synthetic c6ff did not rerun Native or alter source guards/reports."
+  },
+  "mainCompatibility": {
+    "receipt": "evidence/main-0dee-ccdac-compatibility.json",
+    "productAndWorkflowChanges": 0,
+    "mergeTree": "2ee8bfcc4335c6fcf51d5a2a58b8b3ee335e4dd8",
+    "normalMergeTreeExitCode": 0,
+    "rules": {
+      "mergeCommitRequired": true,
+      "unrelatedMainCiReuseRetained": true,
+      "localOnlyUiWorkDoesNotRequireProductionAcceptance": true,
+      "explicitIssue1512ProductionCriteriaRetained": true,
+      "issueSpecifiedAcmeAccountRetained": true,
+      "newAutomaticSmokeImplementationOrSuccessProvedByDocs": false
+    },
+    "boundary": "Documentation-only main compatibility review does not relax the explicit issue1512 production or Native performance requirements.",
+    "publicationLockReadonly": {
+      "receipt": "evidence/main-0dee-web-concurrency-readonly.json",
+      "classification": "shared-production-deployment-concurrency-held-by-acceptance-operator",
+      "operatorRunId": 42381382020,
+      "operatorJobId": 128429531665,
+      "providerRequestOutcome": "not-inspected",
+      "environmentApprovalPending": false,
+      "observationBoundary": "A fixed-time read-only metadata snapshot of the existing shared production deployment lock. No workflow was rerun/cancelled, no logs were read, and the active Claude step does not prove provider success or failure."
+    }
+  },
+  "posthogTargetedApply": {
+    "receipt": "evidence/posthog-error-spike-apply-ccdac744/receipt.json",
+    "projectId": 670821,
+    "insightId": 13703361,
+    "shortId": "STBizeTe",
+    "sourceCommit": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+    "baselineSqlSha256": "7abab6631e0c1cd33c0cde46a15d369533f153d20b1f7f5ef8598f7ef29c5f8d",
+    "appliedSqlSha256": "e43b0341fe51d192c1df4e8c6eb3380f311c1075d3ab745ae66673f4dc3fc472",
+    "descriptionCharacters": 383,
+    "mutationAttempts": 1,
+    "fields": [
+      "query",
+      "description"
+    ],
+    "alertMutations": 0,
+    "otherInsightMutations": 0,
+    "queryExecutions": 1,
+    "result": {
+      "value": 0,
+      "breaching_sources": 0,
+      "evaluated_sources": 18,
+      "evaluated_hour_as_returned": "2026-11-07T21:00:00+08:00",
+      "evaluated_hour_utc": "2026-11-07T13:00:00.000Z",
+      "rows": 1,
+      "interpretation": "value=0 means no evaluated service/error-code bucket breached the configured error-spike threshold for the completed hour; it does not mean zero errors, zero failed requests, or a validated production generation trace."
+    },
+    "derivedCacheResponseChangesRecorded": true,
+    "boundary": "One actual eight-day query returned no breaching service/error-code buckets for the evaluated hour, not zero errors or a successful production generation trace. Cache-derived timezone/timestamps changed and were recorded; alert configuration and subscriber identity were compared unchanged in RAM without retaining contacts."
+  },
+  "posthogCurrentConfigReadonly": {
+    "receipt": "evidence/posthog-scout-notebook-readonly-ccdac744.json",
+    "scoutIds": [
+      "01a1b247-09d7-7388-be42-a8d96310c44b",
+      "01a1b247-0a2c-7611-9061-0f7e791cfd2e"
+    ],
+    "scoutsEnabled": true,
+    "runIntervalMinutes": 1440,
+    "output": "Inbox only",
+    "manualScoutRuns": 0,
+    "configurationWrites": 0,
+    "notebookId": "C9vQAc1L",
+    "notebookKernelObserved": "stopped",
+    "notebookCellsExecuted": 0,
+    "variablesChanged": 0,
+    "boundary": "Current metadata and SQL definitions only. Interactive notebook caps and unknown upstream enumeration completeness remain; no production trace validation is claimed."
+  },
+  "privacy": {
+    "review": "privacy-review.json",
+    "nonFixtureSensitiveMatches": 0,
+    "nonemptyOperationalCredentialKeys": 0,
+    "staticTestCanariesAndNaturalLanguageMatchesExplicitlyClassified": true,
+    "originalBytesPreserved": true
+  },
+  "verification": {
+    "receiptHashClaimsVerified": 46,
+    "committedProductHashClaimsVerified": 4,
+    "additionalReferencedDocumentationHashesVerified": 5,
+    "localAllBytesSha256GitBlobVerified": true,
+    "remoteReadback": "Not performed before root approval. After any separately authorized publication, verify each original path at the immutable commit."
+  },
+  "explicitExclusions": [
+    "binary source bundle and base64 transport manifest",
+    "ZIP archives and PNGs",
+    "raw CI/application/runtime logs",
+    "signed download URLs",
+    "operational authentication email/cookie/token/ACME values",
+    "unrelated source or actor/contact metadata"
+  ],
+  "files": [
+    {
+      "sourcePath": "ops1512/evidence/source-integration-ccdac744.json",
+      "relativePath": "evidence/source-integration-ccdac744.json",
+      "groups": [
+        "ccdac-source-import"
+      ],
+      "bytes": 829,
+      "characters": 829,
+      "sha256": "3676925e44c9263268daa0f41cceec26d9209ea07de541bd9247484fd7b9b75c",
+      "gitBlobSha1": "55d7af77cebaea29348fad178c5ed34c0ddd443e",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/source-integration-ccdac744.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/000.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/source-ccdac744-verify.log",
+      "relativePath": "source-ccdac744-verify.log",
+      "groups": [
+        "ccdac-source-import"
+      ],
+      "bytes": 383,
+      "characters": 383,
+      "sha256": "064940f6056d3e8f66f5c66965ec2703c83faaa1443c6ae358075f4abd3433a8",
+      "gitBlobSha1": "e6aaa33487be0529fdadfa42b7f794fe0326f5a7",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/source-ccdac744-verify.log",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/001.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/auth-root-integration-ccdac744.json",
+      "relativePath": "evidence/auth-root-integration-ccdac744.json",
+      "groups": [
+        "auth-root-integration"
+      ],
+      "bytes": 3439,
+      "characters": 3439,
+      "sha256": "c9beddf7eac082e74cfa582a09ad6086826bc53e8e2e712a444ba850b8a02cbe",
+      "gitBlobSha1": "6a90fe511c42cd593d3bf729bead0f943bf6c8af",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/auth-root-integration-ccdac744.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/002.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-exchange-root-integration.tap",
+      "relativePath": "native-exchange-root-integration.tap",
+      "groups": [
+        "auth-root-checks"
+      ],
+      "bytes": 2149,
+      "characters": 2095,
+      "sha256": "a8f019569353f0bda5395cf482c808fd3908bb11d8f28bc39e3d68a4a18f704f",
+      "gitBlobSha1": "e5df2e2393c836056cbb56d4ab2a85f1d95da555",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/native-exchange-root-integration.tap",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/003.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/main-ad224-related-tests.tap",
+      "relativePath": "main-ad224-related-tests.tap",
+      "groups": [
+        "auth-root-checks"
+      ],
+      "bytes": 5202,
+      "characters": 5070,
+      "sha256": "0eb1c2541a98eada73e25961a5b29d16497c3b5e1012f3497f90b59d428f15e0",
+      "gitBlobSha1": "04ab3806ca8b9e95b5d3ce49f567738fcd75df1b",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/main-ad224-related-tests.tap",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/004.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/auth-final-root-types.log",
+      "relativePath": "auth-final-root-types.log",
+      "groups": [
+        "auth-root-checks"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/auth-final-root-types.log",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/005.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/auth-final-api-types.log",
+      "relativePath": "auth-final-api-types.log",
+      "groups": [
+        "auth-root-checks"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/auth-final-api-types.log",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/006.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/auth-final-frontend-types.log",
+      "relativePath": "auth-final-frontend-types.log",
+      "groups": [
+        "auth-root-checks"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/auth-final-frontend-types.log",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/007.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/auth-final-renderer-types.log",
+      "relativePath": "auth-final-renderer-types.log",
+      "groups": [
+        "auth-root-checks"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/auth-final-renderer-types.log",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/008.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/auth-final-lint.log",
+      "relativePath": "auth-final-lint.log",
+      "groups": [
+        "auth-root-checks"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/auth-final-lint.log",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/009.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/native-exchange-single-statement-source.json",
+      "relativePath": "evidence/native-exchange-single-statement-source.json",
+      "groups": [
+        "exchange-source-regression"
+      ],
+      "bytes": 6462,
+      "characters": 6462,
+      "sha256": "d1b1de09163f3156559fe2a1ed141e3e7fddcb2462cded4e6f4ff71b4c739f14",
+      "gitBlobSha1": "69746927e5006ff2811be8cbfa7622f2ef9bea5b",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/native-exchange-single-statement-source.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/010.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-exchange-single-statement-red.tap",
+      "relativePath": "native-exchange-single-statement-red.tap",
+      "groups": [
+        "exchange-source-regression"
+      ],
+      "bytes": 4557,
+      "characters": 4515,
+      "sha256": "311d6183b851b657f4b95eab5781c57ac02e53791a668c16cb2c9da56ab68ab0",
+      "gitBlobSha1": "1a0bc5cdcbf64e4d56c1f99e424d4de31f4385d2",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/native-exchange-single-statement-red.tap",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/011.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-exchange-single-statement-green.tap",
+      "relativePath": "native-exchange-single-statement-green.tap",
+      "groups": [
+        "exchange-source-regression"
+      ],
+      "bytes": 1174,
+      "characters": 1142,
+      "sha256": "39d474fb27a18308451ee65aeb088eaf0c3745b759ed802bfa4a43701e991dfd",
+      "gitBlobSha1": "1f1b6b0d0081a19cb4b484d0c190b7b8d83dad9b",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/native-exchange-single-statement-green.tap",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/012.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-exchange-source-regressions.tap",
+      "relativePath": "native-exchange-source-regressions.tap",
+      "groups": [
+        "exchange-source-regression"
+      ],
+      "bytes": 2152,
+      "characters": 2098,
+      "sha256": "403f7e9e18bbacef2b349197e9b49e3403fd3805561a4bdd9bbc59bfa3d15624",
+      "gitBlobSha1": "44e5cf42f7649f0d35babc78a4ee88d3e8aa10ff",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/native-exchange-source-regressions.tap",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/013.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-exchange-database-deferred.tap",
+      "relativePath": "native-exchange-database-deferred.tap",
+      "groups": [
+        "exchange-source-regression"
+      ],
+      "bytes": 1053,
+      "characters": 1021,
+      "sha256": "1aa2d6681b66fe60388670157ec31b8e4d1088a64be449f0a5cb813738237b75",
+      "gitBlobSha1": "f61164a4d391589b1e45b01466d67f6b5b620c58",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/native-exchange-database-deferred.tap",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/014.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-exchange-single-statement-lint.log",
+      "relativePath": "native-exchange-single-statement-lint.log",
+      "groups": [
+        "exchange-source-regression"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/native-exchange-single-statement-lint.log",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/015.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-exchange-single-statement-diff.log",
+      "relativePath": "native-exchange-single-statement-diff.log",
+      "groups": [
+        "exchange-source-regression"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/native-exchange-single-statement-diff.log",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/016.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/native-auth-rate-limit-proof.json",
+      "relativePath": "evidence/native-auth-rate-limit-proof.json",
+      "groups": [
+        "sdk-source-mechanism"
+      ],
+      "bytes": 542,
+      "characters": 542,
+      "sha256": "39cf89a89163d95e328acad0a6cd97f259a8683de333791f803b01ae00503617",
+      "gitBlobSha1": "f687ea81e9b2e2b68c66dd6562bf7bf0a510afc4",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/native-auth-rate-limit-proof.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/017.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-auth-rate-limit-proof.mjs",
+      "relativePath": "native-auth-rate-limit-proof.mjs",
+      "groups": [
+        "sdk-source-mechanism"
+      ],
+      "bytes": 2291,
+      "characters": 2291,
+      "sha256": "63b36b3d45230f8f2c6e1d3bf680d11cec4ed3a61caa4a303b109a055cc6e0fb",
+      "gitBlobSha1": "d6c7821321e8a8aaf8f1a900b3443653776373ba",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/native-auth-rate-limit-proof.mjs",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/018.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:ccdac744d0ae0745c5f75aef08e1298077f53525:app/api/desktop/exchange/route.ts",
+      "relativePath": "source-ccdac744/app/api/desktop/exchange/route.ts",
+      "groups": [
+        "fixed-ccdac-product-source"
+      ],
+      "bytes": 3790,
+      "characters": 3790,
+      "sha256": "3b6dbcfea54cf6c97ee7350525a33c5fd45293ff70c80859b0a79cbcd375db06",
+      "gitBlobSha1": "c38192f7e111ac11cb064ef71c8c9fce4e444c5c",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/source-ccdac744/app/api/desktop/exchange/route.ts",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/019.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:ccdac744d0ae0745c5f75aef08e1298077f53525:tests/desktop-auth-exchange.test.ts",
+      "relativePath": "source-ccdac744/tests/desktop-auth-exchange.test.ts",
+      "groups": [
+        "fixed-ccdac-product-source"
+      ],
+      "bytes": 5471,
+      "characters": 5471,
+      "sha256": "9e9727c5bf2548dc1355c740066af7a1f02eaca997b47602efd3288c0a359801",
+      "gitBlobSha1": "5886e218769c8dd9503889ecc0b89a0533f5eb66",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/source-ccdac744/tests/desktop-auth-exchange.test.ts",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/020.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:ccdac744d0ae0745c5f75aef08e1298077f53525:tests/desktop-auth-handoff.db.test.ts",
+      "relativePath": "source-ccdac744/tests/desktop-auth-handoff.db.test.ts",
+      "groups": [
+        "fixed-ccdac-product-source"
+      ],
+      "bytes": 11683,
+      "characters": 11683,
+      "sha256": "94b5d4e8c771de3c150b693b88414496aa806de8791f41b9fafebab64534f33f",
+      "gitBlobSha1": "55663c10e1d107d1a38a0bc023d9cbefd3b60a5a",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/source-ccdac744/tests/desktop-auth-handoff.db.test.ts",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/021.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:ccdac744d0ae0745c5f75aef08e1298077f53525:package.json",
+      "relativePath": "source-ccdac744/package.json",
+      "groups": [
+        "fixed-ccdac-product-source"
+      ],
+      "bytes": 74060,
+      "characters": 74060,
+      "sha256": "4a25722af9dbd15da5fe66ebceda0c4f82fcd021ea36c9ceac00d03e95d99434",
+      "gitBlobSha1": "207250a34325bed4b9c9fd9436669a572d7c2a25",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/source-ccdac744/package.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/022.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/ci-ccdac-owned-final.json",
+      "relativePath": "evidence/ci-ccdac-owned-final.json",
+      "groups": [
+        "ccdac-owned-ci"
+      ],
+      "bytes": 66644,
+      "characters": 66644,
+      "sha256": "fa06a4d303940ab257cd44b889f116e012b25e67542032ae80617fe09c69924f",
+      "gitBlobSha1": "963364ff8e78a345c0d3d309f132c3af2b669c85",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/ci-ccdac-owned-final.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/023.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/main-0dee-ccdac-compatibility.json",
+      "relativePath": "evidence/main-0dee-ccdac-compatibility.json",
+      "groups": [
+        "main-compatibility"
+      ],
+      "bytes": 2287,
+      "characters": 2287,
+      "sha256": "b660ff7a186f5c4077ad84e220d9c61c0acfe49169ba2232382092436d78b27a",
+      "gitBlobSha1": "0f16be8af6ae39cccab565ac28340ad08ac23ae0",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/main-0dee-ccdac-compatibility.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/024.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/posthog-error-spike-apply-ccdac744/receipt.json",
+      "relativePath": "evidence/posthog-error-spike-apply-ccdac744/receipt.json",
+      "groups": [
+        "posthog-targeted-apply"
+      ],
+      "bytes": 2895,
+      "characters": 2895,
+      "sha256": "ac29e9daadd296068dedb9dd9443c7d178fd52a28177b40ebbf446ebd1dcf3e5",
+      "gitBlobSha1": "f33756152e1b32fa501a795ae4202843c29d868b",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/posthog-error-spike-apply-ccdac744/receipt.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/025.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/posthog-error-spike-apply-ccdac744/before.json",
+      "relativePath": "evidence/posthog-error-spike-apply-ccdac744/before.json",
+      "groups": [
+        "posthog-targeted-apply"
+      ],
+      "bytes": 11589,
+      "characters": 11556,
+      "sha256": "41a2df054a52f72425c4de1a3aa0df2e1f715f5bb597aa4827817e420c656707",
+      "gitBlobSha1": "620cd67dc208cd6afc7380e5f81c133bcf097dce",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/posthog-error-spike-apply-ccdac744/before.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/026.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/posthog-error-spike-apply-ccdac744/patch.json",
+      "relativePath": "evidence/posthog-error-spike-apply-ccdac744/patch.json",
+      "groups": [
+        "posthog-targeted-apply"
+      ],
+      "bytes": 13350,
+      "characters": 13343,
+      "sha256": "e4fe6a7227acefef1f947ca6ae5874a25b6e4a23c4e2fb0b4e7fa7bb6a514235",
+      "gitBlobSha1": "30e80e8ffb249930782f4be4f0dcd8781c559f53",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/posthog-error-spike-apply-ccdac744/patch.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/027.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/posthog-error-spike-apply-ccdac744/after.json",
+      "relativePath": "evidence/posthog-error-spike-apply-ccdac744/after.json",
+      "groups": [
+        "posthog-targeted-apply"
+      ],
+      "bytes": 16910,
+      "characters": 16875,
+      "sha256": "ce1933b55c6e5486b3dcae6d67e076f3086563a49b885e8aa5e006e29d49343f",
+      "gitBlobSha1": "cbd3ca8a269ab86d9affb5d8aa0b4a5882976350",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/posthog-error-spike-apply-ccdac744/after.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/028.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/posthog-error-spike-apply-ccdac744/query-validation.json",
+      "relativePath": "evidence/posthog-error-spike-apply-ccdac744/query-validation.json",
+      "groups": [
+        "posthog-targeted-apply"
+      ],
+      "bytes": 15955,
+      "characters": 15955,
+      "sha256": "6ff699dff7840a48cc3bf2ea3780654e806ee2f68de5b3d6c11d1c097d878f11",
+      "gitBlobSha1": "0911f54029584b82c8d161798fb115490f8040ad",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/posthog-error-spike-apply-ccdac744/query-validation.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/029.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/posthog-scout-notebook-readonly-ccdac744.json",
+      "relativePath": "evidence/posthog-scout-notebook-readonly-ccdac744.json",
+      "groups": [
+        "posthog-config-readonly"
+      ],
+      "bytes": 5737,
+      "characters": 5737,
+      "sha256": "dcaabbda4eb4f6e45195b3b7269756ef5104b8bdc5250505c4b7bdeddea1172a",
+      "gitBlobSha1": "a3ced71453e14e9ec4de350b1ffb9144d65faa5b",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/posthog-scout-notebook-readonly-ccdac744.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/030.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/lifecycle.json",
+      "relativePath": "evidence/desktop-ccdac/lifecycle.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 181438,
+      "characters": 181438,
+      "sha256": "14d915a077b835a56f901a6b979ca6fc38621c2f530a256a0ea6555038606d2e",
+      "gitBlobSha1": "fa0f51dda0d76d565e8356ae9e63877afa7d3cd8",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/lifecycle.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/031.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/parity/parity.json",
+      "relativePath": "evidence/desktop-ccdac/parity/parity.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 106971,
+      "characters": 106963,
+      "sha256": "ed8376482f10ff813c13dafd8540d0fc90a0b8bdbe2c02950d5892356a2f19a3",
+      "gitBlobSha1": "e5090bfdf67f2bc18f24a296bcd7625232b2b9aa",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/parity/parity.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/032.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/smoke.json",
+      "relativePath": "evidence/desktop-ccdac/smoke.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 3125,
+      "characters": 3125,
+      "sha256": "a69117dba801b19f6d6cbd19096eb4a86366d3b9693496bf0348cd75766fe662",
+      "gitBlobSha1": "c46d1f2d1948377e01b51f2f449ed74ca52bb3a7",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/smoke.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/033.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/native-crypto.json",
+      "relativePath": "evidence/desktop-ccdac/native-crypto.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 2868,
+      "characters": 2868,
+      "sha256": "98ede83949d825d73d043c5335b9ab29eef9026c96849e8a59c9389cffd85669",
+      "gitBlobSha1": "ccfe8660d613b974202d5cf1de066671ad5a0923",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/native-crypto.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/034.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/mac-acceptance-package.json",
+      "relativePath": "evidence/desktop-ccdac/mac-acceptance-package.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 957,
+      "characters": 957,
+      "sha256": "10b7f2509deaaf91bf742f54859a56436a650e50fe1caeb2cea2eebd6609477e",
+      "gitBlobSha1": "3915d933c785980a022a9a4416e5b46442a67883",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/mac-acceptance-package.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/035.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/compiled/mikka-build.json",
+      "relativePath": "evidence/desktop-ccdac/compiled/mikka-build.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 8259,
+      "characters": 8259,
+      "sha256": "a47f1d5e83ffffa3769868e8124c4acf96a9d1be8cb302af11341492e5284405",
+      "gitBlobSha1": "5aab32d8106acc8c3ed003ac75e4f900bc68c479",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/compiled/mikka-build.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/036.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/summary.json",
+      "relativePath": "evidence/desktop-ccdac/summary.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 120758,
+      "characters": 120758,
+      "sha256": "d9bd72a60ecc473e7e51133390ebf8d7895c2040a36738295ad232f4b3170710",
+      "gitBlobSha1": "e30b63593574ba85140cebf190e50571aab92f53",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/summary.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/037.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/query-operations.json",
+      "relativePath": "evidence/desktop-ccdac/query-operations.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 14794,
+      "characters": 14794,
+      "sha256": "980ab86eabcf662edf1f962c647b72cb93b90449be6c65da4b092af5197275be",
+      "gitBlobSha1": "dcae08f0faffae7a80abc2524ba433b919f67261",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/query-operations.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/038.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/query-operations.md",
+      "relativePath": "evidence/desktop-ccdac/query-operations.md",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 1519,
+      "characters": 1519,
+      "sha256": "af3b74a294ce0672de806591c6967748416a35abd10180a2e0ee0b81ed550fe5",
+      "gitBlobSha1": "a976609b16a77a5ca8ccccc606cddfac6c97f3ab",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/query-operations.md",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/039.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/findings.json",
+      "relativePath": "evidence/desktop-ccdac/findings.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 78778,
+      "characters": 78778,
+      "sha256": "a65dccda093330aa0adc1301c39eaec43a731a1ea9dc98bf3babbf058d05a8ca",
+      "gitBlobSha1": "6935b3ee5d529b07dba98a6a90c5de1f5bd95e86",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/findings.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/040.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/ci-final.json",
+      "relativePath": "evidence/desktop-ccdac/ci-final.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 37616,
+      "characters": 37616,
+      "sha256": "226e453b18cde575383c23f76199ec270a5eb4b54625fa6c5e5f0fd780a4b319",
+      "gitBlobSha1": "9e0fffeb7cac754d512efd252b2cb89db00e5fed",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/ci-final.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/041.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/source-harness.json",
+      "relativePath": "evidence/desktop-ccdac/source-harness.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 3031,
+      "characters": 3031,
+      "sha256": "5597381c53e6d81363a7902bb4e2dd4d7cde508100a4e36cd5d2d8f486b03703",
+      "gitBlobSha1": "ed7325f22f857a5297dfeec42418e957326c6ab1",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/source-harness.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/042.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/download-receipt.json",
+      "relativePath": "evidence/desktop-ccdac/download-receipt.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 1444,
+      "characters": 1444,
+      "sha256": "165c8abb4ba292c7294cb0e5044edd89a8b71caf1e251285c03616b9bd620971",
+      "gitBlobSha1": "c033fe6897231dcb61a6aa6ea7810ffc26ac90b2",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/download-receipt.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/043.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/privacy-scan.json",
+      "relativePath": "evidence/desktop-ccdac/privacy-scan.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 1931,
+      "characters": 1931,
+      "sha256": "f7390d7e2f87ec6378385c68bb351bd1ebf2522d9541e6f8b133b246d48b55e4",
+      "gitBlobSha1": "50892277cd00dd26543274710182baf378b74f8a",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/privacy-scan.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/044.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/compiled-download-receipt.json",
+      "relativePath": "evidence/desktop-ccdac/compiled-download-receipt.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 884,
+      "characters": 884,
+      "sha256": "781f07e567a8b19fc884da09c39d68994708c0d700ee24365dc8ba9593833a6b",
+      "gitBlobSha1": "3b6967ac8fe1e30430ebde6ea2d35aa15760a8e7",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/compiled-download-receipt.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/045.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/compiled-privacy-scan.json",
+      "relativePath": "evidence/desktop-ccdac/compiled-privacy-scan.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 538,
+      "characters": 538,
+      "sha256": "f98d0e39b036a34cacd62227a58c20c44c4264267d8750e206b44c05b55fba5a",
+      "gitBlobSha1": "f8ffa6f378f1ec1eba23c56f5ec88d35312ce847",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/compiled-privacy-scan.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/046.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/postgres-smoke-projection.json",
+      "relativePath": "evidence/desktop-ccdac/postgres-smoke-projection.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 1990,
+      "characters": 1990,
+      "sha256": "8fa90ef77618a1d941b0090fa4309c00dc4c406438f0e39ab56c8b79530a0799",
+      "gitBlobSha1": "a9d834a8bb2c97c112fd9e847d3bcae7d1dc1d99",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/postgres-smoke-projection.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/047.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-native-summary.mjs",
+      "relativePath": "desktop-native-summary.mjs",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 19258,
+      "characters": 19258,
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b",
+      "gitBlobSha1": "dad196c96077ab1504fd8858343d31b00cf0da3a",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/desktop-native-summary.mjs",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/048.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-query-operations-summary.mjs",
+      "relativePath": "desktop-query-operations-summary.mjs",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 7134,
+      "characters": 7134,
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2",
+      "gitBlobSha1": "17a54954b618fc3373715dbc73fa86669c2aa739",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/desktop-query-operations-summary.mjs",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/049.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-query-operations-summary.test.mjs",
+      "relativePath": "desktop-query-operations-summary.test.mjs",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 4248,
+      "characters": 4248,
+      "sha256": "b608c3aba813049bda7d6fa393214696d5bc602742a831236cf32c868bde80e0",
+      "gitBlobSha1": "8d7eed08f88bcca58788680aeef9e7459efce79d",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/desktop-query-operations-summary.test.mjs",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/050.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-query-operations-summary-tests-final.tap",
+      "relativePath": "desktop-query-operations-summary-tests-final.tap",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 623,
+      "characters": 597,
+      "sha256": "c9b38ed9c57d0bbb7ed47698d3f134549f5040c1059ad9eb3df6c68c09d64a67",
+      "gitBlobSha1": "30963be71dbdc2dec9f831c030ad274a2f792e9f",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/desktop-query-operations-summary-tests-final.tap",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/051.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-query-operations-summary-validation.json",
+      "relativePath": "desktop-query-operations-summary-validation.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 1554,
+      "characters": 1554,
+      "sha256": "76bb571804455aa98b2356f93cc668dea62bc4568c6e73112abd9aed9b86b797",
+      "gitBlobSha1": "4b79bc615a9baaf76627a83456bc1076175588ae",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/desktop-query-operations-summary-validation.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/052.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ccdac/index.json",
+      "relativePath": "evidence/desktop-ccdac/index.json",
+      "groups": [
+        "desktop-ccdac-actual"
+      ],
+      "bytes": 7584,
+      "characters": 7584,
+      "sha256": "697353076b526b3f6b863be477bf88bb0cfc821685338f583c6027d7c8b98999",
+      "gitBlobSha1": "bbf261bb72e560977f94900d77c8d6200cc86fa3",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/desktop-ccdac/index.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/053.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/main-0dee-web-concurrency-readonly.json",
+      "relativePath": "evidence/main-0dee-web-concurrency-readonly.json",
+      "groups": [
+        "main-publication-lock-readonly"
+      ],
+      "bytes": 6472,
+      "characters": 6472,
+      "sha256": "ce20e04dbf139128fed9bc0c974dabab832f7373a38f4457f4cacb2dcb4e320f",
+      "gitBlobSha1": "aff132af8597ea3010ad0328792755daf31c82d6",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/evidence/main-0dee-web-concurrency-readonly.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/054.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/archive-ccdac-native-auth-posthog-apply/privacy-review.json",
+      "relativePath": "privacy-review.json",
+      "groups": [
+        "archive-privacy"
+      ],
+      "bytes": 4264,
+      "characters": 4264,
+      "sha256": "e6fc210f2045d07414365b65bc9722068fa99e6218bc57acf443e90261bb26aa",
+      "gitBlobSha1": "7c73df9938a0d9cd98478cebc465ef92b2358bd0",
+      "archivePath": "docs/operations/evidence/1512-raw/ccdac-native-auth-posthog-apply/privacy-review.json",
+      "payloadPath": "evidence/archive-ccdac-native-auth-posthog-apply/payloads/055.payload",
+      "originalBytesPreserved": true
+    }
+  ]
+}

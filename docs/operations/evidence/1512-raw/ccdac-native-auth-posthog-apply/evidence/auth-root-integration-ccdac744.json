@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T14:13:08.669848+00:00",
+  "issue": 1512,
+  "pr": 1518,
+  "candidate": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "tree": "dc7b347b327fb69fd730a46a5cd9f4b1d4343c4c",
+  "parents": [
+    "3ebcc2a3c5f66fae41244f40c726c19695246a4b"
+  ],
+  "reviewedMain": "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5",
+  "sourceFiles": [
+    {
+      "path": "app/api/desktop/exchange/route.ts",
+      "bytes": 3790,
+      "sha256": "3b6dbcfea54cf6c97ee7350525a33c5fd45293ff70c80859b0a79cbcd375db06",
+      "gitBlobSha1": "c38192f7e111ac11cb064ef71c8c9fce4e444c5c"
+    },
+    {
+      "path": "tests/desktop-auth-exchange.test.ts",
+      "bytes": 5471,
+      "sha256": "9e9727c5bf2548dc1355c740066af7a1f02eaca997b47602efd3288c0a359801",
+      "gitBlobSha1": "5886e218769c8dd9503889ecc0b89a0533f5eb66"
+    },
+    {
+      "path": "tests/desktop-auth-handoff.db.test.ts",
+      "bytes": 11683,
+      "sha256": "94b5d4e8c771de3c150b693b88414496aa806de8791f41b9fafebab64534f33f",
+      "gitBlobSha1": "55663c10e1d107d1a38a0bc023d9cbefd3b60a5a"
+    },
+    {
+      "path": "package.json",
+      "bytes": 74060,
+      "sha256": "4a25722af9dbd15da5fe66ebceda0c4f82fcd021ea36c9ceac00d03e95d99434",
+      "gitBlobSha1": "207250a34325bed4b9c9fd9436669a572d7c2a25"
+    }
+  ],
+  "checks": [
+    {
+      "path": "native-exchange-root-integration.tap",
+      "bytes": 2149,
+      "sha256": "a8f019569353f0bda5395cf482c808fd3908bb11d8f28bc39e3d68a4a18f704f",
+      "exitCode": 0,
+      "exitObservedFromExecSession": true
+    },
+    {
+      "path": "main-ad224-related-tests.tap",
+      "bytes": 5202,
+      "sha256": "0eb1c2541a98eada73e25961a5b29d16497c3b5e1012f3497f90b59d428f15e0",
+      "exitCode": 0,
+      "exitObservedFromExecSession": true
+    },
+    {
+      "path": "auth-final-root-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "exitObservedFromExecSession": true
+    },
+    {
+      "path": "auth-final-api-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "exitObservedFromExecSession": true
+    },
+    {
+      "path": "auth-final-frontend-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "exitObservedFromExecSession": true
+    },
+    {
+      "path": "auth-final-renderer-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "exitObservedFromExecSession": true
+    },
+    {
+      "path": "auth-final-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "exitObservedFromExecSession": true
+    }
+  ],
+  "authTests": {
+    "tests": 18,
+    "pass": 18,
+    "fail": 0,
+    "skip": 0
+  },
+  "relatedMainTests": {
+    "tests": 48,
+    "pass": 48,
+    "fail": 0,
+    "skip": 0
+  },
+  "realPostgres": "pending_exact_candidate_CI",
+  "realNativeBudget": "pending_exact_candidate_CI",
+  "priorActualNativeBudget": {
+    "loginNative": 198,
+    "loginWeb": 183,
+    "startupBundled": 159,
+    "startupHosted": 158,
+    "status": "failed"
+  },
+  "sourceOnlyScope": "Type checks, lint and local source regressions do not stand in for real PostgreSQL or Native acceptance."
+}

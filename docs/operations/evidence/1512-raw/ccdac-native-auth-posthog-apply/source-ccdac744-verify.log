@@ -1,0 +1,8 @@
+The bundle contains this ref:
+ccdac744d0ae0745c5f75aef08e1298077f53525 refs/heads/feat/1512-run-observability
+The bundle requires these 3 refs:
+ad8d257129989be43a3cb92e48ccd1197a6d096c 
+ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5 
+b56eedd06f65445114ef6e6c6b42d10bcdc09c70 
+The bundle uses this hash algorithm: sha1
+/workspace/scratch/812e3b7d6d45/ops1512/source-ccdac744.bundle is okay

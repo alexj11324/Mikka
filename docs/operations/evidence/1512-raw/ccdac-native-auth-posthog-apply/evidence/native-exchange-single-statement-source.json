@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "recordedAt": "2026-11-07T14:05:32.945Z",
+  "source": {
+    "base": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+    "worktree": "/workspace/scratch/812e3b7d6d45/Mikka-login1512",
+    "committed": false
+  },
+  "status": "source-regression-passed-postgresql-and-native-acceptance-pending",
+  "productChange": {
+    "route": "/api/desktop/exchange",
+    "pendingRequestStatements": {
+      "before": 2,
+      "after": 1
+    },
+    "implementation": "one SELECT FOR UPDATE CTE supplies the old token to one UPDATE that sets usedAt and clears token atomically",
+    "sdkOttVerificationPreserved": true,
+    "wrongCodeAndVerifierStillConsume": true,
+    "noAuthenticationProtocolOrCachePolicyChange": true,
+    "newNativeLoginQueryCount": null,
+    "previousActualLogin": {
+      "native": 198,
+      "web": 183,
+      "passing": false
+    },
+    "expectedReductionScope": "one pending-request database statement per bound exchange, conditional on real PostgreSQL execution"
+  },
+  "validation": [
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-exchange-single-statement-red.tap",
+      "bytes": 4557,
+      "sha256": "311d6183b851b657f4b95eab5781c57ac02e53791a668c16cb2c9da56ab68ab0",
+      "exitCode": 1,
+      "tests": 7,
+      "pass": 2,
+      "fail": 5,
+      "skipped": 0,
+      "failingLeafAssertions": 4,
+      "cause": "database-calls-2-instead-of-1"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-exchange-single-statement-green.tap",
+      "bytes": 1174,
+      "sha256": "39d474fb27a18308451ee65aeb088eaf0c3745b759ed802bfa4a43701e991dfd",
+      "exitCode": 0,
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-exchange-source-regressions.tap",
+      "bytes": 2152,
+      "sha256": "403f7e9e18bbacef2b349197e9b49e3403fd3805561a4bdd9bbc59bfa3d15624",
+      "exitCode": 0,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-exchange-database-deferred.tap",
+      "bytes": 1053,
+      "sha256": "1aa2d6681b66fe60388670157ec31b8e4d1088a64be449f0a5cb813738237b75",
+      "exitCode": 0,
+      "tests": 8,
+      "pass": 0,
+      "fail": 0,
+      "skipped": 8,
+      "databaseSemanticsValidated": false
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-exchange-single-statement-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-exchange-single-statement-diff.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    }
+  ],
+  "realDatabaseGate": {
+    "availableLocally": false,
+    "executedLocally": false,
+    "testFile": "tests/desktop-auth-handoff.db.test.ts",
+    "checks": [
+      "two-distinct-pg-connections-with-held-winner-lock",
+      "replay",
+      "wrong-verifier-burn-and-token-cleared",
+      "unbound",
+      "expired",
+      "already-used",
+      "null-token"
+    ],
+    "statementTimeoutMs": 10000,
+    "testTimeoutMs": 20000,
+    "cleanup": "rollback owned connections, await exchanges, release clients, delete only owned state hashes and users"
+  },
+  "auth3Analysis": {
+    "status": "supported-source-mechanism-not-exact-runtime-attribution",
+    "browserEntry": "apps/frontend/src/web/platform.tsx:onSessionChanged -> session-owner.ts:watchSessionOwner -> BetterAuth session atom mount -> GET /api/auth/get-session",
+    "rateLimit": "database storage enabled; expired-window reset performs findMany, incrementOne, deleteMany even with a valid session cache",
+    "noDisableOrRemoval": true,
+    "proof": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/native-auth-rate-limit-proof.json",
+      "bytes": 542,
+      "sha256": "39cf89a89163d95e328acad0a6cd97f259a8683de333791f803b01ae00503617"
+    },
+    "reproduction": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/native-auth-rate-limit-proof.mjs",
+      "bytes": 2291,
+      "sha256": "63b36b3d45230f8f2c6e1d3bf680d11cec4ed3a61caa4a303b109a055cc6e0fb"
+    },
+    "limits": "The ad8 lifecycle report aggregates /api/auth/[...all]; it contains no auth subpath or per-query contents, so the three observed SQL calls are not conclusively attributed."
+  },
+  "postgresBasis": {
+    "url": "https://www.postgresql.org/docs/17/transaction-iso.html#XACT-READ-COMMITTED",
+    "description": "After a conflicting update commits, SELECT FOR UPDATE re-evaluates its WHERE condition against the new row version."
+  },
+  "sources": [
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-login1512/app/api/desktop/exchange/route.ts",
+      "bytes": 3790,
+      "sha256": "3b6dbcfea54cf6c97ee7350525a33c5fd45293ff70c80859b0a79cbcd375db06",
+      "repositoryPath": "app/api/desktop/exchange/route.ts"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-exchange.test.ts",
+      "bytes": 5471,
+      "sha256": "9e9727c5bf2548dc1355c740066af7a1f02eaca997b47602efd3288c0a359801",
+      "repositoryPath": "tests/desktop-auth-exchange.test.ts"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-handoff.db.test.ts",
+      "bytes": 11683,
+      "sha256": "94b5d4e8c771de3c150b693b88414496aa806de8791f41b9fafebab64534f33f",
+      "repositoryPath": "tests/desktop-auth-handoff.db.test.ts"
+    }
+  ],
+  "requiredPackageIntegration": {
+    "script": "test:desktop-auth",
+    "addFile": "tests/desktop-auth-exchange.test.ts",
+    "placement": "third command, after tests/desktop-factory-flow.test.ts; retains --experimental-test-module-mocks and tests/support/server-only.mjs"
+  },
+  "boundaries": {
+    "sharedWorktreeEdited": false,
+    "rendererBatchEdited": false,
+    "packageJsonEdited": false,
+    "thresholdsOrWindowsChanged": false,
+    "databaseConnections": 0,
+    "networkRequests": 0,
+    "providers": 0,
+    "virtualMachines": 0,
+    "realBrowserRuns": 0,
+    "staged": false,
+    "committed": false,
+    "pushed": false
+  },
+  "privacy": {
+    "credentials": "only explicit synthetic unusable values in the source-only test and proof; no real values",
+    "sdkError": "only a fixed synthetic error in the local mock",
+    "rawRuntimeLogsIncluded": false
+  }
+}

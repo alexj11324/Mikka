@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T14:17:53.982611+00:00",
+  "head": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "tree": "dc7b347b327fb69fd730a46a5cd9f4b1d4343c4c",
+  "parents": [
+    "3ebcc2a3c5f66fae41244f40c726c19695246a4b"
+  ],
+  "previousHead": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+  "reviewedMain": "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5",
+  "bundleSha256": "3b7d0433644034ed0e86c5976ace58269038bfff8a2aefd4297963bfba5ac41d",
+  "transportHead": "9ff0476d94e9730261b97ecafc6d6e632816ab9d",
+  "transportRun": 42380542147,
+  "transportConclusion": "success",
+  "sourceObjectRefVerified": true,
+  "exactCommitTreeParentsVerified": true,
+  "featureRefPublished": true,
+  "force": false,
+  "ciRun": 42380585447,
+  "desktopRun": 42380585478,
+  "nativeBudget": "pending",
+  "realPostgres": "pending"
+}

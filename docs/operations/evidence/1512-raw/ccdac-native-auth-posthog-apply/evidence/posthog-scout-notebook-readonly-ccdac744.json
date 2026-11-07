@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "status": "readonly_current_configuration_verified",
+  "project_id": 670821,
+  "observed_at_utc": "2026-11-07T14:34:39.500Z",
+  "scouts": [
+    {
+      "id": "01a1b247-09d7-7388-be42-a8d96310c44b",
+      "enabled": true,
+      "status": "active",
+      "emit": true,
+      "run_interval_minutes": 1440,
+      "run_cron_schedule": null,
+      "output_destinations": {
+        "inbox": true,
+        "slack_configured": false,
+        "webhook_configured": false
+      },
+      "precheck_disabled": false,
+      "precheck_query_source": "skill_default",
+      "precheck_source": {
+        "present": false,
+        "sha256": null,
+        "bytes": 0
+      },
+      "effective_precheck_source": {
+        "present": true,
+        "sha256": "479ed4c0dfc2d81300ab754b2c56251e03bb0c25d817ee60e63ed9e93b3ab6b1",
+        "bytes": 235,
+        "serialization": "original_utf8"
+      }
+    },
+    {
+      "id": "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+      "enabled": true,
+      "status": "active",
+      "emit": true,
+      "run_interval_minutes": 1440,
+      "run_cron_schedule": null,
+      "output_destinations": {
+        "inbox": true,
+        "slack_configured": false,
+        "webhook_configured": false
+      },
+      "precheck_disabled": false,
+      "precheck_query_source": "skill_default",
+      "precheck_source": {
+        "present": false,
+        "sha256": null,
+        "bytes": 0
+      },
+      "effective_precheck_source": {
+        "present": true,
+        "sha256": "4c1fbe05b82035cad85a5668373faf2ad81064d5780107c0dc11c32bedc57c0a",
+        "bytes": 97,
+        "serialization": "original_utf8"
+      }
+    }
+  ],
+  "notebook": {
+    "id": "C9vQAc1L",
+    "version": 15,
+    "kernel_status": "stopped",
+    "variables": [
+      {
+        "name": "run_id",
+        "type": "string",
+        "value_state": "empty"
+      },
+      {
+        "name": "thread_id",
+        "type": "string",
+        "value_state": "empty"
+      },
+      {
+        "name": "task_id",
+        "type": "string",
+        "value_state": "empty"
+      },
+      {
+        "name": "trace_id",
+        "type": "string",
+        "value_state": "empty"
+      },
+      {
+        "name": "lookback_hours",
+        "type": "number",
+        "value_state": "present_not_retained"
+      }
+    ],
+    "cell_type_counts": {
+      "markdown": 14,
+      "sql": 3
+    },
+    "sql_cells": [
+      {
+        "id": "8f15f2e8-8c0b-4505-b0d7-e6150c8d5cb3",
+        "dataframe_name": "recent_runtime_traces",
+        "status": "done",
+        "bound_variable_names": [
+          "lookback_hours"
+        ],
+        "limits": [
+          40
+        ],
+        "sql_source": {
+          "present": true,
+          "sha256": "08a86412357564d773b33a2a53e234f534664f3c4b2bf6724230ee69df608ad6",
+          "bytes": 1036,
+          "serialization": "original_utf8"
+        }
+      },
+      {
+        "id": "3f5a1c64-b0de-4a32-be51-341666af8a79",
+        "dataframe_name": "runtime_span_timeline",
+        "status": "done",
+        "bound_variable_names": [
+          "lookback_hours",
+          "run_id",
+          "task_id",
+          "thread_id",
+          "trace_id"
+        ],
+        "limits": [
+          100,
+          2000
+        ],
+        "sql_source": {
+          "present": true,
+          "sha256": "3b151c0b6157266b6082873247d752133b799824eb61c48df5d45366d1073222",
+          "bytes": 1702,
+          "serialization": "original_utf8"
+        }
+      },
+      {
+        "id": "3c4b2757-6de2-4d50-bfe8-0b6991b68b00",
+        "dataframe_name": "runtime_logs",
+        "status": "done",
+        "bound_variable_names": [
+          "lookback_hours",
+          "run_id",
+          "task_id",
+          "thread_id",
+          "trace_id"
+        ],
+        "limits": [
+          100,
+          1000
+        ],
+        "sql_source": {
+          "present": true,
+          "sha256": "d81f0259ddb5f9e7118830913f5d66300d5db8c1167c79c9f0ffeb25ca4bac5f",
+          "bytes": 1564,
+          "serialization": "original_utf8"
+        }
+      }
+    ],
+    "markdown_source": {
+      "present": true,
+      "sha256": "b64b6be4596468dd13d99c5b86073c9f894ca4f6f167f5ad56f49f4cb167016d",
+      "bytes": 10300,
+      "serialization": "original_utf8"
+    }
+  },
+  "checks": {
+    "requested_scouts_found": 2,
+    "requested_scouts_enabled": true,
+    "interval_minutes": 1440,
+    "inbox_only": true,
+    "scout_configurations_written": 0,
+    "scouts_manually_triggered": 0,
+    "other_scouts_changed": 0,
+    "scout_list_rows_received": 29,
+    "non_target_scout_rows_retained": 0,
+    "notebook_variables_written": 0,
+    "notebook_cells_executed": 0,
+    "python_kernel_started": false,
+    "notebook_kernel_observed_status": "stopped",
+    "four_id_bindings_in_each_detail_sql": true,
+    "detail_rows_selected_by_full_matched_trace": true,
+    "overview_remains_recent_runtime_traces_not_id_filtered": true
+  },
+  "boundaries": [
+    "This verifies current saved configuration and SQL definitions, not a successful production trace or model run.",
+    "The existing overview is capped at 40 recent traces. Detail SQL first matches at most 100 trace IDs, then returns up to 2000 span rows or 1000 log rows within the bounded lookback. These are interactive notebook limits, not exhaustive production evidence pagination.",
+    "All four ID variable values were observed empty; their values were not changed or retained. The existing SQL cells were not rerun.",
+    "Kernel metadata was observed stopped, and no Python cells exist; no execution action was called."
+  ],
+  "privacy": {
+    "person_or_owner_fields_retained": false,
+    "variable_values_retained": false,
+    "raw_metadata_retained": false,
+    "sql_or_scout_free_text_retained": false
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "status": "targeted_insight_update_applied_and_verified",
+  "project_id": 670821,
+  "insight_id": 13703361,
+  "insight_short_id": "STBizeTe",
+  "insight_url": "https://us.posthog.com/project/670821/insights/STBizeTe",
+  "source_commit": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "baseline_sql_sha256": "7abab6631e0c1cd33c0cde46a15d369533f153d20b1f7f5ef8598f7ef29c5f8d",
+  "applied_sql_sha256": "e43b0341fe51d192c1df4e8c6eb3380f311c1075d3ab745ae66673f4dc3fc472",
+  "sql_bytes": 12582,
+  "description_sha256": "0a76c3a712141d3b4be181f0304c247fe1ba831d9deb056a46c9a6790e30ead6",
+  "description_characters": 383,
+  "mutation_attempts": 1,
+  "mutation_fields": [
+    "query",
+    "description"
+  ],
+  "alert_mutations": 0,
+  "other_insight_mutations": 0,
+  "query_executions": 1,
+  "readback_at_utc": "2026-11-07T14:28:17.284Z",
+  "readback_checks": {
+    "query_exact": true,
+    "description_exact": true,
+    "description_characters": 383,
+    "query_wrapper_unchanged": true,
+    "alert_configuration_unchanged": true,
+    "subscribers_unchanged": true,
+    "subscriber_count": 1,
+    "changed_top_level_insight_response_fields": [
+      "alerts",
+      "cache_target_age",
+      "description",
+      "filters_hash",
+      "last_modified_at",
+      "last_refresh",
+      "next_allowed_client_refresh",
+      "query",
+      "timezone",
+      "updated_at"
+    ],
+    "changed_top_level_alert_response_fields": [
+      "insight"
+    ],
+    "other_top_level_response_fields_identical": true
+  },
+  "derived_response_changes_documented": true,
+  "result": {
+    "value": 0,
+    "breaching_sources": 0,
+    "evaluated_sources": 18,
+    "evaluated_hour_as_returned": "2026-11-07T21:00:00+08:00",
+    "evaluated_hour_utc": "2026-11-07T13:00:00.000Z",
+    "rows": 1,
+    "interpretation": "value=0 means no evaluated service/error-code bucket breached the configured error-spike threshold for the completed hour; it does not mean zero errors, zero failed requests, or a validated production generation trace."
+  },
+  "validation_batch_wall_ms": 12975,
+  "engine_duration_ms": null,
+  "production_generation_acceptance": false,
+  "saved_insight_cache_refresh_requested": false,
+  "actor_contact_subscriber_ids_saved": false,
+  "source_or_refs_modified": false,
+  "files": [
+    {
+      "path": "before.json",
+      "bytes": 11589,
+      "sha256": "41a2df054a52f72425c4de1a3aa0df2e1f715f5bb597aa4827817e420c656707"
+    },
+    {
+      "path": "patch.json",
+      "bytes": 13350,
+      "sha256": "e4fe6a7227acefef1f947ca6ae5874a25b6e4a23c4e2fb0b4e7fa7bb6a514235"
+    },
+    {
+      "path": "after.json",
+      "bytes": 16910,
+      "sha256": "ce1933b55c6e5486b3dcae6d67e076f3086563a49b885e8aa5e006e29d49343f"
+    },
+    {
+      "path": "query-validation.json",
+      "bytes": 15955,
+      "sha256": "6ff699dff7840a48cc3bf2ea3780654e806ee2f68de5b3d6c11d1c097d878f11"
+    }
+  ]
+}

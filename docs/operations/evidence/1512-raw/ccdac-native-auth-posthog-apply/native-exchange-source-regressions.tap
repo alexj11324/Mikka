@@ -1,0 +1,30 @@
+✔ the OAuth callback is a base-path-free API path (0.955502ms)
+✔ the loopback callback is carried through the return path (0.178209ms)
+✔ only an unadorned loopback callback is accepted (0.330779ms)
+✔ the desktop state must be URL-safe and bounded (0.182004ms)
+✔ the OAuth callback URL is absolute and keeps the base path (1.394455ms)
+✔ challenge, verifier and code shapes are bounded (1.283938ms)
+✔ the browser starts the provider the app asked for, and never hands over a web session unseen (1.006028ms)
+✔ the native cache is bounded opaque base64url, with no caller cookies or identity headers (1.818474ms)
+✔ only the SDK session-data cookie is extracted, with bounded ordered chunk support and explicit clearing (1.994671ms)
+✔ HTTP requests are sanitized before the SDK bearer hook sees either request or context headers (2.143125ms)
+✔ replacement proofs stay in their own bearer response and cannot override explicit rotation clearing (1.062314ms)
+(node:12) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ desktop exchange consumes its pending request in one database operation and retains the OTT boundary
+  ✔ bundled exchange preserves SDK verification and the safe session projection (10.300076ms)
+  ✔ legacy hosted exchange retains its one-time-token response (1.580726ms)
+  ✔ wrong code or verifier still consumes before refusing, without invoking the SDK (3.159159ms)
+  ✔ missing, expired or previously consumed database proof cannot enter the SDK (0.998978ms)
+  ✔ SDK expiry or revocation still rejects after consuming the pending request (1.084908ms)
+  ✔ foreign origin and malformed proof are refused before database access (0.864795ms)
+✔ desktop exchange consumes its pending request in one database operation and retains the OTT boundary (324.255574ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1142.594719

@@ -1,0 +1,30 @@
+✔ the OAuth callback is a base-path-free API path (1.217279ms)
+✔ the loopback callback is carried through the return path (0.329868ms)
+✔ only an unadorned loopback callback is accepted (0.43063ms)
+✔ the desktop state must be URL-safe and bounded (0.261164ms)
+✔ the OAuth callback URL is absolute and keeps the base path (8.300369ms)
+✔ challenge, verifier and code shapes are bounded (0.769632ms)
+✔ the browser starts the provider the app asked for, and never hands over a web session unseen (0.797174ms)
+✔ the native cache is bounded opaque base64url, with no caller cookies or identity headers (1.856103ms)
+✔ only the SDK session-data cookie is extracted, with bounded ordered chunk support and explicit clearing (1.915153ms)
+✔ HTTP requests are sanitized before the SDK bearer hook sees either request or context headers (1.836824ms)
+✔ replacement proofs stay in their own bearer response and cannot override explicit rotation clearing (0.654878ms)
+(node:14) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ desktop exchange consumes its pending request in one database operation and retains the OTT boundary
+  ✔ bundled exchange preserves SDK verification and the safe session projection (9.724324ms)
+  ✔ legacy hosted exchange retains its one-time-token response (1.266122ms)
+  ✔ wrong code or verifier still consumes before refusing, without invoking the SDK (1.64244ms)
+  ✔ missing, expired or previously consumed database proof cannot enter the SDK (1.005048ms)
+  ✔ SDK expiry or revocation still rejects after consuming the pending request (1.084327ms)
+  ✔ foreign origin and malformed proof are refused before database access (0.795531ms)
+✔ desktop exchange consumes its pending request in one database operation and retains the OTT boundary (353.765621ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1252.117735

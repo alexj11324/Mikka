@@ -1,0 +1,231 @@
+{
+  "schemaVersion": 1,
+  "kind": "read-only-production-deployment-concurrency-diagnostic",
+  "observedAt": "2026-11-07T14:38:19.977Z",
+  "repository": "alexj11324/Mikka",
+  "waitingDeployment": {
+    "sourceSha": "0dee82a7737d29297186b77360370832cfcc3f5d",
+    "runId": 42381723206,
+    "jobId": 128430565771,
+    "workflow": ".github/workflows/web-deploy.yml",
+    "status": "pending",
+    "stepsCount": 0,
+    "runnerLabels": [
+      "ubuntu-latest"
+    ],
+    "runnerAssigned": false,
+    "pendingDeployments": [],
+    "jobConcurrency": {
+      "group": "web-deploy-production",
+      "cancelInProgress": false,
+      "queue": "max"
+    }
+  },
+  "holderSource": {
+    "at": "2026-11-07T14:38:19.977Z",
+    "runId": 42381382020,
+    "sourceSha": "b934a82c3186ec6d95bba2c5476ec2711419c3dc",
+    "selected": [
+      {
+        "line": 11,
+        "text": "concurrency:"
+      },
+      {
+        "line": 12,
+        "text": "group: production-smoke-owner-acceptance"
+      },
+      {
+        "line": 13,
+        "text": "cancel-in-progress: false"
+      },
+      {
+        "line": 17,
+        "text": "runs-on: ubuntu-latest"
+      },
+      {
+        "line": 18,
+        "text": "timeout-minutes: 90"
+      },
+      {
+        "line": 19,
+        "text": "concurrency:"
+      },
+      {
+        "line": 20,
+        "text": "group: web-deploy-production"
+      },
+      {
+        "line": 21,
+        "text": "cancel-in-progress: false"
+      },
+      {
+        "line": 22,
+        "text": "queue: max"
+      },
+      {
+        "line": 47,
+        "text": "- name: Import optional own-VM diagnostic key"
+      },
+      {
+        "line": 60,
+        "text": "- name: Exercise explicit cloud task creation and full delivery on Claude Code"
+      },
+      {
+        "line": 71,
+        "text": "- name: Upload Claude Code delivery receipt"
+      },
+      {
+        "line": 78,
+        "text": "- name: Exercise explicit cloud task creation and full delivery on Codex"
+      },
+      {
+        "line": 89,
+        "text": "- name: Upload all delivery receipts"
+      }
+    ]
+  },
+  "holderJobs": {
+    "at": "2026-11-07T14:38:19.977Z",
+    "jobs": [
+      {
+        "id": 128429531665,
+        "name": "delivery",
+        "status": "in_progress",
+        "conclusion": null,
+        "steps": [
+          {
+            "number": 1,
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 2,
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 3,
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 4,
+            "name": "Run corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 5,
+            "name": "Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 6,
+            "name": "Import optional own-VM diagnostic key",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 7,
+            "name": "Exercise explicit cloud task creation and full delivery on Claude Code",
+            "status": "in_progress",
+            "conclusion": null
+          },
+          {
+            "number": 8,
+            "name": "Upload Claude Code delivery receipt",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 9,
+            "name": "Exercise explicit cloud task creation and full delivery on Codex",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 10,
+            "name": "Upload all delivery receipts",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 19,
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 20,
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "pending",
+            "conclusion": null
+          }
+        ]
+      }
+    ]
+  },
+  "filteredRunInventory": {
+    "waiting": {
+      "at": "2026-11-07T14:38:19.977Z",
+      "label": "repo_waiting",
+      "totalCount": 0,
+      "returnedTotal": 0,
+      "webRuns": [],
+      "isError": false
+    },
+    "queued": {
+      "at": "2026-11-07T14:38:19.977Z",
+      "label": "repo_queued",
+      "totalCount": 0,
+      "returnedTotal": 0,
+      "webRuns": [],
+      "isError": false
+    },
+    "pending": {
+      "at": "2026-11-07T14:38:19.977Z",
+      "label": "repo_pending",
+      "totalCount": 1,
+      "returnedTotal": 1,
+      "webRuns": [
+        {
+          "id": 42381723206,
+          "name": "Web deploy",
+          "path": ".github/workflows/web-deploy.yml",
+          "headBranch": "main",
+          "headSha": "0dee82a7737d29297186b77360370832cfcc3f5d",
+          "status": "pending",
+          "conclusion": null,
+          "createdAt": "2026-11-07T14:28:04Z",
+          "updatedAt": "2026-11-07T14:28:05Z",
+          "workflowId": 406825791
+        }
+      ],
+      "isError": false
+    }
+  },
+  "conclusion": {
+    "classification": "shared-production-deployment-concurrency-held-by-acceptance-operator",
+    "operatorRunId": 42381382020,
+    "operatorJobId": 128429531665,
+    "executingStep": "Exercise explicit cloud task creation and full delivery on Claude Code",
+    "codexStepStatus": "pending",
+    "providerRequestOutcome": "not-inspected",
+    "environmentApprovalPending": false,
+    "runnerFailureProven": false,
+    "action": "wait-for-current-owner-acceptance-operator-to-release-concurrency"
+  },
+  "boundaries": {
+    "metadataAndFixedWorkflowSourceOnly": true,
+    "rawLogsRead": false,
+    "providerCalls": false,
+    "resourceMutations": false,
+    "workflowRerun": false,
+    "workflowCancelled": false,
+    "remoteWrites": false
+  }
+}

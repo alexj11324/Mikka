@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "kind": "desktop_native_evidence_index",
+  "recordedAt": "2026-11-07T14:41:04.478Z",
+  "repository": "alexj11324/Mikka",
+  "runId": 42380585478,
+  "attempt": 1,
+  "candidate": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "source": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+  "tree": "dc7b347b327fb69fd730a46a5cd9f4b1d4343c4c",
+  "parents": [
+    "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5",
+    "ccdac744d0ae0745c5f75aef08e1298077f53525"
+  ],
+  "files": [
+    {
+      "file": "evidence/desktop-ccdac/lifecycle.json",
+      "role": "original_artifact_json",
+      "bytes": 181438,
+      "sha256": "14d915a077b835a56f901a6b979ca6fc38621c2f530a256a0ea6555038606d2e",
+      "gitBlobSha": "fa0f51dda0d76d565e8356ae9e63877afa7d3cd8"
+    },
+    {
+      "file": "evidence/desktop-ccdac/parity/parity.json",
+      "role": "original_artifact_json",
+      "bytes": 106971,
+      "sha256": "ed8376482f10ff813c13dafd8540d0fc90a0b8bdbe2c02950d5892356a2f19a3",
+      "gitBlobSha": "e5090bfdf67f2bc18f24a296bcd7625232b2b9aa"
+    },
+    {
+      "file": "evidence/desktop-ccdac/smoke.json",
+      "role": "original_artifact_json",
+      "bytes": 3125,
+      "sha256": "a69117dba801b19f6d6cbd19096eb4a86366d3b9693496bf0348cd75766fe662",
+      "gitBlobSha": "c46d1f2d1948377e01b51f2f449ed74ca52bb3a7"
+    },
+    {
+      "file": "evidence/desktop-ccdac/native-crypto.json",
+      "role": "original_artifact_json",
+      "bytes": 2868,
+      "sha256": "98ede83949d825d73d043c5335b9ab29eef9026c96849e8a59c9389cffd85669",
+      "gitBlobSha": "ccfe8660d613b974202d5cf1de066671ad5a0923"
+    },
+    {
+      "file": "evidence/desktop-ccdac/mac-acceptance-package.json",
+      "role": "original_artifact_json",
+      "bytes": 957,
+      "sha256": "10b7f2509deaaf91bf742f54859a56436a650e50fe1caeb2cea2eebd6609477e",
+      "gitBlobSha": "3915d933c785980a022a9a4416e5b46442a67883"
+    },
+    {
+      "file": "evidence/desktop-ccdac/compiled/mikka-build.json",
+      "role": "original_artifact_json",
+      "bytes": 8259,
+      "sha256": "a47f1d5e83ffffa3769868e8124c4acf96a9d1be8cb302af11341492e5284405",
+      "gitBlobSha": "5aab32d8106acc8c3ed003ac75e4f900bc68c479"
+    },
+    {
+      "file": "evidence/desktop-ccdac/summary.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 120758,
+      "sha256": "d9bd72a60ecc473e7e51133390ebf8d7895c2040a36738295ad232f4b3170710",
+      "gitBlobSha": "e30b63593574ba85140cebf190e50571aab92f53"
+    },
+    {
+      "file": "evidence/desktop-ccdac/query-operations.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 14794,
+      "sha256": "980ab86eabcf662edf1f962c647b72cb93b90449be6c65da4b092af5197275be",
+      "gitBlobSha": "dcae08f0faffae7a80abc2524ba433b919f67261"
+    },
+    {
+      "file": "evidence/desktop-ccdac/query-operations.md",
+      "role": "closed_projection_or_receipt",
+      "bytes": 1519,
+      "sha256": "af3b74a294ce0672de806591c6967748416a35abd10180a2e0ee0b81ed550fe5",
+      "gitBlobSha": "a976609b16a77a5ca8ccccc606cddfac6c97f3ab"
+    },
+    {
+      "file": "evidence/desktop-ccdac/findings.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 78778,
+      "sha256": "a65dccda093330aa0adc1301c39eaec43a731a1ea9dc98bf3babbf058d05a8ca",
+      "gitBlobSha": "6935b3ee5d529b07dba98a6a90c5de1f5bd95e86"
+    },
+    {
+      "file": "evidence/desktop-ccdac/ci-final.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 37616,
+      "sha256": "226e453b18cde575383c23f76199ec270a5eb4b54625fa6c5e5f0fd780a4b319",
+      "gitBlobSha": "9e0fffeb7cac754d512efd252b2cb89db00e5fed"
+    },
+    {
+      "file": "evidence/desktop-ccdac/source-harness.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 3031,
+      "sha256": "5597381c53e6d81363a7902bb4e2dd4d7cde508100a4e36cd5d2d8f486b03703",
+      "gitBlobSha": "ed7325f22f857a5297dfeec42418e957326c6ab1"
+    },
+    {
+      "file": "evidence/desktop-ccdac/download-receipt.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 1444,
+      "sha256": "165c8abb4ba292c7294cb0e5044edd89a8b71caf1e251285c03616b9bd620971",
+      "gitBlobSha": "c033fe6897231dcb61a6aa6ea7810ffc26ac90b2"
+    },
+    {
+      "file": "evidence/desktop-ccdac/privacy-scan.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 1931,
+      "sha256": "f7390d7e2f87ec6378385c68bb351bd1ebf2522d9541e6f8b133b246d48b55e4",
+      "gitBlobSha": "50892277cd00dd26543274710182baf378b74f8a"
+    },
+    {
+      "file": "evidence/desktop-ccdac/compiled-download-receipt.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 884,
+      "sha256": "781f07e567a8b19fc884da09c39d68994708c0d700ee24365dc8ba9593833a6b",
+      "gitBlobSha": "3b6967ac8fe1e30430ebde6ea2d35aa15760a8e7"
+    },
+    {
+      "file": "evidence/desktop-ccdac/compiled-privacy-scan.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 538,
+      "sha256": "f98d0e39b036a34cacd62227a58c20c44c4264267d8750e206b44c05b55fba5a",
+      "gitBlobSha": "f8ffa6f378f1ec1eba23c56f5ec88d35312ce847"
+    },
+    {
+      "file": "evidence/desktop-ccdac/postgres-smoke-projection.json",
+      "role": "closed_projection_or_receipt",
+      "bytes": 1990,
+      "sha256": "8fa90ef77618a1d941b0090fa4309c00dc4c406438f0e39ab56c8b79530a0799",
+      "gitBlobSha": "a9d834a8bb2c97c112fd9e847d3bcae7d1dc1d99"
+    },
+    {
+      "file": "desktop-native-summary.mjs",
+      "role": "offline_reader_or_previous_validation",
+      "bytes": 19258,
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b",
+      "gitBlobSha": "dad196c96077ab1504fd8858343d31b00cf0da3a"
+    },
+    {
+      "file": "desktop-query-operations-summary.mjs",
+      "role": "offline_reader_or_previous_validation",
+      "bytes": 7134,
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2",
+      "gitBlobSha": "17a54954b618fc3373715dbc73fa86669c2aa739"
+    },
+    {
+      "file": "desktop-query-operations-summary.test.mjs",
+      "role": "offline_reader_or_previous_validation",
+      "bytes": 4248,
+      "sha256": "b608c3aba813049bda7d6fa393214696d5bc602742a831236cf32c868bde80e0",
+      "gitBlobSha": "8d7eed08f88bcca58788680aeef9e7459efce79d"
+    },
+    {
+      "file": "desktop-query-operations-summary-tests-final.tap",
+      "role": "offline_reader_or_previous_validation",
+      "bytes": 623,
+      "sha256": "c9b38ed9c57d0bbb7ed47698d3f134549f5040c1059ad9eb3df6c68c09d64a67",
+      "gitBlobSha": "30963be71dbdc2dec9f831c030ad274a2f792e9f"
+    },
+    {
+      "file": "desktop-query-operations-summary-validation.json",
+      "role": "offline_reader_or_previous_validation",
+      "bytes": 1554,
+      "sha256": "76bb571804455aa98b2356f93cc668dea62bc4568c6e73112abd9aed9b86b797",
+      "gitBlobSha": "4b79bc615a9baaf76627a83456bc1076175588ae"
+    }
+  ],
+  "totalFiles": 22,
+  "totalBytes": 599718,
+  "excluded": [
+    "ZIP archives",
+    "PNGs",
+    "runtime logs",
+    "signed download URLs",
+    "desktop-ccdac-download.py (transport implementation unchanged except four fixed identity constants; artifact checks preserved in receipts)"
+  ],
+  "privacy": {
+    "originalArtifacts": "privacy-scan.json and compiled-privacy-scan.json passed; no original JSON bytes modified",
+    "newProjections": "fixed metadata, paths, revision hashes, counts and closed test names only",
+    "previousReaderValidationReused": true
+  },
+  "status": "actual_budget_failed",
+  "performanceTargetsMet": false,
+  "loginTargetMet": false,
+  "firstStartupTargetMet": true,
+  "productionAcceptance": null,
+  "frozenAt": "2026-11-07T14:41:04.478Z"
+}

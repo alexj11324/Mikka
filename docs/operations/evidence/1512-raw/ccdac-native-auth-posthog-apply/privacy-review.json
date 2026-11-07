@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T14:46:02.945840+00:00",
+  "scope": "All 55 frozen original UTF-8 payloads; only source test stdout, closed metadata, source code, and approved original Desktop JSON.",
+  "scannedOriginalFiles": 55,
+  "scannedOriginalBytes": 874378,
+  "checks": [
+    "strict UTF-8 and no NUL",
+    "email / API credential prefix / private key / bearer-shaped text / JWT / signed URL / URL credentials",
+    "nonempty exact operational credential key names in parsed JSON",
+    "manual static auth literal origin review"
+  ],
+  "patternFindings": 4,
+  "classifiedFindings": [
+    {
+      "path": "native-exchange-root-integration.tap",
+      "kind": "bearer",
+      "line": 11,
+      "matchBytes": 15,
+      "matchSha256": "cfa2063a77f33daaddf0fd396f1f65531a17ec57d0d8a73106583e4e06f88a45",
+      "classification": "natural-language-test-title",
+      "reason": "The match is words inside a passing test title about proof lifetime; it is not an Authorization header or bearer value."
+    },
+    {
+      "path": "native-exchange-source-regressions.tap",
+      "kind": "bearer",
+      "line": 11,
+      "matchBytes": 15,
+      "matchSha256": "cfa2063a77f33daaddf0fd396f1f65531a17ec57d0d8a73106583e4e06f88a45",
+      "classification": "natural-language-test-title",
+      "reason": "The match is words inside a passing test title about proof lifetime; it is not an Authorization header or bearer value."
+    },
+    {
+      "path": "source-ccdac744/tests/desktop-auth-exchange.test.ts",
+      "kind": "email",
+      "line": 31,
+      "matchBytes": 23,
+      "matchSha256": "cc6d96611cffa9f02c3626f0b9ee897dc171e2d540a5cae349d4ec316104997b",
+      "classification": "static-unusable-test-fixture",
+      "reason": "Literal .invalid email in the synthetic-owner fixture returned by a test-local mocked authentication API."
+    },
+    {
+      "path": "evidence/desktop-ccdac/lifecycle.json",
+      "kind": "bearer",
+      "line": 40,
+      "matchBytes": 16,
+      "matchSha256": "89378139c77be283fe82f7d9f0c92be7e427fe540942e4ee5c728ea811d57f65",
+      "classification": "natural-language-check-name",
+      "jsonPath": "$.checks[3].name",
+      "reason": "The match is words in the sandbox-isolation check name, not a credential or request header."
+    }
+  ],
+  "additionalStaticFixtureLiterals": [
+    {
+      "path": "source-ccdac744/tests/desktop-auth-exchange.test.ts",
+      "literal": "token",
+      "line": 14,
+      "valueBytes": 31,
+      "valueSha256": "29c570ea535b89345eb3805eb327e2bd507112fd2312bd29251abb089bfc1dff",
+      "reason": "A fixed synthetic value returned by the test-local mocked Better Auth API; not an operational credential and never sent to a real provider."
+    },
+    {
+      "path": "source-ccdac744/tests/desktop-auth-exchange.test.ts",
+      "literal": "bearer",
+      "line": 15,
+      "valueBytes": 44,
+      "valueSha256": "cab3179346eaa5b148ac9d69a2f491c610ca6960e265c47c0af74952e2958d32",
+      "reason": "A fixed synthetic value returned by the test-local mocked Better Auth API; not an operational credential and never sent to a real provider."
+    }
+  ],
+  "jsonKeyFalsePositives": [
+    {
+      "path": "source-ccdac744/package.json",
+      "jsonPath": "$.dependencies.cookie",
+      "valueBytes": 5,
+      "valueSha256": "c5752c93158aa0bc87f4665057b3d30a36b996345fc4250a69368f3ce46277ce",
+      "classification": "dependency-semver",
+      "reason": "The package dependency named cookie holds a package version, not an HTTP cookie."
+    }
+  ],
+  "nonFixtureSensitiveMatches": 0,
+  "nonemptyOperationalCredentialKeys": 0,
+  "originalBytesPreserved": true,
+  "redactionPerformed": false,
+  "rawRuntimeOrPrivateCiLogsIncluded": false,
+  "signedDownloadUrlsIncluded": false,
+  "binaryArchivesScreenshotsOrBundlePayloadsIncluded": false,
+  "operationalAccountCookiesTokensOrEmailValuesIncluded": false,
+  "includedCheckOutput": "Original source regression stdout, empty successful type/lint/diff logs, source bundle verification metadata, and the explicitly frozen offline-reader validation output only.",
+  "boundary": "Static test canaries and lexical detector false positives are documented by exact path/line/hash. This privacy review does not imply production or query-budget acceptance."
+}

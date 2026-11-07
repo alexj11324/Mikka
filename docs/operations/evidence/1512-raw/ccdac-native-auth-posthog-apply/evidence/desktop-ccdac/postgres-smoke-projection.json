@@ -1,0 +1,76 @@
+{
+  "runId": 42380585478,
+  "attempt": 1,
+  "jobId": 128427158793,
+  "observedAt": "2026-11-07T14:20:30.313Z",
+  "checkout": [
+    "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af"
+  ],
+  "tests": [
+    {
+      "name": "a signed-out desktop finishes sign-in and the code works once",
+      "positive": true,
+      "skipped": false,
+      "negative": false,
+      "occurrences": 1
+    },
+    {
+      "name": "a wrong verifier burns the request",
+      "positive": true,
+      "skipped": false,
+      "negative": false,
+      "occurrences": 1
+    },
+    {
+      "name": "two simultaneous exchanges on separate connections consume the row only once",
+      "positive": true,
+      "skipped": false,
+      "negative": false,
+      "occurrences": 1
+    },
+    {
+      "name": "exchange cannot consume an unbound or expired row",
+      "positive": true,
+      "skipped": false,
+      "negative": false,
+      "occurrences": 1
+    },
+    {
+      "name": "used rows and token-less rows cannot redeem a handoff",
+      "positive": true,
+      "skipped": false,
+      "negative": false,
+      "occurrences": 1
+    },
+    {
+      "name": "a second browser cannot rebind, and a different callback is refused",
+      "positive": true,
+      "skipped": false,
+      "negative": false,
+      "occurrences": 1
+    },
+    {
+      "name": "return without a browser session fails, expired requests fail",
+      "positive": true,
+      "skipped": false,
+      "negative": false,
+      "occurrences": 1
+    },
+    {
+      "name": "begin rejects a missing challenge and a foreign origin",
+      "positive": true,
+      "skipped": false,
+      "negative": false,
+      "occurrences": 1
+    },
+    {
+      "name": "the bundled exchange consumes PKCE and OTT once, returning the actual session bearer",
+      "positive": true,
+      "skipped": false,
+      "negative": false,
+      "occurrences": 1
+    }
+  ],
+  "allTargetsPassed": true,
+  "logProjection": "fixed test names and checkout only; raw content not retained"
+}

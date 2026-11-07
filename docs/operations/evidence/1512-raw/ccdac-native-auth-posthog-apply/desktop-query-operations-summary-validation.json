@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "kind": "offline_report_projection_validation",
+  "recordedAt": "2026-11-07T13:39:36.802Z",
+  "files": [
+    {
+      "path": "desktop-query-operations-summary.mjs",
+      "bytes": 7134,
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2"
+    },
+    {
+      "path": "desktop-query-operations-summary.test.mjs",
+      "bytes": 4248,
+      "sha256": "b608c3aba813049bda7d6fa393214696d5bc602742a831236cf32c868bde80e0"
+    },
+    {
+      "path": "desktop-query-operations-summary-tests-final.tap",
+      "bytes": 623,
+      "sha256": "c9b38ed9c57d0bbb7ed47698d3f134549f5040c1059ad9eb3df6c68c09d64a67"
+    },
+    {
+      "path": "desktop-ad8d-download.py",
+      "bytes": 8902,
+      "sha256": "88015fae629612a272ccd0a94f8b24e469db1098a9d43f770352789194a1c121"
+    }
+  ],
+  "validation": {
+    "command": "node --test ops1512/desktop-query-operations-summary.test.mjs",
+    "actualExitCode": 0,
+    "passed": 5,
+    "failed": 0,
+    "scope": "Synthetic partition arithmetic and missing/tampered metadata only; no Native run, service, database or remote mutation",
+    "stdoutFormat": "Node test runner default textual report"
+  },
+  "productionAcceptance": null,
+  "updatedAt": "2026-11-07T13:47:33.289Z",
+  "downloaderVerification": {
+    "artifactIds": [
+      13576252424,
+      13576875507,
+      13575028903
+    ],
+    "actualExitCodes": [
+      0,
+      0
+    ],
+    "allZipDigestsMatched": true,
+    "knownJsonPrivacyScansPassed": true,
+    "signedUrlsPersisted": false,
+    "zipRetained": false
+  }
+}

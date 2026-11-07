@@ -1,0 +1,97 @@
+(node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ desktop exchange consumes its pending request in one database operation and retains the OTT boundary
+  ✖ bundled exchange preserves SDK verification and the safe session projection (17.391863ms)
+  ✖ legacy hosted exchange retains its one-time-token response (2.915573ms)
+  ✖ wrong code or verifier still consumes before refusing, without invoking the SDK (1.650643ms)
+  ✔ missing, expired or previously consumed database proof cannot enter the SDK (1.245981ms)
+  ✖ SDK expiry or revocation still rejects after consuming the pending request (1.916424ms)
+  ✔ foreign origin and malformed proof are refused before database access (1.354184ms)
+✖ desktop exchange consumes its pending request in one database operation and retains the OTT boundary (669.469662ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 2
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1910.726677
+
+✖ failing tests:
+
+test at tests/desktop-auth-exchange.test.ts:1:2409
+✖ bundled exchange preserves SDK verification and the safe session projection (17.391863ms)
+  AssertionError [ERR_ASSERTION]: consume and clear must be one atomic statement
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-exchange.test.ts:55:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-exchange.test.ts:45:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/desktop-auth-exchange.test.ts:1:3020
+✖ legacy hosted exchange retains its one-time-token response (2.915573ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-exchange.test.ts:63:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-exchange.test.ts:57:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/desktop-auth-exchange.test.ts:1:3297
+✖ wrong code or verifier still consumes before refusing, without invoking the SDK (1.650643ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-exchange.test.ts:70:16)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-exchange.test.ts:65:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/desktop-auth-exchange.test.ts:1:3887
+✖ SDK expiry or revocation still rejects after consuming the pending request (1.916424ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-exchange.test.ts:85:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka-login1512/tests/desktop-auth-exchange.test.ts:79:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

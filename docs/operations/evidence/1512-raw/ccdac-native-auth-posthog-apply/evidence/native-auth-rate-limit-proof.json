@@ -1,0 +1,20 @@
+{
+  "sdk": "better-auth",
+  "version": "1.7.12",
+  "sdkFileSha256": "069b00e92eac7169c537242e7122ddd2530136019cc72a411c3a5256cb84ffaa",
+  "route": "/api/auth/get-session",
+  "input": "expired-rate-limit-window",
+  "allowed": true,
+  "adapterOperations": [
+    "findMany",
+    "incrementOne",
+    "deleteMany"
+  ],
+  "adapterOperationsCount": 3,
+  "databaseQueriesMeasured": false,
+  "actualNativeAuth3Attribution": "unproven",
+  "productConfigurationChanged": false,
+  "networkRequests": 0,
+  "databaseConnections": 0,
+  "providerCalls": 0
+}

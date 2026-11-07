@@ -1,0 +1,19 @@
+(node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+﹣ a signed-out desktop finishes sign-in and the code works once (1.203546ms) # SKIP
+﹣ a wrong verifier burns the request (0.195395ms) # SKIP
+﹣ two simultaneous exchanges on separate connections consume the row only once (0.179821ms) # SKIP
+﹣ exchange cannot consume an unbound or expired row (0.109876ms) # SKIP
+﹣ used rows and token-less rows cannot redeem a handoff (0.080792ms) # SKIP
+﹣ a second browser cannot rebind, and a different callback is refused (0.082855ms) # SKIP
+﹣ return without a browser session fails, expired requests fail (0.091538ms) # SKIP
+﹣ begin rejects a missing challenge and a foreign origin (0.688569ms) # SKIP
+ℹ tests 8
+ℹ suites 0
+ℹ pass 0
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 8
+ℹ todo 0
+ℹ duration_ms 477.28828

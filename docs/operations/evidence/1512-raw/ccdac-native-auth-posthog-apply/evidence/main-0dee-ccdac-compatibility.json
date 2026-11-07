@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T14:32:15.087989+00:00",
+  "candidate": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "candidateTree": "dc7b347b327fb69fd730a46a5cd9f4b1d4343c4c",
+  "reviewedMain": "0dee82a7737d29297186b77360370832cfcc3f5d",
+  "mainParents": [
+    "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5",
+    "2ccf15a4a0d239cae38327be17e953fe6d8bfefb"
+  ],
+  "mergeTree": "2ee8bfcc4335c6fcf51d5a2a58b8b3ee335e4dd8",
+  "normalMergeTreeExitCode": 0,
+  "fetchExitCode": 0,
+  "changedFromVerifiedCandidate": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 19323,
+      "sha256": "1477b230539237b49a4c039c7d1c3ab23167fef5fe4d58cc7a6751b1de99bd87",
+      "gitBlobSha1": "3b6dc6fd45d3cd31e2e77135661d8a90c2efff32"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 8934,
+      "sha256": "1a7bc3cc9f0f4e4020a144eb414a22a5384b88cb85bba79af8830fcbc5055bd6",
+      "gitBlobSha1": "5d6803e937f97ed38ab653fdc65c3c08e72f3649"
+    },
+    {
+      "path": "docs/acceptance.md",
+      "bytes": 10527,
+      "sha256": "dc5bb50c036f407e48730e9a9916597506b5c027a6c828db2a6bf92b5fc7ad4e",
+      "gitBlobSha1": "17e11c0f3290547e1bcf7810fa1af6c8d671deda"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-07-1400-production-acceptance-scope.md",
+      "bytes": 2008,
+      "sha256": "c7adbc732b2d766d13650dd35d0537ad169d13c29af2501e196718c66dfd937c",
+      "gitBlobSha1": "4f10a292d6db4f9d8567ede26f5cac33b0fd2a48"
+    },
+    {
+      "path": "docs/dev-workflow.md",
+      "bytes": 14794,
+      "sha256": "bab78c81e5a04c92cff75befea7c6fe89d1eb562a270982b63bce6764b0dea4f",
+      "gitBlobSha1": "9b3290ff8099ec093bf2df2a9105a0cd120deff0"
+    }
+  ],
+  "productAndWorkflowChanges": 0,
+  "relatedRuleReview": {
+    "mergeCommitRequired": true,
+    "unrelatedMainCiReuseRetained": true,
+    "localOnlyUiWorkDoesNotRequireProductionAcceptance": true,
+    "explicitIssue1512ProductionCriteriaRetained": true,
+    "issueSpecifiedAcmeAccountRetained": true,
+    "newAutomaticSmokeImplementationOrSuccessProvedByDocs": false
+  },
+  "sourceCiReuse": "ccdac CI and Native product tree remain unchanged; no new feature commit or repeated suite was created for documentation-only main changes.",
+  "mergePermissionStatus": "waiting_actual_Native_budget_and_current_main_publishers"
+}

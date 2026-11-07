@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42380585478,
+  "attempt": 1,
+  "source": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "harness": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+  "artifacts": [
+    {
+      "id": 13577846797,
+      "kind": "compiled",
+      "name": "desktop-api-build-c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+      "bytes": 47872527,
+      "sha256": "5e7d6f5e7c3f2dd5afc15fd7b64b664ada2f1b41eeeeab831a1630d71483bce5",
+      "headSha": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+      "workflowRunId": 42380585478,
+      "digestVerified": true,
+      "zipRetained": false,
+      "knownMembersExtracted": [
+        "compiled/mikka-build.json"
+      ]
+    }
+  ],
+  "scope": "Known JSON members only; ZIP digests verified in memory then discarded; no URL, PNG or runtime log retained.",
+  "reportsComplete": true,
+  "missingReports": []
+}

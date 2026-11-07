@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "candidate": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "source": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+  "readFromCommit": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "tree": "dc7b347b327fb69fd730a46a5cd9f4b1d4343c4c",
+  "parents": [
+    "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5",
+    "ccdac744d0ae0745c5f75aef08e1298077f53525"
+  ],
+  "sourceTreesEqual": true,
+  "sourceIdentityEvidence": {
+    "actualCheckoutJobs": [
+      128427158907,
+      128427158793,
+      128428338343
+    ],
+    "compiledManifest": "compiled/mikka-build.json",
+    "immutableGitCommitTreeVerified": true
+  },
+  "harnessSha256": "36ed7202e05b11cafb1c5f2f2264c9a6ad4c536672b455ad3c1378fc2e56ae7a",
+  "orderedFiles": [
+    {
+      "path": "apps/desktop/test/parity.mjs",
+      "bytes": 34628,
+      "sha256": "c5f4cba993547a1d2893ab56f936fa8254426cebdbc7978aa161584776ab5ec0"
+    },
+    {
+      "path": "apps/desktop/test/parity-fixtures.mjs",
+      "bytes": 15162,
+      "sha256": "99941a8ab30a471030b0000089ab7fd920ef6dda7786501ea6aab88a1732ba6d"
+    },
+    {
+      "path": "apps/desktop/test/generated-workspace-name.mjs",
+      "bytes": 8508,
+      "sha256": "d0a99fe6ff036fca9fca55a18adab96ea40cbe117400ce11585909c3aad5481c"
+    },
+    {
+      "path": "apps/desktop/test/parity-images.mjs",
+      "bytes": 5493,
+      "sha256": "57147e1f1cb5eb2bdb70879bb99acf0b82737057ddfbf8261edb42386189cedc"
+    },
+    {
+      "path": "apps/desktop/test/parity-clock.mjs",
+      "bytes": 1771,
+      "sha256": "ded3031029e0793a3436c385bae34a6d8b380196216c3bbbd56ba80fd0699d3f"
+    },
+    {
+      "path": "apps/desktop/test/native-viewport.mjs",
+      "bytes": 3346,
+      "sha256": "291cc975f1970a4e7cc392a8fbfc1a87352ad614efd7553a683c7adb715dc496"
+    },
+    {
+      "path": "apps/desktop/test/native-auth-diagnostics.mjs",
+      "bytes": 21444,
+      "sha256": "78398dcd6eb48983a7bb3a128e0756a088cf3b5f9eec17de954f8d32433024af"
+    },
+    {
+      "path": "apps/desktop/test/parity-reader-defaults.mjs",
+      "bytes": 3446,
+      "sha256": "ac5d8ee6887454a65830d80c5cf37ffd7df584da999e1905d040b3a391ebd5a2"
+    },
+    {
+      "path": "apps/desktop/test/parity-page-ready.mjs",
+      "bytes": 13784,
+      "sha256": "d014eeb8d83d13cd449418b112f9777b7c38da919e5006666bd9fdab6fce1db4"
+    },
+    {
+      "path": "apps/desktop/test/parity-settings-ready.mjs",
+      "bytes": 10358,
+      "sha256": "52dde7b6c6b6f892a6d5c161ca23190ddbb139dd14c6d0bf9b164ce480e8d3f7"
+    },
+    {
+      "path": "apps/desktop/test/native-device-ready.mjs",
+      "bytes": 10502,
+      "sha256": "9b7c98ce34e617d324a28f99fe24eb43700b9e999c21bcfa6a88699df5e53264"
+    },
+    {
+      "path": "scripts/acceptance/read-action-transport.mjs",
+      "bytes": 3915,
+      "sha256": "126fead63e72d8d835dde62bda48927176399936ce7499fda39c52350b16e8b8"
+    }
+  ],
+  "method": "exact fixed-commit git blobs concatenated in parity.mjs harnessSha256 order; actual synthetic tree independently matched immutable Git commit",
+  "recordedAt": "2026-11-07T14:41:04.469Z"
+}
