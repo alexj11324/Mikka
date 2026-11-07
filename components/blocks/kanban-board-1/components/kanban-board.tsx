@@ -5,13 +5,12 @@ import { displayTaskTitle } from '@/lib/short-title'
 import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
+import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, MessageSquare, Tag, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
 import { AvatarGroup, AvatarGroupCount } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { HarnessMark } from '@/components/labels/entity-labels'
@@ -142,7 +141,6 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     <div className="flex h-5 min-w-0 items-center gap-1.5">
       {/* No placeholder while the task has no number (Linear sync off): the row starts with what is there (R-25, R-40). */}
       {show('identifier') && task.identifier && <span className="truncate text-xs text-muted-foreground tabular-nums">{task.identifier}</span>}
-      {task.scope === 'personal' && <Tooltip><TooltipTrigger render={<span className="flex shrink-0" />}><Lock aria-label={tCard('personal')} className="size-3.5 text-muted-foreground" /></TooltipTrigger><TooltipContent>{tCard('personalHint')}</TooltipContent></Tooltip>}
       {/* No placeholder circle when nobody owns the task; the control appears on hover and focus. */}
       {show('assignee') && <div className={cn('ml-auto flex shrink-0 items-center', !assigneeGroup && 'opacity-0 group-hover/card:opacity-100 focus-within:opacity-100')}><CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary></div>}
     </div>
