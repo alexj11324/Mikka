@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, safeThreadFailure, safeRepositoryFailure } from './self-hosting-subscription-acceptance.mjs'
+import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, safeThreadFailure, safeRepositoryFailure, safeSourceFailures } from './self-hosting-subscription-acceptance.mjs'
 const target = { ownerId: 'owned-local-user', workspaceId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222' }
 const row = { id: '33333333-3333-4333-8333-333333333333', ownerId: 'authorized-owner', workspaceId: '44444444-4444-4444-8444-444444444444', provider: 'codex' }
 const bundle = () => ({ schema: 1, connectionId: row.id, ownerId: row.ownerId, workspaceId: row.workspaceId, provider: row.provider,
@@ -152,4 +152,9 @@ test('repository errors retain the cause class without retaining repository cred
  const detail = safeRepositoryFailure('fatal: unable to access https://' + privateValue + ': SSL certificate problem: unable to get local issuer certificate');
  assert.deepEqual(detail.categories, ['tls_certificate']); assert.ok(!JSON.stringify(detail).includes(privateValue));
  assert.deepEqual(safeRepositoryFailure(privateValue), { categories: [], exitCode: null });
+})
+
+test('frozen-source failure matching projects locations only and never runtime text', () => {
+ const out = safeSourceFailures('Run credentials unavailable. SYNTHETIC_PRIVATE_VALUE', [{source:'lib/static.ts',line:12,literal:'Run credentials unavailable.'},{source:'lib/static.ts',line:15,literal:'another fixed failure'}]);
+ assert.deepEqual(out, [{source:'lib/static.ts',line:12}]); assert.ok(!JSON.stringify(out).includes('PRIVATE'));
 })

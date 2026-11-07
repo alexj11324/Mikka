@@ -115,6 +115,15 @@ export function safeRepositoryFailure(value) {
     exitCode: matched ? Number(matched[1]) : null }
 }
 
+// A failure may be a fixed product message outside the protocol registry.
+// Match only literals present in the frozen public source and emit their
+// source locations; never return the runtime message or its substitutions.
+export function safeSourceFailures(value, signatures) {
+  const text = typeof value === 'string' ? value.slice(0, 524288) : ''
+  return signatures.filter(row => row.literal.length >= 8 && text.includes(row.literal))
+    .slice(0, 24).map(row => ({ source: row.source, line: row.line }))
+}
+
 export function safeThreadFailure(detail, userCodes) {
   const extra = new Set(['binding_required','account_unavailable','binding_mismatch','stale_binding','pending_auth','reconnect_required','disconnected','quota_unknown','quota_exhausted','backend_unavailable','isolation_required','billing_unverified','subscription_rate_limited','provider_access_denied','provider_request_rejected','provider_temporarily_unavailable','invalid_credential_bundle','subscription_timeout','secret_store_unavailable','secret_not_found','credential_integrity_failed','ECONNRESET','ECONNREFUSED','ENOTFOUND','ETIMEDOUT','EPIPE'])
   const code = value => typeof value === 'string' && (Object.hasOwn(userCodes, value) || extra.has(value)) ? value : 'OTHER'
@@ -208,6 +217,12 @@ export async function runCommunity(env = process.env) {
   check(/^[a-f0-9]{40}$/.test(revision) && revision === env.MIKKA_COMMUNITY_REVISION, 'REVISION')
   const report = { kind: 'real-community-subscriptions', revision, cases: [], cleanup: {}, stage: 'source', status: 'failed',
     sourceRequests: [], credentialFixture: 'existing_authorized_access_projection', freshProviderOAuth: false, refreshGrantCopied: false, canonicalGrantPresent: false }
+  const publicErrors = (await execute('git', ['grep', '-n', '-E', '(Error|Refusal)\\(|error:|summary:|msg:', '--', 'lib', 'app', 'packages/daemon/src', 'packages/protocol/src'], { cwd: source, maxBuffer: 8 * 1024 * 1024 })).stdout
+  const signatures = publicErrors.split('\n').flatMap(line => {
+    const location = /^([^:]+):(\d+):/.exec(line)
+    return location ? [...line.matchAll(/(?:(?:Error|CodedError|ActionFailureError|Refusal)\(|\b(?:error|summary|msg):)\s*(['"])([^'"\n\\]{8,180})\1/g)]
+      .map(match => ({ source: location[1], line: Number(location[2]), literal: match[2] })) : []
+  })
   const name = 'mikka-community-' + env.GITHUB_RUN_ID
   const databasePassword = randomBytes(24).toString('hex'), key = randomBytes(32).toString('base64')
   const devPath = '/release-selfhost-' + env.GITHUB_RUN_ID
@@ -398,6 +413,10 @@ export async function runCommunity(env = process.env) {
       const connectionId = randomUUID(), secretName = 'mikka-byos-' + randomUUID()
       const fixture = accessFixture(s.raw, s.row, { ownerId: own.id, workspaceId: workspace.id, connectionId })
       await inf('/api/v4/secrets/' + secretName, 'POST', { projectId: PROJECT, environment: 'dev', secretPath: devPath, type: 'shared', secretValue: fixture.value }); createdSecrets.push(secretName)
+      const normalRead = await readAuthorizedProjection({ location: { project: PROJECT, environment: 'dev', path: devPath }, name: secretName,
+        clientId: custodyId, clientSecret: custodySecret, report: s.receipt })
+      check(sha(normalRead) === fixture.digest, 'FIXTURE_NORMAL_IDENTITY_READ')
+      s.receipt.fixtureNormalIdentityVerified = true
       // Connected metadata requires a grant reference even for this bounded
       // access-only fixture. Its deliberately absent grant cannot resolve in
       // the unused custody path; no canonical or refresh grant is created.
@@ -501,10 +520,24 @@ export async function runCommunity(env = process.env) {
             const journal = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/runs.json', { user: 'root' }))
             const local = journal.runs?.[runId]
             row.daemonRepository = safeRepositoryFailure(local?.error)
+            row.daemonSourceFailures = safeSourceFailures(local?.error, signatures)
+            row.daemonState = ['queued','preparing','running','paused','waiting_input','finishing','succeeded','failed','cancelled','stopped'].includes(local?.state) ? local.state : 'OTHER'
+            row.daemonStopReason = ['submitted','error','cancelled','blocked','device_lost','lease_expired','quota','asked_human','provider_failure'].includes(local?.stopReason) ? local.stopReason : 'OTHER'
             row.daemonAssignment = { remoteIsExpected: local?.assignment?.remoteUrl === 'https://github.com/alexj11324/Mikka.git',
               githubEndpointMatchesServer: typeof local?.assignment?.github?.endpoint === 'string' && new URL(local.assignment.github.endpoint).origin === origin,
-              githubTokenPrepared: Boolean(local?.assignment?.github?.token), modelCredentialWithheld: local?.credentialWithheld === true }
+              modelCredentialWithheld: local?.credentialWithheld === true }
           } catch { row.daemonDiagnosisUnavailable = true }
+          try {
+            const log = await sandbox.files.read('/home/user/.mikka/template-acceptance/logs/daemon.log', { user: 'root' })
+            row.daemonLogFailureClasses = safeRepositoryFailure(log)
+            row.daemonLogSourceFailures = safeSourceFailures(log, signatures)
+          } catch { row.daemonLogUnavailable = true }
+          try {
+            const ownRun = (await localPool.query('SELECT status,error,report FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3', [runId, own.id, deviceId])).rows[0]
+            row.serverSourceFailures = safeSourceFailures(JSON.stringify(ownRun), signatures)
+            row.serverErrorClasses = safeRepositoryFailure(ownRun?.error)
+          } catch { row.serverDiagnosisUnavailable = true }
+          try { row.serverLogSourceFailures = safeSourceFailures(await docker(['logs', '--tail', '150', name + '-app']), signatures) } catch { row.serverLogUnavailable = true }
           try {
             const { USER_ERROR_CODES } = await import(pathToFileURL(source + '/packages/protocol/src/user-error-codes.ts'))
             row.failureReceipt = safeThreadFailure(await community.rpc('agents.getIssueThread', [issueId, runId]), USER_ERROR_CODES)
@@ -517,7 +550,14 @@ export async function runCommunity(env = process.env) {
       }
       finally {
         if (!deviceId && sandbox) { try { const proof = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/device-proof.json', { user: 'root' })); if (UUID.test(proof.deviceId) && proof.harness === s.harness) deviceId = proof.deviceId } catch { /* registration may not have completed */ } }
-        if (runId) { try { await community.rpc('agents.stopRun', [runId]); await watchRun(community, { runId, issueId }, 45000, WebSocket, Date.now, true); row.cleanup.runStopped = true } catch { row.cleanup.runStopped = false } }
+        if (runId) { try {
+          const ended = detail => detail.thread?.attempts?.length && detail.thread.attempts.every(attempt => ['succeeded','completed','failed','stopped','cancelled'].includes(attempt.status))
+          if (!ended(await community.rpc('agents.getIssueThread', [issueId, runId]))) {
+            await community.rpc('agents.stopRun', [runId])
+            await watchRun(community, { runId, issueId }, 45000, WebSocket, Date.now, new Set([runId]))
+          }
+          row.cleanup.runStopped = true
+        } catch { row.cleanup.runStopped = false } }
         if (deviceId) { try { await community.rpc('agents.removeDevice', [deviceId]); row.cleanup.deviceRemoved = true } catch { row.cleanup.deviceRemoved = false } }
         if (sandbox) { try { await sandbox.kill(); row.cleanup.vmStopped = true; journal.vms = journal.vms.filter(id => id !== sandbox.sandboxId); await saveJournal() } catch { row.cleanup.vmStopped = false } }
       }

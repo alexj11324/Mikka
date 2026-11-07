@@ -154,3 +154,5 @@ test('Apple API denial preserves action/status without exposing raw provider err
 // Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.
 
 // Repository failures retain only fixed classifications; cleanup awaits the terminal live push.
+
+// Verify the normal fixture reader before VMs; source-only error matches retain no runtime messages.
