@@ -7,6 +7,8 @@ export interface ArtifactSummary {
   kind: ArtifactKind
   title: string
   latestVersion: number
+  /** Set on a Factory acceptance report: the task whose PR it reviews, so its card can say the PR's state. */
+  acceptanceTaskId?: string | null
 }
 
 export interface ArtifactVersionInfo {
@@ -32,6 +34,8 @@ export interface ArtifactDetail extends ArtifactSummary {
   media?: ArtifactMedia[]
   /** Owner-only navigation hint. Factory reads and actions still authorize this task independently. */
   acceptanceTaskId?: string | null
+  /** A PR report's task id (「ALEX-84」), for the window title; only the owner's reads say. */
+  issueKey?: string | null
 }
 
 /** One screenshot or recording an acceptance report links to, served by `/api/captures/<captureId>`. */

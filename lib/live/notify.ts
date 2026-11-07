@@ -39,7 +39,12 @@ export async function sendLiveInvalidations(scope: LiveScope, events: LiveInvali
 export function scheduleLive(work: () => Promise<void>) {
   // after() may invoke this after the request scope has ended. Scope is
   // retained for fresh reads; permissions are still resolved by the work.
-  afterJob('after:live-notify', async () => { try { await work() } catch { console.warn('[live] committed invalidation failed') } }, { orRun: true, retainContext: true })
+  afterJob('after:live-notify', async () => {
+    try { await work() } catch (error) {
+      // By name and code only (decision 2026-11-05-0330): a message can carry database content.
+      console.warn('[live] committed invalidation failed', { name: (error as Error | undefined)?.name, code: (error as { code?: unknown } | undefined)?.code })
+    }
+  }, { orRun: true, retainContext: true })
 }
 
 export function notifyLive(scope: LiveScope, events: LiveInvalidation[]) {

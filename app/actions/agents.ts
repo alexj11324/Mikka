@@ -21,6 +21,7 @@ import {
 } from '@/lib/db/schema'
 import { issueDeviceToken } from '@/lib/device-link'
 import { deviceOnlineStates } from '@/lib/device-presence'
+import { devicePresenceView, type PresenceReason } from '@/lib/device-scheduling'
 import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
 import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
@@ -67,6 +68,8 @@ export interface DeviceView {
   arch: string | null
   harnesses: HarnessInfo[]
   online: boolean
+  presenceReason?: PresenceReason
+  offlineDays?: number | null
   /** 参与调度 (decision 2026-11-02-1400): off, Mikka never sends this device a run. */
   enabled: boolean
   lastSeenAt: Date | null
@@ -120,6 +123,7 @@ async function readDevices(userId: string) {
     id: device.id, name: device.name, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
     harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
     online: presence.get(device.id) ?? false,
+    ...devicePresenceView(device.lastSeenAt, presence.get(device.id) ?? false, observedAt),
     repos: repos.filter(repo => repo.deviceId === device.id).map(repo => ({
       id: repo.id, repoPath: repo.repoPath, baseBranch: repo.baseBranch, verifyCommand: repo.verifyCommand,
     })),

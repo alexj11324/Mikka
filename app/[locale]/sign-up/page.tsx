@@ -10,7 +10,7 @@ import { auth, githubEnabled, googleEnabled } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
 import { COMPOSIO_AUTH_CALLBACK_PATH, safeAuthReturn } from '@/lib/auth-return'
 import { oauthAccountNotLinkedProvider } from '@/lib/auth-error'
-import { desktopAuthCallbackPath, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
+import { desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale()
@@ -30,12 +30,12 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
   const composioResume = next === COMPOSIO_AUTH_CALLBACK_PATH ? withBasePath(next) : undefined
   const session = await auth.api.getSession({ headers: await headers() })
   const desktopRefused = Boolean(desktopFlow && query.oauth)
-  if (session?.user && !addAccount && desktopFlow && !desktopRefused) plainRedirect(desktopAuthCallbackPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback))
-  if (session?.user && !addAccount && !desktopRefused) {
+  // A desktop handoff with a web session shows the account first (AuthForm).
+  if (session?.user && !addAccount && !desktopFlow) {
     if (composioResume) plainRedirect(next)
     const locale = await getLocale()
     if (next.startsWith('/?')) plainRedirect(`${getPathname({ locale, href: '/' })}${next.slice(1)}`)
     redirect({ href: next, locale })
   }
-  return <AuthForm emailEnabled={await emailSignInEnabled()} addAccount={addAccount} next={next} mode="sign-up" googleEnabled={googleEnabled} githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} oauthAccountNotLinked={oauthAccountNotLinkedProvider(query.error, query.provider)} continueComposio={Boolean(composioResume)} continueURL={composioResume} desktopFlow={desktopFlow} />
+  return <AuthForm emailEnabled={await emailSignInEnabled()} addAccount={addAccount} next={next} mode="sign-up" googleEnabled={googleEnabled} githubEnabled={githubEnabled} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} oauthAccountNotLinked={oauthAccountNotLinkedProvider(query.error, query.provider)} continueComposio={Boolean(composioResume)} continueURL={composioResume} desktopFlow={desktopFlow} signedInAs={session?.user && desktopFlow && !desktopRefused ? { name: session.user.name, email: session.user.email, image: session.user.image } : null} />
 }

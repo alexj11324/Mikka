@@ -14,7 +14,7 @@ import { Badge } from '@/components/reui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
-import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, type ToolAction } from '@/lib/coordinator/tool-activity'
+import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, toolUnknown, type ToolAction } from '@/lib/coordinator/tool-activity'
 import { CitationChip, useAgentCitations } from '@/components/workspace/agent-citations'
 import { threadGroupOfRun } from '@/components/workspace/thread-status-icon'
 import { HarnessLabel } from '@/components/labels/entity-labels'
@@ -72,16 +72,23 @@ function ThinkingRow({ running, title, text, onOpen }: { running: boolean; title
   </TraceCollapsible>
 }
 
-/** A tool's name as the person reads it: its label, or its own name spelled out; never 「使用工具」 (R-83). */
+/**
+ * A tool's name as the person reads it: its label, or its own name spelled out; never 「使用工具」 (R-83). A tool the
+ * bot does not have reads 「未知步骤」, not the name the model made up.
+ */
 function useToolLabel() {
   const t = useTranslations('Coordinator.activity')
-  return (name: string) => t.has(`tools.${name}` as never) ? t(`tools.${name}` as never) : name.replace(/^mcp__/, '').replace(/__|_/g, ' ')
+  return (name: string, unknown = false) => unknown ? t('unknownStep')
+    : t.has(`tools.${name}` as never) ? t(`tools.${name}` as never) : name.replace(/^mcp__/, '').replace(/__|_/g, ' ')
 }
 
-/** A failure's reason in words: a known error code in the person's language, any other code or message as it is. */
+/**
+ * A failure's reason in words: a known error code in the person's language. Anything else (an SDK error class, an
+ * English message) reads 「没执行成功，已跳过」; the raw text stays under 原始数据 (decision 2026-11-05-0330).
+ */
 function useFailureReason() {
   const t = useTranslations('Coordinator.activity')
-  return (reason: string | null) => reason && t.has(`errors.${reason}` as never) ? t(`errors.${reason}` as never) : reason
+  return (reason: string | null) => !reason ? null : t.has(`errors.${reason}` as never) ? t(`errors.${reason}` as never) : t('skipped')
 }
 
 /**
@@ -91,7 +98,7 @@ function useFailureReason() {
  */
 function ToolRow({ tool, live }: { tool: ChatTool; live: boolean }) {
   const t = useTranslations('Coordinator.activity')
-  const label = useToolLabel()(tool.name)
+  const label = useToolLabel()(tool.name, toolUnknown(tool))
   const reasonText = useFailureReason()
   const sources = useAgentCitations()?.sources
   // A task or thread named by id reads as its number or name, as the chips in the words do.
@@ -227,7 +234,8 @@ function ToolGroup({ tools, live }: { tools: readonly ChatTool[]; live: boolean 
   const LeadIcon = ACTION_ICONS[parts[0]?.action ?? 'other']
   // Calls left running when the reply ended never finished: they failed too.
   const unfinished = live ? [] : tools.filter(tool => tool.state === 'running')
-  const failedLabels = [...new Set([...failedNames, ...unfinished.map(tool => tool.name)])].map(label)
+  const unknown = new Set(tools.filter(toolUnknown).map(tool => tool.name))
+  const failedLabels = [...new Set([...failedNames, ...unfinished.map(tool => tool.name)].map(name => label(name, unknown.has(name))))]
   const current = running ? [...tools].reverse().find(tool => tool.state === 'running') : undefined
   const shown = parts.slice(0, 3).map(part => t(`summary.${part.action}` as never, { count: part.count } as never))
   // Only what succeeded is said as done; when nothing did, the line names the calls that failed (R-83).

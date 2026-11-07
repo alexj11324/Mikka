@@ -14,10 +14,12 @@ the probe runs without a login), and the run hands the model to the CLI.
 When the CLI reported a slot for it, the slot runs. An API key's model is
 unchanged: the Agent installed is enough.
 
-`subscriptionBroker` is required because a subscription run takes a per-run
-access lease from the daemon; the claim of a subscription run on a computer
-without it is refused (`app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts`).
-A local daemon without it is one from before that lease.
+`subscriptionBroker` is the protocol's compatibility name for a daemon that
+can receive a selected subscription assignment. A computer without this
+capability must update before claiming subscription work. Under
+[1800](2026-11-06-1800-machine-is-the-execution-boundary.md) the assignment delivers real credentials
+up front and the CLI uses the provider directly; the legacy capability name
+does not require a provider proxy or per-call remote permission check.
 
 **Why it cannot run**, in 允许使用的模型 and on the 没有能跑这个任务的模型 card,
 is told from the computer closest to running it, by name when it is the only

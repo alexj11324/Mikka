@@ -61,7 +61,10 @@ test('beUI 代码块在 OpenUI 和 Markdown 中真正接入，等待状态使用
   const chat = await readFile(new URL('../components/coordinator/coordinator-chat.tsx', import.meta.url), 'utf8')
   assert.match(activity, /from '@\/components\/ui\/trace'/)
   assert.doesNotMatch(activity, /ai-elements/)
-  assert.match(chat, /<ReplyWaiting \/>/)
+  // The wait before a reply goes through the chat-message slot; its default is the Trace row (docs/ui-overlay.md).
+  const slot = await readFile(new URL('../components/slots/chat-message.tsx', import.meta.url), 'utf8')
+  assert.match(chat, /<ChatWaiting speaker=\{speaker\} \/>/)
+  assert.match(slot, /<ReplyWaiting \/>/)
   await assert.rejects(readFile(new URL('../components/agents/loading-states/thinking-shimmer.tsx', import.meta.url), 'utf8'))
 })
 

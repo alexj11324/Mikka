@@ -89,6 +89,65 @@ session only after the OS keychain encrypts it. Signup stays in the system
 browser with its existing Turnstile protection. The local protocol is for
 packaged assets, not an OAuth callback handler.
 
+The loopback's page then opens the app link `mikka-auth://auth/done?id=…`
+(`mikka-dev-auth` for Mikka Dev; `protocols` in the electron-builder configs),
+so the system brings the app to the front: macOS does not let an app take the
+front from the browser by itself. The link carries no code or page; main
+accepts only an id it issued in the last ten minutes (`src/main/app-link.ts`,
+`open-url` on macOS, `second-instance` on Windows and Linux). The page then
+tries to close its tab and otherwise shows 已登录，可以关闭此页 with 打开 Mikka.
+
+In the browser, `continue=google` or `continue=github` starts that provider
+without another click. A browser that already has a Mikka web session shows
+that account first (以 <名字> 继续 / 换个账号); 换个账号 opens the provider's
+account picker.
+
+## Servers
+
+The app connects to Mikka Cloud (the build's `MIKKA_DESKTOP_APP_URL`) or to a
+self-hosted Mikka server (#1557; the server side is #1556). The sign-in page
+names the server under its card; 更改 opens the server choice. A self-hosted
+address is read once at `<address>/api/desktop/discovery` (then
+`<address>/mikka/api/desktop/discovery` for a bare host) before it can be
+chosen. Main accepts the answer only from that exact origin, never through a
+redirect, and uses the base path it reports. Plain HTTP is accepted only for
+`127.0.0.1`, `localhost` and `[::1]`.
+
+The discovery document the app reads (`src/main/server-discovery.ts`):
+
+```json
+{
+  "name": "Acme Mikka",
+  "version": "2026.11.6",
+  "edition": "community",
+  "basePath": "/mikka",
+  "desktopProtocol": { "min": 0, "max": 1 },
+  "signIn": { "google": false, "github": true, "email": true },
+  "minDesktopVersion": null
+}
+```
+
+`desktopProtocol` may also be a list of versions and `signIn` a list of method
+names. A range that ends below this app's protocol (1) asks for a server
+update; one that starts above it, a `minDesktopVersion` above an installed
+release, or #1415's `426` / `desktop_client_update_required` asks for an app
+update. A server that has no discovery but answers `/api/version` is an older
+Mikka and asks for a server update.
+
+Each account in the encrypted vault records its server (`server`, absent for
+the built-in one). Its bearer is sent only there; the same user id from another
+server is refused. Accounts on different servers stay signed in together and
+the switcher names each account's server when they differ. The page reloads
+when the current server changes, so `app.serverUrl` (share links, browser
+pages), `openExternal`, the loopback sign-in (`begin`, `return`, `exchange`),
+the live ticket and the local daemon's `--server` all follow the current
+account. The renderer CSP has no server origin: the page reaches servers only
+through main. `servers.json` beside the vault holds the sign-in target and each
+server's public name and version, never a credential. Settings › 账户 › 服务器
+switches (sign in on another server as another account) and disconnects (signs
+out every account on that server). The hosted rollback renderer
+(`MIKKA_DESKTOP_RENDERER=hosted`) stays on the built-in server.
+
 ## Transition and rollback
 
 Bundled mode is the default. Set `MIKKA_DESKTOP_RENDERER=hosted` when launching

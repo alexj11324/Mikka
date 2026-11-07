@@ -86,7 +86,7 @@ const components = (title: string, media: readonly ArtifactMedia[]): Components 
 /** Where the selection sits on screen, read when the toolbar positions itself. */
 
 
-export function ArtifactDocument({ title, markdown, compareWith, author, meta, quoted, quoting, onQuote, media = NO_MEDIA }: {
+export function ArtifactDocument({ title, markdown, compareWith, author, meta, quoted, quoting, onQuote, media = NO_MEDIA, lead }: {
   title: string
   markdown: string
   /** The newer version's text: when given, its changes are marked into this one. */
@@ -102,6 +102,8 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
   onQuote?: (text: string) => void
   /** A Factory acceptance report's captures: its recording links play in place. */
   media?: readonly ArtifactMedia[]
+  /** Drawn above the text; once it has content it stands in for the title (a PR's report, P1). */
+  lead?: ReactNode
 }) {
   const articleRef = useRef<HTMLDivElement>(null)
   const [selection, setSelection] = useState<{ text: string; range: Range } | null>(null)
@@ -129,10 +131,12 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
   }, [])
 
   return <div className="min-h-0 flex-1 overflow-y-auto" onMouseUp={readSelection} onKeyUp={readSelection}>
-    <article className="mx-auto w-full max-w-[40rem] px-6 pt-10 pb-16 md:px-10">
-      <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
-      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">{author.authorName && <ArtifactAuthorAvatar author={author} />}{meta}</p>
-      <div ref={articleRef} data-slot="artifact-document" className="mt-6">
+    <article className="group/doc mx-auto w-full max-w-[40rem] px-6 pt-10 pb-16 md:px-10 has-[[data-slot=artifact-lead]:not(:empty)]:max-w-[56rem]">
+      {lead}
+      <h1 className="text-2xl font-semibold text-foreground group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:hidden">{title}</h1>
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:hidden">{author.authorName && <ArtifactAuthorAvatar author={author} />}{meta}</p>
+      {/* Under a PR report lead the report's opening paragraph (the agent's summary) is already in 改动: shown once. */}
+      <div ref={articleRef} data-slot="artifact-document" className="mt-6 group-has-[[data-changes-open]]/doc:hidden group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:[&>p:first-child]:hidden">
         <Markdown remarkPlugins={plugins} components={parts}>{source}</Markdown>
       </div>
     </article>

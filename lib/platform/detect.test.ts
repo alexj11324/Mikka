@@ -45,6 +45,7 @@ test('an electron bridge reports every subsystem it exposes', () => {
     'quota.snapshot': true,
     'preview.scheme': true,
     'settings.local': true,
+    'server.select': false,
   })
 })
 

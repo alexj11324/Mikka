@@ -30,6 +30,16 @@ function stream(pieces: string[], end: RunChunk | null, m = masker()) {
 }
 
 describe("daemon secret masking (before upload)", () => {
+  it('adds a renewed token without losing buffered text or older credential coverage', () => {
+    const m = masker(), chunks = m.chunk(delta(`before ${SECRET.slice(0, 10)}`))
+    const renewed = 'renewed-access-token-123456789'
+    m.add([{ name: 'RENEWED', value: renewed }])
+    chunks.push(...m.chunk(delta(SECRET.slice(10) + ` and ${renewed.slice(0, 12)}`)))
+    chunks.push(...m.chunk(delta(renewed.slice(12) + ' after')), ...m.flush())
+    expect(joined(chunks)).toBe('before [secret:A] and [secret:RENEWED] after')
+    expect(JSON.stringify(chunks)).not.toContain(SECRET)
+    expect(JSON.stringify(chunks)).not.toContain(renewed)
+  })
   it("no secrets (or only short ones) means no masker: output is untouched", () => {
     expect(createRunMasker([])).toBeNull()
     expect(createRunMasker([{ name: "S", value: "1234567" }])).toBeNull()

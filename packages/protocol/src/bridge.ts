@@ -202,6 +202,13 @@ export const LOCAL_RECONNECT = "this-computer-reconnect"
 export interface SshInstallState {
   id: string; target: string; step: 'login' | 'check' | 'install' | 'service' | 'connect'
   status: 'fingerprint' | 'running' | 'online' | 'failed'; deviceId?: string; fingerprint?: string; keyType?: string; reason?: string; retryable?: boolean
+  /** Stable failure details; the full redacted process output stays in a local private log. */
+  error?: {
+    code: 'installer_failed'
+    cause: 'node_required' | 'unsupported_os' | 'npm_permission' | 'npm_cache_permission' | 'cancelled' | 'timeout' | 'service_failed' | 'connection_failed' | 'command_failed'
+    remedy: 'install_node_22' | 'use_supported_os' | 'check_user_directory' | 'retry' | 'retry_service' | 'retry_connection' | 'view_log'
+    logPath?: string
+  }
 }
 
 /** Main reads this through the authenticated browser session, never IPC input. */
@@ -351,4 +358,4 @@ export interface MikkaBridge {
     html(html: string): Promise<string>
   }
 }
-export type { BundledBridge, BundledSession, BundledSignIn, BundledLiveEvent, BundledViewerInput, BundledViewerEvent, BundledViewerResult } from './bundled'
+export type { BundledBridge, BundledSession, BundledSignIn, BundledLiveEvent, BundledViewerInput, BundledViewerEvent, BundledViewerResult, BundledServer, BundledServerState, BundledServerProbe } from './bundled'

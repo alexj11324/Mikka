@@ -5,11 +5,13 @@ import { worktreeGitDir } from "../agents/publish"
 export async function fixedCheckSnapshot(
   repoPath: string,
   worktree: string,
-  sha: string
+  sha: string,
+  signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted()
   if (!/^[a-f0-9]{40}$/.test(sha))
     throw new Error("Check requires an exact candidate SHA")
-  const gitDir = await worktreeGitDir(repoPath, worktree)
+  const gitDir = await worktreeGitDir(repoPath, worktree, signal)
   const git = async (...args: string[]) =>
     (
       await execa(
@@ -25,6 +27,8 @@ export async function fixedCheckSnapshot(
           cwd: worktree,
           env: { GIT_DIR: gitDir, GIT_WORK_TREE: worktree },
           stdin: "ignore",
+          cancelSignal: signal,
+          killDescendants: true,
         }
       )
     ).stdout.trim()

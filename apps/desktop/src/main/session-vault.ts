@@ -2,6 +2,7 @@ import { mkdir, open, rename, rm } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { join } from 'node:path'
 import type { BundledSession } from '@mikka/protocol/bridge'
+import { canonicalServerUrl } from './server-discovery'
 
 export interface EncryptedStorage {
   available(): Promise<boolean>
@@ -9,7 +10,8 @@ export interface EncryptedStorage {
   decrypt(value: Buffer): Promise<string>
 }
 
-export interface StoredSession { token: string; identity: BundledSession; workspace?: string; sessionCache?: string }
+/** `server` is the account's own server (#1557); absent means the vault's own, built-in server. */
+export interface StoredSession { token: string; identity: BundledSession; workspace?: string; sessionCache?: string; server?: string }
 export interface StoredAccounts { activeUserId: string | null; accounts: StoredSession[] }
 export const MAX_STORED_ACCOUNTS = 5
 
@@ -101,11 +103,17 @@ export function publicSession(value: unknown): BundledSession | null {
 
 export function storedSession(value: unknown): StoredSession | null {
   if (!value || typeof value !== 'object') return null
-  const candidate = value as { token?: unknown; identity?: unknown; workspace?: unknown; sessionCache?: unknown }
+  const candidate = value as { token?: unknown; identity?: unknown; workspace?: unknown; sessionCache?: unknown; server?: unknown }
   const identity = publicSession(candidate.identity)
+  let server: string | undefined
+  if (candidate.server !== undefined) {
+    // A stored account never widens to another origin: the exact probed base or nothing.
+    try { server = canonicalServerUrl(String(candidate.server)) } catch { return null }
+    if (typeof candidate.server !== 'string' || candidate.server !== server) return null
+  }
   // oxlint-disable-next-line no-control-regex -- Credentials cannot contain header separators or control bytes.
   return identity && typeof candidate.token === 'string' && candidate.token.length >= 16 && candidate.token.length <= 4096 && !/[\s\x00-\x1f\x7f]/.test(candidate.token)
-    ? { identity, token: candidate.token, ...(typeof candidate.workspace === 'string' && WORKSPACE_ID.test(candidate.workspace) ? { workspace: candidate.workspace } : {}), ...(validSessionCache(candidate.sessionCache) ? { sessionCache: candidate.sessionCache } : {}) } : null
+    ? { identity, token: candidate.token, ...(typeof candidate.workspace === 'string' && WORKSPACE_ID.test(candidate.workspace) ? { workspace: candidate.workspace } : {}), ...(validSessionCache(candidate.sessionCache) ? { sessionCache: candidate.sessionCache } : {}), ...(server ? { server } : {}) } : null
 }
 
 /** All retained identities are main-process data. Reject a malformed account
@@ -128,7 +136,8 @@ export function storedAccounts(value: unknown): StoredAccounts | null {
   return { activeUserId: candidate.activeUserId, accounts }
 }
 
-/** The file contains only OS-keychain ciphertext and is scoped to the backend.
+/** The file contains only OS-keychain ciphertext and is scoped to the app's
+ * built-in backend; accounts on other servers name theirs (`server`).
  * No plaintext/basic_text fallback; an unavailable keychain fails sign-in closed. */
 export class SessionVault {
   private readonly path: string

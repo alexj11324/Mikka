@@ -89,9 +89,12 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
 }
 
 /** Titles and latest versions of the person's artifacts among `ids`, for cards in the chat. */
+/** The Factory task whose acceptance report this artifact is (#1276), so a card can show the PR's state; null for any other artifact. */
+const acceptanceTask = sql<string | null>`(SELECT f."taskId" FROM factory_acceptance_artifacts f WHERE f."artifactId"=${artifacts.id} LIMIT 1)`
+
 export async function artifactSummaries(userId: string, ids: readonly string[]): Promise<Record<string, ArtifactSummary>> {
   if (!ids.length) return {}
-  const rows = await db.select({ id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion })
+  const rows = await db.select({ id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, acceptanceTaskId: acceptanceTask })
     .from(artifacts).where(and(eq(artifacts.userId, userId), inArray(artifacts.id, [...new Set(ids)])))
   return Object.fromEntries(rows.map(row => [row.id, row]))
 }
@@ -131,6 +134,14 @@ export async function readArtifact(userId: string, artifactId: string): Promise<
   return { ...found, botId: run?.botId ?? null, shared: Boolean(live), ...await acceptanceReport(artifactId) }
 }
 
+/** A PR report's task id (「ALEX-84」) for its window title; null for any other artifact or a task the person no longer sees. */
+export async function reportIssueKey(userId: string, found: ArtifactDetail): Promise<string | null> {
+  if (!found.acceptanceTaskId || !found.issueId) return null
+  const [keyed] = await withIssueKeys(userId, [{ id: found.id, kind: found.kind, title: found.title, latestVersion: found.latestVersion,
+    runId: found.runId, issueId: found.issueId, botId: null, authorName: null, updatedAt: new Date() }])
+  return keyed?.issueKey ?? null
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
@@ -151,7 +162,7 @@ async function acceptanceReport(artifactId: string): Promise<Pick<ArtifactDetail
 
 const LIST_LIMIT = 200
 
-const listColumns = { id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, runId: artifacts.runId, issueId: artifacts.issueId, botId: agentRuns.botId, updatedAt: artifacts.updatedAt, authorName: artifactVersions.authorName }
+const listColumns = { id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, acceptanceTaskId: acceptanceTask, runId: artifacts.runId, issueId: artifacts.issueId, botId: agentRuns.botId, updatedAt: artifacts.updatedAt, authorName: artifactVersions.authorName }
 /** The run that made it, for its bot (a run is the person's own, as the artifact is). */
 const madeBy = and(eq(agentRuns.id, artifacts.runId), eq(agentRuns.userId, artifacts.userId))
 const latestVersion = and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, artifacts.latestVersion))

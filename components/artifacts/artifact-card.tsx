@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { AppWindow, ChevronRight, FileText, type LucideProps } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -26,15 +27,18 @@ export function useArtifactMeta() {
   return (artifact: Pick<ArtifactSummary, 'kind' | 'latestVersion'>) => t('cardMeta', { kind: t(artifact.kind === 'html' ? 'kindPage' : 'kindDocument'), version: artifact.latestVersion })
 }
 
-/** One output in the chat (Figma Chat/ArtifactCard 178:11656): sits under the text bubble, opens the reader. */
-export function ArtifactCard({ artifact, onOpen }: { artifact: ArtifactSummary; onOpen: (id: string) => void }) {
+/**
+ * One output in the chat (Figma Chat/ArtifactCard 178:11656): sits under the text bubble, opens the reader.
+ * A PR's acceptance report passes its own title, icon and state line (「Artifact · 待你审」, decision 2026-11-06-1615).
+ */
+export function ArtifactCard({ artifact, onOpen, title, meta: line, icon }: { artifact: ArtifactSummary; onOpen: (id: string) => void; title?: string; meta?: string; icon?: ReactNode }) {
   const meta = useArtifactMeta()
   return <Button variant="ghost" data-slot="artifact-card" onClick={() => onOpen(artifact.id)}
     className="h-16 w-full max-w-[26.25rem] justify-start gap-3 rounded-xl bg-muted/60 px-3 text-left font-normal hover:bg-muted">
-    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-foreground"><ArtifactKindIcon kind={artifact.kind} className="size-5" /></span>
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background text-foreground">{icon ?? <ArtifactKindIcon kind={artifact.kind} className="size-5" />}</span>
     <span className="flex min-w-0 flex-1 flex-col">
-      <span className="truncate text-sm font-medium text-foreground">{artifact.title}</span>
-      <span className="truncate text-xs text-muted-foreground">{meta(artifact)}</span>
+      <span className="truncate text-sm font-medium text-foreground">{title ?? artifact.title}</span>
+      <span className="truncate text-xs text-muted-foreground">{line ?? meta(artifact)}</span>
     </span>
     <ChevronRight data-icon="inline-end" className="text-muted-foreground" />
   </Button>

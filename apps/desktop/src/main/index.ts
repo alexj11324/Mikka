@@ -29,6 +29,9 @@ import { BundledLive } from './bundled-live'
 import { BundledViewer } from './bundled-viewer'
 import { registerBundledBridge } from './bundled-bridge'
 import { SessionVault } from './session-vault'
+import { ServerDirectory } from './server-directory'
+import { BundledServers } from './bundled-servers'
+import { AppLinks, appLinkFromArgv, appLinkScheme } from './app-link'
 import { pickRepo } from './repo-picker'
 import { openBundledWebPage } from './bundled-web'
 import { markStartup } from '../startup'
@@ -66,6 +69,32 @@ let authTimer: NodeJS.Timeout | null = null
 let bundledAuth: BundledAuth | null = null
 let bundledLive: BundledLive | null = null
 let bundledViewer: BundledViewer | null = null
+/** The server the open page was loaded for; its preload reads `app.serverUrl` once. */
+let shownServer: string | null = null
+let gateWindow: BrowserWindow | null = null
+// A browser sign-in ends on a page that opens this app's link; the system then
+// brings the app forward, which macOS does not let the app do by itself.
+const appLinks = new AppLinks(appLinkScheme(FLAVOR))
+
+function bringToFront(): void {
+  if (gateWindow && !gateWindow.isDestroyed()) { gateWindow.show(); gateWindow.focus(); return }
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    if (app.isReady()) createMainWindow()
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  // Opened by the person's click in the browser, so taking the front is expected.
+  if (process.platform === 'darwin') app.focus({ steal: true })
+  mainWindow.focus()
+}
+
+// macOS delivers an opened link here, before `ready` on a cold start. A link
+// this process did not hand out (or one that expired) is ignored.
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  if (appLinks.accepts(url)) bringToFront()
+})
 
 function closeAuthServer(): void {
   if (authTimer) { clearTimeout(authTimer); authTimer = null }
@@ -75,8 +104,8 @@ function closeAuthServer(): void {
 /**
  * Starts a one-shot HTTP listener bound to 127.0.0.1 and returns its callback.
  * The renderer registers that callback with the web app before opening the
- * browser, so the token can only be delivered to this process. No custom URL
- * scheme is registered.
+ * browser, so the token can only be delivered to this process. The app link
+ * on its last page only brings the window forward; it carries no credential.
  */
 async function prepareAuth(rawState: unknown): Promise<string> {
   const state = desktopAuthState(rawState)
@@ -85,6 +114,7 @@ async function prepareAuth(rawState: unknown): Promise<string> {
   const listener = await startLoopbackAuth({
     state,
     appUrl: APP_URL,
+    link: appLinks.issue(),
     onFinish: finish => {
       authServer = null
       if (authTimer) { clearTimeout(authTimer); authTimer = null }
@@ -175,6 +205,24 @@ function registerSession(): void {
     }
     callback({ requestHeaders: details.requestHeaders })
   })
+}
+
+/** The current account's server (#1557), or the sign-in page's; the build's server in hosted mode. */
+function currentServer(): string {
+  return bundledAuth?.serverUrl() ?? APP_URL
+}
+
+/** A page keeps the server it loaded with. When the window's server changes,
+ * the page loads again so nothing from the previous server stays on screen. */
+function reloadForServer(): boolean {
+  const server = currentServer()
+  if (shownServer === null || server === shownServer) return false
+  shownServer = server
+  if (!mainWindow || mainWindow.isDestroyed()) return true
+  let english = false
+  try { english = /^\/mikka\/en(?:\/|$)/.test(new URL(mainWindow.webContents.getURL()).pathname) } catch { /* not a page yet */ }
+  void mainWindow.loadURL(english ? `${RENDERER_URL}/en` : RENDERER_URL)
+  return true
 }
 
 function handleNavigation(event: Electron.Event, url: string): void {
@@ -337,7 +385,6 @@ const updates = new Updates(autoUpdater, {
   }
 })
 
-let gateWindow: BrowserWindow | null = null
 let gate: UpdateGate | null = null
 
 /**
@@ -404,7 +451,8 @@ function runUpdateGate(open: () => void): void {
 async function enforceMinimumVersion(): Promise<void> {
   if (!app.isPackaged || FLAVOR === 'dev' || gate) return
   try {
-    const response = await session.fromPartition(PARTITION).fetch(`${APP_URL.replace(/\/$/, '')}/api/version`, { headers: { origin: APP_ORIGIN }, redirect: 'error', cache: 'no-store' })
+    const server = currentServer()
+    const response = await session.fromPartition(PARTITION).fetch(`${server.replace(/\/$/, '')}/api/version`, { headers: { origin: new URL(server).origin }, redirect: 'error', cache: 'no-store' })
     if (!response.ok) return
     const { minDesktopVersion } = await response.json() as { minDesktopVersion?: unknown }
     if (typeof minDesktopVersion !== 'string' || meetsMinimumVersion(APP_VERSION, minDesktopVersion)) return
@@ -493,10 +541,16 @@ function installMenu(): void {
 
 async function start(): Promise<void> {
   markStartup('main.ready')
+  // The packaged Info.plist (electron-builder `protocols`) declares the scheme;
+  // this makes this build its default handler. An unpackaged run would register Electron itself.
+  if (app.isPackaged) app.setAsDefaultProtocolClient(appLinks.scheme)
   registerSession()
   let restoring = Promise.resolve()
   if (BUNDLED) {
     const backend = session.fromPartition(`${PARTITION}-backend`)
+    // Which server the sign-in page targets; public facts only (server-directory.ts).
+    const directory = new ServerDirectory(join(app.getPath('userData'), 'servers.json'), APP_URL)
+    shownServer = directory.target()
     const vault = new SessionVault(join(app.getPath('userData'), 'credentials'), APP_URL, {
       available: async () => await safeStorage.isAsyncEncryptionAvailable() && (process.platform !== 'linux' || !['basic_text', 'unknown'].includes(safeStorage.getSelectedStorageBackend())),
       encrypt: value => safeStorage.encryptStringAsync(value),
@@ -506,9 +560,14 @@ async function start(): Promise<void> {
       serverUrl: APP_URL, version: APP_VERSION, vault,
       fetch: (url, init) => backend.fetch(url, init),
       openExternal: url => shell.openExternal(url),
+      appLink: () => appLinks.issue(),
+      target: directory.target(),
+      targetChanged: url => directory.follow(url),
+      describe: url => { const known = directory.info(url); return { url: known.url, cloud: directory.isCloud(url), name: known.name } },
       changed: () => {
         bundledLive?.closeAll()
         bundledViewer?.closeAll()
+        if (reloadForServer()) return
         for (const contents of webContents.getAllWebContents()) if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.sessionChanged)
       },
       scopeChanged: () => { bundledLive?.closeAll(); bundledViewer?.closeAll() },
@@ -523,10 +582,10 @@ async function start(): Promise<void> {
     // Open the first backend socket while the OS keychain and local renderer
     // initialize. BundledAuth has validated this compiled origin; preconnect
     // sends no application HTTP request or session credential.
-    backend.preconnect({ url: APP_ORIGIN, numSockets: 1 })
+    backend.preconnect({ url: new URL(directory.target()).origin, numSockets: 1 })
     markStartup('main.backend.preconnect')
     markStartup('main.restore.start')
-    restoring = bundledAuth.restore().then(() => { markStartup('main.restore.end') })
+    restoring = bundledAuth.restore().then(() => { markStartup('main.restore.end'); reloadForServer() })
     bundledLive = new BundledLive(bundledAuth, (owner, event) => {
       const contents = webContents.fromId(owner)
       if (contents && !contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.liveEvent, event)
@@ -535,11 +594,16 @@ async function start(): Promise<void> {
       const contents = webContents.fromId(owner)
       if (contents && !contents.isDestroyed() && isTrustedFrame(contents.getURL(), PAGE_URL)) contents.send(BUNDLED_IPC.viewerEvent, event)
     })
-    registerBundledBridge(bundledAuth, bundledLive, bundledViewer)
+    registerBundledBridge(bundledAuth, bundledLive, bundledViewer, new BundledServers(bundledAuth, directory, {
+      fetch: (url, init) => backend.fetch(url, init),
+      appVersion: APP_VERSION,
+      enforceMinimum: app.isPackaged && FLAVOR === 'prod',
+    }))
     session.fromPartition(PARTITION).protocol.handle('mikka', bundledProtocol(join(__dirname, 'renderer'), bundledAuth))
   }
   registerBridge({
     appUrl: APP_URL,
+    serverUrl: currentServer,
     rendererUrl: PAGE_URL,
     flavor: FLAVOR,
     mintEnrollment: async () => {
@@ -553,10 +617,11 @@ async function start(): Promise<void> {
       return body.token
     },
     openExternal: async url => {
-      const target = appExternalUrl(url, APP_URL)
-      if (!target) throw new Error('openExternal accepts only app-origin HTTP(S) URLs')
       await bundledAuth?.whenRestored()
-      if (bundledAuth && await openBundledWebPage(target, { serverUrl: APP_URL, auth: bundledAuth, openExternal: page => shell.openExternal(page) })) return
+      const server = currentServer()
+      const target = appExternalUrl(url, server)
+      if (!target) throw new Error('openExternal accepts only app-origin HTTP(S) URLs')
+      if (bundledAuth && await openBundledWebPage(target, { serverUrl: server, auth: bundledAuth, openExternal: page => shell.openExternal(page) })) return
       await shell.openExternal(target)
     },
     prepareAuth: BUNDLED ? async () => { throw new Error('Use main-owned bundled sign-in / 请使用桌面登录') } : prepareAuth,
@@ -599,12 +664,12 @@ async function start(): Promise<void> {
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
-    if (gateWindow && !gateWindow.isDestroyed()) { gateWindow.show(); gateWindow.focus(); return }
-    if (!mainWindow) return
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.show()
-    mainWindow.focus()
+  app.on('second-instance', (_event, argv) => {
+    // Windows and Linux open the app link by starting a second instance with it.
+    const link = appLinkFromArgv(argv, appLinks.scheme)
+    if (link !== null && !appLinks.accepts(link)) return
+    if (!mainWindow && !(gateWindow && !gateWindow.isDestroyed())) return
+    bringToFront()
   })
   app.on('before-quit', closeAuthServer)
   app.on('before-quit', closeReturnListener)

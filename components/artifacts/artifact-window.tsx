@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
@@ -14,6 +15,7 @@ import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
 import { FactoryArtifactAcceptance } from '@/components/workspace/factory-acceptance'
+import { useArtifactReview } from '@/components/workspace/artifact-review'
 import { closeArtifact, navigate, openArtifact, openThread } from '@/components/workspace/workspace-navigation'
 
 const ArtifactViewer = dynamic(() => import('./artifact-viewer').then(module => module.ArtifactViewer), { ssr: false })
@@ -40,6 +42,7 @@ const openIssue = (id: string) => navigate({ issue: id })
 export function ArtifactWindow({ artifactId }: { artifactId: string }) {
   const tNav = useTranslations('Nav')
   const tThreads = useTranslations('IssueThreads')
+  const tReview = useTranslations('ArtifactReview')
   const openThreadId = useSearchParams().get('thread')
   // The same key as the reader inside, so both read one request; only the person's own artifact comes back.
   const { data: detail } = useSWR(['artifact', artifactId], () => getArtifact(artifactId))
@@ -61,16 +64,26 @@ export function ArtifactWindow({ artifactId }: { artifactId: string }) {
   const { data: chat } = useSWR<CoordinatorChatView>(detail && !threadMade ? chatKeys.detail(chatBotId) : null, null)
   const quotes = chat?.items.flatMap(item => item.quote ? [item.quote] : []) ?? []
   const shared = { artifactId, onArtifactChange: openArtifact, onClose: closeArtifact }
+  // A PR report reads as its task and PR, 「ALEX-84 · PR #6」; any other artifact keeps its own title.
+  const review = useArtifactReview(detail?.acceptanceTaskId, { hasArtifact: true, runSucceeded: true })
+  const reportTitle = detail?.issueKey && review.number ? tReview('windowTitle', { task: detail.issueKey, number: review.number }) : undefined
+  // P2: 要求修改 in the report puts a chip in the thread's composer; sending it is the report's send-back.
+  const [changeRequest, setChangeRequest] = useState<string | null>(null)
+  const sendBack = useRef<((note: string) => Promise<boolean>) | null>(null)
+  const registerReject = useCallback((send: ((note: string) => Promise<boolean>) | null) => { sendBack.current = send }, [])
   // Until the artifact says where it came from (or when it is not the person's), the reader shows its own loading or error.
   if (!detail || (botId && !threadMade && !bots && !botsError)) return <ArtifactViewer {...shared} quotes={[]} canQuote={false}
     bot={{ name: '', avatar: <Skeleton className="size-5 rounded-full" /> }} chat={() => null} />
-  if (threadMade) return <ArtifactViewer {...shared} quotes={[]} canQuote={false}
+  if (threadMade) return <ArtifactViewer {...shared} quotes={[]} canQuote={false} title={reportTitle}
     bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: null }}
-    decision={detail.acceptanceTaskId && issueId ? view => <FactoryArtifactAcceptance taskId={detail.acceptanceTaskId!} issueId={issueId} artifactId={artifactId} {...view} /> : undefined}
-    chat={() => <IssueThreadPanel issueId={issueId} runId={runId!} onClose={closeArtifact} onOpenThread={openThread} bare />} />
+    decision={detail.acceptanceTaskId && issueId ? ({ slots, ...view }) => <FactoryArtifactAcceptance taskId={detail.acceptanceTaskId!} issueId={issueId} artifactId={artifactId} {...view}
+      review={{ slots, onRequestChanges: setChangeRequest, registerReject }} /> : undefined}
+    chat={() => <IssueThreadPanel issueId={issueId} runId={runId!} onClose={closeArtifact} onOpenThread={openThread} bare
+      changeRequest={changeRequest ? { label: changeRequest, onCancel: () => setChangeRequest(null),
+        onSend: async note => { const sent = await sendBack.current?.(note) ?? false; if (sent) setChangeRequest(null); return sent } } : undefined} />} />
   // A bot that is gone, or a list that failed, falls back to the Coordinator.
   if (bot) return <ArtifactViewer {...shared} quotes={quotes}
-    bot={{ name: bot.name, avatar: <BotAvatar color={bot.color} shape={bot.shape} size="pill" /> }}
+    bot={{ name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="pill" /> }}
     chat={slot => <CoordinatorChat onOpenIssue={openIssue} compact embedded={slot} bot={bot} />} />
   return <ArtifactViewer {...shared} quotes={quotes}
     bot={{ name: tNav('coordinator'), avatar: <CoordinatorAvatar size="pill" /> }}

@@ -12,6 +12,9 @@
   and the 能力 section of [2026-11-01-0338-github-plugin-page](2026-11-01-0338-github-plugin-page.md)
 - Superseded by: [2026-11-02-1730-coordinator-github-mcp](2026-11-02-1730-coordinator-github-mcp.md),
   for how the Coordinator does GitHub operations directly only
+- Superseded in part by: [2026-11-06-1800](2026-11-06-1800-machine-is-the-execution-boundary.md),
+  for pre-provisioned machine credentials, background natural renewal and
+  removal of extra cloud Git/HOME isolation or per-call permission trips
 
 An agent run (Claude Code, Codex or Cursor on the person's computer, and cloud
 runs) gets the person's own GitHub credential, the same as `gh auth login` in
@@ -26,12 +29,16 @@ What follows:
 
 - There is no first-push approval per repository, no push grant, and no
   difference in credentials between a read-only run and one that pushes.
-  readOnly stays as task intent only: the worktree is not writable.
+  readOnly stays as task intent only; it does not make the real worktree or
+  its `.git` read-only.
 - `git_push` in a stored policy and 创建 Pull Request in Plugins › GitHub no
   longer gate anything. The stored values stay readable; nothing is migrated.
-- The run gets the credential through its run-local git credential helper and
-  gh wrapper, fetched with its run token for as long as the run holds its
-  lease. It is never in chat, in argv or in an environment dump.
+- The task gets the real credential during machine preparation or once when
+  first needed. Cloud Git and `gh` use the ordinary machine HOME and Git
+  configuration, without a second shadow repository or isolated credential
+  wrapper. Renew naturally expiring credentials in the background; revoke by
+  pushing a stop or reclaiming the VM, not by authorizing each Git operation
+  remotely ([1800](2026-11-06-1800-machine-is-the-execution-boundary.md)). Secret values never enter chat, argv, logs or reports.
 - A task run still delivers as before: it pushes its task branch and opens the
   pull request; Mikka reads the result back. When Mikka opens or adopts the
   pull request itself, it uses the run owner's own token too.

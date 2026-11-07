@@ -218,9 +218,10 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.equal(await usable(ownRun), true, 'the owner\'s own run keeps going')
     // Decision 2026-11-01-2240: un-sharing and the admin switch govern other members' use only.
     const peersSecond = await runOn(peer)
+    await pool.query(`UPDATE agent_runs SET status='paused' WHERE id=$1`, [peersSecond])
     await policy.setOwnSubscriptionShare(owner, team.id, { shared: false })
     assert.equal(await usable(ownRun), true, 'un-sharing never stops the owner\'s own run')
-    assert.equal(await usable(peersSecond), false, 'un-sharing stops another member\'s run on it')
+    assert.equal(await usable(peersSecond), false, 'un-sharing stops a paused run before it can resume on the withdrawn credential')
     await policy.setOwnSubscriptionShare(owner, team.id, { shared: true, allowOthers: true })
     const peersThird = await runOn(peer)
     await policy.setMemberSubscriptionPolicy({ id: admin, name: 'Admin' }, team.id, false)

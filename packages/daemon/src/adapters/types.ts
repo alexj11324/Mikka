@@ -69,11 +69,19 @@ export interface SessionOptions {
   credential?: RunCredential
   /** Trusted server-issued delivery binding, never model-selected. */
   /** The run owner's own GitHub credential for git and gh; `branch` is the task branch a delivering run pushes. */
-  github?: { endpoint: string; repository: string; branch?: string; runToken: string; issueId: string }
+  github?: { endpoint: string; repository: string; branch?: string; runToken?: string; issueId: string; token?: string; expiresAt?: string | null }
+  /** Host-prepared native gh config; credentials renew in the background. */
+  githubEnvironment?: Record<string, string>
+  /** Trusted cloud runner: use the task machine's ordinary HOME and environment. */
+  machineEnvironment?: true
+  /** Add a refreshed credential to the existing in-memory output masker before use. */
+  onCredential?(name: string, value: string): void
   /** Trusted server-issued app entries (one MCP server each), never model-selected. */
   apps?: RunApps
   /** Trusted claimed run MCP; independent of optional app connections. */
   mcp?: import('../agents/run-apps').RunMcp
+  /** Acceptance-only host receiver, passed only to the Mikka MCP child. */
+  mcpHttpObservationUrl?: string
   /** Fixed container paths supplied by the hosted runner, never by the assignment. */
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Trusted, run-bound host gate. Never populated from model input. */

@@ -1,10 +1,6 @@
 name: Issue 1516 real welcome acceptance
 on:
-  push:
-    branches: [ops/1515-1517-acceptance]
-    paths:
-      - scripts/ops/issues-1516-welcome-acceptance.mjs
-      - .github/workflows/issues-1516-welcome-acceptance.yml
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -36,7 +32,7 @@ jobs:
           secret-name: MIKKA_DATABASE_URL
           recursive: false
           include-imports: false
-      - name: Read the authorized demo account email
+      - name: Read the shared test account email
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -45,10 +41,10 @@ jobs:
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
           secret-path: /
-          secret-name: ACME_DEMO_EMAIL
+          secret-name: SMOKE_OWNER_EMAIL
           recursive: false
           include-imports: false
-      - name: Read the authorized demo account password
+      - name: Read the shared test account password
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -57,14 +53,14 @@ jobs:
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
           secret-path: /
-          secret-name: ACME_DEMO_PASSWORD
+          secret-name: SMOKE_OWNER_PASSWORD
           recursive: false
           include-imports: false
       - name: Verify the bounded production acceptance driver
         run: node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs --self-test
       - name: Exercise the real fresh Coordinator welcome through the normal account
         env:
-          APPLICATION_SHA: 2960d783f0196fed5375593d910a43430a101747
+          APPLICATION_SHA: bcf82a2e058779fc308a8eea19d036fb5b9467e7
           ACCEPTANCE_CASES: claude-d
         run: MIKKA_OPS_DEPENDENCIES="$RUNNER_TEMP/issue1515-diagnostic" node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs
       - if: always()

@@ -30,13 +30,15 @@ export async function cloudStartupSpan<T>(name: string, attributes: Attributes, 
     throw error
   } finally {
     try { span?.end() } catch { /* Observation cannot change provisioning. */ }
-    context.with(scope, () => timingLog({ stage: name, startedAt, endedAt: Date.now(), ms: Date.now() - startedAt }))
+    const endedAt = Date.now()
+    // Keep the log's identity even when no OTel context manager is installed.
+    context.with(scope, () => timingLog({ runIdHash: scope.getValue(runHashContext) ?? null, stage: name, startedAt, endedAt, ms: endedAt - startedAt }))
   }
 }
 
 /** Non-overlapping phases of the existing provisioning state machine. No
  * additional provider or database reads are needed to measure a phase. */
-export function cloudStartupPhases(attributes: Attributes) {
+export function cloudStartupPhases(attributes: Attributes, scope: 'cloud.thread' | 'cloud.worker.claim' = 'cloud.thread') {
   let current: Span | undefined
   let phase: string | undefined
   let startedAt = Date.now()
@@ -53,11 +55,11 @@ export function cloudStartupPhases(attributes: Attributes) {
       endCurrent()
       phase = next
       startedAt = Date.now()
-      try { current = trace.getTracer('mikka.cloud-startup').startSpan(`cloud.thread.${next}`, { attributes }) }
+      try { current = trace.getTracer('mikka.cloud-startup').startSpan(`${scope}.${next}`, { attributes }) }
       catch { /* Observation cannot change provisioning. */ }
       return next
     },
-    end() { endCurrent(); timingLog({ stage: 'cloud.thread.phases', phases }) },
+    end() { endCurrent(); timingLog({ runIdHash: attributes['mikka.run.id_hash'] ?? context.active().getValue(runHashContext) ?? null, stage: `${scope}.phases`, phases }) },
   }
 }
 
