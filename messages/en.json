@@ -5257,5 +5257,24 @@
     "checkUpdate": "Check for update",
     "renderFailed": "This view could not open",
     "renderHint": "Retry to reopen the view."
+  },
+  "HostedSettings": {
+    "models": {
+      "defaults": "Defaults",
+      "filterLabel": "Filter models",
+      "filterAll": "All",
+      "filterSubscription": "Subscriptions",
+      "filterApiKey": "API keys",
+      "filterCustom": "Custom",
+      "search": "Search models",
+      "clearSearch": "Clear search",
+      "noMatch": "No models match “{query}”",
+      "noCustom": "No custom providers yet",
+      "defaultBadge": "Default",
+      "readOnly": "Models can’t be turned off one by one yet",
+      "providerOn": "{on}/{total} on",
+      "firstModel": "Tasks start with",
+      "keyProvider": "Provider"
+    }
   }
 }

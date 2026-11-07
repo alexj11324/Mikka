@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
@@ -23,7 +23,7 @@ import type { OrderRow, OrderView } from '@/lib/model-order'
 import type { OrderCandidate, OrderHarness } from '@/lib/model-order-plan'
 import { settingsHref } from '@/lib/settings-sections'
 import { usePresence } from '@/lib/use-presence'
-import { modelOrderKey, readModelOrder, useModelOrder } from '@/hooks/settings/use-model-order'
+import { modelOrderKey, orderRowRepair, readModelOrder, useModelOrder, useOrderRowStatus } from '@/hooks/settings/use-model-order'
 import { cn } from '@/lib/utils'
 
 export { modelOrderKey, readModelOrder }
@@ -59,14 +59,11 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
     ? <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
     : data.first?.kind !== 'cloud' && <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
   const repair = (row: OrderRow) => {
-    const reason = row.block?.reason
-    if (reason === 'checking' && row.source.kind === 'subscription') return <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { if (row.source.kind === 'subscription') void checkQuota(row.source.connectionId) }}>{t('checkQuota')}</Button>
-    if (reason === 'noDevice') return <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
-    if ((reason === 'paused' || reason === 'expired') && row.source.kind === 'subscription') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#subscription-${row.source.connectionId}`} />}>{t(reason === 'paused' ? 'enableSubscription' : 'reconnectSubscription')}</Button>
-    if (reason === 'keyRefused' && row.source.kind === 'api_key') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#api-key-${row.source.keyId}`} />}>{t('openApiKey')}</Button>
-    // A removed source may have no row left: its source section retains the recovery control.
-    if (reason === 'missing' || reason === 'removed') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={row.source.kind === 'subscription' ? '#subscriptions-heading' : '#api-keys-heading'} />}>{t(row.source.kind === 'subscription' ? 'openSubscription' : 'openApiKey')}</Button>
-    return null
+    const fix = orderRowRepair(row)
+    if (!fix) return null
+    if (fix.kind === 'checkQuota') return <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { void checkQuota(fix.connectionId) }}>{t('checkQuota')}</Button>
+    if (fix.kind === 'devices') return <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
+    return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#${fix.anchor}`} />}>{t(fix.label)}</Button>
   }
   return <>
     <SettingsSection id="run-location-heading" title={t('location')}>
@@ -180,18 +177,8 @@ function OrderList({ rows, pending, unsaved, preferred, repair, onMove, onRemove
 
 function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; repair?: ReactNode; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
   const t = useTranslations('Settings.modelOrder')
-  const runtimeT = useTranslations('RunErrors.subscription_local_runtime_unavailable')
   const commonT = useTranslations('Common')
-  const format = useFormatter()
-  const block = row.block
-  // 顺序未保存 wins over the row's own state until 重试 or the next change (R3).
-  const checking = !retry && block?.reason === 'checking'
-  const warn = Boolean((block && !checking) || retry)
-  const status = retry ? t('orderUnsaved') : checking ? t('blocked.checking')
-    : !block ? t('ready')
-    : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.dateTime(new Date(block.resetsAt), { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) })
-      : block.reason === 'noDevice' ? (block.device.why === 'subscriptionRuntimeUnavailable' ? runtimeT(block.device.detail ?? 'default') : block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
-        : t(`blocked.${block.reason}`)
+  const { status, checking, warn } = useOrderRowStatus()(row, Boolean(retry))
   // The handle carries the drag semantics; the row stays a list item (the primitive puts role=button on the item too).
   return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">
     <KanbanItemHandle render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('handle', { model: row.model, position: index + 1 })} />} className="touch-none text-muted-foreground">
