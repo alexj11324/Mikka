@@ -380,3 +380,23 @@ test('a stream processing error stops upstream before waiting for its unknown-co
   finally { release(); await reading }
   assert.equal(settlements.at(-1)?.cost, null)
 })
+
+test('server-owned billing adapter reuses the full route and settles in its own ledger exactly once', async () => {
+  verified = false // The default platform admission must not be consulted.
+  const events: string[] = [], costs: Array<number | null> = []
+  const adapter = {
+    admit: async (workspace: string) => { assert.equal(workspace, 'fixture-workspace'); events.push('admit') },
+    usage: {
+      metered: true,
+      reserve: async (workspace: string, _model: string, id: string) => { events.push('reserve'); return { id, workspaceId: workspace } },
+      recordGeneration: async () => {},
+      settle: async (_id: string, value: number | null) => { costs.push(value) },
+    },
+  }
+  const selected = await hostedModel('fixture-workspace', 'fixture-model', undefined, 'fixture-owner', adapter)
+  await selected.doGenerate({ prompt: [] })
+  assert.deepEqual(events, ['admit', 'reserve'])
+  assert.deepEqual(costs, [2000])
+  assert.equal(reservations.length, 0)
+  assert.equal(settlements.length, 0)
+})

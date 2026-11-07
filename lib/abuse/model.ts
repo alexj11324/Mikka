@@ -1,5 +1,6 @@
 import 'server-only'
 import { selfHostedDefaultModelConfig } from '@/lib/default-model-config'
+import { defaultModelTarget } from '@/lib/default-model'
 import { selfHostedDefaultModel } from './self-hosted-model'
 import { randomUUID } from 'node:crypto'
 import { gateway, type LanguageModel } from 'ai'
@@ -7,7 +8,8 @@ import { modelAdmission } from '@/lib/model-admission/runtime'
 import { GATEWAY_MODEL_ENDPOINT, managedGatewayOptions, ModelAdmissionError, ZEROCAT_MODEL_ENDPOINT, type GatewayAdmission } from '@/lib/model-admission/contract'
 import { hostedBillingScope } from './context'
 import { checkAbuseAlerts } from './alerts'
-import { canUseMikkaPaid, hostedUsage } from './runtime'
+import { canUseMikkaPaid, hostedUsage as defaultHostedUsage } from './runtime'
+import type { HostedUsageStore } from './store'
 import { withSharedCredits } from '@/lib/credit-shares'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { observedModel, recordAiRoute, recordAiUsage, type AiMetadata } from '@/lib/tracing/ai'
@@ -21,6 +23,12 @@ import {
 type Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
 
 const trustedGatewayModels = new WeakSet<Model>()
+/** Server-owned billing adapter. Callers cannot provide this through model options. */
+export interface HostedModelBilling {
+  usage: Pick<HostedUsageStore, 'metered' | 'reserve' | 'settle' | 'recordGeneration'>
+  admit(workspaceId: string): Promise<unknown>
+}
+export const HOSTED_MODEL_BILLING_VERSION = 1
 /** Server-owned transport. Neither redirects nor a caller proxy can move data. */
 export async function createTrustedGatewayModel(modelId: string, apiKey?: string): Promise<Model> {
   const { createGateway } = await import('ai')
@@ -45,6 +53,10 @@ const routeDenied = (error: unknown) => error instanceof ModelAdmissionError && 
  */
 export async function admitHostedModel(scope: { workspaceId: string; ownerId?: string }, modelId: string,
   options: { signal?: AbortSignal; auditAllowed?: boolean } = {}): Promise<GatewayAdmission | null> {
+  const billing = hostedBillingScope.getStore()
+  const ownerId = scope.ownerId ?? (billing?.workspaceId === scope.workspaceId ? billing.ownerId : undefined)
+  const target = isZeroCatModel(modelId) ? await defaultModelTarget(ownerId) : null
+  if (target?.kind === 'cloud') { await modelAdmission.selfHosted({ ...scope, ownerId }, modelId, `${target.serviceUrl}/v1/models`, options); return null }
   const selfHosted = isZeroCatModel(modelId) ? selfHostedDefaultModelConfig() : null
   if (selfHosted) { await modelAdmission.selfHosted(scope, selfHosted.modelId, selfHosted.baseURL, options); return null }
   if (isZeroCatModel(modelId) && zeroCatConfig()) {
@@ -65,15 +77,23 @@ export async function hostedModel(
   modelId: string,
   provider?: Model,
   ownerId?: string,
-  metadata: AiMetadata = {},
+  metadataOrBilling: AiMetadata | HostedModelBilling = {},
 ): Promise<Model> {
+  const billingAdapter = 'usage' in metadataOrBilling ? metadataOrBilling as HostedModelBilling : undefined
+  const metadata: AiMetadata = billingAdapter ? {} : metadataOrBilling as AiMetadata
+  const hostedUsage = billingAdapter?.usage ?? defaultHostedUsage
+  const billing = hostedBillingScope.getStore()
+  const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
+  const target = isZeroCatModel(modelId) ? await defaultModelTarget(scope.ownerId) : null
+  if (target?.kind === 'cloud' && scope.ownerId) {
+    if (provider) throw new ModelAdmissionError('modelRouteDenied')
+    return observedModel(await (await import('@/lib/cloud-services/model')).cloudDefaultModel({ ...scope, ownerId: scope.ownerId }, target.serviceUrl), { ...metadata, userId: scope.ownerId, route: 'self_hosted' })
+  }
   if (isZeroCatModel(modelId) && selfHostedDefaultModelConfig()) {
     if (provider) throw new ModelAdmissionError('modelRouteDenied')
-    const billing = hostedBillingScope.getStore()
-    const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
     return observedModel(selfHostedDefaultModel(scope), { ...metadata, userId: scope.ownerId, route: 'self_hosted' })
   }
-  await withSharedCredits(workspaceId, canUseMikkaPaid)
+  await withSharedCredits(workspaceId, billingAdapter?.admit ?? canUseMikkaPaid)
   const zeroCat = isZeroCatModel(modelId)
   // The default model's fallback is its own Gateway route; a caller may hand in
   // only the trusted Gateway transport for it, never an arbitrary provider.
@@ -84,8 +104,6 @@ export async function hostedModel(
     catch (error) { unavailable = error instanceof PaidResourceError && error.detail === 'zerocat_endpoint_unexpected' ? 'endpoint_unexpected' : 'unconfigured' }
   }
   const model = provider ?? gateway(modelId)
-  const billing = hostedBillingScope.getStore()
-  const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
   let managed: Model | undefined
   const executionModel = async (admission: GatewayAdmission | null) => {
     if (!admission) return model

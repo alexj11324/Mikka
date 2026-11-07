@@ -310,26 +310,30 @@ async function withPublicationAuthority<T>(claim: Publication, work: (value: { p
 }
 
 /** What publication hands GitHub: the pull request, for the run owner `userId`. */
-export type OwnerPullRequestOpener = (input: Omit<Parameters<typeof openRunPullRequest>[0], 'token' | 'githubAccountId'> & { userId: string }) => Promise<PublishedPullRequest>
+export type OwnerPullRequestOpener = (input: Omit<Parameters<typeof openRunPullRequest>[0], 'token' | 'githubAccountId' | 'installationId'> & { userId: string }) => Promise<PublishedPullRequest>
 
 /**
  * Opens it with the run owner's own GitHub token, and only ever the owner's
  * (decision 2026-11-02-1600), recording the repository's installation on the way.
  */
-export function createOwnerPullRequestOpener(deps: { credential?: (userId: string) => Promise<{ token: string; githubAccountId: string }>; fetcher?: typeof fetch; env?: Record<string, string | undefined> } = {}): OwnerPullRequestOpener {
+export function createOwnerPullRequestOpener(deps: { credential?: (userId: string, remoteKey: string) => Promise<{ token: string; githubAccountId?: string; installationId?: string }>; fetcher?: typeof fetch; env?: Record<string, string | undefined> } = {}): OwnerPullRequestOpener {
   return async ({ userId, ...input }) => {
-    const credential = await (deps.credential ?? ownerGitHubCredential)(userId)
+    const credential = await (deps.credential ?? ownerGitHubCredential)(userId, input.remoteKey)
     const { recordRepositoryInstallation } = await import('@/lib/github/repository-installation')
-    return openRunPullRequest({ ...input, ...credential, ...(deps.fetcher ? { fetcher: deps.fetcher } : {}),
-      onVerified: binding => recordRepositoryInstallation(userId, input.remoteKey, { ...credential, repositoryId: binding.repositoryId }, { fetcher: deps.fetcher, env: deps.env }) })
+    return openRunPullRequest({ ...input, installationId: credential.installationId, ...credential, ...(deps.fetcher ? { fetcher: deps.fetcher } : {}),
+      onVerified: async binding => {
+        if (credential.installationId || !credential.githubAccountId) return
+        await recordRepositoryInstallation(userId, input.remoteKey, { token: credential.token, githubAccountId: credential.githubAccountId, repositoryId: binding.repositoryId }, { fetcher: deps.fetcher, env: deps.env })
+      } })
   }
 }
 export const openOwnerPullRequest = createOwnerPullRequestOpener()
 
 /** The run owner's own GitHub token, as a publication outcome when there is none. */
-async function ownerGitHubCredential(userId: string): Promise<{ token: string; githubAccountId: string }> {
-  const { githubTokenForUser, GitHubAccessError } = await import('@/lib/github/user-access')
-  try { const { token, githubAccountId } = await githubTokenForUser(userId); return { token, githubAccountId } }
+async function ownerGitHubCredential(userId: string, remoteKey: string): Promise<{ token: string; githubAccountId?: string; installationId?: string }> {
+  const { GitHubAccessError } = await import('@/lib/github/user-access')
+  const { githubMachineCredential } = await import('@/lib/github/machine-credential')
+  try { return await githubMachineCredential(userId, { remoteKey }) }
   catch (error) {
     if (!(error instanceof GitHubAccessError)) throw error
     if (error.code === 'githubNotConnected') throw new PublicationError('github_identity_required')

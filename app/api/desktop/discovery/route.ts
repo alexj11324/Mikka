@@ -1,6 +1,7 @@
 import { desktopDiscoveryResponse } from '@/lib/desktop-discovery'
 import { withRequestLog } from '@/lib/request-log'
 import { authSignInMethods } from '@/lib/auth-config'
+import { cloudConnected } from '@/lib/cloud-services/runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,5 +15,5 @@ export const GET = withRequestLog('/api/desktop/discovery', async (request: Requ
     const { githubSignInEnabled } = await import('@/lib/auth')
     signIn.github = await githubSignInEnabled()
   }
-  return desktopDiscoveryResponse(request, process.env, signIn)
+  return desktopDiscoveryResponse(request, process.env, signIn, await cloudConnected())
 })

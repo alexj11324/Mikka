@@ -1,5 +1,6 @@
 'use client'
 
+import { CloudModelSettings } from '@/components/settings/cloud-settings'
 import { useTranslations } from 'next-intl'
 import { SubscriptionSettings } from '@/components/settings/subscription-settings'
 import { SubscriptionShareSettings } from '@/components/settings/subscription-share-settings'
@@ -14,12 +15,13 @@ import type { SettingsModelsProps } from '@/components/slots/settings-models-con
  * The person's thread defaults, run location and sharing choices below are
  * scoped to the workspace open here. 付款 is under 计费 only.
  */
-export function ApiAndSubscriptions({ workspaceId, workspaceName, team }: SettingsModelsProps) {
+export function ApiAndSubscriptions({ workspaceId, workspaceName, team, cloudUserKey }: SettingsModelsProps) {
   const scopeT = useTranslations('Settings.modelScope')
   const apiKeys = useApiKeyList(workspaceId)
   return <>
     <section aria-labelledby="account-models-scope" className="flex flex-col gap-6">
       <h2 id="account-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('account')}</h2>
+      {cloudUserKey && <CloudModelSettings userKey={cloudUserKey} workspaceId={workspaceId} />}
       <SubscriptionSettings workspaceId={workspaceId} />
       {apiKeys.section}
       <ApiKeyFallbackSetting workspaceId={workspaceId} />

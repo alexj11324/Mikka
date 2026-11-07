@@ -72,7 +72,11 @@ before(async () => {
   mock.module('react-native', { namedExports: { AppState: appState, Platform: { OS: 'ios' } } })
   mock.module('expo-secure-store', { namedExports: { getItemAsync: async () => { const wait = nextHeaders; nextHeaders = null; await wait?.promise; return null }, setItemAsync: async () => {} } })
   mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { authClient: { getCookie: async () => `fixture-session=${owner}` } } })
-  mock.module(new URL('../lib/config.ts', import.meta.url).href, { namedExports: { API_URL: origin } })
+  mock.module(new URL('../lib/config.ts', import.meta.url).href, { namedExports: {
+    API_URL: origin,
+    currentAccount: () => ({ id: 'fixture-server', user: { id: owner }, server: { url: origin } }),
+    onServerChange: () => () => {},
+  } })
   mock.module(new URL('../lib/session.ts', import.meta.url).href, { namedExports: { endLostSession: async () => {} } })
   mock.module(new URL('../lib/tracing.ts', import.meta.url).href, { namedExports: { mobileTraceHeaders: () => ({}) } })
   mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
@@ -108,7 +112,7 @@ before(async () => {
 beforeEach(() => {
   owner = 'owner'; legacy = false; deviceOnline = true; presenceSupported = true; acknowledge = true; ticketAvailable = true
   nextThread = null; nextTicket = null; nextHeaders = null; state = null
-  cache.setIdentity(owner); hooks.clearApiCache(); appState.currentState = 'active'
+  cache.setIdentity(`fixture-server:${owner}`, owner); hooks.clearApiCache(); appState.currentState = 'active'
   requests.length = 0; sockets.length = 0
 })
 afterEach(async () => {
@@ -280,7 +284,7 @@ test('late old-account tickets cannot restore cleared proof or open a former acc
   const pending = deferred<void>(); nextTicket = pending
   await mount()
   assert.equal(tickets(), 1); assert.equal(sockets.length, 0)
-  await act(async () => { owner = 'next-owner'; cache.setIdentity(owner); hooks.clearApiCache(); await flush() })
+  await act(async () => { owner = 'next-owner'; cache.setIdentity(`fixture-server:${owner}`, owner); hooks.clearApiCache(); await flush() })
   assert.equal(tickets(), 2); assert.equal(sockets.length, 1)
   assert.ok(readHomeScopeProof(proofs.token()!, owner, secret))
   await act(async () => { pending.resolve(); await flush() })

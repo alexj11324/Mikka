@@ -15,7 +15,7 @@ if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Reconcile tests r
 const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'agent_runs', 'devices', 'cloud_machines',
   'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
   'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'account_deletion_jobs', 'chat_attachments', 'chat_attachment_retirements',
-  'workspace_audit_retention', 'workspace_audit_events', 'workspace_deletions', 'workspace_audit_outbox']
+  'workspace_audit_retention', 'workspace_audit_events', 'workspace_deletions', 'workspace_audit_outbox', 'mobile_push_receipts']
 
 test('the safety-net check names exactly the jobs with work already due', { skip: !valid }, async t => {
   const schema = `reconcile_due_${randomUUID().replaceAll('-', '')}`
@@ -25,7 +25,7 @@ test('the safety-net check names exactly the jobs with work already due', { skip
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 2 })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
   const due = () => reconcileDue(pool, { factoryLifecycle: true, workspace: pool })
-  const none = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false }
+  const none = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false }
   const clear = async () => { for (const table of TABLES) await pool.query(`DELETE FROM ${table}`) }
   const event = (values: string) => pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"nextWakeAt","wakeLeaseUntil",tier,"deliveredAt") VALUES ($1,'owner',$2,'user_message',$3,'{}',${values})`, [randomUUID(), randomUUID(), randomUUID()])
 
@@ -85,6 +85,15 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     await pool.query(`INSERT INTO workspace_audit_outbox (id,"workspaceId") VALUES ($1,$2)`, [randomUUID(), randomUUID()])
     assert.deepEqual(await due(), { ...none, audit: true })
     assert.deepEqual(await reconcileDue(pool, { factoryLifecycle: true }), none, 'without the workspace database the outbox is not read')
+    await clear()
+  })
+  await t.test('a push receipt is due after its lost wake, excluding a live lease or future check', async () => {
+    await pool.query("INSERT INTO mobile_push_receipts(id,user_id,provider,secret,next_check_at) VALUES($1,'owner','cloud','{}',now()+interval '15 minutes')", [randomUUID()])
+    assert.deepEqual(await due(), none)
+    await pool.query("UPDATE mobile_push_receipts SET next_check_at=now()-interval '1 second',lease_until=now()+interval '2 minutes'")
+    assert.deepEqual(await due(), none)
+    await pool.query("UPDATE mobile_push_receipts SET lease_until=now()-interval '1 second'")
+    assert.deepEqual(await due(), { ...none, pushReceipts: true })
     await clear()
   })
 })
