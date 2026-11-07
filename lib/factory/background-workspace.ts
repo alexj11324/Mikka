@@ -110,19 +110,20 @@ export const factoryTaskWorkspaceBoundary = (pool: Pick<Pool, 'query'>, botId: s
 
 type Store = ReturnType<typeof createFactoryStore>
 /** Only methods that own a transaction are wrapped. Their original existing-tx
- * implementation and all source/revision fences are unchanged. */
+ * implementation and all source/revision fences are unchanged. Input failures
+ * remain rejected Promises, matching the original async store contract. */
 export function bindFactoryStoreWorkspace(pool: Pick<Pool, 'query'>, store: Store, botId: string | null): Store {
   const task = factoryTaskWorkspaceBoundary(pool, botId)
   return {
     ...store,
-    route: (...args: Parameters<Store['route']>) => withFactoryBackgroundWorkspace(pool, args[0],
+    route: async (...args: Parameters<Store['route']>) => withFactoryBackgroundWorkspace(pool, args[0],
       { kind: 'issue', id: factoryBackgroundReference(args[1], 'issueId'), botId }, () => store.route(...args), args[2]),
     read: (...args: Parameters<Store['read']>) => task(args[0], args[1], () => store.read(...args)),
-    apply: (...args: Parameters<Store['apply']>) => task(args[0], bindingTaskId(args[1]), () => store.apply(...args), args[4]),
-    recheckCandidate: (...args: Parameters<Store['recheckCandidate']>) => task(args[0], bindingTaskId(args[1]), () => store.recheckCandidate(...args)),
-    retryCheckStart: (...args: Parameters<Store['retryCheckStart']>) => task(args[0], bindingTaskId(args[1]), () => store.retryCheckStart(...args)),
-    retryCompletion: (...args: Parameters<Store['retryCompletion']>) => task(args[0], bindingTaskId(args[1]), () => store.retryCompletion(...args)),
-    retryDeliverableSnapshot: (...args: Parameters<Store['retryDeliverableSnapshot']>) => task(args[0], bindingTaskId(args[1]), () => store.retryDeliverableSnapshot(...args)),
+    apply: async (...args: Parameters<Store['apply']>) => task(args[0], bindingTaskId(args[1]), () => store.apply(...args), args[4]),
+    recheckCandidate: async (...args: Parameters<Store['recheckCandidate']>) => task(args[0], bindingTaskId(args[1]), () => store.recheckCandidate(...args)),
+    retryCheckStart: async (...args: Parameters<Store['retryCheckStart']>) => task(args[0], bindingTaskId(args[1]), () => store.retryCheckStart(...args)),
+    retryCompletion: async (...args: Parameters<Store['retryCompletion']>) => task(args[0], bindingTaskId(args[1]), () => store.retryCompletion(...args)),
+    retryDeliverableSnapshot: async (...args: Parameters<Store['retryDeliverableSnapshot']>) => task(args[0], bindingTaskId(args[1]), () => store.retryDeliverableSnapshot(...args)),
     listForIssue: (...args: Parameters<Store['listForIssue']>) => withFactoryBackgroundWorkspace(pool, args[0],
       { kind: 'issue', id: args[1], ...(args[2]?.anyBot ? {} : { botId }) }, () => store.listForIssue(...args)),
     listPublicForIssue: (...args: Parameters<Store['listPublicForIssue']>) => withFactoryBackgroundWorkspace(pool, args[0],
@@ -143,9 +144,9 @@ export function bindFactoryQuestionsWorkspace(pool: Pick<Pool, 'query'>, questio
       { kind: 'task', id: args[1], ...(args[2] === 'user' ? {} : { botId }) }, () => questions.list(...args)),
     record: (...args: Parameters<Questions['record']>) => run(args[0], args[1], () => questions.record(...args), args[2]),
     settle: (...args: Parameters<Questions['settle']>) => run(args[0], args[1], () => questions.settle(...args), args[2]),
-    escalate: (...args: Parameters<Questions['escalate']>) => question(args[0], factoryBackgroundReference(args[1], 'questionId'), () => questions.escalate(...args)),
-    answer: (...args: Parameters<Questions['answer']>) => question(args[0].userId, factoryBackgroundReference(args[1], 'questionId'), () => questions.answer(...args)),
-    recover: (...args: Parameters<Questions['recover']>) => question(args[0].userId, factoryBackgroundReference(args[1], 'questionId'), () => questions.recover(...args)),
+    escalate: async (...args: Parameters<Questions['escalate']>) => question(args[0], factoryBackgroundReference(args[1], 'questionId'), () => questions.escalate(...args)),
+    answer: async (...args: Parameters<Questions['answer']>) => question(args[0].userId, factoryBackgroundReference(args[1], 'questionId'), () => questions.answer(...args)),
+    recover: async (...args: Parameters<Questions['recover']>) => question(args[0].userId, factoryBackgroundReference(args[1], 'questionId'), () => questions.recover(...args)),
     claimContinuation: (...args: Parameters<Questions['claimContinuation']>) => run(args[0], args[2], () => questions.claimContinuation(...args),
       typeof args[4] === 'function' ? undefined : args[4]),
     async pending(userId, runId, readScope = 'bot') {
