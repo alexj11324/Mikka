@@ -885,6 +885,8 @@
     "sandboxUsernsSpec": "Ubuntu's description of this setting",
     "sandboxDetail": "Error: {detail}",
     "sandboxFix": "How to fix",
+    "noAgentYet": "No agent yet",
+    "howToInstall": "How to install",
     "installAgent": "How to install",
     "copyInstall": "Copy {command}",
     "commands": {
