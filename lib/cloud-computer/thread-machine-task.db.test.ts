@@ -1015,6 +1015,39 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [next])).rows[0].status, 'running', 'no run status is rewritten on failure');
     }));
 
+    for (const status of ['stopped','cancelled'] as const) await t.test('explicit refresh retains a safely exited '+status+' run and its microsecond stop marker', () => withRefreshWorker(async()=>{
+      const prior=await parked(await task(),{status}),fixture=refreshFake({prior},'paused')
+      await pool.query(`UPDATE agent_runs r SET "stopRequestedAt"='2026-11-06T23:59:59.123456Z',
+        report='{"safePoint":{"session":"exited"}}',"deviceId"=m."deviceId","deviceRepoId"=m."repoId"
+        FROM thread_machines m WHERE r.id=$1 AND m."runId"=r.id`,[prior.runId])
+      const before=(await pool.query('SELECT status,"stopRequestedAt"::text AS stop,report FROM agent_runs WHERE id=$1',[prior.runId])).rows[0]
+      assert.deepEqual(await ensureThreadMachine(pool,actor,prior.runId,fixture.provider,undefined,true),{runId:prior.runId,state:'running'})
+      assert.deepEqual((await pool.query('SELECT status,"stopRequestedAt"::text AS stop,report FROM agent_runs WHERE id=$1',[prior.runId])).rows[0],before)
+      assert.deepEqual(fixture.steps,['stage','switch','registered','verify','rpc'])
+    }))
+    for (const stopPhase of ['stage','publication'] as const) await t.test('a fresh stop during maintenance '+stopPhase+' cannot use the historic stopped-run exception', () => withRefreshWorker(async()=>{
+      const prior=await parked(await task(),{status:'stopped'}),fixture=refreshFake({prior},'paused')
+      await pool.query(`UPDATE agent_runs r SET "stopRequestedAt"='2026-11-06T23:59:59.123456Z',
+        report='{"safePoint":{"session":"exited"}}',"deviceId"=m."deviceId","deviceRepoId"=m."repoId"
+        FROM thread_machines m WHERE r.id=$1 AND m."runId"=r.id`,[prior.runId])
+      const connect=fixture.provider.connect
+      fixture.provider.connect=async(...args)=>{
+        const box=await connect(...args),execute=box.commands.run.bind(box.commands)
+        box.commands.run=(async(...commandArgs:Parameters<typeof box.commands.run>)=>{
+          const result=await execute(...commandArgs)
+          if(String(commandArgs[0]).includes(stopPhase==='stage'?'MIKKA_OFFICIAL_WORKER_STAGE':'mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json'))
+            await pool.query('UPDATE agent_runs SET "stopRequestedAt"=clock_timestamp() WHERE id=$1',[prior.runId])
+          return result
+        }) as typeof box.commands.run
+        return box
+      }
+      const warning=mock.method(console,'warn',()=>undefined)
+      try{await assert.rejects(ensureThreadMachine(pool,actor,prior.runId,fixture.provider,undefined,true),/Thread provisioning cancelled|Task runtime is busy or its ownership changed/)}
+      finally{warning.mock.restore()}
+      assert.notEqual((await machine(prior.runId)).state,'running')
+      assert.ok(fixture.steps.includes('rollback'))
+    }))
+
     for (const [state, recovered] of [['paused', false], ['running', true]] as const) {
       await t.test(`explicit runtime refresh updates the ${state} failed original VM without changing answer or recovery history`, () => withRefreshWorker(async () => {
         const f = await failedQuestionMachine(state, recovered), fixture = refreshFake(f, state);

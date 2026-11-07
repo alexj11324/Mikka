@@ -30,7 +30,7 @@ const id = (n: number) => `41600000-0000-4000-8000-${String(n).padStart(12, '0')
 function fixture() {
   const actor = { userId: 'fixture-owner', workspaceId: id(2) }
   const run = { id: id(1), userId: actor.userId, issueId: id(3), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
-    status: 'failed', stopReason: 'blocked', startedAt: null, sessionId: null as string | null, stopRequestedAt: null,
+    status: 'failed', stopReason: 'blocked', startedAt: null, sessionId: null as string | null, stopRequestedAt: null, registrationStopRequestedAt: null,
     kind: 'plan', repoPath: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git',
     agentDefinition: { readOnly: true },
     questionContinuation: { requireSessionResume: true, requiredSandboxId: 'fixture-original', originSessionId: 'private-native-session', originRunId: id(7), questionId: id(8) } }
@@ -59,7 +59,7 @@ function fixture() {
       run.sessionId === null && task.stage === 'spec' && task.status === 'blocked' && question.status === 'blocked' && question.continuationRunId === run.id ? [{ ...task }] : [])
     if (sql.startsWith('SELECT revision,"answerFingerprint",id FROM factory_questions')) return result([{ ...question }])
     if (sql.startsWith('SELECT request,result FROM factory_events')) return result([structuredClone(receipt)])
-    if (sql.startsWith('SELECT r.*') || sql.startsWith('SELECT * FROM agent_runs') || sql.startsWith('SELECT status,"stopRequestedAt"')) return result([{ ...run }])
+    if (sql.startsWith('SELECT r.*') || (sql.startsWith('SELECT * FROM agent_runs') || sql.startsWith('SELECT *,"stopRequestedAt"::text AS "registrationStopRequestedAt" FROM agent_runs')) || sql.startsWith('SELECT status,"stopRequestedAt"')) return result([{ ...run }])
     if (sql.startsWith('SELECT * FROM thread_machines')) return result([{ ...machine }])
     if (sql.startsWith('SELECT 1 FROM devices d JOIN agent_runs')) return result(flags.deviceEnabled ? [{}] : [])
     if (/^SELECT 1 FROM (factory_questions|devices|thread_machines|agent_runs)/.test(sql)) return result([{}])

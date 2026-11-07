@@ -17,20 +17,20 @@ test('registration completion requires the fresh token, device and current lease
   const run = randomUUID(), lease = randomUUID(), device = randomUUID(), token = randomUUID()
   const hash = 'a'.repeat(64), started = new Date('2026-11-07T00:00:00.000Z')
   try {
-    await pool.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text, status text, "stopRequestedAt" timestamptz);
+    await pool.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text, status text, "stopRequestedAt" timestamptz, report jsonb);
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,"lastSeenAt" timestamptz);
       CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"tokenHash" text,"revokedAt" timestamptz,"lastUsedAt" timestamptz);
       CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"deviceId" uuid,"workerLeaseId" uuid,"workerLeaseUntil" timestamptz,state text,"lastActiveAt" timestamptz,"runningSince" timestamptz,"lifecycleAt" timestamptz,lifecycle jsonb,"issueId" uuid,"sandboxId" text,epoch int,"computeSeconds" bigint)`)
     const reset = async () => {
       await pool.query('TRUNCATE agent_runs,devices,device_tokens,thread_machines')
-      await pool.query("INSERT INTO agent_runs VALUES ($1,'owner','queued',NULL)", [run])
+      await pool.query("INSERT INTO agent_runs VALUES ($1,'owner','queued',NULL,NULL)", [run])
       await pool.query("INSERT INTO devices VALUES ($1,'owner',$2)", [device, new Date(started.getTime()+1)])
       await pool.query('INSERT INTO device_tokens VALUES ($1,$2,$3,NULL,$4)', [token, device, hash, new Date(started.getTime()+1)])
       await pool.query(`INSERT INTO thread_machines VALUES ($1,'owner',$2,$3,now()+interval '1 minute','starting',NULL,NULL,NULL,'{}',NULL,'vm',7,0)`, [run, device, lease])
     }
-    const finish = async () => {
+    const finish = async (maintenance?: { status: 'succeeded'|'failed'|'stopped'|'cancelled'; stopRequestedAt: string|null }) => {
       const client = await pool.connect()
-      try { return await finishThreadRegistration(client, run, lease, device, hash, started) }
+      try { return await finishThreadRegistration(client, run, lease, device, hash, started, maintenance) }
       finally { client.release() }
     }
     const cases: [string, string, unknown[]][] = [
@@ -56,6 +56,23 @@ test('registration completion requires the fresh token, device and current lease
       const row = (await pool.query('SELECT state,"workerLeaseId",epoch FROM thread_machines')).rows[0]
       assert.deepEqual(row, { state:'running', workerLeaseId:null, epoch:7 })
     })
+    for (const status of ['stopped','cancelled'] as const) await t.test('safe terminal maintenance preserves historic stop: '+status, async()=>{
+      await reset()
+      await pool.query(`UPDATE agent_runs SET status=$1,"stopRequestedAt"='2026-11-06T23:59:59.123456Z',report='{"safePoint":{"session":"exited"}}'`,[status])
+      const original=(await pool.query('SELECT "stopRequestedAt"::text AS stop FROM agent_runs')).rows[0].stop
+      assert.equal((await finish({status,stopRequestedAt:original})).rowCount,1)
+      assert.deepEqual((await pool.query('SELECT status,"stopRequestedAt"::text AS stop FROM agent_runs')).rows[0],{status,stop:original})
+    })
+    for (const mutation of ['new_stop','requeued','exit_removed','stop_cleared'] as const) await t.test('maintenance refuses changed '+mutation,async()=>{
+      await reset()
+      await pool.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"='2026-11-06T23:59:59.123456Z',report='{"safePoint":{"session":"exited"}}'`)
+      const original=(await pool.query('SELECT "stopRequestedAt"::text AS stop FROM agent_runs')).rows[0].stop
+      if(mutation==='new_stop')await pool.query('UPDATE agent_runs SET "stopRequestedAt"=clock_timestamp()')
+      if(mutation==='requeued')await pool.query("UPDATE agent_runs SET status='queued'")
+      if(mutation==='exit_removed')await pool.query("UPDATE agent_runs SET report='{}'")
+      if(mutation==='stop_cleared')await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL')
+      assert.equal((await finish({status:'stopped',stopRequestedAt:original})).rowCount,0)
+    })
     for (const mutation of ['revoke', 'stop']) await t.test(mutation+' completed during a machine-lock wait cannot authorize registration', async () => {
       await reset()
       const blocker = await pool.connect(), finisher = await pool.connect()
@@ -76,6 +93,28 @@ test('registration completion requires the fresh token, device and current lease
         await blocker.query('COMMIT')
         assert.equal((await completing).rowCount,0)
       } finally { await blocker.query('ROLLBACK'); blocker.release(); finisher.release() }
+    })
+    await t.test('a maintenance stop change committed during the lock wait invalidates the captured historic marker',async()=>{
+      await reset()
+      await pool.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"='2026-11-06T23:59:59.123456Z',report='{"safePoint":{"session":"exited"}}'`)
+      const original=(await pool.query('SELECT "stopRequestedAt"::text AS stop FROM agent_runs')).rows[0].stop
+      const blocker=await pool.connect(),finisher=await pool.connect()
+      try {
+        const pid=(await finisher.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+        await blocker.query('BEGIN')
+        await blocker.query('SELECT 1 FROM agent_runs WHERE id=$1 FOR UPDATE',[run])
+        await blocker.query('SELECT 1 FROM thread_machines WHERE "runId"=$1 FOR UPDATE',[run])
+        const completing=finishThreadRegistration(finisher,run,lease,device,hash,started,{status:'stopped',stopRequestedAt:original})
+        let blocked=false
+        for(let i=0;i<100;i++){
+          if((await pool.query('SELECT cardinality(pg_blocking_pids($1)) AS n',[pid])).rows[0].n>0){blocked=true;break}
+          await new Promise(resolve=>setTimeout(resolve,5))
+        }
+        assert.equal(blocked,true,'the real completion waits for the lifecycle transaction')
+        await blocker.query('UPDATE agent_runs SET "stopRequestedAt"=clock_timestamp()')
+        await blocker.query('COMMIT')
+        assert.equal((await completing).rowCount,0)
+      } finally {await blocker.query('ROLLBACK');blocker.release();finisher.release()}
     })
     await t.test('normal claim committing while completion waits keeps the original lease valid', async () => {
       await reset()

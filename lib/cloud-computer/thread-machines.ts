@@ -605,7 +605,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
       unclaimedQuestionRecovery = await lockUnclaimedQuestionRuntimeRecovery(client, actor, runId)
     }
-    const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand"
+    const run = (await client.query(`SELECT r.*${refreshRuntime ? ',r."stopRequestedAt"::text AS "registrationStopRequestedAt"' : ''},COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       LEFT JOIN agents agent ON agent.id=r."agentId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
@@ -944,7 +944,9 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       await lockQuestionRuntimeUpgrade(client, actor, runId, run.questionContinuation.questionId, questionRuntimeUpgrade)
     }
     // Provision and end both lock the parent run before its machine.
-    const current = (await client.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
+    const current = (await client.query(refreshRuntime
+      ? 'SELECT *,"stopRequestedAt"::text AS "registrationStopRequestedAt" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE'
+      : 'SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
     const activeLease = await client.query('SELECT 1 FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' FOR UPDATE', [runId, leaseId])
     if (!activeLease.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
     if (questionRuntimeUpgrade && (current.status !== 'queued' || current.startedAt || current.sessionId || current.stopRequestedAt ||
@@ -958,6 +960,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       // Maintenance preserves the terminal run. It does not claim a new
       // continuation or borrow the active-worker shortcut used by a wake.
       if (!['succeeded','failed','stopped','cancelled'].includes(current.status) ||
+        current.status !== run.status || current.registrationStopRequestedAt !== run.registrationStopRequestedAt ||
         (exactQuestionMachine && (current.status !== 'failed' || current.sessionId !== run.sessionId))) throw new ComputerError(409, 'Task runtime is busy or its ownership changed')
     } else if (exactQuestionMachine && current.status !== 'queued') {
       if (!['preparing','running','waiting_input'].includes(current.status) || !current.leaseExpiresAt || new Date(current.leaseExpiresAt).getTime()<=Date.now()) throw new ComputerError(409,'Question continuation unavailable')
@@ -1065,7 +1068,8 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     refreshPhase = timings.next('finish')
     refreshBudget?.(1)
     const finished = await finishThreadRegistration(client, runId, leaseId, deviceId,
-      createHash('sha256').update(credential).digest('hex'), handoffStartedAt)
+      createHash('sha256').update(credential).digest('hex'), handoffStartedAt,
+      refreshRuntime ? { status: current.status, stopRequestedAt: current.registrationStopRequestedAt } : undefined)
     if (!finished.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
     await runChanged(pool, runId)
     logThreadLifecycle(finished.rows[0], { phase: finished.rows[0].lifecycle.phase, reason: finished.rows[0].lifecycle.phase, provider: 'running', deadline: Date.now(), computeSeconds: finished.rows[0].computeSeconds })
