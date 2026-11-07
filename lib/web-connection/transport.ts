@@ -1,4 +1,5 @@
 import { OFFICIAL_WEB_URL, officialWebOriginAllowed, webConnectionURL, type WebConnectionEnvironment } from './policy'
+import { NextRequest } from '../../apps/api/compat/server'
 
 const allowedHeaders = [
   'accept', 'authorization', 'content-type', 'range', 'if-none-match', 'last-event-id',
@@ -75,7 +76,10 @@ export function createWebTransport(options: {
       // A discovery/handoff never consumes ambient or caller-supplied authority.
       const headers = new Headers(request.headers)
       for (const name of ['cookie', 'authorization', 'x-mikka-session-cache', 'x-mikka-session-token']) headers.delete(name)
-      return { request: new Request(request, { headers }), run: work => work(), response: finish }
+      // The shared adapter unwraps srvx's native backing request. Constructing
+      // a native Request directly from its Node facade fails Undici's private
+      // state check; the outer H3 event still owns disposal and waitUntil.
+      return { request: new NextRequest(request, { headers }), run: work => work(), response: finish }
     }
     const authorization = request.headers.get('authorization')
     if (!authorization || !bearer.test(authorization) || /^Bearer (?:mkp_|mka_|mkr_)/.test(authorization)) return finish(rejected(401, 'web_connection_session_expired'))
@@ -93,6 +97,6 @@ export function createWebTransport(options: {
       headers.set('origin', new URL(request.url).origin)
       headers.set('sec-fetch-site', 'same-origin')
     }
-    return { request: new Request(request, { headers }), run: work => options.scope(identity, work), response: finish }
+    return { request: new NextRequest(request, { headers }), run: work => options.scope(identity, work), response: finish }
   }
 }
