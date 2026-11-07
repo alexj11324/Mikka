@@ -1,5 +1,7 @@
 import { resolveTaskWorkspace } from './task-workspace-evidence.mjs'
 
+const workspaceUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 /** Resume safely after either database migrated or a prior batch committed.
  * This does not move already bound rows or rewrite content, identifiers, links,
  * receipts, run provenance, or provider policies. Report contains metadata only. */
@@ -26,21 +28,24 @@ export async function backfillTaskWorkspaces(application, workspace) {
       const { rows: links } = await tenant.query(`SELECT l."issueId", l."workspaceId", l."userId" AS "ownerId", 'team' AS source, l."teamId"::text AS "sourceId", t.id IS NOT NULL AS verified
         FROM mikka_team_issues l LEFT JOIN mikka_teams t ON t.id=l."teamId" AND t."workspaceId"=l."workspaceId"
         WHERE l."issueId"=ANY($1::uuid[]) FOR SHARE OF l`, [ids])
-      const { rows: projects } = await tenant.query(`SELECT requested.id AS "issueId",l."workspaceId",'project' AS source,p.id::text AS "sourceId"
+      const { rows: projects } = await tenant.query(`SELECT requested.id AS "issueId",l."workspaceId",'project' AS source,p.id::text AS "sourceId",
+          t.id IS NOT NULL AND l."userId"=p."userId" AS verified
         FROM unnest($1::uuid[]) AS requested(id) JOIN workspace_projects p ON p."issueIds" ? requested.id::text
         JOIN mikka_team_projects l ON l."projectId"=p.id
-        JOIN mikka_teams t ON t.id=l."teamId" AND t."workspaceId"=l."workspaceId" FOR SHARE OF p,l,t`, [ids])
+        LEFT JOIN mikka_teams t ON t.id=l."teamId" AND t."workspaceId"=l."workspaceId" FOR SHARE OF p,l`, [ids])
       await app.query('BEGIN')
       const { rows: tasks } = await app.query('SELECT id,"userId" FROM issues WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [ids])
-      const { rows: runs } = await app.query(`SELECT r."issueId", b."workspaceId", 'bot' AS source, b.id::text AS "sourceId"
-        FROM agent_runs r JOIN bots b ON b.id=r."botId" WHERE r."issueId"=ANY($1::uuid[])
-        UNION SELECT f."issueId",b."workspaceId",'factory',f.id::text FROM factory_tasks f JOIN bots b ON b.id=f."botId" WHERE f."issueId"=ANY($1::uuid[])
-        UNION SELECT r."issueId",c."workspaceId",'thread',r.id::text FROM agent_runs r JOIN computer_run_bindings c ON c."runId"=r.id AND c."ownerId"=r."userId" WHERE r."issueId"=ANY($1::uuid[])
-        UNION SELECT r."issueId",(r."agentDefinition"#>>'{executionIdentity,workspaceId}')::uuid,'execution_identity',r.id::text FROM agent_runs r
-          WHERE r."issueId"=ANY($1::uuid[]) AND r."agentDefinition"#>>'{executionIdentity,workspaceId}' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'`, [ids])
+      const { rows: runs } = await app.query(`SELECT r."issueId", b."workspaceId"::text, 'bot' AS source, r."botId"::text AS "sourceId", b.id IS NOT NULL AS verified
+        FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" WHERE r."issueId"=ANY($1::uuid[]) AND r."botId" IS NOT NULL
+        UNION SELECT f."issueId",b."workspaceId"::text,'factory',f.id::text,b.id IS NOT NULL FROM factory_tasks f LEFT JOIN bots b ON b.id=f."botId"
+          WHERE f."issueId"=ANY($1::uuid[]) AND f."botId" IS NOT NULL
+        UNION SELECT r."issueId",c."workspaceId"::text,'thread',r.id::text,c."ownerId"=r."userId" FROM agent_runs r JOIN computer_run_bindings c ON c."runId"=r.id WHERE r."issueId"=ANY($1::uuid[])
+        UNION SELECT r."issueId",r."agentDefinition"#>>'{executionIdentity,workspaceId}','execution_identity',r.id::text,
+          r."agentDefinition"#>>'{executionIdentity,workspaceId}' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          FROM agent_runs r WHERE r."issueId"=ANY($1::uuid[]) AND r."agentDefinition"#>>'{executionIdentity,workspaceId}' IS NOT NULL`, [ids])
       const owners = new Map(tasks.map(row => [row.id, row.userId]))
       const evidence = [...links.map(link => ({ ...link, verified: link.verified && link.ownerId === owners.get(link.issueId) })), ...projects, ...runs]
-      const candidates = [...new Set(evidence.map(item => item.workspaceId))]
+      const candidates = [...new Set(evidence.map(item => item.workspaceId).filter(id => typeof id === 'string' && workspaceUuid.test(id)))]
       const { rows: live } = candidates.length ? await tenant.query('SELECT id FROM mikka_workspaces WHERE id=ANY($1::uuid[]) FOR SHARE', [candidates]) : { rows: [] }
       const existing = new Set(live.map(row => row.id))
       for (const { id } of rows) {

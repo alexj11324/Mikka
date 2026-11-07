@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 // BE-9: run completion drives Factory reconcile without a Coordinator turn.
 // Real migrations, store, dispatch and reconciler over a disposable *_e2e PG.
@@ -56,6 +57,7 @@ test("run completion enters review without the Coordinator; replays do not advan
     for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
       await pool.query(await readFile(new URL(f, dir), "utf8"));
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','complete@example.invalid',true,now(),now())`);
+    const workspaceId = await seedFixtureWorkspace(pool, 'owner');
     const authorize = async (user: string, issue: string, tx: PoolClient) =>
       (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1;
     const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID();
@@ -73,11 +75,11 @@ test("run completion enters review without the Coordinator; replays do not advan
     const sweep = createFactoryReconciler(pool, store, questions);
     const reconcileFor = () => (userId: string, runId: string) => sweep.run(userId, runId);
     const issueId = randomUUID(), sourceEventId = randomUUID();
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
+    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [issueId, workspaceId]);
     /** A routed task on its own issue whose execute attempt is bound to a running run. */
     const runningTask = async (iss?: string) => {
       const ownIssue = iss ?? randomUUID(), src = randomUUID();
-      if (!iss) await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [ownIssue]);
+      if (!iss) await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [ownIssue, workspaceId]);
       await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [src, src]);
       const r = await store.route("owner", { issueId: ownIssue, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
       const run = await dispatch("owner", { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
@@ -85,7 +87,7 @@ test("run completion enters review without the Coordinator; replays do not advan
       return { task: r.task, runId: run.runId };
     };
     // Host-owned model references only; no credential values or provider I/O.
-    const providerRepoId = randomUUID(), alternateAgentId = randomUUID(), providerWorkspaceId = randomUUID();
+    const providerRepoId = randomUUID(), alternateAgentId = randomUUID(), providerWorkspaceId = workspaceId;
     await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Provider fixture','claude_code',$2)`, [alternateAgentId, deviceId]);
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,'owner','v2/github.com/acme/provider-fixture','https://github.com/acme/provider-fixture.git')`, [providerRepoId, deviceId]);
     const providerDefinition = (harness: 'codex' | 'claude_code', prompt: string, targetDevice = deviceId) => {
@@ -190,7 +192,7 @@ test("run completion enters review without the Coordinator; replays do not advan
         } });
       const completed = async () => {
         const issue = randomUUID(), source = randomUUID();
-        await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Profile Decision fixture','{"type":"doc","content":[]}','todo','normal')`, [issue]);
+        await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Profile Decision fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [issue, workspaceId]);
         await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [source, source]);
         const routed = await currentStore.route('owner', { issueId: issue, sourceEventId: source, eventId: randomUUID(), rationale: 'Task requested', missingInformation: [], missingPermissions: [], needsSpec: false });
         const result = await execute('owner', { binding: factoryBinding(routed.task), agentId, deviceRepoId: repoId });
@@ -900,11 +902,14 @@ test("run completion enters review without the Coordinator; replays do not advan
         try {
           await tx.query('BEGIN');
           childId = await providerChild(tx, f.runId);
-          if (fault === 'scope') await tx.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{executionIdentity,workspaceId}',to_jsonb($2::text)) WHERE id=$1`, [childId, randomUUID()]);
+          if (fault === 'scope') {
+            await assert.rejects(tx.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{executionIdentity,workspaceId}',to_jsonb($2::text)) WHERE id=$1`, [childId, randomUUID()]),
+              { code: '23514', message: 'taskWorkspaceMismatch' }, 'a frozen identity cannot move the child into another workspace');
+          }
           if (fault === 'permissions') await tx.query(`UPDATE agent_runs SET "agentDefinition"="agentDefinition"-'readOnly' WHERE id=$1`, [childId]);
           if (fault === 'repository' || fault === 'monitor-placement') await tx.query('UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [childId, otherRepoId]);
           if (fault === 'epoch') await tx.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{requestEpoch}',to_jsonb($2::text)) WHERE id=$1`, [f.task.attemptId, randomUUID()]);
-          await assert.rejects(adoptProviderContinuation(tx, 'owner', f.runId, childId, () => store), error => error instanceof FactoryError && ['factoryRunMismatch', 'factoryStale'].includes(error.code), fault);
+          if (fault !== 'scope') await assert.rejects(adoptProviderContinuation(tx, 'owner', f.runId, childId, () => store), error => error instanceof FactoryError && ['factoryRunMismatch', 'factoryStale'].includes(error.code), fault);
         } finally { await tx.query('ROLLBACK'); tx.release(); }
         assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1', [childId])).rowCount, 0, fault);
         const current = await store.read('owner', f.task.id);

@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq, or } from 'drizzle-orm'
+import { and, asc, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { actingContext } from '@/lib/activity-actor'
@@ -35,7 +35,7 @@ export async function activeTaskWorkspaces(reader: Reader, requestedId?: string)
   if (scope.workspaceId && requestedId && scope.workspaceId !== requestedId) return []
   const rows = await workspaceDb.select({ id: workspaces.id, kind: workspaces.kind }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
-    .where(membership(scope.userId, scope.workspaceId ?? requestedId))
+    .where(membership(scope.userId, scope.workspaceId ?? requestedId)).orderBy(asc(workspaces.createdAt))
   return rows
 }
 

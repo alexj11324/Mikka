@@ -1,5 +1,6 @@
 // BE-2 / #445: list carries the current candidate's sha and its newest publication.
 // Real migrations and store over a disposable *_e2e PG.
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -33,7 +34,7 @@ test("list: candidate sha + newest publication of the current candidate only", {
       (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1;
     const store = createFactoryStore(pool, authorize);
     const issueId = randomUUID(), sourceEventId = randomUUID();
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
+    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [issueId, await seedFixtureWorkspace(pool, 'owner')]);
     await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [sourceEventId, sourceEventId]);
     const routed = await store.route("owner", { issueId, sourceEventId, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
     const taskId = routed.task.id;

@@ -10,7 +10,8 @@ import { FactoryError } from "./contract";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pool, withDatabaseClient } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
-import { lockCliAgentPolicy, lockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
+import { factoryWorkspaceReader } from './workspace-reader';
+import { lockCliAgentPolicy, prelockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
 import { createFactoryStore } from "./store";
 import { createFactoryHumanStore } from './human-store';
 import { createRetainedDeliverableObserver } from '../cloud-computer/retained-deliverable';
@@ -22,21 +23,18 @@ import { createFactoryCheckClaim, factoryCheckGates } from "./checks";
 import { createFactoryMonitor, createFactoryMonitorRunConsumer, monitorGate } from "./monitor";
 import { reconcileFactoryCheck } from "./reconcile-check";
 import { appendMonitorEvidence } from "./monitor-evidence";
-import { workspaceDb } from "@/lib/workspace-db";
-import { teamIssues } from "@/lib/db/team-schema";
-import { eq } from "drizzle-orm";
 import type { FactoryAuthorize } from "./store";
 import { configuredMonitorProbes } from "./monitor-probe";
 import { monitorWorkspacePartition } from "./monitor-fingerprint";
 import { createFactoryMonitorIssueLinks } from "./monitor-issue-links";
 import { readAuthorizedIssue } from "../github/user-access";
 
-// Preserve existing personal/workspace/team/deletion access rules on every operation.
+// Resolve the effective human tenant; background work uses persisted task authority.
 const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
   // Reuse the held transaction: a second pool checkout here can deadlock
   // concurrent operations when the application connection pool is full.
   await tx.query("SELECT id FROM issues WHERE id=$1 FOR SHARE", [issueId]);
-  return Boolean(await issueForUser(userId, issueId, false, drizzle(tx)));
+  return Boolean(await issueForUser(await factoryWorkspaceReader(userId), issueId, false, drizzle(tx)));
 };
 const humanGates = {
   ...factoryCheckGates,
@@ -73,21 +71,17 @@ export const factorySpecApproval = createFactorySpecApproval(pool, factoryHumanS
 export const factoryMerges = createFactoryMerges(pool, authorize, factoryHumanStore, githubMergeApi());
 export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);
 export const factoryMonitorWorkspaceKey: Parameters<typeof createFactoryMonitor>[3] = async (userId, issueId, tx) => {
-    const [link] = await workspaceDb
-      .select({ workspaceId: teamIssues.workspaceId })
-      .from(teamIssues)
-      .where(eq(teamIssues.issueId, issueId))
-      .limit(1);
     const {
       rows: [issue],
     } = await tx.query(
-      'SELECT i.scope,l."teamSyncId" FROM issues i LEFT JOIN linear_issue_links l ON l."issueId"=i.id WHERE i.id=$1',
+      'SELECT i.scope,i."workspaceId",l."teamSyncId" FROM issues i LEFT JOIN linear_issue_links l ON l."issueId"=i.id WHERE i.id=$1 AND i."ownershipState"=\'bound\'',
       [issueId],
     );
+    if (!issue?.workspaceId) throw new FactoryError('factoryNotFound');
     return monitorWorkspacePartition({
       userId,
       issueId,
-      workspaceId: link?.workspaceId ?? null,
+      workspaceId: issue.workspaceId,
       issueScope: issue.scope,
       linearTeamSyncId: issue.teamSyncId ?? null,
     });
@@ -124,7 +118,7 @@ export const questionSkillAssignments: QuestionSkillGuards = {
     // Cloud claim and runtime maintenance acquire policy before task/run locks.
     if (cloud) await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`computer-policy:${cloud.workspaceId}`]);
     try {
-      await lockCliRunPolicy(tx,question.originRunId,userId);
+      await prelockCliRunPolicy(tx,question.originRunId,userId);
     } catch (error) {
       if (error instanceof Error && error.message === "agentPolicyUnavailable")
         throw new FactoryError("factoryNotFound");

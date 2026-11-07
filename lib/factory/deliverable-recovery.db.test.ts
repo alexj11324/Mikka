@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { createFactoryStore as createCurrentFactoryStore } from './store';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
@@ -56,7 +57,8 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       const issueId = randomUUID(), sourceEventId = randomUUID(), workspaceId = randomUUID(), botId = randomUUID()
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID(), sandboxId = `retained-${randomUUID()}`
       const repoPath = `/home/user/.mikka/bot-workspaces/${botId}`, worktreePath = `/home/user/.mikka/worker/worktrees/${randomUUID()}`
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Synthetic legacy delivery','{"type":"doc","content":[]}','todo','normal')`, [issueId])
+      await seedFixtureWorkspace(pool, 'owner', 'team', workspaceId)
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Synthetic legacy delivery','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`, [issueId, workspaceId])
       await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Fixture Bot')`, [botId, workspaceId])
       await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture cloud','cloud',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
       await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,'owner',$3,'codex',$2)`, [agentId, deviceId, `Fixture Codex ${agentId}`])

@@ -137,7 +137,7 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
   }
   async function fixture() {
-    const issueId = await seedIssue(pool, owner)
+    const issueId = await seedIssue(pool, owner, workspace.id)
     const sourceEventId = randomUUID()
     await pool.query(`INSERT INTO coordinator_events(id,"userId","issueId",kind,"dedupeKey",payload)
       VALUES($1::uuid,$2,$3,'user_message',$1::text,$4)`, [sourceEventId, owner, issueId, JSON.stringify({ text: 'Write exactly 53 bytes and retain the null-input test.' })])

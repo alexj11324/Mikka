@@ -42,7 +42,7 @@ const transport={
 const database={...transport,transaction:async<T>(fn:(tx:typeof transport)=>Promise<T>)=>fn(transport)}
 const stub=(path:string,exports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href, { namedExports: exports })
 stub('../db/index.ts',{db:database,pool:null,withDatabaseClient:forbidden})
-stub('../auth.ts',{auth:{api:{getSession:async()=>authenticated?{user:{id:owner}}:null}}})
+stub('../auth.ts',{auth:{api:{getSession:async()=>authenticated?{user:{id:owner},session:{id:'image-fixture-session'}}:null}}})
 stub('../request-log.ts',{noteLogUser:()=>{},withRequestLog:(_path:string,handler:unknown)=>handler})
 stub('./wake.ts',{coordinatorEnabled:()=>false,wakeCoordinator:forbidden})
 stub('./coordinator-bot.ts',{chatBotId:async(_owner:string,botId:string|null|undefined)=>botId??COORDINATOR_BOT,openChatBotId:async(_user:unknown,botId:string|null|undefined)=>botId??COORDINATOR_BOT})

@@ -20,3 +20,9 @@ test('a malformed authoritative relation quarantines the task even when its tena
 test('UUID capitalization is not a second tenant', () => {
   assert.deepEqual(resolveTaskWorkspace([{ workspaceId: 'ABCD' }, { workspaceId: 'abcd' }], new Set(['abcd'])), { workspaceId: 'abcd', reason: null })
 })
+test('invalid frozen provenance cannot disappear beside a valid source', () => {
+  assert.deepEqual(resolveTaskWorkspace([{ source: 'team', workspaceId: 'shared' }, { source: 'execution_identity', workspaceId: 'invalid', verified: false }], new Set(['shared'])), { workspaceId: null, reason: 'conflicting_evidence' })
+})
+test('a removed referenced source quarantines rather than borrowing another source tenant', () => {
+  assert.deepEqual(resolveTaskWorkspace([{ workspaceId: 'shared' }, { source: 'bot', workspaceId: null, verified: false }], new Set(['shared'])), { workspaceId: null, reason: 'conflicting_evidence' })
+})

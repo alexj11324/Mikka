@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
@@ -53,13 +54,10 @@ test('Factory task denials preserve public errors before policy and execution si
   const claimRoute = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   async function fixture(question = false, workspace = false) {
     const issueId = randomUUID(), eventId = randomUUID(), runId = randomUUID(), questionId = randomUUID()
-    let workspaceId: string | undefined
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Factory policy fixture\',\'{"type":"doc","content":[]}\',\'todo\',\'normal\',$3)', [issueId, workspace ? other : owner, workspace ? 'workspace' : 'personal'])
+    const workspaceId = await seedFixtureWorkspace(pool, owner, workspace ? 'team' : 'personal')
+    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") VALUES ($1,$2,\'Factory policy fixture\',\'{"type":"doc","content":[]}\',\'todo\',\'normal\',$3,$4,\'bound\')', [issueId, workspace ? other : owner, workspace ? 'workspace' : 'personal', workspaceId])
     if (workspace) {
-      workspaceId = randomUUID()
       const team = randomUUID()
-      await pool.query('INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$2,\'Factory policy fixture\')', [workspaceId, owner])
-      await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'admin\',\'active\')', [workspaceId, owner, `${owner}@example.invalid`])
       await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [workspaceId, other, `${other}@example.invalid`])
       await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,\'Factory policy fixture\',\'FP576\')', [team, workspaceId, owner])
       await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [issueId, team, workspaceId, other])

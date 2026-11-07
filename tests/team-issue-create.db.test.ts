@@ -404,7 +404,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[row.id])).rows[0].n,0)
     await app.query('update team184_app_controls set fail=false where title=$1',[value.title])
     const resumed=await query(owner,value);assert.ok('issue' in resumed && resumed.issue);assert.equal(resumed.issue.id,row.id);assert.equal(resumed.issue.scope,'workspace')
-    await app.query('update issues set \"linearSyncPolicy\"=\'disabled\',revision=revision+1 where id=$1',[row.id])
+    await app.query('update issues set "linearSyncPolicy"=\'disabled\',revision=revision+1 where id=$1',[row.id])
     const replay=await query(owner,value);assert.ok('issue' in replay && replay.issue);assert.equal(replay.issue.scope,'workspace')
     assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[row.id])).rows[0].n,0)
   })

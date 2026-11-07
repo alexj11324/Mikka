@@ -77,7 +77,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     const ownerId = await seedUser(pool, 'shared-lender'), userId = await seedUser(pool, 'shared-runner')
     users.push(ownerId, userId)
     const workspace = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }, { userId: ownerId, role: 'member' }])
-    const workspaceId = workspace.id, botId = await seedBot(pool, workspaceId, userId), issueId = await seedIssue(pool, userId)
+    const workspaceId = workspace.id, botId = await seedBot(pool, workspaceId, userId), issueId = await seedIssue(pool, userId, workspaceId)
     const harness = provider === 'claude' ? 'claude_code' : 'codex', model = provider === 'claude' ? 'shared-opus' : 'shared-gpt'
     const connectionId = randomUUID()
     const quota = { vendor: provider === 'claude' ? 'claude_code' : 'codex', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] }

@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -16,7 +17,7 @@ if (connection) {
 if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Run publication DB tests cannot skip in required CI')
 
 type Fixture = {
-  userId: string; deviceId: string; agentId: string; repoId: string; issueId: string; runId: string
+  workspaceId: string; userId: string; deviceId: string; agentId: string; repoId: string; issueId: string; runId: string
   remoteUrl: string; remoteKey: string; identifier: string; branch: string; githubAccountId: string
   /** The receipt admission wrote from the GitHub App grant, when the fixture is admitted to push. */
   admission?: Record<string, unknown>
@@ -74,16 +75,17 @@ test('run result publication commits one owner-scoped result through retries and
     const remoteKey = options.remoteUrl ? repositoryKey(options.remoteUrl) : options.remoteKey ?? `v2/github.com/mikka-ci/repo-${seed}`
     const row: Fixture = {
       userId: `publication-${seed}`, deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(), issueId: randomUUID(), runId: randomUUID(),
-      remoteUrl: options.remoteUrl ?? `https://${remoteKey.slice(3)}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId),
+      workspaceId: randomUUID(), remoteUrl: options.remoteUrl ?? `https://${remoteKey.slice(3)}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId),
     }
     fixtures.push(row)
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,true,now(),now())', [row.userId, `${row.userId}@example.invalid`])
+    await seedFixtureWorkspace(pool, row.userId, options.scope === 'workspace' ? 'team' : 'personal', row.workspaceId)
     await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2)', [row.userId, prefix])
     await pool.query('insert into account (id,"accountId","providerId","userId","createdAt","updatedAt") values ($1,$2,\'github\',$3,now(),now())', [randomUUID(), row.githubAccountId, row.userId])
     await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Publication CI computer\',\'local\',$3)', [row.deviceId, row.userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents (id,"userId","deviceId",harness,name) values ($1,$2,$3,\'codex\',$4)', [row.agentId, row.userId, row.deviceId, `codex ${row.deviceId}`])
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,null)', [row.repoId, row.deviceId, row.userId, row.remoteKey, row.remoteUrl])
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal'])
+    await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$5,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal', row.workspaceId])
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',null,\'Fix redirect\')', [row.runId, row.userId, row.issueId, row.agentId, row.deviceId, row.repoId])
     await pool.query('insert into run_tokens (id,"runId","userId","tokenHash","expiresAt") values ($1,$2,$3,$4,now()+interval \'1 hour\')', [randomUUID(), row.runId, row.userId, `synthetic-${randomUUID()}`])
     if (options.approved) await admit(row)
@@ -432,9 +434,7 @@ test('run result publication commits one owner-scoped result through retries and
       await pool.query('update devices set "protocolVersion"=3 where id=$1', [f.deviceId])
       const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, model: 'fixture-model' }
       const eventId = randomUUID()
-      const {seedWorkspace}=await import('./support/workspace-admin-db')
-      const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
-      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null, workspace.id)
+      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null, f.workspaceId)
       await pool.query('insert into coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,$6,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId, coordinator])
       const before = Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n)
       const admitted = await Promise.all([queueRun(f.userId, input, coordinator, undefined, eventId), queueRun(f.userId, input, coordinator, undefined, eventId)])

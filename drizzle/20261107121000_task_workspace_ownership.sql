@@ -129,10 +129,42 @@ CREATE TRIGGER require_factory_task_workspace BEFORE INSERT OR UPDATE OF "worksp
 FOR EACH ROW EXECUTE FUNCTION require_factory_task_workspace();
 
 CREATE OR REPLACE FUNCTION require_run_child_issue_scope() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE tenant uuid;
+DECLARE tenant uuid; run_owner text; mailbox_tenant text; mailbox_owner text; sender_tenant text; sender_owner text;
 BEGIN
-  SELECT "workspaceId" INTO tenant FROM agent_runs WHERE id=NEW."runId" FOR SHARE;
-  IF tenant IS NULL THEN RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514'; END IF;
+  IF NEW."runId" IS NOT NULL THEN
+    SELECT "workspaceId", "userId" INTO tenant, run_owner FROM agent_runs WHERE id=NEW."runId" FOR SHARE;
+    IF tenant IS NULL THEN RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514'; END IF;
+  ELSIF TG_TABLE_NAME <> 'run_messages' THEN
+    RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514';
+  END IF;
+  -- Conversation envelopes intentionally have no run. Their persisted mailbox
+  -- is their tenant authority; never infer it from the user's oldest workspace.
+  IF TG_TABLE_NAME = 'run_messages' THEN
+    IF run_owner IS NOT NULL AND run_owner <> NEW."userId" THEN
+      RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+    END IF;
+    IF NEW."mailboxId" IS NOT NULL THEN
+      SELECT "workspaceId", "userId" INTO mailbox_tenant, mailbox_owner
+        FROM session_mailboxes WHERE id=NEW."mailboxId" FOR SHARE;
+      IF mailbox_owner IS DISTINCT FROM NEW."userId" OR mailbox_tenant IS NULL
+        OR mailbox_tenant !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+        RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514';
+      END IF;
+      IF tenant IS NOT NULL AND tenant <> mailbox_tenant::uuid THEN
+        RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+      END IF;
+      tenant := mailbox_tenant::uuid;
+    END IF;
+    IF tenant IS NULL THEN RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514'; END IF;
+    IF NEW."senderMailboxId" IS NOT NULL THEN
+      SELECT "workspaceId", "userId" INTO sender_tenant, sender_owner
+        FROM session_mailboxes WHERE id=NEW."senderMailboxId" FOR SHARE;
+      IF sender_owner IS DISTINCT FROM NEW."userId" OR sender_tenant IS NULL
+        OR lower(sender_tenant) <> tenant::text THEN
+        RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+      END IF;
+    END IF;
+  END IF;
   RETURN NEW;
 END;
 $$;

@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { gzipSync, gunzipSync } from 'node:zlib'
@@ -31,7 +32,7 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     const deviceId = randomUUID(), otherDeviceId = randomUUID(), repoId = randomUUID(), id = randomUUID()
     const remote = 'https://github.com/isolated/recovery-fixture.git'
     await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,\'Recovery fixture\',\'{}\',\'todo\',\'normal\')', [issueId, userId])
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,\'Recovery fixture\',\'{}\',\'todo\',\'normal\')', [issueId, userId, await seedFixtureWorkspace(pool, userId)])
     await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt","protocolVersion") VALUES ($1,$3,\'Old device\',\'local\',true,$4,$5,$6),($2,$3,\'New device\',\'local\',$8,$4,$7,$6)',
       [deviceId, otherDeviceId, userId, JSON.stringify([{ harness: 'codex', installed: true }]), new Date(now.getTime() - 600_000), DAEMON_PROTOCOL_VERSION, now, otherTakesPart])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Recovery worker\')', [agentId, userId, deviceId])
@@ -333,7 +334,7 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     await pool.query('UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1', [retryId, foreign.id])
     assert.equal(await latestCheckpoint(retryId), null, 'a foreign owner cannot supply the patch')
     const otherIssueId = randomUUID()
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,\'Other recovery task\',\'{}\',\'todo\',\'normal\')', [otherIssueId, run.userId])
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,\'Other recovery task\',\'{}\',\'todo\',\'normal\')', [otherIssueId, run.userId, await seedFixtureWorkspace(pool, run.userId)])
     await pool.query('UPDATE agent_runs SET "retryOf"=$2,"issueId"=$3 WHERE id=$1', [retryId, run.id, otherIssueId])
     assert.equal(await latestCheckpoint(retryId), null, 'a different task cannot supply the patch')
     const otherRepoId = randomUUID(), otherRemote = 'https://github.com/isolated/other-recovery-repo.git'

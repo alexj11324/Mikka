@@ -1,5 +1,6 @@
 // BE-12: pending questions per task / run in AskUserQuestion shape, over a
 // disposable *_e2e PG with real migrations and the real question store.
+import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -52,7 +53,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     const asked = async (kind: string, text: string, options: string[], user = "owner") => {
       const { agentId, repoId } = fixture[user];
       const issueId = randomUUID(), src = randomUUID(), questionId = randomUUID();
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,$2,'Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId, user]);
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,$2,'Fixture','{"type":"doc","content":[]}','todo','normal',$3,'bound')`, [issueId, user, await seedFixtureWorkspace(pool, user)]);
       await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$3,'user_message',$2,'{"text":"synthetic"}')`, [src, src, user]);
       const r = await store.route(user, { issueId, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
       const { runId } = await dispatch(user, { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
@@ -272,7 +273,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
       assert.equal((await store.read("owner", b.taskId)).task.id, b.taskId, "control: own bot scope reads it");
       // Task re-bound to another bot while its source event stays bot-less: only the task.botId check stops it.
       const rebound = await asked("decision", "Rebound", ["A"]), botId = randomUUID();
-      await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,'owner','Fixture bot')`, [botId, randomUUID()]);
+      await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,'owner','Fixture bot')`, [botId, await seedFixtureWorkspace(pool, 'owner')]);
       await pool.query('UPDATE factory_tasks SET "botId"=$2 WHERE id=$1', [rebound.taskId, botId]);
       await assert.rejects(store.read("owner", rebound.taskId), notFound, "read path checks task.botId");
       await assert.rejects(questions.read("owner", rebound.questionId), notFound);

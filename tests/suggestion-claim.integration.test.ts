@@ -27,7 +27,7 @@ const retry = 'b4000000-0000-4000-8000-000000000013'
 let release!: () => void
 let signal!: () => void
 before(async () => {
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: owner } }) } } } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: owner }, session: { id: 'suggestion-fixture-session' } }) } } } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => true, wakeCoordinator: () => { throw Error('must not invoke provider') } } })
   mock.module('next/server', { namedExports: { after: (fn: () => unknown) => callbacks.push(fn) } })
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })

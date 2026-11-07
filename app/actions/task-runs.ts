@@ -20,7 +20,7 @@ import { withDevicePresence } from '@/lib/live/presence-read'
 import type { PresenceDevice } from '@/lib/live/presence'
 import { changedListIds, listPositionKey, readListPositions, unchangedList, type ListPosition } from '@/lib/list-poll'
 import { cacheReadAction } from '@/lib/cache-read-action'
-import { beginOwnerListRead } from '@/lib/live/revision-read'
+import { beginWorkspaceListRead } from '@/lib/live/revision-read'
 import { issueShortTitle } from '@/lib/short-title-sql'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueVisibility } from '@/lib/issue-visibility'
@@ -57,7 +57,7 @@ async function readTaskRuns() {
   const context = await loadWorkspaceContext(undefined, session.user)
   const visibility = await issueVisibility(session.user, false, context.workspace.id)
   const observedAt = Date.now()
-  const begun = await beginOwnerListRead(session.user.id, ['task_run_list'])
+  const begun = await beginWorkspaceListRead(session.user.id, context.workspace.id, ['task_run_list'])
   // A run whose device went offline is retried (or lands in 等你) by the minute
   // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
@@ -124,7 +124,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     if (!session?.user) throw new ActionFailureError('authRequired')
     const context = await loadWorkspaceContext(undefined, session.user)
     const observedAt = Date.now()
-    const begun = await beginOwnerListRead(session.user.id, ['thread_list'])
+    const begun = await beginWorkspaceListRead(session.user.id, context.workspace.id, ['thread_list'])
     // Only queued local work can show "waiting for device". Ask the gateway
     // on this user read, so an idle socket affects both the view and its hash.
     const queuedDevices = process.env.DEVICE_GATEWAY_URL && process.env.DEVICE_GATEWAY_PUSH_SECRET

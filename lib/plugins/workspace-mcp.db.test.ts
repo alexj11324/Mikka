@@ -71,7 +71,7 @@ test('explicit workspace MCP sharing keeps requester, resource grants, tokens an
     await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Requester Bot\')', [bot, requester, workspace])
     await pool.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'Requester device\')', [device, requester])
     await pool.query('INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,\'Requester Agent\',\'codex\',$3)', [agent, requester, device])
-    await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,\'MCP fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\')', [issue, requester])
+    await pool.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,\'MCP fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\')', [issue, requester, workspace])
     const personal = new PersonalPluginStore(pool, process.env, pool), shares = new WorkspaceMcpStore(pool, pool)
     const connection = await personal.createMcp(owner, createMcpSchema.parse({ name: 'Team finance', url: privateUrl, auth: { name: 'Authorization', value: `Bearer ${secret}` } }))
     const runtime = createPersonalMcpRuntime(personal, transport)

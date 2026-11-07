@@ -245,7 +245,11 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   try { normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }) } catch { throw new ActionFailureError('repoPathInvalid') }
   const issue = await issueForUser(userId, parsed.data.issueId, false, executor)
-  if (!issue) throw new ActionFailureError('issueNotFound')
+  if (!issue || issue.ownershipState !== 'bound' || !issue.workspaceId) throw new ActionFailureError('issueNotFound')
+  // A task already owns its tenant. A bot-less dispatch and a continuation
+  // must use that tenant rather than the account's personal default.
+  const workspaceId = issue.workspaceId
+  if (internal?.workspaceHint && internal.workspaceHint !== workspaceId) throw new ActionFailureError('executionAccountUnavailable')
   const [agent] = await executor.select().from(agents)
     .where(and(eq(agents.id, parsed.data.agentId), eq(agents.userId, userId))).limit(1)
   if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
@@ -257,23 +261,25 @@ async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 
   const { prompt, taskLength: promptTaskLength } = runPromptParts(issue.title, tiptapToText(issue.content), instructions, parsed.data.note)
   const captureDefinition = true
   const query = internal?.client ?? pool
-  const workspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId
-    : input.modelDispatch ? internal?.workspaceHint ?? await (await import('./execution-settings')).executionWorkspace(userId, null) : undefined
-  if (botId && !workspaceId) throw new ActionFailureError('botNotFound')
+  if (botId) {
+    const botWorkspaceId = (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId
+    if (!botWorkspaceId) throw new ActionFailureError('botNotFound')
+    if (botWorkspaceId !== workspaceId) throw new ActionFailureError('runInvalid', { reason: 'botUnavailable' })
+  }
   const found = captureDefinition && byosEnabled() ? await nativeRunBinding(query, userId, agent.id, agent.harness, workspaceId, parsed.data.subscriptionBindingId) : null
   if (parsed.data.subscriptionBindingId && (!found || (parsed.data.model && parsed.data.model !== found.modelId))) throw new ActionFailureError('executionAccountUnavailable')
   const model = parsed.data.subscriptionBindingId ? found?.modelId : parsed.data.model
   if (!model) throw new ActionFailureError('runModelMissing')
   // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
   // A subscription's identity is its provider model, including at the CLI boundary.
-  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
+  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, workspaceId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
   const mailboxEnabled = personalMailboxEnabled()
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
   if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
     const [bot] = botId ? await executor.select({ workspaceId: bots.workspaceId }).from(bots)
       .where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1) : []
     if (botId && !bot) throw new ActionFailureError('runInvalid')
-    mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
+    mailboxScope = { botId, workspaceId }
   }
   const agentDefinition = captureDefinition
     ? freezeWorkerDefinition({ harness: agent.harness, instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model, modelDispatch: input.modelDispatch, agentProfile: input.agentProfile, policyCeiling: input.policyCeiling, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
@@ -302,9 +308,13 @@ async function factoryRunModel(userId: string, botId: string | null, agentId: st
   }
   const [agent] = await db.select({ id: agents.id, deviceId: agents.deviceId, harness: agents.harness }).from(agents).where(and(eq(agents.id, agentId), eq(agents.userId, userId))).limit(1)
   if (!agent?.deviceId || (agent.harness !== 'codex' && agent.harness !== 'claude_code')) throw new ActionFailureError('runModelMissing')
-  const { executionWorkspace } = await import('@/lib/execution-settings')
-  const workspaceId = await executionWorkspace(userId, botId).catch(() => null)
-  if (!workspaceId) throw new ActionFailureError('runModelMissing')
+  const task = issueId ? await issueForUser(userId, issueId) : null
+  const workspaceId = task?.workspaceId
+  if (!workspaceId || task?.ownershipState !== 'bound') throw new ActionFailureError('runModelMissing')
+  if (botId) {
+    const botWorkspaceId = await (await import('@/lib/execution-settings')).executionWorkspace(userId, botId).catch(() => null)
+    if (botWorkspaceId !== workspaceId) throw new ActionFailureError('runInvalid', { reason: 'botUnavailable' })
+  }
   const { target, agentProfile, selectionMode } = await (await import('@/lib/factory/agent-profile')).resolveAgentProfileDispatch(pool,
     { ownerId: userId, workspaceId, botId }, { issueId: issueId!, stage, profileId, agentId: agent.id, deviceId: agent.deviceId, location: 'local', asked: { harness: agent.harness } }, { transaction })
   if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
@@ -317,10 +327,9 @@ async function factoryRunModel(userId: string, botId: string | null, agentId: st
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */
 async function localRunCredential<S extends { id: string; ownerId: string; connectionId: string; connectionRevision: number }>(query: import('pg').Pool | import('pg').PoolClient,
-  userId: string, botId: string | null, harness: string, model: string | undefined, subscription: S | null, keyId?: string) {
-  const botWorkspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId ?? null : null
-  const choiceWorkspaceId = botWorkspaceId ?? (async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, null).catch(() => null))
-  return (await import('@/lib/run-credential-source')).runCredentialSource(query, { ownerId: userId, botId, harness, model, keyId, botWorkspaceId, choiceWorkspaceId, subscription, localLogin: true })
+  userId: string, botId: string | null, workspaceId: string, harness: string, model: string | undefined, subscription: S | null, keyId?: string) {
+  return (await import('@/lib/run-credential-source')).runCredentialSource(query, { ownerId: userId, botId, harness, model, keyId,
+    botWorkspaceId: botId ? workspaceId : null, choiceWorkspaceId: workspaceId, subscription, localLogin: true })
 }
 
 /** Which runs `userId` may see: their own (on no task or a visible task) and teammates' runs on shared visible tasks. */

@@ -19,7 +19,7 @@ export function installTeamSessionFixture(auth) {
   if(!descriptor||typeof descriptor.value!=='function'||(!descriptor.configurable&&!descriptor.writable))throw Error('real auth getSession contract changed')
   const getSession=async function () {
     const id=globalThis.teamCreateTestUser
-    return id?{user:{id,name:'Synthetic',email:`${id}@example.invalid`}}:null
+    return id?{user:{id,name:'Synthetic',email:`${id}@example.invalid`},session:{id:`team-fixture:${id}`,userId:id}}:null
   }
   Object.defineProperties(getSession,Object.getOwnPropertyDescriptors(descriptor.value))
   Object.defineProperty(api,'getSession',{...descriptor,value:getSession})

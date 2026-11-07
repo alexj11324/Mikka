@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -42,9 +43,10 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
   const issueNumbers = new Map<string, number>()
   async function issue(userId: string, scope = 'personal') {
     const id = randomUUID()
+    const workspaceId = await seedFixtureWorkspace(pool, userId)
     const number = (issueNumbers.get(userId) ?? 0) + 1
     issueNumbers.set(userId, number)
-    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope,"scopeSetBy") VALUES ($1,$2,\'Chain task\',$4,\'todo\',\'normal\',$3,\'user\')', [id, userId, scope, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [] })])
+    await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope,"scopeSetBy") VALUES ($1,$2,$5,\'Chain task\',$4,\'todo\',\'normal\',$3,\'user\')', [id, userId, scope, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [] }), workspaceId])
     return id
   }
   let clock = Date.parse('2026-10-01T00:00:00Z')
