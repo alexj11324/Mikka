@@ -85,6 +85,7 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
   let usage: unknown
   let finishReason: string | null = null
   let toolCalls = 0
+  let failed = false
   let logged = false
   const emit = (interrupted: boolean) => {
     if (logged) return
@@ -112,11 +113,12 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
     async pull(controller) {
       let next: ReadableStreamReadResult<P>
       try { next = await reader.read() } catch (error) { emit(true); throw error }
-      if (next.done) { emit(false); controller.close(); return }
+      if (next.done) { emit(failed); controller.close(); return }
       const part = next.value
       if (firstToken === null && FIRST_TOKEN.has(part.type)) firstToken = now()
       if (firstText === null && part.type === 'text-delta') firstText = now()
       if (part.type === 'tool-call') toolCalls++
+      if (part.type === 'error') failed = true
       if (part.type === 'finish') { usage = part.usage; finishReason = reason(part.finishReason) }
       controller.enqueue(part)
     },

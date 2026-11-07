@@ -6,13 +6,15 @@ import type { State } from 'swr'
 import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import { liveKeyConnection } from '../lib/swr/live-focus'
+import { PersistentReadCache } from '../lib/swr/persistent-cache'
+import type { PresenceProof } from '../lib/live/presence'
 
 const home = '10000000-0000-4000-8000-000000000001'
 const team = '20000000-0000-4000-8000-000000000001'
 const otherTeam = '20000000-0000-4000-8000-000000000002'
 const otherHome = '10000000-0000-4000-8000-000000000002'
 type Kind = 'issues' | 'threads' | 'tasks' | 'bots' | 'groups' | 'roster'
-type Read = { items: { id: string; title: string }[]; live: { ownerId: string; workspaceId: string | null; selectedWorkspaceId?: string; deadline?: { at: string; afterMs: number }; revisions?: Record<string, number> }; version?: string; positions?: { id: string; version: string }[]; delta?: true; presenceFallback?: boolean }
+type Read = { items: { id: string; title: string }[]; live: { ownerId: string; workspaceId: string | null; selectedWorkspaceId?: string; deadline?: { at: string; afterMs: number }; revisions?: Record<string, number>; presence?: PresenceProof | null }; version?: string; positions?: { id: string; version: string }[]; delta?: true; presenceFallback?: boolean }
 const replies = new Map<Kind, () => Promise<Read>>()
 let reads: Kind[]
 let cursors: { kind: Kind; known?: string; positions?: unknown }[]
@@ -48,6 +50,7 @@ class FakeSocket {
   onerror: (() => void) | null = null
   onmessage: ((event: { data: string }) => void) | null = null
   readonly url: string
+  readonly sent: { type: string; id: string; token?: string }[] = []
   // The channel asks the Worker for revisions; the fixture addresses the socket by its channel path.
   constructor(url: string) {
     assert.equal(new URL(url).searchParams.get('revisions'), '1')
@@ -59,7 +62,7 @@ class FakeSocket {
       this.message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS })
     })
   }
-  send(value: string) { if (value === 'ping') this.onmessage?.({ data: 'pong' }) }
+  send(value: string) { if (value === 'ping') this.onmessage?.({ data: 'pong' }); else this.sent.push(JSON.parse(value)) }
   close() { this.readyState = 3; this.onclose?.() }
   message(value: unknown) { if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(value) }) }
 }
@@ -126,6 +129,66 @@ async function render(kinds: Kind[], workspace = team, owner = 'owner') {
 async function settled() { await wait(); await wait() }
 function emit(scope: string, kind: string) { for (const socket of sockets) if (socket.url.endsWith(scope)) socket.message({ kind, id: scope }) }
 const deferred = <T,>() => { let resolve!: (value: T) => void; return { promise: new Promise<T>(done => { resolve = done }), resolve: (value: T) => resolve(value) } }
+
+test('real thread hooks require a current presence acknowledgement, update its proof and unregister on exit', async () => {
+  let presence: PresenceProof = { token: `initial.${'a'.repeat(64)}`, expiresAt: Date.now() + 300_000 }
+  replies.set('threads', async () => { const value = snapshot('threads'); return { ...value, presenceFallback: true, live: { ...value.live, presence } } })
+  await render(['threads', 'bots']); await settled()
+  const key = unstableSerialize(['threads', 'owner']), socket = sockets.find(value => value.url.endsWith(home))!
+  assert.equal(liveKeyConnection(cache, key), false)
+  const before = { reads: count('threads'), tickets: tickets.length, sockets: sockets.length }
+  await act(async () => socket.message({ type: 'presence_ready', version: 1 }))
+  assert.equal(socket.sent.length, 1)
+  assert.equal(liveKeyConnection(cache, key), false, 'support does not acknowledge this subscription')
+  const previous = socket.sent[0].id
+  await act(async () => socket.message({ type: 'presence_ack', id: previous, expiresAt: presence.expiresAt }))
+  assert.equal(liveKeyConnection(cache, key), true)
+  presence = { token: `updated.${'b'.repeat(64)}`, expiresAt: Date.now() + 300_000 }
+  await act(async () => { await refresh.threads!() })
+  assert.deepEqual(socket.sent.map(value => value.type), ['presence_watch', 'presence_unwatch', 'presence_watch'])
+  assert.equal(liveKeyConnection(cache, key), false)
+  await act(async () => socket.message({ type: 'presence_ack', id: previous, expiresAt: presence.expiresAt }))
+  assert.equal(liveKeyConnection(cache, key), false, 'the prior proof cannot acknowledge the current read')
+  await act(async () => socket.message({ type: 'presence_ack', id: socket.sent.at(-1)!.id, expiresAt: presence.expiresAt }))
+  assert.equal(liveKeyConnection(cache, key), true)
+  assert.equal(count('threads'), before.reads + 1, 'only the explicit read ran; watch control does not read')
+  assert.equal(tickets.length, before.tickets); assert.equal(sockets.length, before.sockets)
+  await render(['bots']); await wait()
+  assert.equal(socket.sent.at(-1)!.type, 'presence_unwatch')
+  assert.equal(socket.readyState, 1, 'the other list still owns this home socket')
+})
+
+test('an older server presence fallback flag remains uncovered on a healthy new live transport', async () => {
+  replies.set('threads', async () => ({ ...snapshot('threads'), presenceFallback: true }))
+  await render(['threads']); await settled()
+  const socket = sockets.find(value => value.url.endsWith(home))!, key = unstableSerialize(['threads', 'owner'])
+  await act(async () => socket.message({ type: 'presence_ready', version: 1 }))
+  assert.equal(liveKeyConnection(cache, key), false)
+  assert.deepEqual(socket.sent, [])
+})
+
+test('three acknowledged presence tabs still share one authorized read for the same device-state push', { timeout: 10_000 }, async () => {
+  const scoped = [0, 1, 2].map(() => new PersistentReadCache({ userId: 'owner', workspaceId: team, build: 'presence-fixture', role: 'member' }))
+  await Promise.all(scoped.map(value => value.hydrate(async () => undefined)))
+  const presence = { token: `shared.${'c'.repeat(64)}`, expiresAt: Date.now() + 300_000 }
+  replies.set('threads', async () => { const value = snapshot('threads'); return { ...value, presenceFallback: true, live: { ...value.live, presence } } })
+  await act(async () => root.render(<>{scoped.map((provider, index) => <SWRConfig key={index} value={{ provider: () => provider, dedupingInterval: 0 }}>
+    <LiveProvider ownerId="owner" workspaceId={team}><Threads owner="owner" /></LiveProvider>
+  </SWRConfig>)}</>))
+  await settled(); await wait(2_100)
+  await act(async () => {
+    for (const socket of sockets) {
+      socket.message({ type: 'presence_ready', version: 1 })
+      socket.message({ type: 'presence_ack', id: socket.sent.at(-1)!.id, expiresAt: presence.expiresAt })
+    }
+  })
+  const before = count('threads'), key = unstableSerialize(['threads', 'owner'])
+  assert.ok(scoped.every(provider => liveKeyConnection(provider, key) === true))
+  await act(async () => emit(home, 'thread_list')); await settled()
+  assert.equal(count('threads'), before + 1)
+  assert.ok(scoped.every(provider => liveKeyConnection(provider, key) === true))
+  assert.ok(sockets.every(socket => socket.sent.length === 1), 'the shared unchanged proof does not re-register')
+})
 
 for (const kind of ['issues', 'threads'] as const) test(`a restored ${kind} snapshot sends its existing row proofs and removes rows absent from the authorized delta`, async () => {
   const kept = '30000000-0000-4000-8000-000000000001', removed = '30000000-0000-4000-8000-000000000002'
@@ -203,6 +266,42 @@ test('real list hooks update held revisions after an asynchronous read without l
   assert.equal(tickets.length, before.tickets)
   assert.equal(sockets.length, before.sockets)
   assert.equal(liveKeyConnection(cache, issueKey), true)
+})
+
+test('real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes', { timeout: 15_000 }, async () => {
+  const scoped = [0, 1, 2].map(() => new PersistentReadCache({ userId: 'owner', workspaceId: team, build: 'fixture', role: 'member' }))
+  await Promise.all(scoped.map(value => value.hydrate(async () => undefined)))
+  const snapshotAt = (revision: number): Read => {
+    const value = snapshot('bots')
+    return { ...value, items: [{ id: 'bots', title: `revision-${revision}` }], live: { ...value.live, revisions: { [`bot_chat_list:${home}`]: revision } } }
+  }
+  replies.set('bots', async () => snapshotAt(5))
+  await act(async () => root.render(<>{scoped.map((provider, index) => <SWRConfig key={index} value={{ provider: () => provider, dedupingInterval: 0 }}>
+    <LiveProvider ownerId="owner" workspaceId={team}><div data-tab={index}><Bots owner="owner" /></div></LiveProvider>
+  </SWRConfig>)}</>))
+  await settled(); await wait(2_100)
+  assert.equal(sockets.length, 3)
+  for (const socket of sockets) socket.message({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['bot_chat_list'] })
+  const held = deferred<Read>()
+  const before = count('bots')
+  replies.set('bots', () => held.promise)
+  try {
+    await act(async () => sockets[0].message({ kind: 'bot_chat_list', id: home })); await wait()
+    assert.equal(count('bots'), before + 1, 'the first tab is reading a snapshot captured before revision 6')
+    replies.set('bots', async () => snapshotAt(6))
+    await act(async () => { for (const socket of sockets) socket.message({ kind: 'bot_chat_list', id: home, rev: 6 }) }); await wait()
+    assert.equal(count('bots'), before + 1, 'the other tabs join the outstanding claim')
+    await act(async () => held.resolve(snapshotAt(5))); await settled(); await wait(2_100)
+    for (const index of [0, 1, 2]) assert.ok(container.querySelector(`[data-tab="${index}"]`)?.textContent?.includes('revision-6'), 'the newer push must reach every tab without another push or reconnect')
+    assert.equal(count('bots'), before + 2, 'old read + one fresh read, including the paced leader trailing read')
+
+    await wait(2_100)
+    replies.set('bots', async () => snapshotAt(7))
+    const fresh = count('bots')
+    await act(async () => { for (const socket of sockets) socket.message({ kind: 'bot_chat_list', id: home, rev: 7 }) }); await settled()
+    assert.equal(count('bots'), fresh + 1, 'matching pushes still coalesce across real providers')
+    for (const index of [0, 1, 2]) assert.ok(container.querySelector(`[data-tab="${index}"]`)?.textContent?.includes('revision-7'))
+  } finally { held.resolve(snapshotAt(5)) }
 })
 
 test('healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list', { timeout: 80_000 }, async () => {

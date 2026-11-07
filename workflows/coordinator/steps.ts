@@ -39,6 +39,7 @@ import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
+import { withCoordinatorWebSearchTiming } from '@/lib/coordinator/tool-boundary-timing'
 import { issueMembers, issues } from '@/lib/db/schema'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
@@ -194,7 +195,7 @@ export async function prepareTurn(userId: string, botId: string, holder: string,
   'use step'
   const mailboxTools = input.mailboxEnabled ? await mailboxCatalogue(userId, botId, input.executionId) : []
   if (input.runtime) await noteQuotaSwitch(userId, holder, input.runtime, botId, true)
-  return { mailboxTools, prompt: await preparePrompt(userId, botId, input.snapshot, mailboxTools) }
+  return { mailboxTools, ...await preparePromptDetails(userId, botId, input.snapshot, mailboxTools) }
 }
 
 export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string, once = false) {
@@ -218,7 +219,7 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
  * and duration. Durations and counts only. Each model call logs its own line
  * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
  */
-export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[] }) {
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { settings: number; inbox: number; begin: number; prepare: number; execution: number; personal: number; github: number } }) {
   'use step'
   try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
 }
@@ -281,6 +282,11 @@ noticeTurnFailure.maxRetries = 0
  */
 export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; stable: number; messages: ModelMessage[] }> {
   'use step'
+  return (await preparePromptDetails(userId, botId, snapshot, mailboxTools)).prompt
+}
+
+/** Context timings stay beside the prompt, never in its instructions or model options. */
+async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []) {
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
@@ -321,13 +327,21 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubContext } = await import('@/lib/coordinator/github-context')
   const { executionContextParts } = await import('@/lib/coordinator/execution-context')
-  const execution = await executionContextParts(userId, botId)
+  const contextMs = { execution: 0, personal: 0, github: 0 }
+  const timed = async <T>(part: keyof typeof contextMs, work: () => Promise<T>): Promise<T> => {
+    const started = Date.now()
+    try { return await work() } finally { contextMs[part] = Math.max(0, Date.now() - started) }
+  }
+  const [execution, rules, github] = await Promise.all([
+    timed('execution', () => executionContextParts(userId, botId)),
+    timed('personal', () => withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
+    timed('github', () => githubContext(userId, undefined, undefined, botId)),
+  ])
   // Everything up to the memory is the same on every turn; `stable` is where it ends, so a provider can cache it (lib/prompt-cache.ts).
-  const rules = await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)
   // The GitHub lines (the authorized repository list) and the allowed models list are part of the cached prefix: they change only
   // when the repositories or 优先使用的模型 do. Which models can run right now changes per turn, so it stays after the memory.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
-  return { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }
+  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
+  return { prompt: { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }, contextMs }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
@@ -1002,10 +1016,12 @@ export async function stopRun(userId: string, input: { runId: string }, scope?: 
 }
 
 /** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */
-export async function webSearchStep(userId: string, input: { query: string; limit?: number }, scope?: NativeToolScope) {
+export async function webSearchStep(userId: string, input: { query: string; limit?: number }, scope?: NativeToolScope, callId?: string) {
   'use step'
-  await assertNativeToolScope(userId,scope)
-  return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
+  return withCoordinatorWebSearchTiming(async () => {
+    await assertNativeToolScope(userId,scope)
+    return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
+  }, callId)
 }
 
 /** Web work stays in the Bot chat; it never creates an agent_runs row. */
