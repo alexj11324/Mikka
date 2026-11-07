@@ -1,4 +1,4 @@
-name: Issue 1512 official Claude public CA control
+name: Issue 1512 Claude slug public CA control
 
 on:
   push:
@@ -55,7 +55,7 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
-      - name: Observe one fixed public CA file on the official Claude VM
+      - name: Observe the public CA through normal claude-slug creation without origin attestation
         run: >-
           "$RUNNER_TEMP/issue1512-official-ca/bin/python" -B ops/scripts/ops/issue1512-official-claude-ca.py diagnose
           --source source --output "$RUNNER_TEMP/issue1512-official-claude-ca.json"

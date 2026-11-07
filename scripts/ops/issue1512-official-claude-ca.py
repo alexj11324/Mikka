@@ -1,6 +1,5 @@
-"""Observe one public CA file on one fresh official Claude VM; never a release."""
+"""Observe one public CA file on a fresh claude-slug VM; no origin attestation."""
 import argparse
-from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -10,8 +9,6 @@ import signal
 import subprocess
 import sys
 import time
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
 
 SOURCE_SHA = 'd63b5e1b2e70baa368cf42ec6f9b13691571b6e0'
 REPOSITORY = 'alexj11324/Mikka'
@@ -23,12 +20,11 @@ FAILURE_REFERENCE = {'workflowRunId': '42326876749', 'sourceCommit': SOURCE_SHA,
                      'beforeSha256': 'fd1175201e861f159f0d6ae42523b0f5d754ade8a36d105e8b7110b180101862',
                      'afterSha256': '21899698fbaa1da5314e42bc049b146f16cddb2e7540822b2a15f009f8342996'}
 ERROR_CODES = {'workflow_identity_invalid', 'source_mismatch', 'ops_checkout_mismatch', 'checkout_dirty',
-               'key_missing', 'api_path_invalid', 'api_response_invalid', 'official_template_unverified',
-               'template_identity_changed', 'sandbox_identity_invalid', 'sandbox_ownership_mismatch',
-               'command_failed', 'ca_observation_invalid', 'ledger_invalid', 'cleanup_scope_exceeded',
+               'key_missing', 'sandbox_identity_invalid', 'sandbox_ownership_mismatch', 'sandbox_id_not_returned',
+               'command_failed', 'ca_observation_invalid', 'ledger_invalid',
                'sandbox_still_exists', 'diagnostic_deadline', 'interrupted', 'operation_failed'}
-ERROR_TYPES = {'DiagnosticFailure', 'HTTPError', 'TimeoutException', 'TimeoutError', 'CommandExitException',
-               'ConnectError', 'ReadTimeout', 'ConnectTimeout', 'NotFoundException', 'AuthenticationException',
+ERROR_TYPES = {'DiagnosticFailure', 'TimeoutException', 'TimeoutError', 'CommandExitException',
+               'ConnectError', 'ReadTimeout', 'ConnectTimeout', 'NotFoundException', 'SandboxNotFoundException', 'AuthenticationException',
                'ValueError', 'RuntimeError', 'OSError'}
 
 # The guest receives no key, source checkout, task identity or installation.
@@ -89,8 +85,6 @@ def safe_error(error):
     code = error.args[0] if isinstance(error, DiagnosticFailure) and error.args else None
     result = {'code': code if isinstance(code, str) and code in ERROR_CODES else 'operation_failed',
               'type': type(error).__name__ if type(error).__name__ in ERROR_TYPES else 'unknown'}
-    if isinstance(error, HTTPError) and type(error.code) is int and 100 <= error.code <= 599:
-        result['httpStatus'] = error.code
     return result
 
 
@@ -102,45 +96,6 @@ def save(output, ledger):
         json.dump(ledger, stream, indent=2)
         stream.write('\n')
     temp.replace(output)
-
-
-def api_get(path, key):
-    if not (path == '/templates/aliases/claude' or re.fullmatch(r'/(?:templates|sandboxes)/[A-Za-z0-9_-]{1,128}', path)):
-        fail('api_path_invalid')
-    request = Request('https://api.e2b.app' + path, headers={'X-API-Key': key}, method='GET')
-    with urlopen(request, timeout=10) as response:
-        raw = response.read(262145)
-    if len(raw) > 262144:
-        fail('api_response_invalid')
-    value = json.loads(raw)
-    if not isinstance(value, dict):
-        fail('api_response_invalid')
-    return value
-
-
-def official_template(request, key):
-    alias = request('/templates/aliases/claude', key)
-    template_id = alias.get('templateID')
-    if alias.get('public') is not True or not opaque(template_id):
-        fail('official_template_unverified')
-    info = request('/templates/' + template_id, key)
-    if (info.get('templateID') != template_id or info.get('public') is not True
-            or info.get('isDefault') is not True or info.get('buildStatus') != 'ready'
-            or not opaque(info.get('buildID'))):
-        fail('official_template_unverified')
-    def timestamp(value):
-        if not isinstance(value, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})', value):
-            return None
-        try:
-            return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
-        except ValueError:
-            return None
-    builds = info.get('builds', [])
-    build = next((row for row in builds if isinstance(row, dict) and row.get('buildID') == info['buildID']), {}) if isinstance(builds, list) else {}
-    return {'alias': 'claude', 'templateId': template_id, 'buildId': info['buildID'],
-            'public': True, 'isDefault': True, 'buildStatus': 'ready',
-            'templateCreatedAt': timestamp(info.get('createdAt')), 'templateUpdatedAt': timestamp(info.get('updatedAt')),
-            'buildCreatedAt': timestamp(build.get('createdAt')), 'buildUpdatedAt': timestamp(build.get('updatedAt'))}
 
 
 def closed_observation(raw):
@@ -158,15 +113,17 @@ def closed_observation(raw):
 
 
 def new_ledger(context):
-    return {'version': 1, 'diagnosticOnly': True, 'releaseAccepted': False, 'policyChanged': False,
+    return {'version': 2, 'diagnosticOnly': True, 'releaseAccepted': False, 'policyChanged': False,
             'identity': context, 'budget': {'sandboxes': 1, 'sandboxSeconds': 60, 'commands': 1,
                 'commandSeconds': 15, 'overallSeconds': 180},
-            'scope': {'officialTemplate': 'claude', 'file': CA_PATH, 'mikkaInstalled': False,
+            'scope': {'file': CA_PATH, 'mikkaInstalled': False,
                 'taskCredentialsProvided': False, 'providerCalls': 0, 'templateMutations': 0},
-            'buildIdentitySource': 'template_api_before_after', 'sandboxBuildIdExposedByApi': False,
-            'attribution': 'observation_only_requires_matching_base_or_controlled_before_after',
+            'template': {'requestedAlias': 'claude', 'returnedTemplateId': None,
+                'identitySource': 'sandbox_get_info', 'provenance': 'unknown', 'buildId': None,
+                'officialIdentityAttested': False, 'managementApiRead': False},
+            'attribution': 'slug_created_vm_without_mikka_installation_origin_and_build_unknown',
             'failureReference': dict(FAILURE_REFERENCE), 'comparisonToFailure': None,
-            'officialBefore': None, 'officialAfter': None, 'createStarted': False, 'sandboxId': None,
+            'createStarted': False, 'sandboxId': None,
             'observation': None, 'probe': {'status': 'not_started'}, 'cleanup': {'status': 'not_started'},
             'cleanupHistory': []}
 
@@ -175,63 +132,62 @@ def validate_ledger(ledger, context):
     expected = new_ledger(context)
     if (not isinstance(ledger, dict) or set(ledger) != set(expected)
             or any(ledger.get(key) != expected[key] for key in ['version', 'identity', 'budget', 'scope',
-                'buildIdentitySource', 'sandboxBuildIdExposedByApi', 'attribution', 'failureReference'])
+                'attribution', 'failureReference'])
             or ledger.get('diagnosticOnly') is not True or ledger.get('releaseAccepted') is not False
             or ledger.get('policyChanged') is not False or type(ledger.get('createStarted')) is not bool
             or (ledger.get('sandboxId') is not None and (not ledger['createStarted'] or not opaque(ledger['sandboxId'])))):
         fail('ledger_invalid')
-    before = ledger.get('officialBefore')
-    if ledger['createStarted'] and (not isinstance(before, dict) or before.get('alias') != 'claude'
-            or before.get('public') is not True or before.get('isDefault') is not True
-            or not opaque(before.get('templateId')) or not opaque(before.get('buildId'))):
+    template = ledger.get('template')
+    if (not isinstance(template, dict) or set(template) != set(expected['template'])
+            or any(template.get(key) != value for key, value in expected['template'].items() if key != 'returnedTemplateId')
+            or (template['returnedTemplateId'] is not None
+                and (ledger['sandboxId'] is None or not opaque(template['returnedTemplateId'])))):
         fail('ledger_invalid')
 
 
 def assert_owned(info, sandbox_id, ledger, context):
-    if (info.get('sandboxID') != sandbox_id or info.get('templateID') != ledger['officialBefore']['templateId']
-            or info.get('metadata') != context):
+    template_id = getattr(info, 'template_id', None)
+    if (getattr(info, 'sandbox_id', None) != sandbox_id or not opaque(template_id)
+            or getattr(info, 'metadata', None) != context
+            or (ledger['template']['returnedTemplateId'] is not None
+                and template_id != ledger['template']['returnedTemplateId'])):
         fail('sandbox_ownership_mismatch')
+    ledger['template']['returnedTemplateId'] = template_id
 
 
-def cleanup_owned(sdk, request, context, key, ledger, output):
+def cleanup_owned(sdk, context, key, ledger, output):
     validate_ledger(ledger, context)
-    Sandbox, SandboxQuery, SandboxState = sdk
-    receipt = {'status': 'complete', 'sandboxes': [], 'errors': [], 'metadataRecoveryUsed': False}
+    Sandbox, SandboxNotFoundException = sdk
+    receipt = {'status': 'complete', 'sandboxes': [], 'errors': [], 'returnedIdOnly': True}
     try:
         if ledger['createStarted'] and ledger['sandboxId'] is None:
-            receipt['metadataRecoveryUsed'] = True
-            pages = Sandbox.list(query=SandboxQuery(metadata=context, state=[SandboxState.RUNNING, SandboxState.PAUSED]),
-                                 api_key=key, request_timeout=10)
-            rows = pages.next_items() if pages.has_next else []
-            if pages.has_next or len(rows) > 1:
-                fail('cleanup_scope_exceeded')
-            if rows:
-                row = rows[0]
-                if not opaque(row.sandbox_id) or row.metadata != context or row.template_id != ledger['officialBefore']['templateId']:
-                    fail('sandbox_ownership_mismatch')
-                ledger['sandboxId'] = row.sandbox_id
-                save(output, ledger)
+            # A failed create may have allocated a sandbox, but no returned ID
+            # authorizes a lookup or deletion. Keep this unresolved, with the
+            # original 60-second server TTL; never claim confirmed cleanup.
+            fail('sandbox_id_not_returned')
         sandbox_id = ledger['sandboxId']
         if sandbox_id is not None:
-            row = {'sandboxId': sandbox_id, 'killRequested': False, 'absenceConfirmedById': False}
+            row = {'sandboxId': sandbox_id, 'killRequested': False, 'absenceConfirmedById': False,
+                   'absenceHttpStatus': None}
             receipt['sandboxes'].append(row)
             try:
-                info = request('/sandboxes/' + sandbox_id, key)
-            except HTTPError as error:
-                if error.code != 404:
-                    raise
+                info = Sandbox.get_info(sandbox_id, api_key=key, request_timeout=10)
+            # e2b 2.62.0 _cls_get_info maps this exact exception from GET 404.
+            # Other failures, including generic NotFoundException, fail closed.
+            except SandboxNotFoundException:
+                pass
             else:
                 assert_owned(info, sandbox_id, ledger, context)
                 row['killRequested'] = True
                 Sandbox.kill(sandbox_id, api_key=key, request_timeout=10)
                 try:
-                    request('/sandboxes/' + sandbox_id, key)
-                except HTTPError as error:
-                    if error.code != 404:
-                        raise
+                    Sandbox.get_info(sandbox_id, api_key=key, request_timeout=10)
+                except SandboxNotFoundException:
+                    pass
                 else:
                     fail('sandbox_still_exists')
             row['absenceConfirmedById'] = True
+            row['absenceHttpStatus'] = 404
     except Exception as error:
         receipt['status'] = 'failed'
         receipt['errors'].append(safe_error(error))
@@ -241,23 +197,23 @@ def cleanup_owned(sdk, request, context, key, ledger, output):
     return receipt['status'] == 'complete'
 
 
-def diagnose(sdk, request, context, key, output):
+def diagnose(sdk, context, key, output):
     ledger, began = new_ledger(context), time.monotonic()
     save(output, ledger)
-    phase = 'official_identity'
+    phase = 'create'
     try:
-        ledger['officialBefore'] = official_template(request, key)
-        phase = 'create'
         ledger['createStarted'] = True
         save(output, ledger)
-        sandbox = sdk[0].create(ledger['officialBefore']['templateId'], api_key=key,
+        sandbox = sdk[0].create('claude', api_key=key,
                                 timeout=60, metadata=context, request_timeout=25)
         if not opaque(sandbox.sandbox_id):
             fail('sandbox_identity_invalid')
         ledger['sandboxId'] = sandbox.sandbox_id
         save(output, ledger)
         phase = 'sandbox_identity'
-        assert_owned(request('/sandboxes/' + sandbox.sandbox_id, key), sandbox.sandbox_id, ledger, context)
+        assert_owned(sdk[0].get_info(sandbox.sandbox_id, api_key=key, request_timeout=10),
+                     sandbox.sandbox_id, ledger, context)
+        save(output, ledger)
         phase = 'ca_read'
         result = sandbox.commands.run(CA_COMMAND, user='user', timeout=15, request_timeout=20)
         if result.exit_code != 0:
@@ -269,17 +225,12 @@ def diagnose(sdk, request, context, key, output):
             'matchesBeforeMode': ledger['observation']['mode'] == FAILURE_REFERENCE['beforeMode'],
             'matchesAfterMode': ledger['observation']['mode'] == FAILURE_REFERENCE['afterMode']}
         save(output, ledger)
-        phase = 'official_identity_after'
-        ledger['officialAfter'] = official_template(request, key)
-        if any(ledger['officialAfter'][key] != ledger['officialBefore'][key]
-               for key in ['alias', 'templateId', 'buildId', 'public', 'isDefault', 'buildStatus']):
-            fail('template_identity_changed')
         ledger['probe'].update(status='passed', phase='observation_complete')
     except Exception as error:
         ledger['probe'].update(status='failed', phase=phase, error=safe_error(error))
     finally:
         ledger['probe']['elapsedMs'] = round((time.monotonic() - began) * 1000)
-        cleanup_owned(sdk, request, context, key, ledger, output)
+        cleanup_owned(sdk, context, key, ledger, output)
     return ledger
 
 
@@ -303,14 +254,15 @@ def main():
     key = os.environ.pop('E2B_API_KEY', '')
     if not key:
         fail('key_missing')
-    from e2b import Sandbox, SandboxQuery, SandboxState
-    sdk = (Sandbox, SandboxQuery, SandboxState)
+    from e2b import Sandbox
+    from e2b.exceptions import SandboxNotFoundException
+    sdk = (Sandbox, SandboxNotFoundException)
     if args.mode == 'cleanup':
         signal.alarm(30)
         ledger = json.loads(args.output.read_text()) if args.output.exists() else new_ledger(context)
-        passed = cleanup_owned(sdk, api_get, context, key, ledger, args.output)
+        passed = cleanup_owned(sdk, context, key, ledger, args.output)
     else:
-        ledger = diagnose(sdk, api_get, context, key, args.output)
+        ledger = diagnose(sdk, context, key, args.output)
         passed = ledger['probe']['status'] == 'passed' and ledger['cleanup']['status'] == 'complete'
     print(json.dumps({'type': 'mikka_official_claude_ca', 'probe': ledger['probe'], 'cleanup': ledger['cleanup']}), flush=True)
     return 0 if passed else 1
