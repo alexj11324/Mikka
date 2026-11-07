@@ -14,7 +14,7 @@ import { matchesRepositoryAdmission } from '@/lib/repository-admission'
 import { ComputerError } from '@/lib/computer/store'
 import { computerPermission } from '@/lib/computer/permission'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease } from '@/lib/computer/e2b-provider'
-import { CLOUD_WORKER_COMMAND } from '@/lib/computer/worker-command'
+import { CLOUD_WORKER_COMMAND, CLOUD_PRELOADER_WAKE_COMMAND, CLOUD_PRELOADER_WAKE_RECEIPT } from '@/lib/computer/worker-command'
 import { cloudTemplateOrigin, threadMachineTemplateKind } from '@/lib/cloud-template-models'
 import { computerTemplate, e2bApiKey, taskTemplate, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { bootstrapOfficialInstance, isOfficialE2BTemplate, stageOfficialWorkerRelease, switchOfficialWorkerRelease, runtimeCommandOptions, runtimeRequestOptions, type RuntimeBudget } from '@/lib/computer/official-runtime'
@@ -993,12 +993,17 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     // carries no assignment or usable credential. String multipart is one RPC.
     const initialRun = refreshRuntime ? '' : JSON.stringify({ version: 1, runId, bootstrapSha256: createHash('sha256').update(bootstrap).digest('hex') })
     await sandbox.files.write([{ path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun }], { user: 'root', useOctetStream: false, ...runtimeRequestOptions(refreshBudget) })
-    await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka && install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next && install -o user -g user -m 600 ${handoff}.run /home/user/.mikka/initial-run.next && mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${handoff} && unlink ${handoff}.run`, { user: 'root', ...runtimeCommandOptions(10_000, refreshBudget) })
+    // The foreground command must finish the atomic publication before waking
+    // the existing watcher as user. Keep credential bytes in the file upload,
+    // never in this command/argv/env. Only an acknowledged signal skips the
+    // redundant remote start; absent/old preloaders keep the original fallback.
+    const publication = await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka && install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next && install -o user -g user -m 600 ${handoff}.run /home/user/.mikka/initial-run.next && mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${handoff} && unlink ${handoff}.run && runuser -u user -- sh -c '${CLOUD_PRELOADER_WAKE_COMMAND}'`, { user: 'root', ...runtimeCommandOptions(10_000, refreshBudget) })
+    const preloadedWorkerWoken = publication.stdout.trim() === CLOUD_PRELOADER_WAKE_RECEIPT
     // The worker's output streams into the server logs only while this invocation lives;
     // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
     refreshPhase = timings.next('start_worker')
     const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
-    await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...runtimeRequestOptions(refreshBudget), ...workerOutputForwarder(runId, mask) })
+    if (!preloadedWorkerWoken) await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...runtimeRequestOptions(refreshBudget), ...workerOutputForwarder(runId, mask) })
     refreshPhase = timings.next('worker_register')
     const deadline = Math.min(Date.now() + 30_000, refreshDeadline ?? Infinity)
     let ready = false

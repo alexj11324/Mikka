@@ -19,7 +19,10 @@ mock.module(new URL('../subscription-runtime.ts', import.meta.url).href, { named
   authorizeSubscriptionUse: () => assert.fail('target validation must not prepare a provider'),
   subscriptionRuntime: () => { providerCalls++; throw new Error('unexpected provider access') },
 } })
+mock.module(new URL('../rule-dispatch.ts', import.meta.url).href, { namedExports: { cloudReady: async () => true } })
+mock.module(new URL('../cloud-template-models.ts', import.meta.url).href, { namedExports: { cloudModelSupport: () => 'ready' } })
 const { assertFrozenModelTarget, assertProfileTarget, assertProfileSelection } = await import('./agent-profile')
+const { resolveModelDispatch } = await import('../model-dispatch')
 
 const scope = { ownerId: 'requester', workspaceId: randomUUID() }
 type Connection = { id: string; ownerId: string; provider: 'claude' | 'codex'; models: string[]; state: string; paused: boolean; removed: boolean; epoch: string; bindingEpoch: string; quota: unknown }
@@ -39,7 +42,9 @@ function fixture() {
   const mayUseKey = (row: Key) => row.ownerId === scope.ownerId || (allowed && keyShares.has(row.id))
   const query = async (sql: string, params: unknown[] = []) => {
     let kind: string, rows: unknown[]
-    if (sql.includes('FROM factory_agent_profiles')) {
+    if (sql.includes('FROM model_order_settings')) {
+      kind = 'settings'; rows = [{ location: 'cloud', customized: false, preferredHarness: 'codex', autoModelRouting: false }]
+    } else if (sql.includes('FROM factory_agent_profiles')) {
       kind = 'profile_lock'
       rows = profile && params[0] === profile.profileId && params[1] === (profileState.ownerId ?? scope.ownerId) && params[2] === (profileState.workspaceId ?? scope.workspaceId)
         ? [{ id: profile.profileId, ownerId: scope.ownerId, workspaceId: scope.workspaceId, version: profileState.version ?? profile.version, definition: { ...profile.definition, enabled: profileState.enabled ?? true }, digest: profile.digest, archivedAt: profileState.archivedAt ?? null }] : []
@@ -92,6 +97,35 @@ const result = async (fn: () => Promise<void>) => {
   }
 }
 const reset = () => { memberships.length = 0; inactive.clear(); providerCalls = 0 }
+
+for (const shared of [false, true]) test(`fixed ${shared ? 'shared' : 'own'} dispatch avoids unrelated sources while retaining fresh credential refusal`, async () => {
+  reset()
+  const f = fixture(), entry = f.source('subscription', shared)
+  assert.ok(entry.source.kind === 'subscription')
+  const connectionId = entry.source.connectionId
+  const resolve = () => resolveModelDispatch(f.query as Pool, { ...scope, botId: null }, undefined, 'cloud', undefined,
+    { exactEntry: entry, bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
+  const selected = await resolve()
+  assert.equal(selected.kind, 'cloud')
+  assert.deepEqual(selected.entry, entry)
+  assert.equal(f.calls.some(call => ['pooled_owners', 'catalogue_rank', 'own_keys', 'shared_keys'].includes(call.kind)), false)
+  assert.equal(f.calls.filter(call => call.kind === 'catalogue').length, 1)
+  assert.ok(f.calls.filter(call => call.kind === 'catalogue').every(call => call.params[6] === connectionId && call.params[7] === entry.model))
+  f.connections[shared ? 2 : 0].paused = true
+  assert.equal((await resolve()).kind, 'none', 'the next call cannot reuse the prior positive source snapshot')
+  assert.equal(providerCalls, 0)
+})
+
+test('a harness-only dispatch keeps its preference model even with a conflicting exact source', async () => {
+  reset()
+  const f = fixture(), entry = { ...f.source('subscription'), model: 'other-model' }
+  const resolved = await resolveModelDispatch(f.query as Pool, { ...scope, botId: null }, { harness: 'codex' }, 'cloud', undefined,
+    { exactEntry: entry, bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
+  assert.equal(resolved.kind, 'none')
+  if (resolved.kind === 'none') assert.equal(resolved.reason, 'notOffered')
+  assert.ok(f.calls.some(call => call.kind === 'pooled_owners'))
+  assert.equal(providerCalls, 0)
+})
 
 for (const shared of [false, true]) for (const kind of ['subscription', 'api_key'] as const) test(`fixed ${shared ? 'shared' : 'own'} ${kind} reads only its selected source, with the original final fences`, async t => {
   reset()

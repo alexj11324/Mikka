@@ -70,6 +70,7 @@ import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprin
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
 import { reusableHostedModels, type HostedModelProbe } from "./cloud-model-probe"
+import { prefetchHostedCliFiles, type HostedCliPrefetch } from "./hosted-cli-prefetch"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { preflightLocalSubscription } from "./subscription-preflight"
@@ -455,6 +456,12 @@ export class Daemon {
       // A frozen template can be weeks old. The binaries were checked above;
       // the natural refresh period starts when this machine accepts its owner.
       this.lastModelProbe = Date.now()
+    }
+    // Only the activated cloud entry point warms software pages. It does not
+    // delay registration/claim or replace the real CLI/model/identity checks.
+    if (hosted && this.options.e2bContainerRuntime && !this.stopped) {
+      this.cliPrefetch ??= prefetchHostedCliFiles(hosted.binaries,
+        preloadedModels ? this.options.preloadedModels?.manifest?.kind : undefined)
     }
     await this.cloudComputerBroker?.listen()
     if (this.stopped) throw new Error("daemon stopped during startup")
@@ -1085,6 +1092,7 @@ export class Daemon {
 
   /** The hosted runner's CLIs on a cloud machine (subscription-hosted-runner.ts), which its model probe asks. */
   private hostedBinaries: Partial<Record<"codex" | "claude_code", string>> | undefined
+  private cliPrefetch: HostedCliPrefetch | undefined
 
   private modelProbeOn() {
     // A cloud machine probes its own CLIs too (Alex, 2026-11-03): its runs start only on a model they reported.
@@ -1898,6 +1906,7 @@ export class Daemon {
 
   private async stopInternal() {
     this.stopped = true
+    this.cliPrefetch?.abort()
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
     await this.maintenance
@@ -1921,6 +1930,9 @@ export class Daemon {
     }
     await this.outbox?.close()
     await daemonTracer.shutdown()
+    // Cancellation of a real task is never held behind this optional read.
+    // Still drain its descriptor before releasing this daemon's lifecycle.
+    await this.cliPrefetch?.done
     const release = this.releaseLock
     this.releaseLock = null
     await release?.().catch((err: unknown) => {
