@@ -329,9 +329,9 @@ export async function runAcceptance() {
       )::int AS n`,[ownerId,baselineBotIds])
     report.existingActiveWork = {total: active.n}
     if (active.n !== 0) report.existingActiveWork.byKind = await readSql(`SELECT 'execution' AS kind,status,count(*)::int AS count FROM agent_kit_executions WHERE owner_id=$1 AND bot_key=ANY($2::text[]) AND status='running' GROUP BY status
-      UNION ALL SELECT 'lease','active',count(*)::int FROM coordinator_sessions WHERE \"userId\"=$1 AND \"botId\"::text=ANY($2::text[]) AND \"leaseHolder\" IS NOT NULL AND \"leaseUntil\">now()
-      UNION ALL SELECT 'inbox',kind,count(*)::int FROM coordinator_events WHERE \"userId\"=$1 AND \"botId\"::text=ANY($2::text[]) AND \"deliveredAt\" IS NULL AND kind='user_message' GROUP BY kind
-      UNION ALL SELECT 'run',status,count(*)::int FROM agent_runs WHERE \"userId\"=$1 AND \"botId\"::text=ANY($2::text[]) AND status IN ('queued','preparing','running','paused','waiting_input','finishing') GROUP BY status`,[ownerId,baselineBotIds])
+      UNION ALL SELECT 'lease','active',count(*)::int FROM coordinator_sessions WHERE "userId"=$1 AND "botId"::text=ANY($2::text[]) AND "leaseHolder" IS NOT NULL AND "leaseUntil">now()
+      UNION ALL SELECT 'inbox',kind,count(*)::int FROM coordinator_events WHERE "userId"=$1 AND "botId"::text=ANY($2::text[]) AND "deliveredAt" IS NULL AND kind='user_message' GROUP BY kind
+      UNION ALL SELECT 'run',status,count(*)::int FROM agent_runs WHERE "userId"=$1 AND "botId"::text=ANY($2::text[]) AND status IN ('queued','preparing','running','paused','waiting_input','finishing') GROUP BY status`,[ownerId,baselineBotIds])
     check(active.n===0,'shared_account_busy')
     for (const item of selectedCases) {
       const result = { case: item.id, model: item.model, status: 'running' }

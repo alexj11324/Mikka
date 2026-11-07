@@ -22,51 +22,6 @@ on:
 permissions:
   contents: read
 jobs:
-  runtime-candidates:
-    if: false && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-acceptance'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
-    env:
-      APPLICATION_SHA: ${{ inputs.application_sha || 'f7225f3eb1e38762dfdecde0395792c85b81ec22' }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Verify the exact historical release recovery boundaries
-        run: |
-          python3 scripts/ops/issues-1515-1517-runtime-cleanup.py --self-test
-          python3 scripts/e2b/cleanup-template-candidates.test.py
-      - name: Install the pinned release cleanup SDK
-        run: |
-          python3 -m venv "$RUNNER_TEMP/e2b-cleanup"
-          "$RUNNER_TEMP/e2b-cleanup/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
-      - name: Read the existing E2B cleanup key
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: E2B_API_KEY
-          recursive: false
-          include-imports: false
-      - name: Recover only verified private candidates from the failed E2BIG release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: '"$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/ops/issues-1515-1517-runtime-cleanup.py'
-      - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: issues-1515-1517-runtime-cleanup-${{ github.sha }}
-          path: issues-1515-1517-cleanup-report/runtime-candidates.json
-          retention-days: 7
   cleanup:
     concurrency:
       group: production-smoke-owner-acceptance
@@ -92,6 +47,8 @@ jobs:
       - name: Verify scoped production environment extraction without credentials
         run: node scripts/ops/issues-1515-1517-production-env.mjs --self-test
       - run: pnpm install --frozen-lockfile
+      - name: Verify rollback, deletion fences and protected rows without credentials
+        run: node --experimental-test-module-mocks --import tsx --test scripts/ops/issues-1515-1517-cleanup.test.mjs
       - name: Read required production configuration MIKKA_DATABASE_URL
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -200,6 +157,12 @@ jobs:
             echo 'cleanup report unavailable'
           fi
           exit "$result"
+      - name: Verify normal account reads after applied cleanup
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'apply' && success()
+        env:
+          PREFLIGHT_PHASE: after_cleanup
+          MIKKA_OPS_DEPENDENCIES: ${{ github.workspace }}
+        run: node scripts/ops/issues-1515-1517-preflight.mjs
       - name: Verify the specifically authorized personal workspace with read-only SQL
         if: ${{ !cancelled() }}
         run: node --import ./scripts/server-test.mjs --import tsx scripts/ops/issues-1515-self-workspace.ts

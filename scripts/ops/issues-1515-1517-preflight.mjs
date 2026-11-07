@@ -53,7 +53,7 @@ try {
       count(*) FILTER (WHERE "lastSeenAt">now() AND "removedAt" IS NULL)::int AS "futureVisible" FROM devices`)
     await query('demoRuns', `SELECT r.status, count(*)::int AS count FROM agent_runs r JOIN devices d ON d.id=r."deviceId"
       WHERE d.id::text LIKE 'de30000%' AND d."daemonVersion"='0.9.4' AND d.kind='local' GROUP BY r.status ORDER BY r.status`)
-    await query('emptyConnections', `SELECT c.provider,c.state,count(*)::int AS count,count(DISTINCT c."ownerId")::int AS owners
+    await query('emptyConnections', `SELECT c.provider,c.state,EXISTS(SELECT 1 FROM account_deletion_guards g WHERE g."subjectId"=c."ownerId") AS guarded,count(*)::int AS count,count(DISTINCT c."ownerId")::int AS owners
       FROM byos_connections c WHERE c."removedAt" IS NULL AND c.state IN ('pending','reconnect_required','disconnected')
       AND c."providerSubject" IS NULL AND c."accountLabel" IS NULL
       AND c."secretName" IS NULL AND c."secretDigest" IS NULL AND c."accessSecretName" IS NULL AND c."accessDigest" IS NULL
@@ -62,7 +62,7 @@ try {
       AND NOT EXISTS (SELECT 1 FROM byos_bindings b WHERE b."connectionId"=c.id)
       AND NOT EXISTS (SELECT 1 FROM byos_oauth_attempts a WHERE a."connectionId"=c.id AND a."consumedAt" IS NULL AND a."expiresAt">now())
       AND NOT EXISTS (SELECT 1 FROM byos_enrollment_transfers t WHERE t."connectionId"=c.id AND t.epoch=c.epoch AND t."operationId"=c."operationId")
-      GROUP BY c.provider,c.state ORDER BY c.provider,c.state`)
+      GROUP BY c.provider,c.state,guarded ORDER BY c.provider,c.state,guarded`)
     await query('defaultModels', `SELECT e.harness,e.model,count(*)::int AS entries FROM model_order_entries e JOIN model_order_settings s
       ON e."ownerId"=s."ownerId" AND e."workspaceId"=s."workspaceId" WHERE s.customized=false GROUP BY e.harness,e.model ORDER BY e.harness,e.model`)
     await query('invalidToolCounts', `SELECT
@@ -76,7 +76,7 @@ try {
       GROUP BY category,p->>'type' ORDER BY category,type`)
     await db.query('ROLLBACK')
   } finally { db.release() }
-  if(process.env.APPLICATION_SHA && phase==='after_cleanup' && report.queries.emptyConnections.some(row=>row.count>0)) throw Error('abandoned_connections_remaining')
+  if(process.env.APPLICATION_SHA && phase==='after_cleanup' && report.queries.emptyConnections.some(row=>row.count>0 && !row.guarded)) throw Error('abandoned_connections_remaining')
   if(process.env.APPLICATION_SHA && phase==='after_cleanup' && report.queries.devices[0]?.demoVisible!==0) throw Error('demo_devices_remaining')
   const email=process.env.SMOKE_OWNER_EMAIL,password=process.env.SMOKE_OWNER_PASSWORD
   if (!email || !password) report.account={status:'credentials_unavailable'}
@@ -133,7 +133,7 @@ try {
           if(report.account.devices.futureOnlineCount!==0) throw Error('device_cleanup_or_presence_failed')
           // Customized test-account preferences remain theirs. The separately
           // authorized read-only personal-workspace check verifies the exact
-          // original 22-candidate / 8-default baseline.
+          // full catalogue and source-derived latest defaults.
           if(!report.account.sharedSubscriptions.smallModelsPresent) throw Error('shared_subscription_models_missing')
           if(!Array.isArray(order.dispatchOrder) || !order.dispatchOrder.length || order.dispatchOrder.some(node=>node.presenceReason==='future_heartbeat'&&(node.order!==null||node.availability==='ready'))) throw Error('dispatch_contract_invalid')
           const ready=order.dispatchOrder.filter(node=>node.order!==null).sort((a,b)=>a.order-b.order)
