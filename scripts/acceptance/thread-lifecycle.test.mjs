@@ -138,6 +138,15 @@ test('only the full literal expected native program or a literal shell wrapper i
   const record = fixture(), forged = proofChunks(record, 'before_question')
   forged[0].chunk.input.command = `python3 -c 'print("hashlib.sha256 subprocess.check_output ${record.caseId}")'`
   assert.throws(() => nativeEvidence({ chunks: forged }, record), /native_command_mismatch/)
+
+  // A real Codex case prepended a report heredoc to the complete expected script.
+  // Even authentic-looking marker output cannot make that combined call exact.
+  const combined = proofChunks(record, 'before_question', true)
+  const reportWrite = `cat > issue-1593-${record.caseId}.md <<'REPORT'\n# #1593 fixture report\nREPORT\n`
+  const command = reportWrite + expected
+  combined[0].chunk.input.command = `/bin/bash -lc '${command.replaceAll("'", "'\\''")}'`
+  assert.equal(isExactNativeCommand(combined[0].chunk.input.command, expected), false)
+  assert.throws(() => nativeEvidence({ chunks: combined }, record), /native_command_mismatch/)
 })
 
 test('only real paired native outputs count; Claude strings and Codex command objects both work', () => {
@@ -575,6 +584,22 @@ async function runFixture(f) {
   return runLifecycleCase({ client: f.client, botId, profile, scope, harness: 'claude_code', sourceCommit: SOURCE, source: SOURCE_FILE,
     caseId: f.fixed.caseId, markerValue: f.fixed.markerValue, now, pin: f.pin, wait: f.wait, observeProvider: f.observeProvider, signal: f.signal })
 }
+
+
+test('generated task separates report writes from each exact native snapshot tool call', async () => {
+  const f = lifecycleClient()
+  await runFixture(f)
+  const request = f.actions.find(item => item.action === 'issues.saveIssue')
+  const taskText = request.args[0].content.content[0].content[0].text
+  assert.match(taskText, /三段验证脚本.*各自.*独占一次.*原生 shell 工具调用/)
+  assert.match(taskText, /command 只能是.*脚本全文/)
+  assert.match(taskText, /报告创建\/修改必须使用另外的工具调用/)
+  assert.match(taskText, /不得把 cat\/heredoc.*前后命令.*拼进同一次调用/)
+  const scripts = [...taskText.matchAll(/python3 - <<'MIKKA_1593_PY'\n[\s\S]*?\nMIKKA_1593_PY/g)]
+    .map(match => match[0])
+  assert.deepEqual(scripts, ['before_question', 'after_answer', 'delivery']
+    .map(phase => nativeSnapshotCommand(f.fixed, phase)))
+})
 
 test('normal double decision passes its declared scope while overall issue acceptance remains incomplete', async () => {
   const f = lifecycleClient(), report = await runFixture(f)
