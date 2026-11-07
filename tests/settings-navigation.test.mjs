@@ -81,5 +81,93 @@ test('带 basePath 与 locale 的 history 写入保留部署路径和当前语�
     else delete globalThis.document
   })
   assert.equal(pushSettingsHistory('/settings/members?invite=1', undefined, '/mikka'), true)
-  assert.deepEqual(entries, ['/mikka/en/settings/members?invite=1'])
+  assert.deepEqual(entries, ['/mikka/en/settings/members?invite=1&workspace=a'])
+})
+
+function browser(t, initial) {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document')
+  const location = { href: initial }
+  const entries = []
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+    location,
+    history: { pushState: (_state, _title, href) => {
+      location.href = new URL(href, location.href).href
+      entries.push(location.href)
+    } },
+  } })
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { querySelector: () => null } })
+  t.after(() => {
+    if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow)
+    else delete globalThis.window
+    if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument)
+    else delete globalThis.document
+  })
+  return { location, entries }
+}
+
+test('opening settings preserves the selected workspace instead of triggering a scope reload', t => {
+  const { location } = browser(t, 'https://mikka.example/mikka/en/?workspace=team-a&bot=bot-one')
+  assert.equal(pushSettingsHistory('/settings', undefined, '/mikka'), true)
+  const next = new URL(location.href)
+  assert.equal(next.pathname, '/mikka/en/settings')
+  assert.equal(next.searchParams.get('workspace'), 'team-a')
+  assert.equal(next.searchParams.has('bot'), false)
+})
+
+test('leaving settings for chat and board preserves the workspace', t => {
+  const { location } = browser(t, 'https://mikka.example/settings?workspace=team-a&section=profile')
+  assert.equal(pushSettingsHistory('/'), true)
+  assert.equal(new URL(location.href).searchParams.get('workspace'), 'team-a')
+  assert.equal(pushSettingsHistory('/?section=all-issues'), true)
+  assert.equal(new URL(location.href).searchParams.get('workspace'), 'team-a')
+  assert.equal(new URL(location.href).searchParams.get('section'), 'all-issues')
+})
+
+test('settings subpages keep the URL scope rather than an older caller workspace', t => {
+  const { location } = browser(t, 'https://mikka.example/settings?workspace=team-new')
+  assert.equal(pushSettingsHistory('/settings/members?invite=1', 'team-old'), true)
+  assert.equal(new URL(location.href).searchParams.get('workspace'), 'team-new')
+  assert.equal(new URL(location.href).searchParams.get('invite'), '1')
+})
+
+test('an explicit workspace switch still reaches the requested authorization boundary', t => {
+  const { location } = browser(t, 'https://mikka.example/settings?workspace=team-a')
+  assert.equal(pushSettingsHistory('/settings?workspace=team-b', 'team-a'), true)
+  assert.equal(new URL(location.href).searchParams.get('workspace'), 'team-b')
+})
+
+test('a default-workspace route stays implicit and repeated settings navigation is a no-op', t => {
+  const { location, entries } = browser(t, 'https://mikka.example/settings?section=profile')
+  assert.equal(pushSettingsHistory('/settings?section=profile', 'resolved-default'), true)
+  assert.equal(new URL(location.href).searchParams.has('workspace'), false)
+  assert.equal(entries.length, 0)
+})
+
+test('unknown, external, and auth destinations do not write history', t => {
+  const { entries } = browser(t, 'https://mikka.example/settings?workspace=team-a')
+  for (const href of ['/sign-in', '/settings/unknown', 'https://other.example/settings']) {
+    assert.equal(pushSettingsHistory(href), false)
+  }
+  assert.equal(entries.length, 0)
+})
+
+
+test('an explicitly empty destination workspace is not replaced by the previous scope', t => {
+  const { location } = browser(t, 'https://mikka.example/settings?workspace=team-a')
+  assert.equal(pushSettingsHistory('/settings?workspace='), true)
+  assert.equal(new URL(location.href).searchParams.get('workspace'), '')
+})
+
+test('returning to the same settings URL does not add a redundant history entry', t => {
+  const { entries } = browser(t, 'https://mikka.example/settings?workspace=team-a')
+  assert.equal(pushSettingsHistory('/settings'), true)
+  assert.equal(pushSettingsHistory('/settings'), true)
+  assert.equal(entries.length, 0)
+})
+
+test('installed desktop navigation keeps its workspace without copying the previous view', t => {
+  const { location } = browser(t, 'mikka://app/mikka/en/?workspace=team-a&thread=thread-one')
+  assert.equal(pushSettingsHistory('/settings?section=models', undefined, '/mikka'), true)
+  assert.equal(location.href, 'mikka://app/mikka/en/settings?section=models&workspace=team-a')
 })

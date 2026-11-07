@@ -3,10 +3,11 @@ import { createHmac } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { before, mock, test } from 'node:test'
 import { verifyStripeSignature } from '../lib/billing/stripe'
+import { WorkspaceError } from '../lib/workspace-error'
 
-class WorkspaceError extends Error {}
 class AuditExportError extends Error { constructor(readonly code: string, readonly status: number) { super(code) } }
 let user: { id: string } | null = { id: 'admin' }
+let sessionFailure: Error | null = null
 let denied = false
 let auditError: AuditExportError | null = null
 let webhookError: Error | null = null
@@ -19,6 +20,10 @@ const calls: unknown[][] = []
 let auditRoute: typeof import('../app/api/workspaces/[workspaceId]/audit-log/route')
 let stripeRoute: typeof import('../app/api/billing/stripe/route')
 let settingsRoute: typeof import('../app/api/settings/[read]/route')
+let switcherRoute: typeof import('../app/api/workspace/switcher/route')
+const switcherResult = { workspace: { id: workspaceId }, accounts: [] }
+const switcherCalls: unknown[][] = []
+let switcherFailure: Error | null = null
 const workspaceBotCalls: unknown[][] = []
 let workspaceBotResult: unknown = { bots: [] }
 let workspaceBotFailure: Error | null = null
@@ -27,7 +32,16 @@ let sessionGate: Promise<void> = Promise.resolve()
 let sessionReads = 0
 
 before(async () => {
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => user ? { user } : null } } } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => {
+    if (sessionFailure) throw sessionFailure
+    return user ? { user } : null
+  } } } } })
+  mock.module('next-intl/server', { namedExports: { getTranslations: async () => (key: string) => key } })
+  mock.module('@/lib/workspace-switcher', { namedExports: { loadWorkspaceSwitcher: async (...args: unknown[]) => {
+    switcherCalls.push(args)
+    if (switcherFailure) throw switcherFailure
+    return switcherResult
+  } } })
   mock.module('@/lib/db/request-scope', { namedExports: { inDatabaseTransaction: () => false } })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => { if (!user) throw new Error('authRequired'); return user } } })
   mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, loadWorkspaceContext: async (requested?: string) => {
@@ -81,6 +95,69 @@ before(async () => {
   auditRoute = await import('../app/api/workspaces/[workspaceId]/audit-log/route')
   stripeRoute = await import('../app/api/billing/stripe/route')
   settingsRoute = await import('../app/api/settings/[read]/route')
+  switcherRoute = await import('../app/api/workspace/switcher/route')
+})
+
+test('workspace switcher uses the authenticated session and keeps its successful response private', async () => {
+  switcherCalls.length = 0
+  const response = await switcherRoute.GET(new Request('https://mikka.example/api/workspace/switcher?userId=other'))
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('cache-control'), 'private, no-store')
+  assert.deepEqual(await response.json(), switcherResult)
+  assert.deepEqual(switcherCalls, [[{ user }]])
+})
+
+test('workspace switcher refuses a missing session before reading workspace data', async () => {
+  switcherCalls.length = 0
+  user = null
+  try {
+    const response = await switcherRoute.GET(new Request('https://mikka.example/api/workspace/switcher'))
+    assert.equal(response.status, 401)
+    assert.deepEqual(await response.json(), { error: 'authRequired' })
+    assert.equal(switcherCalls.length, 0)
+  } finally { user = { id: 'admin' } }
+})
+
+test('workspace switcher keeps explicit workspace and membership refusals as 403', async () => {
+  try {
+    for (const code of ['workspaceAccessDenied', 'workspaceMembershipSuspended']) {
+      switcherFailure = new WorkspaceError(code)
+      const response = await switcherRoute.GET(new Request('https://mikka.example/api/workspace/switcher'))
+      assert.equal(response.status, 403)
+      assert.equal(response.headers.get('cache-control'), 'private, no-store')
+      assert.deepEqual(await response.json(), { error: 'FeatureCopy.c_6a0f7116' })
+    }
+  } finally { switcherFailure = null }
+})
+
+test('workspace switcher does not turn database or unknown read failures into authority refusals', async t => {
+  const logged = t.mock.method(console, 'error', () => undefined)
+  try {
+    for (const error of [new Error('Connection terminated unexpectedly'), new TypeError('private store detail'), new Error('workspaceAccessDenied')]) {
+      switcherFailure = error
+      logged.mock.resetCalls()
+      const response = await switcherRoute.GET(new Request('https://mikka.example/api/workspace/switcher'))
+      assert.equal(response.status, 500)
+      assert.equal(response.headers.get('cache-control'), 'private, no-store')
+      assert.deepEqual(await response.json(), { error: 'workspaceReadFailed' })
+      assert.ok(logged.mock.calls.some(call => call.arguments[0] === 'Workspace switcher could not be loaded' && call.arguments[1] === error.name))
+      assert.ok(logged.mock.calls.every(call => !JSON.stringify(call.arguments).includes(error.message)), 'logs must not expose error messages')
+    }
+  } finally { switcherFailure = null }
+})
+
+test('workspace switcher keeps an unknown session lookup failure retryable without reading workspace data', async t => {
+  const logged = t.mock.method(console, 'error', () => undefined)
+  switcherCalls.length = 0
+  sessionFailure = new Error('private session store detail')
+  try {
+    const response = await switcherRoute.GET(new Request('https://mikka.example/api/workspace/switcher'))
+    assert.equal(response.status, 500)
+    assert.equal(response.headers.get('cache-control'), 'private, no-store')
+    assert.deepEqual(await response.json(), { error: 'workspaceReadFailed' })
+    assert.equal(switcherCalls.length, 0)
+    assert.ok(logged.mock.calls.every(call => !JSON.stringify(call.arguments).includes(sessionFailure!.message)), 'logs must not expose session-store messages')
+  } finally { sessionFailure = null }
 })
 
 test('workspace-bots GET preserves the full workspace activity result and delegates scope to the existing action', async () => {
