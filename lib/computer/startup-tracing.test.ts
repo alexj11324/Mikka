@@ -4,11 +4,44 @@ import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
 import { SafeExporter, createTracerProvider } from '../tracing/node'
 import { cloudStartupPhases, cloudStartupRunAttributes, cloudStartupSpan, recordCloudBootstrapPhases } from './startup-tracing'
+import { cloudStartupDiagnosticEnv } from './startup-diagnostics'
 
 const memory = new InMemorySpanExporter()
 const provider = createTracerProvider({ exporter: new SafeExporter(memory), sampleRate: 1, environment: 'dev' })
 before(() => provider.register())
 after(async () => { await provider.shutdown(); trace.disable(); context.disable(); propagation.disable() })
+
+test('operator diagnostics only enter the dedicated Bot/repository subscription window', () => {
+  const now = Date.parse('2026-11-07T08:00:00Z'), workspaceId = '15050000-0000-4000-8000-000000000010'
+  const botId = '15050000-0000-4000-8000-000000000011', requesterId = 'synthetic-requester'
+  const window = { version: 1, requesterId, workspaceId, botId, repository: 'owner/repository', expiresAt: '2026-11-07T09:00:00Z' }
+  const env = { MIKKA_CLOUD_DIAGNOSTIC_WINDOW: JSON.stringify(window) }
+  const scope = { deviceKind: 'cloud', repository: 'owner/repository', harness: 'codex', subscriptionBindingId: 'binding',
+    run: { userId: requesterId, botId, agentDefinition: { readOnly: true, subscription: { bindingId: 'binding' },
+      executionIdentity: { requester: requesterId, workspaceId, botId } } } }
+  const taskEnv = { USER_SETTING: 'preserved' }, original = structuredClone(scope)
+  for (const harness of ['codex', 'claude_code']) {
+    assert.deepEqual(cloudStartupDiagnosticEnv(taskEnv, { ...scope, harness }, env, now), { ...taskEnv, CLOUD_STARTUP_TIMING: '1' })
+  }
+  for (const other of [
+    { ...scope, deviceKind: 'local' }, { ...scope, repository: 'owner/another' }, { ...scope, repository: null },
+    { ...scope, harness: 'cursor' }, { ...scope, subscriptionBindingId: undefined }, { ...scope, subscriptionBindingId: 'another' },
+    { ...scope, run: { ...scope.run, userId: 'another' } }, { ...scope, run: { ...scope.run, botId: 'another' } },
+    { ...scope, run: { ...scope.run, agentDefinition: null } },
+    ...['requester', 'workspaceId', 'botId'].map(key => ({ ...scope, run: { ...scope.run, agentDefinition: { ...scope.run.agentDefinition,
+      executionIdentity: { ...scope.run.agentDefinition.executionIdentity, [key]: 'another' } } } })),
+    { ...scope, run: { ...scope.run, agentDefinition: { ...scope.run.agentDefinition, readOnly: false } } },
+  ]) assert.equal(cloudStartupDiagnosticEnv(taskEnv, other, env, now), taskEnv)
+  for (const configuration of [undefined, '', '{invalid', JSON.stringify({ ...window, expiresAt: '2026-11-07T07:00:00Z' }),
+    JSON.stringify({ ...window, expiresAt: '2026-12-07T09:00:00Z' }), JSON.stringify({ ...window, botId: '*' }),
+    JSON.stringify({ ...window, unexpected: true })]) {
+    assert.equal(cloudStartupDiagnosticEnv(taskEnv, scope, { MIKKA_CLOUD_DIAGNOSTIC_WINDOW: configuration }, now), taskEnv)
+  }
+  assert.deepEqual(scope, original)
+  assert.deepEqual(taskEnv, { USER_SETTING: 'preserved' })
+  const explicit = { CLOUD_STARTUP_TIMING: '1' }
+  assert.equal(cloudStartupDiagnosticEnv(explicit, { ...scope, deviceKind: 'local' }, {}, now), explicit)
+})
 
 test('startup phases preserve their parent and expose only a hashed run identity', async () => {
   memory.reset()

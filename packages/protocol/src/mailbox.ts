@@ -12,3 +12,12 @@ export const mailboxInputs = {
   mailbox_sent: z.object({}).strict(),
 }
 export type MailboxToolName = keyof typeof mailboxInputs
+
+/** The claim already computes this canonical set. It describes the existing
+ * stateless MCP transport; it is not authority to execute a mailbox action. */
+export const mailboxCatalogueSchema = z.object({
+  version: z.literal(1),
+  transport: z.literal('mikka-stateless-2025-06-18'),
+  tools: z.array(z.enum(Object.keys(mailboxInputs) as [MailboxToolName, ...MailboxToolName[]]))
+    .max(5).refine(names => new Set(names).size === names.length, 'Duplicate mailbox tool'),
+}).strict()

@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, realpathSync, renameSync } from 'node:fs'
 import { createServer, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { afterEach, expect, it, vi } from 'vitest'
-import { MCP_SERVER_SCRIPT, RunContext } from '../src/agents/run-context'
+import { MCP_SERVER_SCRIPT, prepareRunContextFiles, RunContext, type RunContextOptions } from '../src/agents/run-context'
 import { McpHttpTimingCollector } from '../src/mcp-http-timing'
 import { startCliTimingCollector } from '../src/official-cli-timing'
 import { runRuntimeTimings } from '../src/run-runtime-timing'
@@ -40,10 +41,10 @@ async function backend(respond?: (rpc: Rpc, response: ServerResponse) => void) {
     close: () => new Promise<void>((resolve, reject) => { server.close(error => error ? reject(error) : resolve()); server.closeAllConnections() }) }
 }
 
-function client(url: string, observationUrl: string) {
+function client(url: string, observationUrl: string, extraEnv: Record<string, string> = {}) {
   const child = spawn(process.execPath, [MCP_SERVER_SCRIPT, '--handoff', join(tempDir(), 'handoff.json')], {
     env: { PATH: process.env.PATH, MIKKA_DECISION_MCP_URL: url, MIKKA_DECISION_MCP_TOKEN: syntheticToken,
-      MIKKA_MCP_HTTP_OBSERVATION_URL: observationUrl }, stdio: ['pipe', 'pipe', 'pipe'],
+      MIKKA_MCP_HTTP_OBSERVATION_URL: observationUrl, ...extraEnv }, stdio: ['pipe', 'pipe', 'pipe'],
   })
   const waiting = new Map<number, ReturnType<typeof deferred<Record<string, unknown>>>>()
   const closing = deferred<{ code: number | null; signal: NodeJS.Signals | null }>()
@@ -69,6 +70,58 @@ function client(url: string, observationUrl: string) {
     close: async () => { child.kill('SIGKILL'); await closing.promise },
   }
 }
+
+const preparedCatalogue = { version: 1, tool: { name: 'record_decision', title: 'Record a project decision',
+  description: 'Canonical claim catalogue fixture.', inputSchema: { type: 'object', properties: { idempotencyKey: { type: 'string' } }, required: ['idempotencyKey'] },
+  annotations: { idempotentHint: true } } } as const
+
+it('uses the prepared canonical catalogue without a startup HTTP request and preserves the real decision write', async () => {
+  const api = await backend()
+  const mcp = client(api.url, '', { MIKKA_DECISION_MCP_CATALOGUE: JSON.stringify(preparedCatalogue) })
+  try {
+    const listed = await mcp.request('tools/list')
+    expect(listed).toMatchObject({ result: { tools: expect.arrayContaining([preparedCatalogue.tool]) } })
+    await mcp.request('tools/list')
+    expect(api.calls).toEqual([])
+    await mcp.request('tools/call', { name: 'record_decision', arguments: { idempotencyKey: 'same-business-write' } })
+    expect(api.calls.map(call => [call.method, call.params?.name])).toEqual([['tools/call', 'record_decision']])
+  } finally { await mcp.close(); await api.close() }
+})
+
+it('observes the exact prepared catalogue separately from physical HTTP without retaining its contents', async () => {
+  const api = await backend(), observed = receivedEvents(), runId = randomUUID()
+  const run = runRuntimeTimings.begin(runId, 'device', 'codex')
+  const receiver = await startCliTimingCollector({ runId, harness: 'codex', remoteMcpServerCount: 0, decisionCatalogue: preparedCatalogue })
+  const serialized = JSON.stringify(preparedCatalogue)
+  const mcp = client(api.url, receiver.mcpHttpObservationUrl, { MIKKA_DECISION_MCP_CATALOGUE: serialized })
+  try {
+    await Promise.all([mcp.request('tools/list'), mcp.request('tools/list')])
+    await observed.until(events => events.some(event => event.type === 'catalogue_ready'))
+    expect(api.calls).toEqual([])
+    expect(observed.events.filter(event => event.type === 'catalogue_ready')).toHaveLength(1)
+    await mcp.request('tools/call', { name: 'record_decision', arguments: { idempotencyKey: 'PRIVATE_KEY' } })
+    await observed.until(events => events.some(event => event.type === 'request_body_end'))
+    await mcp.close(); await receiver.close()
+    const receipt = run.finish()!.mcpHttpTiming!
+    expect(receipt).toMatchObject({ version: 3, expectedCatalogueSha256: createHash('sha256').update(serialized).digest('hex'),
+      observedComplete: true, children: [{ sent: 1, completed: 1, catalogue: { source: 'claim' } }],
+      requests: [{ operation: 'decision_record', body: { outcome: 'read' } }] })
+    expect(receipt.requests).toHaveLength(1)
+    expect(JSON.stringify(receipt)).not.toMatch(/PRIVATE|Canonical claim|inputSchema|mkw_|127\.0\.0\.1/)
+  } finally { await mcp.close(); await receiver.close(); run.close(); await api.close() }
+})
+
+it.each(['not-json', JSON.stringify({ ...preparedCatalogue, version: 2 }),
+  JSON.stringify({ ...preparedCatalogue, tool: { ...preparedCatalogue.tool, name: 'arbitrary_tool' } }),
+  JSON.stringify({ ...preparedCatalogue, extra: 'unexpected' })])('does not fetch a replacement for an invalid prepared catalogue', async catalogue => {
+  const api = await backend()
+  const mcp = client(api.url, '', { MIKKA_DECISION_MCP_CATALOGUE: catalogue })
+  try {
+    const listed = await mcp.request('tools/list') as { result: { tools: { name: string }[] } }
+    expect(listed.result.tools.some(tool => tool.name === 'record_decision')).toBe(false)
+    expect(api.calls).toEqual([])
+  } finally { await mcp.close(); await api.close() }
+})
 
 /** Observe the real receiver's accepted events without replacing its parser,
  * transport or state. Tests wait on actual delivery, never a sleep/poll loop. */
@@ -113,7 +166,7 @@ it('observes the real MCP child catalogue and decision fetches, preserving cache
     await receiver.close({ cliExitObserved: true })
     const receipt = run.finish()!.mcpHttpTiming!
     expect(receipt).toMatchObject({ observedChildren: 1, observedComplete: true, rejectedEvents: 0, truncated: false,
-      allFirstPartyHttpComplete: false, generationCoverage: 'unverified', remoteMcpServerCount: 0, childPathAuditVersion: 1 })
+      allFirstPartyHttpComplete: false, generationCoverage: 'unverified', remoteMcpServerCount: 0, childPathAuditVersion: 2 })
     expect(receipt.requests.map(request => [request.operation, request.status, request.outcome])).toEqual([
       ['decision_catalogue', 200, 'ok'], ['decision_record', 200, 'ok'],
     ])
@@ -121,6 +174,38 @@ it('observes the real MCP child catalogue and decision fetches, preserving cache
     expect(receipt.closedChildren).toBe(observed.events.filter(event => event.type === 'child_close').length)
     expect(JSON.stringify(receipt)).not.toMatch(/PRIVATE|mkw_|127\.0\.0\.1|arguments|content|authorization/)
   } finally { await mcp.close(); await receiver.close(); run.close(); await api.close() }
+})
+
+it('records headers before a held response body and measures the real body completion without another business send', async () => {
+  const releaseBody = deferred<void>()
+  const api = await backend((rpc, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' }); response.flushHeaders()
+    void releaseBody.promise.then(() => response.end(JSON.stringify({ jsonrpc: '2.0', id: rpc.id,
+      result: { tools: [{ name: 'record_decision', inputSchema: { type: 'object' } }] } })))
+  })
+  const observed = receivedEvents(), runId = randomUUID(), run = runRuntimeTimings.begin(runId, 'device', 'codex')
+  const receiver = await startCliTimingCollector({ runId, harness: 'codex', remoteMcpServerCount: 0 })
+  const mcp = client(api.url, receiver.mcpHttpObservationUrl)
+  let replied = false
+  const response = mcp.request('tools/list').then(value => { replied = true; return value })
+  // Attach a rejection observer before assertions so cleanup cannot leave a
+  // rejected child promise behind when the real socket fixture fails.
+  void response.catch(() => {})
+  try {
+    await observed.until(events => events.some(event => event.type === 'request_end'))
+    expect(replied).toBe(false)
+    expect(observed.events.some(event => event.type === 'request_body_end')).toBe(false)
+    releaseBody.resolve()
+    expect(await response).toMatchObject({ result: { tools: expect.arrayContaining([expect.objectContaining({ name: 'record_decision' })]) } })
+    await observed.until(events => events.some(event => event.type === 'request_body_end'))
+    await mcp.close(); await receiver.close()
+    const receipt = run.finish()!.mcpHttpTiming!, request = receipt.requests[0]!
+    expect(api.calls).toHaveLength(1)
+    expect(receipt).toMatchObject({ version: 3, observedComplete: true,
+      children: [{ sent: 1, completed: 1 }], requests: [{ outcome: 'ok', status: 200, body: { outcome: 'read' } }] })
+    expect(request.body!.durationMs).toBeGreaterThan(request.durationMs!)
+    expect(request.body!.endedAt).toBeGreaterThanOrEqual(request.endedAt!)
+  } finally { releaseBody.resolve(); await mcp.close(); await receiver.close(); run.close(); await api.close() }
 })
 
 it.each(['http_error', 'connection_error'] as const)('records a real %s at the physical send without changing the fixed business error', async failure => {
@@ -135,7 +220,7 @@ it.each(['http_error', 'connection_error'] as const)('records a real %s at the p
     await observed.until(events => events.some(event => event.type === 'request_end'))
     await mcp.close(); await receiver.close()
     expect(run.finish()!.mcpHttpTiming).toMatchObject({ observedComplete: true, childLifecycleComplete: false,
-      requests: [{ operation: 'decision_record', outcome: 'error', status: failure === 'http_error' ? 503 : null }] })
+      requests: [{ operation: 'decision_record', outcome: 'error', status: failure === 'http_error' ? 503 : null, body: null }] })
     expect(api.calls).toHaveLength(1)
   } finally { await mcp.close(); await receiver.close(); run.close(); await api.close() }
 })
@@ -198,9 +283,19 @@ it('preserves immediate SIGTERM and reports an in-flight fetch as pending withou
 
 it.each(['claude_code', 'codex'] as const)('puts the host observation URL only in the %s Mikka MCP child environment', async harness => {
   const url = `http://127.0.0.1:43210/v1/mcp-http/${'a'.repeat(32)}`
-  const ctx = new RunContext({ harness, worktree: await makeRepo(), runDir: tempDir(), privateDir: tempDir(), machineEnvironment: true,
-    mcp: { url: 'https://mikka.example.invalid/api/mcp', token: syntheticToken }, mcpHttpObservationUrl: url })
+  const worktree = join(realpathSync(tempDir()), 'checkout')
+  const options: RunContextOptions = { harness, worktree, runDir: tempDir(), privateDir: tempDir(), machineEnvironment: true,
+    mcp: { url: 'https://mikka.example.invalid/api/mcp', token: syntheticToken, decisionCatalogue: preparedCatalogue }, mcpHttpObservationUrl: url }
+  const early = prepareRunContextFiles(options)
+  expect(existsSync(worktree)).toBe(false)
+  renameSync(await makeRepo(), worktree)
+  const ctx = new RunContext(options)
+  expect(early.mcpServer()).toEqual(ctx.mcpServer())
   expect(ctx.mcpServer().env.MIKKA_MCP_HTTP_OBSERVATION_URL).toBe(url)
   expect(ctx.decisionMcpEnv()).not.toHaveProperty('MIKKA_MCP_HTTP_OBSERVATION_URL')
   expect(ctx.tempEnv()).not.toHaveProperty('MIKKA_MCP_HTTP_OBSERVATION_URL')
+  expect(ctx.decisionMcpEnv().MIKKA_DECISION_MCP_CATALOGUE).toBe(JSON.stringify(preparedCatalogue))
+  expect(ctx.mcpServer().env.MIKKA_DECISION_MCP_CATALOGUE).toBe(JSON.stringify(preparedCatalogue))
+  expect(ctx.tempEnv()).not.toHaveProperty('MIKKA_DECISION_MCP_CATALOGUE')
+  expect(ctx.mcpServer().args.join(' ')).not.toContain('Canonical claim')
 })
