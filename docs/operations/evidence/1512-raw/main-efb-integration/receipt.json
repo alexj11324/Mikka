@@ -1,0 +1,104 @@
+{
+  "recordedAt": "2026-11-07T08:05:51.624216+00:00",
+  "candidate": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+  "tree": "f5dbda3b6226018974c6a3d8f4d8d40f54b9aa47",
+  "parents": [
+    "1ac1c9554ac67eb689df854a327d1707b5ae88bd",
+    "efb95d951ddbeca1af04bc80d011ccbc2a9f0188"
+  ],
+  "desktopFixCommit": "1ac1c9554ac67eb689df854a327d1707b5ae88bd",
+  "mainIntegrated": "efb95d951ddbeca1af04bc80d011ccbc2a9f0188",
+  "conflicts": [
+    "package.json test:lib-units union preserved both test inventories"
+  ],
+  "workflowDifferenceFromPreviousSource": [],
+  "logs": [
+    {
+      "path": "main-efb-observability-integration.tap",
+      "bytes": 18592,
+      "sha256": "c827ed398cc92c47ce4f55e4113952fce3fe1e9c00882074f65fec032148a48e",
+      "summary": [
+        "\u2139 tests 111",
+        "\u2139 pass 111",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ]
+    },
+    {
+      "path": "main-efb-browser-integration.tap",
+      "bytes": 3367,
+      "sha256": "b6245d70212cdde7f0f5bdf3acaeffd12fda83a0a2b0db332b82bc1d7967d826",
+      "summary": [
+        "\u2139 tests 34",
+        "\u2139 pass 34",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ]
+    },
+    {
+      "path": "main-efb-navigation-integration.tap",
+      "bytes": 9609,
+      "sha256": "0b96c629d4c6d42c134bb1d4e445b0f9bac85b66fcaec2dfd7be6fbd85c06188",
+      "summary": [
+        "\u2139 tests 94",
+        "\u2139 pass 94",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ]
+    },
+    {
+      "path": "desktop-rpc-phases-red.tap",
+      "bytes": 1915,
+      "sha256": "392cf506c16969742f08c1263260a674cdfa9bff1b98cee01e4bc33b773a7edf",
+      "summary": [
+        "\u2139 tests 2",
+        "\u2139 pass 0",
+        "\u2139 fail 2",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ]
+    },
+    {
+      "path": "desktop-rpc-phases-green.tap",
+      "bytes": 1598,
+      "sha256": "6e4bebed93b5549382dcad66b3ece75c9bff395a39fdd42a063e93c3a795860b",
+      "summary": [
+        "\u2139 tests 13",
+        "\u2139 pass 13",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0"
+      ]
+    }
+  ],
+  "desktopAgentChecks": {
+    "source": "agent execution outputs in this session; original stdout was not redirected to a durable log",
+    "focusedPassed": 90,
+    "focusedFailed": 0,
+    "canonicalMainTscExit": 0,
+    "scopedLintExit": 0,
+    "diffCheckExit": 0,
+    "rendererTsc": {
+      "exit": 134,
+      "reason": "V8 default 2 GiB heap exhaustion",
+      "sourceDiagnosticsObserved": false,
+      "retried": false
+    },
+    "noncanonicalTsgo": "Not a passing check: unchanged bundled-viewer Uint8Array/DOM compatibility diagnostics; canonical main tsc subsequently passed"
+  },
+  "productionAndNativeAcceptance": {
+    "status": "pending",
+    "previousCandidate": "ccd4d3b69f7ed0a23da631aa1a1509d838f2a149",
+    "previousNativeLoginQueries": 220,
+    "previousWebLoginQueries": 190,
+    "previousColdStartup": "failed before a completed measurement; count unknown",
+    "newNativeCounts": null,
+    "noSqlSavingsClaimed": true
+  },
+  "externalResourcesCreated": 0,
+  "localDatabaseOrProviderCalls": 0,
+  "goTest": "not run locally; no Go executable available; source reviewed only"
+}

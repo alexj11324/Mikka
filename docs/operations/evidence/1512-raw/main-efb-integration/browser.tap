@@ -1,0 +1,42 @@
+✔ navigation and action probes share one public read, then reuse it until stale (5.160733ms)
+✔ failed version reads stay unknown and do not turn into a known stale build (0.223968ms)
+✔ a known stale action asks for refresh before any action runs (3.473245ms)
+✔ a page is stale only when both builds are known and differ (0.101834ms)
+✔ a missing action asks for refresh without reloading, and retires obsolete traffic (3.170147ms)
+✔ third-party response headers do not retire or reload the app (2.116155ms)
+✔ ordinary errors do not require an app refresh (1.89396ms)
+✔ missing-action handling does not depend on access to sessionStorage (1.693157ms)
+✔ a late refresh subscriber catches the marker before waiting for another event (3.031137ms)
+✔ an early refresh subscriber waits for an event and unsubscribes cleanly (3.431041ms)
+✔ the server minimum desktop version is a valid version or nothing (1.060372ms)
+✔ a desktop build below the minimum must update; at or above it, or without one, it need not (0.413976ms)
+✔ a required refresh stops same-origin application traffic while the public version probe remains available (1.235947ms)
+✔ a read has a useful family and distinct digest without the raw key or its data (1.584563ms)
+✔ live metadata rejects unsafe IDs and preserves numeric revisions (0.211299ms)
+✔ requiring refresh aborts an already-open business stream and preserves the version probe (188.941633ms)
+✔ pageviews strip query strings, hashes, document identifiers and unapproved properties (1.838146ms)
+✔ automatic top-level person mutations are stripped without losing ingestion metadata (0.161444ms)
+✔ unknown events and raw exception events never pass the allowlist (0.196477ms)
+✔ masked replay keeps only its transport payload and cannot mutate a person (0.347014ms)
+✔ all upcoming features fail closed, even if the remote switch is accidentally enabled (0.223667ms)
+✔ gated features are on only when the remote flag is exactly true (0.176677ms)
+✔ the 电脑 tab has its own kill switch, apart from the cloud computer rollout flag (0.455658ms)
+✔ the active Vite web entry initializes PostHog and the shared application mounts its pageview tracker (1.569039ms)
+✔ analytics acceptance preserves the three real anonymous routes and isolated database restriction (10.198261ms)
+✔ all non-local browser HTTP and WebSocket requests are blocked before sending analytics (0.615299ms)
+✔ analytics build proof checks actual packaged bytes, public Vite entry and the synthetic key (42.70526ms)
+✔ artifact verification rejects escaping and symlinked files instead of accepting their filenames (11.371512ms)
+✔ runtime separates the desktop shell and still drops other client details (0.445843ms)
+✔ smoke accounts are recognised only by their +mikka-smoke tag, and the tag survives sanitizing (1.805937ms)
+✔ the CI AppArmor attachment authorizes only the actual installed headless Chromium path (2.989685ms)
+✔ the CI AppArmor helper rejects missing and ambiguous installed browser revisions (3.067422ms)
+✔ the CI AppArmor helper rejects glob syntax, path aliases, and executable symlinks (3.371902ms)
+✔ the CI AppArmor helper refuses non-executable or non-ELF files (2.817395ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 645.330192

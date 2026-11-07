@@ -1,0 +1,155 @@
+(node:12) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ real workflow entry uses the returned execution snapshot for model, prompt and tool registry (26.15034ms)
+✔ normal completion reports fixed preparation timings only in the existing post-commit turn log (10.238882ms)
+✔ disabled Agent Kit still resolves the connected account model without inventing a definition snapshot (1.193582ms)
+✔ older recorded settings keep separate reservation and preparation checkpoints (7.779337ms)
+✔ a replayed harness mismatch fails before hosted or native dispatch (2.996185ms)
+✔ a failed combined preparation closes the committed execution even before its result returned (2.591804ms)
+✔ a stream-start failure waits for a late preparation commit before closing its execution (3.964818ms)
+✔ a preparation failure waits for the started writer before publishing terminal failure (3.732297ms)
+✔ an empty or unheld inbox starts no execution, preparation, model or notice (0.823935ms)
+✔ a disabled preparation whose stream start fails does not invent an execution to clean up (0.797504ms)
+✔ real workflow carries the host catalogue into named options and prompt without changing its frozen execution (2.199442ms)
+✔ real workflow forwards a host task event without changing the frozen execution (2.663252ms)
+✔ 停止 aborts the model call in flight and keeps what the reply had said, marked stopped (2.187012ms)
+✔ 停止 while a tool call runs ends the turn at once: the finished call is kept and nothing waits for the tool (3.545935ms)
+✔ 停止 during settings keeps the stop and never starts the model or tools (2.070386ms)
+✔ 停止 during inbox keeps the stop and never starts the model or tools (2.818616ms)
+✔ 停止 during begin keeps the stop and never starts the model or tools (2.883875ms)
+✔ 停止 during prepare keeps the stop and never starts the model or tools (2.914993ms)
+✔ a message taken after the stopped round gets a fresh signal and runs normally (5.278961ms)
+✔ a tool finish record does not hold up the model; the round stores its reply only after every record, and a failed record fails the turn (15.902876ms)
+✔ the hosted round prepares its execution and prompt beside the independent stream start (3.500737ms)
+✔ the prepared prompt reaches the model with its stable rules as their own system message, ready for a cache breakpoint (2.646677ms)
+✔ welcome-only workflow passes no executable tools; a later or coalesced user request keeps tools (8.054554ms)
+✔ exhausted invalid-tool recovery fails the execution and turn without a success commit (3.629632ms)
+✔ invalid-tool failure hands finished receipts to the atomic failure step, without replay or a success commit (3.525794ms)
+✔ a rejected receipt still releases the failed lease once and retains both failure causes (3.506455ms)
+(node:13) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ actual definition API seeds a new scope with the host-resolved conditional profile (955.674809ms)
+✔ actual SDK and native execution reservations use the same resolved defaults (128.433291ms)
+✔ disabled API and execution paths never initialize a version or touch scope, store or model (0.455227ms)
+✔ preparation recovery scopes the existing key afresh and reuses only its stored failure-hook facts (0.452443ms)
+✔ revoked current scope refuses preparation recovery before any store or proposal call (0.427265ms)
+(node:60) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:60) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ the real combined step prepares the exact Store snapshot and returns its persisted identity (246.276755ms)
+✔ a frozen disabled kit stays disabled when the live switch turns on, with no scope or SQL (0.206382ms)
+✔ a replayed harness mismatch is rejected before prompt preparation (1.866579ms)
+✔ scheduled preparation keeps its snapshot but cannot publish a model-switch notice (1.148414ms)
+✔ a switch change between real preparation attempts preserves the execution and completed cleanup (2.614848ms)
+✔ a switch change between real preparation attempts preserves the execution and failed cleanup (2.207954ms)
+✔ the original public SDK and native reservation still read the live switch (0.311871ms)
+✔ an error part followed by EOF is interrupted even when the reader itself does not throw (3.2052ms)
+✔ a later finish cannot erase a preceding error part; clean finish remains uninterrupted (0.778105ms)
+✔ a model call logs when its first token, first text and end came, its token counts and tool count, never its content (3.135105ms)
+✔ a call with no text and a failing stream still logs once, marked interrupted, and the error reaches the caller (1.050426ms)
+✔ each tool call is timed by name, failures included, and its result is unchanged (0.409198ms)
+✔ provider error parts mark timing interrupted and malformed counts or finish text are not logged (0.638013ms)
+✔ the cacheable prefix is logged as short hashes of the tools and each system message, never their text (1.513235ms)
+✔ the system prompt splits where its stable prefix ends, and stays one string otherwise (1.380285ms)
+✔ rules and context have distinct nonempty cache boundaries without changing any prompt bytes (0.345302ms)
+✔ breakpoints go on the first system message and on the last message and its last part, keeping other options (0.401656ms)
+✔ the OpenAI-compatible request the Claude subscription broker receives carries cache_control on the stable system message and the last message (18.533098ms)
+✔ the actual compatible serializer retains both stable layers and the final message marker (10.501053ms)
+✔ Codex moves only the prepared dynamic system tail after complete history, preserving every object (0.744665ms)
+✔ Codex layout gating leaves old and unknown models unchanged (0.272482ms)
+✔ Codex does not infer a dynamic tail from absent history, legacy or unknown system shapes (0.552625ms)
+(node:147) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:147) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ scheduled SDK turn uses the existing runtime with host-only scope and read catalog (29.537335ms)
+✔ scheduled native relay preserves actual native identity alongside the occurrence scope (0.489078ms)
+✔ a cancelled or stale scheduled turn starts no model and records bounded failure (0.554958ms)
+✔ a truncated scheduled reply uses bounded failure and a later complete reply can publish (0.62222ms)
+{"msg":"model_call_timing","route":"subscription","model":"saved-model","workflowRunId":null,"stepId":null,"attempt":null,"tools":0,"setupMs":6,"firstTokenMs":null,"firstTextMs":null,"durationMs":544,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"74234e98afe7","system":[]}}
+{"msg":"model_call_timing","route":"subscription","model":"saved-model","workflowRunId":null,"stepId":null,"attempt":null,"tools":0,"setupMs":1,"firstTokenMs":null,"firstTextMs":null,"durationMs":0,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"74234e98afe7","system":["13c43d05388c"]}}
+{"msg":"model_call_timing","route":"subscription","model":"saved-model","workflowRunId":null,"stepId":null,"attempt":null,"tools":0,"setupMs":1,"firstTokenMs":null,"firstTextMs":null,"durationMs":0,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"74234e98afe7","system":["13c43d05388c"]}}
+{"msg":"model_call_timing","route":"subscription","model":"gpt-6-luna","workflowRunId":null,"stepId":null,"attempt":null,"tools":2,"setupMs":0,"firstTokenMs":null,"firstTextMs":null,"durationMs":1,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"51e05047268b","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+{"msg":"model_call_timing","route":"subscription","model":"gpt-6-luna","workflowRunId":null,"stepId":null,"attempt":null,"tools":2,"setupMs":0,"firstTokenMs":null,"firstTextMs":null,"durationMs":0,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"51e05047268b","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+{"msg":"model_call_timing","route":"subscription","model":"gpt-6-luna","workflowRunId":null,"stepId":null,"attempt":null,"tools":2,"setupMs":0,"firstTokenMs":null,"firstTextMs":null,"durationMs":1,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"51e05047268b","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+{"msg":"model_call_timing","route":"subscription","model":"gpt-6-luna","workflowRunId":null,"stepId":null,"attempt":null,"tools":2,"setupMs":0,"firstTokenMs":null,"firstTextMs":null,"durationMs":0,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"51e05047268b","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+{"msg":"model_call_timing","route":"subscription","model":"gpt-6-luna","workflowRunId":null,"stepId":null,"attempt":null,"tools":2,"setupMs":1,"firstTokenMs":null,"firstTextMs":null,"durationMs":0,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"51e05047268b","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+{"msg":"model_call_timing","route":"subscription","model":"gpt-6-luna","workflowRunId":null,"stepId":null,"attempt":null,"tools":0,"setupMs":0,"firstTokenMs":null,"firstTextMs":null,"durationMs":1,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"74234e98afe7","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+{"msg":"model_call_timing","route":"subscription","model":"gpt-5.5","workflowRunId":null,"stepId":null,"attempt":null,"tools":0,"setupMs":0,"firstTokenMs":null,"firstTextMs":null,"durationMs":1,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"74234e98afe7","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+{"msg":"model_call_timing","route":"subscription","model":"gpt-6-unknown","workflowRunId":null,"stepId":null,"attempt":null,"tools":0,"setupMs":0,"firstTokenMs":null,"firstTextMs":null,"durationMs":0,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"74234e98afe7","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+{"msg":"model_call_timing","route":"subscription","model":"saved-model","workflowRunId":null,"stepId":null,"attempt":null,"tools":0,"setupMs":1,"firstTokenMs":null,"firstTextMs":null,"durationMs":0,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"74234e98afe7","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+{"msg":"model_call_timing","route":"subscription","model":"claude-haiku-5-5","workflowRunId":null,"stepId":null,"attempt":null,"tools":0,"setupMs":0,"firstTokenMs":null,"firstTextMs":null,"durationMs":1,"inputTokens":null,"outputTokens":null,"cacheReadTokens":null,"cacheWriteTokens":null,"toolCalls":0,"finishReason":null,"interrupted":false,"prefix":{"tools":"74234e98afe7","system":["89068e5cc25f","28b8c501c87f","0c3f5e9d2376"]}}
+(node:168) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:168) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ Workflow serde carries only the fixed non-secret binding descriptor (5.84006ms)
+✔ unsupported non-streaming invocation refuses rather than calling a default provider (0.525073ms)
+✔ the Node model method resolves the fixed descriptor and forwards cancellation into the existing stream call (551.081516ms)
+✔ the same model marks Claude cache breakpoints and leaves a Codex request as it is (2.710644ms)
+✔ the Codex subscription SDK request keeps the dynamic system tail after history without cache fields (34.391326ms)
+✔ only the supported Codex CPA route moves the prepared tail; Claude, API-key and native paths keep their contracts (5.195656ms)
+✔ hosted subscription uses Workflow streaming, zero retry and returns tool-loop messages (4.72829ms)
+✔ stream refusal does not invoke generate or retry (0.750113ms)
+✔ a Workflow stream error logs bounded diagnostics and keeps one attempt and a generic refusal (0.891907ms)
+✔ an undefined stream error or failed logger cannot turn a refusal into success or retry (0.359924ms)
+✔ default snapshot streams with zero retry and malformed subscription never falls back (0.38413ms)
+✔ malformed explicit frozen selection never invokes the default model (0.264729ms)
+✔ after 停止 a tool call that has not started does not run; one already running finishes and is timed (0.541377ms)
+✔ 停止 while the before-tool audit waits prevents the tool body and closes its audit as stopped (8.887772ms)
+✔ actual SDK repairs "none" once without executing a tool or leaking its error (62.10729ms)
+✔ actual SDK repairs "unregistered" once without executing a tool or leaking its error (8.132401ms)
+✔ actual SDK repairs "" once without executing a tool or leaking its error (6.121614ms)
+✔ two invalid SDK steps stop even with text, without a third model request or a false success (7.351201ms)
+✔ completed legitimate tool receipts survive exhausted SDK recovery without replaying the tool (9.849905ms)
+✔ actual OpenAI-compatible serialization sends no welcome tools and retains normal-turn tools (19.976888ms)
+✔ a wire-level empty tool name ends with a safe failure instead of an empty successful turn (5.901742ms)
+✔ each generation shares its APM ancestry and session, captures numeric usage/cost and never captures content (7.904977ms)
+✔ stream first token, finish and cancellation preserve the original stream and produce one receipt (3.110237ms)
+✔ missing and invalid token counts stay absent; public v7 and provider v4 cache fields agree (0.334955ms)
+✔ actual subscription SDK streams retain numeric cache writes from both pinned CPA usage spellings (36.444261ms)
+✔ cache write fallback reads only numeric receipt fields and keeps normalized values authoritative (0.394115ms)
+✔ credential-looking labels and URLs are omitted from AI events and spans (6.670573ms)
+✔ stream read errors and error parts record safe error causes once without swallowing provider errors (3.748321ms)
+✔ abort and consumer cancellation end telemetry once and still cancel upstream (0.672536ms)
+✔ setup errors and an unavailable telemetry sink preserve business behavior (0.971067ms)
+✔ non-SDK Decisions expose only validated numeric scores and usage, not answers (0.71476ms)
+✔ Workflow and failure logs share OTel trace/span IDs and exclude content (12.199033ms)
+✔ tail-retained ordinary failures give native Logs the same effective rate as APM (3.176596ms)
+✔ request, deferred job, durable queue carrier and remote run share ancestry and safe session metadata (9.458358ms)
+✔ ordinary errors and slow requests retain their local child timeline; fast success stays sampled (6.510378ms)
+✔ an after scheduler without an async context still keeps the scheduling request (1.825826ms)
+✔ head-sampled ordinary failures use effective rate one for the entire local tree (4.865154ms)
+✔ a critical failure is retained, preserves safe cause detail and never exports the message (2.437369ms)
+✔ durable SDK stage labels and run identity survive attributes added after span start (4.308044ms)
+▶ server tracing
+  ✔ a span per statement, with route, client kind, operation, statement id, rows and size (1.874279ms)
+  ✔ an after() job keeps its own route and continues the scheduling request's trace (0.195115ms)
+  ✔ a Workflow step is labelled with its workflow and step (0.094202ms)
+  ✔ a cron handler runs as cron:<name> inside its request (0.12576ms)
+  ✔ no parameter value, row content, error value, token, email, prompt or password leaves the process (0.94067ms)
+✔ server tracing (79.558108ms)
+▶ sampling and settings
+  ✔ tests, CI and builds never trace; 10% by default; 1 allowed in dev (0.369718ms)
+  ✔ off without a token or at rate 0; PostHog endpoint by default (0.266322ms)
+  ✔ rate 0 provider records nothing (0.546625ms)
+✔ sampling and settings (1.458031ms)
+▶ export failures
+  ✔ a failed export is reported as success and pauses exporting instead of retrying (0.265981ms)
+  ✔ a throwing exporter never throws into the caller (0.149216ms)
+✔ export failures (0.54326ms)
+▶ helpers
+  ✔ client kind from the route prefix (0.125689ms)
+  ✔ statements keep placeholders and lose literals (0.119029ms)
+  ✔ strings lose query strings, emails and IPs (0.145569ms)
+  ✔ a multi-statement result sums its rows and keeps the last command (0.139421ms)
+  ✔ response size is estimated from a sample of rows (0.187313ms)
+✔ helpers (0.895321ms)
+ℹ tests 111
+ℹ suites 4
+ℹ pass 111
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4938.024884

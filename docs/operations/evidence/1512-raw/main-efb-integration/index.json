@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "subject": "Issue 1512: main efb95 integration and Desktop RPC phase-attribution regression evidence",
+  "primaryParent": "dd72536b18c50d5e53752ce8ec0f7204d0f5389a",
+  "additionalParents": [
+    "540e301cdb3984f8709bd7c445f5e2a6381aa174"
+  ],
+  "parentPurpose": "The first parent preserves the evidence branch; the second retains the authorized ops transport history. No ops tree or feature source files are imported into this archive tree.",
+  "candidate": "fe40dc1cb8aa766f9da90f53bbd373de12afe5c9",
+  "candidateTree": "f5dbda3b6226018974c6a3d8f4d8d40f54b9aa47",
+  "candidateParents": [
+    "1ac1c9554ac67eb689df854a327d1707b5ae88bd",
+    "efb95d951ddbeca1af04bc80d011ccbc2a9f0188"
+  ],
+  "sourceReceiptRecordedAt": "2026-11-07T08:05:51.624216+00:00",
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/main-efb-integration/receipt.json",
+      "bytes": 3312,
+      "sha256": "2bdc7eca63745df9532e217ba861d501bc1e24affddebcdaacbe329c3a83aea3",
+      "gitBlobSha1": "b7f8def437eef63269400490881976cd16d5c0df",
+      "kind": "owner_integration_receipt",
+      "localSource": "evidence/main-efb-integration-receipt.json"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-efb-integration/observability.tap",
+      "bytes": 18592,
+      "sha256": "c827ed398cc92c47ce4f55e4113952fce3fe1e9c00882074f65fec032148a48e",
+      "gitBlobSha1": "3693e144c966b30e2aa82f15b17faf819e147c1e",
+      "kind": "original_saved_test_stdout",
+      "localSource": "main-efb-observability-integration.tap"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-efb-integration/browser.tap",
+      "bytes": 3367,
+      "sha256": "b6245d70212cdde7f0f5bdf3acaeffd12fda83a0a2b0db332b82bc1d7967d826",
+      "gitBlobSha1": "3a180ab82793db3f215eb5f4fe07672d206b3a47",
+      "kind": "original_saved_test_stdout",
+      "localSource": "main-efb-browser-integration.tap"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-efb-integration/navigation.tap",
+      "bytes": 9609,
+      "sha256": "0b96c629d4c6d42c134bb1d4e445b0f9bac85b66fcaec2dfd7be6fbd85c06188",
+      "gitBlobSha1": "71b374c6c071e0cf0d6e610e2a72d3115c3158e0",
+      "kind": "original_saved_test_stdout",
+      "localSource": "main-efb-navigation-integration.tap"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-rpc-phases/red.tap",
+      "bytes": 1915,
+      "sha256": "392cf506c16969742f08c1263260a674cdfa9bff1b98cee01e4bc33b773a7edf",
+      "gitBlobSha1": "9b7bb276808e81c70be267522324830e74b88cec",
+      "kind": "original_saved_expected_failure_stdout",
+      "localSource": "desktop-rpc-phases-red.tap"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-rpc-phases/green.tap",
+      "bytes": 1598,
+      "sha256": "6e4bebed93b5549382dcad66b3ece75c9bff395a39fdd42a063e93c3a795860b",
+      "gitBlobSha1": "ad4bb718e5a7c46153714b7109b278c4f60e796e",
+      "kind": "original_saved_passing_stdout",
+      "localSource": "desktop-rpc-phases-green.tap"
+    }
+  ],
+  "observedSavedStdout": [
+    {
+      "path": "docs/operations/evidence/1512-raw/main-efb-integration/observability.tap",
+      "tests": 111,
+      "passed": 111,
+      "failed": 0,
+      "interpretation": "focused observability integration"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-efb-integration/browser.tap",
+      "tests": 34,
+      "passed": 34,
+      "failed": 0,
+      "interpretation": "focused browser-runtime source/unit integration; not a browser or macOS acceptance"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/main-efb-integration/navigation.tap",
+      "tests": 94,
+      "passed": 94,
+      "failed": 0,
+      "interpretation": "focused navigation and interaction-continuity integration"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-rpc-phases/red.tap",
+      "tests": 2,
+      "passed": 0,
+      "failed": 2,
+      "interpretation": "expected RED before the RPC phase-attribution correction; preserved as failure"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/desktop-rpc-phases/green.tap",
+      "tests": 13,
+      "passed": 13,
+      "failed": 0,
+      "interpretation": "GREEN focused RPC phase-attribution regression"
+    }
+  ],
+  "sourceAttribution": {
+    "rawFiles": "All six source files are preserved byte-for-byte, without redaction or reformatting after passing the privacy review.",
+    "ownerReceipt": "receipt.json is an owner-created integration receipt, not original test stdout. Its five referenced stdout files are separately archived and digest-matched.",
+    "ninetyDesktopChecks": "The reported 90 passing focused Desktop checks and canonical-main tsc/lint/diff outcomes came from agent execution outputs in this session. Original stdout was not redirected to a durable file, is not supplied here, and is not reconstructed as an original log.",
+    "failedAndUnavailableChecks": "The receipt records renderer tsc exit 134 from the default 2 GiB V8 heap limit, a noncanonical tsgo diagnostic, and no local Go executable. None is recast as a passing check.",
+    "archiveVerification": "This archive verifies original bytes, hashes, saved stdout summaries and provenance. It does not rerun tests, call providers, access a database or create an external runtime."
+  },
+  "limits": [
+    "Focused integration regressions are not a new full-CI pass or production/native Desktop acceptance.",
+    "The previous ccd native login count remains 220 versus Web 190; its cold startup failed before a completed measurement. New native counts are unknown.",
+    "No SQL savings, production provider recovery or newly successful Replay session is claimed.",
+    "Expected RED assertions remain errors; the GREEN run is a separate original file."
+  ],
+  "privacyReview": {
+    "emailMatches": 0,
+    "credentialPrefixMatches": 0,
+    "jwtMatches": 0,
+    "authorizationValueMatches": 0,
+    "privateKeyMatches": 0,
+    "signedUrlMatches": 0,
+    "sourcesReviewed": 6,
+    "containsArchiveOrDownloadUrls": false
+  }
+}
