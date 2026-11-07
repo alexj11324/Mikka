@@ -126,7 +126,8 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
         assert.equal(fixed.statements.length, expectedQueries)
         assert.ok(fixed.statements.length < original.statements.length)
         if (selection.targetEntry.source.kind === 'subscription') {
-          assert.equal(fixed.statements.some(row => row.text.includes('FROM model_api_keys WHERE') || row.text.includes('FROM model_api_key_shares s')), false)
+          assert.equal(original.statements.some(row => /\bFROM model_api_keys WHERE\b|\bFROM model_api_key_shares s\b/.test(row.text)), true)
+          assert.equal(fixed.statements.some(row => /\bFROM model_api_keys WHERE\b|\bFROM model_api_key_shares s\b/.test(row.text)), false)
           assert.deepEqual(fixed.statements.filter(row => row.text.includes('WITH choices AS')).map(row => row.rows), [1])
         } else assert.equal(fixed.statements.some(row => row.text.includes('WITH choices AS')), false)
         assert.equal(providerCalls, 0)
@@ -140,7 +141,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
       }
       for (const [name, sql, params, restore, restoreParams] of [
         ['paused', 'UPDATE byos_connections SET paused=true WHERE id=$1', [own], 'UPDATE byos_connections SET paused=false WHERE id=$1', [own]],
-        ['removed', 'UPDATE byos_connections SET "removedAt"=now() WHERE id=$1', [own], 'UPDATE byos_connections SET "removedAt"=NULL WHERE id=$1', [own]],
+        ['removed', `UPDATE byos_connections SET state='disconnected',"removedAt"=now() WHERE id=$1`, [own], `UPDATE byos_connections SET state='connected',"removedAt"=NULL WHERE id=$1`, [own]],
         ['epoch', 'UPDATE byos_connections SET epoch=2 WHERE id=$1', [own], 'UPDATE byos_connections SET epoch=1 WHERE id=$1', [own]],
         ['binding route', "UPDATE byos_bindings SET route='codex_cli' WHERE \"connectionId\"=$1", [own], "UPDATE byos_bindings SET route='codex_cpa' WHERE \"connectionId\"=$1", [own]],
         ['catalogue model removed', 'UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [own, JSON.stringify({ revision: '1', models: ['unrelated-model'] })], 'UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [own, JSON.stringify({ revision: '1', models: ['fixed-entry-model', 'unrelated-model'] })]],
