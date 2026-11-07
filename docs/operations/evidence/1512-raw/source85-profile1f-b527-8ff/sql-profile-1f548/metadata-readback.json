@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "recordedAt": "2026-11-07T12:34:17.257Z",
+  "repository": "alexj11324/Mikka",
+  "repositoryId": 1427517699,
+  "readOnly": true,
+  "downloaded": false,
+  "remoteMutations": 0,
+  "workflow": {
+    "id": 42368835389,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "attempt": 1,
+    "head": "1f548a73304923da466ebe702c99b6a8f6096f15"
+  },
+  "source": {
+    "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "tree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+    "parents": [
+      "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+      "1f548a73304923da466ebe702c99b6a8f6096f15"
+    ]
+  },
+  "candidate": {
+    "sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+    "tree": "3635e075173ffb83c1e157a7f5a93296d2697603"
+  },
+  "artifact": {
+    "id": 13572179042,
+    "name": "desktop-api-build-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "bytes": 47871680,
+    "sha256": "33b411a43819c5ad08ff47c69a6283aa697898cb18fce2e79ac2e8040cc56cff",
+    "expired": false,
+    "createdAt": "2026-11-07T11:39:34Z",
+    "workflowRun": {
+      "id": 42368835389,
+      "repository_id": 1427517699,
+      "head_repository_id": 1427517699,
+      "head_branch": "feat/1512-run-observability",
+      "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15"
+    }
+  },
+  "sameProductTreeAsCandidate": false,
+  "sourceModuleBlobs": [
+    {
+      "path": "lib/desktop-rpc/schemas.ts",
+      "blob": "0d865dc31de7a29191f5be621cbf3859c1314dca"
+    },
+    {
+      "path": "lib/coordinator/chat-poll.ts",
+      "blob": "e28a08d96d9cdd535ade088f2517978d8ef82f3c"
+    },
+    {
+      "path": "apps/desktop/test/parity-fixtures.mjs",
+      "blob": "6f773394dee20cd247daffc152b781423b37a900"
+    },
+    {
+      "path": "apps/desktop/test/live-worker.mjs",
+      "blob": "e25a81358b49d8771d22c31949a42b763894fd1e"
+    }
+  ],
+  "bounds": "Artifact bytes were not downloaded during preparation. Runtime rechecks all provenance and digest before extraction or startup."
+}

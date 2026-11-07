@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "recordedAt": "2026-11-07T12:54:00.659618+00:00",
+  "kind": "main_b527_daemon_integration_review",
+  "source": {
+    "featureParent": "c79f5c60eafa4243c2660b153c0c140af061e0fa",
+    "mainParent": "b5271361bbef8a619e06d472a58a03925dc6489f",
+    "recordedMergeCommit": "b84707b292152426cd90a9cf5bc3f4fe129a453e",
+    "testsStartedOnUncommittedMerge": true,
+    "reviewedAndTestedFilesMatchRecordedMergeCommit": true
+  },
+  "staticReview": {
+    "unresolvedIntegrationBlockers": [],
+    "productFilesEdited": false,
+    "preserved": [
+      "The run root and authenticated bootstrap/HTTP carriers remain intact.",
+      "Claude prewarm baseOptions retain the one captured traceContext used by eventual consumption.",
+      "Native generation receipt, collection close/drain, and final telemetry flush paths are unchanged by this merge.",
+      "collectCliTiming remains a diagnostic opt-in and does not disable generation telemetry.",
+      "Cloud execution authority binds the exact run/device and policy execution owner; subscription payer remains a separate credential/session scope.",
+      "Final checkpoint readiness requires the same-run strict persisted server receipt. An old 204 response is accepted without certifying an archive.",
+      "Provider-acknowledged retirement clears reconcile claim only inside the existing exact owner/workspace/epoch/sandbox update fence."
+    ]
+  },
+  "checks": [
+    {
+      "name": "initial_launcher",
+      "exitCode": 127,
+      "testsExecuted": 0,
+      "classification": "wrong local binary path; corrected to package-local Vitest",
+      "log": "main-b527-daemon-launcher-missing.log"
+    },
+    {
+      "name": "five_changed_daemon_test_files",
+      "command": "node_modules/.bin/vitest run --maxWorkers=1 --no-file-parallelism test/commands-polling.test.ts test/provider-failure-runs.test.ts test/server-link-http.test.ts test/subscription-hosted-runner.test.ts test/terminal-checkpoint.test.ts",
+      "cwd": "packages/daemon",
+      "exitCode": 1,
+      "filesPassed": 3,
+      "filesFailed": 2,
+      "testsPassed": 88,
+      "testsFailed": 63,
+      "passedFiles": [
+        "commands-polling.test.ts",
+        "server-link-http.test.ts",
+        "terminal-checkpoint.test.ts"
+      ],
+      "environmentBlocked": [
+        {
+          "file": "provider-failure-runs.test.ts",
+          "tests": 19,
+          "code": "EPERM",
+          "operation": "listen Unix daemon socket",
+          "source": "src/rpc/server.ts:78; src/main.ts:618"
+        },
+        {
+          "file": "subscription-hosted-runner.test.ts",
+          "tests": 44,
+          "code": "subscription_hosted_runtime_unavailable",
+          "detail": "host_unsupported",
+          "source": "src/subscription-hosted-runner.ts:105",
+          "observedPlatform": "linux",
+          "observedUid": 0,
+          "requiredEnvironment": "non-root Linux"
+        }
+      ],
+      "functionalPassClaim": false,
+      "log": "main-b527-daemon-focused.log"
+    },
+    {
+      "name": "observability_regression",
+      "command": "node_modules/.bin/vitest run --maxWorkers=1 --no-file-parallelism src/tracing.test.ts src/tracing-sampling.test.ts src/adapters/generation-metrics.test.ts test/codex-generation-wiring.test.ts",
+      "cwd": "packages/daemon",
+      "exitCode": 0,
+      "filesPassed": 4,
+      "testsPassed": 37,
+      "testsFailed": 0,
+      "log": "main-b527-observability.log"
+    },
+    {
+      "name": "daemon_types",
+      "command": "../../node_modules/.bin/tsgo --noEmit -p tsconfig.json",
+      "cwd": "packages/daemon",
+      "exitCode": 0,
+      "log": "main-b527-daemon-types.log"
+    },
+    {
+      "name": "protocol_types",
+      "command": "../../node_modules/.bin/tsgo --noEmit -p tsconfig.json",
+      "cwd": "packages/protocol",
+      "exitCode": 0,
+      "log": "main-b527-protocol-types.log"
+    }
+  ],
+  "cleanupReview": {
+    "allLaunchedLocalCommandsExited": true,
+    "daemonStartFailureCallsStop": true,
+    "providerFixtureAfterEachCallsStopAndCleanupTempDirs": true,
+    "hostedFixtureAfterEachCallsCleanupTempDirs": true,
+    "knownFailedSocketDirectories": 19,
+    "knownFailedSocketDirectoriesRemaining": 0,
+    "hostedNativeSessionsReached": false,
+    "limitations": "No broad process inventory or unrelated temporary paths were inspected. The 44 hosted cases stopped at the non-root guard before native startup."
+  },
+  "limitations": [
+    "The local environment blocks Unix listeners and runs as uid 0. The 63 blocked cases require the normal Linux CI environment; their intended functional assertions were not validated locally.",
+    "No cloud bootstrap IPC suite, external provider, VM or production database was run.",
+    "The local command outputs are preserved with real exit codes; neither syntax review nor passing pure tests substitutes for those blocked cases."
+  ],
+  "files": [
+    {
+      "path": "packages/daemon/src/main.ts",
+      "bytes": 92627,
+      "sha256": "1efa485f801f396e037d2821ee63e4c0c9acf65b989f84c8de9c54a842fb9618",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "bytes": 98800,
+      "sha256": "03bc920c09771fbb9af2288ebd2492eb9117c1be213800d7a8091ce4de23812c",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/server-link-http.ts",
+      "bytes": 27196,
+      "sha256": "368255db8f9f91bb94a8d236e6c96ecd8b15648f79be321a3f0dd64710ef5fea",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/server-link.ts",
+      "bytes": 21078,
+      "sha256": "f5fce95eaa1f0f9618726027afbcae6fcbd78dbbfdb8c785e285fc4c5c6f1748",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "bytes": 23129,
+      "sha256": "5ca133d53c0d20ed643a1ae45d0540049019c5413469bdc2ededaa8cbb7d6f69",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/protocol/src/device.ts",
+      "bytes": 35207,
+      "sha256": "b9b3b4ffb8976b8aae17444d41752a05d0043127b9258f6949af31c0d2236ce0",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "bytes": 98272,
+      "sha256": "d8f423b675a9c95a36f9b7d906d0945e9b6688bfab1af686faa8c3a7d6ff37e0",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "app/v1/runs/[runId]/checkpoint/route.ts",
+      "bytes": 4184,
+      "sha256": "a498321fd6872af2e98709fe78d714157073f3073ba107aeeb66326da9eec371",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "bytes": 46513,
+      "sha256": "b3cdc02033acd0a1e2b2d1f7bce0fe7f2f67139c5bcfe1f50f8ff2a16e7ad514",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "bytes": 46323,
+      "sha256": "82b07d79a3e396234dcd28f11c4a3859b36b1733439c3385df700e687de9f53f",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/codex-generation-telemetry.ts",
+      "bytes": 18904,
+      "sha256": "1ccf1b86713a5eaaf40b0d422b0056d51850250c400a7678b29cf21ce704867e",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "bytes": 23883,
+      "sha256": "13f937e643c9337e1338019b21b840a57edfb53414081de7b69d36ab82ae77b0",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/generation-metrics.ts",
+      "bytes": 6447,
+      "sha256": "df427073be8987f77d8ae7180e03a6df0a3c79c67a700fd13e03e3ecb6dbbde9",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/test/commands-polling.test.ts",
+      "bytes": 26563,
+      "sha256": "bb81d6e7b44c2ef8dd8f686c70529372f3cf8d5c653834b2db47049404d98398",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/test/provider-failure-runs.test.ts",
+      "bytes": 14706,
+      "sha256": "de40b239db1840467f39e8505982255b41d5fa32952bd226bb0c3ce9839d8b99",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/test/server-link-http.test.ts",
+      "bytes": 25645,
+      "sha256": "467db4459a106914ebb10b3c561526fd6c65ee8809ea7abb7024ac112445bd0f",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/test/subscription-hosted-runner.test.ts",
+      "bytes": 23153,
+      "sha256": "cee38851269de992258a2499dca44bf341f64b5796fca6d7a7ba435c1fd1d149",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/test/terminal-checkpoint.test.ts",
+      "bytes": 10522,
+      "sha256": "7afeadccbb8011e52873b6e9ef8b02abecef1e85acd106271e5f5e9e00c032eb",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/tracing.test.ts",
+      "bytes": 24536,
+      "sha256": "cd70eee211915640b63a8104d8b484b271d800964e298209e6459442206a8dc8",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/tracing-sampling.test.ts",
+      "bytes": 8410,
+      "sha256": "43323987f25324fcbf5ee1091e644cf36c87dc2ba896053fe0b845450b9c0479",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/generation-metrics.test.ts",
+      "bytes": 4940,
+      "sha256": "d48043847a1efd29f1a0afede6551c4829b7c9f37a693d101b0ace4423b8fde6",
+      "equalsRecordedMergeCommit": true
+    },
+    {
+      "path": "packages/daemon/test/codex-generation-wiring.test.ts",
+      "bytes": 3810,
+      "sha256": "c855943f02aa9db3c3c8633d8cd8650829e94d97a7c755654797ac615818d4db",
+      "equalsRecordedMergeCommit": true
+    }
+  ],
+  "logs": [
+    {
+      "path": "main-b527-daemon-launcher-missing.log",
+      "bytes": 77,
+      "sha256": "20c1ba1358dd3ca315c84b32c6f142057fb7f3493337b314fca3fb1eefda6d00",
+      "source": "original local command stdout and stderr"
+    },
+    {
+      "path": "main-b527-daemon-focused.log",
+      "bytes": 41483,
+      "sha256": "ca9555c6de27d0ebed47ce3b9de5340c4d3d185c1136ffab8948d3059c1b47df",
+      "source": "original local command stdout and stderr"
+    },
+    {
+      "path": "main-b527-observability.log",
+      "bytes": 415,
+      "sha256": "64fc266833157a79030ede2ec0d552ad5acaeb5051f814ed4b1354c1e59fa446",
+      "source": "original local command stdout and stderr"
+    },
+    {
+      "path": "main-b527-daemon-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "original local command stdout and stderr"
+    },
+    {
+      "path": "main-b527-protocol-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "original local command stdout and stderr"
+    }
+  ],
+  "remoteMutations": 0,
+  "productionAcceptance": false
+}

@@ -1,0 +1,62 @@
+TAP version 13
+# (node:13) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:13) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# (node:13) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+# Subtest: Artifact library: a failed Retry stays available, then success dismisses it
+ok 1 - Artifact library: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 3484.704953
+  type: 'test'
+  ...
+# Subtest: Artifact detail: a failed Retry stays available, then success dismisses it
+ok 2 - Artifact detail: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 605.837454
+  type: 'test'
+  ...
+# Subtest: Artifact text: a failed Retry stays available, then success dismisses it
+ok 3 - Artifact text: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 572.548815
+  type: 'test'
+  ...
+# Subtest: Thread detail: a failed Retry stays available, then success dismisses it
+ok 4 - Thread detail: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 548.195694
+  type: 'test'
+  ...
+# Subtest: Thread lookup: a failed Retry stays available, then success dismisses it
+ok 5 - Thread lookup: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 569.608687
+  type: 'test'
+  ...
+# Subtest: Task detail: a failed Retry stays available, then success dismisses it
+ok 6 - Task detail: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 537.882736
+  type: 'test'
+  ...
+# Subtest: Group history: a failed Retry stays available, then success dismisses it
+ok 7 - Group history: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 529.993725
+  type: 'test'
+  ...
+# Subtest: Connection status: a failed Retry stays available, then success dismisses it
+ok 8 - Connection status: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 534.152086
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10115.45139

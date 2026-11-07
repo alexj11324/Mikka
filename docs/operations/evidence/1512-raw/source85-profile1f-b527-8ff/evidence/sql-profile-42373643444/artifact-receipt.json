@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "status": "verified",
+  "repository": "alexj11324/Mikka",
+  "repositoryId": 1427517699,
+  "run": 42368835389,
+  "attempt": 1,
+  "artifact": 13572179042,
+  "candidate": "1f548a73304923da466ebe702c99b6a8f6096f15",
+  "candidateTree": "3635e075173ffb83c1e157a7f5a93296d2697603",
+  "source": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+  "tree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+  "parents": [
+    "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+    "1f548a73304923da466ebe702c99b6a8f6096f15"
+  ],
+  "digest": "33b411a43819c5ad08ff47c69a6283aa697898cb18fce2e79ac2e8040cc56cff",
+  "bytes": 47871680,
+  "artifactKind": "linux_compiled_api",
+  "tarBytes": 47966144,
+  "tarSha256": "826633b18eadd2f3de5518c803454d03638b3ace29f1c3d2a0813a110ac52c44",
+  "artifactCreatedAt": "2026-11-07T11:39:34Z",
+  "workflowCreatedAt": "2026-11-07T11:35:37Z",
+  "recordedAt": "2026-11-07T12:45:19.541Z",
+  "currentAttempt": true,
+  "sameProductTreeAsCandidate": false,
+  "sameExactSyntheticSource": true,
+  "productionAcceptance": false,
+  "signedUrlPersisted": false,
+  "credentialPersisted": false
+}

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "recordedAt": "2026-11-07T12:51:45.841Z",
+  "runId": 42373643444,
+  "attempt": 1,
+  "operationRevision": "739a72af53243b8b639d21261e76547f6b3c35c2",
+  "files": [
+    {
+      "name": "artifact-receipt.json",
+      "bytes": 1104,
+      "sha256": "4f494ed1fb114a22ffa747cf3d14ebbc7c214785230b5cc609fdb94d9499ee60",
+      "source": "unchanged GitHub artifact entry"
+    },
+    {
+      "name": "desktop-query-decomposition.json",
+      "bytes": 51295,
+      "sha256": "a0879c9cb016a6c6fc7be56d8021bbe0a9c05c736c80ad2c89079440db22ad71",
+      "source": "unchanged GitHub artifact entry"
+    },
+    {
+      "name": "runner-receipt.json",
+      "bytes": 792,
+      "sha256": "4058ef5b487923ed7371584d5ddb579c900c3dd8638c8d67c1a8b8cf6519ea01",
+      "source": "unchanged GitHub artifact entry"
+    },
+    {
+      "name": "download-receipt.json",
+      "bytes": 987,
+      "sha256": "e1d7103116e0693b84cc4bc24d15b3f24715dc65c1e72d0c83d01b0a70682e01",
+      "source": "offline verification/projection"
+    },
+    {
+      "name": "workflow-metadata.json",
+      "bytes": 7336,
+      "sha256": "32a14651427dd6563a66b5ef4995287bfe21017db86336e5bc8019297702fdcc",
+      "source": "GitHub metadata field projection"
+    },
+    {
+      "name": "summary.json",
+      "bytes": 3873,
+      "sha256": "7a1ea6ee1c122a5dc8ae1496fc90caf14af46dc82b236eda307c540dfb88a883",
+      "source": "offline verification/projection"
+    }
+  ],
+  "rawLogsRead": false,
+  "signedDownloadUrlPersisted": false,
+  "zipPersisted": false,
+  "productionAcceptance": false
+}

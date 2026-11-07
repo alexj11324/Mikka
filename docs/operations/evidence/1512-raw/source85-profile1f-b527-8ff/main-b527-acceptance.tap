@@ -1,0 +1,232 @@
+TAP version 13
+# Subtest: the actual metadata script permits only an API-confirmed immutable main release
+ok 1 - the actual metadata script permits only an API-confirmed immutable main release
+  ---
+  duration_ms: 186.368783
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses fork receiver without outputs or private data
+ok 2 - pre-checkout refuses fork receiver without outputs or private data
+  ---
+  duration_ms: 29.662764
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses non-main receiver without outputs or private data
+ok 3 - pre-checkout refuses non-main receiver without outputs or private data
+  ---
+  duration_ms: 36.637997
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses wrong trigger without outputs or private data
+ok 4 - pre-checkout refuses wrong trigger without outputs or private data
+  ---
+  duration_ms: 49.164443
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses PR pointer without outputs or private data
+ok 5 - pre-checkout refuses PR pointer without outputs or private data
+  ---
+  duration_ms: 33.059002
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses fork pointer without outputs or private data
+ok 6 - pre-checkout refuses fork pointer without outputs or private data
+  ---
+  duration_ms: 44.948696
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses wrong pointer repository without outputs or private data
+ok 7 - pre-checkout refuses wrong pointer repository without outputs or private data
+  ---
+  duration_ms: 49.033369
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses branch pointer without outputs or private data
+ok 8 - pre-checkout refuses branch pointer without outputs or private data
+  ---
+  duration_ms: 54.435538
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses invalid SHA without outputs or private data
+ok 9 - pre-checkout refuses invalid SHA without outputs or private data
+  ---
+  duration_ms: 46.552048
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses invalid run ID without outputs or private data
+ok 10 - pre-checkout refuses invalid run ID without outputs or private data
+  ---
+  duration_ms: 39.824808
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses pending pointer without outputs or private data
+ok 11 - pre-checkout refuses pending pointer without outputs or private data
+  ---
+  duration_ms: 60.964156
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses failed pointer without outputs or private data
+ok 12 - pre-checkout refuses failed pointer without outputs or private data
+  ---
+  duration_ms: 40.22551
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses different workflow ID without outputs or private data
+ok 13 - pre-checkout refuses different workflow ID without outputs or private data
+  ---
+  duration_ms: 110.29177
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses different workflow path without outputs or private data
+ok 14 - pre-checkout refuses different workflow path without outputs or private data
+  ---
+  duration_ms: 71.368903
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses disabled workflow without outputs or private data
+ok 15 - pre-checkout refuses disabled workflow without outputs or private data
+  ---
+  duration_ms: 59.770318
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses different API workflow path without outputs or private data
+ok 16 - pre-checkout refuses different API workflow path without outputs or private data
+  ---
+  duration_ms: 68.057573
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses different API event without outputs or private data
+ok 17 - pre-checkout refuses different API event without outputs or private data
+  ---
+  duration_ms: 65.895848
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses fork API source without outputs or private data
+ok 18 - pre-checkout refuses fork API source without outputs or private data
+  ---
+  duration_ms: 62.411387
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses different API repository without outputs or private data
+ok 19 - pre-checkout refuses different API repository without outputs or private data
+  ---
+  duration_ms: 61.309217
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses different API source without outputs or private data
+ok 20 - pre-checkout refuses different API source without outputs or private data
+  ---
+  duration_ms: 76.105802
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses different API attempt without outputs or private data
+ok 21 - pre-checkout refuses different API attempt without outputs or private data
+  ---
+  duration_ms: 64.763988
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses unfinished API run without outputs or private data
+ok 22 - pre-checkout refuses unfinished API run without outputs or private data
+  ---
+  duration_ms: 68.728316
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses failed API run without outputs or private data
+ok 23 - pre-checkout refuses failed API run without outputs or private data
+  ---
+  duration_ms: 54.71209
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses advanced main without outputs or private data
+ok 24 - pre-checkout refuses advanced main without outputs or private data
+  ---
+  duration_ms: 53.797208
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses non-commit main without outputs or private data
+ok 25 - pre-checkout refuses non-commit main without outputs or private data
+  ---
+  duration_ms: 57.835186
+  type: 'test'
+  ...
+# Subtest: pre-checkout refuses GitHub refusal without outputs or private data
+ok 26 - pre-checkout refuses GitHub refusal without outputs or private data
+  ---
+  duration_ms: 53.397164
+  type: 'test'
+  ...
+# Subtest: the helper binds the checkout output to the trigger and repeats the fixed workflow identity
+ok 27 - the helper binds the checkout output to the trigger and repeats the fixed workflow identity
+  ---
+  duration_ms: 1.045809
+  type: 'test'
+  ...
+# Subtest: cost selection requires related source changes or a real validated and published candidate
+ok 28 - cost selection requires related source changes or a real validated and published candidate
+  ---
+  duration_ms: 0.97307
+  type: 'test'
+  ...
+# Subtest: skipped, incomplete, stale-attempt or unsuccessful release jobs cannot authorize active work
+ok 29 - skipped, incomplete, stale-attempt or unsuccessful release jobs cannot authorize active work
+  ---
+  duration_ms: 0.614948
+  type: 'test'
+  ...
+# Subtest: the credential guard rechecks main and the attempt after exact-attempt jobs, with no artifact reads
+ok 30 - the credential guard rechecks main and the attempt after exact-attempt jobs, with no artifact reads
+  ---
+  duration_ms: 6.682271
+  type: 'test'
+  ...
+# Subtest: provider work requires this runner own same-source Web and upstream attestation
+ok 31 - provider work requires this runner own same-source Web and upstream attestation
+  ---
+  duration_ms: 0.391491
+  type: 'test'
+  ...
+# Subtest: real request deadline evidence requires the actual timeout, bounded no-retry call and recovered controller
+ok 32 - real request deadline evidence requires the actual timeout, bounded no-retry call and recovered controller
+  ---
+  duration_ms: 1.80102
+  type: 'test'
+  ...
+# Subtest: automatic retirement evidence requires confirmed recoverable bytes, retention refusals and preserved history
+ok 33 - automatic retirement evidence requires confirmed recoverable bytes, retention refusals and preserved history
+  ---
+  duration_ms: 0.669451
+  type: 'test'
+  ...
+# Subtest: only actual completed driver cleanup allows the independent subscription cases after a provider failure
+ok 34 - only actual completed driver cleanup allows the independent subscription cases after a provider failure
+  ---
+  duration_ms: 0.56284
+  type: 'test'
+  ...
+# Subtest: continue-on-error never turns partial, failed or unconfirmed-cleanup evidence into passing acceptance
+ok 35 - continue-on-error never turns partial, failed or unconfirmed-cleanup evidence into passing acceptance
+  ---
+  duration_ms: 0.859618
+  type: 'test'
+  ...
+# Subtest: the privileged job starts only after metadata authorization and keeps exact checkout, account serialization and narrow credentials
+ok 36 - the privileged job starts only after metadata authorization and keeps exact checkout, account serialization and narrow credentials
+  ---
+  duration_ms: 1.462739
+  type: 'test'
+  ...
+# Subtest: the retirement fixture recovers actual checkpoint bytes independently and refuses missing or wrong data
+ok 37 - the retirement fixture recovers actual checkpoint bytes independently and refuses missing or wrong data
+  ---
+  duration_ms: 362.944837
+  type: 'test'
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1852.710631

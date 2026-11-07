@@ -1,0 +1,255 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-07T12:38:36.354955+00:00",
+  "scope": "offline_independent_database_identity_enumeration_proof",
+  "status": "frozen_for_independent_review",
+  "sourceEvidenceCommit": "01afbc767b6ae243aab9298f91add2e92c82a607",
+  "networkOrPosthogQueriesExecuted": false,
+  "modelOrProviderInvocations": 0,
+  "resourcesCreated": 0,
+  "remoteWrites": false,
+  "productRepositoryModified": false,
+  "history": {
+    "manifest": {
+      "path": "evidence/posthog-enumeration-v1-01afbc76/manifest.json",
+      "bytes": 3158,
+      "sha256": "c2a9d65e0bf61ff878f3b58635c203a8ab11b085b1dbd8296646dcf074fd8cf4",
+      "gitBlobSha1": "a179070493d473170cd488d75e337bad185a503e"
+    },
+    "originalFilesUnchanged": 7,
+    "originalSqlStringsUnchanged": 13
+  },
+  "newQuery": {
+    "name": "lookup_trace_count",
+    "sha256": "e7568116c4ba4d329a4f929a314557646ef9172185c16beb92bb08320239086d",
+    "scope": "exact original lookup FROM/WHERE and GROUP BY trace_id relation without LIMIT/OFFSET",
+    "liveValidated": false
+  },
+  "proofBoundary": {
+    "normalizerTruncated": null,
+    "transportRowsetTruncation": "unknown when normalized through current MCP response contract",
+    "databaseEnumeration": "complete only when independently counted scoped identity sets and both full captured snapshots agree",
+    "lookupCountRequired": "snapshots.before.lookupCount and snapshots.after.lookupCount",
+    "logs": "complete unique UUID set only; physical duplicate multiplicity not proven",
+    "notEvaluated": [
+      "tail_error_retention",
+      "source_correlation",
+      "replay_correlation",
+      "apm_session_links"
+    ],
+    "nativeCollectionTruncated": "explicit true or unknown still blocks; not overridden by database enumeration",
+    "upstreamDelivery": "not_proven; native missing/invalid/flush/exit limitations and Claude independent upstream count boundary preserved",
+    "overallAcceptance": null,
+    "notAtomicSnapshot": true,
+    "futureIngestionNotProven": true
+  },
+  "verification": {
+    "red": {
+      "exitCode": 1,
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "meaning": [
+        "old false rejection of fully counted unknown transport",
+        "old false acceptance of stable omitted second trace"
+      ]
+    },
+    "green": {
+      "exitCode": 0,
+      "tests": 2,
+      "pass": 2,
+      "fail": 0
+    },
+    "full": {
+      "exitCode": 0,
+      "tests": 26,
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0,
+      "command": [
+        "node",
+        "--test",
+        "--test-reporter=tap",
+        "normalize-posthog-metadata.test.mjs",
+        "reconcile-production-evidence.test.mjs"
+      ]
+    },
+    "lint": {
+      "exitCode": 0,
+      "config": "../Mikka/.oxlintrc.json",
+      "command": [
+        "../Mikka/node_modules/.bin/oxlint",
+        "--config",
+        "../Mikka/.oxlintrc.json",
+        "--no-ignore",
+        "--deny-warnings",
+        "--format=json",
+        "normalize-posthog-metadata.mjs",
+        "normalize-posthog-metadata.test.mjs",
+        "reconcile-production-evidence.mjs",
+        "reconcile-production-evidence.test.mjs"
+      ]
+    },
+    "syntax": {
+      "exitCodes": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "command": "node --check per owned JavaScript file"
+    },
+    "diffcheck": {
+      "command": "git diff --no-index --check -- history/path current/path for each of seven owned files",
+      "exitCodes": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "stdoutBytes": 0,
+      "whitespaceDiagnostics": 0,
+      "exitCodeMeaning": "no-index returns 1 for differing inputs; all seven are intentionally changed, with no check diagnostics"
+    },
+    "nodeVersion": "v24.22.1",
+    "savedRealResponses": {
+      "newReads": false,
+      "inputPath": "evidence/posthog-pagination-schema-191fcce2.json",
+      "sha256": "073282f96a6da1a1a49b0c1d4fdf05441038672b44e9d0a336197e3e95fe4d74",
+      "rows": [
+        0,
+        27,
+        0,
+        0,
+        0
+      ],
+      "pageTruncated": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "newCountLiveResponse": false
+    }
+  },
+  "privacy": {
+    "operationalMatches": [],
+    "syntheticCanaryExceptions": [
+      {
+        "path": "normalize-posthog-metadata.test.mjs",
+        "line": 168,
+        "kind": "reserved_example_domain_privacy_canary"
+      },
+      {
+        "path": "reconcile-production-evidence.test.mjs",
+        "line": 287,
+        "kind": "reserved_example_domain_privacy_canary"
+      }
+    ],
+    "rawPromptReplyToolInputAccountCredentialDataAdded": false
+  },
+  "files": [
+    {
+      "path": "production-evidence-query-templates.json",
+      "bytes": 58165,
+      "sha256": "a52df37feff2ef4c304d4bc47960657dc5c5badbde0fba4416f0e9bf4fea4c68",
+      "gitBlobSha1": "07f2013526784be3bff29fd23073f5320a980cf3"
+    },
+    {
+      "path": "normalize-posthog-metadata.mjs",
+      "bytes": 19913,
+      "sha256": "56ce0805aa5e75fece1efcd06ab9c0652ab90037c7e453e7e4fe6b7748b36ae5",
+      "gitBlobSha1": "8bd8d631b24cb134e1581e48eca86e8f16d3f557"
+    },
+    {
+      "path": "normalize-posthog-metadata.test.mjs",
+      "bytes": 16966,
+      "sha256": "2be18fcfd5c2c7ee2a780f20aa3e288939cd2dcacc2073cd78ebaf54025993fd",
+      "gitBlobSha1": "d64ce1fa61aa2c2a00789aaa1fad8ecc98f74d5a"
+    },
+    {
+      "path": "normalize-posthog-metadata.md",
+      "bytes": 8328,
+      "sha256": "08b674f22523094d74397c818be77600ea73eaed64e9386211d78e6c778780d3",
+      "gitBlobSha1": "07f2b6ed95a0d004af24abc864368b651db55ebc"
+    },
+    {
+      "path": "reconcile-production-evidence.mjs",
+      "bytes": 28367,
+      "sha256": "52884757d76555bd8478ec7e3154a0b58746a6c9bbe56e7c15083494526626d2",
+      "gitBlobSha1": "521ef985cd815b19b5220025adbd053879ccb41e"
+    },
+    {
+      "path": "reconcile-production-evidence.test.mjs",
+      "bytes": 21016,
+      "sha256": "b2898a5d1bff6e34e32399670b80db543eb7f0f2d0640f9377de807bb7b3edbf",
+      "gitBlobSha1": "2516517552a3f283090fd93a1bc263cee4c455c0"
+    },
+    {
+      "path": "reconcile-production-evidence.md",
+      "bytes": 10635,
+      "sha256": "0f408644e8b8cff18f64605ff89412678ffc0552d17a07c66bc7b7c0506e69fe",
+      "gitBlobSha1": "352be1f9838575ef2b5945da56f4289acee927e0"
+    }
+  ],
+  "rawValidationOutputs": [
+    {
+      "path": "evidence/posthog-enumeration-red.tap",
+      "bytes": 8961,
+      "sha256": "c8138b4b34d7da5496e1393d085a8bb1e151b4bd56bf94036a9a21160a26510c",
+      "gitBlobSha1": "dd9d49007db9e98e2e9a3ff3e4b2983f6652f88b"
+    },
+    {
+      "path": "evidence/posthog-enumeration-green.tap",
+      "bytes": 755,
+      "sha256": "395cb8ce15d0ec45b787acaa290eeedac195768fe15a0bba33e149d2d91d04f0",
+      "gitBlobSha1": "fced153628308cefc1091d0076cfe1c9c18ec27b"
+    },
+    {
+      "path": "evidence/posthog-enumeration-final.tap",
+      "bytes": 7150,
+      "sha256": "eefa6067f3a43cfb54923de51ac2c80cfd987b995c54c94051171137c3c53969",
+      "gitBlobSha1": "9ff0bd64c91b7d2e5da5f7aa41004052f0705060"
+    },
+    {
+      "path": "evidence/posthog-enumeration-oxlint.log",
+      "bytes": 194,
+      "sha256": "9856bca4f6e08ec0b2ea7b907743c690fa2a05ace087997bc01a9ddc0ee28c4e",
+      "gitBlobSha1": "00bec434d1f583d74d2c62c7d51c70a47c0116d8"
+    },
+    {
+      "path": "evidence/posthog-enumeration-diffcheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/posthog-enumeration-syntax-1.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/posthog-enumeration-syntax-2.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/posthog-enumeration-syntax-3.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/posthog-enumeration-syntax-4.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ]
+}

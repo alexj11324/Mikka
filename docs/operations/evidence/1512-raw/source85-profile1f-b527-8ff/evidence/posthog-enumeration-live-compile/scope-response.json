@@ -1,0 +1,19 @@
+{
+  "capturedAt": "2026-11-07T12:45:15.022Z",
+  "tool": "posthog exec call execute-sql --json",
+  "rawToolResponse": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS span_timestamp_utc,\\n    lower(hex(base64Decode(trace_id))) AS trace_id_hex,\\n    if(match(attributes['mikka.run_id'], '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') AND attributes['mikka.run_id'] != '00000000-0000-0000-0000-000000000000', attributes['mikka.run_id'], NULL) AS run_id,\\n    if(match(attributes['mikka.thread_id'], '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') AND attributes['mikka.thread_id'] != '00000000-0000-0000-0000-000000000000', attributes['mikka.thread_id'], NULL) AS thread_id,\\n    if(match(attributes['mikka.task_id'], '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') AND attributes['mikka.task_id'] != '00000000-0000-0000-0000-000000000000', attributes['mikka.task_id'], NULL) AS task_id\\nFROM posthog.trace_spans\\nWHERE timestamp >= toDateTime('2026-10-31 12:45:08', 'UTC')\\n  AND timestamp < toDateTime('2026-11-07 12:45:08', 'UTC')\\n  AND service_name IN ('mikka-web', 'mikka-daemon')\\n  AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\\n  AND ((match(attributes['mikka.run_id'], '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') AND attributes['mikka.run_id'] != '00000000-0000-0000-0000-000000000000')\\n        OR (match(attributes['mikka.thread_id'], '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') AND attributes['mikka.thread_id'] != '00000000-0000-0000-0000-000000000000')\\n        OR (match(attributes['mikka.task_id'], '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') AND attributes['mikka.task_id'] != '00000000-0000-0000-0000-000000000000'))\\nORDER BY timestamp DESC, trace_id, span_id\\nLIMIT 1\"},\"results\":\"span_timestamp_utc|trace_id_hex|run_id|thread_id|task_id\",\"__formatted_results_override\":\"span_timestamp_utc|trace_id_hex|run_id|thread_id|task_id\"}"
+      },
+      {
+        "type": "text",
+        "text": "{\"conversation_id\":\"01a1b60a-cc32-7d5d-af06-4ee6d6bc1686\"}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  }
+}
+

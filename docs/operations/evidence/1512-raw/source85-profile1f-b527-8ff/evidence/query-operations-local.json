@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "kind": "issue1512_test_counter_operation_partition",
+  "recordedAt": "2026-11-07T12:34:07.114872+00:00",
+  "baseRevision": "82f58b2e849abc41f6a6886ab18aa2d9c0e7ea45",
+  "node": "v24.22.1",
+  "source": [
+    {
+      "path": "Mikka/apps/desktop/test/db-query-operations.cjs",
+      "bytes": 529,
+      "sha256": "03632f635faceb39a1e764f5680680d0829ce98635e17d49276957a684e9d575"
+    },
+    {
+      "path": "Mikka/apps/desktop/test/db-metrics.cjs",
+      "bytes": 7661,
+      "sha256": "5b33c424975f562f3b816b9589b8a50b45b4f924d9b5e0ada9b709c27caf038a"
+    },
+    {
+      "path": "Mikka/apps/desktop/test/lifecycle-query-counts.mjs",
+      "bytes": 20301,
+      "sha256": "486fa57d5b877eb477e608da824670a56b097ddc3455fe82d75e6c7701f48ceb"
+    },
+    {
+      "path": "Mikka/apps/desktop/test/db-metrics.test.mjs",
+      "bytes": 30208,
+      "sha256": "39fa4f0c91a9751b516f236e7e04a012fb8389259d8ef92f5c2bec82eb921ffb"
+    }
+  ],
+  "logs": [
+    {
+      "path": "ops1512/query-operations-red.tap",
+      "bytes": 6236,
+      "sha256": "f000a62c76addcabbf49be78c3d59071905439e8e49985b210fa2f82d3df315b"
+    },
+    {
+      "path": "ops1512/query-operations-initial-integration.tap",
+      "bytes": 13491,
+      "sha256": "33f7a8bc9b6343ea1860b81f7e7ef711d65a2c4f7b8ac92852d6f1a3816df770"
+    },
+    {
+      "path": "ops1512/query-operations-green.tap",
+      "bytes": 4610,
+      "sha256": "7b95ad30370638766356a1180591f680c18ed2975bb7de2beee38b761be7470e"
+    },
+    {
+      "path": "ops1512/query-operations-lint.log",
+      "bytes": 69,
+      "sha256": "199555da75a83fe0949c501d1cac91995db05712c9befa4b61a7ae062738439c"
+    },
+    {
+      "path": "ops1512/query-operations-lint-direct.log",
+      "bytes": 69,
+      "sha256": "199555da75a83fe0949c501d1cac91995db05712c9befa4b61a7ae062738439c"
+    },
+    {
+      "path": "ops1512/query-operations-lint-desktop.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "validation": {
+    "beforeImplementation": {
+      "tests": 3,
+      "passed": 0,
+      "failed": 3,
+      "exitCode": 1,
+      "meaning": "missing partition and missing guards reproduced"
+    },
+    "initialIntegration": {
+      "tests": 17,
+      "passed": 14,
+      "failed": 3,
+      "exitCode": 1,
+      "cause": "VM probe require resolved the new sibling module relative to temporary probe; corrected to metrics source path"
+    },
+    "final": {
+      "tests": 17,
+      "passed": 17,
+      "failed": 0,
+      "exitCode": 0,
+      "realInstalledPgWithOtel": [
+        "next CJS",
+        "Nitro CJS",
+        "Nitro ESM"
+      ]
+    },
+    "lint": {
+      "desktopConfigurationFiles": 4,
+      "exitCode": 0,
+      "previousRootConfigurationAttempts": "No files selected; preserved as setup failures, not lint passes"
+    },
+    "nodeSyntax": {
+      "files": 4,
+      "exitCode": 0
+    },
+    "diffWhitespace": {
+      "exitCode": 0
+    }
+  },
+  "boundaries": {
+    "productQueriesAdded": 0,
+    "requestsAdded": 0,
+    "measurementWindowsChanged": false,
+    "counterResetUsed": false,
+    "unknownAndBackgroundQueries": "retained in total; absent or unrecognized operation labels retained as unattributed",
+    "partition": "at the same pg.Client.query entry as original counter; every normalized snapshot and delta sums exactly to queryCalls",
+    "sharedSql": "one observed innermost issuer operation; no inferred allocation among batch items",
+    "connectionBytes": "original global counters only; no operation allocation",
+    "privacy": "fixed 17 labels plus numeric counts; arbitrary route canary cannot enter report",
+    "historicalMissingPartition": "absent/unavailable, not synthetic zeroes"
+  },
+  "actualNativeRetest": "not_run",
+  "productionAcceptance": false
+}

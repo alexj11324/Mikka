@@ -1,0 +1,166 @@
+TAP version 13
+# Subtest: the five saved real MCP responses parse with actual columns and unknown completeness
+ok 1 - the five saved real MCP responses parse with actual columns and unknown completeness
+  ---
+  duration_ms: 9.828228
+  type: 'test'
+  ...
+# Subtest: only the fourteen fixed SQL contracts are accepted; columns are never fabricated for empty results
+ok 2 - only the fourteen fixed SQL contracts are accepted; columns are never fabricated for empty results
+  ---
+  duration_ms: 7.417287
+  type: 'test'
+  ...
+# Subtest: independent lookup count preserves the exact original group predicate and a closed nonnegative integer without claiming transport completeness
+ok 3 - independent lookup count preserves the exact original group predicate and a closed nonnegative integer without claiming transport completeness
+  ---
+  duration_ms: 2.077696
+  type: 'test'
+  ...
+# Subtest: typed arrays retain order and UUID bytes; null, zero, booleans and raw string flags remain distinct
+ok 4 - typed arrays retain order and UUID bytes; null, zero, booleans and raw string flags remain distinct
+  ---
+  duration_ms: 1.342046
+  type: 'test'
+  ...
+# Subtest: the log projection contains only closed body codes, including explicit unsafe-body evidence
+ok 5 - the log projection contains only closed body codes, including explicit unsafe-body evidence
+  ---
+  duration_ms: 1.341184
+  type: 'test'
+  ...
+# Subtest: SQL offsets and parsed row counts are receipts, never an inferred terminal or untruncated page
+ok 6 - SQL offsets and parsed row counts are receipts, never an inferred terminal or untruncated page
+  ---
+  duration_ms: 30.191519
+  type: 'test'
+  ...
+# Subtest: incomplete JSON, duplicate JSON keys, unrecognized envelopes and a conflicting override are rejected
+ok 7 - incomplete JSON, duplicate JSON keys, unrecognized envelopes and a conflicting override are rejected
+  ---
+  duration_ms: 0.74193
+  type: 'test'
+  ...
+# Subtest: column count, header, multi-pipe cells, footers, line breaks and truncation markers fail closed
+ok 8 - column count, header, multi-pipe cells, footers, line breaks and truncation markers fail closed
+  ---
+  duration_ms: 1.493285
+  type: 'test'
+  ...
+# Subtest: numeric and null ambiguity cannot silently become zero or a missing value
+ok 9 - numeric and null ambiguity cannot silently become zero or a missing value
+  ---
+  duration_ms: 5.532122
+  type: 'test'
+  ...
+# Subtest: the matched query and request cannot widen the scope, cross clusters or smuggle a payload column
+ok 10 - the matched query and request cannot widen the scope, cross clusters or smuggle a payload column
+  ---
+  duration_ms: 2.776001
+  type: 'test'
+  ...
+# Subtest: metadata projection rejects private payload shapes and prints no supplied value in its errors
+ok 11 - metadata projection rejects private payload shapes and prints no supplied value in its errors
+  ---
+  duration_ms: 2.492914
+  type: 'test'
+  ...
+# Subtest: unknown response truncation does not supply a missing independent count or turn an empty lookup into evidence
+ok 12 - unknown response truncation does not supply a missing independent count or turn an empty lookup into evidence
+  ---
+  duration_ms: 2.832516
+  type: 'test'
+  ...
+# Subtest: CLI writes a private non-overwriting receipt and emits only closed summaries on failure
+ok 13 - CLI writes a private non-overwriting receipt and emits only closed summaries on failure
+  ---
+  duration_ms: 270.946232
+  type: 'test'
+  ...
+# Subtest: unknown transport can have independently verified stable database identity enumeration without claiming upstream completion
+ok 14 - unknown transport can have independently verified stable database identity enumeration without claiming upstream completion
+  ---
+  duration_ms: 13.398487
+  type: 'test'
+  ...
+# Subtest: stable missing second trace is rejected by the independent lookup count even when both short pages and supplied traces agree
+ok 15 - stable missing second trace is rejected by the independent lookup count even when both short pages and supplied traces agree
+  ---
+  duration_ms: 1.932628
+  type: 'test'
+  ...
+# Subtest: independent lookup count is mandatory, one row, exact scoped and a nonnegative safe integer
+ok 16 - independent lookup count is mandatory, one row, exact scoped and a nonnegative safe integer
+  ---
+  duration_ms: 12.309302
+  type: 'test'
+  ...
+# Subtest: counts cannot override explicit transport/native truncation or hide a duplicate log UUID
+ok 17 - counts cannot override explicit transport/native truncation or hide a duplicate log UUID
+  ---
+  duration_ms: 4.389967
+  type: 'test'
+  ...
+# Subtest: individually consistent snapshots with changed ingestion remain incomplete and capture has exactly three signals
+ok 18 - individually consistent snapshots with changed ingestion remain incomplete and capture has exactly three signals
+  ---
+  duration_ms: 4.388055
+  type: 'test'
+  ...
+# Subtest: log safety uses the completed/failed projection from the saved real query, not raw body text
+ok 19 - log safety uses the completed/failed projection from the saved real query, not raw body text
+  ---
+  duration_ms: 7.443978
+  type: 'test'
+  ...
+# Subtest: all discovered traces reconcile without turning CLI exit or equal sets into upstream/production success
+ok 20 - all discovered traces reconcile without turning CLI exit or equal sets into upstream/production success
+  ---
+  duration_ms: 4.473163
+  type: 'test'
+  ...
+# Subtest: 501 rows require continuous pages and original UUIDs, including the explicit final short page
+ok 21 - 501 rows require continuous pages and original UUIDs, including the explicit final short page
+  ---
+  duration_ms: 41.725891
+  type: 'test'
+  ...
+# Subtest: equal row totals cannot hide different event, span, physical UUID, parent or model identities
+ok 22 - equal row totals cannot hide different event, span, physical UUID, parent or model identities
+  ---
+  duration_ms: 1.871576
+  type: 'test'
+  ...
+# Subtest: native emissions and app-server receipts use distinct equations, without double counting matched fallbacks
+ok 23 - native emissions and app-server receipts use distinct equations, without double counting matched fallbacks
+  ---
+  duration_ms: 2.23871
+  type: 'test'
+  ...
+# Subtest: missing fields/tables, wrong cluster/window, truncation and unstable aggregates remain incomplete
+ok 24 - missing fields/tables, wrong cluster/window, truncation and unstable aggregates remain incomplete
+  ---
+  duration_ms: 1.007952
+  type: 'test'
+  ...
+# Subtest: null is distinct from zero and arbitrary payload/labels never appear in output
+ok 25 - null is distinct from zero and arbitrary payload/labels never appear in output
+  ---
+  duration_ms: 1.37117
+  type: 'test'
+  ...
+# Subtest: Claude equality preserves the missing independent upstream-count boundary; formatted MCP text is not normalized evidence
+ok 26 - Claude equality preserves the missing independent upstream-count boundary; formatted MCP text is not normalized evidence
+  ---
+  duration_ms: 2.069385
+  type: 'test'
+  ...
+1..26
+# tests 26
+# suites 0
+# pass 26
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 440.938123

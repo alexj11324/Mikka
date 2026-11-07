@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "kind": "verified_sequential_profile_projection",
+  "recordedAt": "2026-11-07T12:51:45.838Z",
+  "runId": 42373643444,
+  "attempt": 1,
+  "operationRevision": "739a72af53243b8b639d21261e76547f6b3c35c2",
+  "source": {
+    "source": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "candidate": "1f548a73304923da466ebe702c99b6a8f6096f15",
+    "candidateTree": "3635e075173ffb83c1e157a7f5a93296d2697603",
+    "tree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+    "parents": "f7225f3eb1e38762dfdecde0395792c85b81ec22 1f548a73304923da466ebe702c99b6a8f6096f15",
+    "artifactId": 13572179042,
+    "artifactRunId": 42368835389,
+    "artifactAttempt": 1,
+    "artifactBytes": 47871680,
+    "artifactSha256": "33b411a43819c5ad08ff47c69a6283aa697898cb18fce2e79ac2e8040cc56cff",
+    "verified": true,
+    "compiledVerified": true,
+    "sameProductTreeAsCandidate": false,
+    "sameExactSyntheticSource": true,
+    "clientVersion": "0.1.2"
+  },
+  "status": "passed",
+  "elapsedMs": 10838,
+  "requestsPassed": 24,
+  "requestsPlanned": 24,
+  "sameApiPid": true,
+  "distinctApiPids": 1,
+  "unknownReadings": 0,
+  "gapCount": 24,
+  "gapTotals": {
+    "queryCalls": 0,
+    "pgProtocolReceiveBytes": 0,
+    "pgProtocolSendBytes": 0
+  },
+  "measuredRequestTotals": {
+    "queryCalls": 117,
+    "pgProtocolReceiveBytes": 30715,
+    "pgProtocolSendBytes": 85425
+  },
+  "queryCalls": {
+    "web_sign_in": 17,
+    "web_get_session": 2,
+    "web_bootstrap": 2,
+    "web_session": 0,
+    "web_workspace": 5,
+    "web_live_ticket": 3,
+    "native_sign_in": 17,
+    "native_get_session": 2,
+    "pkce_begin": 1,
+    "system_browser_config": 0,
+    "system_browser_session": 0,
+    "pkce_return": 2,
+    "pkce_exchange": 9,
+    "native_bootstrap": 2,
+    "native_session": 0,
+    "native_task_runs_first": 3,
+    "native_task_runs_second": 3,
+    "native_thread_first": 6,
+    "native_thread_cursor": 4,
+    "native_chat_first": 13,
+    "native_chat_cursor": 7,
+    "native_read_batch": 11,
+    "native_workspace": 5,
+    "native_live_ticket": 3
+  },
+  "readCosts": {
+    "taskFirst": 3,
+    "taskSecond": 3,
+    "threadFirst": 6,
+    "threadCursor": 4,
+    "chatFirst": 13,
+    "chatCursor": 7,
+    "separatelyMeasuredCursorReads": 14,
+    "actualSameArgumentsBatch": 11,
+    "comparison": "sequential warm-request observations; not an allocation of the concurrent Native login window"
+  },
+  "cleanup": {
+    "http_context": {
+      "status": "passed",
+      "created": 2,
+      "disposed": 2
+    },
+    "owned_loopback": {
+      "status": "passed"
+    },
+    "owned_pkce": {
+      "status": "passed",
+      "removedRows": 1
+    },
+    "fixtures": {
+      "status": "passed"
+    },
+    "lease": {
+      "status": "passed",
+      "state": "released"
+    },
+    "api_process": {
+      "status": "passed",
+      "exited": true,
+      "forcedKill": false
+    },
+    "local_gateway": {
+      "status": "passed",
+      "disposed": true,
+      "exited": true,
+      "forcedKill": false
+    },
+    "private_account_files": {
+      "status": "passed"
+    },
+    "private_runtime_files": {
+      "status": "passed"
+    },
+    "owned_metrics_socket": {
+      "status": "passed"
+    }
+  },
+  "stopContainers": {
+    "jobId": 128406695273,
+    "step": 26,
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "temporaryDownloadsRemoved": true,
+  "githubArtifactDigestMatched": true,
+  "rawBytesPreserved": true,
+  "privacyPatternsDetected": 0,
+  "externalModelCalls": 0,
+  "externalVirtualMachines": 0,
+  "productionAcceptance": false,
+  "fullNativeWindowReconciliation": null,
+  "interpretation": "Exact sequential old-source observations. No subtraction from or replacement of the complete Native 196 and Web 173 login windows. Rest workspace and ticket authentication costs are measured on both sides; the batch uses the same returned cursors as the preceding individual reads."
+}

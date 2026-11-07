@@ -1,0 +1,150 @@
+TAP version 13
+# (node:13) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:13) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# (node:13) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+# Subtest: Artifact library: a failed Retry stays available, then success dismisses it
+not ok 1 - Artifact library: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 4339.418473
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:1:14757'
+  failureType: 'hookFailed'
+  error: "The requested module 'mikka:platform' does not provide an export named 'bootstrapScope'"
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+    async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+    async node:internal/modules/esm/loader:647:26
+    async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:138:15)
+    async TestHook.run (node:internal/test_runner/test:1409:7)
+  ...
+# Subtest: Artifact detail: a failed Retry stays available, then success dismisses it
+not ok 2 - Artifact detail: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 0.27803
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:1:14757'
+  failureType: 'hookFailed'
+  error: "The requested module 'mikka:platform' does not provide an export named 'bootstrapScope'"
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+    async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+    async node:internal/modules/esm/loader:647:26
+    async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:138:15)
+    async TestHook.run (node:internal/test_runner/test:1409:7)
+  ...
+# Subtest: Artifact text: a failed Retry stays available, then success dismisses it
+not ok 3 - Artifact text: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 0.471292
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:1:14757'
+  failureType: 'hookFailed'
+  error: "The requested module 'mikka:platform' does not provide an export named 'bootstrapScope'"
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+    async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+    async node:internal/modules/esm/loader:647:26
+    async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:138:15)
+    async TestHook.run (node:internal/test_runner/test:1409:7)
+  ...
+# Subtest: Thread detail: a failed Retry stays available, then success dismisses it
+not ok 4 - Thread detail: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 0.23824
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:1:14757'
+  failureType: 'hookFailed'
+  error: "The requested module 'mikka:platform' does not provide an export named 'bootstrapScope'"
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+    async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+    async node:internal/modules/esm/loader:647:26
+    async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:138:15)
+    async TestHook.run (node:internal/test_runner/test:1409:7)
+  ...
+# Subtest: Thread lookup: a failed Retry stays available, then success dismisses it
+not ok 5 - Thread lookup: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 0.19912
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:1:14757'
+  failureType: 'hookFailed'
+  error: "The requested module 'mikka:platform' does not provide an export named 'bootstrapScope'"
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+    async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+    async node:internal/modules/esm/loader:647:26
+    async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:138:15)
+    async TestHook.run (node:internal/test_runner/test:1409:7)
+  ...
+# Subtest: Task detail: a failed Retry stays available, then success dismisses it
+not ok 6 - Task detail: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 0.300614
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:1:14757'
+  failureType: 'hookFailed'
+  error: "The requested module 'mikka:platform' does not provide an export named 'bootstrapScope'"
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+    async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+    async node:internal/modules/esm/loader:647:26
+    async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:138:15)
+    async TestHook.run (node:internal/test_runner/test:1409:7)
+  ...
+# Subtest: Group history: a failed Retry stays available, then success dismisses it
+not ok 7 - Group history: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 0.20548
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:1:14757'
+  failureType: 'hookFailed'
+  error: "The requested module 'mikka:platform' does not provide an export named 'bootstrapScope'"
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+    async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+    async node:internal/modules/esm/loader:647:26
+    async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:138:15)
+    async TestHook.run (node:internal/test_runner/test:1409:7)
+  ...
+# Subtest: Connection status: a failed Retry stays available, then success dismisses it
+not ok 8 - Connection status: a failed Retry stays available, then success dismisses it
+  ---
+  duration_ms: 0.289146
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:1:14757'
+  failureType: 'hookFailed'
+  error: "The requested module 'mikka:platform' does not provide an export named 'bootstrapScope'"
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    #asyncInstantiate (node:internal/modules/esm/module_job:455:21)
+    async ModuleJob.run (node:internal/modules/esm/module_job:553:5)
+    async node:internal/modules/esm/loader:647:26
+    async TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/tests/read-retry-toasts.test.tsx:138:15)
+    async TestHook.run (node:internal/test_runner/test:1409:7)
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 0
+# fail 8
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5623.678018

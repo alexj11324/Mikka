@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-07T12:48:34.655Z",
+  "scope": "bounded_read_only_existing_workflow_job_log_diagnosis",
+  "rawLogsPersisted": false,
+  "rawLogsPrinted": false,
+  "rawActorOrCredentialFieldsRetained": false,
+  "remoteActions": [],
+  "productionAcceptance": null,
+  "observations": [
+    {
+      "repository": "alexj11324/Mikka",
+      "runId": 42369063869,
+      "jobId": 128403601136,
+      "headSha": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+      "failedStep": 24,
+      "failedStepName": "Upload the prebuilt output to production",
+      "conclusion": "failure",
+      "error": [
+        {
+          "code": "webDeploy:mainChanged",
+          "timestamp": "2026-11-07T12:35:26.1891790Z",
+          "expectedShaInLog": null,
+          "actualShaInLog": null,
+          "shaRedactedByRunner": true
+        }
+      ],
+      "classification": "stale_main_guard_before_vercel_upload",
+      "platformOrProviderFailureProven": false,
+      "source": {
+        "source": "1edbeca687119eb0ef71f209ac3d411fbc85b888",
+        "scriptSha256": "d74dbdea0d92b8ac305d2bd42bbdba2bcc29198af14d04cfabd2b6b076a17650",
+        "workflowSha256": "74f7bdf024b370e59c900a537472f7ab9101ef084e4052984b704f2d4d4bcdf4",
+        "mainGuardBeforeVercelUpload": true,
+        "guardExactMachineCodeInScript": true
+      },
+      "cleanup": {
+        "workflowJobConclusion": "success",
+        "source": "previous exact run jobs metadata"
+      },
+      "logCountOnly": {
+        "totalLines": 3244,
+        "rawLogCharacters": 323623
+      }
+    },
+    {
+      "repository": "alexj11324/Mikka",
+      "runId": 42372716240,
+      "jobId": 128403970861,
+      "headSha": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+      "failedStep": 24,
+      "failedStepName": "Upload the prebuilt output to production",
+      "conclusion": "failure",
+      "error": [
+        {
+          "code": "webDeploy:mainChanged",
+          "timestamp": "2026-11-07T12:42:52.9294597Z",
+          "expectedShaInLog": null,
+          "actualShaInLog": null,
+          "shaRedactedByRunner": true
+        }
+      ],
+      "classification": "stale_main_guard_before_vercel_upload",
+      "platformOrProviderFailureProven": false,
+      "source": {
+        "source": "dab5439b315a9b236697ba7b89f5578c3d6b8e6c",
+        "scriptSha256": "d74dbdea0d92b8ac305d2bd42bbdba2bcc29198af14d04cfabd2b6b076a17650",
+        "workflowSha256": "74f7bdf024b370e59c900a537472f7ab9101ef084e4052984b704f2d4d4bcdf4",
+        "mainGuardBeforeVercelUpload": true,
+        "guardExactMachineCodeInScript": true
+      },
+      "cleanup": {
+        "workflowJobConclusion": null,
+        "reason": "no separate cleanup job in this Web workflow"
+      },
+      "logCountOnly": {
+        "totalLines": 3121,
+        "rawLogCharacters": 313631
+      }
+    }
+  ],
+  "boundary": "Run heads bind expected source. Masked log values do not identify the actual newer main commit. No Vercel quota/schema/build or provider failure is inferred from these guard errors."
+}
+

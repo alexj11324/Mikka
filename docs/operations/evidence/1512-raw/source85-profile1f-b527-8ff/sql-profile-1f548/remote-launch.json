@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "kind": "issue1512_profile_1f_remote_launch",
+  "operationRevision": "739a72af53243b8b639d21261e76547f6b3c35c2",
+  "tree": "9572982ada7475c66cfc43aa88db471202cfde29",
+  "parent": "d2ca56a94254eb5efc429c7a272d142a54fb28fe",
+  "run": 42373643444,
+  "attempt": 1,
+  "statusAtObservation": "queued",
+  "source": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+  "candidate": "1f548a73304923da466ebe702c99b6a8f6096f15",
+  "remoteContentReadback": [
+    {
+      "path": ".github/workflows/issue1512-sql-profile-1f548.yml",
+      "characters": 6242,
+      "blobSha": "be4cc44984405115838a2bab05678dfe4dfac100",
+      "exact": true
+    },
+    {
+      "path": ".github/issue1512-sql-profile-1f548/driver.mjs",
+      "characters": 42790,
+      "blobSha": "1a2a1ab8e8da1907db7ee3e50635dbb1b2a3e1d4",
+      "exact": true
+    },
+    {
+      "path": ".github/issue1512-sql-profile-1f548/artifact.mjs",
+      "characters": 5940,
+      "blobSha": "68897f7fce279fc874f041769087ec437b6367e2",
+      "exact": true
+    },
+    {
+      "path": ".github/issue1512-sql-profile-1f548/driver.test.mjs",
+      "characters": 6142,
+      "blobSha": "943381bc914261f8c60d3b54c2a29d78b0b27840",
+      "exact": true
+    }
+  ],
+  "productionAcceptance": false
+}

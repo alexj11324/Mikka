@@ -1,0 +1,1818 @@
+{
+  "version": 2,
+  "kind": "issue1512_sequential_http_pg_decomposition",
+  "productionAcceptance": false,
+  "startedAt": "2026-11-07T12:45:53.790Z",
+  "status": "passed",
+  "source": {
+    "source": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "candidate": "1f548a73304923da466ebe702c99b6a8f6096f15",
+    "candidateTree": "3635e075173ffb83c1e157a7f5a93296d2697603",
+    "tree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+    "parents": "f7225f3eb1e38762dfdecde0395792c85b81ec22 1f548a73304923da466ebe702c99b6a8f6096f15",
+    "artifactId": 13572179042,
+    "artifactRunId": 42368835389,
+    "artifactAttempt": 1,
+    "artifactBytes": 47871680,
+    "artifactSha256": "33b411a43819c5ad08ff47c69a6283aa697898cb18fce2e79ac2e8040cc56cff",
+    "verified": true,
+    "compiledVerified": true,
+    "sameProductTreeAsCandidate": false,
+    "sameExactSyntheticSource": true,
+    "clientVersion": "0.1.2"
+  },
+  "runner": {
+    "runId": "42373643444",
+    "attempt": 1,
+    "operationRevision": "739a72af53243b8b639d21261e76547f6b3c35c2",
+    "platform": "linux",
+    "arch": "x64",
+    "node": "v24.22.1"
+  },
+  "measurement": {
+    "source": "existing desktop db-metrics.cjs and createLifecycleQueryCounter, one compiled primary API PID",
+    "scope": "all pg.Client.query calls and connection protocol bytes between each pair of snapshots",
+    "exclusions": [
+      "separate harness lease/fixture SQL",
+      "PG connection handshake and TCP/TLS overhead"
+    ],
+    "cache": "ordinary Better Auth signed browser/native session cache; no clearing or invented proof",
+    "workspace": "original fixture team default; REST verifies that team and obtains the real personal-home transport; no workspace switch or fabricated selector",
+    "interpretation": "sequential decomposition only; not an exact allocation of the earlier concurrent Native minus Web query difference",
+    "background": "all primary API background traffic is included; gaps are reported, never subtracted",
+    "protocol": "ordinary leased email auth, real PKCE/owned loopback and source-owned local gateway; no browser, provider challenge, daemon or VM",
+    "taskReads": "separate task/thread/chat reads, then one real batch with the same returned cursors; no Live socket or simulated catch-up",
+    "comparisons": "desktop.session rows are additional action comparisons, not part of an observed login total"
+  },
+  "phases": [
+    {
+      "name": "schema_setup",
+      "elapsedMs": 457
+    },
+    {
+      "name": "environment_bootstrap",
+      "elapsedMs": 2951
+    },
+    {
+      "name": "local_gateway_start",
+      "elapsedMs": 3154
+    },
+    {
+      "name": "api_start",
+      "elapsedMs": 3660
+    },
+    {
+      "name": "lease_and_fixture",
+      "elapsedMs": 5734
+    },
+    {
+      "name": "web_sign_in",
+      "elapsedMs": 7951
+    },
+    {
+      "name": "web_get_session",
+      "elapsedMs": 8082
+    },
+    {
+      "name": "web_bootstrap",
+      "elapsedMs": 8427
+    },
+    {
+      "name": "web_session",
+      "elapsedMs": 8694
+    },
+    {
+      "name": "web_workspace",
+      "elapsedMs": 8705
+    },
+    {
+      "name": "web_live_ticket",
+      "elapsedMs": 8721
+    },
+    {
+      "name": "native_sign_in",
+      "elapsedMs": 8743
+    },
+    {
+      "name": "native_get_session",
+      "elapsedMs": 8893
+    },
+    {
+      "name": "pkce_begin",
+      "elapsedMs": 9012
+    },
+    {
+      "name": "system_browser_config",
+      "elapsedMs": 9026
+    },
+    {
+      "name": "system_browser_session",
+      "elapsedMs": 9035
+    },
+    {
+      "name": "pkce_return",
+      "elapsedMs": 9043
+    },
+    {
+      "name": "pkce_exchange",
+      "elapsedMs": 9064
+    },
+    {
+      "name": "native_bootstrap",
+      "elapsedMs": 9089
+    },
+    {
+      "name": "native_session",
+      "elapsedMs": 9100
+    },
+    {
+      "name": "native_task_runs_first",
+      "elapsedMs": 9105
+    },
+    {
+      "name": "native_task_runs_second",
+      "elapsedMs": 9120
+    },
+    {
+      "name": "native_thread_first",
+      "elapsedMs": 9130
+    },
+    {
+      "name": "native_thread_cursor",
+      "elapsedMs": 9148
+    },
+    {
+      "name": "native_chat_first",
+      "elapsedMs": 9158
+    },
+    {
+      "name": "native_chat_cursor",
+      "elapsedMs": 9184
+    },
+    {
+      "name": "native_read_batch",
+      "elapsedMs": 9196
+    },
+    {
+      "name": "native_workspace",
+      "elapsedMs": 9223
+    },
+    {
+      "name": "native_live_ticket",
+      "elapsedMs": 9230
+    }
+  ],
+  "requests": [
+    {
+      "id": "web_sign_in",
+      "route": "/mikka/api/auth/sign-in/email",
+      "action": null,
+      "purpose": "ordinary_email_auth",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055561746,
+        "instrumentedClients": 1,
+        "queryCalls": 148,
+        "pgProtocolReceiveBytes": 19067,
+        "pgProtocolSendBytes": 35522,
+        "activeConnections": 4,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055561864,
+        "instrumentedClients": 1,
+        "queryCalls": 165,
+        "pgProtocolReceiveBytes": 24333,
+        "pgProtocolSendBytes": 39738,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:01.746Z",
+        "finishedAt": "2026-11-07T12:46:01.864Z",
+        "durationMs": 118,
+        "queryCalls": 17,
+        "pgProtocolReceiveBytes": 5266,
+        "pgProtocolSendBytes": 4216,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "originalLeaseIdentityValidated": true
+      }
+    },
+    {
+      "id": "web_get_session",
+      "route": "/mikka/api/auth/get-session",
+      "action": null,
+      "purpose": "ordinary_email_auth",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055561873,
+        "instrumentedClients": 1,
+        "queryCalls": 165,
+        "pgProtocolReceiveBytes": 24333,
+        "pgProtocolSendBytes": 39738,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055561882,
+        "instrumentedClients": 1,
+        "queryCalls": 167,
+        "pgProtocolReceiveBytes": 24791,
+        "pgProtocolSendBytes": 40469,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:01.873Z",
+        "finishedAt": "2026-11-07T12:46:01.882Z",
+        "durationMs": 9,
+        "queryCalls": 2,
+        "pgProtocolReceiveBytes": 458,
+        "pgProtocolSendBytes": 731,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "originalLeaseIdentityValidated": true
+      }
+    },
+    {
+      "id": "web_bootstrap",
+      "route": "/mikka/api/rpc",
+      "action": "desktop.bootstrap",
+      "purpose": "web_workspace_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562219,
+        "instrumentedClients": 1,
+        "queryCalls": 167,
+        "pgProtocolReceiveBytes": 24791,
+        "pgProtocolSendBytes": 40469,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562484,
+        "instrumentedClients": 1,
+        "queryCalls": 169,
+        "pgProtocolReceiveBytes": 25089,
+        "pgProtocolSendBytes": 41071,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.219Z",
+        "finishedAt": "2026-11-07T12:46:02.484Z",
+        "durationMs": 265,
+        "queryCalls": 2,
+        "pgProtocolReceiveBytes": 298,
+        "pgProtocolSendBytes": 602,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "sameLeasedOwner": true,
+        "cacheWorkspaceMatchesFixture": true
+      }
+    },
+    {
+      "id": "web_session",
+      "route": "/mikka/api/rpc",
+      "action": "desktop.session",
+      "purpose": "additional_action_comparison",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562485,
+        "instrumentedClients": 1,
+        "queryCalls": 169,
+        "pgProtocolReceiveBytes": 25089,
+        "pgProtocolSendBytes": 41071,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562495,
+        "instrumentedClients": 1,
+        "queryCalls": 169,
+        "pgProtocolReceiveBytes": 25089,
+        "pgProtocolSendBytes": 41071,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.485Z",
+        "finishedAt": "2026-11-07T12:46:02.495Z",
+        "durationMs": 10,
+        "queryCalls": 0,
+        "pgProtocolReceiveBytes": 0,
+        "pgProtocolSendBytes": 0,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "sameLeasedOwner": true
+      }
+    },
+    {
+      "id": "web_workspace",
+      "route": "/mikka/api/workspace",
+      "action": null,
+      "purpose": "ordinary_rest_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562496,
+        "instrumentedClients": 1,
+        "queryCalls": 169,
+        "pgProtocolReceiveBytes": 25089,
+        "pgProtocolSendBytes": 41071,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562511,
+        "instrumentedClients": 1,
+        "queryCalls": 174,
+        "pgProtocolReceiveBytes": 26476,
+        "pgProtocolSendBytes": 42696,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.496Z",
+        "finishedAt": "2026-11-07T12:46:02.511Z",
+        "durationMs": 15,
+        "queryCalls": 5,
+        "pgProtocolReceiveBytes": 1387,
+        "pgProtocolSendBytes": 1625,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "sameLeasedOwner": true,
+        "sameWorkspace": true,
+        "verifiedPersonalHomePresent": true,
+        "memberCount": 2,
+        "invitationCount": 0
+      }
+    },
+    {
+      "id": "web_live_ticket",
+      "route": "/mikka/api/live/ticket",
+      "action": null,
+      "purpose": "ordinary_rest_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562512,
+        "instrumentedClients": 1,
+        "queryCalls": 174,
+        "pgProtocolReceiveBytes": 26476,
+        "pgProtocolSendBytes": 42696,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562526,
+        "instrumentedClients": 1,
+        "queryCalls": 177,
+        "pgProtocolReceiveBytes": 27631,
+        "pgProtocolSendBytes": 43399,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.512Z",
+        "finishedAt": "2026-11-07T12:46:02.526Z",
+        "durationMs": 14,
+        "queryCalls": 3,
+        "pgProtocolReceiveBytes": 1155,
+        "pgProtocolSendBytes": 703,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "ownedLocalGateway": true,
+        "samePersonalHome": true,
+        "ticketReturned": true,
+        "socketOpened": false
+      }
+    },
+    {
+      "id": "native_sign_in",
+      "route": "/mikka/api/auth/sign-in/email",
+      "action": null,
+      "purpose": "ordinary_email_auth",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562534,
+        "instrumentedClients": 1,
+        "queryCalls": 177,
+        "pgProtocolReceiveBytes": 27631,
+        "pgProtocolSendBytes": 43399,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562675,
+        "instrumentedClients": 1,
+        "queryCalls": 194,
+        "pgProtocolReceiveBytes": 32998,
+        "pgProtocolSendBytes": 47916,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.534Z",
+        "finishedAt": "2026-11-07T12:46:02.675Z",
+        "durationMs": 141,
+        "queryCalls": 17,
+        "pgProtocolReceiveBytes": 5367,
+        "pgProtocolSendBytes": 4517,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "originalLeaseIdentityValidated": true
+      }
+    },
+    {
+      "id": "native_get_session",
+      "route": "/mikka/api/auth/get-session",
+      "action": null,
+      "purpose": "ordinary_email_auth",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562684,
+        "instrumentedClients": 1,
+        "queryCalls": 194,
+        "pgProtocolReceiveBytes": 32998,
+        "pgProtocolSendBytes": 47916,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562690,
+        "instrumentedClients": 1,
+        "queryCalls": 196,
+        "pgProtocolReceiveBytes": 33456,
+        "pgProtocolSendBytes": 48647,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.684Z",
+        "finishedAt": "2026-11-07T12:46:02.690Z",
+        "durationMs": 6,
+        "queryCalls": 2,
+        "pgProtocolReceiveBytes": 458,
+        "pgProtocolSendBytes": 731,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "originalLeaseIdentityValidated": true
+      }
+    },
+    {
+      "id": "pkce_begin",
+      "route": "/mikka/api/desktop/begin",
+      "action": null,
+      "purpose": "native_pkce",
+      "status": "passed",
+      "httpStatus": 204,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562803,
+        "instrumentedClients": 1,
+        "queryCalls": 196,
+        "pgProtocolReceiveBytes": 33456,
+        "pgProtocolSendBytes": 48647,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562817,
+        "instrumentedClients": 1,
+        "queryCalls": 197,
+        "pgProtocolReceiveBytes": 33493,
+        "pgProtocolSendBytes": 49141,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.803Z",
+        "finishedAt": "2026-11-07T12:46:02.817Z",
+        "durationMs": 14,
+        "queryCalls": 1,
+        "pgProtocolReceiveBytes": 37,
+        "pgProtocolSendBytes": 494,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true
+    },
+    {
+      "id": "system_browser_config",
+      "route": "/mikka/api/desktop/config",
+      "action": null,
+      "purpose": "system_browser_auth_only_config",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562817,
+        "instrumentedClients": 1,
+        "queryCalls": 197,
+        "pgProtocolReceiveBytes": 33493,
+        "pgProtocolSendBytes": 49141,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562826,
+        "instrumentedClients": 1,
+        "queryCalls": 197,
+        "pgProtocolReceiveBytes": 33493,
+        "pgProtocolSendBytes": 49141,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.817Z",
+        "finishedAt": "2026-11-07T12:46:02.826Z",
+        "durationMs": 9,
+        "queryCalls": 0,
+        "pgProtocolReceiveBytes": 0,
+        "pgProtocolSendBytes": 0,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "publicAuthConfigValidated": true,
+        "workspaceBootstrapCalled": false
+      }
+    },
+    {
+      "id": "system_browser_session",
+      "route": "/mikka/api/rpc",
+      "action": "desktop.session",
+      "purpose": "system_browser_auth_only_identity",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562826,
+        "instrumentedClients": 1,
+        "queryCalls": 197,
+        "pgProtocolReceiveBytes": 33493,
+        "pgProtocolSendBytes": 49141,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562834,
+        "instrumentedClients": 1,
+        "queryCalls": 197,
+        "pgProtocolReceiveBytes": 33493,
+        "pgProtocolSendBytes": 49141,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.826Z",
+        "finishedAt": "2026-11-07T12:46:02.834Z",
+        "durationMs": 8,
+        "queryCalls": 0,
+        "pgProtocolReceiveBytes": 0,
+        "pgProtocolSendBytes": 0,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "sameLeasedOwner": true
+      }
+    },
+    {
+      "id": "pkce_return",
+      "route": "/mikka/api/desktop/return",
+      "action": null,
+      "purpose": "native_pkce",
+      "status": "passed",
+      "httpStatus": 303,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562835,
+        "instrumentedClients": 1,
+        "queryCalls": 197,
+        "pgProtocolReceiveBytes": 33493,
+        "pgProtocolSendBytes": 49141,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562851,
+        "instrumentedClients": 1,
+        "queryCalls": 199,
+        "pgProtocolReceiveBytes": 34061,
+        "pgProtocolSendBytes": 50329,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.835Z",
+        "finishedAt": "2026-11-07T12:46:02.851Z",
+        "durationMs": 16,
+        "queryCalls": 2,
+        "pgProtocolReceiveBytes": 568,
+        "pgProtocolSendBytes": 1188,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "exactOwnedLoopback": true
+      }
+    },
+    {
+      "id": "pkce_exchange",
+      "route": "/mikka/api/desktop/exchange",
+      "action": null,
+      "purpose": "native_pkce",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562855,
+        "instrumentedClients": 1,
+        "queryCalls": 199,
+        "pgProtocolReceiveBytes": 34061,
+        "pgProtocolSendBytes": 50329,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562875,
+        "instrumentedClients": 1,
+        "queryCalls": 208,
+        "pgProtocolReceiveBytes": 36371,
+        "pgProtocolSendBytes": 52142,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.855Z",
+        "finishedAt": "2026-11-07T12:46:02.875Z",
+        "durationMs": 20,
+        "queryCalls": 9,
+        "pgProtocolReceiveBytes": 2310,
+        "pgProtocolSendBytes": 1813,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "sameLeasedOwner": true,
+        "sameBrowserSession": true,
+        "signedCachePresent": true
+      }
+    },
+    {
+      "id": "native_bootstrap",
+      "route": "/mikka/api/desktop/rpc",
+      "action": "desktop.bootstrap",
+      "purpose": "native_workspace_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562881,
+        "instrumentedClients": 1,
+        "queryCalls": 208,
+        "pgProtocolReceiveBytes": 36371,
+        "pgProtocolSendBytes": 52142,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562890,
+        "instrumentedClients": 1,
+        "queryCalls": 210,
+        "pgProtocolReceiveBytes": 36669,
+        "pgProtocolSendBytes": 52744,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.881Z",
+        "finishedAt": "2026-11-07T12:46:02.890Z",
+        "durationMs": 9,
+        "queryCalls": 2,
+        "pgProtocolReceiveBytes": 298,
+        "pgProtocolSendBytes": 602,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "sameLeasedOwner": true,
+        "cacheWorkspaceMatchesFixture": true,
+        "carriedNormalSignedCache": true
+      }
+    },
+    {
+      "id": "native_session",
+      "route": "/mikka/api/desktop/rpc",
+      "action": "desktop.session",
+      "purpose": "additional_action_comparison",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562891,
+        "instrumentedClients": 1,
+        "queryCalls": 210,
+        "pgProtocolReceiveBytes": 36669,
+        "pgProtocolSendBytes": 52744,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562896,
+        "instrumentedClients": 1,
+        "queryCalls": 210,
+        "pgProtocolReceiveBytes": 36669,
+        "pgProtocolSendBytes": 52744,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.891Z",
+        "finishedAt": "2026-11-07T12:46:02.896Z",
+        "durationMs": 5,
+        "queryCalls": 0,
+        "pgProtocolReceiveBytes": 0,
+        "pgProtocolSendBytes": 0,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "sameLeasedOwner": true,
+        "carriedNormalSignedCache": true
+      }
+    },
+    {
+      "id": "native_task_runs_first",
+      "route": "/mikka/api/desktop/rpc",
+      "action": "task-runs.pollTaskRuns",
+      "purpose": "native_single_task_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562896,
+        "instrumentedClients": 1,
+        "queryCalls": 210,
+        "pgProtocolReceiveBytes": 36669,
+        "pgProtocolSendBytes": 52744,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562910,
+        "instrumentedClients": 1,
+        "queryCalls": 213,
+        "pgProtocolReceiveBytes": 37618,
+        "pgProtocolSendBytes": 55544,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.896Z",
+        "finishedAt": "2026-11-07T12:46:02.910Z",
+        "durationMs": 14,
+        "queryCalls": 3,
+        "pgProtocolReceiveBytes": 949,
+        "pgProtocolSendBytes": 2800,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "fixtureTaskFound": true,
+        "itemCount": 1,
+        "sameLeasedOwner": true,
+        "samePersonalHome": true,
+        "carriedNormalSignedCache": true
+      }
+    },
+    {
+      "id": "native_task_runs_second",
+      "route": "/mikka/api/desktop/rpc",
+      "action": "task-runs.pollTaskRuns",
+      "purpose": "native_single_task_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562911,
+        "instrumentedClients": 1,
+        "queryCalls": 213,
+        "pgProtocolReceiveBytes": 37618,
+        "pgProtocolSendBytes": 55544,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562920,
+        "instrumentedClients": 1,
+        "queryCalls": 216,
+        "pgProtocolReceiveBytes": 38567,
+        "pgProtocolSendBytes": 58344,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.911Z",
+        "finishedAt": "2026-11-07T12:46:02.920Z",
+        "durationMs": 9,
+        "queryCalls": 3,
+        "pgProtocolReceiveBytes": 949,
+        "pgProtocolSendBytes": 2800,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "fixtureTaskFound": true,
+        "itemCount": 1,
+        "sameLeasedOwner": true,
+        "samePersonalHome": true,
+        "carriedNormalSignedCache": true
+      }
+    },
+    {
+      "id": "native_thread_first",
+      "route": "/mikka/api/desktop/rpc",
+      "action": "task-runs.syncThreadList",
+      "purpose": "native_single_business_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562921,
+        "instrumentedClients": 1,
+        "queryCalls": 216,
+        "pgProtocolReceiveBytes": 38567,
+        "pgProtocolSendBytes": 58344,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562938,
+        "instrumentedClients": 1,
+        "queryCalls": 222,
+        "pgProtocolReceiveBytes": 40200,
+        "pgProtocolSendBytes": 69895,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.921Z",
+        "finishedAt": "2026-11-07T12:46:02.938Z",
+        "durationMs": 17,
+        "queryCalls": 6,
+        "pgProtocolReceiveBytes": 1633,
+        "pgProtocolSendBytes": 11551,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "carriedNormalSignedCache": true,
+        "fixtureThreadFound": true,
+        "itemCount": 1,
+        "positionCount": 1,
+        "sameLeasedOwner": true,
+        "samePersonalHome": true
+      }
+    },
+    {
+      "id": "native_thread_cursor",
+      "route": "/mikka/api/desktop/rpc",
+      "action": "task-runs.syncThreadList",
+      "purpose": "native_single_business_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562939,
+        "instrumentedClients": 1,
+        "queryCalls": 222,
+        "pgProtocolReceiveBytes": 40200,
+        "pgProtocolSendBytes": 69895,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562949,
+        "instrumentedClients": 1,
+        "queryCalls": 226,
+        "pgProtocolReceiveBytes": 40798,
+        "pgProtocolSendBytes": 74366,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.939Z",
+        "finishedAt": "2026-11-07T12:46:02.949Z",
+        "durationMs": 10,
+        "queryCalls": 4,
+        "pgProtocolReceiveBytes": 598,
+        "pgProtocolSendBytes": 4471,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "carriedNormalSignedCache": true,
+        "unchanged": true,
+        "originalReturnedCursorUsed": true,
+        "sameLeasedOwner": true,
+        "samePersonalHome": true
+      }
+    },
+    {
+      "id": "native_chat_first",
+      "route": "/mikka/api/desktop/rpc",
+      "action": "coordinator.syncCoordinatorChat",
+      "purpose": "native_single_business_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562949,
+        "instrumentedClients": 1,
+        "queryCalls": 226,
+        "pgProtocolReceiveBytes": 40798,
+        "pgProtocolSendBytes": 74366,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562974,
+        "instrumentedClients": 1,
+        "queryCalls": 239,
+        "pgProtocolReceiveBytes": 43519,
+        "pgProtocolSendBytes": 106749,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.949Z",
+        "finishedAt": "2026-11-07T12:46:02.974Z",
+        "durationMs": 25,
+        "queryCalls": 13,
+        "pgProtocolReceiveBytes": 2721,
+        "pgProtocolSendBytes": 32383,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "carriedNormalSignedCache": true,
+        "fixtureChatFound": true,
+        "itemCount": 2,
+        "continuationPresent": true,
+        "defaultWorkspaceCoordinator": true,
+        "sameLeasedOwner": true,
+        "samePersonalHome": true
+      }
+    },
+    {
+      "id": "native_chat_cursor",
+      "route": "/mikka/api/desktop/rpc",
+      "action": "coordinator.syncCoordinatorChat",
+      "purpose": "native_single_business_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562975,
+        "instrumentedClients": 1,
+        "queryCalls": 239,
+        "pgProtocolReceiveBytes": 43519,
+        "pgProtocolSendBytes": 106749,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562986,
+        "instrumentedClients": 1,
+        "queryCalls": 246,
+        "pgProtocolReceiveBytes": 44836,
+        "pgProtocolSendBytes": 109470,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.975Z",
+        "finishedAt": "2026-11-07T12:46:02.986Z",
+        "durationMs": 11,
+        "queryCalls": 7,
+        "pgProtocolReceiveBytes": 1317,
+        "pgProtocolSendBytes": 2721,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "carriedNormalSignedCache": true,
+        "unchanged": true,
+        "originalReturnedCursorUsed": true,
+        "sameLeasedOwner": true,
+        "samePersonalHome": true
+      }
+    },
+    {
+      "id": "native_read_batch",
+      "route": "/mikka/api/desktop/rpc",
+      "action": "desktop.readBatch",
+      "purpose": "native_same_cursor_batch",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055562987,
+        "instrumentedClients": 1,
+        "queryCalls": 246,
+        "pgProtocolReceiveBytes": 44836,
+        "pgProtocolSendBytes": 109470,
+        "activeConnections": 5,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055563013,
+        "instrumentedClients": 1,
+        "queryCalls": 257,
+        "pgProtocolReceiveBytes": 47240,
+        "pgProtocolSendBytes": 118619,
+        "activeConnections": 6,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:02.987Z",
+        "finishedAt": "2026-11-07T12:46:03.013Z",
+        "durationMs": 26,
+        "queryCalls": 11,
+        "pgProtocolReceiveBytes": 2404,
+        "pgProtocolSendBytes": 9149,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "carriedNormalSignedCache": true,
+        "logicalItems": 3,
+        "samePreviouslyMeasuredArguments": true,
+        "items": [
+          {
+            "action": "task-runs.pollTaskRuns",
+            "fixtureTaskFound": true,
+            "itemCount": 1,
+            "sameLeasedOwner": true,
+            "samePersonalHome": true
+          },
+          {
+            "action": "task-runs.syncThreadList",
+            "unchanged": true,
+            "originalReturnedCursorUsed": true,
+            "sameLeasedOwner": true,
+            "samePersonalHome": true
+          },
+          {
+            "action": "coordinator.syncCoordinatorChat",
+            "unchanged": true,
+            "originalReturnedCursorUsed": true,
+            "sameLeasedOwner": true,
+            "samePersonalHome": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "native_workspace",
+      "route": "/mikka/api/workspace",
+      "action": null,
+      "purpose": "ordinary_rest_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055563014,
+        "instrumentedClients": 1,
+        "queryCalls": 257,
+        "pgProtocolReceiveBytes": 47240,
+        "pgProtocolSendBytes": 118619,
+        "activeConnections": 6,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055563021,
+        "instrumentedClients": 1,
+        "queryCalls": 262,
+        "pgProtocolReceiveBytes": 48627,
+        "pgProtocolSendBytes": 120244,
+        "activeConnections": 6,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:03.014Z",
+        "finishedAt": "2026-11-07T12:46:03.021Z",
+        "durationMs": 7,
+        "queryCalls": 5,
+        "pgProtocolReceiveBytes": 1387,
+        "pgProtocolSendBytes": 1625,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "carriedNormalSignedCache": true,
+        "sameLeasedOwner": true,
+        "sameWorkspace": true,
+        "verifiedPersonalHomePresent": true,
+        "memberCount": 2,
+        "invitationCount": 0
+      }
+    },
+    {
+      "id": "native_live_ticket",
+      "route": "/mikka/api/live/ticket",
+      "action": null,
+      "purpose": "ordinary_rest_read",
+      "status": "passed",
+      "httpStatus": 200,
+      "before": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055563022,
+        "instrumentedClients": 1,
+        "queryCalls": 262,
+        "pgProtocolReceiveBytes": 48627,
+        "pgProtocolSendBytes": 120244,
+        "activeConnections": 6,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "after": {
+        "version": 1,
+        "runtime": "nitro",
+        "pid": 4492,
+        "startedAt": 1794055557482,
+        "endedAt": 1794055563028,
+        "instrumentedClients": 1,
+        "queryCalls": 265,
+        "pgProtocolReceiveBytes": 49782,
+        "pgProtocolSendBytes": 120947,
+        "activeConnections": 6,
+        "closedConnections": 1,
+        "unknownReadings": 0
+      },
+      "delta": {
+        "startedAt": "2026-11-07T12:46:03.022Z",
+        "finishedAt": "2026-11-07T12:46:03.028Z",
+        "durationMs": 6,
+        "queryCalls": 3,
+        "pgProtocolReceiveBytes": 1155,
+        "pgProtocolSendBytes": 703,
+        "closedConnections": 0,
+        "unknownReadings": 0
+      },
+      "sameApiPid": true,
+      "receipt": {
+        "carriedNormalSignedCache": true,
+        "ownedLocalGateway": true,
+        "samePersonalHome": true,
+        "ticketReturned": true,
+        "socketOpened": false
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "beforeRequest": "web_get_session",
+      "startedAt": "2026-11-07T12:46:01.864Z",
+      "finishedAt": "2026-11-07T12:46:01.873Z",
+      "durationMs": 9,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "web_bootstrap",
+      "startedAt": "2026-11-07T12:46:01.882Z",
+      "finishedAt": "2026-11-07T12:46:02.219Z",
+      "durationMs": 337,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "web_session",
+      "startedAt": "2026-11-07T12:46:02.484Z",
+      "finishedAt": "2026-11-07T12:46:02.485Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "web_workspace",
+      "startedAt": "2026-11-07T12:46:02.495Z",
+      "finishedAt": "2026-11-07T12:46:02.496Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "web_live_ticket",
+      "startedAt": "2026-11-07T12:46:02.511Z",
+      "finishedAt": "2026-11-07T12:46:02.512Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_sign_in",
+      "startedAt": "2026-11-07T12:46:02.526Z",
+      "finishedAt": "2026-11-07T12:46:02.534Z",
+      "durationMs": 8,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_get_session",
+      "startedAt": "2026-11-07T12:46:02.675Z",
+      "finishedAt": "2026-11-07T12:46:02.684Z",
+      "durationMs": 9,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "pkce_begin",
+      "startedAt": "2026-11-07T12:46:02.690Z",
+      "finishedAt": "2026-11-07T12:46:02.803Z",
+      "durationMs": 113,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "system_browser_config",
+      "startedAt": "2026-11-07T12:46:02.817Z",
+      "finishedAt": "2026-11-07T12:46:02.817Z",
+      "durationMs": 0,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "system_browser_session",
+      "startedAt": "2026-11-07T12:46:02.826Z",
+      "finishedAt": "2026-11-07T12:46:02.826Z",
+      "durationMs": 0,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "pkce_return",
+      "startedAt": "2026-11-07T12:46:02.834Z",
+      "finishedAt": "2026-11-07T12:46:02.835Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "pkce_exchange",
+      "startedAt": "2026-11-07T12:46:02.851Z",
+      "finishedAt": "2026-11-07T12:46:02.855Z",
+      "durationMs": 4,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_bootstrap",
+      "startedAt": "2026-11-07T12:46:02.875Z",
+      "finishedAt": "2026-11-07T12:46:02.881Z",
+      "durationMs": 6,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_session",
+      "startedAt": "2026-11-07T12:46:02.890Z",
+      "finishedAt": "2026-11-07T12:46:02.891Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_task_runs_first",
+      "startedAt": "2026-11-07T12:46:02.896Z",
+      "finishedAt": "2026-11-07T12:46:02.896Z",
+      "durationMs": 0,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_task_runs_second",
+      "startedAt": "2026-11-07T12:46:02.910Z",
+      "finishedAt": "2026-11-07T12:46:02.911Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_thread_first",
+      "startedAt": "2026-11-07T12:46:02.920Z",
+      "finishedAt": "2026-11-07T12:46:02.921Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_thread_cursor",
+      "startedAt": "2026-11-07T12:46:02.938Z",
+      "finishedAt": "2026-11-07T12:46:02.939Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_chat_first",
+      "startedAt": "2026-11-07T12:46:02.949Z",
+      "finishedAt": "2026-11-07T12:46:02.949Z",
+      "durationMs": 0,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_chat_cursor",
+      "startedAt": "2026-11-07T12:46:02.974Z",
+      "finishedAt": "2026-11-07T12:46:02.975Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_read_batch",
+      "startedAt": "2026-11-07T12:46:02.986Z",
+      "finishedAt": "2026-11-07T12:46:02.987Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_workspace",
+      "startedAt": "2026-11-07T12:46:03.013Z",
+      "finishedAt": "2026-11-07T12:46:03.014Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "native_live_ticket",
+      "startedAt": "2026-11-07T12:46:03.021Z",
+      "finishedAt": "2026-11-07T12:46:03.022Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    },
+    {
+      "beforeRequest": "cleanup",
+      "startedAt": "2026-11-07T12:46:03.028Z",
+      "finishedAt": "2026-11-07T12:46:03.029Z",
+      "durationMs": 1,
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0,
+      "closedConnections": 0,
+      "unknownReadings": 0
+    }
+  ],
+  "cleanup": {
+    "http_context": {
+      "status": "passed",
+      "created": 2,
+      "disposed": 2
+    },
+    "owned_loopback": {
+      "status": "passed"
+    },
+    "owned_pkce": {
+      "status": "passed",
+      "removedRows": 1
+    },
+    "fixtures": {
+      "status": "passed"
+    },
+    "lease": {
+      "status": "passed",
+      "state": "released"
+    },
+    "api_process": {
+      "status": "passed",
+      "exited": true,
+      "forcedKill": false
+    },
+    "local_gateway": {
+      "status": "passed",
+      "disposed": true,
+      "exited": true,
+      "forcedKill": false
+    },
+    "private_account_files": {
+      "status": "passed"
+    },
+    "private_runtime_files": {
+      "status": "passed"
+    },
+    "owned_metrics_socket": {
+      "status": "passed"
+    }
+  },
+  "requestPlan": [
+    "web_sign_in",
+    "web_get_session",
+    "web_bootstrap",
+    "web_session",
+    "web_workspace",
+    "web_live_ticket",
+    "native_sign_in",
+    "native_get_session",
+    "pkce_begin",
+    "system_browser_config",
+    "system_browser_session",
+    "pkce_return",
+    "pkce_exchange",
+    "native_bootstrap",
+    "native_session",
+    "native_task_runs_first",
+    "native_task_runs_second",
+    "native_thread_first",
+    "native_thread_cursor",
+    "native_chat_first",
+    "native_chat_cursor",
+    "native_read_batch",
+    "native_workspace",
+    "native_live_ticket"
+  ],
+  "gateway": {
+    "sourceOwnedHelper": true,
+    "isolatedLocalWorker": true,
+    "configuredLikeNative": true,
+    "browserStarted": false,
+    "websocketClientStarted": false
+  },
+  "counter": {
+    "revision": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+    "platform": "linux",
+    "arch": "x64",
+    "runtime": "nitro",
+    "pid": 4492,
+    "process": "single compiled primary API for this sequential HTTP diagnostic"
+  },
+  "fixture": {
+    "originalParityFixture": true,
+    "endedTask": true,
+    "disabledDevice": true,
+    "explicitWorkspaceSelector": false
+  },
+  "finishedAt": "2026-11-07T12:46:04.629Z",
+  "elapsedMs": 10838,
+  "summary": {
+    "completedRequests": 24,
+    "comparisonRequests": 2,
+    "sameApiPid": true,
+    "unmeasuredGaps": {
+      "queryCalls": 0,
+      "pgProtocolReceiveBytes": 0,
+      "pgProtocolSendBytes": 0
+    },
+    "cleanupComplete": true,
+    "fullNativeWindowReconciliation": null
+  },
+  "readCosts": {
+    "taskFirst": 3,
+    "taskSecond": 3,
+    "threadFirst": 6,
+    "threadCursor": 4,
+    "chatFirst": 13,
+    "chatCursor": 7,
+    "separatelyMeasuredCursorReads": 14,
+    "actualSameArgumentsBatch": 11,
+    "comparison": "sequential warm-request observations; not an allocation of the concurrent Native login window"
+  }
+}

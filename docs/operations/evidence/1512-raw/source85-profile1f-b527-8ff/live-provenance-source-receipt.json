@@ -1,0 +1,263 @@
+{
+  "schema": "mikka_live_provenance_source_receipt_v1",
+  "created_at": "2026-11-07T12:37:23.323740+00:00",
+  "status": "source_regression_validated_not_native_query_acceptance",
+  "base_head": "82f58b2e849abc41f6a6886ab18aa2d9c0e7ea45",
+  "node_version": "v24.22.1",
+  "swr_version": "2.5.1",
+  "files": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "bytes": 4604,
+      "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+      "git_blob_sha1": "cb23eb39ddc29e746c437bf259ffc1db3ad08436"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "bytes": 23821,
+      "sha256": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b",
+      "git_blob_sha1": "2f462c3080b1a561c194c0ee8c7633a21f2c5fa5"
+    },
+    {
+      "path": "lib/live/channel.test.ts",
+      "bytes": 44287,
+      "sha256": "963178edb6e99f92160230ff165aeebea6e43d9798ded176f04fe248e0a9aadd",
+      "git_blob_sha1": "65a21869ee0d2daa2e8e04d7b4c2a3c20d0c6787"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "bytes": 53571,
+      "sha256": "0b62211c66eb5a229e81ac81f2cad50a785172631c73ceccc69d7907ba026979",
+      "git_blob_sha1": "b0b28dfcabc4c04b4bd4cc884e0199c539b4e2fd"
+    }
+  ],
+  "scope": {
+    "committed_provenance": "Only the latest observed read per actual SWR cache/key. Successful object provenance uses WeakRef plus actual cache object identity, no retained second response value. Failed/discarded newer reads cannot revive an older committed proof.",
+    "continuous_coverage": "Only a currently supported subscription can use the current connection capability/presence acknowledgement boundary. Valid received invalidations advance one conservative maximum even while a key is unsubscribed. Reconnect resets coverage.",
+    "pending_obligation": "The late-subscription boundary is max-merged with any later pending boundary.",
+    "revision_floor": "At flush, pending waits and every active subscription holding the same key contribute per-entity maximum required revisions, preserving previously held revision 9 against an earlier completed revision 5 result.",
+    "preserved_guards": [
+      "same cache and key",
+      "current owner/scope/lifetime",
+      "visibility",
+      "accepted and actually committed cache identity",
+      "custom comparator rejection",
+      "SWR mutation/discard and supersession",
+      "original onSuccess exception semantics",
+      "required revision and held revision floors",
+      "unsupported capability and unacknowledged presence fallback",
+      "read-before-boundary requires a later read",
+      "one ordinary revalidation on invalid proof; no busy loop"
+    ],
+    "timing_basis": "Fetcher entry is a conservative same-realm ordering boundary, earlier than any microtask-batched HTTP send; no claim of actual transport start.",
+    "unchanged": [
+      "Native read batch scheduling",
+      "measurement windows",
+      "business polling",
+      "authorization caching",
+      "API routes",
+      "provider calls",
+      "real service resources"
+    ]
+  },
+  "checks": [
+    {
+      "stage": "original_product_new_regressions",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap --test-name-pattern='a committed SWR read after|a late live subscription shares' scripts/use-live-lists.live.test.tsx",
+      "cwd": "/workspace/scratch/812e3b7d6d45/Mikka",
+      "stdout": {
+        "path": "live-provenance-red.tap",
+        "bytes": 2099,
+        "sha256": "e0d30182741c40cf79e0ea0677a85744c8840876f0960244c884d1b75f7a5a36",
+        "git_blob_sha1": "9c5d7f352f187ead53fb2d83adf6ef9602b9f9b2"
+      },
+      "exit_code": 1,
+      "tap": {
+        "tests": 2,
+        "pass": 0,
+        "fail": 2,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4560.267788
+      },
+      "terminal_tap_complete": true
+    },
+    {
+      "stage": "initial_provenance_coverage_fix",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap --test-name-pattern='committed SWR|late live subscription|while unsubscribed|late subscription|replaced committed|newer failed SWR|continuous ready|continuous coverage|pending deadline' scripts/use-live-lists.live.test.tsx lib/live/channel.test.ts",
+      "cwd": "/workspace/scratch/812e3b7d6d45/Mikka",
+      "stdout": {
+        "path": "live-provenance-focused-green.tap",
+        "bytes": 4301,
+        "sha256": "985415180dcd95abdb8da7310bc0aa02f8d2591d4515f6a83e15d4f9adaf204b",
+        "git_blob_sha1": "18326426aeb0b6f6bd1b1d31dded6beaa26b96ce"
+      },
+      "exit_code": 0,
+      "tap": {
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 6838.900513
+      },
+      "terminal_tap_complete": true
+    },
+    {
+      "stage": "before_active_held_revision_guard",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap lib/live/channel.test.ts scripts/use-live-lists.live.test.tsx scripts/desktop-notification-lifetime.live.test.tsx lib/swr/persistent-cache.test.tsx",
+      "cwd": "/workspace/scratch/812e3b7d6d45/Mikka",
+      "stdout": {
+        "path": "live-provenance-regression.tap",
+        "bytes": 34162,
+        "sha256": "3b24f90f62ab7aa22c1ede132c55ab88d2bb5b9a34b8c2b038cd0a0c62b6efc0",
+        "git_blob_sha1": "e40c4c2991eaabbcea01f8f26c0d4b868923797e"
+      },
+      "exit_code": 0,
+      "tap": {
+        "tests": 136,
+        "pass": 136,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 109337.023431
+      },
+      "terminal_tap_complete": true
+    },
+    {
+      "stage": "corrected_ready_before_read_push_causality",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap --test-name-pattern='push while unsubscribed' scripts/use-live-lists.live.test.tsx",
+      "cwd": "/workspace/scratch/812e3b7d6d45/Mikka",
+      "stdout": {
+        "path": "live-provenance-unsubscribed-final.tap",
+        "bytes": 952,
+        "sha256": "639c24f343c682523100133fe6911a89013ac0e316e02e6247076b757bd6dee9",
+        "git_blob_sha1": "39212a58bbecf5f5effde0d24e6f2e07987c9274"
+      },
+      "exit_code": 0,
+      "tap": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4286.696726
+      },
+      "terminal_tap_complete": true
+    },
+    {
+      "stage": "before_active_held_revision_guard",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap --test-name-pattern='a completed read cannot erase' scripts/use-live-lists.live.test.tsx",
+      "cwd": "/workspace/scratch/812e3b7d6d45/Mikka",
+      "stdout": {
+        "path": "live-provenance-revision-red.tap",
+        "bytes": 1266,
+        "sha256": "ccefd122a74e38cc6967b772d1817816380b434a9aeb21b4bd674f446e17d5a4",
+        "git_blob_sha1": "dbf5367f1382191395f92512ec23b3a6568c1d80"
+      },
+      "exit_code": 1,
+      "tap": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 3926.861223
+      },
+      "terminal_tap_complete": true
+    },
+    {
+      "stage": "final_product_active_held_revision_guard",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap --test-name-pattern='a completed read cannot erase|one coalesced read|another active consumer' lib/live/channel.test.ts scripts/use-live-lists.live.test.tsx",
+      "cwd": "/workspace/scratch/812e3b7d6d45/Mikka",
+      "stdout": {
+        "path": "live-provenance-revision-green.tap",
+        "bytes": 1162,
+        "sha256": "3acef8edda12580159bdd8ecd19b8c1734295f3c79515b288ed7d16766949341",
+        "git_blob_sha1": "7885ecf337fdc7aadb70a790a369ec1f6401d4d0"
+      },
+      "exit_code": 0,
+      "tap": {
+        "tests": 3,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 3688.97694
+      },
+      "terminal_tap_complete": true
+    },
+    {
+      "stage": "final_frozen_four_file_source",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap lib/live/channel.test.ts scripts/use-live-lists.live.test.tsx",
+      "cwd": "/workspace/scratch/812e3b7d6d45/Mikka",
+      "stdout": {
+        "path": "live-provenance-final-regression.tap",
+        "bytes": 26780,
+        "sha256": "ab93351efb5055fd31899282530abb7ed4a6a1af2821b4a2979295653a901151",
+        "git_blob_sha1": "95f1bf7ea147fce202a0a726825e4df0d69f8b15"
+      },
+      "exit_code": null,
+      "tap": {
+        "tests": 106,
+        "pass": 106,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 109882.14509
+      },
+      "terminal_tap_complete": true,
+      "exit_code_note": "The terminal TAP summary is complete (106 passed, zero failed/cancelled/skipped). The already-finished exec session was no longer available after context recovery, so its raw OS exit code is not reconstructed or invented."
+    },
+    {
+      "stage": "initial_provenance_coverage_fix",
+      "command": "./node_modules/.bin/oxlint --deny-warnings lib/swr/read-observer.ts lib/live/channel.ts lib/live/channel.test.ts scripts/use-live-lists.live.test.tsx",
+      "cwd": "/workspace/scratch/812e3b7d6d45/Mikka",
+      "stdout": {
+        "path": "live-provenance-oxlint.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "git_blob_sha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      "exit_code": 0
+    },
+    {
+      "stage": "final_frozen_four_file_source",
+      "command": "./node_modules/.bin/oxlint --deny-warnings lib/swr/read-observer.ts lib/live/channel.ts lib/live/channel.test.ts scripts/use-live-lists.live.test.tsx",
+      "cwd": "/workspace/scratch/812e3b7d6d45/Mikka",
+      "stdout": {
+        "path": "live-provenance-final-oxlint.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "git_blob_sha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      "exit_code": 0
+    },
+    {
+      "stage": "final_frozen_four_file_source",
+      "command": "git diff --check -- lib/swr/read-observer.ts lib/live/channel.ts lib/live/channel.test.ts scripts/use-live-lists.live.test.tsx",
+      "exit_code": 0,
+      "stdout_bytes": 0
+    }
+  ],
+  "verification_boundaries": {
+    "four_file_136_result": "Stage evidence before the additional active held-revision guard. Final affected channel and real-SWR suites were rerun: 106/106. Unchanged notification lifetime and persistent-cache suites were not repeated.",
+    "canonical_types": "Deferred to root for sequential root/API/frontend/renderer canonical checks under the shared memory limit. No additional typecheck was started by this agent.",
+    "actual_native_query_comparison": "Still pending a new real native run; prior 196 Native versus 173 Web remains a failed comparison. These CPU-only regressions do not establish any SQL count saving or production acceptance.",
+    "prior_report": {
+      "path": "evidence/desktop-1f548/lifecycle.json",
+      "bytes": 171073,
+      "sha256": "df182491760f1288fc55d55293e3965a2905d2535dd50cb41b94b988992872c1",
+      "git_blob_sha1": "536d1e166bcee4b32f8ee922ac25e12d2cf39532"
+    },
+    "remote_or_resource_actions": false,
+    "git_stage_commit_push": false
+  }
+}

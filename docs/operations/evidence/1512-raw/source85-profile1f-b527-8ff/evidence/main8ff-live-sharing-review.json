@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-07T12:55:08.145388+00:00",
+  "scope": "main_8ff_1637_with_1512_live_read_sharing_static_review_and_minimal_test_fixture_fix",
+  "upstream": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+  "liveSourceCommit": "85a2b0440e7793c2b5b16c039f2d2329b7b39f79",
+  "localHeadAtCheck": "b84707b292152426cd90a9cf5bc3f4fe129a453e",
+  "integrationState": "8ff ordinary merge pending root commit; existing unrelated SQL edit not owned by this agent",
+  "sourceEdit": {
+    "path": "tests/read-retry-toasts.test.tsx",
+    "bytes": 18186,
+    "sha256": "b7565ff7c57add54d7bab032b2a9fa442694b6e799b4e707ba3e35e406f6db55",
+    "gitBlobSha1": "6ea446c8906fcfb0c08f7b07412eb010507568e0"
+  },
+  "onlyEdits": "Add bootstrapScope workspace export and a readAuthentication export that rejects unexpected auth-only reads in the new upstream full mocks. Reverse replacement byte-equals exact upstream file. Original Sonner/retained-node/read-count/no-network assertions unchanged.",
+  "review": [
+    {
+      "result": "compatible",
+      "topic": "retry",
+      "evidence": "Each action calls preventDefault then the same mutate/reload. Sonner retains the recovery action after failure; a successful read dismisses it. SWR keys, invalidation, and fetch semantics unchanged."
+    },
+    {
+      "result": "compatible",
+      "topic": "provider_mounting",
+      "evidence": "ComputerAgentsProvider and BrowserNotesProvider hold React state only. Their common ancestor position preserves notes/registry across the distinct Settings frame, without moving LiveProvider or AuthenticatedReadCache."
+    },
+    {
+      "result": "compatible",
+      "topic": "owner_workspace_fences",
+      "evidence": "AuthenticatedReadCache keys owner/workspace/build/role, retires cache generations, and renderer AccountCache remains keyed by owner. New upstream hosted settings regression exercises owner/workspace state retirement."
+    },
+    {
+      "result": "compatible",
+      "topic": "ready_coverage",
+      "evidence": "read-observer and channel match exact 85 frozen hashes. Ready/presence acknowledgement barrier, current cache object identity, no-error condition, push barrier and reconnect invalidation remain unchanged. UI retries do not manufacture accepted reads; failed reads do not certify coverage."
+    },
+    {
+      "result": "fixed",
+      "topic": "mock_export_blocker",
+      "evidence": "Real original 8/8 hook failure lacked bootstrapScope. Matching both imported mock exports makes 8/8 real React/SWR/Sonner cases pass; auth-only stub is not exercised."
+    }
+  ],
+  "verification": {
+    "red": {
+      "exitCode": 1,
+      "tests": 8,
+      "pass": 0,
+      "fail": 8,
+      "category": "SyntaxError missing mikka:platform bootstrapScope export"
+    },
+    "green": {
+      "exitCode": 0,
+      "tests": 8,
+      "pass": 8,
+      "fail": 0
+    },
+    "continuity": {
+      "exitCode": 0,
+      "tests": 43,
+      "pass": 43,
+      "fail": 0,
+      "files": [
+        "components/workspace/issue-workspace-settings.test.tsx",
+        "components/artifacts/artifact-library.test.tsx",
+        "components/artifacts/artifact-viewer-continuity.test.tsx",
+        "components/workspace/group-chat-continuity.test.tsx"
+      ]
+    },
+    "baseCommand": [
+      "node",
+      "--experimental-test-module-mocks",
+      "--import",
+      "./scripts/server-test.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "--test-reporter=tap"
+    ],
+    "lintExitCode": 0,
+    "diffcheckExitCode": 0,
+    "canonicalTypes": "not rerun by reviewer; root owns integration typechecks"
+  },
+  "limits": {
+    "nativePerformance": "not remeasured; prior login 196 > 173 remains unmet",
+    "liveTransportInNewToastsTest": "mocked; does not replace the separate real SWR/Live 85 regression",
+    "productionAcceptance": null,
+    "remoteMutations": false,
+    "modelOrProviderInvocations": 0,
+    "resourcesCreated": 0,
+    "stageOrCommitByReviewer": false
+  },
+  "reviewedSource": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "bytes": 4604,
+      "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463",
+      "gitBlobSha1": "cb23eb39ddc29e746c437bf259ffc1db3ad08436"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "bytes": 23821,
+      "sha256": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b",
+      "gitBlobSha1": "2f462c3080b1a561c194c0ee8c7633a21f2c5fa5"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+      "gitBlobSha1": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f"
+    },
+    {
+      "path": "components/authenticated-read-cache.tsx",
+      "bytes": 4071,
+      "sha256": "8a37c05d9473e5fc47f7f0b1188122e1aa014902841fc4e0575e2b55a94d3d48",
+      "gitBlobSha1": "15a6b6a7aa5db70955d2a5cf4072fadfd6f41700"
+    },
+    {
+      "path": "components/browser/browser-notes.tsx",
+      "bytes": 4087,
+      "sha256": "d12368b0ff9345e0f3b503f1fd0c923410784e6e9c577e1ab9a5d6004a2fa0bc",
+      "gitBlobSha1": "956d254b924f86058e298d9a3546789ab8faa5a7"
+    },
+    {
+      "path": "components/computer/computer-agents.tsx",
+      "bytes": 3490,
+      "sha256": "53655efe96907d37890779ff27b0d1fd469deab65187d9c7082c5000a55b3bfa",
+      "gitBlobSha1": "176cd10ead34ef1a5ec8d7374c035a4cfae59624"
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "bytes": 52839,
+      "sha256": "311a0001a8fe8405e19871b0160f1f02afbf0660c20afc144cb6cbc02c646c26",
+      "gitBlobSha1": "083e26f8f997b5ab7a237ee9f29d223bf8f88b59"
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "bytes": 13984,
+      "sha256": "f95db2def2a0926857782ce2f68032d0a1dc708d0e2f629595b8d5885600d3e1",
+      "gitBlobSha1": "b1959fb58fd36901cea130f947bbe7199d82f127"
+    }
+  ],
+  "rawOutputs": [
+    {
+      "path": "main8ff-read-retry-red.tap",
+      "bytes": 7456,
+      "sha256": "b895d34428d98996093eea4fde52482de2243a9d8afa8f3787459904261ac7ad",
+      "gitBlobSha1": "1f0e4b897f650e95408251b42dcd8b3ece5edbef"
+    },
+    {
+      "path": "main8ff-read-retry-green.tap",
+      "bytes": 2282,
+      "sha256": "eb6b16f47b73d9a7c19d21de41cffb16ecd3a5112f073f34ac18b2515a2ddb50",
+      "gitBlobSha1": "0062ae68c3a201d8d7765f7c0160e7c0905dbad6"
+    },
+    {
+      "path": "main8ff-continuity-focused.tap",
+      "bytes": 12875,
+      "sha256": "c89f6827012677d28b9b06bfb5e97baaed084ac5fd1c7fe36e044ab61401ff40",
+      "gitBlobSha1": "f4e8d7b06e9925c768f06f012565b4e66996103e"
+    },
+    {
+      "path": "main8ff-read-retry-lint.log",
+      "bytes": 194,
+      "sha256": "e154833caa93fa231482a04cc4b6ab11dd174cd1b4885056f347f22c3d6aea7f",
+      "gitBlobSha1": "d1466648297234a8045107053f0934b919b1d5e5"
+    },
+    {
+      "path": "main8ff-read-retry-diffcheck.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ]
+}

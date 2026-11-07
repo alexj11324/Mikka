@@ -1,0 +1,295 @@
+TAP version 13
+# Subtest: unknown transport can have independently verified stable database identity enumeration without claiming upstream completion
+not ok 1 - unknown transport can have independently verified stable database identity enumeration without claiming upstream completion
+  ---
+  duration_ms: 14.36313
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/ops1512/reconcile-production-evidence.test.mjs:77:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + [
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'before',
+    +     table: 'lookup_trace_by_ids'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'before',
+    +     table: 'span_timeline',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'before',
+    +     table: 'trace_integrity',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'before',
+    +     table: 'generation_receipts',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'before',
+    +     table: 'safe_native_logs',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'before',
+    +     table: 'capture_summary',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'before',
+    +     table: 'apm_generation_spans',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'before',
+    +     table: 'ai_capture_summary',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'before',
+    +     table: 'native_generation_collection',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'after',
+    +     table: 'lookup_trace_by_ids'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'after',
+    +     table: 'span_timeline',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'after',
+    +     table: 'trace_integrity',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'after',
+    +     table: 'generation_receipts',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'after',
+    +     table: 'safe_native_logs',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'after',
+    +     table: 'capture_summary',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'after',
+    +     table: 'apm_generation_spans',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'after',
+    +     table: 'ai_capture_summary',
+    +     traceId: '00000000000000000000000000000001'
+    +   },
+    +   {
+    +     code: 'page_truncated_or_unknown',
+    +     page: 0,
+    +     snapshot: 'after',
+    +     table: 'native_generation_collection',
+    +     traceId: '00000000000000000000000000000001'
+    +   }
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'before'
+      table: 'lookup_trace_by_ids'
+      page: 0
+    1:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'before'
+      traceId: '00000000000000000000000000000001'
+      table: 'span_timeline'
+      page: 0
+    2:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'before'
+      traceId: '00000000000000000000000000000001'
+      table: 'trace_integrity'
+      page: 0
+    3:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'before'
+      traceId: '00000000000000000000000000000001'
+      table: 'generation_receipts'
+      page: 0
+    4:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'before'
+      traceId: '00000000000000000000000000000001'
+      table: 'safe_native_logs'
+      page: 0
+    5:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'before'
+      traceId: '00000000000000000000000000000001'
+      table: 'capture_summary'
+      page: 0
+    6:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'before'
+      traceId: '00000000000000000000000000000001'
+      table: 'apm_generation_spans'
+      page: 0
+    7:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'before'
+      traceId: '00000000000000000000000000000001'
+      table: 'ai_capture_summary'
+      page: 0
+    8:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'before'
+      traceId: '00000000000000000000000000000001'
+      table: 'native_generation_collection'
+      page: 0
+    9:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'after'
+      table: 'lookup_trace_by_ids'
+      page: 0
+    10:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'after'
+      traceId: '00000000000000000000000000000001'
+      table: 'span_timeline'
+      page: 0
+    11:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'after'
+      traceId: '00000000000000000000000000000001'
+      table: 'trace_integrity'
+      page: 0
+    12:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'after'
+      traceId: '00000000000000000000000000000001'
+      table: 'generation_receipts'
+      page: 0
+    13:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'after'
+      traceId: '00000000000000000000000000000001'
+      table: 'safe_native_logs'
+      page: 0
+    14:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'after'
+      traceId: '00000000000000000000000000000001'
+      table: 'capture_summary'
+      page: 0
+    15:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'after'
+      traceId: '00000000000000000000000000000001'
+      table: 'apm_generation_spans'
+      page: 0
+    16:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'after'
+      traceId: '00000000000000000000000000000001'
+      table: 'ai_capture_summary'
+      page: 0
+    17:
+      code: 'page_truncated_or_unknown'
+      snapshot: 'after'
+      traceId: '00000000000000000000000000000001'
+      table: 'native_generation_collection'
+      page: 0
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/reconcile-production-evidence.test.mjs:81:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.start (node:internal/test_runner/test:1262:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+  ...
+# Subtest: stable missing second trace is rejected by the independent lookup count even when both short pages and supplied traces agree
+not ok 2 - stable missing second trace is rejected by the independent lookup count even when both short pages and supplied traces agree
+  ---
+  duration_ms: 2.216588
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/ops1512/reconcile-production-evidence.test.mjs:91:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'sets_consistent'
+    - 'incomplete'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'incomplete'
+  actual: 'sets_consistent'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/reconcile-production-evidence.test.mjs:98:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 128.131812

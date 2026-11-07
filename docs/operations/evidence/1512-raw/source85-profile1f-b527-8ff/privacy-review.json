@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T13:01:14.927984+00:00",
+  "scope": "original bytes selected for this evidence preparation",
+  "scannedOriginalFiles": 76,
+  "scannedOriginalBytes": 582673,
+  "checks": [
+    "UTF-8 validation and JSON parsing for JSON files",
+    "email, credential prefix, Bearer literal, private key, signed URL and URL userinfo patterns",
+    "recursive nonempty JSON credential keys",
+    "manual review of privacy fixture call sites, loopback workflow credential scope and metadata-only diagnostic sources",
+    "exact byte/SHA256/Git blob validation against frozen receipts"
+  ],
+  "patternFindings": 4,
+  "intentionalSyntheticExceptions": [
+    {
+      "path": "normalize-posthog-metadata.test.mjs",
+      "kind": "email",
+      "line": 168,
+      "matchSha256": "9dc98d058b1d6f4688703fdded7387b1851cddf5e946b37e324c029fc811905f",
+      "length": 22,
+      "classification": "intentional_synthetic_fixture",
+      "basis": "Literal negative-test input in the metadata projection privacy test. Reserved .invalid email or credential-shaped alphabetic canary is supplied only to the local normalizer, and the test requires error output not to contain it."
+    },
+    {
+      "path": "normalize-posthog-metadata.test.mjs",
+      "kind": "credential_prefix",
+      "line": 168,
+      "matchSha256": "81bbafe09f37420a1d57e0d63acf3917b250024f7db611ef0d10bab94a2b9b7c",
+      "length": 17,
+      "classification": "intentional_synthetic_fixture",
+      "basis": "Literal negative-test input in the metadata projection privacy test. Reserved .invalid email or credential-shaped alphabetic canary is supplied only to the local normalizer, and the test requires error output not to contain it."
+    },
+    {
+      "path": "reconcile-production-evidence.test.mjs",
+      "kind": "email",
+      "line": 287,
+      "matchSha256": "92160a4e3b08ffce26e7ef9b1e8ccce892455aeba96f64e0a8b4a804936f9624",
+      "length": 38,
+      "classification": "intentional_synthetic_fixture",
+      "basis": "Reserved .invalid domain literal in an offline privacy rejection test; not an observed account address."
+    },
+    {
+      "path": "sql-profile-1f548/workflow.yml",
+      "kind": "url_userinfo",
+      "line": 72,
+      "matchSha256": "1627a13bbad59f3289581952542d47681068b03332d512bee253f2d9950493b2",
+      "length": 32,
+      "classification": "intentional_synthetic_fixture",
+      "basis": "Fixed synthetic e2e credential for the fresh job-local PostgreSQL 17 service on 127.0.0.1:5432/mikka_e2e. It grants no production or external access."
+    }
+  ],
+  "nonFixtureSensitiveMatches": 0,
+  "nonemptyOperationalCredentialKeys": 0,
+  "originalBytesPreserved": true,
+  "redactionPerformed": false,
+  "rawPrivateCiLogsIncluded": false,
+  "arbitraryApiOrModelPayloadsIncluded": false,
+  "signedDownloadUrlsIncluded": false,
+  "binaryArchivesOrScreenshotsIncluded": false,
+  "boundary": "The only credential-like literals are the documented offline test fixtures and the isolated workflow database fixture. No production acceptance or comprehensive external data audit is inferred from this local review.",
+  "operationalAccountCookiesTokensOrEmailValuesIncluded": false
+}

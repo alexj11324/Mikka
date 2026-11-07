@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-07T12:29:51.115285+00:00",
+  "sourceEvidenceCommit": "01afbc767b6ae243aab9298f91add2e92c82a607",
+  "purpose": "Exact immutable v1 history before independently counted lookup enumeration change",
+  "files": [
+    {
+      "path": "production-evidence-query-templates.json",
+      "bytes": 56861,
+      "sha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+      "gitBlobSha1": "0b0f0f4c3eb129e90cf2f357762001e630103705"
+    },
+    {
+      "path": "normalize-posthog-metadata.mjs",
+      "bytes": 19782,
+      "sha256": "b74fa507a7fe545a7926f32c3cead14eef6490160fa64d932bd330dbd0853be0",
+      "gitBlobSha1": "f4c1e06fe0d789b226d55cdb66716208d0f9e3e6"
+    },
+    {
+      "path": "normalize-posthog-metadata.test.mjs",
+      "bytes": 14795,
+      "sha256": "8358b58661438bd572f6c910c0e7c597679bb6079da5997053600ca709b32e17",
+      "gitBlobSha1": "75de4ab47d049dd0001546cf035b1d57c5ab610c"
+    },
+    {
+      "path": "normalize-posthog-metadata.md",
+      "bytes": 7470,
+      "sha256": "57eff1e19820e0e98df639fe1806d0c3c31acb61b1b6ac6e0d946d15304ca8f1",
+      "gitBlobSha1": "8f816ec9a8c4486676a5fe980e507a5668d1de1d"
+    },
+    {
+      "path": "reconcile-production-evidence.mjs",
+      "bytes": 26617,
+      "sha256": "86aace9b34cfe0d0465c43fe7fa56032d88acb9b45a11c96c8e5fc83422ef44f",
+      "gitBlobSha1": "c3a95c49b89c9f2d3575f0faedae08de159f31d5"
+    },
+    {
+      "path": "reconcile-production-evidence.test.mjs",
+      "bytes": 15455,
+      "sha256": "b37ef6bef27632ec022d1a40c9b5afd8e383dc6c0dae5cd42cf53f56c591b68f",
+      "gitBlobSha1": "196dcedcdc53538321573a15d9cf91390301c443"
+    },
+    {
+      "path": "reconcile-production-evidence.md",
+      "bytes": 6663,
+      "sha256": "aebc35e46e4f7a38d7db943e746b5b0b7cc04e6787c5ad5a3535d7ce7377f4fb",
+      "gitBlobSha1": "9ba28ac106a9b1e543d34d388921debefb3e57fb"
+    }
+  ],
+  "originalQueryHashes": {
+    "lookup_trace_by_ids": "9508fdb7327e3688a12377021e821bf7d6dbd3acb85ef956207091d3136d8fdb",
+    "span_timeline": "ea6a0f5e5a26dc82e9d44e2cf7707e316b89169265f49d52f79e871083c5d2b3",
+    "trace_integrity": "f925cc10817c9903888b5d014d049bd70fa79aa29de29db259aaad0dd8a4036e",
+    "generation_receipts": "621c07e4b85df37f0793f4dce6786c5447a8612d9b9f120f6129b093dcc206a5",
+    "tail_error_retention": "93cadd4c63825a6c291f53e857a28de50695311137f0e533589415c80c70f727",
+    "safe_native_logs": "8008fa8570622dd8a11d26968fd72f0392fab91521dc774ed432e8de5efde394",
+    "source_correlation": "a460dfed6c168ab732064df0ab1a9cc1fdadbf64077eee81a75bd632cf4fa8b3",
+    "replay_correlation": "07cbb3f5c660377a577aafd882d3e64436fd61d907656643bbf21a1b82b36304",
+    "capture_summary": "9b7d18e1e1596aef96ab253706b32d81ea25a89f9a74299b36e3c9d7522639e9",
+    "apm_generation_spans": "1d43fcc835476f143ba6c51c390a8cfbc5c522fc9a0c8184374046ec76050b40",
+    "ai_capture_summary": "d0f778fb375bdebc0de8643d79f74d2a17ba9125581409be58c55645afaf47ec",
+    "apm_session_links": "6ac78767b11634edf38640c61fd37f5f34d393bcf44adbab9ea0cf109ffa1edb",
+    "native_generation_collection": "8de7a9e941869dc778ab5dd9bc61ac9a0484626d8d2e08518a2bbd17fc08bde4"
+  }
+}

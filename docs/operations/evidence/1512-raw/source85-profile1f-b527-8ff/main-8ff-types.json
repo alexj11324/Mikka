@@ -1,0 +1,70 @@
+{
+  "sourceParent": "b84707b292152426cd90a9cf5bc3f4fe129a453e",
+  "mergeHead": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+  "checks": [
+    {
+      "name": "root",
+      "command": [
+        "node",
+        "node_modules/tsrs/bin/tsrs",
+        "--noEmit"
+      ],
+      "startedAt": "2026-11-07T12:52:52.851792+00:00",
+      "finishedAt": "2026-11-07T12:52:56.843722+00:00",
+      "exitCode": 0,
+      "log": "/workspace/scratch/812e3b7d6d45/ops1512/main-8ff-types-root.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "api",
+      "command": [
+        "node",
+        "node_modules/tsrs/bin/tsrs",
+        "--noEmit",
+        "-p",
+        "apps/api/tsconfig.json"
+      ],
+      "startedAt": "2026-11-07T12:52:56.848186+00:00",
+      "finishedAt": "2026-11-07T12:52:58.424369+00:00",
+      "exitCode": 0,
+      "log": "/workspace/scratch/812e3b7d6d45/ops1512/main-8ff-types-api.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "frontend",
+      "command": [
+        "node",
+        "--max-old-space-size=4096",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "apps/frontend/tsconfig.json"
+      ],
+      "startedAt": "2026-11-07T12:52:58.428458+00:00",
+      "finishedAt": "2026-11-07T12:53:31.997569+00:00",
+      "exitCode": 0,
+      "log": "/workspace/scratch/812e3b7d6d45/ops1512/main-8ff-types-frontend.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "renderer",
+      "command": [
+        "node",
+        "--max-old-space-size=4096",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "apps/desktop/tsconfig.renderer.json"
+      ],
+      "startedAt": "2026-11-07T12:53:32.003972+00:00",
+      "finishedAt": "2026-11-07T12:54:08.722639+00:00",
+      "exitCode": 0,
+      "log": "/workspace/scratch/812e3b7d6d45/ops1512/main-8ff-types-renderer.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

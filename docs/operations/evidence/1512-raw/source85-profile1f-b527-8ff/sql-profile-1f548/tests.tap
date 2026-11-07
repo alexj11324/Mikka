@@ -1,0 +1,15 @@
+✔ the measured synthetic source is distinct from the PR head tree (1.088233ms)
+✔ CLI rejects incomplete, duplicated or unknown paths before any work (0.630442ms)
+✔ owner-wide reads require the actual personal home, never the selected team (0.589229ms)
+✔ thread sync uses returned positions and refuses a changed or unproved cursor (1.065719ms)
+✔ chat uses the normal null selector and only its returned continuation (0.484521ms)
+✔ the one batch preserves each measured argument and order without a mutation (0.277149ms)
+✔ safe read receipts contain no body, owner, workspace, fixture ID or cursor (0.360635ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 111.249736

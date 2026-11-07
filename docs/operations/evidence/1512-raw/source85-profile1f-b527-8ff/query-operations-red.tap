@@ -1,0 +1,95 @@
+✖ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (247.371838ms)
+✖ operation SQL counts partition the original full window without removing unknown or background work (2.465224ms)
+✖ operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories (0.510771ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 329.51695
+
+✖ failing tests:
+
+test at apps/desktop/test/db-metrics.test.mjs:155:3
+✖ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (247.371838ms)
+  Error: Command failed: /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node /tmp/mikka-pg-binding-2OHBfL/probe.cjs /tmp/mikka-pg-binding-2OHBfL /workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.cjs nitro cjs {"instrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation-pg@0.76.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+sdk-trace-node@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}
+  TypeError: Cannot read properties of undefined (reading '/actions/coordinator/poll')
+      at /tmp/mikka-pg-binding-2OHBfL/probe.cjs:98:42
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+  
+      at genericNodeError (node:internal/errors:986:15)
+      at wrappedFn (node:internal/errors:540:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:28)
+      at maybeClose (node:internal/child_process:1172:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:335:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: '/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node /tmp/mikka-pg-binding-2OHBfL/probe.cjs /tmp/mikka-pg-binding-2OHBfL /workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.cjs nitro cjs {"instrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation-pg@0.76.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+sdk-trace-node@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}',
+    stdout: '',
+    stderr: "TypeError: Cannot read properties of undefined (reading '/actions/coordinator/poll')\n    at /tmp/mikka-pg-binding-2OHBfL/probe.cjs:98:42\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n"
+  }
+
+test at apps/desktop/test/db-metrics.test.mjs:207:1
+✖ operation SQL counts partition the original full window without removing unknown or background work (2.465224ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   '/actions/coordinator/chat': 0,
+  -   '/actions/coordinator/poll': 0,
+  -   '/actions/coordinator/summaries': 0,
+  -   '/actions/issues/poll': 0,
+  -   '/actions/projects/list': 0,
+  -   '/actions/task-runs/read': 0,
+  -   '/actions/threads/poll': 2,
+  -   '/api/auth/[...all]': 0,
+  -   '/api/desktop/begin': 0,
+  -   '/api/desktop/exchange': 0,
+  -   '/api/desktop/return': 0,
+  -   '/api/desktop/rpc': 0,
+  -   '/api/live/ticket': 1,
+  -   '/api/rpc': 0,
+  -   '/api/workspace': 0,
+  -   '/api/workspace/switcher': 0,
+  -   unattributed: 2
+  - }
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.test.mjs:213:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at node:internal/test_runner/test:1305:31
+      at node:internal/process/task_queues:151:7
+      at AsyncResource.runInAsyncScope (node:async_hooks:227:14)
+      at AsyncResource.runMicrotask (node:internal/process/task_queues:148:8) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { '/api/auth/[...all]': 0, '/api/desktop/begin': 0, '/api/desktop/return': 0, '/api/desktop/exchange': 0, '/api/desktop/rpc': 0, '/api/rpc': 0, '/api/workspace': 0, '/api/workspace/switcher': 0, '/api/live/ticket': 1, '/actions/coordinator/chat': 0, '/actions/coordinator/poll': 0, '/actions/coordinator/summaries': 0, '/actions/threads/poll': 2, '/actions/task-runs/read': 0, '/actions/issues/poll': 0, '/actions/projects/list': 0, unattributed: 2 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/db-metrics.test.mjs:218:1
+✖ operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories (0.510771ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.test.mjs:224:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /LIFECYCLE_QUERY_COUNTER_SNAPSHOT_INVALID/,
+    operator: 'throws',
+    diff: 'simple'
+  }

@@ -1,0 +1,713 @@
+
+ RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/Mikka/packages/daemon
+
+ ❯ test/subscription-hosted-runner.test.ts (44 tests | 44 failed) 862ms
+   × prepares the hosted Claude with its initial claim lease before checkout, then uses the final normal HOME and cwd with zero credential RPC 36ms
+   × cancels an actually parked hosted Claude before any final options exist 31ms
+   × retains the hosted account-source refusal after a successful prewarm claim with no prompt or fallback 20ms
+   × codex collects CLI timing only for an explicit diagnostic opt-in (default) 21ms
+   × codex collects CLI timing only for an explicit diagnostic opt-in (acceptance_host) 17ms
+   × codex collects CLI timing only for an explicit diagnostic opt-in (repository) 16ms
+   × claude_code collects CLI timing only for an explicit diagnostic opt-in (default) 19ms
+   × claude_code collects CLI timing only for an explicit diagnostic opt-in (acceptance_host) 21ms
+   × claude_code collects CLI timing only for an explicit diagnostic opt-in (repository) 22ms
+   × Codex clears inherited compression only with timing enabled (true) 22ms
+   × Codex clears inherited compression only with timing enabled (false) 17ms
+   × codex consumes claim credentials and uses ordinary HOME/env/Git without any Mikka auth or proxy request 17ms
+   × claude_code consumes claim credentials and uses ordinary HOME/env/Git without any Mikka auth or proxy request 20ms
+   × codex uses a delivered GitHub credential even when MCP was unavailable 18ms
+   × claude_code uses a delivered GitHub credential even when MCP was unavailable 21ms
+   × codex passes the actual model key and provider address directly to its CLI 26ms
+   × claude_code passes the actual model key and provider address directly to its CLI 17ms
+   × codex starts an owned desktop with subscription credentials without changing the credential owner 20ms
+   × claude_code starts an owned desktop with subscription credentials without changing the credential owner 21ms
+   × codex starts an owned desktop with api_key credentials without changing the credential owner 26ms
+   × claude_code starts an owned desktop with api_key credentials without changing the credential owner 17ms
+   × codex refuses a shared-subscription desktop before CLI startup when its broker is missing 19ms
+   × claude_code refuses a shared-subscription desktop before CLI startup when its broker is missing 15ms
+   × codex stops its actual CLI immediately after a local pushed stop 17ms
+   × claude_code stops its actual CLI immediately after a local pushed stop 16ms
+   × refuses route before any CLI receives the prompt 18ms
+   × refuses model before any CLI receives the prompt 17ms
+   × refuses expired before any CLI receives the prompt 17ms
+   × refuses stopped before any CLI receives the prompt 19ms
+   × does not send a prompt when the real native account guard refuses API-key mode 18ms
+   × honors the installed official CLI model report before spawning 17ms
+   × Claude admits its exact prepared catalogue model with a missing CLI report and no remote check 16ms
+   × Claude admits its exact prepared catalogue model with a shortcuts CLI report and no remote check 16ms
+   × Claude admits its exact prepared catalogue model with a failed CLI report and no remote check 16ms
+   × catalogue evidence cannot admit codex outside the selected model and Claude route 36ms
+   × catalogue evidence cannot admit different-model outside the selected model and Claude route 25ms
+   × retains local codex computer policy ask without server authorization 16ms
+   × retains local codex computer policy allow without server authorization 17ms
+   × retains local codex computer policy deny without server authorization 18ms
+   × retains local claude_code computer policy ask without server authorization 16ms
+   × retains local claude_code computer policy allow without server authorization 15ms
+   × retains local claude_code computer policy deny without server authorization 16ms
+   × advertises hosted execution only with the installed local gate factory: true 18ms
+   × advertises hosted execution only with the installed local gate factory: false 16ms
+ ❯ test/provider-failure-runs.test.ts (19 tests | 19 failed) 448ms
+   × reports balance separately and keeps even an empty worktree for continuation 50ms
+   × reports auth separately and keeps even an empty worktree for continuation 28ms
+   × reports unavailable separately and keeps even an empty worktree for continuation 26ms
+   × prefers the explicit provider receipt while preserving a quota reset 20ms
+   × does not infer provider failure from ordinary error text or agent reports 19ms
+   × does not infer provider failure from ordinary error text or agent reports 20ms
+   × does not infer provider failure from ordinary error text or agent reports 18ms
+   × keeps cancellation authoritative over a provider event 24ms
+   × drops provider metadata when cancellation arrives while the terminal report is collected 25ms
+   × retains a typed provider startup refusal through a hosted error wrapper 25ms
+   × does not classify a generic startup exception carrying an HTTP status 20ms
+   × confirms an empty first-request snapshot before publishing provider_failure 30ms
+   × confirms an empty first-request snapshot before publishing quota_exhausted 22ms
+   × marks a failed final upload unavailable and continues only with the retained original worktree 20ms
+   × waits for an in-flight heartbeat before saving the final tree 23ms
+   × keeps repeated cancellation authoritative while the provider_failure checkpoint is uploading 20ms
+   × keeps repeated cancellation authoritative while the quota_exhausted checkpoint is uploading 18ms
+   × cannot claim a ready checkpoint when startup has not prepared a worktree 19ms
+   × records an accepted oversize marker as unavailable instead of recoverable 19ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 63 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/provider-failure-runs.test.ts > reports balance separately and keeps even an empty worktree for continuation
+Error: listen EPERM: operation not permitted /tmp/orvd-7qhxDb/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:79:53
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > reports auth separately and keeps even an empty worktree for continuation
+Error: listen EPERM: operation not permitted /tmp/orvd-z0WF4M/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:79:53
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > reports unavailable separately and keeps even an empty worktree for continuation
+Error: listen EPERM: operation not permitted /tmp/orvd-9dNUJs/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:79:53
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > prefers the explicit provider receipt while preserving a quota reset
+Error: listen EPERM: operation not permitted /tmp/orvd-icRTWV/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:88:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > does not infer provider failure from ordinary error text or agent reports
+Error: listen EPERM: operation not permitted /tmp/orvd-fwv2u8/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:97:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > does not infer provider failure from ordinary error text or agent reports
+Error: listen EPERM: operation not permitted /tmp/orvd-LUd79n/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:97:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > does not infer provider failure from ordinary error text or agent reports
+Error: listen EPERM: operation not permitted /tmp/orvd-CL7FXk/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:97:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > keeps cancellation authoritative over a provider event
+Error: listen EPERM: operation not permitted /tmp/orvd-Y8ChuO/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:104:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > drops provider metadata when cancellation arrives while the terminal report is collected
+Error: listen EPERM: operation not permitted /tmp/orvd-3Bt6DD/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:117:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > retains a typed provider startup refusal through a hosted error wrapper
+Error: listen EPERM: operation not permitted /tmp/orvd-I3udjE/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:131:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > does not classify a generic startup exception carrying an HTTP status
+Error: listen EPERM: operation not permitted /tmp/orvd-nMW9wl/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:137:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > confirms an empty first-request snapshot before publishing provider_failure
+Error: listen EPERM: operation not permitted /tmp/orvd-GUVFFb/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:146:38
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > confirms an empty first-request snapshot before publishing quota_exhausted
+Error: listen EPERM: operation not permitted /tmp/orvd-WhzV7G/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:146:38
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > marks a failed final upload unavailable and continues only with the retained original worktree
+Error: listen EPERM: operation not permitted /tmp/orvd-ytBJCX/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:184:73
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > waits for an in-flight heartbeat before saving the final tree
+Error: listen EPERM: operation not permitted /tmp/orvd-jbpHe6/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:222:38
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > keeps repeated cancellation authoritative while the provider_failure checkpoint is uploading
+Error: listen EPERM: operation not permitted /tmp/orvd-eFQ3CD/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:261:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > keeps repeated cancellation authoritative while the quota_exhausted checkpoint is uploading
+Error: listen EPERM: operation not permitted /tmp/orvd-DIKQXx/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:261:26
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > cannot claim a ready checkpoint when startup has not prepared a worktree
+Error: listen EPERM: operation not permitted /tmp/orvd-rYA5H5/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:281:38
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/63]⎯
+
+ FAIL  test/provider-failure-runs.test.ts > records an accepted oversize marker as unavailable instead of recoverable
+Error: listen EPERM: operation not permitted /tmp/orvd-57pNT9/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:618:20
+ ❯ Daemon.start src/main.ts:322:14
+ ❯ run test/provider-failure-runs.test.ts:39:18
+ ❯ test/provider-failure-runs.test.ts:288:38
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > prepares the hosted Claude with its initial claim lease before checkout, then uses the final normal HOME and cwd with zero credential RPC
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:51:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > cancels an actually parked hosted Claude before any final options exist
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:67:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > retains the hosted account-source refusal after a successful prewarm claim with no prompt or fallback
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:79:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > codex collects CLI timing only for an explicit diagnostic opt-in (default)
+ FAIL  test/subscription-hosted-runner.test.ts > codex collects CLI timing only for an explicit diagnostic opt-in (acceptance_host)
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code collects CLI timing only for an explicit diagnostic opt-in (default)
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code collects CLI timing only for an explicit diagnostic opt-in (acceptance_host)
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code collects CLI timing only for an explicit diagnostic opt-in (repository)
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:91:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > codex collects CLI timing only for an explicit diagnostic opt-in (repository)
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:91:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > Codex clears inherited compression only with timing enabled (true)
+ FAIL  test/subscription-hosted-runner.test.ts > Codex clears inherited compression only with timing enabled (false)
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:115:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > codex consumes claim credentials and uses ordinary HOME/env/Git without any Mikka auth or proxy request
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code consumes claim credentials and uses ordinary HOME/env/Git without any Mikka auth or proxy request
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:130:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > codex uses a delivered GitHub credential even when MCP was unavailable
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code uses a delivered GitHub credential even when MCP was unavailable
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:153:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > codex passes the actual model key and provider address directly to its CLI
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code passes the actual model key and provider address directly to its CLI
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:168:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > codex starts an owned desktop with subscription credentials without changing the credential owner
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code starts an owned desktop with subscription credentials without changing the credential owner
+ FAIL  test/subscription-hosted-runner.test.ts > codex starts an owned desktop with api_key credentials without changing the credential owner
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code starts an owned desktop with api_key credentials without changing the credential owner
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:182:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > codex refuses a shared-subscription desktop before CLI startup when its broker is missing
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code refuses a shared-subscription desktop before CLI startup when its broker is missing
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:224:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > codex stops its actual CLI immediately after a local pushed stop
+ FAIL  test/subscription-hosted-runner.test.ts > claude_code stops its actual CLI immediately after a local pushed stop
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:236:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > refuses route before any CLI receives the prompt
+ FAIL  test/subscription-hosted-runner.test.ts > refuses model before any CLI receives the prompt
+ FAIL  test/subscription-hosted-runner.test.ts > refuses expired before any CLI receives the prompt
+ FAIL  test/subscription-hosted-runner.test.ts > refuses stopped before any CLI receives the prompt
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:251:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > does not send a prompt when the real native account guard refuses API-key mode
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:262:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > honors the installed official CLI model report before spawning
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:269:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > Claude admits its exact prepared catalogue model with a missing CLI report and no remote check
+ FAIL  test/subscription-hosted-runner.test.ts > Claude admits its exact prepared catalogue model with a shortcuts CLI report and no remote check
+ FAIL  test/subscription-hosted-runner.test.ts > Claude admits its exact prepared catalogue model with a failed CLI report and no remote check
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:283:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > catalogue evidence cannot admit codex outside the selected model and Claude route
+ FAIL  test/subscription-hosted-runner.test.ts > catalogue evidence cannot admit different-model outside the selected model and Claude route
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:301:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > retains local codex computer policy ask without server authorization
+ FAIL  test/subscription-hosted-runner.test.ts > retains local codex computer policy allow without server authorization
+ FAIL  test/subscription-hosted-runner.test.ts > retains local codex computer policy deny without server authorization
+ FAIL  test/subscription-hosted-runner.test.ts > retains local claude_code computer policy ask without server authorization
+ FAIL  test/subscription-hosted-runner.test.ts > retains local claude_code computer policy allow without server authorization
+ FAIL  test/subscription-hosted-runner.test.ts > retains local claude_code computer policy deny without server authorization
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:315:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/63]⎯
+
+ FAIL  test/subscription-hosted-runner.test.ts > advertises hosted execution only with the installed local gate factory: true
+ FAIL  test/subscription-hosted-runner.test.ts > advertises hosted execution only with the installed local gate factory: false
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:39:40
+     37| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     38| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     39|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     40|
+     41| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:105:71
+ ❯ fixture test/subscription-hosted-runner.test.ts:43:24
+ ❯ test/subscription-hosted-runner.test.ts:341:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/63]⎯
+
+
+ Test Files  2 failed | 3 passed (5)
+      Tests  63 failed | 88 passed (151)
+   Start at  07:47:16
+   Duration  8.05s (tests 53%, import 37%, transform 10%)
+
+    Isolate  5 workers spawned · ~137ms startup each (spawn + environment, per file)
+             at least ~546ms faster with isolate: false — reuses workers across files instead of one per file
+

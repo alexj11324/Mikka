@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "recordedAt": "2026-11-07T12:40:17.856093+00:00",
+  "kind": "source-only-diagnostic-preparation",
+  "frozen": true,
+  "repository": "alexj11324/Mikka",
+  "runtime": "Node.js v24.22.1",
+  "identity": {
+    "version": 1,
+    "recordedAt": "2026-11-07T12:34:17.257Z",
+    "repository": "alexj11324/Mikka",
+    "repositoryId": 1427517699,
+    "readOnly": true,
+    "downloaded": false,
+    "remoteMutations": 0,
+    "workflow": {
+      "id": 42368835389,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "head": "1f548a73304923da466ebe702c99b6a8f6096f15"
+    },
+    "source": {
+      "sha": "7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+      "tree": "de1e82157c2e64a55607e7655073ecff884c56ba",
+      "parents": [
+        "f7225f3eb1e38762dfdecde0395792c85b81ec22",
+        "1f548a73304923da466ebe702c99b6a8f6096f15"
+      ]
+    },
+    "candidate": {
+      "sha": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "tree": "3635e075173ffb83c1e157a7f5a93296d2697603"
+    },
+    "artifact": {
+      "id": 13572179042,
+      "name": "desktop-api-build-7355553d3ec5e3c99b792f27eda2c8380724eeb2",
+      "bytes": 47871680,
+      "sha256": "33b411a43819c5ad08ff47c69a6283aa697898cb18fce2e79ac2e8040cc56cff",
+      "expired": false,
+      "createdAt": "2026-11-07T11:39:34Z",
+      "workflowRun": {
+        "id": 42368835389,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "feat/1512-run-observability",
+        "head_sha": "1f548a73304923da466ebe702c99b6a8f6096f15"
+      }
+    },
+    "sameProductTreeAsCandidate": false,
+    "sourceModuleBlobs": [
+      {
+        "path": "lib/desktop-rpc/schemas.ts",
+        "blob": "0d865dc31de7a29191f5be621cbf3859c1314dca"
+      },
+      {
+        "path": "lib/coordinator/chat-poll.ts",
+        "blob": "e28a08d96d9cdd535ade088f2517978d8ef82f3c"
+      },
+      {
+        "path": "apps/desktop/test/parity-fixtures.mjs",
+        "blob": "6f773394dee20cd247daffc152b781423b37a900"
+      },
+      {
+        "path": "apps/desktop/test/live-worker.mjs",
+        "blob": "e25a81358b49d8771d22c31949a42b763894fd1e"
+      }
+    ],
+    "bounds": "Artifact bytes were not downloaded during preparation. Runtime rechecks all provenance and digest before extraction or startup."
+  },
+  "publishFiles": [
+    {
+      "local": "workflow.yml",
+      "remote": ".github/workflows/issue1512-sql-profile-1f548.yml"
+    },
+    {
+      "local": "driver.mjs",
+      "remote": ".github/issue1512-sql-profile-1f548/driver.mjs"
+    },
+    {
+      "local": "artifact.mjs",
+      "remote": ".github/issue1512-sql-profile-1f548/artifact.mjs"
+    },
+    {
+      "local": "driver.test.mjs",
+      "remote": ".github/issue1512-sql-profile-1f548/driver.test.mjs"
+    }
+  ],
+  "trigger": {
+    "branch": "ops/1512-git-transport",
+    "commitMessagePrefix": "issue1512:profile-1f548 ",
+    "mutationPerformed": false
+  },
+  "checks": {
+    "unit": {
+      "command": "node --test driver.test.mjs > tests.tap 2>&1",
+      "exitCode": 0,
+      "tests": 7,
+      "passed": 7,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "rawOutput": "tests.tap",
+      "outputFormat": "Node test spec reporter; original stdout retained despite .tap filename"
+    },
+    "syntax": {
+      "commands": [
+        "node --check driver.mjs",
+        "node --check artifact.mjs",
+        "node --check driver.test.mjs"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 0,
+      "rawOutputFile": null
+    },
+    "lint": {
+      "command": "/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.bin/oxlint --no-ignore driver.mjs artifact.mjs driver.test.mjs > lint.log 2>&1",
+      "exitCode": 0,
+      "rawOutput": "lint.log"
+    },
+    "workflow": {
+      "method": "Python yaml.safe_load plus explicit contract assertions",
+      "passed": true,
+      "rawOutputFile": null,
+      "observedOutput": "PASS workflow YAML, fixed source, offline-before-credential, isolated service, single token step, fixed outputs, always cleanup",
+      "assertions": [
+        "contents read and actions read only",
+        "20 minute job and fresh PostgreSQL 17 service",
+        "exact source checkout and persisted credentials disabled",
+        "offline contract tests precede the only GH_TOKEN step",
+        "driver step receives only the isolated database connection",
+        "fixed script paths and trigger prefix",
+        "always cleanup of owned downloads",
+        "upload restricted to the three audited JSON report names"
+      ]
+    },
+    "originalProfileFiles": {
+      "unchanged": true,
+      "files": {
+        "desktop-query-decomposition.mjs": {
+          "path": "/workspace/scratch/812e3b7d6d45/ops1512/desktop-query-decomposition.mjs",
+          "bytes": 30351,
+          "sha256": "5ce05f24dffc80888f248dbf28ff8a5761b42e5142a670b2e51124f2362a4aa0"
+        },
+        "issue1512-sql-profile-artifact.mjs": {
+          "path": "/workspace/scratch/812e3b7d6d45/ops1512/issue1512-sql-profile-artifact.mjs",
+          "bytes": 5755,
+          "sha256": "a7cf7f79f14a224467de61f67be2d3415720faead7b2ecd8137535709f1acf63"
+        },
+        "issue1512-sql-profile.yml": {
+          "path": "/workspace/scratch/812e3b7d6d45/ops1512/issue1512-sql-profile.yml",
+          "bytes": 6072,
+          "sha256": "ca941a82619bd521a7ce37b82ca48b60aef787336a5ef3bab7b06ab4b8fe0359"
+        }
+      }
+    }
+  },
+  "boundaries": {
+    "requestCount": 24,
+    "sourceOnly": true,
+    "artifactDownloaded": false,
+    "databaseStarted": false,
+    "apiStarted": false,
+    "gatewayStarted": false,
+    "browserStarted": false,
+    "modelCalls": 0,
+    "virtualMachinesCreated": 0,
+    "remoteMutations": 0,
+    "runtimeExecution": "pending root review and explicitly authorized ops execution",
+    "fullNativeWindowReconciliation": null,
+    "productionAcceptance": false
+  },
+  "meaning": [
+    "Validates fixed source and request/receipt contracts without making a database or network request during tests.",
+    "Runtime will independently recheck the artifact digest, synthetic source identity, compiled source manifest and owned loopback gateway.",
+    "Sequential per-request deltas and all gaps are diagnostic; they do not reallocate or replace the recorded complete Native 196 and Web 173 login windows.",
+    "The actual synthetic source tree differs from the feature candidate tree; neither artifact nor runtime may claim those trees are equal."
+  ],
+  "files": {
+    "driver.mjs": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/sql-profile-1f548/driver.mjs",
+      "bytes": 42790,
+      "sha256": "58a4840e3464db4f3c0fdb739a695794d84e5f551dd2fb8b2eab8f38d095ceaa"
+    },
+    "artifact.mjs": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/sql-profile-1f548/artifact.mjs",
+      "bytes": 5940,
+      "sha256": "c317f6e598758af7ba55df02de4160355503ffca32968d86fd9a5be5e3108f9d"
+    },
+    "driver.test.mjs": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/sql-profile-1f548/driver.test.mjs",
+      "bytes": 6142,
+      "sha256": "fd296b0272bdb175b8b9327069893d3dabfe993652616b0f59c83333dcb3bfc4"
+    },
+    "workflow.yml": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/sql-profile-1f548/workflow.yml",
+      "bytes": 6242,
+      "sha256": "b48ad77c3b5c7be24af5667a51a056fc68e20c04115ef1705ea3b27305739344"
+    },
+    "README.md": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/sql-profile-1f548/README.md",
+      "bytes": 9230,
+      "sha256": "d4815644d34042e87727f171e8e7eb85ef4b9691b804a5c1b7b9606b7812aa48"
+    },
+    "metadata-readback.json": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/sql-profile-1f548/metadata-readback.json",
+      "bytes": 1995,
+      "sha256": "ce23f838fa556d098cd2a89cfacf5229a967125f582e782bcc4e01d8770eac53"
+    },
+    "tests.tap": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/sql-profile-1f548/tests.tap",
+      "bytes": 739,
+      "sha256": "fe47835c6e57824ae7eb21617505f2ffea6e6375b5ae44753cd162ed7142e230"
+    },
+    "lint.log": {
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/sql-profile-1f548/lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

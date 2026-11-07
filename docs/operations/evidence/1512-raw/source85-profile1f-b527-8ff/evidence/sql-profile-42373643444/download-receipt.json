@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "artifactId": 13574965407,
+  "artifactName": "issue1512-sql-decomposition-1f548-42373643444-1",
+  "runId": 42373643444,
+  "attempt": 1,
+  "head": "739a72af53243b8b639d21261e76547f6b3c35c2",
+  "zipBytes": 6721,
+  "zipSha256": "451f765e7645d71577207715cc365d4be99eee3a24f2e996c70d72f108df7e73",
+  "githubDigestMatched": true,
+  "onlyExpectedEntries": true,
+  "privacyPatternsDetected": 0,
+  "rawBytesPreserved": true,
+  "zipPersisted": false,
+  "signedUrlPersisted": false,
+  "files": [
+    {
+      "name": "artifact-receipt.json",
+      "bytes": 1104,
+      "sha256": "4f494ed1fb114a22ffa747cf3d14ebbc7c214785230b5cc609fdb94d9499ee60"
+    },
+    {
+      "name": "desktop-query-decomposition.json",
+      "bytes": 51295,
+      "sha256": "a0879c9cb016a6c6fc7be56d8021bbe0a9c05c736c80ad2c89079440db22ad71"
+    },
+    {
+      "name": "runner-receipt.json",
+      "bytes": 792,
+      "sha256": "4058ef5b487923ed7371584d5ddb579c900c3dd8638c8d67c1a8b8cf6519ea01"
+    }
+  ]
+}

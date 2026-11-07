@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-11-07T12:46:02.815229+00:00",
+  "scope": "historical_compile_preparation_only",
+  "status": "no_observed_eligible_historical_binding",
+  "projectId": 670821,
+  "existingHistory": {
+    "input": {
+      "path": "evidence/posthog-pagination-schema-191fcce2.json",
+      "bytes": 42221,
+      "sha256": "073282f96a6da1a1a49b0c1d4fdf05441038672b44e9d0a336197e3e95fe4d74",
+      "gitBlobSha1": "63d39e407d96d2408b099f467b19acdab80a51a1"
+    },
+    "traceId": "77cad3a99b9e154b27aaa2c6c0226283",
+    "window": [
+      "2026-11-06 20:00:00",
+      "2026-11-06 20:10:00"
+    ],
+    "lookupRunThreadTaskIdsAllEmpty": true,
+    "timelineRows": 27,
+    "timelineRunThreadTaskIdsAllNull": true
+  },
+  "authorizedScopeRead": {
+    "calls": 1,
+    "where": "production mikka-web/daemon; past seven days; at least one legitimate nonempty UUID; newest row only",
+    "timeWindow": [
+      "2026-10-31 12:45:08",
+      "2026-11-07 12:45:08"
+    ],
+    "limit": 1,
+    "projection": [
+      "span_timestamp_utc",
+      "trace_id_hex",
+      "run_id",
+      "thread_id",
+      "task_id"
+    ],
+    "requestTruncate": false,
+    "returnedRows": 0,
+    "returnedColumns": [
+      "span_timestamp_utc",
+      "trace_id_hex",
+      "run_id",
+      "thread_id",
+      "task_id"
+    ],
+    "responseTruncation": null,
+    "observation": "Response is header-only; no usable historical UUID binding was returned. This is not a proof of end-to-end transport completeness or that no such span can exist.",
+    "executedQuerySha256": "645885a0a00afc278e94fa4c6eb3a4fe5f18ceb57661a6d3965faa1c7be5698e"
+  },
+  "lookupTraceCount": {
+    "attempts": 0,
+    "liveValidated": false,
+    "reason": "No real nonempty historical binding available; do not compile with all-empty predicates or fabricate an ID.",
+    "nextValidation": "Use an actual deployment acceptance trace with a preserved nonempty run/thread/task binding."
+  },
+  "providerOrModelInvocations": 0,
+  "resourcesCreated": 0,
+  "settingsMutations": false,
+  "productionAcceptance": null,
+  "frozenOfflineReceiptUnchanged": {
+    "path": "evidence/posthog-enumeration-independent-count-receipt.json",
+    "bytes": 8490,
+    "sha256": "7495c2c4fc5cad5d7306108ac44032716812031dfb78316591ab54f250669bde",
+    "gitBlobSha1": "8851177de384d2f2544bfce62eb654ec11bf674c"
+  },
+  "artifacts": [
+    {
+      "path": "evidence/posthog-enumeration-live-compile/scope-request.json",
+      "bytes": 2194,
+      "sha256": "7805fe735e7d89bf2147ed02c46a54bcf35d771adc7f5c80a2c347d95978044b",
+      "gitBlobSha1": "5eb1d887ace108a8a19e00e94f3a908463c564e3"
+    },
+    {
+      "path": "evidence/posthog-enumeration-live-compile/scope-query.sql",
+      "bytes": 1788,
+      "sha256": "525d9debbfe811d27a0bd0c032847d81f0640257bb7afb880fbcc5d51053b7ba",
+      "gitBlobSha1": "5a9e6a0f71ed4a2ea8706078642dd607186988dc"
+    },
+    {
+      "path": "evidence/posthog-enumeration-live-compile/scope-response.json",
+      "bytes": 2417,
+      "sha256": "8023c01fab666abfc79a168b1f0caeba9cd37d282b3ca96d5e1a2ce588acf93a",
+      "gitBlobSha1": "f260811d86e107ee1e80b580a876d161c7c36d92"
+    }
+  ]
+}

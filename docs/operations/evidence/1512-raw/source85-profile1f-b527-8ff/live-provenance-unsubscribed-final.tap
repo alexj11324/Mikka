@@ -1,0 +1,25 @@
+TAP version 13
+# (node:10) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:10) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a new unversioned push while unsubscribed invalidates the committed read before a late subscription
+ok 1 - a new unversioned push while unsubscribed invalidates the committed read before a late subscription
+  ---
+  duration_ms: 471.850353
+  type: 'test'
+  ...
+# Subtest: a higher-revision push while unsubscribed invalidates the committed read before a late subscription
+ok 2 - a higher-revision push while unsubscribed invalidates the committed read before a late subscription
+  ---
+  duration_ms: 327.793696
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4286.696726

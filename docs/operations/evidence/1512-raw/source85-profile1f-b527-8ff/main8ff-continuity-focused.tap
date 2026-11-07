@@ -1,0 +1,283 @@
+TAP version 13
+# (node:13) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:13) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a background artifact read failure retains the same row, category and scroll container through retry
+ok 1 - a background artifact read failure retains the same row, category and scroll container through retry
+  ---
+  duration_ms: 356.487054
+  type: 'test'
+  ...
+# Subtest: artifact access refusal ReadResponseError:401 stays hidden through a later network failure
+ok 2 - artifact access refusal ReadResponseError:401 stays hidden through a later network failure
+  ---
+  duration_ms: 29.852437
+  type: 'test'
+  ...
+# Subtest: artifact access refusal ReadResponseError:403 stays hidden through a later network failure
+ok 3 - artifact access refusal ReadResponseError:403 stays hidden through a later network failure
+  ---
+  duration_ms: 22.228054
+  type: 'test'
+  ...
+# Subtest: artifact access refusal ReadResponseError:404 stays hidden through a later network failure
+ok 4 - artifact access refusal ReadResponseError:404 stays hidden through a later network failure
+  ---
+  duration_ms: 19.208464
+  type: 'test'
+  ...
+# Subtest: artifact access refusal CacheReadError:401 stays hidden through a later network failure
+ok 5 - artifact access refusal CacheReadError:401 stays hidden through a later network failure
+  ---
+  duration_ms: 25.70904
+  type: 'test'
+  ...
+# Subtest: artifact access refusal ListReadScopeError:List read scope changed stays hidden through a later network failure
+ok 6 - artifact access refusal ListReadScopeError:List read scope changed stays hidden through a later network failure
+  ---
+  duration_ms: 23.367534
+  type: 'test'
+  ...
+# Subtest: artifact access refusal ListReadScopeError:List read scope changed stays hidden through a later network failure
+ok 7 - artifact access refusal ListReadScopeError:List read scope changed stays hidden through a later network failure
+  ---
+  duration_ms: 16.316969
+  type: 'test'
+  ...
+# Subtest: a refused library retry completing across a quick remount unlocks the current view
+ok 8 - a refused library retry completing across a quick remount unlocks the current view
+  ---
+  duration_ms: 17.230708
+  type: 'test'
+  ...
+# (node:14) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:14) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a failed background detail read retains the real document, selection, scroll and adjacent draft
+ok 9 - a failed background detail read retains the real document, selection, scroll and adjacent draft
+  ---
+  duration_ms: 890.732189
+  type: 'test'
+  ...
+# Subtest: an HTML artifact retains its iframe and element selection mode during a background detail failure
+ok 10 - an HTML artifact retains its iframe and element selection mode during a background detail failure
+  ---
+  duration_ms: 36.340984
+  type: 'test'
+  ...
+# Subtest: a background text retry refreshes the selected version without replacing its loaded document
+ok 11 - a background text retry refreshes the selected version without replacing its loaded document
+  ---
+  duration_ms: 57.536249
+  type: 'test'
+  ...
+# Subtest: an initial detail read failure keeps a local fallback and Retry actually recovers it
+ok 12 - an initial detail read failure keeps a local fallback and Retry actually recovers it
+  ---
+  duration_ms: 22.204018
+  type: 'test'
+  ...
+# Subtest: an initial text read failure keeps a local fallback and Retry actually recovers it
+ok 13 - an initial text read failure keeps a local fallback and Retry actually recovers it
+  ---
+  duration_ms: 19.727328
+  type: 'test'
+  ...
+# Subtest: a detail 401 refusal keeps old content hidden through network failure and restores only after a successful read
+ok 14 - a detail 401 refusal keeps old content hidden through network failure and restores only after a successful read
+  ---
+  duration_ms: 25.515758
+  type: 'test'
+  ...
+# Subtest: a detail 403 refusal keeps old content hidden through network failure and restores only after a successful read
+ok 15 - a detail 403 refusal keeps old content hidden through network failure and restores only after a successful read
+  ---
+  duration_ms: 21.19848
+  type: 'test'
+  ...
+# Subtest: a detail 404 refusal keeps old content hidden through network failure and restores only after a successful read
+ok 16 - a detail 404 refusal keeps old content hidden through network failure and restores only after a successful read
+  ---
+  duration_ms: 19.243408
+  type: 'test'
+  ...
+# Subtest: a text 401 refusal keeps old content hidden through network failure and restores only after a successful read
+ok 17 - a text 401 refusal keeps old content hidden through network failure and restores only after a successful read
+  ---
+  duration_ms: 21.161414
+  type: 'test'
+  ...
+# Subtest: a text 403 refusal keeps old content hidden through network failure and restores only after a successful read
+ok 18 - a text 403 refusal keeps old content hidden through network failure and restores only after a successful read
+  ---
+  duration_ms: 23.714789
+  type: 'test'
+  ...
+# Subtest: a text 404 refusal keeps old content hidden through network failure and restores only after a successful read
+ok 19 - a text 404 refusal keeps old content hidden through network failure and restores only after a successful read
+  ---
+  duration_ms: 28.45734
+  type: 'test'
+  ...
+# Subtest: a missing detail response removes the previously loaded document
+ok 20 - a missing detail response removes the previously loaded document
+  ---
+  duration_ms: 16.868406
+  type: 'test'
+  ...
+# Subtest: a missing text response removes the previously loaded document
+ok 21 - a missing text response removes the previously loaded document
+  ---
+  duration_ms: 15.510972
+  type: 'test'
+  ...
+# Subtest: another artifact or authenticated cache scope cannot borrow the old document after a failed read
+ok 22 - another artifact or authenticated cache scope cannot borrow the old document after a failed read
+  ---
+  duration_ms: 23.911576
+  type: 'test'
+  ...
+# (node:15) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:15) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# (node:15) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+# Subtest: a failed group send survives leaving for Settings and returning, with explicit retry only
+ok 23 - a failed group send survives leaving for Settings and returning, with explicit retry only
+  ---
+  duration_ms: 642.715555
+  type: 'test'
+  ...
+# Subtest: a send still in flight stays pending through a remount and receives the same late failure
+ok 24 - a send still in flight stays pending through a remount and receives the same late failure
+  ---
+  duration_ms: 14.940039
+  type: 'test'
+  ...
+# Subtest: a confirmed send finishing offscreen is never retried and is pruned when its stored message arrives
+ok 25 - a confirmed send finishing offscreen is never retried and is pruned when its stored message arrives
+  ---
+  duration_ms: 20.606366
+  type: 'test'
+  ...
+# Subtest: a background read failure keeps the mounted history, failed send, draft, selection and reading position
+ok 26 - a background read failure keeps the mounted history, failed send, draft, selection and reading position
+  ---
+  duration_ms: 15.669821
+  type: 'test'
+  ...
+# Subtest: unauthorized still hides previously visible group messages and disables its composer
+ok 27 - unauthorized still hides previously visible group messages and disables its composer
+  ---
+  duration_ms: 10.428587
+  type: 'test'
+  ...
+# Subtest: not_found still hides previously visible group messages and disables its composer
+ok 28 - not_found still hides previously visible group messages and disables its composer
+  ---
+  duration_ms: 25.419384
+  type: 'test'
+  ...
+# Subtest: a 401 refusal cannot revive cached group history after a later transport failure
+ok 29 - a 401 refusal cannot revive cached group history after a later transport failure
+  ---
+  duration_ms: 14.912092
+  type: 'test'
+  ...
+# Subtest: a 403 refusal cannot revive cached group history after a later transport failure
+ok 30 - a 403 refusal cannot revive cached group history after a later transport failure
+  ---
+  duration_ms: 15.514456
+  type: 'test'
+  ...
+# Subtest: a 404 refusal cannot revive cached group history after a later transport failure
+ok 31 - a 404 refusal cannot revive cached group history after a later transport failure
+  ---
+  duration_ms: 10.461096
+  type: 'test'
+  ...
+# Subtest: an initial unavailable read keeps the existing local error state without inventing empty history
+ok 32 - an initial unavailable read keeps the existing local error state without inventing empty history
+  ---
+  duration_ms: 2.354796
+  type: 'test'
+  ...
+# Subtest: pending group messages stay isolated by group, authenticated owner and workspace
+ok 33 - pending group messages stay isolated by group, authenticated owner and workspace
+  ---
+  duration_ms: 15.150717
+  type: 'test'
+  ...
+# (node:21) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:21) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# (node:21) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+# Subtest: a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft
+ok 34 - a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft
+  ---
+  duration_ms: 1102.32057
+  type: 'test'
+  ...
+# Subtest: legacy Settings also loads inside the frame and keeps it when returning to chat
+ok 35 - legacy Settings also loads inside the frame and keeps it when returning to chat
+  ---
+  duration_ms: 34.958628
+  type: 'test'
+  ...
+# Subtest: hosted Settings preserves pending browser notes and the computer registry across its distinct frame
+ok 36 - hosted Settings preserves pending browser notes and the computer registry across its distinct frame
+  ---
+  duration_ms: 47.842542
+  type: 'test'
+  ...
+# {"duringSettings":{"notes":1,"hasComposer":false,"computerRun":"fixture-computer-run"},"after":{"draft":"hosted unsent draft","notes":[[1,"keep hosted annotation"]],"computerRun":"fixture-computer-run"}}
+# Subtest: hosted Settings providers still retire state when the owner or workspace changes
+ok 37 - hosted Settings providers still retire state when the owner or workspace changes
+  ---
+  duration_ms: 24.102915
+  type: 'test'
+  ...
+# Subtest: routed Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive
+ok 38 - routed Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive
+  ---
+  duration_ms: 29.893714
+  type: 'test'
+  ...
+# Subtest: legacy Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive
+ok 39 - legacy Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive
+  ---
+  duration_ms: 20.711744
+  type: 'test'
+  ...
+# Subtest: Settings search and repeated Back/Forward restore the addressed bot when the router renders after popstate
+ok 40 - Settings search and repeated Back/Forward restore the addressed bot when the router renders after popstate
+  ---
+  duration_ms: 83.977255
+  type: 'test'
+  ...
+# Subtest: Settings search and repeated Back/Forward restore the addressed bot when the router renders before popstate
+ok 41 - Settings search and repeated Back/Forward restore the addressed bot when the router renders before popstate
+  ---
+  duration_ms: 75.025398
+  type: 'test'
+  ...
+# Subtest: the existing authenticated scope boundary still discards annotations across owners and workspaces
+ok 42 - the existing authenticated scope boundary still discards annotations across owners and workspaces
+  ---
+  duration_ms: 25.438532
+  type: 'test'
+  ...
+# Subtest: a standalone Settings shell still provides its frame and route-specific members content
+ok 43 - a standalone Settings shell still provides its frame and route-specific members content
+  ---
+  duration_ms: 5.207794
+  type: 'test'
+  ...
+1..43
+# tests 43
+# suites 0
+# pass 43
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5139.00274

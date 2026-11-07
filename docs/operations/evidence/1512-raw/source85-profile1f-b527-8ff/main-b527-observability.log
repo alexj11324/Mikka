@@ -1,0 +1,12 @@
+
+ RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/Mikka/packages/daemon
+
+
+ Test Files  4 passed (4)
+      Tests  37 passed (37)
+   Start at  07:50:20
+   Duration  2.15s (import 57%, tests 28%, transform 14%, worker 1%)
+
+    Isolate  4 workers spawned · ~118ms startup each (spawn + environment, per file)
+             at least ~355ms faster with isolate: false — reuses workers across files instead of one per file
+
