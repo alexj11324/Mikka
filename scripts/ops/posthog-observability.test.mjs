@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { DatabaseSync } from 'node:sqlite'
+import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { errorAlertFixtures, fixtureDigest, syntheticErrorQuery, verifySyntheticResult } from './posthog-alert-acceptance.mjs'
 import { ALERTS, DASHBOARD, INSIGHTS, MANAGED_TAG, alertChanges, insightChanges, posthogApi, sync } from './posthog-observability.mjs'
 
 /** An in-memory PostHog with the API surface the script uses. */
@@ -121,221 +124,66 @@ test('the API key is required and never appears in errors', async () => {
   await assert.rejects(api.alerts(), error => !error.message.includes(key) && /403/.test(error.message))
 })
 
-function handledWorkflowSpans(rows) {
-  const query = INSIGHTS.find(item => item.key === 'alert-error-spike').query.source.query
-  const start = query.indexOf('    successful_entries AS (')
-  assert.ok(start >= 0, 'success must belong to an entry, never a whole trace')
-  const filter = query.slice(start, query.indexOf('    service_start AS (')).trim().replace(/,$/, '')
-  const candidateStart = query.indexOf('AND (raw.is_root_span')
-  const candidate = query.slice(candidateStart + 4, start).trim().replace(/\),$/, '').trim()
-  const normalizationStart = query.indexOf("CASE WHEN raw.name LIKE 'workflow.execute %'")
-  const normalizedName = query.slice(normalizationStart, query.indexOf(' AS name,', normalizationStart))
-  const db = new DatabaseSync(':memory:')
-  try {
-    // Only adapt ClickHouse's Array(String)/JSON primitives; execute the actual
-    // candidate predicate, parent joins, success predicates and role expansion.
-    const array = value => value == null ? [] : JSON.parse(value)
-    db.function('length', value => array(value).length)
-    db.function('arrayElement', (value, index) => array(value)[index - 1] ?? '')
-    db.function('isValidJSON', value => { try { JSON.parse(value); return 1 } catch { return 0 } })
-    db.function('JSONExtractString', (value, key) => {
-      try { const result = JSON.parse(value)?.[key]; return typeof result === 'string' ? result : '' } catch { return '' }
-    })
-    db.exec(`CREATE TABLE spans (
-      service_name TEXT, trace_id TEXT, span_id TEXT, parent_span_id TEXT,
-      name TEXT, is_root_span INTEGER, status_code INTEGER, route TEXT,
-      error_code TEXT, http_status INTEGER, links TEXT
-    )`)
-    const insert = db.prepare('INSERT INTO spans VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    for (const { service = 'mikka-web', trace = 'trace', id, parent, name, root = false, status = 0, route,
-      error = 'unknown_error', http = null, links = [] } of rows)
-      insert.run(service, trace, id, parent, name, Number(root), status, route, error, http, JSON.stringify(links))
-    db.exec(`CREATE VIEW workflow_spans AS SELECT raw.service_name, raw.trace_id, raw.span_id,
-      raw.parent_span_id, ${normalizedName} AS name, raw.is_root_span, raw.status_code, raw.route,
-      raw.error_code, raw.http_status, raw.links FROM spans raw
-      WHERE raw.service_name = 'mikka-web' AND ${candidate}`)
-    return db.prepare(`WITH ${filter} SELECT trace_id, span_id FROM handled_spans ORDER BY trace_id, span_id`).all()
-      .map(row => `${row.trace_id}/${row.span_id}`)
-  } finally { db.close() }
-}
+// The engine result is an explicit recorded validation, not a CI network query.
+// Any SQL or fixture edit invalidates it until the exact synthetic SELECT is rerun.
+const readEngineReceipt = () => JSON.parse(readFileSync(new URL('./posthog/error-spike-engine-receipt.json', import.meta.url), 'utf8'))
 
-function hookAttempt(parent, route, trace = 'trace') {
-  return [
-    { trace, id: 'resume', parent, name: 'hook.resume', status: 2, route },
-    { trace, id: 'sdk', parent: 'resume', name: 'world.hooks.getByToken', status: 2, route },
-    { trace, id: 'http', parent: 'sdk', name: 'http GET', status: 2, route, error: 'not-found', http: 404 },
-    { trace, id: 'transport', parent, name: 'workflow.events.ws.connect', status: 2, route, error: 'TRANSPORT' },
-  ]
-}
-
-const deliveryLink = (trace, span = 'delivery') => JSON.stringify({ trace_id: trace, span_id: span })
-
-function flowAttempt(trace, { sdk = 'world.events.create run_started', wrapper = 'workflow.replay.load',
-  http = 410, code = 'HTTP 410', route = '/.well-known/workflow/v1/flow',
-  deliveryStatus = 1, deliveryHttp = 200, delivery = true, links = [deliveryLink(`${trace}-delivery`)],
-  invocationStatus = 1, invocationError = 'unknown_error', legacyNames = false, service = 'mikka-web' } = {}) {
-  const rows = [
-    ...(delivery ? [{ trace: `${trace}-delivery`, id: 'delivery', parent: 'delivery-parent', name: 'workflow.route.flow', status: deliveryStatus,
-      route: '/.well-known/workflow/v1/flow', http: deliveryHttp }] : []),
-    { trace, id: 'invocation', parent: 'run-origin', name: legacyNames ? 'workflow.execute fixture' : 'workflow.execute',
-      status: invocationStatus, route, error: invocationError, links },
-    ...(wrapper ? [{ trace, id: 'wrapper', parent: 'invocation', name: legacyNames && wrapper === 'step.execute' ? 'step.execute fixture' : wrapper,
-      status: 2, route }] : []),
-    { trace, id: 'sdk', parent: wrapper ? 'wrapper' : 'invocation', name: sdk, status: 2, route },
-    { trace, id: 'http', parent: 'sdk', name: http === 404 ? 'http GET' : 'http POST', status: 2, route, error: code, http },
-    { trace, id: 'transport', parent: 'invocation', name: 'workflow.events.ws.connect', status: 2, route, error: 'TRANSPORT' },
-  ]
-  return rows.map(row => ({ ...row, service }))
-}
-
-function queuedFlowAttempt(trace, linked = false) {
-  const deliveryTrace = linked ? trace : `${trace}-delivery`
-  const rows = flowAttempt(trace, { links: [linked ? deliveryLink('origin', 'start') : deliveryLink(deliveryTrace, 'queue')] })
-  rows.find(row => row.id === 'delivery').trace = deliveryTrace
-  if (linked) rows.find(row => row.id === 'invocation').parent = 'queue'
-  rows.push({ trace: deliveryTrace, id: 'queue', parent: 'delivery', name: 'vqs.process', status: 0,
-    route: '/.well-known/workflow/v1/flow' })
-  return rows
-}
-
-test('only confirmed handled Workflow attempts and their exact wrappers leave the error alert', () => {
-  const rows = [
-    ...flowAttempt('expired'),
-    ...flowAttempt('duplicate-wait', { sdk: 'world.events.create wait_created', wrapper: 'workflow.run', http: 409, code: 'HTTP 409' }),
-    ...flowAttempt('duplicate-step', { sdk: 'world.events.create step_started', wrapper: 'step.execute', http: 409, code: 'HTTP 409', legacyNames: true }),
-    ...flowAttempt('failed-entry', { deliveryStatus: 2, deliveryHttp: 500 }),
-    ...flowAttempt('missing-entry', { delivery: false }),
-    ...flowAttempt('missing-http-status', { deliveryHttp: null }),
-    ...flowAttempt('other-route', { route: '/api/rpc' }),
-    ...flowAttempt('other-operation', { sdk: 'world.events.create run_completed', http: 409, code: 'HTTP 409' }),
-    ...flowAttempt('other-error', { http: 500, code: 'not-found' }),
-    ...flowAttempt('other-service', { service: 'mikka-daemon' }),
-  ]
-  assert.deepEqual(handledWorkflowSpans(rows), [
-    'duplicate-step/http', 'duplicate-step/sdk', 'duplicate-wait/http', 'duplicate-wait/sdk',
-    'expired/http', 'expired/sdk', 'expired/wrapper',
-  ])
-})
-
-test('successful non-root wake and cron entries handle only their own exact hook attempts', () => {
-  const rows = [
-    { trace: 'wake', id: 'request', parent: '', name: 'POST /api/rpc', root: true, route: '/api/rpc', http: 200 },
-    { trace: 'wake', id: 'entry', parent: 'request', name: 'after:workflow-wake', route: 'after:workflow-wake' },
-    ...hookAttempt('entry', 'after:workflow-wake', 'wake'),
-    { trace: 'cron', id: 'request', parent: 'remote-parent', name: 'GET /api/cron/reconcile', route: '/api/cron/reconcile', http: 200 },
-    { trace: 'cron', id: 'entry', parent: 'request', name: 'cron:reconcile', route: 'cron:reconcile' },
-    ...hookAttempt('entry', 'cron:reconcile', 'cron'),
-  ]
-  assert.deepEqual(handledWorkflowSpans(rows), [
-    'cron/http', 'cron/resume', 'cron/sdk', 'wake/http', 'wake/resume', 'wake/sdk',
-  ])
-})
-
-test('another successful entry in the same trace never handles a failed child entry', () => {
-  const rows = [
-    { id: 'success', parent: '', name: 'GET /api/cron/reconcile', root: true, route: '/api/cron/reconcile', http: 200 },
-    { id: 'failed', parent: 'success', name: 'after:workflow-wake', status: 2, route: 'after:workflow-wake' },
-    ...hookAttempt('failed', 'after:workflow-wake'),
-  ]
-  assert.deepEqual(handledWorkflowSpans(rows), [])
-})
-
-for (const [name, options] of [
-  ['missing link', { links: [] }],
-  ['multiple links', { links: [deliveryLink('guard-delivery'), deliveryLink('guard-delivery')] }],
-  ['malformed link', { links: ['{'] }],
-  ['missing link trace ID', { links: [JSON.stringify({ span_id: 'delivery' })] }],
-  ['wrong link trace', { links: [deliveryLink('another-delivery')] }],
-  ['wrong link span', { links: [deliveryLink('guard-delivery', 'another-span')] }],
-  ['failed invocation', { invocationStatus: 2 }],
-  ['business error on normal return', { invocationStatus: 1, invocationError: 'TypeError' }],
-  ['unknown intermediate span', { wrapper: 'unknown.wrapper' }],
-]) test(`a ${name} keeps the flow errors`, () => {
-  assert.deepEqual(handledWorkflowSpans(flowAttempt('guard', options)), [])
-})
-
-test('a successful delivery in the same trace cannot replace the failed linked delivery', () => {
-  const rows = flowAttempt('shared', { deliveryStatus: 2, deliveryHttp: 500 })
-  rows.push({ trace: 'shared', id: 'other-delivery', parent: '', name: 'workflow.route.flow', root: true,
-    route: '/.well-known/workflow/v1/flow', status: 1, http: 200 })
-  assert.deepEqual(handledWorkflowSpans(rows), [])
-})
-
-test('a legacy run-origin link alone never impersonates the invocation delivery', () => {
-  const rows = flowAttempt('legacy', { links: [deliveryLink('origin', 'start')] })
-  rows.push({ trace: 'origin', id: 'start', parent: '', name: 'workflow.start fixture', root: true,
-    route: '/.well-known/workflow/v1/flow', status: 1, http: 200 })
-  rows.push({ trace: 'legacy', id: 'local-delivery', parent: '', name: 'workflow.route.flow', root: true,
-    route: '/.well-known/workflow/v1/flow', status: 1, http: 200 })
-  assert.deepEqual(handledWorkflowSpans(rows), [])
-})
-
-test('a linked invocation keeps its exact successful delivery parent despite its separate run-origin link', () => {
-  const rows = flowAttempt('legacy', { links: [deliveryLink('origin', 'start')], legacyNames: true })
-  rows.find(row => row.id === 'delivery').trace = 'legacy'
-  rows.find(row => row.id === 'invocation').parent = 'delivery'
-  assert.deepEqual(handledWorkflowSpans(rows), ['legacy/http', 'legacy/sdk', 'legacy/wrapper'])
-})
-
-for (const linked of [false, true]) test(`${linked ? 'linked' : 'continuous'} mode follows only the exact vqs.process delivery hop`, () => {
-  assert.deepEqual(handledWorkflowSpans(queuedFlowAttempt('queue-attempt', linked)), [
-    'queue-attempt/http', 'queue-attempt/sdk', 'queue-attempt/wrapper',
-  ])
-})
-
-for (const [name, change] of [
-  ['failed queue', rows => { rows.find(row => row.id === 'queue').status = 2 }],
-  ['typed queue error', rows => { rows.find(row => row.id === 'queue').error = 'REAL_QUEUE_FAILURE' }],
-  ['unknown queue span', rows => { rows.find(row => row.id === 'queue').name = 'unknown.queue' }],
-  ['wrong queue parent', rows => { rows.find(row => row.id === 'queue').parent = 'another-delivery' }],
-  ['cross-service queue', rows => { rows.find(row => row.id === 'queue').service = 'mikka-daemon' }],
-  ['failed delivery', rows => { rows.find(row => row.id === 'delivery').http = 500 }],
-  ['typed delivery error', rows => { rows.find(row => row.id === 'delivery').error = 'REAL_DELIVERY_FAILURE' }],
-  ['extra queue hop', rows => {
-    const queue = rows.find(row => row.id === 'queue')
-    rows.push({ ...queue, id: 'extra-queue' })
-    queue.parent = 'extra-queue'
-  }],
-]) test(`a ${name} cannot borrow another successful entry to hide errors`, () => {
-  for (const linked of [false, true]) {
-    const rows = queuedFlowAttempt('guard-queue', linked)
-    change(rows)
-    rows.push({ trace: rows.find(row => row.id === 'queue').trace, id: 'unrelated-delivery', parent: '',
-      name: 'workflow.route.flow', status: 1, http: 200, route: '/.well-known/workflow/v1/flow' })
-    assert.deepEqual(handledWorkflowSpans(rows), [], linked ? 'linked' : 'continuous')
+test('the exact error-alert SQL and fixtures retain their verified real HogQL result', () => {
+  const receipt = readEngineReceipt()
+  const cases = errorAlertFixtures()
+  const source = INSIGHTS.find(item => item.key === 'alert-error-spike').query.source.query
+  assert.equal(receipt.schema_version, 1)
+  assert.equal(receipt.kind, 'synthetic_hogql_readonly')
+  assert.equal(receipt.project_id, 670821)
+  assert.equal(receipt.production_acceptance, false)
+  assert.equal(receipt.ci_executes_remote_query, false)
+  assert.equal(receipt.sql_sha256, fixtureDigest(source))
+  assert.equal(receipt.fixtures_sha256, fixtureDigest(JSON.stringify(cases)))
+  assert.equal(receipt.acceptance_script_sha256, fixtureDigest(readFileSync(new URL('./posthog-alert-acceptance.mjs', import.meta.url))))
+  assert.equal(receipt.baseline_sha256, fixtureDigest(receipt.baseline_sql))
+  const metricTail = sql => sql.slice(sql.indexOf('    service_start AS ('))
+  assert.equal(metricTail(source), metricTail(receipt.baseline_sql), 'preserve the owner array coverage and baseline computation')
+  const query = syntheticErrorQuery(source, cases, receipt.baseline_sql)
+  assert.equal(receipt.synthetic_query_sha256, fixtureDigest(query))
+  assert.equal(receipt.result_sha256, fixtureDigest(receipt.result))
+  assert.equal(query.includes('posthog.'), false, 'synthetic validation must not read production tables')
+  const verified = verifySyntheticResult(receipt.result, cases)
+  assert.deepEqual(verified.summary, receipt.summary)
+  // These are the two demonstrated old defects, not merely a different query hash.
+  for (const name of ['successful non-root wake and cron entries handle only their own exact hook attempts',
+    'another successful entry in the same trace never handles a failed child entry']) {
+    const fixture = cases.find(item => item.name === name)
+    assert.equal(verified.rows.find(row => row.id === fixture.id).baselinePassed, 0)
   }
+  assert.equal(verified.rows.find(row => row.id === cases.at(-1).id).baselinePassed, 1, 'legacy linked root behavior stays supported')
+  const duplicate = cases.find(item => item.name === 'duplicate physical span rows do not become different excluded identities')
+  const duplicateResult = verified.rows.find(row => row.id === duplicate.id)
+  assert.equal(duplicateResult.distinct, 3)
+  assert.equal(duplicateResult.raw, 4)
 })
 
-test('two invocations in one trace retain the failed invocation even with a shared successful delivery', () => {
-  const rows = flowAttempt('shared')
-  const failed = flowAttempt('shared', { invocationStatus: 2 }).filter(row => row.trace === 'shared')
-    .map(row => ({ ...row, id: `failed-${row.id}`, parent: row.parent === 'run-origin' ? row.parent : `failed-${row.parent}` }))
-  assert.deepEqual(handledWorkflowSpans([...rows, ...failed]), ['shared/http', 'shared/sdk', 'shared/wrapper'])
+test('the recorded engine response rejects truncation, extra columns and altered identities', () => {
+  const { result } = readEngineReceipt()
+  assert.throws(() => verifySyntheticResult(result.split('\n').slice(0, -1).join('\n')), /ALERT_ENGINE_/)
+  const lines = result.split('\n')
+  const detail = lines.findIndex(line => line.startsWith('case-'))
+  const extraColumn = [...lines]
+  extraColumn[detail] += '|unexpected'
+  assert.throws(() => verifySyntheticResult(extraColumn.join('\n')), /ALERT_ENGINE_RESULT_COLUMNS/)
+  const changedIdentity = [...lines]
+  const fields = changedIdentity[detail].split('|')
+  fields[1] = 'ids:unexpected/http'
+  changedIdentity[detail] = fields.join('|')
+  assert.throws(() => verifySyntheticResult(changedIdentity.join('\n')), /ALERT_ENGINE_IDENTITY_MISMATCH/)
 })
 
-test('a direct event write uses its exact cross-trace invocation link without requiring a root delivery', () => {
-  assert.deepEqual(handledWorkflowSpans(flowAttempt('direct', { wrapper: null })), ['direct/http', 'direct/sdk'])
+test('the error insight description fits the official targeted update schema', () => {
+  assert.ok(INSIGHTS.find(item => item.key === 'alert-error-spike').description.length <= 400)
 })
 
-test('a direct cron lookup still requires the corresponding successful HTTP entry', () => {
-  const rows = [
-    { id: 'request', parent: 'remote', name: 'GET /api/cron/reconcile', route: '/api/cron/reconcile', http: 200 },
-    { id: 'cron', parent: 'request', name: 'cron:reconcile', route: 'cron:reconcile' },
-    ...hookAttempt('cron', 'cron:reconcile').filter(row => row.id !== 'resume')
-      .map(row => row.id === 'sdk' ? { ...row, parent: 'cron' } : row),
-  ]
-  assert.deepEqual(handledWorkflowSpans(rows), ['trace/http', 'trace/sdk'])
-  rows[0].http = 502
-  rows.push({ id: 'other-request', parent: '', name: 'GET /api/cron/reconcile', root: true,
-    route: '/api/cron/reconcile', http: 200 })
-  assert.deepEqual(handledWorkflowSpans(rows), [])
-})
-
-test('a real SDK error code or an unrelated failed sibling is never hidden', () => {
-  const rows = flowAttempt('typed')
-  rows.find(row => row.id === 'sdk').error = 'REAL_FAILURE'
-  assert.deepEqual(handledWorkflowSpans(rows), [])
-  rows.find(row => row.id === 'sdk').error = 'unknown_error'
-  rows.find(row => row.id === 'wrapper').error = 'REAL_WRAPPER_FAILURE'
-  assert.deepEqual(handledWorkflowSpans(rows), ['typed/http', 'typed/sdk'])
+test('the official query-only acceptance entry emits the exact verified packet without contacting PostHog', () => {
+  const query = execFileSync(process.execPath, [fileURLToPath(new URL('./posthog-alert-acceptance.mjs', import.meta.url)), '--query-only'], {
+    encoding: 'utf8', timeout: 5000, maxBuffer: 1048576,
+  })
+  assert.equal(fixtureDigest(query), readEngineReceipt().synthetic_query_sha256)
 })

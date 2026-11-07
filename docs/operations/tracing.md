@@ -452,6 +452,18 @@ Edit the definitions or SQL in a PR, then apply once it merges. A change made
 in the PostHog app shows as drift in the next `--check`; copy it back into the
 repository or it is overwritten on the next `--apply`.
 
+Validate the error-spike classifier with `node scripts/ops/posthog-alert-acceptance.mjs`.
+It runs one synthetic read-only query through the authenticated PostHog CLI in
+project 670821. `--query-only` prints the exact packet for review or MCP use.
+The 64 cases exercise the actual HogQL CTEs, including continuous/linked delivery,
+non-root entries, the single queue hop, wake/cron/nudge handling, missing or
+conflicting proof, unrelated failures and duplicate physical span rows. The
+recorded result binds exact SQL, fixtures, script, query and returned identities;
+CI checks that receipt offline and does not claim to rerun the remote engine.
+A SQL or fixture change requires a new actual engine result. The service-hour
+coverage, weighted median, warmup and thresholds retain the existing array
+aggregation; only proven handled attempts are removed from error counts.
+
 
 ## One run, one trace (#1512)
 
