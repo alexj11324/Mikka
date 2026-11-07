@@ -28,7 +28,7 @@ test('PG: receipt recovery survives a lost Workflow wake without sending accepte
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('base64')
   t.after(async () => { await database.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end(); if (oldKey === undefined) delete process.env.WORKSPACE_SECRETS_KEY; else process.env.WORKSPACE_SECRETS_KEY = oldKey })
   await database.query('CREATE TABLE "user"(id text PRIMARY KEY)')
-  for (const file of ['20261107130100_cloud_service_client.sql', '20261107130300_cloud_push.sql', '20261107130400_phone_push_receipt_recovery.sql']) await database.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), 'utf8'))
+  for (const file of ['20261107171001_cloud_service_client.sql', '20261107171003_cloud_push.sql', '20261107171004_phone_push_receipt_recovery.sql']) await database.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), 'utf8'))
   await database.query('CREATE TABLE mobile_push_tokens (LIKE public.mobile_push_tokens INCLUDING ALL)')
   await database.query('INSERT INTO "user" VALUES ($1),($2)', ['owner', 'other'])
   const { deliverPhonePush, checkPhonePushReceipts, recoverPhonePushReceipts } = await import('./mobile-push-delivery')

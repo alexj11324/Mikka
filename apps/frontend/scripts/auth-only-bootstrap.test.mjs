@@ -34,6 +34,7 @@ const fixtureModules = new Map([
   ['@/components/workspace/create-workspace-form', 'export const CreateWorkspaceForm = () => null;'],
   ['@/components/workspace/invitation-card', 'export const InvitationCard = () => null;'],
   ['@/components/device-authorization', 'export const DeviceAuthorization = () => null;'],
+  ['@/components/plugins/github-settings', 'export const GitHubSettings = () => null;'],
   ['@/app/[locale]/not-found', 'export default () => null;'],
   ['@/components/auth-form', `import { createElement } from 'react'; import { useSWRConfig } from 'swr'; export const AuthForm = props => { ${stateAccess}.authCache = useSWRConfig().cache; return createElement('div', { 'data-auth': true, 'data-owner': props.signedInAs?.name ?? 'signed-out', 'data-handoff': Boolean(props.desktopFlow), 'data-email-enabled': props.emailEnabled }); };`],
   ['@/components/auth/forgot-password-form', 'export const ForgotPasswordForm = () => null;'],
@@ -43,7 +44,7 @@ const fixtureModules = new Map([
   ['@/components/version-guard', 'export const VersionGuard = () => null;'],
   ['@/components/posthog-analytics', 'export const PostHogAnalytics = () => null;'],
   ['@/lib/posthog-config', 'export const posthogConfig = { token: "" };'],
-  ['@/lib/auth-client', `export const authClient = { $store: { atoms: { session: { subscribe: listener => ${stateAccess}.subscribe(listener) } } } };`],
+  ['@/lib/auth-client', `export const authClient = { $store: { atoms: { session: { subscribe: listener => ${stateAccess}.subscribe(listener) } } } }; export const cloudAuthClient = authClient;`],
   ['@/lib/swr/persistent-cache', `export const clearPersistentReadCaches = async () => { ${stateAccess}.cacheClears++; };`],
 ])
 const compiled = await build({
