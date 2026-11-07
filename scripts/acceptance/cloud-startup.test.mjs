@@ -3,7 +3,7 @@ import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
 import { alignServerTimings, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace } from './cloud-startup.mjs'
-import { readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
+import { readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const workspace = id(1), botId = id(2), deviceId = id(3), agentId = id(4)
@@ -18,6 +18,7 @@ const startupTiming = (runId, harness) => ({ version: 1, runIdHash: createHash('
   phases: [{ name: 'daemon.adapter.cli_init', startMs: 50, endMs: 400, ms: 350, outcome: 'ok' }] })
 const startedStage = sample => { const item = stage('agent_start', 3500); item.chunk.data.startupTiming = startupTiming(sample.runId, sample.harness); return item }
 const runtimeTiming = sample => ({ version: 1, source: 'http_server_link', window: 'run_launch_to_agent_exit',
+  scope: 'daemon_http_server_link_and_task_fetch', allFirstPartyHttpComplete: false,
   runIdHash: createHash('sha256').update(sample.runId).digest('hex').slice(0, 16), harness: sample.harness,
   startedAt: epoch + 1000, endedAt: epoch + 6000, ms: 5000, executionStartMs: 2500, executionEndMs: 4000,
   agentAccepted: { kind: sample.harness === 'codex' ? 'codex_turn_start_ack' : 'claude_user_ack', at: epoch + 3500, ms: 2500 },
@@ -25,6 +26,14 @@ const runtimeTiming = sample => ({ version: 1, source: 'http_server_link', windo
     startMs: 3000, endMs: 3010, ms: 10, outcome: 'ok' }],
   counts: [{ endpoint: 'run_telemetry', phase: 'executing', shared: false, started: 1, completed: 1, errors: 0, ms: 10 }],
   providerOutputChunks: 2, toolCallsStarted: 1, toolCallsCompleted: 1, toolCallsFailed: 0,
+  mcpHttpTiming: { version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children', generationCoverage: 'unverified',
+    allFirstPartyHttpComplete: false, remoteMcpServerCount: 0, childPathAuditVersion: 1,
+    runIdHash: createHash('sha256').update(sample.runId).digest('hex').slice(0, 16), harness: sample.harness,
+    startedAt: epoch + 2000, endedAt: epoch + 5500, expectedChildren: 1, observedChildren: 1, closedChildren: 0,
+    observedComplete: true, childLifecycleComplete: false, rejectedEvents: 0, truncated: false,
+    children: [{ child: 1, startedAt: epoch + 2100, closedAt: null, lastSequence: 3, sent: 1, completed: 1, lost: 0 }],
+    requests: [{ child: 1, sequence: 1, operation: 'decision_catalogue', startedAt: epoch + 2200,
+      endedAt: epoch + 2250, durationMs: 50, status: 200, outcome: 'ok' }] },
   officialCliTiming: { version: 1, source: 'official_cli_otlp', runIdHash: createHash('sha256').update(sample.runId).digest('hex').slice(0, 16),
     harness: sample.harness, startedAt: epoch + 2000, endedAt: epoch + 5500, collection: 'best_effort', flush: 'not_confirmed',
     cliExitObserved: true, batches: 1, recordsReceived: 1, duplicates: 0, rejectedBatches: 0, invalidEvents: 0, ignoredRecords: 0, truncated: false,
@@ -253,7 +262,7 @@ test('startup intervals retain only closed fields and reject foreign run data or
   }
 })
 
-test('the full runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness', () => {
+test('the scoped runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness', () => {
   const sample = { runId: id(999), harness: 'codex', sampleId: 'proof', requireRuntimeReceipt: true, requireOfficialTiming: true }
   const value = runtimeTiming(sample)
   sample.runIdHash = value.runIdHash
@@ -264,7 +273,7 @@ test('the full runtime receipt gates direct execution, preserves only closed evi
   assert.equal(sample.runtimeEvidence.status, 'passed')
   assert.equal(sample.runtimeEvidence.extraRemoteCalls, 0)
   assert.equal(sample.runtimeEvidence.officialDelivery, 'best_effort_not_a_complete_call_count')
-  assert.doesNotMatch(JSON.stringify(sample), /PRIVATE|path|error"/)
+  assert.doesNotMatch(JSON.stringify(sample), /PRIVATE|"(?:path|error)":/)
   const invalid = structuredClone(value); invalid.counts[0].started = 0
   assert.equal(readRuntimeTiming(invalid, sample), null)
   const missing = structuredClone(sample.runtimeTiming); delete missing.officialCliTiming
@@ -272,6 +281,74 @@ test('the full runtime receipt gates direct execution, preserves only closed evi
   const hiddenProxy = structuredClone(sample.runtimeTiming)
   hiddenProxy.counts[0].endpoint = 'provider_proxy'; hiddenProxy.counts[0].phase = 'preparing'
   assert.equal(runtimeEvidence(hiddenProxy).status, 'failed')
+})
+
+test('an HTTP-only legacy receipt cannot prove child-send coverage', () => {
+  const value = runtimeTiming({ runId: id(998), harness: 'codex' })
+  delete value.mcpHttpTiming
+  delete value.scope
+  delete value.allFirstPartyHttpComplete
+  const parsed = readRuntimeTiming(value, { runIdHash: value.runIdHash, harness: value.harness })
+  const required = runtimeEvidence(parsed)
+  assert.equal(required.status, 'unavailable')
+  assert.equal(required.allFirstPartyHttpComplete, false)
+  assert.equal(required.reason, 'mcp_http_observation_missing')
+})
+
+test('child business observations cannot become global coverage or fail solely for a missing lifecycle close', () => {
+  const value = runtimeTiming({ runId: id(997), harness: 'claude_code' }), scope = { runIdHash: value.runIdHash, harness: value.harness }
+  value.mcpHttpTiming.privateToken = 'PRIVATE'
+  value.mcpHttpTiming.requests[0].url = 'PRIVATE'
+  const parsed = readRuntimeTiming(value, scope), proof = runtimeEvidence(parsed)
+  assert.equal(proof.status, 'passed')
+  assert.equal(proof.basis, 'host_authorization_census_and_closed_mcp_business_paths')
+  assert.equal(proof.hostAuthorizationComplete, true)
+  assert.equal(proof.allFirstPartyHttpComplete, false)
+  assert.equal(proof.childBusiness.generationCoverage, 'unverified')
+  assert.equal(proof.childBusiness.childLifecycleComplete, false)
+  assert.equal(proof.childBusiness.observedPhysicalSends, 1)
+  assert.doesNotMatch(JSON.stringify(parsed), /PRIVATE|privateToken|url/)
+  const pending = structuredClone(parsed)
+  pending.mcpHttpTiming.observedComplete = false
+  Object.assign(pending.mcpHttpTiming.children[0], { sent: 2, lastSequence: 4 })
+  pending.mcpHttpTiming.requests.push({ child: 1, sequence: 2, operation: 'decision_record', startedAt: epoch + 5000,
+    endedAt: null, durationMs: null, status: null, outcome: 'pending' })
+  const observed = runtimeEvidence(readRuntimeTiming(pending, scope))
+  assert.equal(observed.status, 'passed', 'an observed pending business request is not an extra authorization request')
+  assert.equal(observed.extraRemoteCalls, 0)
+  assert.equal(observed.childBusiness.pendingObservedSends, 1)
+  assert.equal(observed.childBusiness.observedComplete, false)
+})
+
+test('child evidence rejects foreign identity, fake completeness, malformed sequences and unobserved remote MCP scope', () => {
+  const value = runtimeTiming({ runId: id(996), harness: 'codex' }), scope = { runIdHash: value.runIdHash, harness: value.harness }
+  for (const mutate of [
+    child => { child.runIdHash = '0'.repeat(16) }, child => { child.harness = 'claude_code' },
+    child => { child.generationCoverage = 'complete' }, child => { child.allFirstPartyHttpComplete = true },
+    child => { delete child.remoteMcpServerCount }, child => { child.childPathAuditVersion = 2 },
+    child => { child.childLifecycleComplete = true }, child => { child.requests[0].operation = 'permission_check' },
+    child => { child.requests[0].sequence = 2 }, child => { child.children[0].lastSequence = 4 },
+    child => { child.requests[0].endedAt = null }, child => { child.requests.push({ ...child.requests[0] }) },
+    child => { child.requests[0].status = 503 }, child => { child.requests[0].status = null },
+  ]) {
+    const invalid = structuredClone(value); mutate(invalid.mcpHttpTiming)
+    assert.equal(readMcpHttpTiming(invalid.mcpHttpTiming, scope), null)
+    const proof = runtimeEvidence(readRuntimeTiming(invalid, scope))
+    assert.equal(proof.status, 'unavailable')
+    assert.equal(proof.reason, 'mcp_http_observation_invalid')
+  }
+  for (const mutate of [
+    child => { child.remoteMcpServerCount = 1 },
+    child => { child.observedComplete = false; child.rejectedEvents = 1 },
+    child => { child.observedComplete = false; child.truncated = true },
+    child => { child.observedComplete = false; child.children[0].lost = 1 },
+    child => { child.requests[0].operation = 'decision_record' },
+  ]) {
+    const incomplete = structuredClone(value); mutate(incomplete.mcpHttpTiming)
+    const parsed = readRuntimeTiming(incomplete, scope)
+    assert.ok(parsed.mcpHttpTiming)
+    assert.equal(runtimeEvidence(parsed).status, 'unavailable')
+  }
 })
 
 test('direct diagnostics use and delete only this test repository variable, and extra auth fails after cleanup', async () => {
@@ -431,7 +508,7 @@ test('Claude initialization is retained as history but never proves current task
   value.agentAccepted.kind = 'claude_system_init'
   const parsed = readRuntimeTiming(value,{runIdHash:value.runIdHash,harness:'claude_code'})
   assert.equal(parsed.agentAccepted.kind,'claude_system_init')
-  assert.deepEqual(runtimeEvidence(parsed),{status:'unavailable',reason:'official_agent_acceptance_missing'})
+  assert.deepEqual(runtimeEvidence(parsed),{status:'unavailable',reason:'official_agent_acceptance_missing',allFirstPartyHttpComplete:false})
   value.agentAccepted.kind = 'claude_user_ack'
   assert.equal(runtimeEvidence(readRuntimeTiming(value,{runIdHash:value.runIdHash,harness:'claude_code'})).status,'passed')
 })

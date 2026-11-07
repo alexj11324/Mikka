@@ -63,6 +63,132 @@
           }
         ]
       }
+    },
+    {
+      "sourceCommit": "c563af107a6cb7aaabce996b1eda9d9b53508a99",
+      "runId": "42316232040",
+      "runAttempt": 1,
+      "buildJobId": "128229535482",
+      "failure": "fresh candidate --probe-models command exceeded its 45-second deadline",
+      "errorCode": "TimeoutException",
+      "published": false,
+      "createdTemplateInventory": [
+        {
+          "kind": "claude",
+          "templateId": "4w1siy3a48mblixzsto1",
+          "buildId": "adedc30f-6623-4f82-b714-b629ac324f19",
+          "name": "mikka-c563af107a6c-42316232040-1-claude",
+          "evidence": [
+            {
+              "line": 295,
+              "text": "2026-11-07T00:07:58.3857959Z [claude] [2026-11-07T00:07:58.385676] [info] Requesting build for template: mikka-c563af107a6c-42316232040-1-claude"
+            },
+            {
+              "line": 296,
+              "text": "2026-11-07T00:07:58.6106849Z [claude] [2026-11-07T00:07:58.610426] [info] Template created with ID: 4w1siy3a48mblixzsto1, Build ID: adedc30f-6623-4f82-b714-b629ac324f19"
+            }
+          ]
+        },
+        {
+          "kind": "desktop",
+          "templateId": "xyeuq29c5pm9q0ewokkg",
+          "buildId": "0f042fe6-08a7-41b6-b869-8acee23c437a",
+          "name": "mikka-c563af107a6c-42316232040-1-desktop",
+          "evidence": [
+            {
+              "line": 293,
+              "text": "2026-11-07T00:07:58.3848421Z [desktop] [2026-11-07T00:07:58.384663] [info] Requesting build for template: mikka-c563af107a6c-42316232040-1-desktop"
+            },
+            {
+              "line": 297,
+              "text": "2026-11-07T00:07:58.6108077Z [desktop] [2026-11-07T00:07:58.610510] [info] Template created with ID: xyeuq29c5pm9q0ewokkg, Build ID: 0f042fe6-08a7-41b6-b869-8acee23c437a"
+            }
+          ]
+        },
+        {
+          "kind": "codex",
+          "templateId": "h443b6kwfzuuztj5uvs0",
+          "buildId": "2db4d98e-3a5a-4801-8ccf-3641cbc25243",
+          "name": "mikka-c563af107a6c-42316232040-1-codex",
+          "evidence": [
+            {
+              "line": 294,
+              "text": "2026-11-07T00:07:58.3854518Z [codex] [2026-11-07T00:07:58.385325] [info] Requesting build for template: mikka-c563af107a6c-42316232040-1-codex"
+            },
+            {
+              "line": 298,
+              "text": "2026-11-07T00:07:58.6111039Z [codex] [2026-11-07T00:07:58.610578] [info] Template created with ID: h443b6kwfzuuztj5uvs0, Build ID: 2db4d98e-3a5a-4801-8ccf-3641cbc25243"
+            }
+          ]
+        }
+      ],
+      "originalCleanup": {
+        "jobId": "128232347702",
+        "evidenceLimitation": "The old alias-as-ID absent receipt did not prove deletion. The exact-ID readback below supersedes it."
+      }
+    },
+    {
+      "sourceCommit": "74d5758b095fd5367465bdc4b19eb5165280418d",
+      "runId": "42318838707",
+      "runAttempt": 1,
+      "buildJobId": "128238293558",
+      "failure": "fresh candidate --probe-models command exceeded its 45-second deadline",
+      "errorCode": "TimeoutException",
+      "published": false,
+      "createdTemplateInventory": [
+        {
+          "kind": "claude",
+          "templateId": "966bk6t9cm5iullgv36s",
+          "buildId": "e390bc53-0f7c-4ca7-9937-c41aead63ca4",
+          "name": "mikka-74d5758b095f-42318838707-1-claude",
+          "evidence": [
+            {
+              "line": 293,
+              "text": "2026-11-07T00:33:12.0174704Z [claude] [2026-11-07T00:33:12.016795] [info] Requesting build for template: mikka-74d5758b095f-42318838707-1-claude"
+            },
+            {
+              "line": 297,
+              "text": "2026-11-07T00:33:12.2217200Z [claude] [2026-11-07T00:33:12.221555] [info] Template created with ID: 966bk6t9cm5iullgv36s, Build ID: e390bc53-0f7c-4ca7-9937-c41aead63ca4"
+            }
+          ]
+        },
+        {
+          "kind": "codex",
+          "templateId": "jx1258qhmsbzyatxsqya",
+          "buildId": "116b9f6a-7cfb-4ad7-96d2-30a5b638642b",
+          "name": "mikka-74d5758b095f-42318838707-1-codex",
+          "evidence": [
+            {
+              "line": 295,
+              "text": "2026-11-07T00:33:12.1727709Z [codex] [2026-11-07T00:33:12.172538] [info] Requesting build for template: mikka-74d5758b095f-42318838707-1-codex"
+            },
+            {
+              "line": 298,
+              "text": "2026-11-07T00:33:12.2696075Z [codex] [2026-11-07T00:33:12.269430] [info] Template created with ID: jx1258qhmsbzyatxsqya, Build ID: 116b9f6a-7cfb-4ad7-96d2-30a5b638642b"
+            }
+          ]
+        },
+        {
+          "kind": "desktop",
+          "templateId": "hwvvc42pkofnn3ry94ry",
+          "buildId": "d0d05a1e-5336-4ea7-8cc1-4cbace60dcb3",
+          "name": "mikka-74d5758b095f-42318838707-1-desktop",
+          "evidence": [
+            {
+              "line": 292,
+              "text": "2026-11-07T00:33:12.0169024Z [desktop] [2026-11-07T00:33:12.016750] [info] Requesting build for template: mikka-74d5758b095f-42318838707-1-desktop"
+            },
+            {
+              "line": 296,
+              "text": "2026-11-07T00:33:12.2141604Z [desktop] [2026-11-07T00:33:12.213967] [info] Template created with ID: hwvvc42pkofnn3ry94ry, Build ID: d0d05a1e-5336-4ea7-8cc1-4cbace60dcb3"
+            }
+          ]
+        }
+      ],
+      "originalCleanup": {
+        "jobId": "128240751859",
+        "evidenceLimitation": "The old alias-as-ID absent receipt did not prove deletion. The exact-ID readback below supersedes it."
+      }
     }
   ],
   "cleanupDefect": {
@@ -1096,6 +1222,383 @@
         "jobReadbackStatus": 404,
         "independentReadbackStatus": 404
       }
+    },
+    {
+      "scope": "3 exact IDs from the naturally completed failed c563 release",
+      "runId": "42317467183",
+      "jobId": "128233520911",
+      "sourceRunId": "42316232040",
+      "sourceRunAttempt": 1,
+      "sourceCommit": "c563af107a6cb7aaabce996b1eda9d9b53508a99",
+      "cleanupEngineCommit": "8c58b1a64f0b29cdcdcb229fa8fcf5acb45a2d97",
+      "cleanupCommit": "582d125396aaa1d3029572b63b55dae254a57887",
+      "artifact": {
+        "id": 13550964108,
+        "sha256": "8c10f2c5acae37bd1b8dd44115bb0e4a7bc53ea3e78d154583de5cd46e7a1915"
+      },
+      "result": "deleted",
+      "interpretation": "DELETE 204 followed by two exact-ID 404 reads.",
+      "status": "passed",
+      "rawReceipt": {
+        "version": 1,
+        "workflowSource": "582d125396aaa1d3029572b63b55dae254a57887",
+        "recoveryRunId": "42317467183",
+        "sourceCommit": "c563af107a6cb7aaabce996b1eda9d9b53508a99",
+        "runId": "42316232040",
+        "runAttempt": "1",
+        "sandboxes": [],
+        "templates": [
+          {
+            "name": "mikka-c563af107a6c-42316232040-1-claude",
+            "kind": "claude",
+            "templateId": "4w1siy3a48mblixzsto1",
+            "status": "deleted"
+          },
+          {
+            "name": "mikka-c563af107a6c-42316232040-1-desktop",
+            "kind": "desktop",
+            "templateId": "xyeuq29c5pm9q0ewokkg",
+            "status": "deleted"
+          },
+          {
+            "name": "mikka-c563af107a6c-42316232040-1-codex",
+            "kind": "codex",
+            "templateId": "h443b6kwfzuuztj5uvs0",
+            "status": "deleted"
+          }
+        ],
+        "readback": [
+          {
+            "name": "mikka-c563af107a6c-42316232040-1-claude",
+            "kind": "claude",
+            "templateId": "4w1siy3a48mblixzsto1",
+            "status": "absent"
+          },
+          {
+            "name": "mikka-c563af107a6c-42316232040-1-desktop",
+            "kind": "desktop",
+            "templateId": "xyeuq29c5pm9q0ewokkg",
+            "status": "absent"
+          },
+          {
+            "name": "mikka-c563af107a6c-42316232040-1-codex",
+            "kind": "codex",
+            "templateId": "h443b6kwfzuuztj5uvs0",
+            "status": "absent"
+          }
+        ],
+        "ownedSandboxesAfter": [],
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-c563af107a6c-42316232040-1-claude",
+            "status": 200
+          },
+          {
+            "method": "GET",
+            "path": "/templates/4w1siy3a48mblixzsto1",
+            "status": 200,
+            "templateId": "4w1siy3a48mblixzsto1",
+            "public": false,
+            "isDefault": false,
+            "nameMatched": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/templates/4w1siy3a48mblixzsto1",
+            "status": 204
+          },
+          {
+            "method": "GET",
+            "path": "/templates/4w1siy3a48mblixzsto1",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-c563af107a6c-42316232040-1-desktop",
+            "status": 200
+          },
+          {
+            "method": "GET",
+            "path": "/templates/xyeuq29c5pm9q0ewokkg",
+            "status": 200,
+            "templateId": "xyeuq29c5pm9q0ewokkg",
+            "public": false,
+            "isDefault": false,
+            "nameMatched": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/templates/xyeuq29c5pm9q0ewokkg",
+            "status": 204
+          },
+          {
+            "method": "GET",
+            "path": "/templates/xyeuq29c5pm9q0ewokkg",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-c563af107a6c-42316232040-1-codex",
+            "status": 200
+          },
+          {
+            "method": "GET",
+            "path": "/templates/h443b6kwfzuuztj5uvs0",
+            "status": 200,
+            "templateId": "h443b6kwfzuuztj5uvs0",
+            "public": false,
+            "isDefault": false,
+            "nameMatched": true
+          },
+          {
+            "method": "DELETE",
+            "path": "/templates/h443b6kwfzuuztj5uvs0",
+            "status": 204
+          },
+          {
+            "method": "GET",
+            "path": "/templates/h443b6kwfzuuztj5uvs0",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-c563af107a6c-42316232040-1-claude",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/4w1siy3a48mblixzsto1",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-c563af107a6c-42316232040-1-desktop",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/xyeuq29c5pm9q0ewokkg",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-c563af107a6c-42316232040-1-codex",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/h443b6kwfzuuztj5uvs0",
+            "status": 404
+          }
+        ],
+        "errors": []
+      },
+      "helperBranchCleanup": {
+        "version": 1,
+        "repository": "alexj11324/Mikka",
+        "observedAt": "2026-11-07 00:23:42 UTC",
+        "cleanupRun": 42317848177,
+        "cleanupJob": 128234806897,
+        "cleanupCommit": "147e5e20b7239c7b44f48705c79089f0ae9e7e94",
+        "status": "passed",
+        "originalRun": {
+          "id": 42317467183,
+          "headSha": "582d125396aaa1d3029572b63b55dae254a57887",
+          "attempt": 1,
+          "status": "completed",
+          "conclusion": "success"
+        },
+        "preservedArtifact": {
+          "id": 13550964108,
+          "digest": "sha256:8c10f2c5acae37bd1b8dd44115bb0e4a7bc53ea3e78d154583de5cd46e7a1915",
+          "expired": false
+        },
+        "refs": [
+          {
+            "branch": "ops/1505-c563-template-recovery",
+            "expectedSha": "582d125396aaa1d3029572b63b55dae254a57887",
+            "deleteStatus": 204,
+            "jobReadbackStatus": 404,
+            "independentReadbackStatus": 404
+          },
+          {
+            "branch": "ops/1505-c563-recovery-ref-cleanup",
+            "expectedSha": "147e5e20b7239c7b44f48705c79089f0ae9e7e94",
+            "deleteStatus": 204,
+            "jobReadbackStatus": 404,
+            "independentReadbackStatus": 404
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "scope": "3 exact IDs from the naturally completed failed 74d5 release",
+      "runId": "42320346333",
+      "jobId": "128243119098",
+      "sourceRunId": "42318838707",
+      "sourceRunAttempt": 1,
+      "sourceCommit": "74d5758b095fd5367465bdc4b19eb5165280418d",
+      "cleanupEngineCommit": "8c58b1a64f0b29cdcdcb229fa8fcf5acb45a2d97",
+      "cleanupCommit": "0552a7e60718e66675bfc46298422ad184f87801",
+      "artifact": {
+        "id": 13551484948,
+        "sha256": "fe99053b4dda275e888b7f4c46f74bed31df583235675d25d21b050ba87f10d0"
+      },
+      "result": "already_absent",
+      "interpretation": "Both alias and exact ID were already 404 on the first correct lookup and again on independent readback. This recovery sent no template DELETE; it does not attribute the earlier removal.",
+      "status": "passed",
+      "rawReceipt": {
+        "version": 1,
+        "workflowSource": "0552a7e60718e66675bfc46298422ad184f87801",
+        "recoveryRunId": "42320346333",
+        "sourceCommit": "74d5758b095fd5367465bdc4b19eb5165280418d",
+        "runId": "42318838707",
+        "runAttempt": "1",
+        "sandboxes": [],
+        "templates": [
+          {
+            "name": "mikka-74d5758b095f-42318838707-1-claude",
+            "kind": "claude",
+            "templateId": "966bk6t9cm5iullgv36s",
+            "status": "absent"
+          },
+          {
+            "name": "mikka-74d5758b095f-42318838707-1-codex",
+            "kind": "codex",
+            "templateId": "jx1258qhmsbzyatxsqya",
+            "status": "absent"
+          },
+          {
+            "name": "mikka-74d5758b095f-42318838707-1-desktop",
+            "kind": "desktop",
+            "templateId": "hwvvc42pkofnn3ry94ry",
+            "status": "absent"
+          }
+        ],
+        "readback": [
+          {
+            "name": "mikka-74d5758b095f-42318838707-1-claude",
+            "kind": "claude",
+            "templateId": "966bk6t9cm5iullgv36s",
+            "status": "absent"
+          },
+          {
+            "name": "mikka-74d5758b095f-42318838707-1-codex",
+            "kind": "codex",
+            "templateId": "jx1258qhmsbzyatxsqya",
+            "status": "absent"
+          },
+          {
+            "name": "mikka-74d5758b095f-42318838707-1-desktop",
+            "kind": "desktop",
+            "templateId": "hwvvc42pkofnn3ry94ry",
+            "status": "absent"
+          }
+        ],
+        "ownedSandboxesAfter": [],
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-74d5758b095f-42318838707-1-claude",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/966bk6t9cm5iullgv36s",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-74d5758b095f-42318838707-1-codex",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/jx1258qhmsbzyatxsqya",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-74d5758b095f-42318838707-1-desktop",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/hwvvc42pkofnn3ry94ry",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-74d5758b095f-42318838707-1-claude",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/966bk6t9cm5iullgv36s",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-74d5758b095f-42318838707-1-codex",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/jx1258qhmsbzyatxsqya",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/aliases/mikka-74d5758b095f-42318838707-1-desktop",
+            "status": 404
+          },
+          {
+            "method": "GET",
+            "path": "/templates/hwvvc42pkofnn3ry94ry",
+            "status": 404
+          }
+        ],
+        "errors": []
+      },
+      "helperBranchCleanup": {
+        "schemaVersion": 1,
+        "issue": "https://github.com/alexj11324/Mikka/issues/1505",
+        "observedAt": "2026-11-07 00:55:26 UTC",
+        "status": "passed",
+        "scope": "exact_completed_recovery_branch_and_own_helper_only",
+        "target": {
+          "branch": "ops/1505-74d5-template-recovery",
+          "expectedSha": "0552a7e60718e66675bfc46298422ad184f87801",
+          "completedRun": 42320346333,
+          "runAttempt": 1,
+          "runConclusion": "success",
+          "deleteStatus": 204,
+          "jobReadbackStatus": 404,
+          "independentReadbackStatus": 404
+        },
+        "helper": {
+          "branch": "ops/1505-74d5-recovery-ref-cleanup",
+          "expectedSha": "f6b5404d82557d1b850c264f44ac2238a5ed1603",
+          "runId": 42320968861,
+          "jobId": 128245154266,
+          "conclusion": "success",
+          "deleteStatus": 204,
+          "jobReadbackStatus": 404,
+          "independentReadbackStatus": 404
+        },
+        "retainedArtifact": {
+          "id": 13551484948,
+          "sha256": "fe99053b4dda275e888b7f4c46f74bed31df583235675d25d21b050ba87f10d0",
+          "expired": false,
+          "verifiedAgainAfterBranchDeletion": true
+        },
+        "otherRefsDeleted": false,
+        "artifactsDeleted": false,
+        "productionAccess": false,
+        "paidResourcesCreated": false
+      }
     }
   ],
   "limits": [
@@ -1103,5 +1606,14 @@
     "The 45-second failures remain recorded; a longer diagnostic command is not a passing formal release.",
     "Recovery touched only immutable issue-owned ID/name pairs, verified private before deletion; public/previous images were retained.",
     "A future preloaded-catalogue fix requires an exact-source new build, full fresh conservation, same-source real Claude Code and Codex subscription gates, and final production timing."
-  ]
+  ],
+  "observedThroughDate": "2026-11-07",
+  "resourceSummary": {
+    "historicalTemplateIdsConfirmedAbsent": 46,
+    "historicalTemplateIdsDeletedByRecordedRecovery": 43,
+    "historicalTemplateIdsAlreadyAbsentAtCorrectLookup": 3,
+    "separateNewPreviewTemplateIdsDeleted": 2,
+    "newPreviewEvidence": "2026-11-06-e2b-preloaded-receipt-validation.json",
+    "note": "Already-absent IDs are not reported as DELETE operations. Source/run/attempt owned running/paused VM readbacks and temporary helper refs are in the individual receipts."
+  }
 }

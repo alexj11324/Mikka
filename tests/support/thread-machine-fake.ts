@@ -33,12 +33,17 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
       sandboxId,
       files: {
         read: async () => catalogue.sha,
-        write: async (path: string, body: string) => {
+        write: async (path: string | { path: string; data: string }[], body?: unknown) => {
           // The handoff alone cannot register a worker that has not started.
-          if (!/^\/run\/mikka-viewer\/thread-[a-f0-9-]+\.json$/.test(path)) return
-          const { deviceId, credential } = JSON.parse(body) as { deviceId: string; credential: string }
-          handoff = { deviceId, credential }
-          credentials.set(deviceId, credential)
+          const files = typeof path === 'string' ? [{ path, data: body }] : path
+          for (const file of files) {
+            // A locator sidecar or maintenance file is not a worker bootstrap.
+            if (!/^\/run\/mikka-viewer\/thread-[a-f0-9-]+\.json$/.test(file.path)) continue
+            if (typeof file.data !== 'string') throw new Error('Fixture bootstrap must be text')
+            const { deviceId, credential } = JSON.parse(file.data) as { deviceId: string; credential: string }
+            handoff = { deviceId, credential }
+            credentials.set(deviceId, credential)
+          }
         },
       },
       commands: { run: async (command: string) => {
