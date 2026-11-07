@@ -35,6 +35,7 @@ import type { RailDestination } from '@/components/nav/icon-rail'
 import { prefetchSettingsSection } from '@/lib/settings-prefetch'
 import { FieldError } from '@/components/ui/field'
 import { GovernancePlan, GovernanceTemplates, GovernanceUsage } from '@ui-slot/settings-governance'
+import { ORGANIZATION_SETTINGS, OrganizationSettings } from '@ui-slot/settings-organization'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
 
@@ -65,7 +66,8 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const billing = workspace !== undefined && workspace.edition !== 'community'
   const community = workspace?.edition === 'community'
   const cloudAdmin = community && workspace?.serverAdmin === true
-  const section = (requestedSection === 'billing' && !billing) || (requestedSection === 'cloud' && !cloudAdmin) ? 'preferences' : requestedSection
+  // 组织 exists only where a UI layer draws it (slot settings-organization).
+  const section = (requestedSection === 'billing' && !billing) || (requestedSection === 'cloud' && !cloudAdmin) || (requestedSection === 'organization' && !ORGANIZATION_SETTINGS) ? 'preferences' : requestedSection
   const admin = workspace?.role === 'admin'
   const personal = workspace?.workspace.kind === 'personal'
   // Team settings show once the workspace is known to be a team, as admin-only ones wait for the role.
@@ -129,6 +131,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} team={team} cloudUserKey={community ? userKey : undefined} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'organization': return workspaceId && !preview ? <OrganizationSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'usage': return workspaceId && !preview ? <><UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />{team && <GovernanceUsage key={`governance-${workspaceId}`} workspaceId={workspaceId} />}</> : waiting
     case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}{admin && <BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />}</> : waiting
     // Bots of people who left are a team's (decision 2026-11-02-0203); they moved here with Bot 与 Agents' removal (2026-11-02-1400).

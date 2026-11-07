@@ -33,6 +33,8 @@ export type GovernanceSummary = {
   approvalTemplateLimit: number
   canEdit: boolean
   templates: GovernanceTemplate[]
+  /** Enterprise (#1642): admins only, the Organizations they own or administer, to bind this workspace to. */
+  organizations?: { id: string; name: string; role: 'owner' | 'admin' }[]
 }
 export type GovernanceUsage = {
   from: string
