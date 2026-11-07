@@ -3,6 +3,7 @@
 - Date: 2026-11-07
 - Source: Alex, 2026-11-07, on the web build of [2045](2026-11-07-2045-tasks-only-threads-inside.md), where every row under 待处理 showed a raised hand: 「应该是 waiting for you 的时候，需要我处理的时候才会举手」, 「我明确要求过，每一个状态都要有不同的符号」 and 「你有去做过调研吗？……依据是哪一个竞品」. After the research below he approved the seven-state model: 「可以按照你新的这个东西去做」.
 - Rule: R-52; `mobile.md` 「Where it lives」
+- Superseded in part by: [2026-11-07-2300](2026-11-07-2300-one-conversation-per-task.md) (受阻 has its own octagon, not the hand; an attempt never shows the hand)
 - Replaces, in part: [2045](2026-11-07-2045-tasks-only-threads-inside.md) rules 3 and 4 (the group 待处理 and its icon on every row); the board-blocked tasks in 待处理 from the #1673 mapping
 
 ## What went wrong
@@ -28,7 +29,8 @@ A task row shows one state. In 等待你 and 进行中 the state comes from the 
 
 | Group | State | Icon (lucide; SF Symbol on iOS) | When |
 | --- | --- | --- | --- |
-| 等待你 | 等你处理 | raised hand (`Hand`; `hand.raised`) | The attempt needs the person: a question, an approval, a PR to review, a login or key to fix, quota used up. The reason is the row's grey line: 等你回复, 等你确认, 待审阅, 要重新登录, 额度用完. |
+| 等待你 | 等你处理 | raised hand (`Hand`; `hand.raised`) | The task needs the person: a question, an approval, a PR to review. The reason is the row's grey line: 等你回复, 等你确认, 待审阅. |
+| 等待你 | 受阻 | octagon (`OctagonAlert`; `exclamationmark.octagon`), added by [2300](2026-11-07-2300-one-conversation-per-task.md) | A login, key or permission to fix, quota used up, a device offline. The grey line says which. |
 | 等待你 | 失败 | warning triangle (`TriangleAlert`; `exclamationmark.triangle`) | The attempt failed and nobody took over. The raw error stays inside the attempt (2026-11-05-0330). |
 | 进行中 | 运行中 | turning ring (`CircleDot` still, the ring animating; `circle.dotted` or a spinner) | The attempt is preparing, running or finishing. |
 | 进行中 | 排队中 | clock (`Clock`; `clock`) | Queued, or waiting for its next scheduled run. |

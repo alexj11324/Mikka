@@ -310,8 +310,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   [decision](decisions/2026-11-01-2255-library-delete-own-files.md)).
 - **R-52** Since 2026-11-07 every list is a task list, grouped 等待你 · 进行中 ·
   待办 · 已完成 ([decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)), and each row
-  carries its own state's icon, never its group's: the raised hand only for 等你处理, a
-  triangle for 失败, a ring for 运行中, a clock for 排队中, and the board's own icon
+  carries its own state's icon, never its group's: the raised hand only for 等你处理, an
+  octagon for 受阻 ([2300](decisions/2026-11-07-2300-one-conversation-per-task.md)), a triangle for 失败, a ring for 运行中, a clock for 排队中, and the board's own icon
   in 待办 and 已完成 ([states and icons](decisions/2026-11-07-2230-one-icon-per-task-state.md)). 等待你 and 受阻
   below become 等待你, 空闲 becomes 待办, 已解决 becomes 已完成, and the
   judgement below decides the state of a task's current thread. Before that,

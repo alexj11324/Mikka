@@ -40,6 +40,7 @@ The Bot tab's large title sits in the top bar's own row with a **+** on the righ
 (新建 Bot, 新建群聊); there is no workspace menu, and workspaces switch only in
 设置 › 工作区. The 任务 tab groups its tasks 等待你 · 进行中 · 待办 · 已完成; each row carries its
 own state's icon, the raised hand only for 等你处理
+(a task has one conversation, and every tab's title sits in the top row: [2300](decisions/2026-11-07-2300-one-conversation-per-task.md))
 ([states and icons](decisions/2026-11-07-2230-one-icon-per-task-state.md)), and no coloured dots; its + creates a task. The
 paragraphs below on the 对话 bar's workspace menu and on the 线程 tab and its
 segment are replaced by this. Each tab is
