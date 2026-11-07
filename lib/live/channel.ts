@@ -51,8 +51,9 @@ export class LiveChannel {
   private generation = 0
   private connected = false
   /** Continuous coverage starts at this generation's capability acknowledgement.
-   * Every valid push advances it, including keys not yet subscribed here. */
+   * Pushes advance only their bounded event kind, including unsubscribed keys. */
   private coverageAfter: number | null = null
+  private invalidationAfter = new Map<LiveKind, number>()
   private capabilities = new Set<LiveKind>()
   private revisionKinds = new Set<LiveKind>()
   private presenceSupported = false
@@ -94,7 +95,8 @@ export class LiveChannel {
       if (this.runtime.visible()) { this.fallback(); void this.connect() }
     }
     if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true, false, undefined,
-      this.supported(subscription) ? this.coverageAfter ?? undefined : undefined)
+      this.supported(subscription) && this.coverageAfter !== null
+        ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined)
     this.syncPresence()
     this.fallback()
     this.scheduleDeadline(subscription)
@@ -159,6 +161,7 @@ export class LiveChannel {
   private closeSocket() {
     this.connected = false
     this.coverageAfter = null
+    this.invalidationAfter.clear()
     this.capabilities.clear(); this.revisionKinds.clear()
     this.presenceSupported = false
     for (const watch of this.presenceWatches.values()) this.clear(`presence:${watch.id}`)
@@ -422,7 +425,8 @@ export class LiveChannel {
           const value = liveInvalidation(parsed, this.revisionKinds.size > 0)
           if (value) {
             this.observe({ event: 'received', kind: value.kind, id: value.id, rev: value.rev })
-            const after = this.coverageAfter = readBoundary()
+            const after = readBoundary()
+            this.invalidationAfter.set(value.kind, after)
             this.invalidate(value.kind, value.id, false, false, value.rev !== undefined && this.revisionKinds.has(value.kind) ? value.rev : undefined, after)
           } else this.observe({ event: 'skipped', reason: 'invalid' })
         } catch { /* malformed keys/capabilities cannot trigger reads or disable fallback */ }
