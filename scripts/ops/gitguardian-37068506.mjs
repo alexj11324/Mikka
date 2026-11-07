@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/gitguardian-37068506',
-  base: '02db9c4b01698c28502949bb884ba87e9f39fbf7',
+  base: 'b81ba153ba9e20a8782cc8afc2adc3590ee70203',
   workspace: 837165, incident: 37068506,
   source: '518b9d32eb9315656173ae7a074c920546fdcb70',
   file: 'docker-compose.yml', blob: '80bf3b1e101f3f8fc34ae95640f2f3017a708ce8',
@@ -70,6 +70,45 @@ export function validateIncident(incident) {
   if (incident.status === 'IGNORED') requireThat(incident.ignore_reason === 'false_positive', 'INCIDENT_REASON')
   else requireThat(incident.ignore_reason == null, 'INCIDENT_REASON')
   return { status: incident.status, ignoreReason: incident.ignore_reason ?? null }
+}
+
+export function inspectIncident(incident) {
+  const expectedPath = `/workspace/${TARGET.workspace}/incidents/${TARGET.incident}`
+  const expectedUrl = `https://dashboard.gitguardian.com${expectedPath}`
+  const detector = incident?.detector?.display_name
+  let url = null
+  if (typeof incident?.gitguardian_url === 'string') {
+    try { url = new URL(incident.gitguardian_url) } catch { /* Only closed booleans below. */ }
+  }
+  const parts = url?.pathname.split('/').filter(Boolean) ?? []
+  return {
+    idMatches: incident?.id === TARGET.incident,
+    expectedCount: 3,
+    actualCount: Number.isSafeInteger(incident?.occurrences_count) && incident.occurrences_count >= 0 ? incident.occurrences_count : null,
+    countMatches: incident?.occurrences_count === 3,
+    detectorExactMatches: detector === 'Generic Password',
+    detectorCasefoldMatches: typeof detector === 'string' && detector.toLowerCase() === 'generic password',
+    urlExactMatches: incident?.gitguardian_url === expectedUrl,
+    urlParseable: url !== null,
+    urlHttps: url?.protocol === 'https:',
+    urlHostMatches: url?.host === 'dashboard.gitguardian.com',
+    urlWorkspaceMatches: parts[0] === 'workspace' && parts[1] === String(TARGET.workspace),
+    urlIncidentMatches: parts[2] === 'incidents' && parts[3] === String(TARGET.incident),
+    urlPathMatches: url?.pathname === expectedPath,
+    urlPathTrailingSlashMatches: url?.pathname === `${expectedPath}/`,
+    urlNoCredentials: url !== null && url.username === '' && url.password === '',
+    urlNoQueryOrFragment: url !== null && url.search === '' && url.hash === '',
+    status: ['TRIGGERED', 'ASSIGNED', 'RESOLVED', 'IGNORED'].includes(incident?.status) ? incident.status : 'OTHER',
+    projectionNullOrAbsent: incident?.occurrences == null,
+    projectionEmpty: Array.isArray(incident?.occurrences) && incident.occurrences.length === 0,
+  }
+}
+
+export async function inspect({ request, report }) {
+  validateToken((await request(ROUTES.token)).data)
+  report.workspaceVerified = true
+  report.inspection = inspectIncident((await request(ROUTES.incident)).data)
+  report.result = 'inspected'
 }
 
 export function validateOccurrences(rows, headers) {
@@ -139,13 +178,14 @@ async function main() {
   const report = { incident: TARGET.incident, workspace: TARGET.workspace, result: 'blocked', writeAttempts: 0, requests: [],
     secretContentRequested: false, scannerConfigurationChanged: false, checkRunEditedOrSkipped: false }
   try {
-    requireThat(process.argv.length === 3 && ['--preflight', '--apply'].includes(process.argv[2]), 'MODE')
+    // This diagnostic revision deliberately has no CLI disposition entry point.
+    requireThat(process.argv.length === 3 && ['--preflight', '--inspect'].includes(process.argv[2]), 'MODE')
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
     report.execution = validateExecution({ env: process.env, event, head: git('rev-parse', 'HEAD'),
       parent: git('rev-parse', 'HEAD^'), changed: git('diff', '--name-only', 'HEAD^', 'HEAD').split('\n').filter(Boolean) })
     report.source = validateSource(execFileSync('git', ['show', `${TARGET.source}:${TARGET.file}`], { stdio: ['ignore', 'pipe', 'pipe'] }))
     if (process.argv[2] === '--preflight') report.result = 'source_verified'
-    else await dispose({ request: guardianClient(process.env.GITGUARDIAN_API_TOKEN, fetch, row => report.requests.push(row)), report })
+    else await inspect({ request: guardianClient(process.env.GITGUARDIAN_API_TOKEN, fetch, row => report.requests.push(row)), report })
   } catch (error) {
     report.error = error instanceof GuardError ? error.code : 'DISPOSITION_FAILED'
     process.exitCode = 1

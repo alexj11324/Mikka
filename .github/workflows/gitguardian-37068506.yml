@@ -1,4 +1,4 @@
-name: GitGuardian incident 37068506 disposition
+name: GitGuardian incident 37068506 inspection
 
 on:
   push:
@@ -48,5 +48,5 @@ jobs:
           secret-name: GITGUARDIAN_API_TOKEN
           recursive: false
           include-imports: false
-      - name: Verify the exact incident, ignore the false positive once and read it back
-        run: node scripts/ops/gitguardian-37068506.mjs --apply
+      - name: Inspect only closed metadata for the fixed incident, without any mutation
+        run: node scripts/ops/gitguardian-37068506.mjs --inspect

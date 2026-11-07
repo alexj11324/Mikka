@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { TARGET, ROUTES, validateExecution, validateSource, validateToken, validateIncident,
-  validateOccurrences, guardianClient, dispose } from './gitguardian-37068506.mjs'
+  validateOccurrences, guardianClient, dispose, inspectIncident, inspect } from './gitguardian-37068506.mjs'
 
 const clone = value => structuredClone(value)
 const code = expected => error => error.code === expected && error.message === expected
@@ -225,4 +225,52 @@ test('HTTP errors do not read provider response bodies and transport errors rema
   assert.equal(canceled, true)
   const unavailable = guardianClient('synthetic', async () => { throw new Error('untrusted-provider-text') })
   await assert.rejects(unavailable(ROUTES.token), code('API_TRANSPORT'))
+})
+
+test('inspection identifies field mismatches without serializing arbitrary provider strings', () => {
+  const actual = inspectIncident({ ...incident(), occurrences_count: 12,
+    detector: { display_name: 'generic password' },
+    gitguardian_url: `https://dashboard.gitguardian.com/workspace/${TARGET.workspace}/incidents/${TARGET.incident}/` })
+  assert.equal(actual.idMatches, true)
+  assert.equal(actual.expectedCount, 3)
+  assert.equal(actual.actualCount, 12)
+  assert.equal(actual.countMatches, false)
+  assert.equal(actual.detectorExactMatches, false)
+  assert.equal(actual.detectorCasefoldMatches, true)
+  assert.equal(actual.urlExactMatches, false)
+  assert.equal(actual.urlHostMatches, true)
+  assert.equal(actual.urlWorkspaceMatches, true)
+  assert.equal(actual.urlIncidentMatches, true)
+  assert.equal(actual.urlPathMatches, false)
+  assert.equal(actual.urlPathTrailingSlashMatches, true)
+  assert.equal(actual.projectionEmpty, true)
+  const arbitrary = inspectIncident({ id: 'provider-string', occurrences_count: 'provider-string',
+    detector: { display_name: 'provider-string' }, gitguardian_url: 'provider-string',
+    status: 'provider-string', occurrences: ['provider-string'], secret_hash: 'provider-string' })
+  assert.equal(arbitrary.actualCount, null)
+  assert.equal(arbitrary.status, 'OTHER')
+  assert.equal(arbitrary.urlParseable, false)
+  assert.equal(JSON.stringify(arbitrary).includes('provider-string'), false)
+  assert.ok(Object.values(arbitrary).every(value => typeof value === 'boolean' || typeof value === 'number' || value === null || value === 'OTHER'))
+})
+
+test('inspection reads exactly token and projected incident metadata, even when the disposition guard rejects', async () => {
+  const api = fakeApi({ incident: () => ({ ...incident(), occurrences_count: 12 }) })
+  await inspect({ request: api.request, report: api.receipt })
+  assert.deepEqual(api.calls, [{ path: ROUTES.token, method: 'GET' }, { path: ROUTES.incident, method: 'GET' }])
+  assert.equal(api.receipt.result, 'inspected')
+  assert.equal(api.receipt.writeAttempts, 0)
+  assert.equal(api.receipt.inspection.countMatches, false)
+  assert.throws(() => validateIncident({ ...incident(), occurrences_count: 12 }), code('INCIDENT_SCOPE'))
+})
+
+test('this diagnostic revision cannot invoke disposition through the CLI', () => {
+  const child = spawnSync(process.execPath, [new URL('./gitguardian-37068506.mjs', import.meta.url).pathname, '--apply'], {
+    encoding: 'utf8', env: { PATH: process.env.PATH },
+  })
+  assert.equal(child.status, 1)
+  const receipt = JSON.parse(child.stdout.trim())
+  assert.equal(receipt.error, 'MODE')
+  assert.equal(receipt.writeAttempts, 0)
+  assert.deepEqual(receipt.requests, [])
 })
