@@ -58,7 +58,7 @@ test('Plugins → GitHub connections are per Mikka user and leave the login iden
   })
 
   await t.test('GitHub sign-in callbacks stay with Better Auth unless the state is this user\'s connect state', async () => {
-    const { cookie } = connection.startGitHubConnect(first)
+    const { cookie } = await connection.startGitHubConnect(first)
     const state = cookie.value.slice(0, cookie.value.indexOf('.'))
     assert.equal(connection.githubConnectUser(state, cookie.value), first)
     assert.equal(connection.githubConnectUser('better-auth-state', cookie.value), null)
@@ -70,7 +70,7 @@ test('Plugins → GitHub connections are per Mikka user and leave the login iden
   })
 
   await t.test('a failed connect callback says why when it can: cancelled on GitHub, or another Mikka session', async () => {
-    const { cookie } = connection.startGitHubConnect(first)
+    const { cookie } = await connection.startGitHubConnect(first)
     const state = cookie.value.slice(0, cookie.value.indexOf('.'))
     const headers = { cookie: `${cookie.name}=${cookie.value}` }
     const reason = async (query: string) => {

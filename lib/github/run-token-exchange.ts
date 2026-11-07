@@ -5,7 +5,7 @@ import { classifyRunGitHubFailure, logRunGitHubFailure } from './run-token-failu
 export interface RunGitHubScope {
   runId: string
   userId: string
-  /** The run's own github.com repository, for bookkeeping only; it scopes nothing. */
+  /** The run's own repository. Cloud installation credentials use its owning installation. */
   remoteKey?: string
 }
 
@@ -23,9 +23,9 @@ export const RUN_GITHUB_MIN_VALIDITY_MS = 45 * 60_000
  */
 export function createRunGitHubTokenExchange(deps: {
   authorize(request: Request): Promise<RunGitHubScope | null>
-  issue(userId: string): Promise<{ token: string; expiresAt: Date | null; githubAccountId?: string }>
+  issue(userId: string, scope: RunGitHubScope): Promise<{ token: string; expiresAt: Date | null; githubAccountId?: string; installationId?: string }>
   /** Bookkeeping after a successful answer; a failure here never withholds the token. */
-  afterIssue?(scope: RunGitHubScope, issued: { token: string; githubAccountId?: string }): Promise<void>
+  afterIssue?(scope: RunGitHubScope, issued: { token: string; githubAccountId?: string; installationId?: string }): Promise<void>
   /** Direct machine credentials refresh at the provider's natural expiry. */
   naturalExpiry?: boolean
   /** Where a failure's structured line goes; the server log by default. */
@@ -43,11 +43,11 @@ export function createRunGitHubTokenExchange(deps: {
       if (!scope) return denied()
       runId = scope.runId
       stage = 'issue'
-      const issued = await deps.issue(scope.userId)
+      const issued = await deps.issue(scope.userId, scope)
       // The run may have ended or changed hands during GitHub IO.
       stage = 'reauthorize'
       const current = await deps.authorize(request)
-      if (!current || current.runId !== scope.runId || current.userId !== scope.userId) return denied()
+      if (!current || current.runId !== scope.runId || current.userId !== scope.userId || current.remoteKey !== scope.remoteKey) return denied()
       await deps.afterIssue?.(current, issued).catch(() => undefined)
       const cap = now() + MAX_ANSWER_MS
       const expiresAt = deps.naturalExpiry ? issued.expiresAt?.toISOString() ?? null

@@ -51,6 +51,7 @@ jobs:
     env:
       # This public deployment selector is not a credential. Community images still default to community.
       MIKKA_EDITION: cloud
+      MIKKA_CLOUD_BACKEND_URL: https://mikka-cloud.vercel.app
       VERCEL_ORG_ID: team_C7lwxVVvnUicFli6112mvxpv
       VERCEL_PROJECT_ID: prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH
       VERCEL_CLI: vercel@65.4.0

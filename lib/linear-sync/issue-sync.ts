@@ -1,4 +1,4 @@
-import { defaultModelConfigured } from '@/lib/default-model-config'
+import { defaultModelAvailable } from '@/lib/default-model'
 import 'server-only'
 import { issueListChanged } from '../live/lists'
 import { and, eq, sql } from 'drizzle-orm'
@@ -149,7 +149,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
     await tx.update(linearIssueLinks).set({ appSyncedAt: saved.updatedAt, linearUpdatedAt: new Date(remote.updatedAt), linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.id, link.link.id))
     return saved
   })
-  if (statusEvent && defaultModelConfigured()) {
+  if (statusEvent && await defaultModelAvailable(team.ownerId)) {
     const { wakeCoordinator } = await import('@/lib/coordinator/wake')
     await wakeCoordinator(team.ownerId)
   }

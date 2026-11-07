@@ -19,6 +19,8 @@ const browser = new Window({ url: 'https://mikka.example/en?settings=integration
 const originalFetch = globalThis.fetch
 const requests: { resolve: (response: Response) => void }[] = []
 let composioRequests = 0
+let appAdmin = false
+let appRequests = 0
 // Plugins › GitHub's write settings, as the permissions route answers them.
 let permissions: Record<string, unknown> | null = null
 const patches: unknown[] = []
@@ -44,7 +46,7 @@ before(async () => {
 })
 
 beforeEach(() => {
-  userId = 'viewer-a'; pending = false; requests.length = 0; composioRequests = 0; patches.length = 0
+  userId = 'viewer-a'; pending = false; requests.length = 0; composioRequests = 0; patches.length = 0; appAdmin = false; appRequests = 0
   permissions = null
   verification = null; verificationSaveFails = false; verificationPatches.length = 0
   browser.history.replaceState({}, '', '?settings=integrations')
@@ -53,6 +55,8 @@ beforeEach(() => {
   root = createRoot(container)
   globalThis.fetch = (input, init) => String(input).endsWith('/github')
     ? new Promise<Response>(resolve => { requests.push({ resolve }) })
+    : String(input).endsWith('/github/manifest')
+      ? (appRequests++, Promise.resolve(Response.json({ viewerId: userId, admin: appAdmin, configured: false, slug: null, installUrl: null })))
     : String(input).includes('/github/repositories/verification')
       ? init?.method === 'PATCH'
         ? (verificationPatches.push(JSON.parse(String(init.body))), verificationSaveFails
@@ -110,6 +114,23 @@ test('GitHub installation management is exposed as a link with the exact destina
   assert.ok(link)
   assert.equal(link?.textContent, 'githubManage')
   assert.equal(link?.getAttribute('href'), '/api/integrations/github/install')
+})
+
+test('server App setup is restricted to the confirmed administrator and never polls on focus', async () => {
+  await render()
+  await respondNotConnected(0, 'viewer-a')
+  assert.ok(!container.textContent?.includes('githubAppCreate'))
+  appAdmin = true
+  await revisit()
+  await respondNotConnected(1, 'viewer-a')
+  assert.ok(container.textContent?.includes('githubAppCreate'))
+  const beforeFocus = appRequests
+  await focus()
+  await frame()
+  assert.equal(appRequests, beforeFocus)
+  pending = true
+  await render()
+  assert.ok(!container.textContent?.includes('githubAppCreate'))
 })
 
 test('a switched cookie cannot expose B repositories while the session hook still identifies A', async () => {
