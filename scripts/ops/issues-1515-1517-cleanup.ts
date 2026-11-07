@@ -63,7 +63,7 @@ try {
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
     await client.query("SET LOCAL statement_timeout='30s'")
     stage = 'subscription_targets'
-    const targetRows = (await client.query(`SELECT c.id FROM byos_connections c WHERE c."removedAt" IS NULL
+    const targetRows = (await client.query(`SELECT c.id,c.\"ownerId\",c.provider,EXISTS(SELECT 1 FROM account_deletion_guards g WHERE g.\"subjectId\"=c.\"ownerId\") AS guarded FROM byos_connections c WHERE c."removedAt" IS NULL
       AND c.state='pending' AND c."updatedAt"<now()-interval '1 hour'
       AND (c."operationDeadline" IS NULL OR c."operationDeadline"<now())
       AND c."providerSubject" IS NULL AND c."accountLabel" IS NULL
@@ -73,7 +73,14 @@ try {
       AND NOT EXISTS(SELECT 1 FROM byos_oauth_attempts a WHERE a."connectionId"=c.id AND a."consumedAt" IS NULL AND a."expiresAt">now())
       AND NOT EXISTS(SELECT 1 FROM byos_enrollment_transfers t WHERE t."connectionId"=c.id AND t.epoch=c.epoch AND t."operationId"=c."operationId")
       ORDER BY c.id`)).rows
-    const ids = targetRows.map(row => row.id as string)
+    const guarded = targetRows.filter(row => row.guarded)
+    const eligible = targetRows.filter(row => !row.guarded)
+    const ids = eligible.map(row => row.id as string)
+    report.emptyConnectionsFound = targetRows.length
+    report.emptyConnectionsPreservedForAccountDeletion = guarded.length
+    report.accountDeletionStages = (await client.query(`SELECT j.stage,count(*)::int AS count FROM account_deletion_jobs j
+      WHERE j.\"subjectUserId\"=ANY($1::text[]) GROUP BY j.stage ORDER BY j.stage`, [guarded.map(row => row.ownerId)])).rows
+    report.emptyConnectionProviders = ['claude','codex'].map(provider => ({provider,found:targetRows.filter(row => row.provider===provider).length,eligible:eligible.filter(row => row.provider===provider).length,preserved:guarded.filter(row => row.provider===provider).length}))
     const protectedRows = async () => (await client.query(`SELECT c.id,md5(to_jsonb(c)::text) AS digest FROM byos_connections c WHERE NOT (c.id::text=ANY($1::text[])) ORDER BY c.id`, [ids])).rows
     stage = 'subscription_protected_snapshot'
     const protectedBefore = await protectedRows()
@@ -82,7 +89,15 @@ try {
     // exposes extra candidates or skipped locks before any durable cleanup.
     report.targetDeletionGuards = (await client.query(`SELECT count(*)::int AS n FROM byos_connections c JOIN account_deletion_guards g ON g.\"subjectId\"=c.\"ownerId\" WHERE c.id::text=ANY($1::text[])`,[ids])).rows[0].n
     stage = 'subscription_expire'
-    const result = await expireSubscriptionAcquisitions(client)
+    // Scope the existing expiry business path to eligible owners. Any extra
+    // row it touches still fails the protected-row comparison and rolls back.
+    // Account deletion fences are never bypassed, removed or weakened.
+    const result = {expired: 0, ownerIds: [] as string[]}
+    for (const ownerId of [...new Set(eligible.map(row => row.ownerId as string))]) {
+      const expired = await expireSubscriptionAcquisitions(client, ownerId)
+      result.expired += expired.expired
+      result.ownerIds.push(...expired.ownerIds)
+    }
     stage = 'subscription_validate'
     check(result.expired === ids.length, 'cleanup_subscription_count_mismatch')
     check(same(protectedBefore, await protectedRows()), 'cleanup_protected_subscription_changed')

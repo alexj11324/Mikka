@@ -1,6 +1,17 @@
 name: Issues 1515-1517 production cleanup
 on:
   workflow_dispatch:
+    inputs:
+      application_sha:
+        description: Exact deployed application SHA
+        required: true
+        type: string
+      mode:
+        description: Apply only after the preceding dry-run succeeds
+        required: true
+        default: dry-run
+        type: choice
+        options: [dry-run, apply]
   push:
     branches: [ops/1515-1517-acceptance]
     paths:
@@ -20,7 +31,7 @@ jobs:
       actions: read
       id-token: write
     env:
-      APPLICATION_SHA: f7225f3eb1e38762dfdecde0395792c85b81ec22
+      APPLICATION_SHA: ${{ inputs.application_sha || 'f7225f3eb1e38762dfdecde0395792c85b81ec22' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -57,6 +68,9 @@ jobs:
           path: issues-1515-1517-cleanup-report/runtime-candidates.json
           retention-days: 7
   cleanup:
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-acceptance'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -64,7 +78,7 @@ jobs:
       contents: read
       id-token: write
     env:
-      APPLICATION_SHA: f7225f3eb1e38762dfdecde0395792c85b81ec22
+      APPLICATION_SHA: ${{ inputs.application_sha || 'f7225f3eb1e38762dfdecde0395792c85b81ec22' }}
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -172,7 +186,7 @@ jobs:
           fi
           exit "$result"
       - name: Authorized cleanup apply with counts-only output
-        if: false
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'apply'
         env:
           CLEANUP_MODE: apply
         run: |

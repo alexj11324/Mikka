@@ -1,10 +1,18 @@
 name: Issue 1516 real welcome acceptance
 on:
   workflow_dispatch:
+    inputs:
+      application_sha:
+        description: Exact deployed application SHA
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
   preflight:
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-acceptance'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -60,7 +68,7 @@ jobs:
         run: node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs --self-test
       - name: Exercise the real fresh Coordinator welcome through the normal account
         env:
-          APPLICATION_SHA: f7225f3eb1e38762dfdecde0395792c85b81ec22
+          APPLICATION_SHA: ${{ inputs.application_sha || 'f7225f3eb1e38762dfdecde0395792c85b81ec22' }}
           ACCEPTANCE_CASES: all
         run: MIKKA_OPS_DEPENDENCIES="$RUNNER_TEMP/issue1515-diagnostic" node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs
       - if: always()
