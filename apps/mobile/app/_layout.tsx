@@ -66,7 +66,7 @@ function SessionGate() {
   </View>
   return (
     <HomeProvider key={data.user.id}>
-      <PushSetup />
+      <PushSetup session={data.session?.id ?? null} />
       {/* The tabs (docs/design/mobile-comma-redesign.md); a chat, a thread and the rest are pushed over them, so the
           tab bar goes away there. */}
       <Stack screenOptions={screenOptions(colors.page)}>
@@ -87,8 +87,16 @@ function SessionGate() {
  * Pushes, once signed in: a tap opens what it was about (also a tap that
  * launched the app), and iOS's permission is read but not asked for here; the
  * app asks after the Coordinator's first message of its own, or from 通知.
+ * This phone registers at sign-in, on return to the front and when its
+ * session changes (lib/push.ts).
  */
-function PushSetup() {
+function PushSetup({ session }: { session: string | null }) {
+  // Which session this phone is signed in with: the server binds the push token to it, so a new session registers
+  // again (#1659). Declared before watchPushes so the first registration already knows it.
+  useEffect(() => {
+    if (Platform.OS === 'web') return
+    void import('@/lib/push').then(push => push.setPushSession(session)).catch(() => undefined)
+  }, [session])
   useEffect(() => {
     if (Platform.OS === 'web') return
     let cleanup: (() => void) | undefined
