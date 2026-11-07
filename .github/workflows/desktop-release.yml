@@ -61,10 +61,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.ref == 'refs/heads/main' && 'desktop-release' || format('desktop-release-{0}', github.ref) }}
-  cancel-in-progress: true
-
 env:
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
@@ -77,6 +73,10 @@ jobs:
   preflight:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Replace obsolete Web waits without interrupting an already signing app.
+    concurrency:
+      group: ${{ github.ref == 'refs/heads/main' && 'desktop-release-preflight' || format('desktop-release-preflight-{0}', github.ref) }}
+      cancel-in-progress: true
     permissions:
       contents: read
       actions: read
@@ -117,6 +117,10 @@ jobs:
     needs: preflight
     runs-on: macos-26  # macos-15's Xcode 26.3 crashes compiling the glass layers of build/icon.icon
     timeout-minutes: 90
+    # Finish the active signed candidate; GitHub keeps only the latest pending job.
+    concurrency:
+      group: ${{ github.ref == 'refs/heads/main' && 'desktop-release' || format('desktop-release-{0}', github.ref) }}
+      cancel-in-progress: false
     permissions:
       contents: write
       actions: read
@@ -260,6 +264,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/release/ci-gate.mjs
+      - name: Reject an installer whose production UI overlay changed
+        run: node scripts/release/hosted-ui.mjs production
       - name: Require the matching production Web deployment
         # The deployed Web source must contain the installed UI's source before publication.
         env:
