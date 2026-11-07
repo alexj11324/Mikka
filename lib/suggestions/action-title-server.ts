@@ -7,6 +7,7 @@ import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { db } from '@/lib/db'
 import { attentionSettings, suggestions } from '@/lib/db/schema'
 import { ACTION_BATCH, actionLocale, actionTitlePrompt, parseActionTitles, type ActionLocale, type ActionTitleInput } from './action-title'
+import { withAiMetadata } from '@/lib/tracing/ai'
 
 /** The small text model that writes action lines; the Coordinator's flash model. */
 const ACTION_TITLE_MODEL = COORDINATOR_MODEL
@@ -43,7 +44,7 @@ export async function writeActionTitles(userId: string, items: readonly ActionTi
     for (let start = 0; start < items.length; start += ACTION_BATCH) {
       const batch = items.slice(start, start + ACTION_BATCH)
       const { instructions, prompt } = actionTitlePrompt(batch, locale)
-      const { text } = await generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(ACTION_TITLE_TIMEOUT_MS) })
+      const { text } = await withAiMetadata({ operation: 'action_title' }, () => generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(ACTION_TITLE_TIMEOUT_MS) }))
       for (const [id, actionTitle] of parseActionTitles(text, batch.map(item => item.id), locale)) {
         await db.update(suggestions).set({ actionTitle }).where(and(eq(suggestions.id, id), eq(suggestions.userId, userId)))
       }

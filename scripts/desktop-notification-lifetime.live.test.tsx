@@ -6,6 +6,7 @@ import type { State } from 'swr'
 import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import type { DesktopNotification, DesktopRun } from '../lib/platform/desktop-notifications'
+import type { LocalDevice } from '@mikka/protocol/bridge'
 
 const home = '10000000-0000-4000-8000-000000000001'
 const otherHome = '10000000-0000-4000-8000-000000000002'
@@ -21,6 +22,7 @@ let snapshot: Snapshot, taskReads: number, preferenceReads: number, runtime: 'we
 let router: { push: (href: string) => void }
 let choices: Choice[], clicks: ReturnType<typeof deferred<string | null>>[], shown: DesktopNotification[], badges: number[]
 let clickListeners: Set<(href: string) => void>
+let deviceReads: number, readDevices: () => Promise<{ id: string }[]>
 
 mock.module(new URL('../app/actions/task-runs.ts', import.meta.url).href, { namedExports: {
   pollTaskRuns: async () => { taskReads++; return structuredClone(snapshot) }, syncThreadList: async () => { throw Error('unexpected thread read') },
@@ -28,7 +30,7 @@ mock.module(new URL('../app/actions/task-runs.ts', import.meta.url).href, { name
 mock.module(new URL('../app/actions/issues.ts', import.meta.url).href, { namedExports: { syncIssueList: async () => { throw Error('unexpected issue read') } } })
 mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: { pollBotChatSummaries: async () => { throw Error('unexpected chat read') } } })
 mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { pollBots: async () => { throw Error('unexpected bot read') } } })
-mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: { listDevices: async () => { throw Error('no device setup belongs in the notification fixture') } } })
+mock.module(new URL('../app/actions/agents.ts', import.meta.url).href, { namedExports: { listDevices: () => { deviceReads++; return readDevices() } } })
 mock.module(new URL('../app/actions/desktop-notifications.ts', import.meta.url).href, { namedExports: {
   chooseDesktopNotifications: (candidates: { id: string }[]) => {
     const choice = { ids: candidates.map(candidate => candidate.id), result: deferred<{ show: string[] }>() }
@@ -86,6 +88,7 @@ before(async () => {
 })
 beforeEach(() => {
   taskReads = 0; preferenceReads = 0; runtime = 'desktop'; choices = []; clicks = []; shown = []; badges = []; clickListeners = new Set(); sockets.length = 0
+  deviceReads = 0; readDevices = async () => { throw Error('no device setup belongs in the notification fixture') }
   router = { push: () => { throw Error('unexpected navigation') } }
   snapshot = runs()
   cache = new Map()
@@ -201,4 +204,70 @@ test('replacing the router discards the old pending click and keeps the current 
   assert.deepEqual(currentDestinations, [])
   await act(async () => { clicks[1].resolve('/notification-destination'); await clicks[1].promise })
   assert.deepEqual(currentDestinations, ['/notification-destination'])
+})
+
+function nativeSetup(status: () => Promise<LocalDevice>) {
+  const actions: string[] = []
+  Object.assign(Reflect.get(browser, 'mikka'), { device: { status }, ssh: { autoLocal: async (action: string) => { actions.push(action) } } })
+  return actions
+}
+const localDevice = (patch: Partial<LocalDevice>): LocalDevice => ({ status: 'online', signedIn: true, deviceId: 'local', workspaceId: null, server: 'online', ...patch })
+
+for (const [name, local, expected] of [
+  ['connecting', localDevice({ status: 'connecting' }), []],
+  ['offline', localDevice({ status: 'offline' }), ['repair']],
+  ['unsigned', localDevice({ signedIn: false }), ['install']],
+  ['unregistered', localDevice({ deviceId: null }), ['install']],
+] as const) test(`native setup does not read the device list when ${name}`, async () => {
+  const actions = nativeSetup(async () => local)
+  readDevices = async () => [{ id: 'local' }]
+  await render()
+  assert.equal(deviceReads, 0)
+  assert.deepEqual(actions, expected)
+})
+
+test('native setup still reads ownership before retaining or replacing an online signed-in device', async () => {
+  const actions = nativeSetup(async () => localDevice({}))
+  readDevices = async () => [{ id: 'local' }]
+  await render()
+  assert.equal(deviceReads, 1)
+  assert.deepEqual(actions, [])
+  await render('owner', false)
+  readDevices = async () => [{ id: 'other' }]
+  await render()
+  assert.equal(deviceReads, 2)
+  assert.deepEqual(actions, ['install'])
+})
+
+test('native setup does not start an ownership read after its account has unmounted', async () => {
+  const status = deferred<LocalDevice>()
+  const actions = nativeSetup(() => status.promise)
+  readDevices = async () => []
+  await render()
+  await render('owner', false)
+  await act(async () => { status.resolve(localDevice({})); await status.promise })
+  assert.equal(deviceReads, 0)
+  assert.deepEqual(actions, [])
+})
+
+test('an old ownership response cannot install a device after the account changes', async () => {
+  const devices = deferred<{ id: string }[]>()
+  const actions = nativeSetup(async () => localDevice({}))
+  readDevices = () => devices.promise
+  await render()
+  assert.equal(deviceReads, 1)
+  nativeSetup(async () => localDevice({ status: 'connecting' }))
+  cache = new Map(); snapshot = runs('running', 'next-owner')
+  await render('next-owner')
+  await act(async () => { devices.resolve([]); await devices.promise })
+  assert.deepEqual(actions, [])
+  assert.equal(deviceReads, 1)
+})
+
+test('failed ownership verification never becomes an install decision', async () => {
+  const actions = nativeSetup(async () => localDevice({}))
+  readDevices = async () => { throw Error('fixture ownership unavailable') }
+  await render()
+  assert.equal(deviceReads, 1)
+  assert.deepEqual(actions, [])
 })

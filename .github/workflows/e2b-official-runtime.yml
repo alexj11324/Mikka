@@ -234,7 +234,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: e2b-template-subscription-diagnostics
+          name: e2b-template-subscription-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/subscription-diagnostics.json
             ${{ runner.temp }}/accepted.json
@@ -246,23 +246,42 @@ jobs:
           node scripts/release/web-deploy.mjs main
           node --input-type=module - "$RUNNER_TEMP/accepted.json" <<'JS'
           import { readFileSync } from 'node:fs'
-          import { assertReportIdentity, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
-          const report = JSON.parse(readFileSync(process.argv[2]))
-          assertReportIdentity(report, { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
-            runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT })
-          if (templateModelsDigest(report) !== process.env.TEMPLATE_MODELS_SHA256) throw Error('runtime_release_models_digest_mismatch')
+          import { join } from 'node:path'
+          import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
+          reportStep(() => {
+            const report = JSON.parse(readFileSync(process.argv[2]))
+            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
+              runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
+            assertReportIdentity(report, expected)
+            const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {
+              ...expected, sha256: process.env.CANDIDATE_SHA256,
+            })
+            assertCandidatePreserved(report, candidate)
+            if (templateModelsDigest(report) !== process.env.TEMPLATE_MODELS_SHA256) throw Error('runtime_release_models_digest_mismatch')
+          })
           JS
           "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --publish-verified "$RUNNER_TEMP/accepted.json" > "$RUNNER_TEMP/release.json"
           node --input-type=module - "$RUNNER_TEMP/release.json" <<'JS'
           import { readFileSync, appendFileSync } from 'node:fs'
-          import { reportDigest, TEMPLATE_KINDS } from './scripts/e2b/runtime-report.mjs'
-          const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
-          const ids = Object.fromEntries(TEMPLATE_KINDS.map(kind => [kind, report.templates[kind].templateId]))
-          appendFileSync(process.env.GITHUB_OUTPUT, `release-sha256=${reportDigest(bytes)}\ntemplate-ids=${JSON.stringify(ids)}\n`)
+          import { join } from 'node:path'
+          import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportDigest, reportStep, TEMPLATE_KINDS } from './scripts/e2b/runtime-report.mjs'
+          reportStep(() => {
+            const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
+            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
+              runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
+            assertReportIdentity(report, expected)
+            const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {
+              ...expected, sha256: process.env.CANDIDATE_SHA256,
+            })
+            assertCandidatePreserved(report, candidate, { published: true })
+            const ids = Object.fromEntries(TEMPLATE_KINDS.map(kind => [kind, report.templates[kind].templateId]))
+            appendFileSync(process.env.GITHUB_OUTPUT, `release-sha256=${reportDigest(bytes)}\ntemplate-ids=${JSON.stringify(ids)}\n`)
+          })
           JS
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ needs.validate.outputs.source-sha }}
+          CANDIDATE_SHA256: ${{ needs.validate.outputs.candidate-sha256 }}
           TEMPLATE_MODELS_SHA256: ${{ needs.validate.outputs.template-models-sha256 }}
       - name: Preserve the complete public release report
         id: release
@@ -333,7 +352,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: e2b-runtime-release-cleanup
+          name: e2b-runtime-release-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/release-cleanup.json
           if-no-files-found: warn
           retention-days: 7

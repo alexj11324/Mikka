@@ -8,10 +8,12 @@ import { rendererHost } from './host'
 import { Link } from './i18n-navigation'
 import { localeHref, localeOf, useLocation } from './location'
 import { openCurrentPageInBrowser } from './open-settings'
+import type { BootstrapScope } from './bootstrap'
 
 export { AuthForm } from './auth-form'
 export { setSession } from './auth-client'
 export const platform = 'desktop' as const
+export function bootstrapScope(_location: URL): BootstrapScope { return 'workspace' }
 export function PlatformExtras() { return null }
 export function onSessionChanged(listener: () => void) { return rendererHost().onSessionChanged(listener) }
 export function authenticatedReturn(location: URL) {

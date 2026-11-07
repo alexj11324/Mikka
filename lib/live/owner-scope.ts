@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg'
 import type { LiveScope } from './scope'
+import { readBatchOwnerScope } from '../desktop-rpc/read-batch-context'
 
 type Database = Pick<PoolClient, 'query'>
 
@@ -13,4 +14,10 @@ export async function ownerLiveScope(workspaceDatabase: Database, ownerId: strin
       WHERE w."userId"=$1 AND w.kind='personal'`, [ownerId],
   )
   return rows.length === 1 ? rows[0] : null
+}
+
+/** Only a list's read-before-data path may share this observation. Writers and
+ * after-COMMIT notification targets always use the fresh reader above. */
+export function ownerLiveReadScope(workspaceDatabase: Database, ownerId: string): Promise<LiveScope | null> {
+  return readBatchOwnerScope(workspaceDatabase, ownerId, () => ownerLiveScope(workspaceDatabase, ownerId))
 }

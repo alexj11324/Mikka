@@ -24,7 +24,7 @@ mock.module(new URL('./connection.ts', import.meta.url).href, { namedExports: {
   githubConnection: async () => connectionLogin ? { githubAccountId: '42', githubLogin: connectionLogin } : null,
   disconnectGitHub: async () => {},
 } })
-mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_path: string, handler: unknown) => handler } })
+mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_path: string, handler: unknown) => handler } })
 
 const repository = { id: 91, full_name: 'Owner/Project', private: true }
 const installation = { id: 11, app_id: 4840908, suspended_at: null }

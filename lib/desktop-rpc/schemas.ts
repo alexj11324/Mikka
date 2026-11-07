@@ -8,6 +8,7 @@ import { API_KEY_PRESETS } from '@/lib/model-api-key-providers'
 import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 import { setAppPolicyInput } from '@/lib/app-policy/apps'
 import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
+import { MAX_READ_BATCH, READ_BATCH_ACTIONS, type ReadBatchCall } from './read-batch-contract'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -71,10 +72,20 @@ const avatar = z.instanceof(FormData).superRefine((form, context) => {
   if (entries.length !== 1 || entries[0]?.[0] !== 'avatar' || !(file instanceof Blob)
     || file.size > 200 * 1024 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) context.addIssue({ code: 'custom' })
 })
+const readBatch: z.ZodType = tuple(z.array(object({ action: z.enum(READ_BATCH_ACTIONS), args: z.array(z.unknown()) }))
+  .min(1).max(MAX_READ_BATCH)).superRefine((value, context) => {
+  const [calls] = value as [ReadBatchCall[]]
+  for (const [index, call] of calls.entries()) {
+    if (!desktopActionSchemas[call.action].safeParse(call.args).success) {
+      context.addIssue({ code: 'custom', path: [0, index, 'args'], message: 'desktop_rpc_request_invalid' })
+    }
+  }
+})
 
 /** Explicit transport whitelist. Optional parameters and array lengths are
  * checked here before the original action performs its ownership checks. */
 export const desktopActionSchemas = {
+  'desktop.readBatch': readBatch,
   'desktop.bootstrap': inWorkspace,
   'desktop.session': none,
   'desktop.accounts': none,

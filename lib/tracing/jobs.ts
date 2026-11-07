@@ -1,4 +1,4 @@
-import { SpanStatusCode, context, isSpanContextValid, trace, type Link, type Span } from '@opentelemetry/api'
+import { SpanStatusCode, context, isSpanContextValid, trace, type Span } from '@opentelemetry/api'
 import { routeScope } from './labels'
 import { safeErrorAttributes } from '@mikka/protocol/tracing'
 
@@ -10,17 +10,13 @@ import { safeErrorAttributes } from '@mikka/protocol/tracing'
 export type JobKind = 'background' | 'workflow' | 'cron'
 export type JobOptions = {
   /**
-   * Start a new trace even when a span is active, linked to it. For deferred
-   * work (after()), which inherits the context of the request that scheduled
-   * it: that request's span has ended or is about to.
+   * A deferred operation has its own lifetime and route label. Its parent may
+   * already have ended; W3C ancestry still joins the same end-to-end trace.
    */
   detach?: boolean
 }
 
 const isThenable = (value: unknown): value is PromiseLike<unknown> => typeof (value as { then?: unknown } | null)?.then === 'function'
-
-/** True for an SDK span that has already ended (a non-recording, unsampled parent is still live). */
-const ended = (span: Span) => (span as unknown as { ended?: unknown }).ended === true
 
 /**
  * Runs `work` under the job's label: a span named `route` with
@@ -28,21 +24,17 @@ const ended = (span: Span) => (span as unknown as { ended?: unknown }).ended ===
  * route scope, so every query inside it (and any db_sample line) carries the
  * job's route rather than the caller's.
  *
- * The span is a child of the active span when that span is still live (a cron
- * handler inside its request). Otherwise, or with `detach`, it is a new root
- * span with a link to the scheduling span, and the sampler decides it at the
- * same MIKKA_TRACE_SAMPLE_RATE as a request. Tracing never changes the work's
- * result or throws into it.
+ * The span retains its scheduling parent even after that parent ends. A job
+ * with no valid context creates a root. Its independent route label keeps
+ * database attribution correct without splitting the run into several traces.
  */
-export function runJob<T>(route: string, kind: JobKind, work: () => T, { detach = false }: JobOptions = {}): T {
+export function runJob<T>(route: string, kind: JobKind, work: () => T, _options: JobOptions = {}): T {
   let span: Span | undefined
   let scope = context.active()
   try {
     const active = trace.getSpan(scope)
-    const nested = !detach && active !== undefined && !ended(active)
     const from = active?.spanContext()
-    const links: Link[] | undefined = !nested && from && isSpanContextValid(from) ? [{ context: from }] : undefined
-    span = trace.getTracer('mikka.jobs').startSpan(route, { root: !nested, links, attributes: { 'mikka.route': route, 'mikka.client_kind': kind } }, scope)
+    span = trace.getTracer('mikka.jobs').startSpan(route, { root: !from || !isSpanContextValid(from), attributes: { 'mikka.route': route, 'mikka.client_kind': kind, 'mikka.trace.critical': kind === 'workflow' || /coordinator|dispatch|run-|factory|computer/.test(route) } }, scope)
     scope = trace.setSpan(scope, span)
   } catch { span = undefined }
   const finish = (failed: boolean, error?: unknown) => {

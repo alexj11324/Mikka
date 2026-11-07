@@ -3,6 +3,7 @@ import 'server-only'
 import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { createHash, randomUUID } from 'node:crypto'
 import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
+import { observeAiRequest, type AiMetadata } from '@/lib/tracing/ai'
 
 const DECISION_TIMEOUT_MS = 5000
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -39,52 +40,77 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   await withSharedCredits(scope.workspaceId, payer => usage.hostedUsage.reserve(payer, DECISION_MODEL, callId))
   let requestStarted = false
   try {
-    const requestInput = decisionRequestInput(input)
-    const requestedQuestions = structuredClone(questions)
-    const body = JSON.stringify({ model: DECISION_MODEL, input: requestInput, questions: requestedQuestions })
-    // Snapshot the same normalized bytes as body before yielding to I/O. The
-    // caller may mutate its image objects while this request is in flight.
-    const imageDigests = typeof requestInput === 'string' ? [] : requestInput.flatMap(message => message.content.flatMap(part => part.type === 'input_image'
-      ? [createHash('sha256').update(Buffer.from(part.image_url.slice(part.image_url.indexOf(',') + 1), 'base64')).digest('hex')]
-      : []))
-    const executionId = randomUUID(), startedAt = new Date().toISOString()
-    await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
-    if (signal?.aborted) throw new DOMException('Model request cancelled', 'AbortError')
-    requestStarted = true
-    const response = await fetch(DECISIONS_URL, {
-      method: 'POST',
-      redirect: 'error',
-      headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-      body,
-      signal: AbortSignal.any([AbortSignal.timeout(DECISION_TIMEOUT_MS), ...(signal ? [signal] : [])]),
-    })
-    if (!response.ok) { await response.body?.cancel(); throw Error('decisionProviderUnavailable') }
-    const payload: unknown = await response.json()
-    {
-      const receipt = payload as {provider_metadata?:unknown}
-      await usage.hostedUsage.settle(callId,gatewayCost(receipt.provider_metadata),0,0,gatewayGenerationId(receipt.provider_metadata))
-      await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
-    }
-    const answers = validatedAnswers(payload, requestedQuestions)
-    // These fields come from the response envelope, not an answer or input.
-    const metadata = payload as { model?: unknown; provider_metadata?: { gateway?: { generationId?: unknown } } }
-    const generation = metadata?.provider_metadata?.gateway?.generationId
-    if (signal?.aborted || metadata.model !== DECISION_MODEL || typeof generation !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)) return null
-    if (!answers && !diagnostics?.retainInvalidReceipt) return null
-    const execution: DecisionExecution = {
-      executionId, modelId: DECISION_MODEL, providerGenerationId: generation,
-      startedAt, completedAt: new Date().toISOString(), requestDigest: hash(body),
-      imageDigests, vision: imageDigests.length ? 'image-input-submitted' : 'no-image-input',
-    }
-    // Host-only group diagnostics opt in to retaining a paid invalid response.
-    // No usable answer is exposed; the default contract of all other callers
-    // (including decide/callDecisionRequest) remains null for invalid answers.
-    return { answers: answers ?? new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(), execution, ...(answers ? {} : {validationFailure:'invalid_response' as const}) }
+    return await observeAiRequest({ modelId: DECISION_MODEL, userId: scope.ownerId, route: 'gateway', operation: 'decision' }, async report => {
+      const requestInput = decisionRequestInput(input)
+      const requestedQuestions = structuredClone(questions)
+      const body = JSON.stringify({ model: DECISION_MODEL, input: requestInput, questions: requestedQuestions })
+      // Snapshot the same normalized bytes as body before yielding to I/O. The
+      // caller may mutate its image objects while this request is in flight.
+      const imageDigests = typeof requestInput === 'string' ? [] : requestInput.flatMap(message => message.content.flatMap(part => part.type === 'input_image'
+        ? [createHash('sha256').update(Buffer.from(part.image_url.slice(part.image_url.indexOf(',') + 1), 'base64')).digest('hex')]
+        : []))
+      const executionId = randomUUID(), startedAt = new Date().toISOString()
+      await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
+      if (signal?.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+      requestStarted = true
+      const response = await fetch(DECISIONS_URL, {
+        method: 'POST',
+        redirect: 'error',
+        headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.any([AbortSignal.timeout(DECISION_TIMEOUT_MS), ...(signal ? [signal] : [])]),
+      })
+      if (!response.ok) { await response.body?.cancel(); throw Error('decisionProviderUnavailable') }
+      const payload: unknown = await response.json()
+      {
+        const receipt = payload as {provider_metadata?:unknown; usage?:unknown}
+        const cost = gatewayCost(receipt.provider_metadata)
+        report({ usage: decisionTokenUsage(receipt.usage), totalCostUsd: cost === null ? null : cost / 1_000_000 })
+        await usage.hostedUsage.settle(callId,cost,0,0,gatewayGenerationId(receipt.provider_metadata))
+        await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
+      }
+      const answers = validatedAnswers(payload, requestedQuestions)
+      const judgment: AiMetadata = {}
+      for (const name of ['tier', 'effort'] as const) {
+        const answer = answers?.get(name)
+        if (answer?.type === 'score') {
+          judgment[`${name}Score`] = answer.score
+          judgment[`${name}Confidence`] = answer.confidence
+        }
+      }
+      report({ metadata: judgment, invalid: !answers })
+      // These fields come from the response envelope, not an answer or input.
+      const metadata = payload as { model?: unknown; provider_metadata?: { gateway?: { generationId?: unknown } } }
+      const generation = metadata?.provider_metadata?.gateway?.generationId
+      if (signal?.aborted || metadata.model !== DECISION_MODEL || typeof generation !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)) { report({ invalid: true }); return null }
+      if (!answers && !diagnostics?.retainInvalidReceipt) return null
+      const execution: DecisionExecution = {
+        executionId, modelId: DECISION_MODEL, providerGenerationId: generation,
+        startedAt, completedAt: new Date().toISOString(), requestDigest: hash(body),
+        imageDigests, vision: imageDigests.length ? 'image-input-submitted' : 'no-image-input',
+      }
+      // Host-only group diagnostics opt in to retaining a paid invalid response.
+      // No usable answer is exposed; the default contract of all other callers
+      // (including decide/callDecisionRequest) remains null for invalid answers.
+      return { answers: answers ?? new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(), execution, ...(answers ? {} : {validationFailure:'invalid_response' as const}) }
+    }, signal)
   } catch {
     await usage.hostedUsage.settle(callId,requestStarted ? null : 0)
     // No upstream text, credentials, image bytes or untrusted purpose in logs.
     console.error('Decision unavailable', { purpose: purpose.replace(/[^a-z0-9_-]/gi, '').slice(0, 80) })
     return null
+  }
+}
+
+/** Only the numeric usage envelope; answers, images and request digests are never telemetry. */
+function decisionTokenUsage(value: unknown) {
+  const usage = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const rawDetails = usage.input_tokens_details ?? usage.prompt_tokens_details
+  const details = rawDetails && typeof rawDetails === 'object' ? rawDetails as Record<string, unknown> : {}
+  return {
+    inputTokens: usage.inputTokens ?? usage.input_tokens ?? usage.prompt_tokens,
+    outputTokens: usage.outputTokens ?? usage.output_tokens ?? usage.completion_tokens,
+    inputTokenDetails: { cacheReadTokens: details.cached_tokens, cacheWriteTokens: usage.cache_creation_input_tokens },
   }
 }
 /** Compatibility for callers that need answers only. Use invokeDecision when

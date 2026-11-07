@@ -120,6 +120,32 @@ test('web auth routing preserves real PKCE, refused handoff, account addition an
   for (const excluded of ['sig', 'ba_context', 'exp', 'prompt']) assert.equal(continuation.searchParams.has(excluded), false)
 })
 
+test('identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations', async () => {
+  const { isDesktopHandoffPage } = await browserModule('export { isDesktopHandoffPage } from "./apps/frontend/src/web/auth-routing.ts"')
+  const url = new URL('https://app.example/mikka/en/sign-in')
+  url.search = new URLSearchParams({ desktop: '1', desktop_state: 'abcdefghijklmnop', desktop_callback: 'http://localhost:4567/auth/callback', desktop_next: '/' })
+  assert.equal(isDesktopHandoffPage(url), true)
+  for (const [name, value] of [['oauth', 'failed'], ['addAccount', '1']]) {
+    const next = new URL(url); next.searchParams.set(name, value)
+    assert.equal(isDesktopHandoffPage(next), true)
+  }
+  for (const path of ['/mikka/en/sign-up', '/mikka/en/', '/mikka/en/device']) {
+    const next = new URL(url); next.pathname = path
+    assert.equal(isDesktopHandoffPage(next), false)
+  }
+  for (const name of ['desktop', 'desktop_state', 'desktop_callback']) {
+    const next = new URL(url); next.searchParams.append(name, next.searchParams.get(name))
+    assert.equal(isDesktopHandoffPage(next), false)
+  }
+  const foreign = new URL(url); foreign.searchParams.set('desktop_callback', 'https://foreign.example/auth/callback')
+  assert.equal(isDesktopHandoffPage(foreign), false)
+  const oauth = new URL(url)
+  for (const [key, value] of new URLSearchParams('sig=signed&client_id=client&scope=a&ba_context=hidden&exp=123')) oauth.searchParams.set(key, value)
+  assert.equal(isDesktopHandoffPage(oauth), false)
+  const composio = new URL(url); composio.searchParams.set('next', '/api/integrations/composio/callback')
+  assert.equal(isDesktopHandoffPage(composio), false)
+})
+
 test('web session owner watches the actual SDK atom without mutating it or treating an error as logout', async () => {
   const { watchSessionOwner } = await browserModule('export { watchSessionOwner } from "./apps/frontend/src/web/session-owner.ts"')
   let listener

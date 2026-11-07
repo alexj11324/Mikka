@@ -9,7 +9,7 @@ const stored = new Map<string, string | null>()
 const calls: unknown[][] = []
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 stub('../../../../../../lib/auth.ts', { auth: { api: { getSession: async () => owner ? { user: { id: owner } } : null } } })
-stub('../../../../../../lib/request-log.ts', { withRequestLog: (_path: string, handler: unknown) => handler })
+stub('../../../../../../lib/request-log.ts', { noteLogRpcAction: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
 class GitHubAccessError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }

@@ -45,7 +45,7 @@ before(async () => {
   mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { db } })
   mock.module(new URL('../../../../lib/credentials/chat-guard.ts', import.meta.url).href, { namedExports: { credentialChatFingerprints: loadFingerprints } })
   mock.module(new URL('../../../../lib/request-log.ts', import.meta.url).href, { namedExports: {
-    noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler,
+    noteLogRpcAction: () => {}, noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler,
   } })
   mock.module('workflow/api', { namedExports: { getRun } })
   mock.module(new URL('../../../../lib/coordinator/coordinator-bot.ts', import.meta.url).href, { namedExports: {

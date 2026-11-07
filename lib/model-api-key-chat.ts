@@ -4,6 +4,7 @@ import type { LanguageModel } from 'ai'
 import { pool } from './db'
 import { openApiKeyForChat } from './model-api-keys'
 import type { HostedApiKeySnapshot } from './subscription-model-snapshot'
+import { observedModel } from './tracing/ai'
 
 type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
 
@@ -22,7 +23,7 @@ async function open(frozen: HostedApiKeySnapshot): Promise<V4Model> {
  */
 export async function resolveApiKeyChatModel(frozen: HostedApiKeySnapshot): Promise<LanguageModel> {
   const first = await open(frozen)
-  return new Proxy(first, { get(target, property) {
+  return observedModel(new Proxy(first, { get(target, property) {
     const member = Reflect.get(target, property, target)
     if (property === 'doStream' || property === 'doGenerate') {
       return async (...args: unknown[]) => {
@@ -31,5 +32,5 @@ export async function resolveApiKeyChatModel(frozen: HostedApiKeySnapshot): Prom
       }
     }
     return member
-  } })
+  } }), { modelId: frozen.modelId, userId: frozen.ownerId, route: 'api_key', operation: frozen.coordinator ? 'coordinator' : 'bot' })
 }
