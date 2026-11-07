@@ -4,8 +4,9 @@ import { execFileSync,execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
-export const TARGET = { base: '4e2893bf6671999187a79fa534ab9208d6e52bc7', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
-const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs']
+import { businessAcceptance, acceptanceCode } from './self-hosting-cloud-acceptance.mjs'
+export const TARGET = { base: 'c68cdfa3a82ab099d25902d6803c1c8d09949a34', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs','scripts/ops/self-hosting-cloud-acceptance.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
 }
@@ -123,6 +124,6 @@ export async function readiness({env=process.env,fetcher=fetch,report}) {
 
 async function main(){const report={phase:'prepare-private-cloud',result:'blocked',requests:[],applicationSecretValuesRequested:false,credentialsWrittenToGitHub:false,newIdentityCreated:false};try{
  const git=(...a)=>execFileSync('git',a,{encoding:'utf8'}).trim();const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));assertExecution(process.env,event,git('rev-parse','HEAD'),git('rev-parse','HEAD^'),git('diff','--name-only','HEAD^','HEAD').split('\n'))
- if(process.argv[2]==='--preflight')report.result='source_verified';else if(process.argv[2]==='--readiness'){report.phase='private_cloud_readiness';report.http=[];await readiness({report})}else {demand(process.argv[2]==='--prepare','MODE');await prepare({report})}
- }catch(e){report.error=/^[A-Z0-9_]+$/.test(e.message)?e.message:'RELEASE_PREPARATION_FAILED';process.exitCode=1}console.log(JSON.stringify(report));if(process.env.GITHUB_STEP_SUMMARY)await appendFile(process.env.GITHUB_STEP_SUMMARY,'\n```json\n'+JSON.stringify(report)+'\n```\n')}
+ if(process.argv[2]==='--preflight')report.result='source_verified';else if(process.argv[2]==='--readiness'){report.phase='private_cloud_readiness';report.http=[];await readiness({report})}else if(process.argv[2]==='--business'){report.phase='cloud_protocol_acceptance';report.http=[];await businessAcceptance({report})}else {demand(process.argv[2]==='--prepare','MODE');await prepare({report})}
+ }catch(e){report.error=process.argv[2]==='--business'?acceptanceCode(e):/^[A-Z0-9_]+$/.test(e.message)?e.message:'RELEASE_PREPARATION_FAILED';process.exitCode=1}console.log(JSON.stringify(report));if(process.env.GITHUB_STEP_SUMMARY)await appendFile(process.env.GITHUB_STEP_SUMMARY,'\n```json\n'+JSON.stringify(report)+'\n```\n')}
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)await main()

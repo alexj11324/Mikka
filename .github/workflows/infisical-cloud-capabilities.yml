@@ -81,6 +81,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      issues: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -91,6 +92,16 @@ jobs:
           node-version: 24
       - run: node --test scripts/ops/self-hosting-release.test.mjs
       - run: node scripts/ops/self-hosting-release.mjs --preflight
+      - name: Install the fixed upstream HTTPS tunnel with SHA-256 verification
+        run: |
+          curl --fail --silent --show-error --location --max-time 60 https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 -o "$RUNNER_TEMP/mikka-cloudflared"
+          node --input-type=module <<'JS'
+          import { readFileSync, chmodSync } from 'node:fs'
+          import { createHash } from 'node:crypto'
+          const file = process.env.RUNNER_TEMP + '/mikka-cloudflared'
+          if (createHash('sha256').update(readFileSync(file)).digest('hex') !== '1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872') throw Error('TUNNEL_DIGEST')
+          chmodSync(file, 0o700)
+          JS
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -124,4 +135,6 @@ jobs:
           secret-name: VERCEL_TEAM_TOKEN
           recursive: false
           include-imports: false
-      - run: node scripts/ops/self-hosting-release.mjs --readiness
+      - run: node scripts/ops/self-hosting-release.mjs --business
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
