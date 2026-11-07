@@ -56,36 +56,45 @@ export function createApiHandler(routes: ApiRoute[], beginTrace: TraceFactory = 
         if (found) { template = found.route.template; break }
       }
     } catch { return failure(400) }
-    const prepared = await prepareWebTransport?.(original, template)
-    if (prepared instanceof Response) return prepared
-    const transport: WebTransport | null = prepared ?? null
-    const request = transport?.request ?? original
-    const scope = createRequestScope(request)
     const trace = beginTrace(original, template)
-    // Register before work/output: Node and Vercel retain the entire lifetime,
-    // including tasks registered during handler execution and nested after().
-    event.waitUntil(scope.after.lifetime)
+    // Authentication and transport refusals are part of the original request.
+    // Register trace disposal before preparation can return or reject.
     onDispose(event, reason => {
       trace.finish(result?.status ?? 500, caught ?? reason)
-      return scope.after.finish()
     })
-    const dispatch = () => runRequestScope(scope, () => trace.run(async () => {
-      try { result = await router.fetch(request) }
+    return trace.run(async () => {
+      let prepared: WebTransport | Response | null | undefined
+      try { prepared = await prepareWebTransport?.(original, template) }
       catch (error) {
-        if (error instanceof NavigationResponse) {
-          result = error.location ? new Response(null, { status: error.status, headers: { location: error.location } }) : failure(error.status)
-        } else {
-          caught = error
-          console.error('api_route_failed', { name: error instanceof Error ? error.name : 'UnknownError', route: template })
-          result = failure(500)
-        }
+        caught = error
+        throw error
       }
-      const headers = new Headers(result.headers)
-      requireRequestScope().cookies.commit(headers)
-      const response = new Response(result.body, { status: result.status, statusText: result.statusText, headers })
-      return transport ? transport.response(response) : response
-    }))
-    return transport ? transport.run(dispatch) : dispatch()
+      if (prepared instanceof Response) { result = prepared; return prepared }
+      const transport: WebTransport | null = prepared ?? null
+      const request = transport?.request ?? original
+      const scope = createRequestScope(request)
+      // The adapted request owns the business scope. H3 invokes disposal in
+      // registration order: end its trace, then drain after work and nested after().
+      event.waitUntil(scope.after.lifetime)
+      onDispose(event, () => scope.after.finish())
+      const dispatch = () => runRequestScope(scope, async () => {
+        try { result = await router.fetch(request) }
+        catch (error) {
+          if (error instanceof NavigationResponse) {
+            result = error.location ? new Response(null, { status: error.status, headers: { location: error.location } }) : failure(error.status)
+          } else {
+            caught = error
+            console.error('api_route_failed', { name: error instanceof Error ? error.name : 'UnknownError', route: template })
+            result = failure(500)
+          }
+        }
+        const headers = new Headers(result.headers)
+        requireRequestScope().cookies.commit(headers)
+        const response = new Response(result.body, { status: result.status, statusText: result.statusText, headers })
+        return transport ? transport.response(response) : response
+      })
+      return transport ? transport.run(dispatch) : dispatch()
+    })
   })
   return app
 }
