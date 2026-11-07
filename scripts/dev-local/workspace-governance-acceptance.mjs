@@ -79,7 +79,7 @@ export async function verifyWorkspaceGovernance({ accounts, pool, progress, sign
     // Delivered background messages cannot wake a real model. The issue and
     // user came from the real RPC above; Factory still validates the source.
     await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload,tier,"deliveredAt")
-      VALUES ($1,$2,'user_message',$1::text,$3,$4,'background',now())`, [sourceEventId,account.userId,issue.id,{ text: marker }])
+      VALUES ($1::uuid,$2,'user_message',$1::text,$3,$4,'background',now())`, [sourceEventId,account.userId,issue.id,{ text: marker }])
     const body = { issueId: issue.id, sourceEventId, eventId: randomUUID(), rationale: 'Workspace governance acceptance', missingInformation: ['Acceptance intentionally waits for clarification'] }
     const routed = await request(account, '/api/factory/tasks/route', body)
     assert.equal(routed.stage, 'clarify')
