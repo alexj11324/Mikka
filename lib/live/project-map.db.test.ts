@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import type { LiveInvalidation } from './events'
 import type { LiveScope } from './scope'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 test('project map invalidations use current scope and only committed writes', { skip: !dbUrl }, async t => {
   const pending: (() => Promise<void>)[] = [], sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
@@ -35,8 +35,11 @@ test('project map invalidations use current scope and only committed writes', { 
     await Promise.all([connection.end(), pool.end(), workspacePool.end()]); mock.restoreAll()
   })
   const owner = await seedUser(connection, 'map-live-owner'), peer = await seedUser(connection, 'map-live-peer')
-  const home = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
-  await connection.query('UPDATE mikka_workspaces SET kind=\'personal\' WHERE id=$1', [home.id])
+  const home = { id: await seedPersonalWorkspace(connection, owner) }
+  await assert.rejects(connection.query(
+    `INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member','active')`,
+    [home.id, peer],
+  ), { code: '23514' }, 'a Personal workspace cannot admit another owner')
   const shared = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
   const team = await seedTeam(connection, shared.id, owner)
   const privateProject = await seedProject(connection, owner, []), sharedProject = await seedProject(connection, owner, [{ teamId: team.id, workspaceId: shared.id }])

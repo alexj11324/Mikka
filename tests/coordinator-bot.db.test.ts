@@ -22,6 +22,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
+  const { withTaskWorkspace } = await import('../lib/task-workspace')
   const { observePoolCommits } = await import('../lib/db/commit-effects')
   observePoolCommits(pool)
   const bots = await import('../lib/coordinator/coordinator-bot')
@@ -533,17 +534,19 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
   await t.test('an in-flight null-Bot route defers migration; its unfrozen history moves after commit', { timeout: 10_000 }, async () => {
     const p = await person('route-before-backfill'), issueId = await seedIssue(pool, p.id), eventId = await sourceEvent(p.id)
     const coordinator = await bots.coordinatorBot(p.id, null, { backfill: false })
-    const writer = await pool.connect()
-    try {
-      await writer.query('BEGIN')
-      const pending = (await route(p.id, issueId, eventId, writer)).task
-      await assert.rejects(bots.backfillCoordinatorChat(appPool, p.id, coordinator), { code: '55P03' }, 'NOWAIT defers rather than deadlocking against the producer')
-      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: null }])
-      await writer.query('COMMIT')
-      await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
-      assert.deepEqual((await pool.query('SELECT "botId" FROM factory_tasks WHERE id=$1', [pending.id])).rows, [{ botId: coordinator.botId }])
-      assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: coordinator.botId }])
-    } finally { await writer.query('ROLLBACK'); writer.release() }
+    await withTaskWorkspace(p.id, p.workspaceId, async () => {
+      const writer = await pool.connect()
+      try {
+        await writer.query('BEGIN')
+        const pending = (await route(p.id, issueId, eventId, writer)).task
+        await assert.rejects(bots.backfillCoordinatorChat(appPool, p.id, coordinator), { code: '55P03' }, 'NOWAIT defers rather than deadlocking against the producer')
+        assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: null }])
+        await writer.query('COMMIT')
+        await bots.backfillCoordinatorChat(appPool, p.id, coordinator)
+        assert.deepEqual((await pool.query('SELECT "botId" FROM factory_tasks WHERE id=$1', [pending.id])).rows, [{ botId: coordinator.botId }])
+        assert.deepEqual((await pool.query('SELECT "botId" FROM coordinator_events WHERE id=$1', [eventId])).rows, [{ botId: coordinator.botId }])
+      } finally { try { await writer.query('ROLLBACK') } finally { writer.release() } }
+    })
   })
 
   await t.test('migration first fences a stale source validation before it can create a null-Bot task', { timeout: 10_000 }, async () => {

@@ -47,6 +47,12 @@ test('Factory flow routes accept only a freshly verified native or browser human
         return { binding: input.binding, stage: 'implement' }
       },
     } }),
+    // The real approval schema imports a dispatch helper, but this adapter unit
+    // supplies its own approval port above. Loading device execution is outside
+    // its boundary; an unexpected dispatch remains a hard failure.
+    mock.module(new URL('../lib/factory/dispatch.ts', import.meta.url).href, { namedExports: {
+      factoryBinding: () => assert.fail('the HTTP adapter unit must not dispatch a real run'),
+    } }),
     mock.module(new URL('../lib/factory/public-flow.ts', import.meta.url).href, { namedExports: { readFactoryFlow: async (_client: unknown, task: { id: string }) => ({ version: 2, id: task.id }) } }),
   ]
   try {

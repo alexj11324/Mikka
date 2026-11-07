@@ -62,10 +62,11 @@ test('the device list key reaches only the owner home, after real device writers
     for (const [id, owner, kind] of [[home, 'owner', 'personal'], [team, 'owner', 'team'], [peerHome, 'peer', 'personal']]) {
       await database.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES ($1,$2,'Fixture',$3)`, [id, owner, kind])
     }
-    // The peer shares the owner's team and even the owner's home; devices stay the owner's.
-    for (const [workspace, userId] of [[home, 'owner'], [home, 'peer'], [team, 'owner'], [team, 'peer'], [peerHome, 'peer']]) {
+    // Team membership does not grant the peer access to the owner's devices.
+    for (const [workspace, userId] of [[home, 'owner'], [team, 'owner'], [team, 'peer'], [peerHome, 'peer']]) {
       await database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member','active')`, [workspace, userId])
     }
+    await assert.rejects(database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'peer','peer','peer','member','active')`, [home]), { code: '23514' }, 'a Personal workspace cannot admit another owner')
     const device = randomUUID(), token = `orv_${randomBytes(32).toString('base64url')}`
     const codex = { harness: 'codex', installed: true, version: '1.0.0' }, claude = { harness: 'claude_code', installed: true, version: '2.1.0' }
     await database.query(`INSERT INTO devices(id,name,"ownerId",harnesses,"lastSeenAt") VALUES ($1,'mine','owner',$2,now())`, [device, JSON.stringify([codex])])
