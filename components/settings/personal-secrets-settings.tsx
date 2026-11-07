@@ -1,10 +1,8 @@
 'use client'
 
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
-import useSWR from 'swr'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Ellipsis, EyeIcon, EyeOffIcon, FileUp, Plus } from 'lucide-react'
-import { createMySecret, deleteMySecret, importMySecrets, listMySecrets, replaceMySecret } from '@/app/actions/user-secrets'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,12 +16,12 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
-import { DOTENV_MAX_BYTES, parseDotenv } from '@/lib/secrets/dotenv'
-import { isReservedEnvName, SECRET_NOTE_MAX } from '@/lib/secrets/format'
+import { SECRET_NOTE_MAX } from '@/lib/secrets/format'
 import type { UserSecretView } from '@/lib/secrets/user-store'
 import { relativeTime } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
 import { usePresence, type PresenceProps } from '@/lib/use-presence'
+import { useDotenvFile, useDotenvPreview, useMySecretEditor, useMySecretImport, useMySecrets } from '@/hooks/settings/use-secrets'
 import { cn } from '@/lib/utils'
 
 type Editing = { kind: 'new' } | { kind: 'edit'; secret: UserSecretView } | { kind: 'bulk' }
@@ -36,23 +34,22 @@ type Saved = { notice: string | null } | null
  */
 export function PersonalSecretsSettings({ workspaceId, workspaceName }: { workspaceId: string; workspaceName?: string }) {
   const t = useTranslations('Settings.secrets')
-  const actionError = useActionError()
   const locale = useLocale()
-  const list = useSWR(['account:my-secrets', workspaceId], () => listMySecrets(workspaceId))
+  const list = useMySecrets(workspaceId)
   const [editing, setEditing] = useState<Editing | null>(null)
   const sheet = usePresence(editing)
   const [notice, setNotice] = useState<string | null>(null)
-  const secrets = list.data && !list.data.error ? list.data.secrets : null
+  const secrets = list.secrets
   const open = (next: Editing) => { setNotice(null); setEditing(next) }
-  const close = (saved: Saved) => { setEditing(null); if (saved) { setNotice(saved.notice); void list.mutate() } }
+  const close = (saved: Saved) => { setEditing(null); if (saved) { setNotice(saved.notice); list.reload() } }
 
   return <>
     <SettingsSection id="my-secrets-heading" title={t('mineHeading')} action={secrets?.length ? <>
       <Button {...settingsSectionAction} onClick={() => open({ kind: 'bulk' })}>{t('bulkAdd')}</Button>
       <Button {...settingsSectionAction} onClick={() => open({ kind: 'new' })}>{t('add')}</Button>
     </> : undefined}>
-      {!list.data && !list.error && <SettingsLoading label={t('loading')} rows={2} bare />}
-      {(list.error || list.data?.error) && <FieldError className="px-5 py-4">{actionError(list.data?.error)}</FieldError>}
+      {list.loading && <SettingsLoading label={t('loading')} rows={2} bare />}
+      {list.error && <FieldError className="px-5 py-4">{list.error}</FieldError>}
       {secrets?.length === 0 && <div className="flex flex-col items-start gap-3 px-5 py-6">
         <p className="text-sm text-muted-foreground">{t('empty')}</p>
         <div className="flex gap-2">
@@ -95,51 +92,29 @@ function MySecretSheet({ workspaceId, workspaceName, secret, onClose, open = tru
   const t = useTranslations('Settings.secrets')
   const commonT = useTranslations('Common')
   const card = useTranslations('CredentialLogin')
-  const actionError = useActionError()
   const [name, setName] = useState(secret?.name ?? '')
   const [value, setValue] = useState('')
   const [reveal, setReveal] = useState(false)
   const [note, setNote] = useState(secret?.note ?? '')
   const [masked, setMasked] = useState(secret ? secret.kind === 'secret' : true)
-  const [pending, setPending] = useState<'save' | 'delete' | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [confirm, setConfirm] = useState<'shadow' | 'delete' | null>(null)
+  const editor = useMySecretEditor(workspaceId, secret, secretName => t('shortValueNotMasked', { name: secretName }))
+  const { pending, error, setError } = editor
+  const [deleting, setDeleting] = useState(false)
+  // Deleting asks first; a name the workspace already has asks too (the editor says so).
+  const confirm = deleting ? 'delete' : editor.shadow ? 'shadow' : null
+  const closeConfirm = () => { setDeleting(false); editor.cancelShadow() }
   const changed = secret === null || Boolean(value) || note.trim() !== secret.note
   const ready = changed && (secret !== null || (Boolean(name.trim()) && Boolean(value)))
 
   async function save(overrideWorkspace = false) {
-    setConfirm(null)
-    setPending('save')
-    setError(null)
-    try {
-      const result = secret
-        ? await replaceMySecret({ id: secret.id, ...(value ? { value } : {}), ...(note.trim() !== secret.note ? { note: note.trim() } : {}) }, workspaceId)
-        : await createMySecret({ name: name.trim(), kind: masked ? 'secret' : 'env', value, note: note.trim(), overrideWorkspace }, workspaceId)
-      // A name the workspace already has: ask once, then the personal value wins in this person's runs.
-      if (result.error === 'secretNameShadowsWorkspace') { setConfirm('shadow'); return }
-      if (result.error) { setError(actionError(result.error)); return }
-      onClose({ notice: result.warning === 'shortValueNotMasked' ? t('shortValueNotMasked', { name: result.name }) : null })
-    } catch {
-      setError(actionError())
-    } finally {
-      setPending(null)
-    }
+    closeConfirm()
+    const saved = await editor.save({ name, value, note, masked }, overrideWorkspace)
+    if (saved) onClose(saved)
   }
 
   async function remove() {
-    if (!secret) return
-    setConfirm(null)
-    setPending('delete')
-    setError(null)
-    try {
-      const result = await deleteMySecret({ id: secret.id }, workspaceId)
-      if (result.error) { setError(actionError(result.error)); return }
-      onClose({ notice: null })
-    } catch {
-      setError(actionError())
-    } finally {
-      setPending(null)
-    }
+    closeConfirm()
+    if (await editor.remove()) onClose({ notice: null })
   }
 
   return <Sheet open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={next => { if (!next && !pending) onClose(null) }}>
@@ -171,13 +146,13 @@ function MySecretSheet({ workspaceId, workspaceName, secret, onClose, open = tru
           </Field>
         </FieldGroup>
         <SheetFooter className="flex-row items-center justify-end">
-          {secret && <Button type="button" variant="destructive" className="mr-auto" disabled={pending !== null} onClick={() => setConfirm('delete')}>{pending === 'delete' ? t('deleting') : commonT('delete')}</Button>}
+          {secret && <Button type="button" variant="destructive" className="mr-auto" disabled={pending !== null} onClick={() => setDeleting(true)}>{pending === 'delete' ? t('deleting') : commonT('delete')}</Button>}
           <Button type="button" variant="outline" disabled={pending !== null} onClick={() => onClose(null)}>{commonT('cancel')}</Button>
           <Button type="submit" disabled={pending !== null || !ready}>{pending === 'save' ? <Spinner data-icon="inline-start" /> : null}{pending === 'save' ? commonT('saving') : commonT('save')}</Button>
         </SheetFooter>
       </form>
     </SheetContent>
-    <AlertDialog open={confirm !== null} onOpenChange={next => { if (!next) setConfirm(null) }}>
+    <AlertDialog open={confirm !== null} onOpenChange={next => { if (!next) closeConfirm() }}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{confirm === 'delete' ? t('removeTitle', { name: secret?.name ?? '' }) : t('shadowConfirm', { workspace: workspaceName ?? t('workspaceGroup'), name: name.trim() })}</AlertDialogTitle></AlertDialogHeader>
         <AlertDialogFooter>
@@ -198,51 +173,24 @@ function MyBulkSheet({ workspaceId, workspaceName, onClose, open = true, onOpenC
   const [text, setText] = useState('')
   const [masked, setMasked] = useState(true)
   const [replace, setReplace] = useState(true)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [shadowed, setShadowed] = useState<string[] | null>(null)
-  const [done, setDone] = useState({ created: 0, replaced: 0, kept: 0 })
-  const preview = useMemo(() => {
-    if (!text.trim()) return null
-    try {
-      const parsed = parseDotenv(text)
-      const reserved = parsed.entries.filter(entry => isReservedEnvName(entry.name)).map(entry => ({ line: entry.line, name: entry.name, reason: 'reserved' as const }))
-      return { entries: parsed.entries.filter(entry => !isReservedEnvName(entry.name)), errors: [...parsed.errors, ...reserved].sort((a, b) => a.line - b.line) }
-    } catch { return 'tooLarge' as const }
-  }, [text])
-  const count = preview && preview !== 'tooLarge' ? preview.entries.length : 0
+  const importer = useMySecretImport(workspaceId)
+  const { pending, error, setError, shadowed, done } = importer
+  const { preview: previewed, count } = useDotenvPreview(text)
+  const preview = previewed && 'tooLarge' in previewed ? 'tooLarge' as const : previewed
+  const readFile = useDotenvFile(setText)
 
   const fileInput = useRef<HTMLInputElement>(null)
   function pick(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file) return
-    if (file.size > DOTENV_MAX_BYTES) { setError(actionError('secretImportTooLarge')); return }
-    setError(null)
-    void file.text().then(setText)
+    setError(readFile(file))
   }
 
   async function save(overrideWorkspace = false) {
-    setShadowed(null)
-    setPending(true)
-    setError(null)
-    try {
-      // The confirmed second pass only adds the shadowed names: everything else was written by the first.
-      const result = await importMySecrets({ text, masked, onConflict: overrideWorkspace || !replace ? 'skip' : 'replace', overrideWorkspace }, workspaceId)
-      if (result.error) { setError(actionError(result.error)); return }
-      const total = overrideWorkspace
-        ? { created: done.created + result.created.length, replaced: done.replaced, kept: done.kept }
-        : { created: result.created.length, replaced: result.replaced.length, kept: result.kept.length + result.errors.filter(problem => problem.reason !== 'shadowsWorkspace').length }
-      const shadows = result.errors.filter(problem => problem.reason === 'shadowsWorkspace').map(problem => problem.name ?? '')
-      // Names the workspace already has: ask once, then add them with the personal value.
-      if (shadows.length) { setDone(total); setShadowed(shadows); return }
-      setText('')
-      onClose({ notice: t('importDone', total) })
-    } catch {
-      setError(actionError())
-    } finally {
-      setPending(false)
-    }
+    const total = await importer.run({ text, masked, replace }, overrideWorkspace)
+    if (!total) return
+    setText('')
+    onClose({ notice: t('importDone', total) })
   }
 
   return <Sheet open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={next => { if (!next && !pending) onClose(done.created || done.replaced ? { notice: t('importDone', done) } : null) }}>
@@ -285,7 +233,7 @@ function MyBulkSheet({ workspaceId, workspaceName, onClose, open = true, onOpenC
         </SheetFooter>
       </form>
     </SheetContent>
-    <AlertDialog open={shadowed !== null} onOpenChange={next => { if (!next) setShadowed(null) }}>
+    <AlertDialog open={shadowed !== null} onOpenChange={next => { if (!next) importer.cancelShadow() }}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{t('shadowConfirmMany', { workspace: workspaceName ?? t('workspaceGroup'), names: (shadowed ?? []).join('、') })}</AlertDialogTitle></AlertDialogHeader>
         <AlertDialogFooter>

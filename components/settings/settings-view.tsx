@@ -22,7 +22,6 @@ import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
-import { SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
@@ -111,7 +110,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
     case 'privacy': return <PrivacySettings />
     case 'logins':
-    case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} workspace={workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} /> : waiting} />
+    case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
     case 'preferences': return <PreferencesSettings />
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />

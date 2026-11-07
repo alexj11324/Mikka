@@ -1,13 +1,10 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
 import { useRef, useState, type FormEvent } from 'react'
-import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { Ellipsis, EyeIcon, EyeOffIcon, LockIcon, Plus } from 'lucide-react'
-import { deleteSavedLogin, listSavedLoginUsage, replaceSavedLoginPassword, saveSavedLogin, type listSavedLogins } from '@/app/actions/settings-activity'
-import { settingsRead } from '@/lib/settings-read'
-import type { SavedLogin, SavedLoginUse } from '@/lib/settings/saved-logins'
+import type { SavedLogin } from '@/lib/settings/saved-logins'
+import { useSavedLoginEditor, useSavedLoginUsage, useSavedLogins, withoutScheme } from '@/hooks/settings/use-secrets'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { SiteIcon } from '@/components/credentials/site-icon'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -21,7 +18,6 @@ import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/com
 import { Spinner } from '@/components/ui/spinner'
 import { SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { relativeTime } from '@/lib/relative-time'
-import { useActionError } from '@/lib/use-action-error'
 import { usePresence } from '@/lib/use-presence'
 import { cn } from '@/lib/utils'
 
@@ -33,28 +29,16 @@ type Editing = { kind: 'new' } | { kind: 'password'; login: SavedLogin }
  */
 export function SavedLoginsSettings() {
   const t = useTranslations('Settings.logins')
-  const actionError = useActionError()
   const locale = useLocale()
-  const { data, error, isLoading, mutate } = useSWR(settingsKeys.savedLogins(), () => settingsRead<Awaited<ReturnType<typeof listSavedLogins>>>('saved-logins'))
+  const saved = useSavedLogins()
+  const { logins, deleteError, remove } = saved
+  const isLoading = saved.loading
+  const error = saved.failed
   const [editing, setEditing] = useState<Editing | null>(null)
   const sheet = usePresence(editing)
   const [removing, setRemoving] = useState<SavedLogin | null>(null)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [usageOf, setUsageOf] = useState<SavedLogin | null>(null)
-
-  const logins = data && !('error' in data) ? data.logins : []
   const add = () => setEditing({ kind: 'new' })
-
-  async function remove(login: SavedLogin) {
-    setDeleteError(null)
-    try {
-      const result = await deleteSavedLogin(login.id)
-      if (result.error) { setDeleteError(actionError(result.error)); return }
-      void mutate()
-    } catch {
-      setDeleteError(actionError())
-    }
-  }
 
   return <>
     <SettingsSection id="saved-logins-heading" title={t('heading')} action={logins.length > 0 ? <Button {...settingsSectionAction} onClick={add}>{t('add')}</Button> : undefined}>
@@ -79,7 +63,7 @@ export function SavedLoginsSettings() {
                 <DropdownMenuGroup>
                   <DropdownMenuItem onClick={() => setEditing({ kind: 'password', login })}>{t('changePassword')}</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setUsageOf(login)}>{t('usage')}</DropdownMenuItem>
-                  <DropdownMenuItem variant="destructive" onClick={() => { setDeleteError(null); setRemoving(login) }}>{t('delete')}</DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onClick={() => { saved.clearDeleteError(); setRemoving(login) }}>{t('delete')}</DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -89,7 +73,7 @@ export function SavedLoginsSettings() {
       {deleteError && <FieldError className="px-5 py-3">{deleteError}</FieldError>}
     </SettingsSection>
 
-    {sheet.value && <LoginSheet editing={sheet.value} open={sheet.open} onOpenChangeComplete={sheet.onOpenChangeComplete} onClose={saved => { setEditing(null); if (saved) void mutate() }} />}
+    {sheet.value && <LoginSheet editing={sheet.value} open={sheet.open} onOpenChangeComplete={sheet.onOpenChangeComplete} onClose={done => { setEditing(null); if (done) saved.reload() }} />}
 
     {/* Deleting cannot be undone: ask first, as 密钥与环境 does. */}
     <AlertDialog open={Boolean(removing)} onOpenChange={open => { if (!open) setRemoving(null) }}>
@@ -117,14 +101,12 @@ export function SavedLoginsSettings() {
 function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing: Editing; open: boolean; onOpenChangeComplete: (open: boolean) => void; onClose: (saved: boolean) => void }) {
   const t = useTranslations('Settings.logins')
   const card = useTranslations('CredentialLogin')
-  const actionError = useActionError()
   const login = editing.kind === 'password' ? editing.login : null
   const [site, setSite] = useState(login?.site ?? '')
   const [account, setAccount] = useState(login?.account ?? '')
   const [password, setPassword] = useState('')
   const [reveal, setReveal] = useState(false)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { pending, error, setError, save } = useSavedLoginEditor(login)
   // A new password starts on its own field; a new login starts on the site.
   const passwordField = useRef<HTMLInputElement>(null)
   const ready = Boolean(password) && (login !== null || (Boolean(site.trim()) && Boolean(account.trim())))
@@ -132,18 +114,9 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (!ready || pending) return
-    setPending(true)
-    setError(null)
-    try {
-      const result = login ? await replaceSavedLoginPassword(login.id, password) : await saveSavedLogin({ site: site.trim(), account: account.trim(), password })
-      if (result.error) { setError(actionError(result.error)); return }
-      setPassword('')
-      onClose(true)
-    } catch {
-      setError(actionError())
-    } finally {
-      setPending(false)
-    }
+    if (!await save({ site, account, password })) return
+    setPassword('')
+    onClose(true)
   }
 
   return <Sheet open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={next => { if (!next && !pending) onClose(false) }}>
@@ -183,8 +156,7 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
 function UsageList({ id }: { id: string }) {
   const t = useTranslations('Settings.logins')
   const locale = useLocale()
-  const { data, error, isLoading } = useSWR(['account:saved-login-usage', id], () => listSavedLoginUsage(id))
-  const uses: SavedLoginUse[] = data && !('error' in data) ? data.uses : []
+  const { uses, loading: isLoading, failed: error } = useSavedLoginUsage(id)
   if (isLoading) return <SettingsLoading label={t('usageLoading')} rows={2} bare />
   if (error) return <FieldError>{t('usageError')}</FieldError>
   if (uses.length === 0) return <p className="text-sm text-muted-foreground">{t('usageEmpty')}</p>
@@ -194,8 +166,4 @@ function UsageList({ id }: { id: string }) {
       <span className="text-xs text-muted-foreground">{relativeTime(use.at, locale)}</span>
     </div>)}
   </div>
-}
-
-function withoutScheme(site: string): string {
-  return site.replace(/^https?:\/\//, '')
 }
