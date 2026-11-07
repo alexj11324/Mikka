@@ -57,6 +57,27 @@ it('consumes a private locator tied to the exact one-use bootstrap without persi
   expect(device).not.toContain(f.locator.bootstrapSha256)
 })
 
+it('preserves trace metadata and binds the locator to the complete original bootstrap bytes', () => {
+  const f = handoff()
+  const input = { ...f.input,
+    traceContext: { traceparent: `00-${'1'.repeat(32)}-${'2'.repeat(16)}-01`, runId: f.runId,
+      sessionId: 'replay_fixture', sampleRate: 1 },
+    tracing: { endpoint: 'https://us.i.posthog.com/i/v1/traces', projectToken: 'phc_fixture12345', sampleRate: 1 },
+  }
+  const body = `${JSON.stringify(input, null, 2)}\n`
+  // Neither the payload before telemetry was added nor a reserialized copy
+  // matches the bytes actually handed over for this optional hint.
+  for (const candidate of [body, f.body, JSON.stringify(input)]) {
+    writeFileSync(f.path, body, { mode: 0o600 })
+    writeFileSync(f.hint, JSON.stringify({ ...f.locator,
+      bootstrapSha256: createHash('sha256').update(candidate).digest('hex'),
+    }), { mode: 0o600 })
+    expect(consumeCloudBootstrap(f.path)).toEqual({ ...input, ...(candidate === body ? { initialRunId: f.runId } : {}) })
+    expect(existsSync(f.path)).toBe(false)
+    expect(existsSync(f.hint)).toBe(false)
+  }
+})
+
 it('does not reuse a locator across credential rotation or another device/workspace', () => {
   for (const changed of [
     { credential: `orv_${'b'.repeat(43)}` }, { deviceId: randomUUID() }, { workspaceId: randomUUID() },

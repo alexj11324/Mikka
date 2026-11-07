@@ -23,6 +23,16 @@ export const USER_ERROR_CODES = {
 
   installer_failed: ["node_required", "unsupported_os", "npm_permission", "npm_cache_permission", "cancelled", "timeout", "service_failed", "connection_failed", "command_failed"],
   model_tool_unavailable: [],
+  cloud_not_connected: [],
+  cloud_scope_missing: [],
+  cloud_server_revoked: [],
+  cloud_invalid_request: ["configuration", "protocol", "state"],
+  cloud_rate_limited: [],
+  cloud_access_denied: ["origin", "administrator"],
+  cloud_unavailable: ["network", "response", "protocol", "storage", "refresh_uncertain"],
+  cloud_quota_exhausted: [],
+
+  github_app_setup_failed: ['admin', 'origin', 'state', 'encryption', 'storage', 'configured', 'request', 'response', 'template'],
   desktop_client_update_required: [],
   desktop_session_expired: [],
   desktop_session_changed: [],

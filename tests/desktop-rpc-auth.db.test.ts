@@ -92,7 +92,7 @@ test('native RPC verifies real bearer sessions, tenant membership, expiry and on
     await t.test('the bundled exchange consumes PKCE and OTT once, returning the actual session bearer', async () => {
       mocks.push(mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth } }))
       mocks.push(mock.module(new URL('../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: database, db: drizzle(database, { schema }) } }))
-      mocks.push(mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_path: string, handler: unknown) => handler } }))
+      mocks.push(mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_path: string, handler: unknown) => handler } }))
       const { POST } = await import('../app/api/desktop/exchange/route')
       const create = async () => {
         const state = randomBytes(24).toString('base64url'), verifier = randomBytes(32).toString('base64url'), code = randomBytes(32).toString('base64url')

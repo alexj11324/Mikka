@@ -30,7 +30,7 @@ stub('./triage-batch.ts', { TRIAGE_BATCH_BUDGET_MS: 1000, runTriageBatch: async 
 stub('./run-completion-delivery.ts', { deliverRunCompletion: async () => {} })
 stub('./push-decision.ts', { pushByDecision: async () => {} })
 stub('../run-test-fixture.ts', { runTestFixture: () => undefined })
-stub('../default-model-config.ts', { defaultModelConfigured: () => defaultAvailable })
+stub('../default-model.ts', { defaultModelAvailable: async () => defaultAvailable })
 stub('./model-ready.ts', { botModelReady: async (owner: string, bot: string | null) => { readinessCalls.push([owner, bot]); return ownModelReady } })
 stub('./interrupted-turns.ts', { recoverInterruptedTurns: async () => ({ recovered: 0 }) })
 stub('../abuse/context.ts', { hostedBillingScope: { run: (_scope: unknown, run: () => unknown) => run() } })

@@ -12,49 +12,101 @@ WITH
           AND (resource_attributes['deployment.environment.name'] = 'production' OR resource_attributes['deployment.environment'] = 'production')
     ),
     workflow_spans AS (
-        SELECT service_name, trace_id, span_id, parent_span_id, is_root_span, name, status_code,
-            toFloatOrNull(attributes['http.response.status_code']) AS http_status,
-            coalesce(nullIf(attributes['mikka.route'], ''), 'unknown') AS route,
-            coalesce(nullIf(attributes['mikka.error.code'], ''), nullIf(attributes['error.type'], ''), 'unknown_error') AS error_code
-        FROM posthog.trace_spans
-        WHERE timestamp >= evaluated_hour - INTERVAL 8 DAY AND timestamp < evaluated_hour + INTERVAL 1 HOUR
-          AND service_name = 'mikka-web'
-          AND (resource_attributes['deployment.environment.name'] = 'production' OR resource_attributes['deployment.environment'] = 'production')
-          AND (is_root_span OR status_code = 2 AND name IN (
-              'http GET', 'http POST', 'world.hooks.getByToken', 'hook.resume', 'workflow.replay.load',
-              'world.events.create wait_created', 'world.events.create wait_completed', 'world.events.create step_started',
-              'world.events.create run_started', 'world.events.create hook_received'))
+        SELECT raw.service_name, raw.trace_id, raw.span_id, raw.parent_span_id, raw.links,
+            CASE WHEN raw.name LIKE 'workflow.execute %' THEN 'workflow.execute'
+                 WHEN raw.name LIKE 'workflow.run %' THEN 'workflow.run'
+                 WHEN raw.name LIKE 'step.execute %' THEN 'step.execute' ELSE raw.name END AS name,
+            raw.status_code,
+            toFloatOrNull(raw.attributes['http.response.status_code']) AS http_status,
+            coalesce(nullIf(raw.attributes['mikka.route'], ''), 'unknown') AS route,
+            coalesce(nullIf(raw.attributes['mikka.error.code'], ''), nullIf(raw.attributes['error.type'], ''), 'unknown_error') AS error_code
+        FROM posthog.trace_spans raw
+        WHERE raw.timestamp >= evaluated_hour - INTERVAL 8 DAY AND raw.timestamp < evaluated_hour + INTERVAL 1 HOUR
+          AND raw.service_name = 'mikka-web'
+          AND (raw.resource_attributes['deployment.environment.name'] = 'production' OR raw.resource_attributes['deployment.environment'] = 'production')
+          AND (raw.name IN (
+              'workflow.route.flow', 'vqs.process', 'workflow.execute', 'workflow.run', 'step.execute',
+              'workflow.replay.load', 'after:workflow-wake', 'cron:reconcile', 'GET /api/cron/reconcile', 'hook.resume')
+              OR raw.name LIKE 'workflow.execute %' OR raw.name LIKE 'workflow.run %' OR raw.name LIKE 'step.execute %'
+              OR raw.status_code = 2 AND raw.name IN (
+                  'http GET', 'http POST', 'world.hooks.getByToken',
+                  'world.events.create wait_created', 'world.events.create wait_completed', 'world.events.create step_started',
+                  'world.events.create run_started', 'world.events.create hook_received'))
     ),
     workflow_traces AS (
-        -- Keep ancestry in each trace so matching does not rescan the historical window.
+        -- Finite node tuple: id, parent, name, route, error, HTTP status, span status, links.
+        -- Keep non-root entries. Success elsewhere in a trace is never an attempt's proof.
         SELECT service_name, trace_id,
-            groupArrayIf((span_id, parent_span_id, name, route, error_code, http_status), status_code = 2) AS errors
-        FROM workflow_spans
-        WHERE service_name = 'mikka-web'
-        GROUP BY service_name, trace_id
-        HAVING countIf(is_root_span AND (status_code = 2 OR http_status >= 400)) = 0
-           AND countIf(is_root_span AND status_code != 2 AND (
-               (name = 'workflow.route.flow' AND route = '/.well-known/workflow/v1/flow'
-                OR name = 'GET /api/cron/reconcile' AND route = '/api/cron/reconcile')
-               AND http_status >= 200 AND http_status < 300
-               OR name = 'after:workflow-wake' AND route = 'after:workflow-wake')) > 0
+            groupArray((span_id, parent_span_id, name, route, error_code, http_status, status_code, links)) AS nodes
+        FROM workflow_spans GROUP BY service_name, trace_id
+    ),
+    delivery_contexts AS (
+        -- A queue context proves only its exact successful flow parent, never its own origin link.
+        SELECT DISTINCT service_name, trace_id,
+            arrayJoin(arrayMap(d -> d.1, arrayFilter(d -> d.7 IN (0, 1) AND d.5 = 'unknown_error' AND (
+                d.3 = 'workflow.route.flow' AND d.4 = '/.well-known/workflow/v1/flow' AND d.6 >= 200 AND d.6 < 300
+                OR d.3 = 'vqs.process' AND arrayExists(f -> f.1 = d.2 AND f.3 = 'workflow.route.flow'
+                    AND f.4 = '/.well-known/workflow/v1/flow' AND f.7 IN (0, 1) AND f.5 = 'unknown_error'
+                    AND f.6 >= 200 AND f.6 < 300, nodes)), nodes))) AS span_id
+        FROM workflow_traces
+    ),
+    invocations AS (
+        SELECT service_name, trace_id,
+            arrayJoin(arrayFilter(i -> i.3 = 'workflow.execute' AND i.7 IN (0, 1) AND i.5 = 'unknown_error', nodes)) AS invocation
+        FROM workflow_traces
+    ),
+    invocation_references AS (
+        -- Linked: exact local parent. Continuous: one valid link to the delivery or its vqs.process.
+        -- JSON link IDs already use the table's native base64 representation.
+        SELECT service_name, trace_id, invocation.1 AS invocation_id,
+            arrayJoin(arrayConcat([(trace_id, invocation.2)],
+                if(length(invocation.8) = 1 AND isValidJSON(arrayElement(invocation.8, 1)),
+                    [(JSONExtractString(arrayElement(invocation.8, 1), 'trace_id'), JSONExtractString(arrayElement(invocation.8, 1), 'span_id'))], []))) AS reference
+        FROM invocations
+    ),
+    proven_invocations AS (
+        -- Resolve cross-trace links once per invocation, not once per error/client/wrapper.
+        SELECT i.service_name AS service_name, i.trace_id AS trace_id, groupUniqArray(i.invocation_id) AS ids
+        FROM invocation_references i JOIN delivery_contexts d
+          ON i.service_name = d.service_name AND tupleElement(i.reference, 1) = d.trace_id AND tupleElement(i.reference, 2) = d.span_id
+        GROUP BY i.service_name, i.trace_id
+    ),
+    entry_proofs AS (
+        SELECT t.service_name AS service_name, t.trace_id AS trace_id, t.nodes AS nodes,
+            arrayFilter(n -> n.7 = 2, t.nodes) AS errors, coalesce(i.ids, []) AS invocation_ids,
+            arrayMap(o -> o.1, arrayFilter(o -> o.7 IN (0, 1) AND o.5 = 'unknown_error'
+                AND o.3 = 'after:workflow-wake' AND o.4 = 'after:workflow-wake', t.nodes)) AS wake_ids,
+            arrayMap(o -> o.1, arrayFilter(o -> o.7 IN (0, 1) AND o.5 = 'unknown_error'
+                AND o.3 = 'cron:reconcile' AND o.4 = 'cron:reconcile'
+                AND arrayExists(e -> e.1 = o.2 AND e.3 = 'GET /api/cron/reconcile' AND e.4 = '/api/cron/reconcile'
+                    AND e.7 IN (0, 1) AND e.5 = 'unknown_error' AND e.6 >= 200 AND e.6 < 300, t.nodes), t.nodes)) AS cron_ids,
+            -- The inner step span starts before stepMetadata; its route can still be flow.
+            -- Only its hook/SDK/client descendants must carry the exact closed nudge label.
+            arrayMap(o -> o.1, arrayFilter(o -> o.7 IN (0, 1) AND o.5 = 'unknown_error' AND o.3 = 'step.execute', t.nodes)) AS step_ids
+        FROM workflow_traces t LEFT JOIN proven_invocations i
+          ON t.service_name = i.service_name AND t.trace_id = i.trace_id
     ),
     handled_attempts AS (
-        -- Error tuple fields are span id, parent id, name, route, code and HTTP status.
         SELECT service_name, trace_id, errors,
-            arrayFilter(c ->
-                (c.3 = 'http POST' AND c.4 = '/.well-known/workflow/v1/flow'
-                 AND (c.6 = 409 AND c.5 = 'HTTP 409' OR c.6 = 410 AND c.5 = 'HTTP 410')
-                 OR c.3 = 'http GET' AND c.6 = 404 AND c.5 = 'not-found'
-                    AND c.4 IN ('cron:reconcile', 'after:workflow-wake', 'workflow:coordinatorWakeDeadline/nudgeWorkflow')
-                 OR c.3 = 'http POST' AND c.6 = 404 AND c.5 = 'HTTP 404'
-                    AND c.4 = 'workflow:coordinatorWakeDeadline/nudgeWorkflow')
-                AND arrayExists(p -> p.1 = c.2 AND p.5 = 'unknown_error' AND p.4 = c.4 AND (
-                    c.6 = 409 AND p.3 IN ('world.events.create wait_created', 'world.events.create wait_completed', 'world.events.create step_started', 'world.events.create run_started')
-                    OR c.6 = 410 AND p.3 = 'world.events.create run_started'
-                    OR c.6 = 404 AND (c.3 = 'http GET' AND p.3 = 'world.hooks.getByToken'
-                        OR c.3 = 'http POST' AND p.3 = 'world.events.create hook_received')), errors), errors) AS clients
-        FROM workflow_traces
+            arrayFilter(c -> arrayExists(p -> p.1 = c.2 AND p.5 = 'unknown_error' AND p.4 = c.4 AND (
+                c.3 = 'http POST' AND c.4 = '/.well-known/workflow/v1/flow'
+                AND (c.6 = 409 AND c.5 = 'HTTP 409' AND p.3 IN (
+                    'world.events.create wait_created', 'world.events.create wait_completed', 'world.events.create step_started', 'world.events.create run_started')
+                    OR c.6 = 410 AND c.5 = 'HTTP 410' AND p.3 = 'world.events.create run_started')
+                AND (has(invocation_ids, p.2) OR arrayExists(w -> w.1 = p.2
+                    AND w.3 IN ('workflow.replay.load', 'workflow.run', 'step.execute') AND has(invocation_ids, w.2), nodes))
+                OR c.6 = 404 AND (
+                    c.3 = 'http GET' AND c.5 = 'not-found' AND p.3 = 'world.hooks.getByToken'
+                      AND c.4 IN ('cron:reconcile', 'after:workflow-wake', 'workflow:coordinatorWakeDeadline/nudgeWorkflow')
+                    OR c.3 = 'http POST' AND c.5 = 'HTTP 404' AND p.3 = 'world.events.create hook_received'
+                      AND c.4 = 'workflow:coordinatorWakeDeadline/nudgeWorkflow')
+                AND (c.4 = 'cron:reconcile' AND has(cron_ids, p.2)
+                    OR arrayExists(w -> w.1 = p.2 AND w.3 = 'hook.resume' AND w.4 = c.4 AND (
+                        c.4 = 'after:workflow-wake' AND has(wake_ids, w.2)
+                        OR c.4 = 'cron:reconcile' AND has(cron_ids, w.2)
+                        OR c.4 = 'workflow:coordinatorWakeDeadline/nudgeWorkflow' AND has(step_ids, w.2)), nodes))
+            ), errors), errors) AS clients
+        FROM entry_proofs
     ),
     handled_parents AS (
         SELECT service_name, trace_id, errors, clients,

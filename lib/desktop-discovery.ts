@@ -8,7 +8,7 @@ import { WEB_CONNECTION_PROTOCOL, webConnectionEnabled } from './web-connection/
 type Environment = Record<string, string | undefined>
 
 /** Public configuration only. Discovering an installation never loads auth,
- * opens a database, creates a session or returns provider credentials. */
+ * creates a session or returns provider credentials. The route supplies the persisted cloud connection bit. */
 export function desktopDiscovery(env: Environment = process.env) {
   const name = env.MIKKA_SERVER_NAME?.trim().slice(0, 120) || 'Mikka'
   return {
@@ -25,9 +25,10 @@ export function desktopDiscovery(env: Environment = process.env) {
   }
 }
 
-export function desktopDiscoveryResponse(request: Request, env: Environment = process.env, signIn?: ReturnType<typeof authSignInMethods>) {
+export function desktopDiscoveryResponse(request: Request, env: Environment = process.env, signIn?: ReturnType<typeof authSignInMethods>, cloudConnected = false) {
   const discovery = desktopDiscovery(env)
   if (signIn) discovery.signIn = signIn
+  discovery.cloud.connected = cloudConnected
   let updateRequired = false
   const version = request.headers.get('x-mikka-client-version')
   if (request.headers.get('x-mikka-client') === 'desktop' && version && discovery.minDesktopVersion) {

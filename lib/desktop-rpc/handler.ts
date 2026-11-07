@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { noteLogRpcAction } from '../request-log'
 import { decode, encode, DESKTOP_RPC_VERSION, DESKTOP_RPC_PREVIOUS_VERSION, UPDATE_REQUIRED } from './wire'
 import { desktopSameOriginRequest } from '../desktop-auth'
 
@@ -71,6 +72,7 @@ export async function dispatchRpc<Session>(options: RpcDispatchOptions<Session>,
     if (![DESKTOP_RPC_VERSION, DESKTOP_RPC_PREVIOUS_VERSION].includes(input.version as 0 | 1)
       || (headerVersion !== null && headerVersion !== String(input.version))) return failure(426, UPDATE_REQUIRED)
     if (!Object.hasOwn(options.actions, input.action)) return failure(404, 'desktop_rpc_action_unknown', input.version)
+    noteLogRpcAction(input.action)
     const action = options.actions[input.action]
     let args: unknown
     try { args = decode(input.args) } catch { return failure(400, 'desktop_rpc_request_invalid', input.version) }

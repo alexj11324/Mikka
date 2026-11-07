@@ -4,13 +4,20 @@ import { CodedError, type CodedErrorOptions } from '@mikka/protocol/coded-error'
 import type { Pool, PoolClient } from 'pg'
 import type { WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
 import { MODEL_ROUTING_TIERS, modelTier } from '@/lib/model-routing'
-import { credentialStates, orderCandidates } from '@/lib/model-order'
+import { credentialStates, orderCandidates, selectedOrderCandidates } from '@/lib/model-order'
 import { executionIdentityForRun, ExecutionIdentityError } from '@/lib/execution-identity'
 import { assertProfileTarget, assertProfileSelection, BUILTIN_AGENT_PROFILE_ID, isBuiltinAgentProfileSelection, type AgentProfileSelection } from './agent-profile'
 
 import { watchdogProfileAdmission, watchdogProfileClaimContext, type ProfileFactoryContext } from './profile-watchdog'
 
 type Query = Pick<Pool | PoolClient, 'query'>
+// Match the fixed-Profile target fence. Inherited/default roles still need the
+// complete preference catalogue; a frozen custom source cannot choose another.
+function profileQuotaCandidates(pool: Pool, scope: { ownerId: string; workspaceId: string }, selection: AgentProfileSelection) {
+  return selection.profileId !== BUILTIN_AGENT_PROFILE_ID && (selection.source === 'explicit' || selection.source === 'decision') && selection.definition.model.mode === 'fixed'
+    ? selectedOrderCandidates(pool, scope, selection.targetEntry) : orderCandidates(pool, scope)
+}
+
 export type AgentProfileAdmissionDetail =
   | 'scope_unavailable' | 'snapshot_invalid' | 'target_mismatch' | 'credential_mismatch' | 'binding_unavailable'
   | 'watchdog_receipt' | 'watchdog_target' | 'continuation_mismatch' | 'current_profile' | 'question_receipt' | 'question_origin'
@@ -42,7 +49,7 @@ export async function refreshCloudRunProfileClaim(pool: Pool, actor: { userId: s
     [subscriptionBindingId, entry.source.connectionId, entry.model, actor.workspaceId])
   if (!bound.rowCount) return
   const scope = { ownerId: actor.userId, workspaceId: actor.workspaceId }
-  const candidates = await orderCandidates(pool, scope)
+  const candidates = await profileQuotaCandidates(pool, scope, selection)
   await credentialStates(pool, scope, [entry], candidates, undefined, { probe: 'always' })
 }
 
@@ -61,7 +68,7 @@ export async function refreshProfileQuota(pool: Pool, input: {
   const binding = await nativeRunBinding(pool, input.ownerId, input.agentId, entry.harness, input.workspaceId, input.subscriptionBindingId)
   if (!binding || binding.connectionId !== entry.source.connectionId || binding.modelId !== entry.model) return
   const scope = { ownerId: input.ownerId, workspaceId: input.workspaceId }
-  await credentialStates(pool, scope, [entry], await orderCandidates(pool, scope))
+  await credentialStates(pool, scope, [entry], await profileQuotaCandidates(pool, scope, selection))
 }
 
 /** A host-supplied source is an exception only for the exact frozen role of an

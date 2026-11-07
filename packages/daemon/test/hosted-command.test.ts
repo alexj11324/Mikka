@@ -7,6 +7,26 @@ import { cleanupTempDirs, tempDir, waitFor } from './helpers'
 afterEach(cleanupTempDirs)
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 
+async function waitForStoppedPid(pid: number) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('Expected a positive, safe integer PID')
+  // Linux can close inherited pipes during do_exit before /proc reports Z/X.
+  // Still require a terminal state or an absent PID within this short bound.
+  await waitFor(() => {
+    if (process.platform === 'linux') {
+      try { return /\) [ZX] /.test(readFileSync(`/proc/${pid}/stat`, 'utf8')) }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+        // A different /proc namespace can hide a live child. Confirm absence.
+      }
+    }
+    try { process.kill(pid, 0); return false }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ESRCH') return true
+      throw error
+    }
+  }, 1000)
+}
+
 function fixture() {
   const root = tempDir(), binary = join(root, 'child.cjs'), ready = join(root, 'ready'), stopped = join(root, 'stopped')
   writeFileSync(binary, `const fs = require('node:fs')
@@ -52,10 +72,32 @@ it('an already cancelled verification never starts a shell', async () => {
 it('keeps bounded successful output and removes descendants when their shell exits first', async () => {
   const f = fixture()
   const result = await runHostedCommand(f.root,
-    `${quote(process.execPath)} ${quote(f.binary)} &\nwhile [ ! -f ${quote(f.ready)} ]; do sleep 0.01; done\nprintf complete`, false, 5000)
+    `${quote(process.execPath)} ${quote(f.binary)} &\nwhile [ ! -s ${quote(f.ready)} ]; do sleep 0.01; done\nprintf complete`, false, 5000)
   expect(result).toMatchObject({ exitCode: 0, timedOut: false, output: 'complete' })
   const pid = Number(readFileSync(f.ready, 'utf8'))
-  if (process.platform === 'linux' && existsSync(`/proc/${pid}/stat`))
-    expect(readFileSync(`/proc/${pid}/stat`, 'utf8')).toMatch(/\) [ZX] /)
-  else expect(() => process.kill(pid, 0)).toThrow()
+  await waitForStoppedPid(pid)
+})
+
+it('does not accept a live child as a stopped verification process', async () => {
+  const f = fixture(), controller = new AbortController()
+  const command = runHostedCommand(f.root, f.script, false, 10_000, controller.signal)
+  let pid: number | undefined
+  try {
+    pid = await waitFor(() => {
+      try {
+        const value = readFileSync(f.ready, 'utf8')
+        const candidate = Number(value)
+        return value.length > 0 && Number.isSafeInteger(candidate) && candidate > 0 ? candidate : false
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+        throw error
+      }
+    }, 5000)
+    await expect(waitForStoppedPid(pid)).rejects.toThrow('waitFor timed out')
+    expect(existsSync(f.stopped)).toBe(false)
+  } finally {
+    controller.abort()
+    await command
+    if (pid !== undefined) await waitForStoppedPid(pid)
+  }
 })

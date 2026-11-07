@@ -34,6 +34,14 @@ export function webAuthentication(location: URL) {
   }
 }
 
+/** This browser page only chooses the account handed to an existing PKCE
+ * request. Other sign-in and OAuth continuation routes retain full bootstrap. */
+export function isDesktopHandoffPage(location: URL): boolean {
+  if (withoutLocale(location.pathname) !== '/sign-in') return false
+  const value = webAuthentication(location)
+  return Boolean(value.desktopFlow && !value.oauthResume && !value.composioResume)
+}
+
 /** A machine callback leaves the SPA through its original HTTP endpoint. */
 export function authenticatedReturn(location: URL): string | null {
   const value = webAuthentication(location)

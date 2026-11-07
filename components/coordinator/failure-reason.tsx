@@ -9,6 +9,7 @@ import { Link } from '@/i18n/navigation'
 import { settingsHref } from '@/lib/settings-sections'
 import { openModelPicker } from './bot-model-picker'
 import { subscriptionRecovery } from '@/lib/subscription-refusal'
+import { withBasePath } from '@/lib/base-path'
 import { RunErrorDetails } from '@/components/workspace/run-error-text'
 
 const TRANSIENT = new Set(['usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable'])
@@ -27,11 +28,17 @@ export function FailureReason({ failure, botId, onResend, sending = false, retry
   const refusal = useTranslations('Billing.refusal')
   const balance = useTranslations('Billing.balance')
   const picker = useTranslations('Coordinator.modelPicker')
+  const cloud = useTranslations('Settings.cloud'), errors = useTranslations('RunErrors')
   const message = failureMessageKey(failure)
-  const reason = message.namespace === 'Billing.refusal' ? refusal(message.key) : chat(message.key)
+  const reason = message.namespace === 'RunErrors' ? errors(message.key) : message.namespace === 'Billing.refusal' ? refusal(message.key) : chat(message.key)
   const transient = failure.kind === 'hosted' && TRANSIENT.has(failure.code)
   const recovery = failure.kind === 'subscription' ? subscriptionRecovery(failure.notice) : null
-  const action = failure.kind === 'hosted' && !transient && failure.code !== 'platform_paused'
+  const cloudCode = failure.kind === 'failed' ? failure.cloudCode : undefined
+  const action = cloudCode === 'cloud_quota_exhausted'
+    ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} render={<a href={withBasePath('/api/cloud/models/billing?redirect=1')} target="_blank" rel="noreferrer" />}>{cloud('topUp')}</Button>
+    : cloudCode && ['cloud_not_connected', 'cloud_server_revoked', 'cloud_scope_missing'].includes(cloudCode)
+    ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} render={<Link href={settingsHref('account')} />}>{cloud('connectAccount')}</Button>
+    : failure.kind === 'hosted' && !transient && failure.code !== 'platform_paused'
     ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{failure.code === 'verification_required' ? refusal('verifyCard') : balance('topUp')}</Button>
     : recovery === 'settings'
       ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>{chat('subscriptionRefusal.open')}</Button>

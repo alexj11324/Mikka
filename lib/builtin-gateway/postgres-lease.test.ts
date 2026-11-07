@@ -7,7 +7,7 @@ import { MAX_PRESENCE_SOURCES, PostgresGatewayBus } from './postgres'
 
 type Result = { rows: Array<Record<string, unknown>> }
 type Query = string | { text: string; query_timeout?: number }
-type Controls = { absent?: boolean; holdInitial?: boolean; holdEnd?: boolean; holdResponse?: boolean; failCancel?: boolean; diesBeforeWait?: boolean }
+type Controls = { absent?: boolean; holdInitial?: boolean; holdEnd?: boolean; holdResponse?: boolean; failCancel?: boolean; diesBeforeWait?: boolean; holdWaitStart?: boolean }
 const flush = () => new Promise<void>(resolve => setImmediate(resolve))
 
 /** Only transport timing is controlled here. Real PG lock behavior is covered
@@ -32,8 +32,10 @@ class ControlledClient extends EventEmitter {
       if (this.controls.holdInitial) return this.response(this.initial.promise)
       return this.response(Promise.resolve({ rows: [{ absent: this.controls.absent ?? false }] }))
     }
-    if (text.includes('pg_advisory_lock_shared')) return this.response(this.controls.diesBeforeWait
-      ? Promise.resolve({ rows: [{}] }) : this.waiting.promise)
+    if (text.includes('pg_advisory_lock_shared')) {
+      if (!this.controls.holdWaitStart) this.emit('notice', { message: 'mikka_gateway_wait_started' })
+      return this.response(this.controls.diesBeforeWait ? Promise.resolve({ rows: [{}] }) : this.waiting.promise)
+    }
     if (text.includes('pg_try_advisory_lock')) return this.response(Promise.resolve({ rows: [{ held: true }] }))
     if (text.includes('pg_notify') && this.failPublish) return Promise.reject(new Error('isolated publish failure'))
     return this.response(Promise.resolve({ rows: [] }))
@@ -92,6 +94,37 @@ test('source leases precede LISTEN and equal callbacks retain distinct shared wa
   first()
   assert.equal(wire.watchers()[0].ending, false, 'another reference with the same callback still owns the waiter')
   second(); await flush()
+  assert.equal(wire.watchers()[0].ended, true)
+  assert.equal(wire.watchers()[0].cancellations, 1)
+})
+
+test('observe waits for PostgreSQL to enter the blocking command before exposing a cancellable waiter', async t => {
+  const wire = transport({ holdWaitStart: true }); t.after(() => wire.stop())
+  await wire.bus.ready()
+  let ready = false
+  const pending = wire.bus.observe(randomUUID(), () => {}).then(release => { ready = true; return release })
+  await flush()
+  assert.equal(ready, false, 'a queued client write cannot prove the backend has entered a cancellable command')
+  const waiter = wire.watchers()[0]
+  waiter.emit('notice', { message: 'unrelated notice' })
+  await flush()
+  assert.equal(ready, false)
+  waiter.emit('notice', { message: 'mikka_gateway_wait_started' })
+  await pending
+  await wire.bus.stop()
+  assert.equal(waiter.cancellations, 1)
+  assert.equal(waiter.ended, true)
+})
+
+test('a missing command acknowledgement retains the bounded initialization deadline and closes its session', async t => {
+  const wire = transport({ holdWaitStart: true }); t.after(() => wire.stop())
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  await wire.bus.ready()
+  const pending = wire.bus.observe(randomUUID(), () => {})
+  const rejected = assert.rejects(pending, { code: 'BUILTIN_GATEWAY_PRESENCE_UNAVAILABLE' })
+  await flush()
+  t.mock.timers.tick(5_000)
+  await rejected; await flush()
   assert.equal(wire.watchers()[0].ended, true)
   assert.equal(wire.watchers()[0].cancellations, 1)
 })

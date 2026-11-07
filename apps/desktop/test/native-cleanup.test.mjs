@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict'
 import { fork } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { stopLocalDaemons } from './native-cleanup.mjs'
 import { readNativeDaemonMetadata } from './native-metadata.mjs'
 
-async function daemon(t) {
+async function daemon(t, { delayedListen = false, helloPid } = {}) {
   // Keep the Unix socket below macOS's path length limit.
   const profile = await mkdtemp('/tmp/mikka-drain-')
-  const child = fork(fileURLToPath(new URL('./fixtures/native-daemon.mjs', import.meta.url)), [profile], { execArgv: ['--import', 'tsx'], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] })
+  const child = fork(fileURLToPath(new URL('./fixtures/native-daemon.mjs', import.meta.url)), [profile, delayedListen ? 'delayed-listen' : '', helloPid ? String(helloPid) : ''], { execArgv: ['--import', 'tsx'], stdio: ['ignore', 'ignore', 'pipe', 'ipc'] })
   let stderr = ''
   child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-4000) })
   t.after(async () => {
@@ -32,7 +32,7 @@ async function daemon(t) {
     ])
     message = result[0]
   } finally { clearTimeout(timer); ready.abort() }
-  assert.equal(message, 'ready')
+  assert.equal(message, delayedListen ? 'starting' : 'ready')
   return { profile, child }
 }
 
@@ -57,6 +57,38 @@ test('drain authenticates exact profiles and waits past socket closure to proces
   })
   assert.equal(foreign.child.exitCode, null, 'a different profile remains running')
   assert.deepEqual(await stopLocalDaemons([foreign.profile]), { profilesStopped: true })
+})
+
+test('a recorded starting daemon is drained when its socket appears within the same cleanup deadline', async t => {
+  const owned = await daemon(t, { delayedListen: true })
+  const foreign = await daemon(t)
+  // Finish the dynamic client import before measuring the real startup race.
+  await stopLocalDaemons([join(owned.profile, 'absent')])
+  let stopped = false
+  const started = performance.now()
+  const cleanup = observeChildExit(owned.child, async () => {
+    assert.deepEqual(await stopLocalDaemons([owned.profile]), { profilesStopped: true })
+    stopped = true
+  })
+  void cleanup.catch(() => undefined)
+  await new Promise(resolve => setTimeout(resolve, 250))
+  assert.equal(stopped, false, 'the live PID alone cannot authorize cleanup')
+  assert.equal(owned.child.exitCode, null)
+  await assert.rejects(lstat(join(owned.profile, 'daemon.sock')), { code: 'ENOENT' })
+  const ready = once(owned.child, 'message', { signal: AbortSignal.timeout(5000) })
+  owned.child.send('listen')
+  assert.equal((await ready)[0], 'ready')
+  await cleanup
+  assert.ok(performance.now() - started < 20_000, 'startup, drain and exit share the existing deadline')
+  assert.equal(foreign.child.exitCode, null, 'a different profile remains running')
+})
+
+test('an authenticated socket with a different PID cannot drain or authorize cleanup', async t => {
+  const foreign = await daemon(t)
+  const owned = await daemon(t, { helloPid: foreign.child.pid })
+  await assert.rejects(stopLocalDaemons([owned.profile]), /NATIVE_DAEMON_STOP_UNPROVEN/)
+  assert.equal(owned.child.exitCode, null)
+  assert.equal(foreign.child.exitCode, null)
 })
 
 test('a wrong profile secret cannot drain or authorize cleanup', async t => {

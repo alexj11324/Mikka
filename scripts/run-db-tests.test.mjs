@@ -430,6 +430,29 @@ test('offline guard must be on the same step that runs the guarded file (GM3)',(
   assert.throws(()=>run(`node --import ./${entry.guard}x --test ${entry.file}`),/source guard/)
   assert.deepEqual(scriptSteps('a && b; c || d'),['a','b','c','d'])
 })
+test('live database authentication schema inspection finishes before temporary-schema fixtures start', () => {
+  const command = JSON.parse(readFileSync('package.json', 'utf8')).scripts['test:live-db']
+  const steps = command.split(' && ')
+  const groups = steps.map(step => step.split(/\s+/).filter(token => token.endsWith('.db.test.ts')))
+  const files = groups.flat()
+  const authentication = files.filter(file => /\bbetterAuth\s*\(/.test(readFileSync(file, 'utf8'))).sort()
+  assert.deepEqual(authentication, ['lib/computer/event-session.db.test.ts', 'lib/live/ticket-session.db.test.ts'])
+  assert.deepEqual([...groups[0]].sort(), authentication, 'BetterAuth introspects all schemas, including schemas concurrently dropped by other fixtures')
+  assert.equal(groups.length, 2)
+  assert.equal(new Set(files).size, files.length, 'each required file runs exactly once')
+  assert.ok(groups[1].includes('lib/computer/event-broker.db.test.ts'))
+  assert.ok(steps.every(step => step.startsWith('node ') && step.includes('--test ')))
+  // Exercise the actual shell separators without starting a database. A failed
+  // authentication group must remain a failed gate, never an ignored first step.
+  for (const [auth, fixtures] of [[0, 0], [1, 0], [0, 1]]) {
+    let stubbed = command
+    for (const [index, step] of steps.entries()) stubbed = stubbed.replace(step, `sh -c 'echo group${index}; exit ${index ? fixtures : auth}'`)
+    const result = spawnSync('sh', ['-c', stubbed], { encoding: 'utf8' })
+    assert.equal(result.stdout, auth ? 'group0\n' : 'group0\ngroup1\n')
+    assert.equal(result.status, auth || fixtures)
+  }
+})
+
 test('test:personal-mailbox-core runs the runtime-off step even when the first step fails, and still fails overall',()=>{
   const command=JSON.parse(readFileSync('package.json','utf8')).scripts['test:personal-mailbox-core']
   const steps=command.split(/;\s*/)

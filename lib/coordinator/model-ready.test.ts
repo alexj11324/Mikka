@@ -36,7 +36,7 @@ mock.module(new URL('../points-fallback.ts', import.meta.url).href, { namedExpor
   hostedPointsRefusal: async () => null, pointsFallback: async () => { throw new Error('unexpected points fallback') },
 } })
 let botModelReady: typeof import('./model-ready')['botModelReady']
-before(async () => { ({ botModelReady } = await import('./model-ready')) })
+before(async () => { process.env.MIKKA_EDITION = 'community'; ({ botModelReady } = await import('./model-ready')) })
 beforeEach(() => { selected = undefined; rows = []; keys = []; key = undefined; fallback = null; scopes.length = 0 })
 function subscription(provider = 'claude', used = 0.2, age = 0): BotSubscriptionChoice {
   return { bindingId: 'fixture-binding', connectionId: 'fixture-connection', ownerId: 'alice', provider,

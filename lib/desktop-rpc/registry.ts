@@ -2,6 +2,7 @@ import 'server-only'
 import { desktopActionSchemas, type DesktopActionName } from './schemas'
 import { desktopBootstrap, desktopSession, desktopAccounts, desktopWorkspaceLink } from './bootstrap'
 import type { DesktopActions } from './handler'
+import { createReadBatch } from './read-batch'
 import * as actions0 from '@/app/actions/account'
 import * as actions1 from '@/app/actions/agents'
 import * as actions2 from '@/app/actions/app-policy'
@@ -41,6 +42,7 @@ import * as actions35 from '@/app/actions/workspace-settings'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
+  'desktop.readBatch': createReadBatch(() => desktopActions),
   'desktop.bootstrap': desktopBootstrap,
   'desktop.session': desktopSession,
   'desktop.accounts': desktopAccounts,

@@ -1,7 +1,7 @@
 import { assertNoSecret, type SecretFingerprint } from '@/lib/credentials/fingerprint'
 import { QUIET_REPLY } from '@/lib/attention/handoff'
 import { credentialMasker, identityMasker, maskDeep, maskStreamStep, withCredentialMasking } from '@/lib/secrets/mask'
-import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
+import { coordinatorModelPart, type CoordinatorStreamEvent, type CoordinatorWorkflowStreamPart } from './stream'
 import { TOOL_PREVIEW_CHARS } from './chat-projection'
 import { HIDDEN_TOOLS, jsonbText, quotePreview, toolQuoteText } from './context'
 import { rawToolOperation, rawToolTarget, toolDisplayName, toolLabel, toolResultMetadata, TOOL_TARGET_CHARS, type ToolCallMetadata, type ToolResultMetadata } from './tool-metadata'
@@ -66,15 +66,43 @@ const reasoningMasker = withCredentialMasking(identityMasker)
 /** One thinking block as it streams: masked text released so far (`buf`), what was sent of it, the raw tail held back. */
 type ReasoningBlock = { pending: string; buf: string; sent: number; blocked: boolean }
 
+/** Changes to projection boundaries invalidate the HTTP event cursor, including for recorded raw streams. */
+export const COORDINATOR_STREAM_PROJECTION_VERSION = 2
+
+/** Local HTTP projection time, including replay: not the provider's generation clock or send-to-first-text time. */
+export type CoordinatorStreamTiming = {
+  streamId: string
+  fingerprintCount: number
+  maxHoldback: number
+  firstRawTextMs: number | null
+  firstEmittedTextMs: number | null
+  committedMs: number | null
+  firstEmittedAtCommitted: 0 | 1
+  firstBlockedByHoldback: 0 | 1
+  quietEligible: 0 | 1
+  stopped: 0 | 1
+  /** 0 committed, 1 EOF, 2 error, 3 superseded by another turn, 4 HTTP cancellation. */
+  terminal: 0 | 1 | 2 | 3 | 4
+}
+
 /**
  * What leaves the durable model stream: assistant text, each tool's name, state and short masked previews,
  * when the model starts and stops thinking, and its reasoning as it streams, masked like the text. Whole tool
  * inputs and outputs stay server-side.
  */
-export function coordinatorTextStream(userId: string, fingerprints: SecretFingerprint[]) {
+export function coordinatorTextStream(userId: string, fingerprints: SecretFingerprint[], options: {
+  now?: () => number
+  onTiming?: (timing: CoordinatorStreamTiming) => void
+} = {}) {
   const holdback = Math.max(0, ...fingerprints.map(entry => entry.length - 1))
+  const now = options.now ?? Date.now
   let id: string | null = null
   let quietEligible = false
+  let scoped = false
+  let stopped = false
+  const seenTurns = new Set<string>()
+  let startedAt = 0
+  let timing: CoordinatorStreamTiming | null = null
   let text = ''
   let sent = 0
   let stepStart = 0
@@ -86,6 +114,15 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
   let stepThought = 0
   /** Scoped to this turn; no arbitrary tool name is a hide rule. */
   const invalidCalls = new Set<string>()
+
+  const elapsed = () => Math.max(0, now() - startedAt)
+  function reportTerminal(terminal: CoordinatorStreamTiming['terminal']) {
+    if (!timing) return
+    const sample = { ...timing, terminal }
+    timing = null
+    // Observability cannot interrupt the stream, its credential guard, or cancellation.
+    try { options.onTiming?.(sample) } catch { /* No stream data or thrown details enter diagnostics. */ }
+  }
 
   /**
    * Sends what is safe of a thinking block: credential patterns are masked by `maskStreamStep`; the last `holdback`
@@ -112,73 +149,115 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
     if (!id) return
     assertNoSecret(userId, text.slice(Math.max(0, sent - holdback)), fingerprints)
     const through = complete ? text.length : Math.max(0, text.length - holdback)
-    if (through > sent) controller.enqueue({ type: 'text', id, delta: text.slice(sent, through) })
+    if (through > sent) {
+      if (timing && timing.firstEmittedTextMs === null) {
+        timing.firstEmittedTextMs = elapsed()
+        timing.firstEmittedAtCommitted = complete ? 1 : 0
+      }
+      controller.enqueue({ type: 'text', id, delta: text.slice(sent, through) })
+    } else if (timing && timing.firstEmittedTextMs === null && text.length > 0 && holdback > 0 && !complete) {
+      timing.firstBlockedByHoldback = 1
+    }
     sent = through
   }
 
-  return new TransformStream<CoordinatorWorkflowStreamPart, CoordinatorStreamEvent>({
+  return Object.assign(new TransformStream<CoordinatorWorkflowStreamPart, CoordinatorStreamEvent>({
     transform(part, controller) {
-      // WorkflowAgent also emits these boundaries between tool-backed model calls.
-      const type: string = part.type
-      if (part.type === 'coordinator-turn-start') {
-        id = part.id
-        quietEligible = part.quietEligible
-        text = ''; sent = 0; stepStart = 0; stepText = ''; reasoning.clear(); thought = ''; stepThought = 0; invalidCalls.clear()
-        controller.enqueue({ type: 'start', id })
-      } else if (part.type === 'coordinator-turn-committed') {
-        if (part.id !== id) throw new Error('coordinator_stream_turn_mismatch')
-        if (!part.quiet) publish(controller, true)
-        controller.enqueue({ type: 'committed', id: part.id, through: part.through, quiet: part.quiet })
-        id = null
-      } else if (id && type === 'start-step') {
-        invalidCalls.clear()
-        stepStart = text.length
-        stepText = ''
-        stepThought = thought.length
-      } else if (id && part.type === 'reset-step') {
-        invalidCalls.clear()
-        // A retried durable model step replaces its partial attempt, keeping earlier completed steps.
-        reasoning.clear()
-        if (thought.length > stepThought) {
-          thought = thought.slice(0, stepThought)
-          if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'reset', text: thought })
+      try {
+        if (part.type === 'coordinator-turn-start') {
+          if (seenTurns.has(part.id)) return
+          reportTerminal(3)
+          seenTurns.add(part.id)
+          id = part.id
+          quietEligible = part.quietEligible
+          scoped = part.modelStream === 'scoped-v1'
+          stopped = false
+          startedAt = now()
+          timing = { streamId: id, fingerprintCount: fingerprints.length, maxHoldback: holdback,
+            firstRawTextMs: null, firstEmittedTextMs: null, committedMs: null,
+            firstEmittedAtCommitted: 0, firstBlockedByHoldback: 0, quietEligible: quietEligible ? 1 : 0, stopped: 0, terminal: 0 }
+          text = ''; sent = 0; stepStart = 0; stepText = ''; reasoning.clear(); thought = ''; stepThought = 0; invalidCalls.clear()
+          controller.enqueue({ type: 'start', id })
+          return
+        } else if (part.type === 'coordinator-turn-stopped') {
+          if (part.id === id) {
+            stopped = true
+            if (timing) timing.stopped = 1
+          }
+          return
+        } else if (part.type === 'coordinator-turn-committed') {
+          if (part.id !== id) {
+            if (seenTurns.has(part.id)) return
+            throw new Error('coordinator_stream_turn_mismatch')
+          }
+          if (timing) timing.committedMs = elapsed()
+          if (!part.quiet) publish(controller, true)
+          controller.enqueue({ type: 'committed', id: part.id, through: part.through, quiet: part.quiet })
+          reportTerminal(0)
+          id = null
+          return
         }
-        text = text.slice(0, stepStart)
-        stepText = ''
-        const through = Math.min(sent, Math.max(0, text.length - holdback))
-        if (sent > through) controller.enqueue({ type: 'reset', id, text: text.slice(0, through) })
-        sent = through
-      } else if (id && part.type === 'text-delta') {
-        stepText += part.text
-        // Every model call may decline a handoff. Keep its partial sentinel hidden.
-        if (quietEligible && QUIET_REPLY.startsWith(stepText.trim())) return
-        text = text.slice(0, stepStart) + (stepStart ? '\n\n' : '') + stepText
-        publish(controller)
-      } else if (id && (part.type === 'tool-call' || part.type === 'tool-result' || part.type === 'tool-error')) {
-        if (part.type === 'tool-call' && part.invalid === true) invalidCalls.add(part.toolCallId)
-        if (invalidCalls.has(part.toolCallId) || isInvalidToolResult(part)) return
-        // A hand-off turn may end quiet, leaving nothing in the chat; its steps never show either.
-        if (quietEligible || HIDDEN_TOOLS.has(part.toolName)) return
-        const result = part.type === 'tool-call' ? { state: 'running' as const } : resultMetadata(userId, part.type === 'tool-result' ? part.output : part.error, part.type === 'tool-error', fingerprints)
-        const metadata = part.type === 'tool-call' ? callMetadata(userId, part.toolName, part.input, fingerprints) : {}
-        const input = part.type === 'tool-call' ? preview(userId, part.input, fingerprints) : undefined
-        const output = part.type === 'tool-result' ? preview(userId, part.output, fingerprints) : undefined
-        const words = part.type === 'tool-call' ? quote(userId, part.input, fingerprints) : undefined
-        controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, ...result, ...metadata, ...(input ? { input } : {}), ...(output ? { output } : {}), ...(words ? { quote: words } : {}), ...(part.type === 'tool-call' ? { at: text.length } : {}) })
-      } else if (id && part.type === 'reasoning-start') {
-        reasoning.set(part.id, { pending: '', buf: '', sent: 0, blocked: false })
-        if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'start' })
-      } else if (id && part.type === 'reasoning-delta') {
-        const block = reasoning.get(part.id)
-        if (block && !quietEligible) think(controller, block, part.text)
-      } else if (id && part.type === 'reasoning-end') {
-        const block = reasoning.get(part.id)
-        if (block && !quietEligible) think(controller, block, '', true)
-        reasoning.delete(part.id)
-        if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'end' })
-      } else if (id && part.type === 'error') {
-        controller.enqueue({ type: 'error' })
-      }
+        if (!id || stopped) return
+        const model = coordinatorModelPart(part, id, scoped)
+        if (!model) return
+        // WorkflowAgent also emits these boundaries between tool-backed model calls.
+        part = model
+        const type: string = part.type
+        if (type === 'start-step') {
+          invalidCalls.clear()
+          stepStart = text.length
+          stepText = ''
+          stepThought = thought.length
+        } else if (id && part.type === 'reset-step') {
+          invalidCalls.clear()
+          // A retried durable model step replaces its partial attempt, keeping earlier completed steps.
+          reasoning.clear()
+          if (thought.length > stepThought) {
+            thought = thought.slice(0, stepThought)
+            if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'reset', text: thought })
+          }
+          text = text.slice(0, stepStart)
+          stepText = ''
+          const through = Math.min(sent, Math.max(0, text.length - holdback))
+          if (sent > through) controller.enqueue({ type: 'reset', id, text: text.slice(0, through) })
+          sent = through
+        } else if (id && part.type === 'text-delta') {
+          if (timing && timing.firstRawTextMs === null && part.text.length > 0) timing.firstRawTextMs = elapsed()
+          stepText += part.text
+          // Every model call may decline a handoff. Keep its partial sentinel hidden.
+          if (quietEligible && QUIET_REPLY.startsWith(stepText.trim())) return
+          text = text.slice(0, stepStart) + (stepStart ? '\n\n' : '') + stepText
+          publish(controller)
+        } else if (id && (part.type === 'tool-call' || part.type === 'tool-result' || part.type === 'tool-error')) {
+          if (part.type === 'tool-call' && part.invalid === true) invalidCalls.add(part.toolCallId)
+          if (invalidCalls.has(part.toolCallId) || isInvalidToolResult(part)) return
+          // A hand-off turn may end quiet, leaving nothing in the chat; its steps never show either.
+          if (quietEligible || HIDDEN_TOOLS.has(part.toolName)) return
+          const result = part.type === 'tool-call' ? { state: 'running' as const } : resultMetadata(userId, part.type === 'tool-result' ? part.output : part.error, part.type === 'tool-error', fingerprints)
+          const metadata = part.type === 'tool-call' ? callMetadata(userId, part.toolName, part.input, fingerprints) : {}
+          const input = part.type === 'tool-call' ? preview(userId, part.input, fingerprints) : undefined
+          const output = part.type === 'tool-result' ? preview(userId, part.output, fingerprints) : undefined
+          const words = part.type === 'tool-call' ? quote(userId, part.input, fingerprints) : undefined
+          controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, ...result, ...metadata, ...(input ? { input } : {}), ...(output ? { output } : {}), ...(words ? { quote: words } : {}), ...(part.type === 'tool-call' ? { at: text.length } : {}) })
+        } else if (id && part.type === 'reasoning-start') {
+          reasoning.set(part.id, { pending: '', buf: '', sent: 0, blocked: false })
+          if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'start' })
+        } else if (id && part.type === 'reasoning-delta') {
+          const block = reasoning.get(part.id)
+          if (block && !quietEligible) think(controller, block, part.text)
+        } else if (id && part.type === 'reasoning-end') {
+          const block = reasoning.get(part.id)
+          if (block && !quietEligible) think(controller, block, '', true)
+          reasoning.delete(part.id)
+          if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'end' })
+        } else if (id && part.type === 'error') {
+          controller.enqueue({ type: 'error' })
+        }
+      } catch (error) { reportTerminal(2); throw error }
     },
+    flush() { reportTerminal(1) },
+  }), {
+    // Upstream errors and downstream cancellation bypass TransformStream.flush.
+    reportTerminal,
   })
 }
