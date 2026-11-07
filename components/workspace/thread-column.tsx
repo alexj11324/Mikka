@@ -43,7 +43,7 @@ export function ThreadColumn({ runId, issueId: known, overList = false, name }: 
   const readFailedMessage = t('loadFailed'), retryLabel = t('retry')
   useEffect(() => {
     const notice = `thread-issue-read-${runId}`
-    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: () => { void mutate() } } })
+    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: event => { event.preventDefault(); void mutate() } } })
     else toast.dismiss(notice)
     return () => { toast.dismiss(notice) }
   }, [backgroundFailed, runId, mutate, readFailedMessage, retryLabel])

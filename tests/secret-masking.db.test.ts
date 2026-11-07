@@ -139,8 +139,9 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     const checkpoint = await import('../app/v1/runs/[runId]/checkpoint/route')
     const diff = `--- a/.env\n+++ b/.env\n@@ -0,0 +1 @@\n+API_TOKEN=${SECRET}\n`
     const cp = await checkpoint.POST(call('POST', `/v1/runs/${runId}/checkpoint`, { baseCommit: 'a'.repeat(40), patch: gzipSync(diff).toString('base64'), files: 1, takenAt: new Date().toISOString() }), { params: Promise.resolve({ runId }) })
-    assert.equal(cp.status, 204, await cp.clone().text())
-    const { rows: [saved] } = await pool.query(`select patch, files from run_checkpoints where "runId"=$1`, [runId])
+    assert.equal(cp.status, 200, await cp.clone().text())
+    const { rows: [saved] } = await pool.query(`select patch, files, "takenAt" from run_checkpoints where "runId"=$1`, [runId])
+    assert.deepEqual(await cp.json(), { runId, takenAt: saved.takenAt.toISOString() })
     noPlain('checkpoint', gunzipSync(saved.patch).toString('utf8'))
     assert.ok(gunzipSync(saved.patch).toString('utf8').includes('+API_TOKEN=[secret:API_TOKEN]'))
 

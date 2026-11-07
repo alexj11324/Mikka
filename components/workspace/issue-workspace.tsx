@@ -552,8 +552,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     : <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
   // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
   // the default keeps the workspace frame mounted around settings (#1603).
-  if (settingsShown && OWN_SETTINGS_FRAME) return <SignOutBoundary pending={signingOut}><SettingsFrame user={user} onRail={leaveSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame></SignOutBoundary>
-  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider><AppFrame settings={settingsShown}
+  // Both visual frames share the workspace's pending notes and computer registry.
+  return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && OWN_SETTINGS_FRAME
+    ? <SettingsFrame user={user} onRail={leaveSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
+    : <AppFrame settings={settingsShown}
     bar={<WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
     rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} />}>
     {settingsShown ? settingsContent
@@ -595,5 +597,5 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     {artifactId && <ArtifactWindow artifactId={artifactId} />}
     </>}
     {dialogs}
-  </AppFrame></BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
+  </AppFrame>}</BrowserNotesProvider></ComputerAgentsProvider></SignOutBoundary>
 }
