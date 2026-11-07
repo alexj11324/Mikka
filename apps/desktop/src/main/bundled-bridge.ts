@@ -3,10 +3,11 @@ import { BUNDLED_IPC } from '@mikka/protocol/ipc'
 import type { BundledAuth } from './bundled-auth'
 import type { BundledLive } from './bundled-live'
 import type { BundledViewer } from './bundled-viewer'
+import type { BundledServers } from './bundled-servers'
 import { RENDERER_URL } from './bundled-policy'
 import { trustedIpcSender } from './security'
 
-export function registerBundledBridge(auth: BundledAuth, live: BundledLive, viewer: BundledViewer): void {
+export function registerBundledBridge(auth: BundledAuth, live: BundledLive, viewer: BundledViewer, servers?: BundledServers): void {
   const observed = new Set<number>()
   function handle(channel: string, run: (owner: number, ...input: unknown[]) => unknown) {
     ipcMain.handle(channel, (event: IpcMainInvokeEvent, ...input: unknown[]) => {
@@ -42,4 +43,14 @@ export function registerBundledBridge(auth: BundledAuth, live: BundledLive, view
   handle(BUNDLED_IPC.viewerConnect, (owner, id) => viewer.connect(owner, id))
   handle(BUNDLED_IPC.viewerSend, (owner, id, data) => viewer.send(owner, id, data))
   handle(BUNDLED_IPC.viewerClose, (owner, id) => viewer.close(owner, id))
+  if (!servers) return
+  handle(BUNDLED_IPC.serverState, () => servers.state())
+  handle(BUNDLED_IPC.serverProbe, (_owner, address) => servers.probe(address))
+  handle(BUNDLED_IPC.serverSelect, (_owner, url) => { live.closeAll(); viewer.closeAll(); return servers.select(url ?? null) })
+  handle(BUNDLED_IPC.serverDisconnect, (_owner, url) => { live.closeAll(); viewer.closeAll(); return servers.disconnect(url) })
+  // The preload reads this once per page load for `app.serverUrl`. It is the
+  // public base the page addresses share links to, never a credential.
+  ipcMain.on(BUNDLED_IPC.serverUrl, event => {
+    event.returnValue = trustedIpcSender(event.senderFrame, RENDERER_URL) ? auth.serverUrl() : ''
+  })
 }

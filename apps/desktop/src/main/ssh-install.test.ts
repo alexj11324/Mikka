@@ -60,14 +60,14 @@ test('host check failure names the step, keeps the reason and allows retry', asy
   }, async (command, args) => {
     if (args.includes('-G')) return 'hostname example.com\nport 22'
     if (command === 'ssh-keygen') return 'known key'
-    if (args.at(-1)?.includes('uname')) throw new Error('Node.js >=24 required')
+    if (args.at(-1)?.includes('uname')) throw new Error('Node.js >=22 required')
     return ''
   })
   await installer.begin('example.com')
   await done
   assert.equal(installer.state()?.step, 'check')
   assert.equal(installer.state()?.retryable, true)
-  assert.equal(installer.state()?.reason, 'Node.js >=24 required')
+  assert.equal(installer.state()?.reason, 'Node.js >=22 required')
 })
 
 test('failures identify the exact installation step and never advance past it', async () => {
@@ -258,7 +258,7 @@ test('添加这台电脑 installs, starts and signs in the daemon here as a lapt
   assert.ok(t.calls.every(call => call.command === '/bin/zsh' && call.args[0] === '-lc'), 'every step runs in the login shell')
   assert.equal(t.calls.some(call => ['ssh', 'ssh-keygen', 'ssh-keyscan'].includes(call.command)), false)
   const scripts = t.calls.map(call => call.args[1])
-  assert.ok(scripts.includes('npm install --global @aspectlylabs/mikka'))
+  assert.ok(scripts.some(script => script.startsWith('npm install --global --cache ') && script.includes('--prefix ')))
   assert.ok(scripts.includes("mikka daemon service install --server 'https://example.com/mikka' --device-type laptop"))
   assert.equal(t.minted(), 1)
   assert.equal(t.calls.filter(call => call.input === 'private-token\n').length, 1)
@@ -283,7 +283,7 @@ test('重新连接 for this computer restarts its daemon and waits; it neither i
   await t.done
   assert.equal(t.installer.state()?.status, 'online')
   const scripts = t.calls.map(call => call.args[1])
-  assert.deepEqual(scripts, ["mikka daemon service install --server 'https://example.com/mikka' --device-type laptop", 'mikka daemon status'])
+  assert.deepEqual(scripts.slice(1), ["mikka daemon service install --server 'https://example.com/mikka' --device-type laptop", 'mikka daemon status'])
   assert.equal(t.minted(), 0)
 })
 
@@ -300,7 +300,7 @@ test('automatic repair restarts a daemon that is already set up, without install
   assert.equal(first?.target, LOCAL_TARGET)
   await t.done
   assert.equal(t.installer.state()?.status, 'online')
-  assert.deepEqual(t.calls.map(call => call.args[1]), ["mikka daemon service install --server 'https://example.com/mikka' --device-type laptop", 'mikka daemon status'])
+  assert.deepEqual(t.calls.map(call => call.args[1]).slice(1), ["mikka daemon service install --server 'https://example.com/mikka' --device-type laptop", 'mikka daemon status'])
   assert.equal(t.minted(), 0)
 })
 
@@ -336,7 +336,7 @@ test('an unconfirmed account fails repair without registering again or reporting
   await installer.repairLocal('owner-a')
   await done
   assert.equal(installer.state()?.status, 'failed')
-  assert.equal(installer.state()?.reason, 'Device account could not be confirmed')
+  assert.equal(installer.state()?.error?.cause, 'connection_failed')
   assert.equal(minted, 0)
 })
 
@@ -358,7 +358,7 @@ test('automatic repair installs and signs in when the restart fails (first launc
   await installer.repairLocal()
   await done
   assert.equal(installer.state()?.status, 'online')
-  assert.ok(scripts.includes('npm install --global @aspectlylabs/mikka'))
+  assert.ok(scripts.some(script => script.startsWith('npm install --global --cache ') && script.includes('--prefix ')))
   assert.ok(scripts.some(script => script.startsWith('mikka daemon login')))
   assert.equal(events.every(state => state.target === LOCAL_TARGET), true)
 })
@@ -370,7 +370,7 @@ test('a failed automatic install keeps the reason and 重试 installs again', as
   const installer = new SshInstaller('https://example.com/mikka', async () => 'private-token', state => {
     if (state.status === 'online' || state.status === 'failed') settle(state)
   }, async (_command, args) => {
-    if (args[1] === 'npm install --global @aspectlylabs/mikka' && attempt++ === 0) throw new Error('npm ERR! code EACCES')
+    if (args[1].startsWith('npm install --global --cache ') && attempt++ === 0) throw new Error('npm ERR! code EACCES')
     if (args[1].startsWith('mikka daemon status')) return '{"server":"online","deviceId":"this-mac"}'
     return ''
   }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] }, async () => true)
@@ -378,7 +378,8 @@ test('a failed automatic install keeps the reason and 重试 installs again', as
   const failed = await settled
   assert.equal(failed.status, 'failed')
   assert.equal(failed.step, 'install')
-  assert.match(failed.reason ?? '', /EACCES/)
+  assert.equal(failed.error?.cause, 'npm_permission')
+  assert.match(failed.reason ?? '', /^Cannot write the Mikka install directory/)
   settled = new Promise<SshInstallState>(resolve => { settle = resolve })
   await installer.beginLocal()
   assert.equal((await settled).status, 'online')

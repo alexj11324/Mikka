@@ -4,6 +4,7 @@ import { queueTaskRun } from '@/lib/factory/queue-local'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { runInvalidDetail } from '@/lib/run-invalid-reason'
+import { taskDestinationSchema } from '@/lib/task-destination'
 import { FatalError } from 'workflow'
 import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
 import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
@@ -38,6 +39,7 @@ import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import * as store from '@/lib/coordinator/store'
 import { db, pool } from '@/lib/db'
 import { webSearch } from '@/lib/search'
+import { withCoordinatorWebSearchTiming } from '@/lib/coordinator/tool-boundary-timing'
 import { issueMembers, issues } from '@/lib/db/schema'
 import { type ApprovalActionName, type ComposioActionName } from '@/lib/composio-actions'
 import { runComposioAction } from '@/lib/composio'
@@ -132,9 +134,9 @@ export async function releaseLease(userId: string, holder: string, botId: string
   return store.releaseLease(userId, holder, botId)
 }
 
-export async function failTurn(userId: string, holder: string, error: string, botId: string) {
+export async function failTurn(userId: string, holder: string, error: string, botId: string, completed?: { messages: ModelMessage[]; streamId: string }) {
   'use step'
-  await store.failTurn(userId, holder, error, botId)
+  await store.failTurn(userId, holder, error, botId, completed)
   // Messages that arrived during the failed turn are not part of it: start their turn now
   // rather than at the next reconciliation sweep (#1212). The failed message itself was delivered.
   if (await store.hasPendingEvents(userId, botId)) {
@@ -193,7 +195,7 @@ export async function prepareTurn(userId: string, botId: string, holder: string,
   'use step'
   const mailboxTools = input.mailboxEnabled ? await mailboxCatalogue(userId, botId, input.executionId) : []
   if (input.runtime) await noteQuotaSwitch(userId, holder, input.runtime, botId, true)
-  return { mailboxTools, prompt: await preparePrompt(userId, botId, input.snapshot, mailboxTools) }
+  return { mailboxTools, ...await preparePromptDetails(userId, botId, input.snapshot, mailboxTools) }
 }
 
 export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string, once = false) {
@@ -217,7 +219,7 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
  * and duration. Durations and counts only. Each model call logs its own line
  * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
  */
-export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[] }) {
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[]; phaseMs?: { settings: number; inbox: number; begin: number; prepare: number; execution: number; personal: number; github: number } }) {
   'use step'
   try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
 }
@@ -280,6 +282,11 @@ noticeTurnFailure.maxRetries = 0
  */
 export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; stable: number; messages: ModelMessage[] }> {
   'use step'
+  return (await preparePromptDetails(userId, botId, snapshot, mailboxTools)).prompt
+}
+
+/** Context timings stay beside the prompt, never in its instructions or model options. */
+async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []) {
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
@@ -320,13 +327,21 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubContext } = await import('@/lib/coordinator/github-context')
   const { executionContextParts } = await import('@/lib/coordinator/execution-context')
-  const execution = await executionContextParts(userId, botId)
+  const contextMs = { execution: 0, personal: 0, github: 0 }
+  const timed = async <T>(part: keyof typeof contextMs, work: () => Promise<T>): Promise<T> => {
+    const started = Date.now()
+    try { return await work() } finally { contextMs[part] = Math.max(0, Date.now() - started) }
+  }
+  const [execution, rules, github] = await Promise.all([
+    timed('execution', () => executionContextParts(userId, botId)),
+    timed('personal', () => withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
+    timed('github', () => githubContext(userId, undefined, undefined, botId)),
+  ])
   // Everything up to the memory is the same on every turn; `stable` is where it ends, so a provider can cache it (lib/prompt-cache.ts).
-  const rules = await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)
   // The GitHub lines (the authorized repository list) and the allowed models list are part of the cached prefix: they change only
   // when the repositories or 优先使用的模型 do. Which models can run right now changes per turn, so it stays after the memory.
-  const prompt = promptWithCachedContext(rules, cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
-  return { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }
+  const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
+  return { prompt: { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }, contextMs }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
@@ -550,11 +565,14 @@ export async function dispatchRun(userId: string, input: { issueId: string; prof
 async function dispatchRunBody(userId: string, input: { issueId: string; profileId?: string; agentId?: string; repo?: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string) {
   await timedPhase('authorizeDispatch', () => assertNativeToolScope(userId,scope))
   if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' as const }
-  const { newThread, sourceEventId, target, ...request } = input
+  const { newThread, sourceEventId, target: offeredTarget, ...request } = input
+  let target = offeredTarget
   requestEventId ??= sourceEventId
   try {
     const workspaceId = await timedPhase('executionWorkspace', async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, botId))
-    request.profileId = await timedPhase('requestedAgentProfile', async () => (await import('@/lib/factory/profile-request')).requestedAgentProfile(pool, { ownerId: userId, botId, workspaceId }, requestEventId, request.profileId))
+    const selection = await timedPhase('requestedAgentProfile', async () => (await import('@/lib/factory/profile-request')).requestedTaskSelection(pool, { ownerId: userId, botId, workspaceId }, requestEventId, request.profileId))
+    request.profileId = selection.profileId
+    if (selection.taskDestination?.kind === 'cloud') target = 'cloud'
   } catch (error) { if (error instanceof AgentProfileError) return { error: error.code }; throw error }
   // The Agent or model the Bot named must be one of 优先使用的模型, the list its prompt shows; otherwise nothing is queued.
   if (request.model) {
@@ -692,8 +710,20 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     }
     if (target.kind === 'device') return onDevice(target)
     if (requestEventId) {
-      const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
-      if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
+      const event=(await pool.query(`SELECT "userId","botId","issueId",kind,"deliveredAt",
+        payload ? 'taskDestination' AS "hasTaskDestination",payload->'taskDestination' AS "taskDestination"
+        FROM coordinator_events WHERE id=$1`,[requestEventId])).rows[0]
+      if (!event || event.userId!==userId || event.botId!==botId) throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
+      if (event.hasTaskDestination) {
+        const destination = taskDestinationSchema.safeParse(event.taskDestination)
+        // create_issue binds a task-form event to the created issue. A chat
+        // request has no destination and retains ordinary placement behavior.
+        if (!destination.success || destination.data.kind !== 'cloud' || event.issueId !== input.issueId ||
+          event.kind !== 'user_message' || !event.deliveredAt) throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
+        // The person's fixed cloud choice also applies when the model omitted
+        // target; startup failure cannot turn it into local placement recovery.
+        place = 'cloud'
+      }
     }
     // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
     // An API-key model binds no subscription to it; a subscription model binds the entry's own account.
@@ -835,7 +865,9 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
         runModel = { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? (request.harness ? 'picked' : 'preference'), location: 'cloud', entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
           ...(subscriptionBindingId ? { subscriptionBindingId } : {}), ...(source.kind === 'api_key' ? { apiKeyId: source.keyId } : {}) }
       }
-      return dispatchComputerTask(userId, { ...request, harness, factoryBotId: chatBotId ?? request.botId, sourceEventId, note, ...runModel, ...(previous ? { threadRunId: previous.id } : {}), ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution)
+      // A repository thread stays on its admitted repository even when its
+      // next turn arrives through the computer tool instead of dispatch_run.
+      return dispatchComputerTask(userId, { ...request, harness, factoryBotId: chatBotId ?? request.botId, sourceEventId, note, ...runModel, ...(previous ? { threadRunId: previous.id } : {}), ...(previous?.remoteUrl ? { repo: previous.remoteUrl } : {}), ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution)
     },
   }))
 }
@@ -986,10 +1018,12 @@ export async function stopRun(userId: string, input: { runId: string }, scope?: 
 }
 
 /** Web search through the shared SearchProvider (MIK-5); degrades to searchUnavailable on 429/5xx/timeout. */
-export async function webSearchStep(userId: string, input: { query: string; limit?: number }, scope?: NativeToolScope) {
+export async function webSearchStep(userId: string, input: { query: string; limit?: number }, scope?: NativeToolScope, callId?: string) {
   'use step'
-  await assertNativeToolScope(userId,scope)
-  return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
+  return withCoordinatorWebSearchTiming(async () => {
+    await assertNativeToolScope(userId,scope)
+    return webSearch(input.query, { userId, caller: 'coordinator' }, { limit: input.limit })
+  }, callId)
 }
 
 /** Web work stays in the Bot chat; it never creates an agent_runs row. */

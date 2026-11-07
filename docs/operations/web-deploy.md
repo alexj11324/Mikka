@@ -217,7 +217,14 @@ published in the **same macOS job**; no Actions artifact transports a paid
 bundle between jobs. The latter JSON is covered by the existing release
 manifest digest and is also embedded in the signed app’s `dist/` for inspection
 after installation. Existing signing, notarization and skip-notarization draft
-rules still apply. New desktop runs cancel obsolete ones.
+rules still apply. A new preflight cancels an obsolete Linux Web wait. macOS
+signing/notarization runs one candidate at a time, preserves an active signer,
+and keeps only the latest pending candidate. This lets a valid signed build
+finish when a newer Web contains its source. Before waiting on that Web at
+publication, a changed production overlay rejects the old installer immediately;
+the normal Web-source proof, final overlay equality and sealed-candidate checks
+remain required. Do not classify two Web runs as duplicates from the public SHA
+alone: their recorded overlay SHAs may differ.
 
 ### Public output boundary
 
@@ -231,6 +238,8 @@ rules still apply. New desktop runs cancel obsolete ones.
   upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI
   source, `.map`, inline source-map directives and `sourcesContent`.
 - The desktop production renderer and main/preload emit no source maps.
+  Installers include their bundled `dist/` and package metadata, explicitly
+  excluding hoisted workspace `node_modules/` and its development source/maps.
   After signing, the complete actual ASAR is extracted and audited
   before publication. The private checkout remains outside the package.
 - Do not print environment files, credentials or private source while debugging.

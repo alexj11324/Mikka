@@ -14,7 +14,9 @@ async function accept(preloadedModels?: HostedModelProbe) {
   // Only the desktop template carries a desktop and its driver; a task machine
   // (E2B's claude or codex template) has neither.
   const computer = existsSync('/opt/mikka/computer/cua-driver') ? ['--e2b-computer'] : []
-  const code = await runCli(['daemon', '--data-dir', dataDir, '--server', config.server, '--hosted-subscriptions', '--e2b-container-runtime', ...computer], undefined, { protectionBypass: config.protectionBypass, preloadedModels })
+  // The cloud host owns closed, per-run loopback timing. A team member does not
+  // need to create an administrator-owned workspace variable to observe it.
+  const code = await runCli(['daemon', '--data-dir', dataDir, '--server', config.server, '--hosted-subscriptions', '--e2b-container-runtime', ...computer], undefined, { protectionBypass: config.protectionBypass, preloadedModels, initialRunId: config.initialRunId, collectCliTiming: true })
   if (code !== null && code !== 0) throw new Error('Cloud worker failed')
 }
 const failed = () => { process.stderr.write('Cloud worker unavailable\n'); process.exit(1) }

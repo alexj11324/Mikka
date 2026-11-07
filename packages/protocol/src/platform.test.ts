@@ -47,6 +47,7 @@ function bridge(overrides: Partial<MikkaBridge> = {}): MikkaBridge {
     },
     quota: { get: async () => ({ status: "unknown" }) as never },
     preview: { html: async () => "mikka-preview://preview" },
+    bundled: { server: { state: async () => ({}) as never, probe: async () => ({ status: "unreachable" }), select: async () => ({}) as never, disconnect: async () => ({}) as never } } as unknown as MikkaBridge["bundled"],
     ...overrides,
   }
 }

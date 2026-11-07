@@ -270,3 +270,9 @@ describe('daemon.update: the desktop app on this computer asks after it starts',
     expect(reportedUpdateFailure(file, '0.0.1')).toMatchObject({ version: '999.0.0', code: 'install_failed' })
   })
 })
+
+it('desktop-managed updates keep their private prefix/cache without changing legacy installs', () => {
+  const env = { PATH: '/usr/bin', npm_config_cache: '/old/root-owned/cache' }
+  expect(autoUpdate.serviceNpmEnvironment('/home/alex/.mikka/npm/lib/node_modules/@aspectlylabs/mikka/mikka.js', '/home/alex', env)).toEqual({ ...env, npm_config_prefix: '/home/alex/.mikka/npm', npm_config_cache: '/home/alex/.mikka/npm-cache' })
+  expect(autoUpdate.serviceNpmEnvironment('/usr/local/lib/node_modules/@aspectlylabs/mikka/mikka.js', '/home/alex', env)).toBe(env)
+})

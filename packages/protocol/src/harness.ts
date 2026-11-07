@@ -52,6 +52,9 @@ export const harnessInfoSchema = z.object({
    * short-lived access lease (never the refresh grant) and wipes it at run end.
    */
   subscriptionBroker: z.literal(true).optional(),
+  /** The broker can verify full Claude model IDs against the run's own account
+   * catalogue instead of treating the CLI shortcut menu as exhaustive. */
+  subscriptionModelCatalogue: z.literal(true).optional(),
   /** A failed local startup check takes precedence over a stale broker flag. Omitted after a successful recheck. */
   subscriptionPreflight: subscriptionPreflightSchema.optional(),
   /** Set only by an E2B worker with the guarded Bot computer broker. */

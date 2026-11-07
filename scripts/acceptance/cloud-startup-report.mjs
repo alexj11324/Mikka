@@ -160,17 +160,29 @@ export function markdown(report) {
     '', '| Sample / call | 准备成本下限 | Provider headers（含上游） | Service total | Outcome | Trace ID |', '|---|---:|---:|---:|---|---|')
   for (const sample of report.samples) for (const call of sample.nativeProviderCalls ?? [])
     lines.push(`| ${sample.sampleId} / ${call.call} | ${seconds(call.measuredPreparationLowerBoundMs)} | ${seconds(call.providerHeadersIncludingUpstreamMs)} | ${seconds(call.serviceMs)} | ${call.outcome} | \`${call.traceId ?? 'unavailable'}\` |`)
-  lines.push('', '### 运行期 HTTP 发送收据', '', '统计实际 Mikka HTTP 发送。启动准备、共享 heartbeat/run-control/遥测和自然到期后台续租分开记录；官方 CLI 直连 provider 不经过这条 transport。真实任务 ACK 若早于 agent_start，也从 ACK 起检查额外鉴权。',
-    '', '| Sample | 官方任务接收信号 | 收据完整 | 额外鉴权/代理 | 判定 |', '|---|---|---|---:|---|')
+  lines.push('', '### 宿主鉴权与代理发送收据', '', '完整性仅指 daemon HttpServerLink/taskFetch 记录的宿主入口。启动准备、共享 heartbeat/run-control/遥测和自然到期后台续租分开记录；官方 CLI 直连 provider 不经过这条 transport。真实任务 ACK 若早于 agent_start，也从 ACK 起检查额外鉴权。',
+    '', '| Sample | 官方任务接收信号 | 宿主收据完整 | 宿主额外鉴权/代理 | 判定 |', '|---|---|---|---:|---|')
   for (const sample of report.samples) lines.push(`| ${sample.sampleId} | ${sample.runtimeTiming?.agentAccepted?.kind ?? 'unavailable'} | ${sample.runtimeTiming ? String(sample.runtimeTiming.complete && !sample.runtimeTiming.truncated) : 'unavailable'} | ${sample.runtimeEvidence?.extraRemoteCalls ?? 'unavailable'} | ${sample.runtimeEvidence?.status ?? 'unavailable'} |`)
   lines.push('', '| Sample | Phase | Endpoint 类别 | Shared | Started | Completed | Errors | 请求到响应头总秒数 |', '|---|---|---|---|---:|---:|---:|---:|')
   for (const sample of report.samples) for (const item of sample.runtimeTiming?.counts ?? [])
     lines.push(`| ${sample.sampleId} | ${item.phase} | ${item.endpoint} | ${item.shared} | ${item.started} | ${item.completed} | ${item.errors} | ${seconds(item.ms)} |`)
+  lines.push('', '### MCP 子进程业务请求观测', '', 'decision_catalogue 和 decision_record 是目录/决策业务请求，不计为额外权限检查。只列实收的物理发送；子进程未收到 close 时终态未知，CLI 自行重启的世代总量也未知。generationCoverage=unverified、allFirstPartyHttpComplete=false；未观测世代的请求总数是 unavailable。宿主声明的远程 MCP 应用必须为 0；CLI 自行从 HOME、项目或插件载入的网络连接不在这份全局计数承诺中。',
+    '', '| Sample | 已观测 / 已关闭 child | 目录 / 决策 / pending | 已观测配对完整 | child 终态完整 | 宿主远程 MCP 数 | 证据状态 |', '|---|---:|---:|---|---|---:|---|')
+  for (const sample of report.samples) {
+    const child = sample.runtimeEvidence?.childBusiness
+    lines.push(`| ${sample.sampleId} | ${child?.observedChildren ?? 'unavailable'} / ${child?.closedChildren ?? 'unavailable'} | ${child?.observedCatalogueSends ?? 'unavailable'} / ${child?.observedDecisionSends ?? 'unavailable'} / ${child?.pendingObservedSends ?? 'unavailable'} | ${child?.observedComplete ?? 'unavailable'} | ${child?.childLifecycleComplete ?? 'unavailable'} | ${child?.remoteMcpServerCount ?? 'unavailable'} | ${child?.status ?? 'unavailable'}${child?.reason ? `: ${child.reason}` : ''} |`)
+  }
+  lines.push('', '请求相对真实 ACK 的时间仅为同 VM 墙钟差，保留正负值，不用于 5 秒门槛。耗时为子进程从 fetch 发送到响应头返回或异常的单调时钟间隔，不含后续正文读取或 JSON-RPC 解析。',
+    '', '| Sample / child.request | 业务操作 | UTC start | UTC end | 耗时秒 | start 相对 ACK 秒 | Outcome |', '|---|---|---|---|---:|---:|---|')
+  for (const sample of report.samples) for (const request of sample.runtimeTiming?.mcpHttpTiming?.requests ?? []) {
+    const ack = sample.runtimeTiming?.agentAccepted?.at
+    lines.push(`| ${sample.sampleId} / ${request.child}.${request.sequence} | ${request.operation} | ${new Date(request.startedAt).toISOString()} | ${request.endedAt === null ? 'unavailable' : new Date(request.endedAt).toISOString()} | ${seconds(request.durationMs)} | ${seconds(Number.isFinite(ack) ? request.startedAt - ack : null)} | ${request.outcome} |`)
+  }
   lines.push('', '### 官方 CLI provider / tool 耗时观察', '', '仅保留官方 OTLP 数字事件，delivery=best_effort，flush=not_confirmed；CLI 正常退出也不能证明每个事件都已送达。以下是已观察到的逐次事件，不是完整 provider 调用总数。',
     '', '| Sample / event | 事件 | 耗时秒 | Outcome | 官方 sequence |', '|---|---|---:|---|---:|')
   for (const sample of report.samples) for (const [index, event] of (sample.runtimeTiming?.officialCliTiming?.events ?? []).entries())
     lines.push(`| ${sample.sampleId} / ${index + 1} | ${event.name} | ${seconds(event.durationMs)} | ${event.outcome} | ${event.sequence ?? 'unavailable'} |`)
-  lines.push('', '日志中没有 native call 不能单独证明零调用。优化后的零额外鉴权门槛还必须通过完整运行生命周期的真实 HTTP 发送收据；官方 CLI 遥测明确为 best effort，未收到事件不会被当作零 provider 请求。', '')
+  lines.push('', '日志中没有 native call 不能单独证明零调用。当前受测路径的零额外鉴权判定依据是宿主鉴权/代理入口物理计数为零，加固定 worker 版本中 MCP 子进程唯一 fetch 的两类闭式业务路径审计，并有实际目录发送观测。它不宣称所有业务 HTTP 或所有子进程世代已被计数。官方 CLI 遥测为 best effort，未收到事件不会被当作零 provider 请求。', '')
   return lines.join('\n')
 }
 

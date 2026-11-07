@@ -48,9 +48,12 @@ export interface PoolDevice {
   activeRuns: number
   /** When it joined (ms): the earlier goes first on a tie. */
   joinedAt: number
-  /** Its last heartbeat (ms), for 「离线 · 5 天前」; null when it never reported. */
-  lastSeenAt?: number | null
-  harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker' | 'subscriptionPreflight'>[]
+  /** Last heartbeat; server reads normalize it to ms for the settings view. */
+  lastSeenAt?: Date | string | number | null
+  /** Server-verified catalogues keyed by the exact connection whose lease a run
+   * will use. CLI shortcut menus are not an exhaustive list of full model IDs. */
+  subscriptionModels?: Readonly<Record<string, readonly string[]>>
+  harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker' | 'subscriptionModelCatalogue' | 'subscriptionPreflight'>[]
 }
 
 export type EntryBlock =
@@ -77,10 +80,10 @@ export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'cloudModelsUnkn
 /**
  * The provider model a device runs for an entry. Null when the device cannot run the entry: 参与调度 off,
  * offline, the Agent not installed, or (for a subscription model) the daemon cannot take a subscription
- * run (no `subscriptionBroker`: the claim is refused without it) or did not report the model. A
- * subscription model runs only where the daemon's own CLI probe (packages/daemon/src/model-probe.ts)
- * reported it, as a model id or a slot's resolved model (Alex, 2026-11-03: no guessing); a daemon that
- * reported no models at all is too old to say, so it needs an update. An API key's model runs on any
+ * run (no `subscriptionBroker`: the claim is refused without it) or has no evidence for the model.
+ * Evidence is the daemon's CLI report or, for a capable Claude broker, the exact run account's
+ * current catalogue. Older daemons need an update to validate IDs outside their shortcut menu.
+ * Unknown evidence never becomes a runnable model. An API key's model runs on any
  * installed Agent of the key's protocol, since the key is handed to the run and the CLI's probe, run
  * without the key, cannot list it.
  */
@@ -95,8 +98,24 @@ export const DEVICE_STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInst
 /** Whether a harness report lists a model (@mikka/protocol harnessReportsModel). Null when it reported none. */
 export const reportsModel = harnessReportsModel
 
+export type DeviceModelEvidence = 'account_catalogue' | 'cli_report' | 'only_latest_confirmed' | 'unknown'
+
+/** Evidence for this model, separate from runtime readiness and presence. A
+ * Claude shortcut menu can confirm its listed generation, never disprove full
+ * historical IDs that the menu does not enumerate. */
+export function deviceModelEvidence(device: Pick<PoolDevice, 'harnesses' | 'subscriptionModels'>, entry: OrderEntry): DeviceModelEvidence {
+  const info = device.harnesses.find(item => item.harness === entry.harness)
+  if (!info?.installed) return 'unknown'
+  if (reportsModel(info, entry.model) === true) return 'cli_report'
+  if (entry.source.kind === 'subscription' && entry.harness === 'claude_code') {
+    if (info.subscriptionBroker && info.subscriptionModelCatalogue && device.subscriptionModels?.[entry.source.connectionId]?.includes(entry.model)) return 'account_catalogue'
+    if (info.models?.length || info.modelSlots?.length) return 'only_latest_confirmed'
+  }
+  return 'unknown'
+}
+
 /** What a device can do for an entry whatever its 参与调度 or whether it is online (those come first in deviceStage). */
-export function deviceSupport(device: Pick<PoolDevice, 'harnesses'>, entry: OrderEntry): Exclude<DeviceStage, 'off' | 'offline'> {
+export function deviceSupport(device: Pick<PoolDevice, 'harnesses' | 'subscriptionModels'>, entry: OrderEntry): Exclude<DeviceStage, 'off' | 'offline'> {
   const info = device.harnesses.find(item => item.harness === entry.harness)
   // A failed check wins over a stale broker flag. API-key runs do not use
   // subscription auth, so their existing installed-Agent path is unchanged.
@@ -104,8 +123,11 @@ export function deviceSupport(device: Pick<PoolDevice, 'harnesses'>, entry: Orde
   if (!info?.installed) return 'notInstalled'
   if (entry.source.kind !== 'subscription') return 'ready'
   if (!info.subscriptionBroker) return 'needsUpdate'
+  // Claude Code accepts the full model IDs of the account supplied by the
+  // run-scoped broker. Its local /model menu only reports shortcut slots.
   const reported = reportsModel(info, entry.model)
-  return reported === null ? 'needsUpdate' : reported ? 'ready' : 'modelNotReported'
+  if (reported !== true && entry.harness === 'claude_code' && device.subscriptionModels?.[entry.source.connectionId]?.includes(entry.model)) return info.subscriptionModelCatalogue ? 'ready' : 'needsUpdate'
+  return reported === null ? info.subscriptionModelCatalogue ? 'modelNotReported' : 'needsUpdate' : reported ? 'ready' : 'modelNotReported'
 }
 
 /**
@@ -133,7 +155,7 @@ export function deviceStage(device: PoolDevice, entry: OrderEntry): DeviceStage 
  * too old to take a subscription run. `device` names that computer when it is
  * the only one at that step, `count` how many are.
  */
-export type NoDeviceWhy = { why: 'none' } | { why: Exclude<DeviceStage, 'ready'>; device: string; count: number; detail?: SubscriptionPreflightFailure }
+export type NoDeviceWhy = { why: 'none' } | { why: Exclude<DeviceStage, 'ready'>; device: string; count: number; detail?: SubscriptionPreflightFailure; modelEvidence?: DeviceModelEvidence }
 
 export function whyNoDevice(devices: readonly PoolDevice[], entry: OrderEntry): NoDeviceWhy {
   if (!devices.length) return { why: 'none' }
@@ -141,7 +163,9 @@ export function whyNoDevice(devices: readonly PoolDevice[], entry: OrderEntry): 
   const best = staged.reduce((top, item) => DEVICE_STAGES.indexOf(item.stage) > DEVICE_STAGES.indexOf(top.stage) ? item : top)
   const why = best.stage === 'ready' ? 'needsUpdate' : best.stage
   const detail = why === 'subscriptionRuntimeUnavailable' ? best.device.harnesses.find(info => info.harness === entry.harness)?.subscriptionPreflight : undefined
-  return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length, ...(detail ? { detail } : {}) }
+  const modelEvidence = best.device.subscriptionModels !== undefined && entry.source.kind === 'subscription' && entry.harness === 'claude_code'
+    && (why === 'modelNotReported' || why === 'needsUpdate') ? deviceModelEvidence(best.device, entry) : undefined
+  return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length, ...(detail ? { detail } : {}), ...(modelEvidence ? { modelEvidence } : {}) }
 }
 
 /**
@@ -235,6 +259,40 @@ export const DEFAULT_ORDER_PREFERENCE: readonly { harness: OrderHarness; words: 
 ]
 
 export interface OrderCandidate { harness: OrderHarness; model: string; name: string; source: EntrySource }
+
+/** A catalogue may include historical releases. Only untouched defaults collapse
+ * those releases; the complete catalogue remains available for manual choices.
+ * Compare versions within a family and credential, never across accounts or tiers
+ * (a new Opus does not retire Haiku, nor does a new Sol retire Luna). Catalogue
+ * order breaks ties, so its recommended alias wins over an equivalent snapshot. */
+export function latestDefaultCandidates<T extends OrderCandidate>(candidates: readonly T[]): T[] {
+  const release = (model: string): { family: string; version: number[] } | undefined => {
+    const id = model.toLowerCase().replace(/^(?:anthropic|openai)\//, '').replace(/-\d{8}$/, '').replace(/-\d{4}-\d{2}-\d{2}$/, '')
+    const claude = /^claude-(opus|sonnet|haiku|fable)-(\d+)(?:[.-](\d+))?$/.exec(id)
+    if (claude) return { family: `claude:${claude[1]}`, version: [Number(claude[2]), Number(claude[3] ?? 0)] }
+    const legacyClaude = /^claude-(\d+)(?:[.-](\d+))?-(opus|sonnet|haiku|fable)$/.exec(id)
+    if (legacyClaude) return { family: `claude:${legacyClaude[3]}`, version: [Number(legacyClaude[1]), Number(legacyClaude[2] ?? 0)] }
+    const gpt = /^gpt-(\d+)(?:\.(\d+))?(?:-([a-z][a-z0-9-]*))?$/.exec(id)
+    if (gpt) return { family: `gpt:${gpt[3] ?? 'default'}`, version: [Number(gpt[1]), Number(gpt[2] ?? 0)] }
+  }
+  const selected = new Map<string, { candidate: T; version: number[] }>()
+  const families = new Map<T, string>()
+  for (const candidate of candidates) {
+    const current = release(candidate.model)
+    if (!current) continue
+    const source = candidate.source.kind === 'subscription' ? candidate.source.connectionId : candidate.source.keyId
+    const key = `${candidate.harness}\u0000${candidate.source.kind}\u0000${source}\u0000${current.family}`
+    families.set(candidate, key)
+    const previous = selected.get(key)
+    if (!previous || current.version[0] > previous.version[0] || (current.version[0] === previous.version[0] && current.version[1] > previous.version[1])) {
+      selected.set(key, { candidate, version: current.version })
+    }
+  }
+  return candidates.filter(candidate => {
+    const family = families.get(candidate)
+    return family === undefined || selected.get(family)?.candidate === candidate
+  })
+}
 
 /**
  * The list a person who has not touched it gets, from what they connected and

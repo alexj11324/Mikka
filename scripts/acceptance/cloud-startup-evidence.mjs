@@ -10,6 +10,94 @@ const ms = value => Number.isFinite(value) && value >= 0 && value <= 86_400_000
 const count = value => Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000
 const epoch = value => Number.isSafeInteger(value) && value > 0
 const outcome = value => ['ok', 'error', 'unknown'].includes(value)
+const MCP_OPERATIONS = new Set(['decision_catalogue', 'decision_record'])
+
+/** The child reports its physical fetches, not prompt/tool contents. Received
+ * generations can be complete; the official CLI's whole generation inventory
+ * is not observable here and must never be inferred from an empty receipt. */
+export function readMcpHttpTiming(value, record) {
+  if (value?.version !== 1 || value.source !== 'mikka_mcp_physical_fetch' || value.scope !== 'observed_mikka_mcp_children'
+    || value.generationCoverage !== 'unverified' || value.allFirstPartyHttpComplete !== false
+    || !Number.isInteger(value.remoteMcpServerCount) || value.remoteMcpServerCount < 0 || value.remoteMcpServerCount > 64
+    || value.childPathAuditVersion !== 1 || value.runIdHash !== record.runIdHash || value.harness !== record.harness
+    || !/^[a-f0-9]{16}$/.test(value.runIdHash ?? '') || !['claude_code', 'codex'].includes(value.harness)
+    || !epoch(value.startedAt) || !epoch(value.endedAt) || value.endedAt < value.startedAt
+    || value.expectedChildren !== 1 || !count(value.observedChildren) || value.observedChildren > 8
+    || !count(value.closedChildren) || value.closedChildren > value.observedChildren
+    || typeof value.observedComplete !== 'boolean' || typeof value.childLifecycleComplete !== 'boolean'
+    || typeof value.truncated !== 'boolean' || !count(value.rejectedEvents)
+    || !Array.isArray(value.children) || value.children.length !== value.observedChildren
+    || !Array.isArray(value.requests) || value.requests.length > 128) return null
+  const children = [], requests = [], seen = new Set()
+  for (const child of value.children) {
+    if (child?.child !== children.length + 1 || !epoch(child.startedAt) || child.startedAt < value.startedAt || child.startedAt > value.endedAt
+      || !(child.closedAt === null || epoch(child.closedAt) && child.closedAt >= child.startedAt && child.closedAt <= value.endedAt)
+      || !['lastSequence', 'sent', 'completed', 'lost'].every(key => count(child[key])) || child.lastSequence < 1
+      || child.completed > child.sent) return null
+    children.push({ child: child.child, startedAt: child.startedAt, closedAt: child.closedAt,
+      lastSequence: child.lastSequence, sent: child.sent, completed: child.completed, lost: child.lost })
+  }
+  if (children.filter(child => child.closedAt !== null).length !== value.closedChildren) return null
+  for (const request of value.requests) {
+    const child = children.find(child => child.child === request?.child)
+    const key = `${request?.child}:${request?.sequence}`
+    if (!child || !count(request.sequence) || request.sequence < 1 || seen.has(key) || !MCP_OPERATIONS.has(request.operation)
+      || !epoch(request.startedAt) || request.startedAt < child.startedAt || request.startedAt > (child.closedAt ?? value.endedAt)
+      || !['ok', 'error', 'pending'].includes(request.outcome)
+      || !(request.status === null || Number.isInteger(request.status) && request.status >= 100 && request.status <= 599)
+      || (request.outcome === 'pending' ? request.endedAt !== null || request.durationMs !== null || request.status !== null
+        : !epoch(request.endedAt) || request.endedAt < request.startedAt || request.endedAt > (child.closedAt ?? value.endedAt)
+          || !ms(request.durationMs) || request.outcome !== (request.status >= 200 && request.status < 300 ? 'ok' : 'error'))) return null
+    seen.add(key)
+    requests.push({ child: request.child, sequence: request.sequence, operation: request.operation,
+      startedAt: request.startedAt, endedAt: request.endedAt, durationMs: request.durationMs, status: request.status, outcome: request.outcome })
+  }
+  const matched = children.every(child => {
+      const sent = requests.filter(request => request.child === child.child).sort((a, b) => a.sequence - b.sequence)
+      return sent.length === child.sent && child.completed === sent.filter(request => request.outcome !== 'pending').length
+        && child.lastSequence === 1 + child.sent + child.completed + (child.closedAt === null ? 0 : 1)
+        && sent.every((request, index) => request.sequence === index + 1)
+  })
+  const complete = value.observedChildren >= value.expectedChildren && value.rejectedEvents === 0 && !value.truncated
+    && children.every(child => child.lost === 0 && child.sent === child.completed) && matched
+  const lifecycleComplete = complete && value.closedChildren === value.observedChildren
+  if (value.observedComplete && !complete || value.childLifecycleComplete && !lifecycleComplete) return null
+  return { version: 1, source: value.source, scope: value.scope, generationCoverage: 'unverified',
+    allFirstPartyHttpComplete: false, remoteMcpServerCount: value.remoteMcpServerCount, childPathAuditVersion: 1,
+    runIdHash: value.runIdHash, harness: value.harness, startedAt: value.startedAt, endedAt: value.endedAt,
+    expectedChildren: 1, observedChildren: value.observedChildren, closedChildren: value.closedChildren,
+    observedComplete: value.observedComplete && complete, childLifecycleComplete: value.childLifecycleComplete && lifecycleComplete,
+    rejectedEvents: value.rejectedEvents, truncated: value.truncated, children, requests }
+}
+
+/** This is evidence for the audited business-only child paths. It does not
+ * claim to enumerate every generation spawned by the official CLI. Missing
+ * child_close is retained as incomplete lifecycle coverage, not an auth call. */
+export function mcpBusinessEvidence(value, record) {
+  const timing = value === undefined ? undefined : readMcpHttpTiming(value, record)
+  const unknown = { allFirstPartyHttpComplete: false, generationCoverage: 'unverified' }
+  if (!timing) return { ...unknown, status: 'unavailable', reason: value === undefined ? 'mcp_http_observation_missing' : 'mcp_http_observation_invalid' }
+  const base = { ...unknown, source: timing.source, scope: timing.scope, childPathAuditVersion: timing.childPathAuditVersion,
+    remoteMcpServerCount: timing.remoteMcpServerCount, observedChildren: timing.observedChildren, closedChildren: timing.closedChildren,
+    observedComplete: timing.observedComplete, childLifecycleComplete: timing.childLifecycleComplete,
+    observedPhysicalSends: timing.requests.length,
+    observedCatalogueSends: timing.requests.filter(request => request.operation === 'decision_catalogue').length,
+    observedDecisionSends: timing.requests.filter(request => request.operation === 'decision_record').length,
+    pendingObservedSends: timing.requests.filter(request => request.outcome === 'pending').length }
+  if (timing.remoteMcpServerCount !== 0) return { ...base, status: 'unavailable', reason: 'remote_mcp_scope_uncovered' }
+  if (timing.rejectedEvents || timing.truncated || timing.children.some(child => child.lost > 0))
+    return { ...base, status: 'unavailable', reason: 'mcp_http_observation_incomplete' }
+  for (const child of timing.children) {
+    const requests = timing.requests.filter(request => request.child === child.child).sort((a, b) => a.sequence - b.sequence)
+    if (requests.length !== child.sent || requests.filter(request => request.outcome !== 'pending').length !== child.completed
+      || child.lastSequence !== 1 + child.sent + child.completed + (child.closedAt === null ? 0 : 1)
+      || requests.some((request, index) => request.sequence !== index + 1))
+      return { ...base, status: 'unavailable', reason: 'mcp_http_sequence_invalid' }
+  }
+  if (!timing.requests.some(request => request.operation === 'decision_catalogue' && request.outcome !== 'pending'))
+    return { ...base, status: 'unavailable', reason: 'mcp_catalogue_observation_missing' }
+  return { ...base, status: 'observed' }
+}
 
 export function readOfficialCliTiming(value, record) {
   if (value?.version !== 1 || value.source !== 'official_cli_otlp' || value.runIdHash !== record.runIdHash || value.harness !== record.harness
@@ -36,6 +124,9 @@ export function readOfficialCliTiming(value, record) {
 
 export function readRuntimeTiming(value, record) {
   if (value?.version !== 1 || value.source !== 'http_server_link' || value.window !== 'run_launch_to_agent_exit'
+    || (value.scope !== undefined && value.scope !== 'daemon_http_server_link_and_task_fetch')
+    || (value.allFirstPartyHttpComplete !== undefined && value.allFirstPartyHttpComplete !== false)
+    || (value.scope === undefined) !== (value.allFirstPartyHttpComplete === undefined)
     || value.runIdHash !== record.runIdHash || value.harness !== record.harness || !/^[a-f0-9]{16}$/.test(value.runIdHash ?? '')
     || !['claude_code', 'codex'].includes(value.harness) || typeof value.complete !== 'boolean' || typeof value.truncated !== 'boolean'
     || !epoch(value.startedAt) || !epoch(value.endedAt) || value.endedAt < value.startedAt || !ms(value.ms)
@@ -70,21 +161,25 @@ export function readRuntimeTiming(value, record) {
   if (accepted !== undefined && (!epoch(accepted?.at) || !ms(accepted.ms) || accepted.ms > value.ms + 0.01
     || !(value.harness === 'codex' ? accepted.kind === 'codex_turn_start_ack' : ['claude_user_ack', 'claude_system_init', 'claude_first_event'].includes(accepted.kind)))) return null
   const officialCliTiming = value.officialCliTiming === undefined ? undefined : readOfficialCliTiming(value.officialCliTiming, record)
+  const mcpHttpTiming = value.mcpHttpTiming === undefined ? undefined : readMcpHttpTiming(value.mcpHttpTiming, record)
   return { version: 1, source: 'http_server_link', window: value.window, runIdHash: value.runIdHash, harness: value.harness,
+    ...(value.scope ? { scope: value.scope, allFirstPartyHttpComplete: false } : {}),
     startedAt: value.startedAt, endedAt: value.endedAt, ms: value.ms, executionStartMs: value.executionStartMs, executionEndMs: value.executionEndMs,
     complete: value.complete, truncated: value.truncated, requests, counts, providerOutputChunks: value.providerOutputChunks,
     ...(accepted ? { agentAccepted: { kind: accepted.kind, at: accepted.at, ms: accepted.ms } } : {}),
     toolCallsStarted: value.toolCallsStarted, toolCallsCompleted: value.toolCallsCompleted, toolCallsFailed: value.toolCallsFailed,
-    ...(officialCliTiming ? { officialCliTiming } : {}), ...(officialCliTiming === null ? { officialCliTimingStatus: 'invalid' } : {}) }
+    ...(officialCliTiming ? { officialCliTiming } : {}), ...(officialCliTiming === null ? { officialCliTimingStatus: 'invalid' } : {}),
+    ...(mcpHttpTiming ? { mcpHttpTiming } : {}), ...(mcpHttpTiming === null ? { mcpHttpTimingStatus: 'invalid' } : {}) }
 }
 
-/** Full physical-send coverage proves the absence of per-operation Mikka auth.
- * Observed official events describe provider durations; their delivery is best
- * effort, so their count is never represented as a complete provider census. */
+/** Count the host's authorization/proxy entry points and check the fixed child
+ * business-path audit. Child business sends are observed, not a complete count
+ * of all CLI generations; official provider delivery is best effort too. */
 export function runtimeEvidence(receipt, { requireOfficial = false } = {}) {
   if (!receipt?.complete || receipt.truncated || receipt.executionStartMs === null || receipt.executionEndMs === null)
-    return { status: 'unavailable', reason: 'runtime_receipt_incomplete' }
-  if (!receipt.agentAccepted || (receipt.harness === 'claude_code' && receipt.agentAccepted.kind !== 'claude_user_ack')) return { status: 'unavailable', reason: 'official_agent_acceptance_missing' }
+    return { status: 'unavailable', reason: 'runtime_receipt_incomplete', allFirstPartyHttpComplete: false }
+  if (!receipt.agentAccepted || (receipt.harness === 'claude_code' && receipt.agentAccepted.kind !== 'claude_user_ack'))
+    return { status: 'unavailable', reason: 'official_agent_acceptance_missing', allFirstPartyHttpComplete: false }
   const forbidden = new Set(['policy_snapshot', 'permission_check', 'permission_request', 'server_decision', 'computer_authority',
     'subscription_context', 'provider_proxy', 'credential_lease', 'github_credential_lease', 'other_run_request'])
   // An official task ACK can arrive just before the existing UI stage returns.
@@ -102,12 +197,19 @@ export function runtimeEvidence(receipt, { requireOfficial = false } = {}) {
   const official = receipt.officialCliTiming
   const providerEvents = official?.events.filter(event => event.kind === 'provider') ?? []
   const toolEvents = official?.events.filter(event => event.kind === 'tool') ?? []
+  const childBusiness = receipt.mcpHttpTimingStatus === 'invalid'
+    ? { status: 'unavailable', reason: 'mcp_http_observation_invalid', allFirstPartyHttpComplete: false, generationCoverage: 'unverified' }
+    : mcpBusinessEvidence(receipt.mcpHttpTiming, receipt)
   const base = { extraRemoteCalls: extras.reduce((sum, item) => sum + item.started, 0), extras, backgroundCredentialRefresh: refresh,
+    hostAuthorizationComplete: true, allFirstPartyHttpComplete: false, childBusiness,
     observedProviderEvents: providerEvents.length, observedToolEvents: toolEvents.length,
     officialDelivery: official ? 'best_effort_not_a_complete_call_count' : 'unavailable' }
   if (extras.length) return { ...base, status: 'failed', reason: 'extra_runtime_authorization_or_proxy' }
   if (receipt.toolCallsCompleted < 1 || receipt.providerOutputChunks < 1) return { ...base, status: 'unavailable', reason: 'execution_cycle_missing' }
   if (requireOfficial && (!official || official.truncated || official.rejectedBatches || official.invalidEvents || providerEvents.length < 1))
     return { ...base, status: 'unavailable', reason: 'official_provider_timings_missing' }
-  return { ...base, status: 'passed', basis: 'all_mikka_http_sends_during_execution_counted' }
+  if (childBusiness.status !== 'observed') return { ...base, status: 'unavailable', reason: childBusiness.reason }
+  if (receipt.scope !== 'daemon_http_server_link_and_task_fetch' || receipt.allFirstPartyHttpComplete !== false)
+    return { ...base, status: 'unavailable', reason: 'host_http_scope_unverified' }
+  return { ...base, status: 'passed', basis: 'host_authorization_census_and_closed_mcp_business_paths' }
 }

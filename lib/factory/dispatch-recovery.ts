@@ -88,7 +88,7 @@ async function insertEvent(tx: PoolClient, row: { userId: string; botId: string 
  * Write path: called in the transaction that queues a Factory run. When the target device cannot
  * take it right now, records one `run_dispatch_failed:<runId>:<reasonCode>`. Returns the reason or null.
  */
-export async function recordFactoryDispatchFailure(tx: PoolClient, userId: string, runId: string, attemptId: string | null = null, at = Date.now()): Promise<FactoryDispatchFailureReason | null> {
+export async function recordFactoryDispatchFailure(tx: PoolClient, userId: string, runId: string, attemptId: string | null = null, at?: number): Promise<FactoryDispatchFailureReason | null> {
   const { rows: [row] } = await tx.query(`SELECT r.status, r."issueId", r."botId", ag.harness, d.id AS "dId", d.name, d.enabled, d."lastSeenAt", d.harnesses,
       (SELECT a."taskId" FROM factory_attempts a WHERE a.id=$3) AS "taskId"
     FROM agent_runs r
@@ -96,6 +96,8 @@ export async function recordFactoryDispatchFailure(tx: PoolClient, userId: strin
     JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
     WHERE r.id=$1 AND r."userId"=$2`, [runId, userId, attemptId]);
   if (!row || row.status !== 'queued') return null;
+  // A heartbeat can commit while this query waits. Observe it after the read.
+  at ??= Date.now();
   const online = row.enabled && await deviceIsOnline({ id: row.dId, lastSeenAt: row.lastSeenAt }, at);
   const reason = factoryDispatchFailureReason({ id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt, harnesses: row.harnesses, online }, row.harness, at);
   if (reason) await insertEvent(tx, { userId, botId: row.botId, kind: 'run_dispatch_failed', dedupeKey: `run_dispatch_failed:${runId}:${reason}`, issueId: row.issueId, runId,

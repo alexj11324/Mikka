@@ -375,3 +375,57 @@ test('a team transport failure is closed before the default reporter and still t
   assert.deepEqual(browser.saved[0].teamWorkspaceFailure, { code: 'team_workspace_failed', detail: 'workspace_read' })
   assert.equal(JSON.stringify(browser.saved).includes(privateValue), false)
 })
+
+test('closed stages identify the failed assertion while preserving logout and the final target proof', async () => {
+  const secret = 'private page text and cookie canary'
+  const f = fixture()
+  const normalSmoke = f.args.smoke
+  f.args.smoke = async scope => {
+    await normalSmoke(scope)
+    const step = scope.step?.bind(scope) ?? ((_stage, operation) => operation())
+    await step('coordinator-selection', async () => 'private locator result')
+    await step('composer', async () => { throw new Error(secret, { cause: new Error(secret) }) })
+  }
+  await assert.rejects(runDeployedBrowserSmoke(f.args), { code: 'browser_assertions_failed' })
+  assert.equal(f.saved[0].browserStage, 'composer')
+  assert.equal(f.saved[0].failedStage, 'composer')
+  assert.equal(f.saved[0].cleanupSucceeded, true)
+  assert.equal(f.saved[0].targetAfterVerified, true)
+  assert.deepEqual(f.calls, ['target1', 'smoke', 'close', 'signout', 'anonymous', 'target2'])
+  assert.equal(JSON.stringify(f.saved).includes(secret), false)
+  assert.equal(JSON.stringify(f.saved).includes('private locator result'), false)
+})
+test('a stage preserves a callback result in memory and never records it in a successful report', async () => {
+  const f = fixture()
+  const normalSmoke = f.args.smoke
+  const privateResult = { text: 'private response body', cookie: 'private cookie' }
+  f.args.smoke = async scope => {
+    await normalSmoke(scope)
+    const step = scope.step?.bind(scope) ?? ((_stage, operation) => operation())
+    assert.equal(await step('required-features', async () => privateResult), privateResult)
+  }
+  const report = await runDeployedBrowserSmoke(f.args)
+  assert.equal(report.browserStage, 'required-features')
+  assert.equal(report.failedStage, null)
+  assert.equal(report.assertionsPassed, true)
+  assert.equal(report.cleanupSucceeded, true)
+  for (const value of Object.values(privateResult)) assert.equal(JSON.stringify(report).includes(value), false)
+})
+test('an unknown stage fails before its callback and cannot add arbitrary content to the closed report', async () => {
+  const f = fixture()
+  const normalSmoke = f.args.smoke
+  const privateStage = 'private selector or account name'
+  let called = false
+  f.args.smoke = async scope => {
+    await normalSmoke(scope)
+    const step = scope.step?.bind(scope) ?? ((_stage, operation) => operation())
+    await step(privateStage, async () => { called = true })
+  }
+  await assert.rejects(runDeployedBrowserSmoke(f.args), { code: 'browser_contract_rejected' })
+  assert.equal(called, false)
+  assert.equal(f.saved[0].browserStage, null)
+  assert.equal(f.saved[0].failedStage, null)
+  assert.equal(f.saved[0].cleanupSucceeded, true)
+  assert.equal(f.saved[0].targetAfterVerified, true)
+  assert.equal(JSON.stringify(f.saved).includes(privateStage), false)
+})
