@@ -4,13 +4,14 @@ import { cloudModelSupport, type CloudModelState } from './cloud-template-models
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { deviceOnlineStates } from './device-presence'
+import { deviceSchedulingView, type SchedulingNode } from './device-scheduling'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { ActionFailureError } from './action-error'
 import { apiKeyHarnesses } from './model-api-key-providers'
 import { hasStaleOfficialAllowance, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
-  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, offerKey, onPreferredAgent, placeStage, planDispatch, whyNoDevice,
+  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, latestDefaultCandidates, offerKey, onPreferredAgent, placeStage, planDispatch, whyNoDevice,
   type CredentialState, type DeviceStage, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
@@ -39,6 +40,8 @@ export interface OrderRow extends OrderEntry {
 }
 
 export interface OrderView {
+  /** Actual dispatch rank and availability, from the same planner as new runs. */
+  dispatchOrder?: SchedulingNode[]
   location: RunLocation
   customized: boolean
   autoModelRouting: boolean
@@ -122,7 +125,7 @@ async function settingsRow(query: Query, scope: OrderScope) {
 export async function readOrder(query: Query, scope: OrderScope, candidates?: (OrderCandidate & { provider: string })[]): Promise<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean; entries: OrderEntry[] }> {
   const settings = await settingsRow(query, scope)
   if (!settings.customized) {
-    const available = candidates ?? await orderCandidates(query, scope)
+    const available = latestDefaultCandidates(candidates ?? await orderCandidates(query, scope))
     const defaults = defaultOrderByAgent(available, settings.preferredHarness)
     // Include lighter reported models from the default credentials without
     // silently adding a different paid key. Turning routing off restores each
@@ -260,14 +263,17 @@ export async function checkOrderQuota(query: Query, scope: OrderScope, connectio
  * The person's own local devices as dispatch sees them; 参与调度 is `enabled`.
  * A run not yet ended counts toward its device's load (pickDevice).
  */
-export async function poolDevices(query: Query, ownerId: string): Promise<PoolDevice[]> {
-  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
+export async function poolDevices(query: Query, ownerId: string): Promise<(PoolDevice & { lastSeenAt: number | null })[]> {
+  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number; subscriptionModels: Record<string, string[]> }>(
     `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d.harnesses,d."deviceType",d."createdAt",
-      (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns"
+      (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns",
+      COALESCE((SELECT jsonb_object_agg(c.id::text,c."modelCatalog"->'models') FROM byos_connections c
+        WHERE c."ownerId"=$1 AND c.provider='claude' AND c.state='connected' AND c.paused=false AND c."removedAt" IS NULL
+          AND c."modelCatalog"->>'revision'=c.epoch::text AND jsonb_typeof(c."modelCatalog"->'models')='array'), '{}'::jsonb) AS "subscriptionModels"
     FROM devices d WHERE d."ownerId"=$1 AND d.kind='local' AND d."removedAt" IS NULL ORDER BY d."lastSeenAt" DESC NULLS LAST,d.id`, [ownerId])
   const presence = await deviceOnlineStates(rows)
   return rows.map(row => ({
-    id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [],
+    id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [], subscriptionModels: row.subscriptionModels ?? {},
     server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(), lastSeenAt: row.lastSeenAt?.getTime() ?? null,
   }))
 }
@@ -293,6 +299,7 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
   const plan = planDispatch({ entries: runnable, location: order.location, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] })
   const firstDevice = plan.kind === 'device' ? devices.find(device => device.id === plan.deviceId) : undefined
   return {
+    dispatchOrder: deviceSchedulingView({ location: order.location, entries: runnable, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] }),
     location: order.location,
     customized: order.customized,
     autoModelRouting: order.autoModelRouting,

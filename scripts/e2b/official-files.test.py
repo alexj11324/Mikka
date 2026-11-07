@@ -146,6 +146,18 @@ class CliVerification(unittest.TestCase):
 
 
 class OfficialFiles(unittest.TestCase):
+    def test_missing_original_reports_the_exact_manifest_path_and_preserves_the_filesystem_cause(self):
+        with tempfile.TemporaryDirectory() as name:
+            cli = Path(name) / 'official-cli'
+            cli.write_text('original file contents must never be in diagnostics')
+            baseline = files.capture([name])
+            cli.unlink()
+            with self.assertRaisesRegex(RuntimeError, 'official_files_removed ') as raised:
+                files.verify(baseline)
+            self.assertEqual(json.loads(str(raised.exception).removeprefix('official_files_removed ')), {'path': str(cli)})
+            self.assertIsInstance(raised.exception.__cause__, FileNotFoundError)
+            self.assertNotIn('original file contents', str(raised.exception))
+
     def test_provider_certificate_relinks_require_exact_measured_target_and_same_certificate_bytes(self):
         rules, _ = files.finalization_policy('claude')
         certificate = next(value['_certificate'] for value in rules.values() if value.get('_certificate') and not value['_certificate'].get('providerRoot'))

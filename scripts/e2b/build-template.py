@@ -54,6 +54,8 @@ ANONYMOUS_WORKER_READY = ("test -s /home/user/.mikka/preloaded.pid && "
                           "tr '\\0' '\\n' < \"/proc/$mikka_preloaded_pid/cmdline\" | grep -Fxq -- '--wait-bootstrap'")
 # One deadline includes reading/verifying selected native CLI bytes and the
 # real anonymous catalogue exchange. Never warm files in a separate command.
+# The standalone official-instance installer has no snapshot receipt. Its
+# explicit live probe is separate from the release's completed-receipt gate.
 MODEL_PROBE_COMMAND = ('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; '
                        'python3 /opt/mikka/worker/scripts/e2b/official-files.py cli-verify '
                        '/opt/mikka/worker/.mikka-original-cli.json --kind {kind} && '
@@ -336,6 +338,8 @@ def assert_new_template(name, api_key):
     if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', name) or name in KINDS:
         raise ValueError('template_name_invalid')
     try:
+        # Template names are aliases, not template IDs. The ID endpoint can
+        # return 404 for an existing alias and must not prove it is unused.
         _request('GET', f'/templates/aliases/{name}', api_key)
     except HTTPError as error:
         if error.code == 404:
@@ -377,17 +381,22 @@ def cleanup_templates(candidates, api_key, request=None):
                         receipts.append({**row, 'status': 'absent'})
                         continue
                     raise
+            alias = None
             try:
                 alias = request('GET', '/templates/aliases/' + name, api_key)
             except HTTPError as error:
-                if error.code == 404 and template_id is None:
+                if error.code != 404:
+                    raise
+                if template_id is None:
                     receipts.append({**row, 'status': 'absent'})
                     continue
-                raise
-            alias_id = alias.get('templateID')
-            if (not isinstance(alias_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', alias_id)
-                    or (template_id is not None and alias_id != template_id)):
-                raise ValueError('cleanup_candidate_identity_mismatch')
+                # The known ID still exists. Its exact recorded name below
+                # can prove ownership even after its alias has disappeared.
+            else:
+                alias_id = alias.get('templateID')
+                if (not isinstance(alias_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', alias_id)
+                        or (template_id is not None and alias_id != template_id)):
+                    raise ValueError('cleanup_candidate_identity_mismatch')
             if template_id is None:
                 # Recover a build that created its alias before writing a report.
                 template_id = alias_id
@@ -400,15 +409,17 @@ def cleanup_templates(candidates, api_key, request=None):
                         continue
                     raise
             names = (info.get('names') or []) + (info.get('aliases') or [])
-            # E2B names may be namespace/alias. The exact, team-scoped alias
-            # lookup above must independently bind that name to this same ID.
-            if (not any(isinstance(value, str) and re.fullmatch(r'(?:[^/]+/)?' + re.escape(name), value) for value in names)
+            # Namespace-qualified names require the independent team-scoped
+            # alias binding. Without an alias, require the exact recorded name.
+            matches_name = (name in names if alias is None else
+                any(isinstance(value, str) and re.fullmatch(r'(?:[^/]+/)?' + re.escape(name), value) for value in names))
+            if (not matches_name
                     or info.get('isDefault') is True or info.get('templateID') != template_id):
                 raise ValueError('cleanup_candidate_identity_mismatch')
-            if info.get('public') is True or alias.get('public') is True:
+            if info.get('public') is True or (alias is not None and alias.get('public') is True):
                 receipts.append({**row, 'status': 'retained_public'})
                 continue
-            if info.get('public') is not False or alias.get('public') is not False:
+            if info.get('public') is not False or (alias is not None and alias.get('public') is not False):
                 raise ValueError('cleanup_candidate_visibility_unknown')
             request('DELETE', '/templates/' + template_id, api_key)
             try:
@@ -424,28 +435,207 @@ def cleanup_templates(candidates, api_key, request=None):
     return receipts
 
 
-def probe_models(template_id, kind, api_key, sandbox_factory=None):
-    """Read the built image's actual CLI catalogues, never a handwritten model list."""
+def validate_model_receipt(receipt, source_commit, worker_sha, manifest, kind):
+    """Bind the completed anonymous probe to this immutable release and CLI selection."""
+    if (not isinstance(receipt, dict)
+            or set(receipt) != {'version', 'sourceCommit', 'workerSha', 'manifest', 'binaries', 'reports'}
+            or type(receipt.get('version')) is not int or receipt['version'] != 1
+            or receipt.get('sourceCommit') != source_commit or receipt.get('workerSha') != worker_sha):
+        raise RuntimeError('model_receipt_identity_invalid')
+    official_files_guard().validate_cli_manifest(manifest, kind)
+    if (type(manifest['version']) is not int
+            or json.dumps(receipt['manifest'], sort_keys=True) != json.dumps(manifest, sort_keys=True)):
+        raise RuntimeError('model_receipt_manifest_mismatch')
+    selected = {harness: binary['path'] for harness in ('claude_code', 'codex')
+                if (binary := manifest['original'][harness] or manifest['added'].get(harness))}
+    if not selected or receipt['binaries'] != selected:
+        raise RuntimeError('model_receipt_selection_mismatch')
+    reports = receipt['reports']
+    if not isinstance(reports, list) or len(reports) != len(selected):
+        raise RuntimeError('model_receipt_reports_invalid')
+    seen = set()
+    required_fields = {'harness', 'installed', 'version', 'models', 'modelSlots'}
+    def text(value, limit):
+        return isinstance(value, str) and 0 < len(value) <= limit and value.strip() == value
+    for row in reports:
+        if (not isinstance(row, dict) or not required_fields.issubset(row)
+                or set(row) - (required_fields | {'defaultModelSlot'})
+                or not isinstance(row['harness'], str) or row['harness'] not in selected or row['harness'] in seen
+                or row['installed'] is not True or row['version'] is not None):
+            raise RuntimeError('model_receipt_reports_invalid')
+        models, slots = row['models'], row['modelSlots']
+        if (not isinstance(models, list) or not 0 < len(models) <= 500
+                or not all(text(model, 128) and model != 'auto' for model in models)
+                or len(set(models)) != len(models) or not isinstance(slots, list) or len(slots) != len(models)):
+            raise RuntimeError('model_receipt_reports_invalid')
+        for model, slot in zip(models, slots):
+            if (not isinstance(slot, dict) or set(slot) != {'slot', 'model', 'name'} or slot['slot'] != model
+                    or not text(slot['model'], 128) or not text(slot['name'], 200)):
+                raise RuntimeError('model_receipt_reports_invalid')
+        if 'defaultModelSlot' in row and row['defaultModelSlot'] not in models:
+            raise RuntimeError('model_receipt_reports_invalid')
+        seen.add(row['harness'])
+    required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
+    if any(harness not in seen for harness in required):
+        raise RuntimeError('model_receipt_required_harness_missing')
+    return [row for row in reports if row['harness'] in required]
+
+
+def probe_models(template_id, kind, api_key, source_commit, worker_sha, sandbox_factory=None):
+    """Read the real probe that made the snapshot ready; never launch a second cold worker."""
+    if (not re.fullmatch(r'[a-f0-9]{40}', source_commit) or not re.fullmatch(r'[a-f0-9]{40}', worker_sha)
+            or kind not in KINDS):
+        raise ValueError('model_receipt_expected_identity_invalid')
     if sandbox_factory is None:
         from e2b import Sandbox
         sandbox_factory = Sandbox.create
-    required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
     sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60, metadata=release_metadata())
+    began = time.monotonic()
+    stage = 'ready_check'
+    byte_counts = {'workerIdentity': None, 'manifest': None, 'receipt': None}
+    receipt_json_received = False
+    failure = None
+
+    def read_file(key, path):
+        data = sandbox.files.read(path, user='user', request_timeout=30)
+        # A failed read exposes no partial count. None means unknown, not zero.
+        byte_counts[key] = len(data.encode('utf-8'))
+        return data
+
     try:
-        result = sandbox.commands.run(MODEL_PROBE_COMMAND.format(kind=kind), user='user', timeout=45)
-        if result.exit_code != 0:
-            raise RuntimeError('model_probe_failed')
-        reports = json.loads(result.stdout)
-        if not isinstance(reports, list):
-            raise RuntimeError('model_probe_invalid')
-        for harness in required:
-            found = next((row for row in reports if isinstance(row, dict) and row.get('harness') == harness and row.get('installed') is True), None)
-            if not found or not (found.get('models') or found.get('modelSlots')):
-                raise RuntimeError(f'model_probe_missing {harness}')
-        return [row for row in reports if row.get('harness') in required]
+        path = '/home/user/.mikka/preloaded-models.json'
+        # No identity has been handed to this disposable instance. Check that
+        # the writer is still the anonymous, ready process before trusting its
+        # private read-only receipt. Full fresh-image conservation follows.
+        result = sandbox.commands.run(ANONYMOUS_WORKER_READY +
+            ' && test ! -e /home/user/.mikka/bootstrap.json && test ! -e /home/user/.mikka/worker/device.json' +
+            f' && test -f {path} && test ! -L {path} && test ! -w {path}' +
+            f' && test "$(stat -c %u {path})" = "$(id -u)" && readlink -f /opt/mikka/worker', user='user', timeout=45)
+        if result.exit_code != 0 or result.stdout.strip() != f'/opt/mikka/releases/{source_commit}/source':
+            raise RuntimeError('model_receipt_worker_not_ready')
+        stage = 'worker_identity'
+        installed_sha = read_file('workerIdentity', '/opt/mikka/worker-source-sha').strip()
+        if installed_sha != worker_sha:
+            raise RuntimeError('model_receipt_worker_mismatch')
+        stage = 'manifest_read'
+        manifest_raw = read_file('manifest', '/opt/mikka/worker/.mikka-original-cli.json')
+        stage = 'manifest_parse'
+        manifest = json.loads(manifest_raw)
+        stage = 'receipt_read'
+        raw = read_file('receipt', path)
+        if len(raw) > 1_048_576:
+            raise RuntimeError('model_receipt_too_large')
+        stage = 'receipt_parse'
+        receipt = json.loads(raw)
+        # Decoded JSON is not evidence that the release or catalogue is valid.
+        receipt_json_received = True
+        stage = 'receipt_validate'
+        return validate_model_receipt(receipt, source_commit, worker_sha, manifest, kind)
+    except Exception as error:
+        failure = error
+        try:
+            codes = {
+                'model_receipt_worker_not_ready': 'worker_not_ready',
+                'model_receipt_worker_mismatch': 'worker_mismatch',
+                'model_receipt_too_large': 'receipt_too_large',
+                'model_receipt_identity_invalid': 'identity_invalid',
+                'model_receipt_manifest_mismatch': 'manifest_mismatch',
+                'model_receipt_selection_mismatch': 'selection_mismatch',
+                'model_receipt_reports_invalid': 'reports_invalid',
+                'model_receipt_required_harness_missing': 'required_harness_missing',
+                'official_cli_manifest_invalid': 'manifest_invalid',
+            }
+            code = error.args[0] if len(error.args) == 1 and isinstance(error.args[0], str) else None
+            category = codes.get(code)
+            if type(error).__name__ in ('TimeoutException', 'TimeoutError', 'ReadTimeout', 'ConnectTimeout'):
+                category = 'timeout'
+            elif category is None:
+                if isinstance(error, json.JSONDecodeError):
+                    category = 'invalid_json'
+                elif stage in ('worker_identity', 'manifest_read', 'receipt_read'):
+                    category = 'read_failed'
+                else:
+                    category = 'unexpected'
+            # File counts and closed categories only; never receipt text,
+            # transport messages, CLI output or account/credential details.
+            print(json.dumps({
+                'event': 'mikka_model_probe_failed', 'kind': kind, 'stage': stage, 'error': category,
+                'bytes': byte_counts, 'elapsedMs': round((time.monotonic() - began) * 1000),
+                'receiptJsonReceived': receipt_json_received,
+            }, separators=(',', ':')), file=sys.stderr, flush=True)
+        except Exception:
+            error.add_note('model_probe_diagnostic_failed')
+        raise
     finally:
         # This probe created this disposable sandbox; no existing worker is touched.
-        sandbox.kill()
+        try:
+            sandbox.kill()
+        except Exception:
+            if failure is None:
+                raise
+            failure.add_note('model_probe_cleanup_failed')
+
+
+CONSERVATION_DIAGNOSTIC_MAX_BYTES = 262144
+CONSERVATION_DIAGNOSTIC_MAX_CHANGES = 512
+
+
+def conservation_diagnostic(error, kind, stage):
+    """Only the guard's bounded metadata may cross the SDK error boundary."""
+    stages = {'preload_receipts', 'preload_validation', 'fresh_scan', 'fresh_receipt', 'fresh_validation'}
+    codes = {'official_manifest_invalid', 'official_conservation_invalid', 'official_conservation_missing',
+             'official_files_removed', 'e2b_certificate_target_invalid'}
+    message = error.args[0] if error.args else None
+    detail = {'kind': kind if kind in KINDS else 'unknown', 'stage': stage if stage in stages else 'unknown',
+              'code': message if isinstance(message, str) and message in codes else 'conservation_failed'}
+    exit_code = getattr(error, 'exit_code', None)
+    if type(exit_code) is int and -255 <= exit_code <= 255:
+        detail['exitCode'] = exit_code
+    stderr = getattr(error, 'stderr', '')
+    if not isinstance(stderr, str):
+        return detail
+    if len(stderr) > CONSERVATION_DIAGNOSTIC_MAX_BYTES or len(stderr.encode('utf-8', errors='replace')) > CONSERVATION_DIAGNOSTIC_MAX_BYTES:
+        return {**detail, 'code': 'conservation_diagnostic_too_large'}
+    kinds = {'file', 'link', 'directory', 'special'}
+    fields = {'kind', 'sha256', 'mode', 'uid', 'gid', 'target', 'type', 'device'}
+    def path(value, absolute=False):
+        return (isinstance(value, str) and 0 < len(value) <= 2048
+                and re.fullmatch(r'[A-Za-z0-9_./@+~()=: -]+', value)
+                and (not absolute or (value.startswith('/') and '..' not in Path(value).parts)))
+    def field(key, value):
+        if value is None: return True
+        if key == 'kind': return isinstance(value, str) and value in kinds
+        if key == 'sha256': return isinstance(value, str) and re.fullmatch(r'[a-f0-9]{64}', value)
+        if key == 'target': return path(value)
+        return type(value) is int and 0 <= value <= (4095 if key == 'mode' else 2**64 - 1)
+    for line in stderr.splitlines():
+        for code in ('official_files_changed', 'official_files_removed'):
+            marker = 'RuntimeError: ' + code + ' '
+            if not line.startswith(marker):
+                continue
+            try:
+                parsed = json.loads(line[len(marker):])
+                if code == 'official_files_removed':
+                    if not isinstance(parsed, dict) or set(parsed) != {'path'} or not path(parsed['path'], absolute=True):
+                        raise ValueError('conservation_metadata_invalid')
+                    return {**detail, 'code': code, 'missing': parsed}
+                if not isinstance(parsed, list) or not 0 < len(parsed) <= CONSERVATION_DIAGNOSTIC_MAX_CHANGES:
+                    raise ValueError('conservation_metadata_invalid')
+                for row in parsed:
+                    if (not isinstance(row, dict) or set(row) - {'path', 'kind', 'before', 'after', 'resolvedSha256'}
+                            or not {'path', 'kind', 'before', 'after'}.issubset(row)
+                            or not path(row['path'], absolute=True) or not isinstance(row['kind'], str) or row['kind'] not in kinds
+                            or not isinstance(row['before'], dict) or not row['before'] or not isinstance(row['after'], dict)
+                            or row['before'].keys() != row['after'].keys() or set(row['before']) - fields
+                            or not all(field(key, value) for side in ('before', 'after') for key, value in row[side].items())
+                            or ('resolvedSha256' in row and (row['resolvedSha256'] is None or not field('sha256', row['resolvedSha256'])))):
+                        raise ValueError('conservation_metadata_invalid')
+                return {**detail, 'code': code, 'changes': parsed}
+            except (ValueError, TypeError, KeyError, RecursionError):
+                return {**detail, 'code': 'conservation_metadata_invalid'}
+        if line.startswith('RuntimeError: ') and line.removeprefix('RuntimeError: ') in codes:
+            detail['code'] = line.removeprefix('RuntimeError: ')
+    return detail
 
 
 def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
@@ -465,21 +655,32 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
         print('mikka-conservation-stage ' + json.dumps({'kind': kind, 'phase': name, 'elapsedMs': round((now - began) * 1000)}, separators=(',', ':')), file=sys.stderr, flush=True)
         began = now
     stage('create')
+    phase = 'preload_receipts'
     try:
         conservation = json.loads(sandbox.files.read('/opt/mikka/official-files-conservation.json', user='root', request_timeout=30))
         conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/official-files-ready.json', user='root', request_timeout=30))
         stage('preload_receipts')
+        phase = 'preload_validation'
         guard = official_files_guard()
         guard.validate_receipt(conservation, kind)
+        phase = 'fresh_scan'
         result = sandbox.commands.run(ANONYMOUS_WORKER_READY + f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
                                       user='root', timeout=300, request_timeout=310)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')
         stage('fresh_scan')
+        phase = 'fresh_receipt'
         conservation['preloadFinalization'] = conservation['finalization']
         conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/fresh-conservation.json', user='root', request_timeout=30))
         stage('fresh_receipt')
+        phase = 'fresh_validation'
         return guard.validate_receipt(conservation, kind)
+    except Exception as error:
+        # Emit before finally destroys the disposable instance. Never print
+        # SDK stdout/stderr or exception messages; keep the original failure.
+        print('mikka-conservation-failed ' + json.dumps(conservation_diagnostic(error, kind, phase), separators=(',', ':')),
+              file=sys.stderr, flush=True)
+        raise
     finally:
         sandbox.kill()
 
@@ -561,6 +762,7 @@ def main(argv=None):
         parser.error('--name is required to build')
     kinds = list(dict.fromkeys(args.kind or KINDS))
     sha = commit(args.source_ref)
+    worker_sha = worker_hash(sha)
     # Confirm absence before claiming cleanup ownership. A manual collision
     # must never turn into deletion of a previous candidate.
     candidates = [{'kind': kind, 'name': f'{args.name}-{kind}'} for kind in kinds]
@@ -573,7 +775,7 @@ def main(argv=None):
         _, result = build(name, sha, api_key=api_key, on_build_logs=logs, kind=kind)
         entry = {'templateId': result.template_id, 'buildId': result.build_id, 'name': name,
                  'baseTemplate': kind, 'preinstalled': True}
-        entry['models'] = probe_models(result.template_id, kind, api_key)
+        entry['models'] = probe_models(result.template_id, kind, api_key, sha, worker_sha)
         entry['conservation'] = probe_conservation(result.template_id, api_key, kind)
         return kind, entry
 
@@ -586,7 +788,7 @@ def main(argv=None):
         cleanup = cleanup_templates(candidates, api_key)
         print('mikka-template-cleanup ' + json.dumps(cleanup, separators=(',', ':')), file=sys.stderr, flush=True)
         raise
-    out = {'sourceCommit': sha, 'workerSha': worker_hash(sha), 'templates': templates}
+    out = {'sourceCommit': sha, 'workerSha': worker_sha, 'templates': templates}
     if args.json:
         print(json.dumps(out))
     else:

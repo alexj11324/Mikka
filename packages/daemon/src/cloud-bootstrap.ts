@@ -7,6 +7,7 @@ import { readJson, writeJsonAtomic } from './fs-util'
 import { DAEMON_VERSION, daemonPaths } from './paths'
 import { connectDaemonInDataDir, isNoDaemon } from './rpc/client'
 import { probeHostedRuntimeModels, type HostedModelProbe } from './cloud-model-probe'
+import { installedCloudWorkerIdentity, PRELOADED_MODEL_RECEIPT, writePreloadedModelReceipt } from './cloud-model-receipt'
 
 const configSchema = z.object({
   deviceId: z.uuid(), workspaceId: z.uuid(),
@@ -60,15 +61,24 @@ export function watchCloudBootstraps(directory: string, accept: () => Promise<vo
  * their processes finish. The one-use handoff receives only in-memory models;
  * no device identity or credential is read while preparing the snapshot. */
 export async function preloadCloudWorker(directory: string, accept: (models: HostedModelProbe) => Promise<void>,
-  failed: (error: unknown) => void, probe = probeHostedRuntimeModels) {
+  failed: (error: unknown) => void, probe = probeHostedRuntimeModels, identify = installedCloudWorkerIdentity) {
   mkdirSync(directory, { recursive: true, mode: 0o700 })
+  const identity = identify()
   const models = await probe()
-  const closeWatcher = watchCloudBootstraps(directory, () => accept(models), failed)
+  const current = identify()
+  if (identity.sourceCommit !== current.sourceCommit || identity.workerSha !== current.workerSha)
+    throw Error('cloud_model_receipt_identity_changed')
+  writePreloadedModelReceipt(directory, identity, models)
+  const receipt = join(directory, PRELOADED_MODEL_RECEIPT)
+  let closeWatcher: () => void
+  try { closeWatcher = watchCloudBootstraps(directory, () => accept(models), failed) }
+  catch (error) { unlinkSync(receipt); throw error }
   const ready = join(directory, 'preloaded.pid')
   const close = () => {
     process.off('exit', close)
     closeWatcher()
     try { unlinkSync(ready) } catch { /* Already removed. */ }
+    try { unlinkSync(receipt) } catch { /* Already removed. */ }
   }
   process.once('exit', close)
   try { writeFileSync(ready, `${process.pid}\n`, { mode: 0o600 }) }

@@ -50,7 +50,7 @@ export function isDeviceOnline(
       : typeof lastSeenAt === "number"
         ? lastSeenAt
         : Date.parse(lastSeenAt)
-  return Number.isFinite(seen) && now - seen <= DEVICE_ONLINE_WINDOW_MS
+  return Number.isFinite(seen) && seen <= now && now - seen <= DEVICE_ONLINE_WINDOW_MS
 }
 
 /** "设备 n/m 在线": how many of the user's devices are online. */

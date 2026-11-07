@@ -157,7 +157,10 @@ dbTest('personal provenance and STOP/pending survive actual inbox persistence an
     ]
     for (const seed of seeds) await recordCoordinatorEvent(db, seed)
     const taken = await store.takeInbox(userId, 'synthetic-provenance-holder', botId)
-    assert.deepEqual([taken.held, taken.added], [true, 3])
+    assert.deepEqual([taken.held, taken.added], [true, 1])
+    assert.deepEqual(promptMessages(null, (await store.loadConversation(userId, botId)).messages, trust).map(message => message.content), ['STOP publication'])
+    const runtime = await store.takeInbox(userId, 'synthetic-provenance-holder', botId)
+    assert.deepEqual([runtime.held, runtime.added], [true, 2])
     await store.editMemory(userId, () => ({ memory: '- synthetic private provenance note', result: null }), botId)
     const conversation = await store.loadConversation(userId, botId)
     assert.equal(conversation.memory, '- synthetic private provenance note')
@@ -212,21 +215,29 @@ dbTest('unclassified runtime data stays pending while direct user input and clas
       const id=randomUUID();runtimeIds.push(id)
       await db.insert(schema.coordinatorEvents).values({id,userId:owner,botId:coordinator,kind:'action_decided',dedupeKey:`judgment:${owner}:${i}`,issueId:null,runId:null,payload:{status:'pending',action:'synthetic'},createdAt:new Date('2026-10-28T00:00:00Z')})
     }
+    const backgroundId=randomUUID()
+    await db.insert(schema.coordinatorEvents).values({
+      id:backgroundId,userId:owner,botId:coordinator,kind:'issue_status_changed',tier:'background',
+      dedupeKey:`background:${owner}`,issueId:null,runId:null,payload:{title:'Synthetic issue',status:'review'},
+      createdAt:new Date('2026-10-27T22:00:00Z'),
+    })
     await recordCoordinatorEvent(db,userMessageEvent(owner,'Continue the existing authorized work',{ botId: coordinator }))
     const selected=await store.untriagedEvents(owner, coordinator)
     assert.ok(selected.some(event=>event.kind==='user_message'),'direct input is not starved behind the runtime batch')
     const direct=await store.takeInbox(owner, 'direct-holder', coordinator)
-    assert.equal(direct.added,1,'NULL runtime tiers are not implicitly consumed as results')
+    assert.equal(direct.added,1,'neither background nor unclassified runtime data may accompany the direct request')
     assert.equal(await store.releaseLease(owner, 'direct-holder', coordinator),false)
     const pending=await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId,owner),eq(schema.coordinatorEvents.id,runtimeIds[0])))
     assert.equal(pending[0].tier,null);assert.equal(pending[0].deliveredAt,null)
+    const [background]=await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id,backgroundId))
+    assert.equal(background.deliveredAt,null,'the earlier background notification remains queued')
     await store.setEventTier(runtimeIds[0],'result',{userId:owner+'-foreign',botId:coordinator})
     const [denied]=await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id,runtimeIds[0]))
     assert.equal(denied.tier,null,'a foreign scope cannot classify this event')
     // Explicit synthetic classification tests persistence, not model quality.
     await store.setEventTier(runtimeIds[0],'result',{userId:owner,botId:coordinator})
     const takes=await Promise.all(['holder-a','holder-b'].map(holder=>store.takeInbox(owner, holder, coordinator)))
-    assert.equal(takes.reduce((sum,take)=>sum+take.added,0),1,'concurrent leases cannot deliver a result twice')
+    assert.equal(takes.reduce((sum,take)=>sum+take.added,0),2,'one lease delivers the classified result and retained background exactly once')
     const winner=takes.findIndex(take=>take.held)
     assert.notEqual(winner,-1)
     const repeated=await store.takeInbox(owner, ['holder-a','holder-b'][winner], coordinator)
@@ -236,7 +247,7 @@ dbTest('unclassified runtime data stays pending while direct user input and clas
     assert.equal(delivered.tier,'result','delivered event classification is immutable to a stale update')
     assert.ok(delivered.deliveredAt)
     const messages=await db.select().from(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId,owner))
-    assert.equal(messages.length,2)
+    assert.equal(messages.length,3)
     const remaining=await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId,owner),sql`${schema.coordinatorEvents.deliveredAt} is null`))
     assert.equal(remaining.length,51,'unjudged rows remain undelivered')
   })

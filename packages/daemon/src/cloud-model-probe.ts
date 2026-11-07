@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { hostedBinaries, readHostedCliManifest } from './hosted-binaries'
+import { hostedBinaries, readHostedCliManifest, type HostedCliManifest } from './hosted-binaries'
 import { probeHarnessModels } from './model-probe'
 import type { HarnessInfo } from '@mikka/protocol'
 
@@ -12,14 +12,16 @@ export interface HostedModelProbe {
   binaries: Binaries
   fingerprint: string
   reports: HarnessInfo[]
+  manifest?: HostedCliManifest
 }
 
-function fingerprint(binaries: Binaries) {
-  return JSON.stringify({ manifest: readHostedCliManifest(), binaries: Object.entries(binaries).map(([harness, path]) => {
+function selectionState(binaries: Binaries) {
+  return { manifest: readHostedCliManifest(), binaries: Object.entries(binaries).map(([harness, path]) => {
     const info = statSync(path)
     return [harness, path, info.dev, info.ino, info.size, info.mtimeMs, info.ctimeMs]
-  }) })
+  }) }
 }
+const fingerprint = (binaries: Binaries) => JSON.stringify(selectionState(binaries))
 
 /** Reuse only reports for the unchanged selection the runtime resolved. File
  * metadata catches ordinary CLI updates without hashing large binaries on the
@@ -35,7 +37,7 @@ export function reusableHostedModels(probe: HostedModelProbe | undefined, binari
  * Drain every child before returning or deleting any shared scratch directory. */
 export async function probeHostedRuntimeModels(passed?: Binaries): Promise<HostedModelProbe> {
   const binaries = hostedBinaries(passed)
-  const before = fingerprint(binaries)
+  const state = selectionState(binaries), before = JSON.stringify(state)
   const scratchDir = mkdtempSync(join(tmpdir(), 'mikka-template-models-'))
   try {
     const settled = await Promise.allSettled(Object.entries(binaries).map(async ([harness, binary]) => {
@@ -49,7 +51,7 @@ export async function probeHostedRuntimeModels(passed?: Binaries): Promise<Hoste
       reports.push(result.value)
     }
     if (!reports.length || fingerprint(binaries) !== before) throw Error('hosted_model_probe_changed')
-    return { binaries, fingerprint: before, reports }
+    return { binaries, fingerprint: before, reports, ...(state.manifest ? { manifest: state.manifest } : {}) }
   } finally { rmSync(scratchDir, { recursive: true, force: true }) }
 }
 
