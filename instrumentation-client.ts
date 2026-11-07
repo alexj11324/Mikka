@@ -3,7 +3,7 @@ import { posthogConfig } from '@/lib/posthog-config'
 import { sanitizeAnalyticsEvent } from '@/lib/analytics-policy'
 import { watchRemovedActions } from '@/lib/app-build'
 
-// A page older than the deployment reloads when it hits a removed server action.
+// Obsolete actions stop old traffic and offer a refresh without discarding the page.
 watchRemovedActions(window)
 
 if (posthogConfig.token) {
