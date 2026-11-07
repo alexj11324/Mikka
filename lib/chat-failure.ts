@@ -14,14 +14,34 @@ import { parseCodedErrorText } from '@mikka/protocol/coded-error'
  */
 type WakeCode = 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted'
 
-export type ChatFailure =
+export type ChatFailure = (
   | { kind: 'hosted'; code: NonNullable<ReturnType<typeof hostedRefusal>> }
   | { kind: 'subscription'; notice: NonNullable<ReturnType<typeof subscriptionRefusal>> }
   | { kind: 'wake'; code: WakeCode }
   // Keep the existing discriminator readable by already-installed mobile clients.
   | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
+  // The stored code(s) as recorded, for 详情 only (decision 2026-11-05-0330): the
+  // line's own code, then the turn failure behind a wake code. Never the words.
+) & { raw?: string }
 
-export function chatFailure(chat: { working: boolean; error: string | null; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
+export function chatFailure(chat: { working: boolean; error: string | null; cause?: string | null; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
+  const failure = failureOf(chat)
+  if (!failure || !chat.error) return failure
+  // A stored code (with its detail) always goes; other text only when nothing else names the failure,
+  // so a recognised provider refusal does not carry its request ids along (the phone contract).
+  const unknown = failure.kind === 'failed' && !failure.reason
+  const lines = [...new Set([chat.error, chat.cause].flatMap(line => {
+    const text = line?.trim()
+    const code = text ? CODE.exec(text)?.[1] : undefined
+    return code ? [code] : text && unknown ? [text] : []
+  }))]
+  return lines.length ? { ...failure, raw: lines.join('\n') } : failure
+}
+
+// The code alone, or ending a wrapped message (`Error: …`, `Step "…" failed after 3 retries: …`).
+const CODE = /(?:^|: )([a-z][a-z0-9_]*(?: \([a-z][a-z0-9_]*\))?)$/
+
+function failureOf(chat: { working: boolean; error: string | null; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
   if (chat.working) return null
   // A turn that ended with no reply and nothing recorded (its lease ran out): the person's message is the newest.
   if (!chat.error) return chat.items?.findLast(item => item.from !== 'event')?.from === 'person' && !chat.items.at(-1)?.pending ? { kind: 'failed' } : null

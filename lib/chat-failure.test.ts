@@ -9,7 +9,7 @@ const balance = 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after
 
 test('exhausted tool recovery has a stable friendly failure and retry',()=>{
   const failure=chatFailure({working:false,error:'model_tool_unavailable'})!
-  assert.deepEqual(failure,{kind:'failed',reason:'tools'})
+  assert.deepEqual(failure,{kind:'failed',reason:'tools',raw:'model_tool_unavailable'})
   assert.deepEqual(failureMessageKey(failure),{namespace:'Coordinator',key:'replyToolUnavailable'})
   assert.deepEqual(failureLine(failure),{text:'回复未完成，请重试',retry:true,recovery:null})
   assert.equal(chatFailure({working:true,error:'model_tool_unavailable'}),null)
@@ -42,16 +42,16 @@ test('generic, quoted and tool errors never become a balance state from credit o
   ]) {
     assert.equal(chatBalanceRefusal(error), false, error)
     const failure = chatFailure({ working: false, error })!
-    assert.deepEqual(failure, { kind: 'failed' }, error)
+    assert.deepEqual(failure, chatBalanceRefusal(error) ? { kind: 'failed', reason: 'balance' } : { kind: 'failed', raw: error }, error)
     assert.equal(failureLine(failure).retry, true, error)
   }
 })
 
 test('a failed reply is named by what the person can do, never the raw error', () => {
-  assert.deepEqual(chatFailure({ working: false, error: 'Step "step//./workflows/coordinator/agent-kit-steps//botRuntime" failed after 3 retries: binding_required' }), { kind: 'subscription', notice: 'selectionChanged' })
-  assert.deepEqual(chatFailure({ working: false, error: 'Error: points_exhausted' }), { kind: 'hosted', code: 'points_exhausted' })
-  assert.deepEqual(chatFailure({ working: false, error: 'wake_exhausted' }), { kind: 'wake', code: 'wake_exhausted' })
-  assert.deepEqual(chatFailure({ working: false, error: 'model timed out' }), { kind: 'failed' })
+  assert.deepEqual(chatFailure({ working: false, error: 'Step "step//./workflows/coordinator/agent-kit-steps//botRuntime" failed after 3 retries: binding_required' }), { kind: 'subscription', notice: 'selectionChanged', raw: 'binding_required' })
+  assert.deepEqual(chatFailure({ working: false, error: 'Error: points_exhausted' }), { kind: 'hosted', code: 'points_exhausted', raw: 'points_exhausted' })
+  assert.deepEqual(chatFailure({ working: false, error: 'wake_exhausted' }), { kind: 'wake', code: 'wake_exhausted', raw: 'wake_exhausted' })
+  assert.deepEqual(chatFailure({ working: false, error: 'model timed out' }), { kind: 'failed', raw: 'model timed out' })
 })
 
 test('nothing while a turn works; a turn that ended with no reply and nothing recorded is a failure', () => {
@@ -68,4 +68,18 @@ test('every actionable server subscription error remains readable in the mobile 
     assert.equal(failure?.kind, 'subscription', code)
     assert.ok(failure && failureLine(failure).text, code)
   }
+})
+
+test('详情 carries the stored codes as recorded: the line code, then the turn failure behind a wake code (decision 2026-11-05-0330)', () => {
+  // A subscription turn the provider rejected: the line reads the subscription copy, 详情 the code with its detail.
+  assert.deepEqual(chatFailure({ working: false, error: 'subscription_generation_failed (provider_request_rejected)' }),
+    { kind: 'subscription', notice: 'retry', raw: 'subscription_generation_failed (provider_request_rejected)' })
+  // Retries ran out: the line is 回复重试已停止, 详情 also names the last real failure.
+  assert.deepEqual(chatFailure({ working: false, error: 'wake_exhausted', cause: 'subscription_generation_failed (provider_request_rejected)' }),
+    { kind: 'wake', code: 'wake_exhausted', raw: 'wake_exhausted\nsubscription_generation_failed (provider_request_rejected)' })
+  // An unknown code has no words of its own: the generic line, the code as it is under 详情.
+  assert.deepEqual(chatFailure({ working: false, error: 'some_new_failure_code' }), { kind: 'failed', raw: 'some_new_failure_code' })
+  // The same text twice is listed once; nothing while working.
+  assert.equal(chatFailure({ working: false, error: 'wake_failed', cause: 'wake_failed' })?.raw, 'wake_failed')
+  assert.equal(chatFailure({ working: true, error: 'wake_exhausted', cause: 'x' }), null)
 })
