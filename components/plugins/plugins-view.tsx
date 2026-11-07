@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
-import useSWR, { useSWRConfig, type SWRResponse } from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ArrowUpRight, ChevronRight, Ellipsis, Plus, Puzzle, Search } from 'lucide-react'
 
-import { goToHref, workspaceLink } from '@/components/workspace/workspace-navigation'
+import { goToHref } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'
 import { isToolkitSlug } from '@/lib/composio-accounts'
 import type { SkillsSearchResult } from '@/lib/skills-search'
@@ -18,14 +18,12 @@ import type { ConnectKind } from '@/lib/plugins/connect-kind'
 import { matchesStoreQuery, storeItemState, type StoreItemState } from '@/lib/plugins/store-state'
 import { getLinearIntegrationState } from '@/app/actions/linear-sync'
 import { getTelegramIntegrationStatus } from '@/app/actions/telegram'
-import { Link } from '@/i18n/navigation'
-import { AppTile, ConnectedAppDetail, ConnectedAppRow, ConnectedAppsStatus, OWN_APPS, PluginBreadcrumb, PluginRow, isOwnApp, useAppInfo, useConnectedApps, useStoreCatalog, type ConnectedApps, type OwnAppId } from '@/components/plugins/connected-apps'
+import { AppTile, ConnectedAppDetail, ConnectedAppsStatus, OWN_APPS, PluginBreadcrumb, isOwnApp, useAppInfo, useConnectedApps, useStoreCatalog, type ConnectedApps, type OwnAppId } from '@/components/plugins/connected-apps'
 import { CredentialDialog, type CredentialTarget } from '@/components/plugins/credential-dialog'
-import { McpConnections, useMcpConnections } from '@/components/plugins/mcp-connections'
 import { GitHubSettings } from '@/components/plugins/github-settings'
 import { LinearSettings } from '@/components/settings/linear-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
-import { SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { IconTile } from '@/components/reui/icon-tile'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -35,10 +33,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { SearchInput } from '@/components/ui/search-input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ConnectionsList } from '@ui-slot/settings-connections'
+import { OwnAppsStatus, type OwnAppState, type OwnAppStates, type OwnAppsRead } from '@/components/plugins/connected-list'
 
-type OwnAppState = 'connected' | 'notConnected' | 'paused' | null
-interface OwnAppStates { states: Partial<Record<OwnAppId, OwnAppState>>; failed: OwnAppId[] }
-type OwnAppsRead = Pick<SWRResponse<OwnAppStates>, 'data' | 'error' | 'isLoading' | 'isValidating' | 'mutate'>
 const OWN_APP_STATES_KEY = 'plugin-own-app-states'
 /** Items a section shows before its ›. */
 const SECTION_PREVIEW = 6
@@ -90,12 +87,6 @@ export async function fetchOwnAppStates(previous: Partial<Record<OwnAppId, OwnAp
   return { states, failed }
 }
 
-function OwnAppsStatus({ read }: { read: OwnAppsRead }) {
-  const t = useTranslations('Plugins')
-  const info = useAppInfo()
-  const failed = read.error ? OWN_APPS : read.data?.failed ?? []
-  return failed.length > 0 ? <SettingsSaveError message={t('connectionStatusFailed', { names: failed.map(id => info(id).name).join('、') })} retryLabel={t('retry')} onRetry={() => { void read.mutate() }} /> : null
-}
 
 /** Where a page sits: the app (`&app=`) or a store section (`&category=`), from the URL. */
 function readLocation() {
@@ -161,43 +152,10 @@ export function PluginsView({ section, rootLabel, linearNotice = null, workspace
         </div>}
     </div>
   }
-  if (section === 'connections') return <ConnectedList key={workspaceId} apps={apps} ownRead={ownRead} href={id => href({ app: id })} onOpen={openApp} workspaceId={workspaceId} workspaceName={workspaceName} />
+  if (section === 'connections') return <ConnectionsList key={workspaceId} apps={apps} ownRead={ownRead} href={id => href({ app: id })} onOpen={openApp} workspaceId={workspaceId} workspaceName={workspaceName} />
   return <Store apps={apps} ownRead={ownRead} category={category} rootLabel={rootLabel} href={href} go={go} tab={tab} setTab={setTab} query={query} setQuery={setQuery} />
 }
 
-/** 设置 › 连接: only what the person has connected, one uniform row each. */
-function ConnectedList({ apps, ownRead, href, onOpen, workspaceId, workspaceName }: { apps: ConnectedApps; ownRead: OwnAppsRead; href: (id: string) => string; onOpen: (id: string) => void; workspaceId?: string; workspaceName?: string }) {
-  const t = useTranslations('Plugins')
-  const info = useAppInfo()
-  const mcp = useMcpConnections(workspaceId)
-  const mcpEmpty = !workspaceId || (mcp.data && !mcp.error && mcp.data.servers.length === 0)
-  const composio = apps.connectedToolkits()
-  const ownStates = ownRead.data?.states
-  const ownKnown = ownRead.data && !ownRead.data.failed.length && !ownRead.error
-  const loading = apps.loading || (!ownRead.data && !ownRead.error)
-  const own = OWN_APPS.filter(id => ownStates?.[id] === 'connected' || ownStates?.[id] === 'paused')
-  if (!apps.loading && !apps.error && ownKnown && !composio.length && !own.length && mcpEmpty) return <div className="flex flex-col gap-4">
-    <ConnectedAppsStatus apps={apps} />
-    <Empty className="min-h-48">
-      <EmptyHeader>
-        <EmptyMedia variant="icon"><Puzzle aria-hidden="true" /></EmptyMedia>
-        <EmptyTitle>{t('noConnections')}</EmptyTitle>
-      </EmptyHeader>
-      <Button variant="secondary" size="sm" nativeButton={false} render={<Link href={workspaceLink({ section: 'plugins' })} />}>{t('openStore')}</Button>
-    </Empty>
-  </div>
-  return <div className="flex flex-col gap-4">
-    <ConnectedAppsStatus apps={apps} />
-    <OwnAppsStatus read={ownRead} />
-    {loading && !composio.length && !own.length ? <SettingsLoading label={t('loadingApps')} /> : composio.length > 0 || own.length > 0 ? <SettingsSection id="plugin-apps">
-      {composio.map(id => <ConnectedAppRow key={id} apps={apps} app={id} href={href(id)} onOpen={() => onOpen(id)} />)}
-      {own.map(id => <PluginRow key={id} app={id} name={info(id).name} href={href(id)} onOpen={() => onOpen(id)} dim={ownStates?.[id] === 'paused'}>
-        <span className="text-xs text-muted-foreground">{t(`state.${ownStates![id]!}`)}</span>
-      </PluginRow>)}
-    </SettingsSection> : null}
-    {workspaceId && <McpConnections workspaceId={workspaceId} workspaceName={workspaceName} read={mcp} />}
-  </div>
-}
 
 /** The rail's 插件: the 应用 store and the 技能 tab. */
 function Store({ apps, ownRead, category, rootLabel, href, go, tab, setTab, query, setQuery }: {
