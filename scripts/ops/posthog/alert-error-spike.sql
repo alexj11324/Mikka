@@ -1,8 +1,7 @@
 WITH
     toStartOfHour(now()) - INTERVAL 1 HOUR AS evaluated_hour,
     spans AS (
-        SELECT timestamp, service_name, status_code, trace_id, span_id, parent_span_id, is_root_span, name,
-            toFloatOrNull(attributes['http.response.status_code']) AS http_status,
+        SELECT timestamp, service_name, status_code, trace_id, span_id,
             1 / coalesce(toFloatOrNull(attributes['mikka.trace.sample_rate']), 0.1) AS sample_weight,
             coalesce(nullIf(attributes['mikka.route'], ''), 'unknown') AS route,
             coalesce(nullIf(attributes['mikka.error.code'], ''), nullIf(attributes['error.type'], ''), 'unknown_error') AS error_code
@@ -12,60 +11,78 @@ WITH
           AND service_name IN ('mikka-web', 'mikka-daemon')
           AND (resource_attributes['deployment.environment.name'] = 'production' OR resource_attributes['deployment.environment'] = 'production')
     ),
-    successful_traces AS (
-        SELECT service_name, trace_id
-        FROM spans
-        WHERE service_name = 'mikka-web' AND is_root_span AND status_code != 2
-          AND ((name = 'workflow.route.flow' AND route = '/.well-known/workflow/v1/flow'
+    workflow_spans AS (
+        SELECT service_name, trace_id, span_id, parent_span_id, is_root_span, name, status_code,
+            toFloatOrNull(attributes['http.response.status_code']) AS http_status,
+            coalesce(nullIf(attributes['mikka.route'], ''), 'unknown') AS route,
+            coalesce(nullIf(attributes['mikka.error.code'], ''), nullIf(attributes['error.type'], ''), 'unknown_error') AS error_code
+        FROM posthog.trace_spans
+        WHERE timestamp >= evaluated_hour - INTERVAL 8 DAY AND timestamp < evaluated_hour + INTERVAL 1 HOUR
+          AND service_name = 'mikka-web'
+          AND (resource_attributes['deployment.environment.name'] = 'production' OR resource_attributes['deployment.environment'] = 'production')
+          AND (is_root_span OR status_code = 2 AND name IN (
+              'http GET', 'http POST', 'world.hooks.getByToken', 'hook.resume', 'workflow.replay.load',
+              'world.events.create wait_created', 'world.events.create wait_completed', 'world.events.create step_started',
+              'world.events.create run_started', 'world.events.create hook_received'))
+    ),
+    workflow_traces AS (
+        -- Keep ancestry in each trace so matching does not rescan the historical window.
+        SELECT service_name, trace_id,
+            groupArrayIf((span_id, parent_span_id, name, route, error_code, http_status), status_code = 2) AS errors
+        FROM workflow_spans
+        WHERE service_name = 'mikka-web'
+        GROUP BY service_name, trace_id
+        HAVING countIf(is_root_span AND (status_code = 2 OR http_status >= 400)) = 0
+           AND countIf(is_root_span AND status_code != 2 AND (
+               (name = 'workflow.route.flow' AND route = '/.well-known/workflow/v1/flow'
                 OR name = 'GET /api/cron/reconcile' AND route = '/api/cron/reconcile')
                AND http_status >= 200 AND http_status < 300
-               OR name = 'after:workflow-wake' AND route = 'after:workflow-wake')
-          AND (service_name, trace_id) NOT IN (
-              SELECT service_name, trace_id FROM spans
-              WHERE is_root_span AND (status_code = 2 OR http_status >= 400)
-          )
+               OR name = 'after:workflow-wake' AND route = 'after:workflow-wake')) > 0
     ),
     handled_attempts AS (
-        SELECT c.service_name AS service_name, c.trace_id AS trace_id,
-            c.span_id AS client_span_id, p.span_id AS sdk_span_id,
-            p.parent_span_id AS wrapper_span_id, p.name AS sdk_name
-        FROM spans c JOIN spans p
-          ON c.service_name = p.service_name AND c.trace_id = p.trace_id AND c.parent_span_id = p.span_id
-        WHERE c.status_code = 2 AND p.status_code = 2 AND p.error_code = 'unknown_error' AND c.route = p.route
-          AND (c.service_name, c.trace_id) IN (SELECT service_name, trace_id FROM successful_traces)
-          AND (
-              c.name = 'http POST' AND c.route = '/.well-known/workflow/v1/flow'
-              AND (c.http_status = 409 AND c.error_code = 'HTTP 409'
-                   AND p.name IN ('world.events.create wait_created', 'world.events.create step_started', 'world.events.create run_started')
-                   OR c.http_status = 410 AND c.error_code = 'HTTP 410' AND p.name = 'world.events.create run_started')
-              OR c.name = 'http GET' AND c.http_status = 404 AND c.error_code = 'not-found'
-                 AND c.route IN ('cron:reconcile', 'after:workflow-wake') AND p.name = 'world.hooks.getByToken'
-          )
+        -- Error tuple fields are span id, parent id, name, route, code and HTTP status.
+        SELECT service_name, trace_id, errors,
+            arrayFilter(c ->
+                (c.3 = 'http POST' AND c.4 = '/.well-known/workflow/v1/flow'
+                 AND (c.6 = 409 AND c.5 = 'HTTP 409' OR c.6 = 410 AND c.5 = 'HTTP 410')
+                 OR c.3 = 'http GET' AND c.6 = 404 AND c.5 = 'not-found'
+                    AND c.4 IN ('cron:reconcile', 'after:workflow-wake', 'workflow:coordinatorWakeDeadline/nudgeWorkflow')
+                 OR c.3 = 'http POST' AND c.6 = 404 AND c.5 = 'HTTP 404'
+                    AND c.4 = 'workflow:coordinatorWakeDeadline/nudgeWorkflow')
+                AND arrayExists(p -> p.1 = c.2 AND p.5 = 'unknown_error' AND p.4 = c.4 AND (
+                    c.6 = 409 AND p.3 IN ('world.events.create wait_created', 'world.events.create wait_completed', 'world.events.create step_started', 'world.events.create run_started')
+                    OR c.6 = 410 AND p.3 = 'world.events.create run_started'
+                    OR c.6 = 404 AND (c.3 = 'http GET' AND p.3 = 'world.hooks.getByToken'
+                        OR c.3 = 'http POST' AND p.3 = 'world.events.create hook_received')), errors), errors) AS clients
+        FROM workflow_traces
+    ),
+    handled_parents AS (
+        SELECT service_name, trace_id, errors, clients,
+            arrayFilter(p -> has(arrayMap(c -> c.2, clients), p.1), errors) AS parents
+        FROM handled_attempts
     ),
     handled_spans AS (
-        SELECT service_name, trace_id, client_span_id AS span_id FROM handled_attempts
-        UNION
-        SELECT service_name, trace_id, sdk_span_id AS span_id FROM handled_attempts
-        UNION
-        SELECT p.service_name AS service_name, p.trace_id AS trace_id, p.span_id AS span_id
-        FROM handled_attempts a JOIN spans p
-          ON a.service_name = p.service_name AND a.trace_id = p.trace_id AND a.wrapper_span_id = p.span_id
-        WHERE p.status_code = 2 AND p.error_code = 'unknown_error'
-          AND (a.sdk_name = 'world.hooks.getByToken' AND p.name = 'hook.resume'
-               OR a.sdk_name = 'world.events.create run_started' AND p.name = 'workflow.replay.load')
+        SELECT service_name, trace_id,
+            arrayJoin(arrayConcat(
+                arrayMap(c -> c.1, clients),
+                arrayMap(p -> p.1, parents),
+                arrayMap(g -> g.1, arrayFilter(g -> g.5 = 'unknown_error' AND (
+                    g.3 = 'hook.resume' AND arrayExists(p -> p.2 = g.1 AND p.3 IN ('world.hooks.getByToken', 'world.events.create hook_received'), parents)
+                    OR g.3 = 'workflow.replay.load' AND arrayExists(p -> p.2 = g.1 AND p.3 = 'world.events.create run_started', parents)), errors))
+            )) AS span_id
+        FROM handled_parents
     ),
     service_start AS (
-        SELECT service_name, min(timestamp) AS first_seen FROM spans GROUP BY service_name
+        SELECT service_name, min(timestamp) AS first_seen,
+            groupUniqArray(toStartOfHour(timestamp)) AS observed_hours,
+            countIf(timestamp >= evaluated_hour) > 0 AS current_service_observed
+        FROM spans GROUP BY service_name
     ),
-    observed_hours AS (
-        SELECT service_name, toStartOfHour(timestamp) AS hour
-        FROM spans WHERE timestamp >= evaluated_hour - INTERVAL 7 DAY
-        GROUP BY service_name, hour
-    ),
-    covered_hour_grid AS (
-        SELECT h.service_name AS service_name, h.hour AS hour
-        FROM observed_hours h JOIN service_start s ON h.service_name = s.service_name
-        WHERE h.hour >= toStartOfHour(s.first_seen) + INTERVAL 1 HOUR AND h.hour < evaluated_hour
+    service_coverage AS (
+        SELECT service_name, current_service_observed,
+            arrayFilter(h -> h >= evaluated_hour - INTERVAL 7 DAY
+                AND h >= toStartOfHour(first_seen) + INTERVAL 1 HOUR AND h < evaluated_hour, observed_hours) AS covered_hours
+        FROM service_start
     ),
     hourly AS (
         SELECT service_name, error_code, toStartOfHour(timestamp) AS hour, sum(sample_weight) AS estimated_errors,
@@ -74,36 +91,20 @@ WITH
           AND (service_name, trace_id, span_id) NOT IN (SELECT service_name, trace_id, span_id FROM handled_spans)
         GROUP BY service_name, error_code, hour
     ),
-    sources AS (
-        SELECT service_name, error_code FROM hourly GROUP BY service_name, error_code
-    ),
-    baseline AS (
-        SELECT s.service_name AS service_name, s.error_code AS error_code,
-            count() AS baseline_hours, median(coalesce(q.estimated_errors, 0)) AS median_errors
-        FROM sources s JOIN covered_hour_grid h ON s.service_name = h.service_name
-        LEFT JOIN hourly q ON q.service_name = s.service_name AND q.error_code = s.error_code AND q.hour = h.hour
-        GROUP BY s.service_name, s.error_code
-    ),
-    current_hour AS (
-        SELECT * FROM hourly WHERE hour = evaluated_hour
-    ),
-    current_service AS (
-        SELECT service_name, count() AS observed_spans
-        FROM spans WHERE timestamp >= evaluated_hour
-        GROUP BY service_name
+    per_code AS (
+        SELECT service_name, error_code, groupArray((hour, estimated_errors)) AS hour_counts,
+            sumIf(estimated_errors, hour = evaluated_hour) AS current_errors,
+            anyIf(example_routes, hour = evaluated_hour) AS example_routes
+        FROM hourly GROUP BY service_name, error_code
     ),
     metrics AS (
-        SELECT s.service_name AS service_name, s.error_code AS error_code,
-            coalesce(b.baseline_hours, 0) AS covered_hours,
-            coalesce(cs.observed_spans, 0) > 0 AS current_service_observed,
-            coalesce(c.estimated_errors, 0) AS current_errors,
-            coalesce(c.example_routes, '') AS example_routes,
-            coalesce(b.median_errors, 0) AS median_errors,
-            greatest(3 * coalesce(b.median_errors, 0), 50) AS threshold_errors
-        FROM sources s
-        LEFT JOIN current_service cs ON s.service_name = cs.service_name
-        LEFT JOIN baseline b ON s.service_name = b.service_name AND s.error_code = b.error_code
-        LEFT JOIN current_hour c ON s.service_name = c.service_name AND s.error_code = c.error_code
+        SELECT p.service_name AS service_name, p.error_code AS error_code,
+            length(s.covered_hours) AS covered_hours, s.current_service_observed AS current_service_observed,
+            p.current_errors AS current_errors, p.example_routes AS example_routes,
+            if(length(s.covered_hours) = 0, 0,
+                arrayReduce('median', arrayMap(h -> tupleElement(arrayFirst(c -> c.1 = h, p.hour_counts), 2), s.covered_hours))) AS median_errors,
+            greatest(3 * median_errors, 50) AS threshold_errors
+        FROM per_code p JOIN service_coverage s ON p.service_name = s.service_name
     ),
     per_source AS (
 SELECT

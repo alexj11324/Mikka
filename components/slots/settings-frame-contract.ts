@@ -2,8 +2,9 @@
 // window bar around the settings page. The default (components/slots/settings-frame.tsx)
 // and a layer's slots/settings-frame.tsx both implement `SettingsFrame`; callers
 // import from @/components/settings/settings-shell, except IssueWorkspace.
-// Each also exports `OWN_SETTINGS_FRAME`: true when settings must be drawn in
-// this frame instead of inside the workspace's frame.
+// Each may also export `OWN_SETTINGS_FRAME` (optional; see UI_SLOT_EXPORTS in
+// lib/ui-overlay.mjs): true when settings must be drawn in this frame instead
+// of inside the workspace's frame.
 import type { ReactNode } from 'react'
 import type { RailDestination } from '@/components/nav/icon-rail'
 
