@@ -4,7 +4,7 @@ import { execFileSync,execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
-export const TARGET = { base: 'fbe1e81a27c3b1536e2fa1c1f84a261473531a0a', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+export const TARGET = { base: '03016bef840f0afb7da7c8687cd3047ff04eda09', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
 const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
@@ -85,7 +85,11 @@ export function runtimeLogSummary(text) {
 }
 async function runtimeDiagnostics(env, id, report) {
  demand(/^dpl_[A-Za-z0-9]+$/.test(id),'RUNTIME_LOG_DEPLOYMENT_SCOPE')
- try {const {stdout}=await promisify(execFile)('npx',['--yes','vercel@65.4.0','logs','--project',TARGET.app,'--deployment',id,'--json','--since','30m','--limit','30','--query','level:error','--scope',TARGET.team,'--token',env.VERCEL_TEAM_TOKEN],{env:{...env,VERCEL_TELEMETRY_DISABLED:'1'},encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:60000,maxBuffer:8*1024*1024});report.runtimeLogs=runtimeLogSummary(stdout);report.runtimeLogs.status='read'}catch{report.runtimeLogs={status:'unavailable'}}
+ try {const {stdout}=await promisify(execFile)('npx',['--yes','vercel@65.4.0','logs','--project',TARGET.app,'--deployment',id,'--json','--since','30m','--limit','30','--scope',TARGET.team,'--token',env.VERCEL_TEAM_TOKEN],{env:{...env,VERCEL_TELEMETRY_DISABLED:'1'},encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:60000,maxBuffer:8*1024*1024});report.runtimeLogs=runtimeLogSummary(stdout);report.runtimeLogs.status='read';report.runtimeLogs.jsonTypes=stdout.split('\n').filter(Boolean).map(line=>{try{const row=JSON.parse(line);return ['summary','log','runtime_log','runtime-log','error'].includes(row.type)?row.type:'OTHER'}catch{return 'OTHER'}})}catch{report.runtimeLogs={status:'unavailable'}}
+ let text='';const signal=AbortSignal.timeout(18000)
+ const logs=async()=>{try{const r=await fetch('https://api.vercel.com/v1/projects/'+TARGET.app+'/deployments/'+id+'/runtime-logs?teamId='+TARGET.team,{headers:{authorization:'Bearer '+env.VERCEL_TEAM_TOKEN},redirect:'error',signal});report.runtimeStreamStatus=r.status;if(!r.ok){await r.body?.cancel();return}const reader=r.body.getReader();const decoder=new TextDecoder();try{while(text.length<256*1024){const p=await reader.read();if(p.done)break;text+=decoder.decode(p.value,{stream:true})}}finally{await reader.cancel().catch(()=>{})}}catch{report.runtimeStreamEndedByDeadline=signal.aborted}}
+ const trigger=async()=>{try{const r=await fetch('https://mikka-cloud.vercel.app/mikka/cloud/health',{redirect:'error',signal:AbortSignal.timeout(10000)});report.runtimeProbeStatus=r.status;await r.body?.cancel()}catch{report.runtimeProbeStatus=null}}
+ await Promise.allSettled([logs(),trigger()]);report.runtimeStream=runtimeLogSummary(text)
 }
 
 export async function readiness({env=process.env,fetcher=fetch,report}) {
