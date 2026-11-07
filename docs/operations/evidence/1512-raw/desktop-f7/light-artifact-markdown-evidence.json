@@ -1,0 +1,52 @@
+{
+  "headSha": "f7e901ed2c71c3d66318877a8e8f48fa69a82e09",
+  "runId": 42335295533,
+  "jobId": 128291791143,
+  "artifactId": 13558729569,
+  "artifactSha256": "a6fc514d3cca7ba23476627e1228200f3903a65e90137d508aa1fe80ac7606ca",
+  "appRevision": "096597d7cb30607f16b880c42a007e3ea26316e4",
+  "harnessRevision": "096597d7cb30607f16b880c42a007e3ea26316e4",
+  "harnessSha256": "04c9f9474a927a1f1f358b8e731db3bf3c6bef44afc1cd6740a948cf7cba6c9e",
+  "startedAt": "2026-11-07T03:55:06.036Z",
+  "finishedAt": "2026-11-07T03:59:31.798Z",
+  "result": "failed",
+  "cleanup": "passed",
+  "screenIndexZeroBased": 32,
+  "screenCount": 100,
+  "pageErrorCount": 0,
+  "screen": {
+    "name": "artifact-markdown",
+    "theme": "light",
+    "width": 1440,
+    "height": 900,
+    "changedPixels": 45112,
+    "totalPixels": 1296000,
+    "comparedPixels": 1296000,
+    "excludedIdentityPixels": 0,
+    "changedRatio": 0.03480864197530864,
+    "maximumRatio": 0.001,
+    "maskGeometryMatches": true,
+    "passed": false
+  },
+  "maskCount": 4,
+  "files": [
+    {
+      "kind": "hosted",
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/desktop-f7/light-artifact-markdown-hosted.png",
+      "bytes": 84946,
+      "sha256": "2675ff0aea72cb80d8272f68dce030bcf164241a38212a75bf0fecfa4fe4b095"
+    },
+    {
+      "kind": "bundled",
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/desktop-f7/light-artifact-markdown-bundled.png",
+      "bytes": 76182,
+      "sha256": "a20eb0fc00baca18800f136c15418a095ffd1b20439f394542f50cb3e1c299e8"
+    },
+    {
+      "kind": "diff",
+      "path": "/workspace/scratch/812e3b7d6d45/ops1512/evidence/desktop-f7/light-artifact-markdown-diff.png",
+      "bytes": 53141,
+      "sha256": "417ffd4beed7b88aa5060052ad67775e4f9f1affc6c9340a8f8bd67c9e325c29"
+    }
+  ]
+}
