@@ -17,6 +17,7 @@ on:
       - 'patches/**'
       - 'scripts/e2b/**'
       - 'scripts/e2b/publish-template-env.mjs'
+      - 'scripts/e2b/runtime-report.mjs'
       - 'lib/computer/official-runtime.ts'
       - '.github/workflows/e2b-official-runtime.yml'
       - '.github/workflows/e2b-template.yml'
@@ -59,7 +60,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs
+      - run: node --test scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/e2b/runtime-report.test.mjs scripts/release/web-deploy.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
       - run: python3 scripts/e2b/official-files.test.py
       - run: python3 scripts/e2b/cleanup-template-candidates.test.py
@@ -149,8 +150,8 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      release-evidence: ${{ steps.publish.outputs.release-evidence }}
-      template-ids: ${{ steps.publish.outputs.template-ids }}
+      release-artifact-id: ${{ steps.release.outputs.artifact-id }}
+      release-sha256: ${{ steps.publish.outputs.report-sha256 }}
     env:
       # Existing ACME-owned workspace and dedicated test Bot, never a real task.
       MIKKA_ACCEPTANCE_WORKSPACE_ID: de300001-ece6-4021-8214-c986ea306bde
@@ -166,6 +167,18 @@ jobs:
         run: node scripts/release/web-deploy.mjs main
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Require one immutable candidate artifact reference
+        run: node scripts/e2b/runtime-report.mjs reference
+        env:
+          RUNTIME_ARTIFACT_ID: ${{ needs.validate.outputs.candidate-artifact-id }}
+          RUNTIME_REPORT_SHA256: ${{ needs.validate.outputs.candidate-sha256 }}
+          RUNTIME_WORKER_SHA: ${{ needs.validate.outputs.source-sha }}
+      - name: Download this run's exact complete candidate report
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.validate.outputs.candidate-artifact-id }}
+          path: ${{ runner.temp }}/runtime-candidates
+          merge-multiple: true
       - name: Install only the pinned gate SDKs
         run: |
           npm install --prefix "$RUNNER_TEMP/e2b-js" --ignore-scripts --no-audit --no-fund 'e2b@2.62.1'
@@ -207,13 +220,11 @@ jobs:
           include-imports: false
       - name: Require real Claude Code and Codex subscriptions on the private candidates
         run: |
-          node --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'
-          import { writeFileSync } from 'node:fs'
-          writeFileSync(process.argv[2], process.env.CANDIDATE_REPORT, { mode: 0o600 })
-          JS
-          node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/candidates.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
+          node scripts/e2b/runtime-report.mjs verify "$RUNNER_TEMP/runtime-candidates/candidates.json"
+          node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/runtime-candidates/candidates.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
         env:
-          CANDIDATE_REPORT: ${{ needs.validate.outputs.candidate-report }}
+          RUNTIME_REPORT_SHA256: ${{ needs.validate.outputs.candidate-sha256 }}
+          RUNTIME_WORKER_SHA: ${{ needs.validate.outputs.source-sha }}
       - name: Preserve closed subscription gate diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -227,14 +238,17 @@ jobs:
         run: |
           node scripts/release/web-deploy.mjs main
           "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --publish-verified "$RUNNER_TEMP/accepted.json" > "$RUNNER_TEMP/release.json"
-          node --input-type=module - "$RUNNER_TEMP/release.json" <<'JS'
-          import { readFileSync, appendFileSync } from 'node:fs'
-          const report = JSON.parse(readFileSync(process.argv[2], 'utf8'))
-          const ids = Object.fromEntries(Object.entries(report.templates).map(([kind, row]) => [kind, row.templateId]))
-          appendFileSync(process.env.GITHUB_OUTPUT, `release-evidence=${JSON.stringify(report)}\ntemplate-ids=${JSON.stringify(ids)}\n`)
-          JS
+          node scripts/e2b/runtime-report.mjs seal "$RUNNER_TEMP/release.json"
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - name: Preserve the complete accepted public release evidence
+        id: release
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2b-runtime-release-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release.json
+          if-no-files-found: error
+          retention-days: 7
   publish:
     needs: [validate, await-web, subscriptions]
     permissions:
@@ -244,9 +258,9 @@ jobs:
     with:
       runtime-refresh: true
       runtime-worker-sha: ${{ needs.validate.outputs.source-sha }}
-      runtime-template-models: ${{ needs.validate.outputs.template-models }}
-      runtime-template-ids: ${{ needs.subscriptions.outputs.template-ids }}
-      runtime-release-evidence: ${{ needs.subscriptions.outputs.release-evidence }}
+      runtime-models-sha256: ${{ needs.validate.outputs.models-sha256 }}
+      runtime-release-artifact-id: ${{ needs.subscriptions.outputs.release-artifact-id }}
+      runtime-release-sha256: ${{ needs.subscriptions.outputs.release-sha256 }}
   cleanup:
     needs: [check, validate, await-web, subscriptions, publish]
     if: always() && github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.check.outputs.changed == 'true'
@@ -259,6 +273,18 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Recover this run's candidate report when one was uploaded
+        id: candidates
+        if: needs.validate.outputs.candidate-artifact-id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.validate.outputs.candidate-artifact-id }}
+          path: ${{ runner.temp }}/runtime-candidates
+          merge-multiple: true
       - name: Install the pinned cleanup SDK
         run: |
           python3 -m venv "$RUNNER_TEMP/e2b-cleanup"
@@ -276,13 +302,26 @@ jobs:
           include-imports: false
       - name: Close this attempt's instances and remove only its private candidates
         run: |
-          python3 - <<'PY'
-          import os,pathlib
-          pathlib.Path(os.environ['RUNNER_TEMP'],'cleanup-candidates.json').write_text(os.environ.get('CANDIDATE_REPORT') or '{}')
-          PY
-          "$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/e2b/cleanup-template-candidates.py --report "$RUNNER_TEMP/cleanup-candidates.json" --output "$RUNNER_TEMP/release-cleanup.json"
+          args=()
+          report_failed=false
+          if [ "$ARTIFACT_OUTCOME" = success ]; then
+            if node scripts/e2b/runtime-report.mjs verify "$RUNNER_TEMP/runtime-candidates/candidates.json"; then
+              args+=(--report "$RUNNER_TEMP/runtime-candidates/candidates.json")
+            else
+              echo 'Candidate report verification failed; cleaning only this exact run attempt.'
+              report_failed=true
+            fi
+          elif [ -n "$CANDIDATE_ARTIFACT_ID" ]; then
+            echo 'Candidate report download failed; cleaning only this exact run attempt.'
+            report_failed=true
+          fi
+          "$RUNNER_TEMP/e2b-cleanup/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/release-cleanup.json"
+          [ "$report_failed" = false ]
         env:
-          CANDIDATE_REPORT: ${{ needs.validate.outputs.candidate-report }}
+          ARTIFACT_OUTCOME: ${{ steps.candidates.outcome }}
+          CANDIDATE_ARTIFACT_ID: ${{ needs.validate.outputs.candidate-artifact-id }}
+          RUNTIME_REPORT_SHA256: ${{ needs.validate.outputs.candidate-sha256 }}
+          RUNTIME_WORKER_SHA: ${{ needs.validate.outputs.source-sha }}
       - name: Preserve release cleanup receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

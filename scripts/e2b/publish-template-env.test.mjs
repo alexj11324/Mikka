@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createHash } from 'node:crypto'
-import { assertConservation, currentWorkerSha, pairEnv, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
+import { assertConservation, currentWorkerSha, pairEnv, publish, releaseFileInputs, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
+import { runtimeModelsSha256 } from './runtime-report.mjs'
 
 const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const report = harness => ({ harness, installed: true, version: null, models: ['fixture-model'] })
@@ -39,6 +42,36 @@ const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
 const OLD_STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: OTHER, sourceCommit: OTHER, models: MODELS }).map(row => [row.key, row.value]))
 OLD_STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = OTHER
+
+test('the publication file keeps complete large evidence and still applies every real release gate', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'runtime-publication-'))
+  try {
+    const file = join(directory, 'release.json'), report = structuredClone(EVIDENCE)
+    for (const [kind, row] of Object.entries(report.templates)) row.name = `mikka-${COMMIT.slice(0, 12)}-123-1-${kind}`
+    report.templates.desktop.conservation.fixtureEvidence = 'x'.repeat(310446)
+    const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_SHA: COMMIT, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '1',
+      MIKKA_CLOUD_WORKER_SOURCE_COMMIT: COMMIT, SOURCE_SHA: SHA, RUNTIME_MODELS_SHA256: runtimeModelsSha256(report) }
+    const save = () => {
+      const bytes = JSON.stringify(report) + '\n'; writeFileSync(file, bytes)
+      env.RUNTIME_REPORT_SHA256 = createHash('sha256').update(bytes).digest('hex')
+    }
+    save()
+    const inputs = releaseFileInputs(file, { env })
+    assert.deepEqual(inputs.releaseEvidence, report)
+    assert.deepEqual(inputs.models, MODELS); assert.deepEqual(inputs.templates, TEMPLATES)
+    const good = fixture(); await good.run(inputs)
+    assert.ok(good.calls.length > 0)
+    report.templates.codex.models[0].models[0] = 'changed-after-build'
+    save()
+    assert.throws(() => releaseFileInputs(file, { env }), /runtime_release_models_mismatch/)
+    report.templates.codex.models = structuredClone(MODELS.codex)
+    delete report.subscriptionAcceptance.codex
+    save()
+    const rejected = fixture()
+    await assert.rejects(rejected.run(releaseFileInputs(file, { env })), /runtime_release_subscription_missing codex/)
+    assert.equal(rejected.calls.length, 0, 'missing real subscription proof fails before publication requests')
+  } finally { rmSync(directory, { recursive: true, force: true }) }
+})
 
 test('conservation requires both strict installation and exact provider-only finalization changes', () => {
   const proof = conservation('claude')

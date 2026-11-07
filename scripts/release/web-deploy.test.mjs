@@ -275,7 +275,15 @@ test('both release paths use one non-cancelling pending queue, and the Web wait 
   assert.match(e2b, /if \[ "\$RUNTIME_REFRESH" = true \] \|\| \[ "\$wanted" != "\$live" \]; then echo "changed=true"/)
   assert.match(e2b, /validate:\n    needs: \[test, check\]\n    if: needs\.check\.outputs\.changed == 'true'/)
   assert.match(e2b, /runtime-worker-sha: \$\{\{ needs\.validate\.outputs\.source-sha \}\}/)
-  assert.match(e2b, /runtime-template-models: \$\{\{ needs\.validate\.outputs\.template-models \}\}/)
+  assert.match(e2b, /runtime-models-sha256: \$\{\{ needs\.validate\.outputs\.models-sha256 \}\}/)
+  assert.match(e2b, /runtime-release-artifact-id: \$\{\{ needs\.subscriptions\.outputs\.release-artifact-id \}\}/)
+  assert.match(e2b, /runtime-release-sha256: \$\{\{ needs\.subscriptions\.outputs\.release-sha256 \}\}/)
+  for (const workflow of [web, e2b, readFileSync(new URL('../../.github/workflows/e2b-template.yml', import.meta.url), 'utf8')]) {
+    assert.doesNotMatch(workflow, /CANDIDATE_REPORT:|RUNTIME_RELEASE_EVIDENCE:|runtime-template-models:|candidate-report=|release-evidence=/,
+      'complete proofs must remain in artifact files, never job outputs or process environment strings')
+  }
+  assert.match(web, /artifact-ids: \$\{\{ inputs\.runtime-release-artifact-id \}\}/)
+  assert.match(web, /RUNTIME_RELEASE_FILE: \$\{\{ runner\.temp \}\}\/runtime-release\/release\.json/)
   const checkJob = e2b.slice(e2b.indexOf('\n  check:'), e2b.indexOf('\n  validate:'))
   assert.match(checkJob, /fetch-depth: 0/)
   const checkGuard = checkJob.indexOf('node scripts/release/web-deploy.mjs main')

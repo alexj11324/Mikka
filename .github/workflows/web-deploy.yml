@@ -20,15 +20,15 @@ on:
       runtime-worker-sha:
         type: string
         default: ''
-      runtime-template-models:
+      runtime-models-sha256:
         type: string
-        default: '{}'
-      runtime-template-ids:
+        default: ''
+      runtime-release-artifact-id:
         type: string
-        default: '{}'
-      runtime-release-evidence:
+        default: ''
+      runtime-release-sha256:
         type: string
-        default: '{}'
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -108,6 +108,20 @@ jobs:
       - name: Pin the private UI revision
         if: steps.skip.outputs.skip != 'true'
         run: node scripts/release/hosted-ui.mjs record .hosted-ui
+      - name: Require one immutable accepted runtime artifact reference
+        if: inputs.runtime-refresh == true
+        run: node scripts/e2b/runtime-report.mjs reference
+        env:
+          RUNTIME_ARTIFACT_ID: ${{ inputs.runtime-release-artifact-id }}
+          RUNTIME_REPORT_SHA256: ${{ inputs.runtime-release-sha256 }}
+          RUNTIME_WORKER_SHA: ${{ inputs.runtime-worker-sha }}
+      - name: Download this run's exact accepted runtime evidence
+        if: inputs.runtime-refresh == true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ inputs.runtime-release-artifact-id }}
+          path: ${{ runner.temp }}/runtime-release
+          merge-multiple: true
       - name: Read the existing Vercel runtime release token
         if: inputs.runtime-refresh == true
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
@@ -125,13 +139,11 @@ jobs:
         run: node scripts/e2b/publish-template-env.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          DESKTOP_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids || '{}').desktop }}
-          CLAUDE_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids || '{}').claude }}
-          CODEX_TEMPLATE_ID: ${{ fromJSON(inputs.runtime-template-ids || '{}').codex }}
           SOURCE_SHA: ${{ inputs.runtime-worker-sha }}
           MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
-          TEMPLATE_MODELS: ${{ inputs.runtime-template-models }}
-          RUNTIME_RELEASE_EVIDENCE: ${{ inputs.runtime-release-evidence }}
+          RUNTIME_REPORT_SHA256: ${{ inputs.runtime-release-sha256 }}
+          RUNTIME_RELEASE_FILE: ${{ runner.temp }}/runtime-release/release.json
+          RUNTIME_MODELS_SHA256: ${{ inputs.runtime-models-sha256 }}
       # `vercel pull` returns Vercel's sensitive values empty. prod:/vercel is the
       # Infisical source Vercel production is synced from; the next step fills only
       # keys production defines and Vercel withheld. Runtime still reads Vercel's copy.

@@ -5,10 +5,12 @@ on:
     outputs:
       source-sha:
         value: ${{ jobs.build.outputs.source-sha }}
-      template-models:
-        value: ${{ jobs.build.outputs.template-models }}
-      candidate-report:
-        value: ${{ jobs.build.outputs.candidate-report }}
+      candidate-artifact-id:
+        value: ${{ jobs.build.outputs.candidate-artifact-id }}
+      candidate-sha256:
+        value: ${{ jobs.build.outputs.candidate-sha256 }}
+      models-sha256:
+        value: ${{ jobs.build.outputs.models-sha256 }}
 permissions:
   contents: read
 jobs:
@@ -20,9 +22,10 @@ jobs:
       contents: read
       id-token: write
     outputs:
-      source-sha: ${{ steps.build.outputs.source-sha }}
-      template-models: ${{ steps.build.outputs.template-models }}
-      candidate-report: ${{ steps.build.outputs.candidate-report }}
+      source-sha: ${{ steps.build.outputs.worker-sha }}
+      candidate-artifact-id: ${{ steps.candidates.outputs.artifact-id }}
+      candidate-sha256: ${{ steps.build.outputs.report-sha256 }}
+      models-sha256: ${{ steps.build.outputs.models-sha256 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -56,27 +59,37 @@ jobs:
           name="mikka-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$GITHUB_SHA" --json > "$RUNNER_TEMP/candidates.json"
           node --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'
-          import { readFileSync, appendFileSync } from 'node:fs'
+          import { readFileSync } from 'node:fs'
           const report = JSON.parse(readFileSync(process.argv[2], 'utf8'))
           if (report.sourceCommit !== process.env.GITHUB_SHA || !/^[a-f0-9]{40}$/.test(report.workerSha)) throw Error('Runtime source mismatch')
-          const models = {}
           for (const kind of ['desktop', 'claude', 'codex']) {
             const row = report.templates[kind], proof = row.conservation
             if (row.baseTemplate !== kind || row.preinstalled !== true || !row.buildId || !Array.isArray(row.models)
               || !proof?.before?.entries || JSON.stringify(proof.before) !== JSON.stringify(proof.after)) throw Error('Candidate preservation gate failed')
-            models[kind] = row.models
             console.log(`${kind}: ${proof.before.entries} preserved entries, manifest ${proof.before.sha256}`)
           }
-          appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models=${JSON.stringify(models)}\ncandidate-report=${JSON.stringify(report)}\n`)
           JS
+          node scripts/e2b/runtime-report.mjs seal "$RUNNER_TEMP/candidates.json"
+      - name: Preserve the complete immutable candidate report
+        id: candidates
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2b-runtime-candidates-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidates.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Close leftover probes and failed private builds
         if: always() && steps.e2b-key.outcome == 'success'
         run: |
           args=()
-          if [ "$BUILD_OUTCOME" = success ]; then args+=(--sandboxes-only --report "$RUNNER_TEMP/candidates.json"); fi
+          if [ "$BUILD_OUTCOME" = success ]; then
+            args+=(--report "$RUNNER_TEMP/candidates.json")
+            if [ "$ARTIFACT_OUTCOME" = success ]; then args+=(--sandboxes-only); fi
+          fi
           "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/build-cleanup.json"
         env:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
+          ARTIFACT_OUTCOME: ${{ steps.candidates.outcome }}
       - name: Preserve candidate build cleanup receipt
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
