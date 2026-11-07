@@ -147,6 +147,7 @@ jobs:
       - run: pnpm test:execution-rules
       - run: pnpm test:abuse
       - run: pnpm test:self-hosting
+      - run: pnpm test:self-hosted-byok
       - run: pnpm test:hosted-usage
       - run: pnpm test:model-admission
       - run: pnpm test:audit

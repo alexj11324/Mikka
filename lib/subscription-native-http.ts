@@ -7,7 +7,7 @@ import type { SubscriptionService } from "./subscription-service";
 import { subscriptionNativeTiming } from "./subscription-native-timing";
 
 const input = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("context") }).strict(),
+  z.object({ action: z.literal("context"), requireModelCatalogue: z.literal(true).optional() }).strict(),
   z
     .object({
       action: z.literal("request"),
@@ -87,7 +87,7 @@ export function subscriptionNativeHTTP(deps: {
       const use = await timing.measure('binding', () => service.nativeRun(owner, deviceId, runId));
       if (body.action === "context") {
         phase = "context";
-        return Response.json(await timing.measure('context', () => service.nativeContext(use, request.signal)), {
+        return Response.json(await timing.measure('context', () => service.nativeContext(use, request.signal, body.requireModelCatalogue)), {
           headers,
         });
       }

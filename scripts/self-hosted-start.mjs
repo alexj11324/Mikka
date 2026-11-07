@@ -50,7 +50,9 @@ export function selfHostedEnvironment(env, root) {
   if (env.WORKFLOW_TARGET_WORLD !== 'local') throw new Error('SELF_HOSTED_LOCAL_WORKFLOW_REQUIRED')
   env.MIKKA_DATA_DIR ||= join(root, 'data')
   env.WORKFLOW_LOCAL_DATA_DIR ||= join(env.MIKKA_DATA_DIR, 'workflow')
-  env.WORKFLOW_LOCAL_BASE_URL ||= `${env.BETTER_AUTH_URL.replace(/\/$/, '')}/mikka`
+  // Nitro mounts the SDK consumers at the origin root, outside /mikka.
+  // The SDK preserves this URL's pathname when appending its consumer route.
+  env.WORKFLOW_LOCAL_BASE_URL ||= env.BETTER_AUTH_URL
   return env
 }
 

@@ -94,7 +94,7 @@ export async function wakingChats(userId: string): Promise<string[]> {
 /**
  * Takes the lease for `holder` (or renews it) and moves undelivered inbox
  * events into the conversation as user messages. Background events ride along
- * but do not count: with nothing else waiting, nothing moves. `held` is false
+ * with runtime notifications, never direct user input. With nothing else waiting, nothing moves. `held` is false
  * when another turn holds the lease; that turn will pick the events up.
  */
 export interface InboxTake {
@@ -147,7 +147,10 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       return {held:true,...NO_TAKE}
     }
     const scheduledRead=scheduled?.scope??undefined
-    let due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id))
+    const eligible = candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id)
+    // Keep pending human corrections together, without runtime notifications in their turn.
+    const direct = eligible.filter(event => event.kind === 'user_message')
+    let due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(direct.length ? direct : eligible)
     if (!due.length) return { held: true, ...NO_TAKE }
     let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
     const source = due.findLast(event => event.kind === 'user_message' && event.payload.postedToChat !== true)
@@ -166,7 +169,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       }
     }
     const isolatedTask = Boolean(taskEventId) || Boolean(scheduled)
-    const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
+    const backgroundLimit = isolatedTask || due.some(event => event.kind === 'user_message') ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(backgroundLimit) : []
@@ -361,8 +364,10 @@ export async function retryFailedTurn(userId: string, botId: string): Promise<bo
  * turn was answering keeps the reason too (`mikkaFailure`), so the chat shows it
  * under that message after the next turn and after a reload.
  */
-export async function failTurn(userId: string, holder: string, error: string, botId: string): Promise<void> {
+export async function failTurn(userId: string, holder: string, error: string, botId: string, completed?: { messages: ModelMessage[]; streamId: string }): Promise<void> {
   const reason = error.slice(0, 1000)
+  const messages = completed ? maskDeep(completed.messages, credentialMasker) : []
+  if (messages.length) await assertCredentialSafeChat(userId, messages)
   await db.transaction(async tx => {
     const released = await tx.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: reason, lastErrorAt: new Date(), updatedAt: new Date() })
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
@@ -373,6 +378,18 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
       WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
         AND position=(SELECT max(position) FROM coordinator_messages WHERE "userId"=${userId} AND "botId"=${botId}::uuid)`)
+    // A bounded tool-recovery failure can follow real completed tool effects.
+    // Keep their receipts and the invalid-call evidence in the same transaction
+    // as the failure/lease release. A replay no longer owns the lease and
+    // returns above, so it cannot duplicate these messages or their effects.
+    if (messages.length) {
+      const first = await nextPosition(tx, userId, botId)
+      await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
+        return { id: crypto.randomUUID(), userId, botId, position: first + index,
+          message: { ...plain, ...(message.role === 'assistant' && completed?.streamId ? { mikkaStreamId: completed.streamId } : {}) } }
+      }))
+    }
   })
 }
 

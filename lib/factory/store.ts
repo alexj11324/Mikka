@@ -240,9 +240,13 @@ export function createFactoryStore(
     userId: string,
     eventId: string,
     issueId: string,
+    lock = true,
   ) {
     const { rows } = await tx.query(
-      `SELECT e.id FROM coordinator_events e WHERE e.id=$1 AND e."userId"=$2 AND e.kind='user_message' AND e."botId" IS NOT DISTINCT FROM $3::uuid AND (e."issueId" IS NULL OR e."issueId"=$4) AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$3 AND b."ownerId"=$2))`,
+      // A null-Bot source can still be considered by Coordinator backfill.
+      // Keep the validated execution scope until this write transaction ends;
+      // a source moved before this lock is acquired must fail the predicate.
+      `SELECT e.id FROM coordinator_events e WHERE e.id=$1 AND e."userId"=$2 AND e.kind='user_message' AND e."botId" IS NOT DISTINCT FROM $3::uuid AND (e."issueId" IS NULL OR e."issueId"=$4) AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$3 AND b."ownerId"=$2))${lock && botId === null ? ' FOR SHARE OF e' : ''}`,
       [eventId, userId, botId, issueId],
     );
     return rows.length === 1;
@@ -264,7 +268,7 @@ export function createFactoryStore(
       task.botId !== botId ||
       !factoryScopeAllows(task, issue) ||
       !(await authorize(userId, task.issueId, tx)) ||
-      !(await sourceAllowed(tx, userId, task.sourceEventId, task.issueId))
+      !(await sourceAllowed(tx, userId, task.sourceEventId, task.issueId, lock))
     )
       fail("factoryNotFound");
     return task;

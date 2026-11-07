@@ -25,6 +25,8 @@ Open `http://localhost:3000/mikka`. Compose starts only the app and PostgreSQL. 
 
 The app port binds to `127.0.0.1` by default. For remote access, put a TLS reverse proxy on the host and set `BETTER_AUTH_URL=https://mikka.example.com`. The value is an **origin**, without `/mikka`, credentials, a query, or a fragment. Forward `Host` unchanged, support WebSocket upgrades, and forward the original HTTPS scheme. The server rejects conflicting forwarded hosts or schemes. HTTP is accepted only for a configured loopback origin; use HTTPS for a network deployment.
 
+Forward both `/mikka/*` and the root `/.well-known/workflow/*` paths to this service; Nitro mounts its Workflow consumers at the origin root.
+
 If you publish a different host port, set both `MIKKA_PORT` and the port in `BETTER_AUTH_URL`. Configuration takes effect when the container is recreated:
 
 ```sh

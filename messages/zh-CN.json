@@ -873,7 +873,6 @@
     "setup": "设置仓库和 Agent",
     "offlineSince": "离线 · {time}",
     "noAgent": "未检测到 Agent",
-    "sandboxBlocked": "已检测到 {agents}，但沙箱不可用",
     "sandboxMissing": "这台设备无法自动安装 {packages}。用系统包管理器安装后会自动恢复。",
     "sandboxRefused": "这台机器的系统设置不允许普通用户创建沙箱，需要管理员开启 user namespace。",
     "sandboxUserns": "Ubuntu 的 AppArmor 限制了普通用户创建沙箱（user namespace 限制）。在这台设备上解除限制后，Agent 会自动恢复。",
@@ -945,9 +944,12 @@
       "cancelled": "已取消",
       "manual": "手动连接"
     },
-    "runsModels": "能跑 {models}",
-    "runsCount": "能跑 {count} 个优先使用的模型",
-    "runsNone": "不能跑优先使用的模型",
+    "computers": "电脑",
+    "noRuns": "{reason} · 不会被派任务",
+    "noSubscriptionRuns": "{reason} · 不会被派订阅任务",
+    "notScheduling": "未参与调度",
+    "needsUpdate": "Mikka 需要更新",
+    "sandboxUnavailable": "沙箱不可用",
     "offlineNoRuns": "离线 · 不会被派任务",
     "local": {
       "adding": "正在添加这台电脑",
@@ -3231,6 +3233,7 @@
     },
     "loadError": "对话加载失败，正在重试。",
     "failedTitle": "回复失败",
+    "replyToolUnavailable": "回复未完成，请重试",
     "apiBalance": "API 余额不足",
     "subscriptionRefusal": {
       "unavailable": "所选订阅不可用",
@@ -4728,6 +4731,7 @@
     "mergeConfirm": "合并"
   },
   "ArtifactReview": {
+    "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · 线程完成后生成",
       "preparing": "Artifact · 正在准备 PR",
@@ -5060,6 +5064,19 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "installer_failed": {
+      "default": "Mikka 未能安装，请查看本机安装日志。",
+      "node_required": "请安装 Node.js 22 或更新版本，然后重试。",
+      "unsupported_os": "请使用 Linux 或 macOS 电脑。",
+      "npm_permission": "Mikka 无法写入安装目录，请检查用户目录权限后重试。",
+      "npm_cache_permission": "Mikka 无法写入 npm 缓存，请检查用户目录权限后重试。",
+      "cancelled": "已取消安装，可以重试。",
+      "timeout": "安装超时，请检查连接后重试。",
+      "service_failed": "Mikka 服务未能启动，请查看安装日志后重试。",
+      "connection_failed": "设备未能连接到当前登录账号，请检查连接后重试。",
+      "command_failed": "安装命令失败，请查看安装日志中的完整错误。"
+    },
+    "model_tool_unavailable": { "default": "回复未完成，请重试" },
     "desktop_client_update_required": { "default": "请更新 Mikka 后继续" },
     "desktop_session_expired": { "default": "请重新登录 Mikka" },
     "desktop_session_changed": { "default": "账号或工作区已切换，请重试" },
@@ -5257,5 +5274,33 @@
     "checkUpdate": "检查更新",
     "renderFailed": "此页面未能打开",
     "renderHint": "请重试打开页面。"
+  },
+  "DesktopServer": {
+    "title": "选择服务器",
+    "server": "服务器",
+    "cloud": "Mikka Cloud",
+    "selfHosted": "自托管服务器",
+    "address": "服务器地址",
+    "connect": "连接",
+    "connecting": "正在连接…",
+    "continue": "继续",
+    "cancel": "取消",
+    "change": "更改",
+    "switch": "切换",
+    "disconnect": "断开",
+    "disconnecting": "正在断开…",
+    "disconnectTitle": "断开 {name}，并退出这台服务器上的账号？",
+    "version": "版本 {version}",
+    "errors": {
+      "invalidAddress": "地址无效",
+      "httpsRequired": "地址要以 https:// 开头",
+      "unreachable": "连不上这台服务器",
+      "notMikka": "这个地址不是 Mikka 服务器",
+      "serverUpdate": "服务器版本 {version} 过旧，请把服务器升级到最新版本",
+      "serverUpdateUnknown": "服务器版本过旧，请把服务器升级到最新版本",
+      "appUpdate": "请把 Mikka 升级到 {version} 或更新版本",
+      "appUpdateUnknown": "请把 Mikka 升级到最新版本",
+      "failed": "操作失败，请重试"
+    }
   }
 }

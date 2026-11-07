@@ -27,7 +27,9 @@ test('standalone startup uses the operator database and durable local Workflow o
   assert.equal(env.MIKKA_DATABASE_URL, env.DATABASE_URL)
   assert.equal(env.WORKFLOW_TARGET_WORLD, 'local')
   assert.equal(env.WORKFLOW_LOCAL_DATA_DIR, '/data/workflow')
-  assert.equal(env.WORKFLOW_LOCAL_BASE_URL, 'https://self.example.test/mikka')
+  assert.equal(env.WORKFLOW_LOCAL_BASE_URL, 'https://self.example.test')
+  const override = 'http://127.0.0.1:4321/operator-routing'
+  assert.equal(selfHostedEnvironment({ DATABASE_URL: env.DATABASE_URL, WORKFLOW_LOCAL_BASE_URL: override }, '/app').WORKFLOW_LOCAL_BASE_URL, override)
   assert.throws(() => selfHostedEnvironment({}, '/app'), /SELF_HOSTED_DATABASE_REQUIRED/)
   assert.throws(() => selfHostedEnvironment({ DATABASE_URL: 'postgres://fixture', VERCEL: '1' }, '/app'), /SELF_HOSTED_PLATFORM_ENV_REFUSED/)
   assert.throws(() => selfHostedEnvironment({ DATABASE_URL: 'postgres://fixture', WORKFLOW_TARGET_WORLD: 'vercel' }, '/app'), /SELF_HOSTED_LOCAL_WORKFLOW_REQUIRED/)

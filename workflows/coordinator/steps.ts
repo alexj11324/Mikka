@@ -4,6 +4,7 @@ import { queueTaskRun } from '@/lib/factory/queue-local'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { runInvalidDetail } from '@/lib/run-invalid-reason'
+import { taskDestinationSchema } from '@/lib/task-destination'
 import { FatalError } from 'workflow'
 import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
 import { SCHEDULE_INSTRUCTIONS } from '@/lib/schedules/contract'
@@ -132,9 +133,9 @@ export async function releaseLease(userId: string, holder: string, botId: string
   return store.releaseLease(userId, holder, botId)
 }
 
-export async function failTurn(userId: string, holder: string, error: string, botId: string) {
+export async function failTurn(userId: string, holder: string, error: string, botId: string, completed?: { messages: ModelMessage[]; streamId: string }) {
   'use step'
-  await store.failTurn(userId, holder, error, botId)
+  await store.failTurn(userId, holder, error, botId, completed)
   // Messages that arrived during the failed turn are not part of it: start their turn now
   // rather than at the next reconciliation sweep (#1212). The failed message itself was delivered.
   if (await store.hasPendingEvents(userId, botId)) {
@@ -550,11 +551,14 @@ export async function dispatchRun(userId: string, input: { issueId: string; prof
 async function dispatchRunBody(userId: string, input: { issueId: string; profileId?: string; agentId?: string; repo?: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string) {
   await timedPhase('authorizeDispatch', () => assertNativeToolScope(userId,scope))
   if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' as const }
-  const { newThread, sourceEventId, target, ...request } = input
+  const { newThread, sourceEventId, target: offeredTarget, ...request } = input
+  let target = offeredTarget
   requestEventId ??= sourceEventId
   try {
     const workspaceId = await timedPhase('executionWorkspace', async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, botId))
-    request.profileId = await timedPhase('requestedAgentProfile', async () => (await import('@/lib/factory/profile-request')).requestedAgentProfile(pool, { ownerId: userId, botId, workspaceId }, requestEventId, request.profileId))
+    const selection = await timedPhase('requestedAgentProfile', async () => (await import('@/lib/factory/profile-request')).requestedTaskSelection(pool, { ownerId: userId, botId, workspaceId }, requestEventId, request.profileId))
+    request.profileId = selection.profileId
+    if (selection.taskDestination?.kind === 'cloud') target = 'cloud'
   } catch (error) { if (error instanceof AgentProfileError) return { error: error.code }; throw error }
   // The Agent or model the Bot named must be one of 优先使用的模型, the list its prompt shows; otherwise nothing is queued.
   if (request.model) {
@@ -692,8 +696,20 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
     }
     if (target.kind === 'device') return onDevice(target)
     if (requestEventId) {
-      const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
-      if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
+      const event=(await pool.query(`SELECT "userId","botId","issueId",kind,"deliveredAt",
+        payload ? 'taskDestination' AS "hasTaskDestination",payload->'taskDestination' AS "taskDestination"
+        FROM coordinator_events WHERE id=$1`,[requestEventId])).rows[0]
+      if (!event || event.userId!==userId || event.botId!==botId) throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
+      if (event.hasTaskDestination) {
+        const destination = taskDestinationSchema.safeParse(event.taskDestination)
+        // create_issue binds a task-form event to the created issue. A chat
+        // request has no destination and retains ordinary placement behavior.
+        if (!destination.success || destination.data.kind !== 'cloud' || event.issueId !== input.issueId ||
+          event.kind !== 'user_message' || !event.deliveredAt) throw new ActionFailureError('runInvalid', { reason: 'taskDestinationMismatch' })
+        // The person's fixed cloud choice also applies when the model omitted
+        // target; startup failure cannot turn it into local placement recovery.
+        place = 'cloud'
+      }
     }
     // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
     // An API-key model binds no subscription to it; a subscription model binds the entry's own account.

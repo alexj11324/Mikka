@@ -34,6 +34,7 @@ export function failureLine(failure: ChatFailure): FailureLine {
     }
     case 'failed': return failure.reason === 'balance'
       ? { text: 'API 余额不足', retry: false, recovery: 'model' }
+      : failure.reason === 'tools' ? { text: '回复未完成，请重试', retry: true, recovery: null }
       : { text: '回复失败', retry: true, recovery: null }
   }
 }
