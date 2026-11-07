@@ -67,6 +67,21 @@ for (const harness of ['codex', 'claude_code'] as const) {
   })
 }
 
+it.each([true, false])('Codex clears inherited compression only with timing enabled (%s)', async enabled => {
+  const f = await fixture('codex', enabled)
+  const options = { ...f.options, env: { ...f.options.env, FIXTURE_TIMING_ENV: '1',
+    OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: 'none' } }
+  f.assignment.taskEnv = { ...f.assignment.taskEnv, OTEL_EXPORTER_OTLP_COMPRESSION: 'gzip' }
+  const assignmentBefore = structuredClone(f.assignment), envBefore = { ...options.env }
+  expect((await collect(await f.runner.start(f.assignment, options))).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+  expect(JSON.parse(readFileSync(join(f.config, 'fixture-timing-env.json'), 'utf8'))).toEqual({
+    logsCompression: enabled ? null : 'none', genericCompression: enabled ? null : 'gzip', exporterConfigured: enabled,
+  })
+  expect(f.assignment).toEqual(assignmentBefore)
+  expect(options.env).toEqual(envBefore)
+  expect(f.never).not.toHaveBeenCalled()
+})
+
 it.each(['codex', 'claude_code'] as const)('%s consumes claim credentials and uses ordinary HOME/env/Git without any Mikka auth or proxy request', async harness => {
   const f = await fixture(harness)
   const session = await f.runner.start(f.assignment, { ...f.options, prompt: 'PROBE_MACHINE' })

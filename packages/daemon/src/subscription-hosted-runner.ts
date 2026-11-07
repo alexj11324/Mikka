@@ -243,6 +243,7 @@ export async function createHostedBotRunner(host: {
           // normal native trace receiver. Do not overwrite that last argument.
           const hostedTiming = kind === 'claude_code' ? cliTiming : undefined
           const childEnv = { ...env, ...config.env, ...hostedTiming?.env }
+          for (const key of cliTiming?.unsetEnv ?? []) delete childEnv[key]
           if (oauthToken !== undefined) {
             childEnv.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = '3'
             delete childEnv.CLAUDE_CODE_OAUTH_TOKEN
