@@ -44,6 +44,8 @@ stub('./native-turn.ts', { nativeCoordinatorTurn: async () => { throw new Error(
 stub('./tools.ts', { coordinatorTools: () => ({}) })
 stub('./agent-kit-steps.ts', {
   beginAgentExecution: async () => null,
+  // These recorded settings predate agentKitEnabled and keep the original steps.
+  beginPreparedAgentExecution: async () => { throw new Error('unexpected combined preparation for recorded settings') },
   finishAgentExecution: async () => {},
   botRuntime: async () => ({ harness: 'ai_sdk' }),
 })

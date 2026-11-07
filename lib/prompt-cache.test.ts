@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import { cacheableInstructions, promptOptions, withCacheBreakpoints, withCodexSystemCacheBreakpoints } from './prompt-cache'
+import { cacheableInstructions, promptOptions, withCacheBreakpoints, withCodexStablePrefix } from './prompt-cache'
 
 type Prompt = Parameters<typeof withCacheBreakpoints>[0]
 const prompt: Prompt = [
@@ -98,34 +98,55 @@ test('the actual compatible serializer retains both stable layers and the final 
   }
 })
 
-test('Codex stable-system hints preserve bytes and other options, with at most two explicit layers', () => {
-  const system = cacheableInstructions('RULEScontexttail', 12, 5) as Exclude<ReturnType<typeof cacheableInstructions>, string>
+test('Codex moves only the prepared dynamic system tail after complete history, preserving every object', () => {
+  const system = cacheableInstructions('RULEScontexttail', 12, 5) as Prompt
   const input: Prompt = [{ ...system[0], providerOptions: { ...system[0].providerOptions, openaiCompatible: { other: 1 } } }, ...system.slice(1), ...prompt.slice(2)]
   const saved = structuredClone(input)
-  const marked = withCodexSystemCacheBreakpoints(input, 'gpt-6-luna')
-  assert.deepEqual(marked.map(message => message.providerOptions?.openaiCompatible?.mikka_cache_breakpoint ?? null), ['stable_system_v1', 'stable_system_v1', null, null, null, null])
-  assert.deepEqual(marked.map(message => [message.role, message.content]), input.map(message => [message.role, message.content]))
-  assert.equal(marked[0].providerOptions?.openaiCompatible?.other, 1)
-  assert.equal(marked[2], input[2], 'the live tail is untouched')
-  assert.equal(marked[5], input[5], 'history keeps implicit caching')
+  const moved = withCodexStablePrefix(input, 'gpt-6-luna')
+  const expected = [input[0], input[1], ...input.slice(3), input[2]]
+  assert.deepEqual(moved, expected)
+  moved.forEach((message, index) => assert.equal(message, expected[index], 'roles, content, tool IDs and options retain their original objects'))
+  assert.equal(moved.at(-1)?.role, 'system', 'Factory/Schedule instructions never become user data')
+  assert.equal(moved[0].providerOptions?.openaiCompatible?.other, 1)
+  assert.equal(JSON.stringify(moved).includes('mikka_cache_breakpoint'), false)
+  assert.equal(JSON.stringify(moved).includes('prompt_cache_breakpoint'), false)
+  assert.equal(withCodexStablePrefix(moved, 'gpt-6-luna'), moved, 'applying the layout twice is a no-op')
   assert.deepEqual(input, saved)
-  const extra: Prompt = [system[0], system[1], system[0], prompt[2], system[0]]
-  assert.deepEqual(withCodexSystemCacheBreakpoints(extra, 'gpt-6-luna').map(message => message.providerOptions?.openaiCompatible?.mikka_cache_breakpoint ?? null), ['stable_system_v1', 'stable_system_v1', null, null, null], 'only two initial system layers, never a later system message')
-  const collapsed = cacheableInstructions('RULEStail', 5, 5) as Prompt
-  assert.deepEqual(withCodexSystemCacheBreakpoints(collapsed, 'gpt-6-luna').map(message => message.providerOptions?.openaiCompatible?.mikka_cache_breakpoint ?? null), ['stable_system_v1', null])
+  const collapsed = [...cacheableInstructions('RULEStail', 5, 5) as Prompt, prompt[2]]
+  assert.deepEqual(withCodexStablePrefix(collapsed, 'gpt-6-luna'), [collapsed[0], collapsed[2], collapsed[1]])
 })
 
-test('Codex capability gating leaves old, unknown and unhinted prompts unchanged', () => {
-  const hinted = cacheableInstructions('RULEScontexttail', 12, 5) as Prompt
+test('Codex layout gating leaves old and unknown models unchanged', () => {
+  const hinted: Prompt = [...cacheableInstructions('RULEScontexttail', 12, 5) as Prompt, prompt[2]]
   for (const model of ['gpt-5.6', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra']) {
-    assert.equal(withCodexSystemCacheBreakpoints(hinted, model).filter(message => message.providerOptions?.openaiCompatible?.mikka_cache_breakpoint === 'stable_system_v1').length, 2)
+    assert.deepEqual(withCodexStablePrefix(hinted, model), [hinted[0], hinted[1], hinted[3], hinted[2]], model)
   }
   for (const model of ['gpt-5.5', 'gpt-5.4', 'gpt-5.6-unknown', 'gpt-6', 'gpt-6-unknown', 'gpt-6.2-sol', 'gpt-7-luna', 'openai/gpt-6-luna', 'claude-haiku-5-5', 'fixture-model']) {
-    assert.equal(withCodexSystemCacheBreakpoints(hinted, model), hinted, model)
+    assert.equal(withCodexStablePrefix(hinted, model), hinted, model)
   }
-  const old = cacheableInstructions('RULEStail', 5) as Prompt
-  assert.equal(withCodexSystemCacheBreakpoints(old, 'gpt-6-luna'), old)
-  assert.equal(withCodexSystemCacheBreakpoints(prompt, 'gpt-6-luna'), prompt)
-  const conversationFirst: Prompt = [prompt[2], hinted[0]]
-  assert.equal(withCodexSystemCacheBreakpoints(conversationFirst, 'gpt-6-luna'), conversationFirst)
+})
+
+test('Codex does not infer a dynamic tail from absent history, legacy or unknown system shapes', () => {
+  const system = cacheableInstructions('RULEScontexttail', 12, 5) as Prompt
+  const cases: Record<string, Prompt> = {
+    empty: [],
+    'no history': system,
+    'no dynamic tail': [system[0], system[1], prompt[2]],
+    'legacy unhinted': [...cacheableInstructions('RULEStail', 5) as Prompt, prompt[2]],
+    'conversation first': [prompt[2], ...system],
+    'three stable layers': [system[0], system[1], system[0], system[2], prompt[2]],
+    'extra system': [...system, { role: 'system', content: 'another instruction' }, prompt[2]],
+    'later system': [...system, prompt[2], { role: 'system', content: 'another instruction' }],
+    'empty stable text': [{ ...system[0], content: '' } as Prompt[number], ...system.slice(1), prompt[2]],
+    'empty tail': [system[0], system[1], { role: 'system', content: '' }, prompt[2]],
+    'unknown hint': [{ ...system[0], providerOptions: { anthropic: { cacheControl: { type: 'unknown' } } } }, ...system.slice(1), prompt[2]],
+    'unknown tail hint': [system[0], system[1], { ...system[2], providerOptions: { anthropic: { cacheControl: { type: 'unknown' } } } }, prompt[2]],
+    'non-string tail': [system[0], system[1], { role: 'system', content: [{ type: 'text', text: 'tail' }] } as unknown as Prompt[number], prompt[2]],
+    'unknown history role': [...system, { role: 'unknown', content: [] } as unknown as Prompt[number]],
+  }
+  for (const [name, input] of Object.entries(cases)) {
+    const saved = structuredClone(input)
+    assert.equal(withCodexStablePrefix(input, 'gpt-6-luna'), input, name)
+    assert.deepEqual(input, saved, name)
+  }
 })
