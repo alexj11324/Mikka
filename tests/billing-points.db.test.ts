@@ -12,7 +12,7 @@ test('Stripe purchased points ledger', { skip: !dbUrl }, async t => {
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
   const owner = await seedUser(pool, 'points-owner')
   const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
-  const env = { STRIPE_SECRET_KEY: 'sk_test_fixture' }
+  const env = { MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'sk_test_fixture' }
   const id = (prefix: string) => `${prefix}_${randomUUID().replaceAll('-', '')}`
   const session = () => ({ id: id('cs'), mode: 'payment', payment_status: 'paid', payment_intent: id('pi'), amount_total: 1000, currency: 'usd', metadata: { workspaceId: workspace.id, points: '1000', purpose: 'points_purchase' } })
   const event = (type: string, object: unknown) => ({ id: id('evt'), type, data: { object } })

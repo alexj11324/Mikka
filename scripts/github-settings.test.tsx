@@ -109,7 +109,7 @@ test('GitHub installation management is exposed as a link with the exact destina
   const link = container.querySelector('a[role="link"]')
   assert.ok(link)
   assert.equal(link?.textContent, 'githubManage')
-  assert.equal(link?.getAttribute('href'), 'https://github.com/apps/mikka-github/installations/new')
+  assert.equal(link?.getAttribute('href'), '/api/integrations/github/install')
 })
 
 test('a switched cookie cannot expose B repositories while the session hook still identifies A', async () => {
