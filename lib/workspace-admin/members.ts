@@ -158,6 +158,7 @@ export interface RemovedMember extends MemberRemoval { label: string }
  * workspace and pending invitations to the same email go with it.
  */
 export async function removeMember(actorId: string, workspaceId: string, targetId: string, transferTo?: string, audit?: AuditRequestContext): Promise<RemovedMember> {
+  const { enqueueMemberLifecycle, drainMemberLifecycleOutbox } = await import('@/lib/governance/member-outbox')
   memberId.parse(targetId)
   if (targetId === actorId) throw new WorkspaceError('workspaceCannotRemoveSelf')
   const removed = await workspaceDb.transaction(async tx => {
@@ -175,11 +176,12 @@ export async function removeMember(actorId: string, workspaceId: string, targetI
     await tx.update(workspaceInvitations).set({ status: 'revoked' })
       .where(and(eq(workspaceInvitations.workspaceId, workspaceId), eq(workspaceInvitations.email, target.email.toLowerCase()), eq(workspaceInvitations.status, 'pending')))
     await tx.delete(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, targetId)))
+    await enqueueMemberLifecycle(tx, workspaceId, targetId, 'suspend')
     await workspaceListScopeChanged(tx, workspaceId, before)
     return { removed: true as const, transferred, label: target.name || target.email }
   })
   // After the membership is gone: the membership check already fences them, this removes what stays behind.
-  await releaseDepartingMember(workspaceId, targetId)
+  await drainMemberLifecycleOutbox(workspaceId, targetId)
   return removed
 }
 

@@ -170,8 +170,10 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   let browser
   try {
     // Native admission initializes the real owner FK/Coordinator head through
-    // readCliRunPolicy; this fixture has no task or Bot workspace membership.
+    // readCliRunPolicy. Model policy now reads the same real Workspace as the binding.
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('alice','BYOS fixture','alice@byos-fixture.invalid',true,now(),now()) ON CONFLICT (id) DO NOTHING`)
+    await pool.query(`INSERT INTO mikka_workspaces (id,"userId",name,kind) VALUES ($1,'alice','BYOS fixture','team') ON CONFLICT (id) DO NOTHING`, [workspaceId])
+    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,'alice','BYOS fixture','alice@byos-fixture.invalid','admin','active') ON CONFLICT ("workspaceId","userId") DO NOTHING`, [workspaceId])
     assert.equal((await http(new Request('http://localhost/api/subscriptions', { method: 'POST' }))).status, 401)
     assert.equal((await http(new Request('http://localhost/api/subscriptions', { method: 'POST', headers: { 'sec-fetch-site': 'cross-site' } }))).status, 403)
     assert.equal((await post({ action: 'connect', workspaceId, provider: 'codex', accessToken: 'never-import' })).status, 409)
