@@ -1,3 +1,4 @@
+import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
 import { captureRunFailure } from "@mikka/protocol/run-failure"
 import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
@@ -70,6 +71,7 @@ import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
+import { writeCloudRegistration } from "./cloud-registration"
 import { reusableHostedModels, type HostedModelProbe } from "./cloud-model-probe"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
@@ -156,6 +158,8 @@ export interface DaemonOptions {
   preloadedModels?: HostedModelProbe
   /** One-use control-plane locator; the existing registered claim still authorizes it. */
   initialRunId?: string
+  /** Trusted one-use bootstrap optimization; fresh claim still grants authority. */
+  anonymousClaudeCandidate?: AnonymousClaudeCandidate
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
   /** Trusted acceptance launcher only; opt in to persisted run/CLI diagnostics. */
@@ -443,6 +447,7 @@ export class Daemon {
           journal: this.journal,
           binaries: this.options.harnessBinaries,
           collectCliTiming: this.options.collectCliTiming,
+          anonymousClaudeCandidate: this.options.anonymousClaudeCandidate,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
           computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
           // The cloud machine's own probe decides which subscription models a run may use here.
@@ -1348,6 +1353,10 @@ export class Daemon {
     const computerBroker = this.localComputerBroker ?? this.cloudComputerBroker ?? this.options.computerBroker
     if (computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
     this.registered = true
+    if (this.options.hostedSubscriptions && this.options.e2bContainerRuntime && workspaceId && !this.stopped) {
+      try { writeCloudRegistration(this.paths.dataDir, deviceId, workspaceId, credential) }
+      catch { this.log.warn({ event: 'cloud_registration_notice_failed' }, 'Cloud registration notification unavailable') }
+    }
     if (computerBroker && !this.stopped) {
       this.reviewAbort?.abort()
       const abort = new AbortController()
@@ -1905,6 +1914,7 @@ export class Daemon {
 
   private async stopInternal() {
     this.stopped = true
+    const anonymousClosing = this.options.anonymousClaudeCandidate?.close()
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
     await this.maintenance
@@ -1926,6 +1936,7 @@ export class Daemon {
       await this.localComputerBroker?.close()
       await this.cloudComputerBroker?.close()
     }
+    await anonymousClosing
     await this.outbox?.close()
     await daemonTracer.shutdown()
     const release = this.releaseLock

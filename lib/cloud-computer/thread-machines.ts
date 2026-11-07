@@ -1,3 +1,4 @@
+import { anonymousClaudeStartupHint, firstAnonymousClaudeTask } from '../computer/claude-startup-hint'
 import { runChanged } from '../live/panels'
 import { cloudStartupSpan, cloudStartupPhases, cloudStartupRunAttributes } from '@/lib/computer/startup-tracing'
 import { captureTraceContext, withRunSpan } from '@/lib/tracing/context'
@@ -26,7 +27,9 @@ import { armDueTimerAfterCommit, armDueTimerSoon } from '@/lib/due-timer'
 import { afterDatabaseCommit } from '@/lib/db/commit-effects'
 import { logThreadLifecycle } from './thread-lifecycle-log'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
-import { readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
+import { readWorkerTail, saveWorkerTail, workerCommand, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
+import { registrationCommand, quoteShell, REGISTRATION_WAITING, REGISTRATION_COMPLETE, REGISTRATION_LEGACY } from '@/lib/computer/registration-command'
+import { finishThreadRegistration, THREAD_CREDENTIAL_SQL } from './thread-registration'
 import { factoryEventId } from '../factory/event-id'
 import { questionFingerprint } from '../factory/questions/contract'
 import { unclaimedPlanQuestionContinuation } from '../factory/questions/execution-continuation'
@@ -779,6 +782,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       machine = await replaceGoneSandbox(pool, runId, freshTemplate(), leaseId)
       if (!machine) throw new ComputerError(409, 'Thread provisioning cancelled')
     }
+    const anonymousFreshMachine = !connected && !machine.sandboxId && !machine.deviceId && cloudTemplateOrigin(machine.snapshotId)?.kind === 'claude'
     const sandbox = connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId, operationId: machine.operationId }, actor.userId)
     connected = null
     refreshPhase = timings.next('record_sandbox')
@@ -977,7 +981,10 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     await client.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch","verifyCommand","remoteUrl") VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING', [repoId, deviceId, actor.userId, run.repoPath, run.baseBranch, run.verifyCommand,run.remoteUrl])
     await client.query('UPDATE thread_machines SET "deviceId"=$2,"repoId"=$3 WHERE "runId"=$1', [runId, deviceId, repoId])
     await client.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1', [deviceId])
-    await client.query('INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,now()+interval \'24 hours\')', [randomUUID(), actor.userId, 'Thread worker', createHash('sha256').update(credential).digest('hex'), deviceId, actor.workspaceId])
+    // This new token has never been exposed to the VM and cannot inherit
+    // lastUsedAt. Capture exact DB time in the existing insertion, before
+    // commit and the first publication of this credential.
+    const issuedCredential = (await client.query(THREAD_CREDENTIAL_SQL, [randomUUID(), actor.userId, 'Thread worker', createHash('sha256').update(credential).digest('hex'), deviceId, actor.workspaceId])).rows[0]
     definition = await rebindExecutionDevice(client, { ...current, agentDefinition: definition }, deviceId)
     await client.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=COALESCE($5::jsonb,"agentDefinition") WHERE id=$1 AND "userId"=$4 AND status=\'queued\'', [runId, deviceId, repoId, actor.userId, definition ? JSON.stringify(definition) : null])
     // The host relocates a check to its dedicated machine before claim. Its
@@ -988,7 +995,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     // Publishing bootstrap wakes an existing preloader before the explicit start
     // command. Count only this credential's use since its handoff began.
     refreshPhase = timings.next('publish_bootstrap')
-    const handoffStartedAt = (await pool.query('SELECT clock_timestamp() AS now')).rows[0].now as Date
+    const handoffStartedAt = issuedCredential.now as Date
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     const bootstrap = JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(),
       traceContext: captureTraceContext({ runId }), tracing: daemonTraceSettings(),
@@ -997,40 +1004,68 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     // and rollback. This optional locator binds to the same one-use bytes; it
     // carries no assignment or usable credential. String multipart is one RPC.
     const initialRun = refreshRuntime ? '' : JSON.stringify({ version: 1, runId, bootstrapSha256: createHash('sha256').update(bootstrap).digest('hex') })
-    await sandbox.files.write([{ path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun }], { user: 'root', useOctetStream: false, ...runtimeRequestOptions(refreshBudget) })
+    const anonymousClaude = anonymousClaudeStartupHint({
+      freshTask: firstAnonymousClaudeTask({ created: anonymousFreshMachine, refresh: refreshRuntime, retained: Boolean(retainedSandboxId), question: exactQuestionMachine }, current),
+      runId, bootstrap, kind: current.kind, repository: run.repoPath, definition, userId: actor.userId, botId: current.botId,
+    })
+    await sandbox.files.write([{ path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun }, { path: `${handoff}.claude`, data: anonymousClaude }], { user: 'root', useOctetStream: false, ...runtimeRequestOptions(refreshBudget) })
     // The foreground command must finish the atomic publication before waking
     // the existing watcher as user. Keep credential bytes in the file upload,
     // never in this command/argv/env. Only an acknowledged signal skips the
     // redundant remote start; absent/old preloaders keep the original fallback.
-    const publication = await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka && install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next && install -o user -g user -m 600 ${handoff}.run /home/user/.mikka/initial-run.next && mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${handoff} && unlink ${handoff}.run && runuser -u user -- sh -c '${CLOUD_PRELOADER_WAKE_COMMAND}'`, { user: 'root', ...runtimeCommandOptions(10_000, refreshBudget) })
-    const preloadedWorkerWoken = publication.stdout.trim() === CLOUD_PRELOADER_WAKE_RECEIPT
-    // The worker's output streams into the server logs only while this invocation lives;
-    // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
+    const directory = '/home/user/.mikka/worker'
+    const publish = `install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next && install -o user -g user -m 600 ${handoff}.run /home/user/.mikka/initial-run.next && mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json && install -o user -g user -m 600 ${handoff}.claude /home/user/.mikka/anonymous-claude.next && mv /home/user/.mikka/anonymous-claude.next /home/user/.mikka/anonymous-claude.json && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${handoff} && unlink ${handoff}.run && unlink ${handoff}.claude`
+    let registrationWaiting = false, phaseOutput = ''
     refreshPhase = timings.next('start_worker')
-    const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
-    if (!preloadedWorkerWoken) await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...runtimeRequestOptions(refreshBudget), ...workerOutputForwarder(runId, mask) })
-    refreshPhase = timings.next('worker_register')
-    const deadline = Math.min(Date.now() + 30_000, refreshDeadline ?? Infinity)
-    let ready = false
-    do {
-      refreshBudget?.(1)
-      ready = Boolean((await pool.query('SELECT 1 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id WHERE d.id=$1 AND d."ownerId"=$2 AND d."lastSeenAt">=$3 AND t."tokenHash"=$4 AND t."revokedAt" IS NULL AND t."lastUsedAt">=$3', [deviceId, actor.userId, handoffStartedAt, createHash('sha256').update(credential).digest('hex')])).rowCount)
-      if (!ready) await new Promise(resolve => setTimeout(resolve, 500))
-    } while (!ready && Date.now() < deadline)
-    if (!ready) {
-      refreshBudget?.(1)
-      // Maintenance diagnostics belong to the VM, never to its historical
-      // failed run. Ordinary provisioning still records the run's first error.
+    try {
+      const publication = await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka ${directory} && ${registrationCommand({
+        directory, deviceId, workspaceId: actor.workspaceId, workerSha: expectedSha,
+        tokenSha256: createHash('sha256').update(credential).digest('hex'),
+        publish, wake: `runuser -u user -- sh -c ${quoteShell(CLOUD_PRELOADER_WAKE_COMMAND)}`,
+        wakeReceipt: CLOUD_PRELOADER_WAKE_RECEIPT,
+        // The detached fallback retains the original sandbox log, without
+        // keeping this foreground wait's stdout/stderr pipes open.
+        start: `runuser -u user -- sh -c ${quoteShell(workerCommand(CLOUD_WORKER_COMMAND))}`,
+        timeoutMs: refreshBudget ? refreshBudget(30_000) : 30_000,
+      })}`, { user: 'root', ...runtimeCommandOptions(40_000, refreshBudget), onStdout: chunk => {
+        phaseOutput = (phaseOutput + chunk).slice(-256)
+        if (!registrationWaiting && phaseOutput.includes(REGISTRATION_WAITING + '\n')) {
+          registrationWaiting = true
+          refreshPhase = timings.next('worker_register')
+        }
+      } })
+      const messages = publication.stdout.split('\n')
+      if (messages.includes(REGISTRATION_LEGACY)) {
+        // Rolling deployments/rollback can still select a legitimate old worker.
+        // Only absence of its release-bound capability retains the original
+        // polling path; no timeout probing or extra queries on new workers.
+        registrationWaiting = true
+        refreshPhase = timings.next('worker_register')
+        const deadline = Math.min(Date.now() + 30_000, refreshDeadline ?? Infinity)
+        let ready = false
+        do {
+          refreshBudget?.(1)
+          ready = Boolean((await pool.query('SELECT 1 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id WHERE d.id=$1 AND d."ownerId"=$2 AND d."lastSeenAt">=$3 AND t."tokenHash"=$4 AND t."revokedAt" IS NULL AND t."lastUsedAt">=$3',
+            [deviceId, actor.userId, handoffStartedAt, createHash('sha256').update(credential).digest('hex')])).rowCount)
+          if (!ready) await new Promise(resolve => setTimeout(resolve, 500))
+        } while (!ready && Date.now() < deadline)
+        if (!ready) throw new Error('Thread worker did not register')
+      } else if (!messages.includes(REGISTRATION_COMPLETE)) throw new Error('Thread worker did not register')
+      // A transport may coalesce stdout until completion. Keep every phase;
+      // its wait then remains in start_worker, never outside the parent clock.
+      if (!registrationWaiting) refreshPhase = timings.next('worker_register')
+    } catch (error) {
+      if (!registrationWaiting) throw error
+      const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
       await saveWorkerTail(pool, runId, await readWorkerTail(async () => sandbox), mask, refreshRuntime ? undefined : 'Thread worker did not register').catch(() => undefined)
-      throw new Error('Thread worker did not register')
+      throw new Error('Thread worker did not register', { cause: error })
     }
     refreshPhase = timings.next('verify_runtime')
     if (verifyRefreshedRuntime) await verifyRefreshedRuntime()
     refreshPhase = timings.next('finish')
     refreshBudget?.(1)
-    const finished = await pool.query(`UPDATE thread_machines SET state='running',"lastActiveAt"=now(),"runningSince"=COALESCE("runningSince",now()),"workerLeaseId"=NULL,"workerLeaseUntil"=NULL,"lifecycleAt"=now(),
-      lifecycle=lifecycle||jsonb_build_object('phase',CASE WHEN lifecycle->>'phase'='create_requested' THEN 'created' ELSE 'resumed' END,'owner','run-recovery','failures',0)
-      WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>'ended' RETURNING "runId","issueId","sandboxId",epoch,lifecycle,"computeSeconds"`, [runId, leaseId])
+    const finished = await finishThreadRegistration(client, runId, leaseId, deviceId,
+      createHash('sha256').update(credential).digest('hex'), handoffStartedAt)
     if (!finished.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
     await runChanged(pool, runId)
     logThreadLifecycle(finished.rows[0], { phase: finished.rows[0].lifecycle.phase, reason: finished.rows[0].lifecycle.phase, provider: 'running', deadline: Date.now(), computeSeconds: finished.rows[0].computeSeconds })

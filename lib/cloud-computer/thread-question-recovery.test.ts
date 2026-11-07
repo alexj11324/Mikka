@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test, { mock } from 'node:test'
+import { REGISTRATION_COMPLETE } from '../computer/registration-command'
 
 // The real runtime-maintenance orchestration, with storage/receipt and cloud
 // transport boundaries mocked. The same path's immutable SQL receipts and
@@ -61,13 +62,13 @@ function fixture() {
     if (sql.startsWith('SELECT r.*') || sql.startsWith('SELECT * FROM agent_runs') || sql.startsWith('SELECT status,"stopRequestedAt"')) return result([{ ...run }])
     if (sql.startsWith('SELECT * FROM thread_machines')) return result([{ ...machine }])
     if (sql.startsWith('SELECT 1 FROM devices d JOIN agent_runs')) return result(flags.deviceEnabled ? [{}] : [])
-    if (/^SELECT 1 FROM (factory_questions|devices|thread_machines)/.test(sql)) return result([{}])
-    if (sql.startsWith('SELECT clock_timestamp()')) return result([{ now: new Date() }])
-    if (sql.startsWith('UPDATE thread_machines')) {
+    if (/^SELECT 1 FROM (factory_questions|devices|thread_machines|agent_runs)/.test(sql)) return result([{}])
+    if (sql.startsWith('INSERT INTO device_tokens')) return result([{ now: new Date() }])
+    if (sql.startsWith('UPDATE thread_machines') || sql.startsWith('WITH locked_run')) {
       if (sql.startsWith('UPDATE thread_machines SET "workerLeaseId"=$2')) {
         machine.workerLeaseId = values[1] as string; machine.workerLeaseUntil = new Date(Date.now() + 60_000)
       }
-      if (sql.startsWith("UPDATE thread_machines SET state='running'")) return result([
+      if (sql.includes("SET state='running'")) return result([
         { ...machine, state: 'running', epoch: 1, lifecycle: { phase: 'resumed' }, computeSeconds: 0 },
       ])
       return result([{ runId: run.id }])
@@ -78,7 +79,7 @@ function fixture() {
   const pool = { query, connect: async () => ({ query, release: () => { released = true } }) } as never
   const box = { sandboxId: machine.sandboxId,
     files: { read: async () => 'b'.repeat(40), write: async () => { state.steps.push('bootstrap') } },
-    commands: { run: async () => { state.steps.push('worker'); return { stdout: '' } } },
+    commands: { run: async () => { state.steps.push('worker'); return { stdout: REGISTRATION_COMPLETE + '\n' } } },
   }
   const hooks = { onConnect: undefined as (() => void) | undefined }
   const provider = {

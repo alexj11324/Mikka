@@ -1,3 +1,4 @@
+import { REGISTRATION_COMPLETE, REGISTRATION_WAITING } from '../computer/registration-command';
 // One task, one cloud sandbox (Alex, 2026-11-01). A task's next run resumes the
 // sandbox its last run left paused; no other task, bot or repository can take
 // it; a finished run of an open task parks its sandbox (paused, tokens
@@ -230,7 +231,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
                 await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`,[bootstrap.deviceId,createHash('sha256').update(bootstrap.credential).digest('hex')]);
                 await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`,[bootstrap.deviceId]);
               }
-              return {stdout:'',stderr:'',exitCode:0};
+              return {stdout:command.includes(REGISTRATION_COMPLETE)?REGISTRATION_COMPLETE+'\n':'',stderr:'',exitCode:0};
             }}} as never;
         };
         assert.deepEqual(await ensureThreadMachine(pool,actor,f.next,fixture.provider),{runId:f.next,state:'running'});
@@ -405,6 +406,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
               await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
               steps.push('registered');
+              stdout = REGISTRATION_COMPLETE + '\n';
             } else if (command.includes('mikka-runtime-process-verified')) {
               steps.push('rpc'); stdout = 'mikka-runtime-process-verified 42';
             } else assert.ok(command.includes('node dist/cloud/cloud-worker.js'), 'only worker startup remains');
@@ -1099,8 +1101,11 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       fixture.provider.connect = async id => {
         const sandbox = await connect(id, workspaceId);
         const execute = sandbox.commands.run.bind(sandbox.commands);
-        sandbox.commands.run = (async (command: string, options: { timeoutMs?: number }) => {
-          if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) return { stdout: '', stderr: '', exitCode: 0 };
+        sandbox.commands.run = (async (command: string, options: { timeoutMs?: number; onStdout?: (chunk: string) => void }) => {
+          if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
+            options.onStdout?.(REGISTRATION_WAITING + '\n');
+            throw new Error('cloud_registration_timeout');
+          }
           if (command.startsWith('tail -n 200 ')) return { stdout: tail, stderr: '', exitCode: 0 };
           const result = await execute(command, options);
           if (command.includes('node dist/cloud/cloud-worker.js')) {
@@ -1199,7 +1204,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               authenticated++;
               // Make the historical late floor observably later than this real authentication.
               await pool.query('SELECT pg_sleep(0.02)');
-              return { stdout: 'mikka-preloaded-worker-woken\n', stderr: '', exitCode: 0 };
+              return { stdout: REGISTRATION_COMPLETE + '\n', stderr: '', exitCode: 0 };
             }
             if (command.includes('node dist/cloud/cloud-worker.js')) {
               starts++;
