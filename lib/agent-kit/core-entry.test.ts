@@ -13,7 +13,7 @@ let kitSetting:boolean|undefined=true
 let taskEventId:string|undefined
 const record=(name:string)=>(...args:unknown[])=>{calls.push({name,args})}
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
-const writable=new WritableStream()
+const writable=new WritableStream({write:part=>{record('modelStream')(part)}})
 // 停止 reaches the workflow through its hook; `stopNow` delivers one stop to it.
 let stopNow=()=>{}
 let stopDuringTurn=false
@@ -161,10 +161,14 @@ test('real workflow entry uses the returned execution snapshot for model, prompt
   assert.equal(calls.find(c=>c.name==='prompt')?.args[2],execution!.snapshot)
   assert.deepEqual(calls.find(c=>c.name==='tools')?.args,[owner,bot,undefined,{switches,coordinator:false,execution,audits:[],writeEnabled:false,computerEnabled:false,mailboxEnabled:false,mailboxTools:[]}])
   assert.equal(calls.filter(c=>c.name==='hosted').length,1)
-  const hosted=calls.find(c=>c.name==='hosted')!.args[2] as {writable:unknown;preventClose:boolean}
-  assert.equal(hosted.writable,writable);assert.equal(hosted.preventClose,true)
+  const hosted=calls.find(c=>c.name==='hosted')!.args[2] as {writable:WritableStream;preventClose:boolean}
+  const modelWriter=hosted.writable.getWriter()
+  await modelWriter.write({type:'reset-step'});modelWriter.releaseLock()
+  assert.deepEqual(calls.find(c=>c.name==='modelStream')?.args,[{type:'coordinator-model-part',id:'synthetic-workflow:0',part:{type:'reset-step'}}])
+  assert.ok(calls.filter(c=>c.name==='stream').every(c=>c.args[0]===writable), 'control markers retain the original shared writable')
+  assert.equal(hosted.preventClose,true)
   assert.equal(calls.find(c=>c.name==='append')?.args[5],'synthetic-workflow:0')
-  assert.deepEqual(calls.filter(c=>c.name==='stream').map(c=>c.args[1]),[{type:'coordinator-turn-start',id:'synthetic-workflow:0',quietEligible:false},{type:'coordinator-turn-committed',id:'synthetic-workflow:0',through:3,quiet:false}])
+  assert.deepEqual(calls.filter(c=>c.name==='stream').map(c=>c.args[1]),[{type:'coordinator-turn-start',id:'synthetic-workflow:0',quietEligible:false,modelStream:'scoped-v1'},{type:'coordinator-turn-committed',id:'synthetic-workflow:0',through:3,quiet:false}])
   assert.ok(calls.findIndex(c=>c.name==='append') < calls.findIndex(c=>c.name==='stream' && (c.args[1] as {type:string}).type==='coordinator-turn-committed'))
   assert.equal(calls.filter(c=>c.name==='failed').length,0)
   assert.equal(calls.filter(c=>c.name==='mailboxCatalogue').length,0, 'flag-off never resolves mailbox persistence')

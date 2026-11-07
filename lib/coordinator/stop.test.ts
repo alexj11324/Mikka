@@ -36,6 +36,23 @@ test('a stopped handoff turn that was only starting its quiet sentinel says noth
   assert.equal(said, '')
 })
 
+test('stopped text unwraps only the matching scoped round and still ends at its stop marker', async () => {
+  const scoped = (id: string, part: unknown) => ({ type: 'coordinator-model-part', id, part })
+  const said = await stoppedStepText(parts(
+    { type: 'coordinator-turn-start', id: 'run:1', quietEligible: false, modelStream: 'scoped-v1' },
+    scoped('run:1', { type: 'text-delta', id: 't', text: 'Keep this' }),
+    { type: 'coordinator-turn-start', id: 'run:0', quietEligible: true, modelStream: 'scoped-v1' },
+    scoped('run:0', { type: 'reset-step' }),
+    scoped('run:0', { type: 'text-delta', id: 't', text: 'old turn' }),
+    { type: 'text-delta', id: 't', text: 'unscoped text' },
+    { type: 'coordinator-turn-stopped', id: 'run:0' },
+    scoped('run:1', { type: 'text-delta', id: 't', text: ' reply' }),
+    { type: 'coordinator-turn-stopped', id: 'run:1' },
+    scoped('run:1', { type: 'text-delta', id: 't', text: ' late' }),
+  ), 'run:1')
+  assert.equal(said, 'Keep this reply')
+})
+
 test('stopped messages keep completed calls, add the words in flight once, and end on an assistant message', () => {
   const completed: ModelMessage[] = [{ role: 'assistant', content: 'Checking.' }]
   assert.deepEqual(stoppedMessages(completed, 'The task is', 'Checking.'), [...completed, { role: 'assistant', content: 'The task is' }])
