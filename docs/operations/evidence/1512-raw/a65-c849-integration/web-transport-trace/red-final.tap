@@ -1,0 +1,237 @@
+TAP version 13
+# Subtest: web transport accepted belongs to the original request trace before any business scope
+not ok 1 - web transport accepted belongs to the original request trace before any business scope
+  ---
+  duration_ms: 25.386155
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:1:12312'
+  failureType: 'testCodeFailure'
+  error: 'transport preparation and fresh authentication run under the request parent'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:269:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: web transport expired belongs to the original request trace before any business scope
+not ok 2 - web transport expired belongs to the original request trace before any business scope
+  ---
+  duration_ms: 2.608849
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:1:12312'
+  failureType: 'testCodeFailure'
+  error: |-
+    even a transport early response owns a request trace
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:261:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: web transport unavailable belongs to the original request trace before any business scope
+not ok 3 - web transport unavailable belongs to the original request trace before any business scope
+  ---
+  duration_ms: 1.242406
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:1:12312'
+  failureType: 'testCodeFailure'
+  error: |-
+    even a transport early response owns a request trace
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:261:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: web transport disabled belongs to the original request trace before any business scope
+not ok 4 - web transport disabled belongs to the original request trace before any business scope
+  ---
+  duration_ms: 0.965417
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:1:12312'
+  failureType: 'testCodeFailure'
+  error: |-
+    even a transport early response owns a request trace
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:261:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: web transport preflight belongs to the original request trace before any business scope
+not ok 5 - web transport preflight belongs to the original request trace before any business scope
+  ---
+  duration_ms: 0.784074
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:1:12312'
+  failureType: 'testCodeFailure'
+  error: |-
+    even a transport early response owns a request trace
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:261:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: a rejected transport preparation keeps the original H3 error response and finishes its trace once
+not ok 6 - a rejected transport preparation keeps the original H3 error response and finishes its trace once
+  ---
+  duration_ms: 0.876464
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:1:16797'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:305:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: adapted Web stream complete retains tracing and after disposal
+not ok 7 - adapted Web stream complete retains tracing and after disposal
+  ---
+  duration_ms: 3.220814
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:1:17643'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   undefined,
+        'request',
+        'request',
+    -   'request'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'request'
+    1: 'request'
+    2: 'request'
+  actual:
+    1: 'request'
+    2: 'request'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:337:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: adapted Web stream cancel retains tracing and after disposal
+not ok 8 - adapted Web stream cancel retains tracing and after disposal
+  ---
+  duration_ms: 1.892888
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:1:17643'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   undefined,
+        'request',
+        'request',
+    -   'request'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'request'
+    1: 'request'
+    2: 'request'
+  actual:
+    1: 'request'
+    2: 'request'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:337:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: adapted Web stream error retains tracing and after disposal
+not ok 9 - adapted Web stream error retains tracing and after disposal
+  ---
+  duration_ms: 2.156657
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:1:17643'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   undefined,
+        'request',
+        'request',
+    -   'request'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'request'
+    1: 'request'
+    2: 'request'
+  actual:
+    1: 'request'
+    2: 'request'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/apps/api/src/application.test.ts:337:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 0
+# fail 9
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 878.740687

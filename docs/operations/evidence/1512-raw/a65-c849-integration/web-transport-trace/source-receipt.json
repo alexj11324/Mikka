@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "kind": "web_transport_request_trace_source_validation",
+  "status": "frozen_uncommitted_source_fix",
+  "createdAt": "2026-11-07T17:11:57.541345+00:00",
+  "baseCommit": "477dc1090c33b26889ed73655f8b581a88979acc",
+  "baseTree": "83ba6ec57c28dce54b19fe8b900065a99a62b430",
+  "files": [
+    {
+      "path": "apps/api/src/application.ts",
+      "before": {
+        "path": "web-transport-trace/application.ts.before",
+        "bytes": 4962,
+        "sha256": "5ec5eeee353766eaf120239441ac7b743a06cd0e6802ee143924ecd9307c708c",
+        "gitBlobSha1": "ca15978735ff7ba31921e40cd0491798debf26a5"
+      },
+      "after": {
+        "path": "web-transport-trace/source/apps/api/src/application.ts",
+        "bytes": 5366,
+        "sha256": "3f7f1cec43009acd2778dcfdbb0557f4956de0a0e49ea930861caa2a97c3d315",
+        "gitBlobSha1": "6fe5ed716899e34c0860e69295ecbec99669b293"
+      },
+      "currentWorktreeMatchesSnapshot": true
+    },
+    {
+      "path": "apps/api/src/application.test.ts",
+      "before": {
+        "path": "web-transport-trace/application.test.ts.before",
+        "bytes": 13157,
+        "sha256": "aec9e3f4cff8c4df79b014d470313b7c58293bd0ca32f83d5f18746a0ed0c901",
+        "gitBlobSha1": "8cf8fcf508a73bc53902eb6a4371ea3411974813"
+      },
+      "after": {
+        "path": "web-transport-trace/source/apps/api/src/application.test.ts",
+        "bytes": 22079,
+        "sha256": "98176f15cf56ecc19fb38c3cd773e247b7f32f62151042404d308d217cdcdc9d",
+        "gitBlobSha1": "06c77fecdaf3c65c30d0240e460aa6f70b53efbd"
+      },
+      "currentWorktreeMatchesSnapshot": true
+    }
+  ],
+  "patch": {
+    "path": "web-transport-trace/patch.diff",
+    "bytes": 13847,
+    "sha256": "89614f7caaa51c155839dbd8720f98e43e4d1c7e5c82aa926ee3f1ad8da7fe0b",
+    "gitBlobSha1": "2763298f86fbf14053b31249127f341126b5ff28"
+  },
+  "rootCause": {
+    "source": "apps/api/src/application.ts",
+    "mechanism": "prepareWebTransport was awaited before beginTrace and trace.run. Its direct 204/401/403/503 responses returned without onDispose tracing. Fresh bearer authentication ran without the parent required by pg instrumentation.",
+    "traceParentRequirement": "lib/tracing/node.ts createPgInstrumentation requires requireParentSpan=true",
+    "inputSource": "apps/api/src/index.ts fresh auth.api.getSession with disableCookieCache=true is called by the actual transport authenticator"
+  },
+  "change": {
+    "requestTraceStartsBeforePreparation": true,
+    "originalRequestRemainsTraceSource": true,
+    "preparationRunsInsideSameTrace": true,
+    "earlyResponseStatusRecordedWithoutRewritingResponse": true,
+    "businessRequestScopeCreatedOnlyAfterAdaptation": true,
+    "prepareErrorObjectRethrownToOriginalH3Handling": true,
+    "traceDisposalRegisteredBeforeAfterDisposal": true,
+    "afterLifetimeRegisteredBeforeBusinessDispatch": true,
+    "newAuthenticationCalls": 0,
+    "newSqlStatements": 0,
+    "authSdkOrCorsConfigurationChanged": false,
+    "bodyHeadersOrCredentialsAddedToTelemetry": false
+  },
+  "sourceContracts": {
+    "actualH3OnDisposeOrder": "Installed h3 dist/response.mjs invokeDisposeCallbacks calls callbacks in registration order; trace finish is registered first, scope.after.finish second.",
+    "unrelatedSlashRedirectAndMalformedPathBehavior": "unchanged; this patch targets the new prepareWebTransport boundary"
+  },
+  "validation": [
+    {
+      "phase": "initial_test_fixture",
+      "exitCode": 1,
+      "summary": {
+        "tests": 9,
+        "suites": 0,
+        "pass": 0,
+        "fail": 9,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "output": {
+        "path": "web-transport-trace/red.tap",
+        "bytes": 8756,
+        "sha256": "5aba48662837c2a3cb04b0e9260d44b08d9c472139ee9106782dd15ae21543e3",
+        "gitBlobSha1": "737be706db65f34af6bd9d0aa1ed461bdf06d225"
+      },
+      "boundary": "The first in-memory tracer test inherited the environment sampler. Before the causal red/green check, the fixture explicitly selected AlwaysOnSampler without modifying process.env. This first output is preserved, but is not the final causal red proof."
+    },
+    {
+      "phase": "original_implementation_causal_red",
+      "exitCode": 1,
+      "summary": {
+        "tests": 9,
+        "suites": 0,
+        "pass": 0,
+        "fail": 9,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "command": "TMPDIR=/dev/shm/issue1512-ops-812e3b7d6d45/tmp node --import ./tests/support/server-only.mjs --import tsx --test --test-reporter=tap --test-name-pattern='web transport .* belongs|a rejected transport|adapted Web stream' apps/api/src/application.test.ts",
+      "output": {
+        "path": "web-transport-trace/red-final.tap",
+        "bytes": 7898,
+        "sha256": "a504de730d6820c7ed178e3fbfb3f2a030c5dbdefea70562830896421bd592ca",
+        "gitBlobSha1": "bdd520a5f19417525ca3deb141d457861e1a33e2"
+      },
+      "implementationHash": "5ec5eeee353766eaf120239441ac7b743a06cd0e6802ee143924ecd9307c708c",
+      "proof": [
+        "Actual createWebTransport accepted authentication has no active request parent.",
+        "Actual early 204/401/403/503 outcomes create no request trace.",
+        "Rejected preparation creates no request trace.",
+        "Adapted stream authentication lacks the request context."
+      ]
+    },
+    {
+      "phase": "focused_existing_and_regression",
+      "exitCode": 0,
+      "summary": {
+        "tests": 30,
+        "suites": 0,
+        "pass": 30,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "command": "TMPDIR=/dev/shm/issue1512-ops-812e3b7d6d45/tmp node --import ./tests/support/server-only.mjs --import tsx --test --test-reporter=tap apps/api/src/application.test.ts lib/web-connection/transport.test.ts lib/tracing/run-context.test.ts",
+      "output": {
+        "path": "web-transport-trace/green-focused.tap",
+        "bytes": 7270,
+        "sha256": "4729982d0d2548e16d5e808087ef3606786be95e12cec956b9680ca192e6cec1",
+        "gitBlobSha1": "702ab2ea762b99b9bb4e466694292910f8021d17"
+      }
+    },
+    {
+      "phase": "real_node_transport_lifetime",
+      "exitCode": 0,
+      "summary": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "command": "TMPDIR=/dev/shm/issue1512-ops-812e3b7d6d45/tmp node --import ./tests/support/server-only.mjs --import tsx --test --test-reporter=tap apps/api/src/web-transport-node.test.ts",
+      "output": {
+        "path": "web-transport-trace/green-node.tap",
+        "bytes": 1526,
+        "sha256": "b9de9045c8b36d6f05c7988f5f38c44e56ddb24a253e42589d67f572816ea52c",
+        "gitBlobSha1": "cf128217bc5d95b90b0e2243bea807bfc3dad0e9"
+      },
+      "scope": "Existing real loopback srvx/H3 HTTP fixture; original Node request, body, CORS, stream completion/cancellation and after drain. Its owned servers close in test finally."
+    },
+    {
+      "phase": "lint",
+      "exitCode": 0,
+      "command": "./node_modules/.bin/oxlint --no-ignore --deny-warnings apps/api/src/application.ts apps/api/src/application.test.ts",
+      "output": {
+        "path": "web-transport-trace/lint.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "phase": "diff_check",
+      "exitCode": 0,
+      "command": "git diff --check -- apps/api/src/application.ts apps/api/src/application.test.ts",
+      "output": {
+        "path": "web-transport-trace/diff-check-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    }
+  ],
+  "regressionCoverage": [
+    "In-memory actual OpenTelemetry parent/child trace IDs and original Request identity.",
+    "Response statuses 200, 204, 401, 403, 503; 503 error span status.",
+    "Business scope absent during transport preparation and authentication.",
+    "Exactly the existing authentication count; rejected/preflight requests never dispatch.",
+    "CORS cookie/credentials stripping unchanged; static header/body/cookie canaries not exported.",
+    "Preparation exceptions retain original object and H3 500 response.",
+    "Stream complete/cancel/error keep single finish, finish-before-after, and waitUntil drain."
+  ],
+  "boundaries": {
+    "realDatabaseExecuted": false,
+    "authSdkSessionExecuted": false,
+    "providerOrModelExecuted": false,
+    "browserOrVmStarted": false,
+    "remoteTelemetryExported": false,
+    "exporter": "in-memory only",
+    "rootApiAndTestTypecheckAfterPatch": "not run by this agent; final integrated canonical check remains with root",
+    "productionAcceptanceClaimed": false
+  },
+  "mutation": {
+    "ownedSourceFilesOnly": [
+      "apps/api/src/application.ts",
+      "apps/api/src/application.test.ts"
+    ],
+    "gitStage": false,
+    "gitCommit": false,
+    "remoteMutation": false,
+    "publishStateModified": false
+  }
+}

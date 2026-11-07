@@ -1,0 +1,85 @@
+
+> next-app@0.0.1 test:live-lists /workspace/scratch/812e3b7d6d45/Mikka
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-lists.live.test.tsx scripts/desktop-notification-lifetime.live.test.tsx
+
+(node:1402) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1402) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a decision that returns after the integration unmounts cannot raise an OS notification (371.627067ms)
+✔ a prior account decision cannot notify after the Vite account subtree is replaced (230.184082ms)
+✔ an ordinary list refresh does not discard a valid pending decision from the same session (195.269819ms)
+✔ changing from the desktop runtime invalidates an outstanding notification decision (199.315533ms)
+✔ a pending notification click cannot navigate after the integration unmounts (34.211732ms)
+✔ replacing the router discards the old pending click and keeps the current click handler (35.104811ms)
+✔ native setup does not read the device list when connecting (3.93161ms)
+✔ native setup does not read the device list when offline (4.114386ms)
+✔ native setup does not read the device list when unsigned (2.246434ms)
+✔ native setup does not read the device list when unregistered (2.356199ms)
+✔ native setup still reads ownership before retaining or replacing an online signed-in device (3.197881ms)
+✔ native setup does not start an ownership read after its account has unmounted (2.40959ms)
+✔ an old ownership response cannot install a device after the account changes (3.977479ms)
+✔ failed ownership verification never becomes an install decision (2.352334ms)
+(node:1403) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:1403) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a committed SWR read after connection readiness covers the pending live flush (864.167092ms)
+✔ a late live subscription shares the committed read from its continuously ready connection (328.186038ms)
+✔ a new unversioned push while unsubscribed invalidates the committed read before a late subscription (326.584921ms)
+✔ a higher-revision push while unsubscribed invalidates the committed read before a late subscription (325.962513ms)
+✔ a late subscription cannot reuse a read from without the capability acknowledgement (325.106539ms)
+✔ a late subscription cannot reuse a read from before the capability acknowledgement (325.590201ms)
+(node:1403) TimeoutNaNWarning: NaN is not a number.
+Timeout duration was set to 1.
+✔ a committed read from an earlier connection generation cannot cover a late subscription (327.129221ms)
+✔ a replaced committed cache object cannot satisfy the pending live flush (325.481934ms)
+✔ a newer failed SWR read cannot resurrect an earlier committed provenance (327.228179ms)
+✔ live catch-ups share an ordinary SWR read that starts after both scoped connections open (647.639617ms)
+✔ a SWR read that starts before the live connection opens cannot consume its catch-up (324.525282ms)
+✔ a new unversioned push during a shared SWR read still gets its trailing read (646.570625ms)
+✔ a higher-revision push during a shared SWR read still gets its trailing read (645.49568ms)
+✔ a later-started SWR read must still prove every required revision before covering a live push (486.186233ms)
+✔ a SWR response discarded by an optimistic mutation cannot consume the live catch-up (488.607733ms)
+✔ a custom comparator retaining an older cache value cannot certify an unversioned live catch-up (486.836026ms)
+✔ a shared read cannot replace the revision held when the live obligation began with a lower revision (488.443593ms)
+✔ a completed read cannot erase the higher revision still held by the active live subscription (647.015579ms)
+✔ an original onSuccess exception remains a SWR error without a shared-read retry (486.931503ms)
+✔ a discarded shared read cannot start another request after the page becomes hidden (809.781434ms)
+✔ a newer SWR read replaces a shared observation without applying or re-reading the discarded result (488.180619ms)
+✔ an old cache error cannot be attributed to a superseded read or consume the replacement revision requirement (649.248213ms)
+✔ a shared permission failure keeps SWR error handling and does not start another request (485.986745ms)
+✔ retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope (811.142329ms)
+✔ resolving the issue home different from the selected workspace preserves its live subscription (648.407185ms)
+✔ resolving the issue home equal to the selected workspace preserves its live subscription (645.731928ms)
+✔ an unresolved issue home retains disconnected fallback even when its selected workspace channel is healthy (326.892902ms)
+✔ real thread hooks require a current presence acknowledgement, update its proof and unregister on exit (490.321524ms)
+✔ an older server presence fallback flag remains uncovered on a healthy new live transport (325.303861ms)
+✔ three acknowledged presence tabs still share one authorized read for the same device-state push (2752.579813ms)
+✔ a restored issues snapshot sends its existing row proofs and removes rows absent from the authorized delta (325.130897ms)
+✔ a restored threads snapshot sends its existing row proofs and removes rows absent from the authorized delta (324.95102ms)
+✔ a restored list with partial proofs cannot receive unchanged while rows are missing (323.846994ms)
+✔ a restored list with missing proofs cannot receive unchanged while rows are missing (324.073995ms)
+✔ an explicit revoked access response hides a previously visible cached issue list (678.446218ms)
+✔ real list hooks update held revisions after an asynchronous read without losing scoped focus coverage (5052.301828ms)
+✔ real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes (7598.452234ms)
+✔ healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list (61938.030676ms)
+✔ a late tasks response after the cookie changes cannot populate the old owner's real SWR cache (328.155212ms)
+✔ a late bots response after the cookie changes cannot populate the old owner's real SWR cache (323.565771ms)
+✔ a late issue response cannot replace the selected workspace, and an unresolved read has no adopted SSR rows (807.792927ms)
+✔ a server-selected replacement workspace is refused under the former issue-list key (324.632085ms)
+✔ group list GET results are bound to both the authenticated owner and the requested workspace before caching (325.364494ms)
+✔ a delayed Bot roster cannot populate another owner's list key (323.688244ms)
+✔ a delayed Bot roster cannot populate another workspace's list key (324.7617ms)
+✔ leaving Settings catches up a roster event that arrived while its read was paused (2746.652766ms)
+✔ hidden list views retain a dirty event and catch up once when visible (3081.668033ms)
+✔ without an active owned home, the owner-wide list never guesses the Provider workspace (323.411101ms)
+✔ a server-derived chat lease expiry performs one read without recreating the transport (2276.526804ms)
+✔ a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility (1357.081238ms)
+✔ a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat (2624.574365ms)
+ℹ tests 65
+ℹ suites 0
+ℹ pass 65
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 110147.210789

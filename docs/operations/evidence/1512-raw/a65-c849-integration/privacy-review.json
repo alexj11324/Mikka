@@ -1,0 +1,592 @@
+{
+  "schemaVersion": 1,
+  "kind": "closed_source_evidence_privacy_review",
+  "status": "passed_for_frozen_collection_pending_owner_publication_review",
+  "reviewedAt": "2026-11-07T17:35:03.869967+00:00",
+  "filesScanned": 52,
+  "bytesScanned": 282954,
+  "broadPatternFindings": 52,
+  "classificationCounts": {
+    "exact_package_coordinate": 40,
+    "exact_source_only_request_fixture": 12
+  },
+  "unresolvedFindings": 0,
+  "packageCoordinateCounts": {
+    "posthog-js@1.438.13_": 6,
+    "types+react@19.3.0_react": 6,
+    "posthog+browser-common@0.9.5": 1,
+    "esbuild@0.28.2": 9,
+    "next-app@0.0.1": 14,
+    "frontend@0.0.1": 4
+  },
+  "packageCoordinateSourceProofs": [
+    {
+      "revision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "path": "package.json",
+      "bytes": 75648,
+      "characters": 75648,
+      "sha256": "2fe651c8ebecf7668df5d6cfa47b7dfcebcbea0af50802ecb4d9016b430f2687",
+      "gitBlobSha1": "f6e0a239adcde2b8f3f8f3985e72d1ad95d12da3"
+    },
+    {
+      "revision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "path": "apps/frontend/package.json",
+      "bytes": 378,
+      "characters": 378,
+      "sha256": "1e7f72216b72ab5581be6257acb78d03d5bed0957741c918c7542dedca10924b",
+      "gitBlobSha1": "f304311903743e2177d2aa4d1962cd10f56773c8"
+    },
+    {
+      "revision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "path": "pnpm-lock.yaml",
+      "bytes": 957312,
+      "characters": 957312,
+      "sha256": "c25dcec973162a2e91bb8efead27f92cb9021b53a3afb4ef0215538ba1690f6a",
+      "gitBlobSha1": "0a6b6e088bc92c8774b381750153fc3a1d510f17"
+    }
+  ],
+  "sourceOnlyFixtureBoundary": "Only exact literal matches in the fixed in-memory Request/Response tests are accepted. The two before/after full source snapshots and the complete patch are byte-bound to immutable Git objects. A literal in the staging regression fragment is separately checked against the exact final test; no general cookie/token exception is granted.",
+  "scanCategories": [
+    "email_or_package_coordinate",
+    "bearer_value",
+    "credential_url",
+    "signed_url",
+    "private_key",
+    "credential_token",
+    "jwt",
+    "assignment_secret"
+  ],
+  "noHitCategories": [
+    "credential_url",
+    "signed_url",
+    "private_key",
+    "credential_token",
+    "jwt"
+  ],
+  "findings": [
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 92,
+      "matchSha256": "a3946fd4448f7be0e537b7dfc9a1cb637811ace3c832f6ba444d5d0904b05dc2",
+      "matchedBytes": 20,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 92,
+      "matchSha256": "28d1d6bb9479b90aa1574d205e23d440ad2f16a8f6884c7eaa4139a0fcef3baf",
+      "matchedBytes": 24,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 97,
+      "matchSha256": "a3946fd4448f7be0e537b7dfc9a1cb637811ace3c832f6ba444d5d0904b05dc2",
+      "matchedBytes": 20,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 97,
+      "matchSha256": "28d1d6bb9479b90aa1574d205e23d440ad2f16a8f6884c7eaa4139a0fcef3baf",
+      "matchedBytes": 24,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 102,
+      "matchSha256": "a3946fd4448f7be0e537b7dfc9a1cb637811ace3c832f6ba444d5d0904b05dc2",
+      "matchedBytes": 20,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 102,
+      "matchSha256": "28d1d6bb9479b90aa1574d205e23d440ad2f16a8f6884c7eaa4139a0fcef3baf",
+      "matchedBytes": 24,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 107,
+      "matchSha256": "a3946fd4448f7be0e537b7dfc9a1cb637811ace3c832f6ba444d5d0904b05dc2",
+      "matchedBytes": 20,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 107,
+      "matchSha256": "28d1d6bb9479b90aa1574d205e23d440ad2f16a8f6884c7eaa4139a0fcef3baf",
+      "matchedBytes": 24,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 112,
+      "matchSha256": "a3946fd4448f7be0e537b7dfc9a1cb637811ace3c832f6ba444d5d0904b05dc2",
+      "matchedBytes": 20,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 112,
+      "matchSha256": "28d1d6bb9479b90aa1574d205e23d440ad2f16a8f6884c7eaa4139a0fcef3baf",
+      "matchedBytes": 24,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 117,
+      "matchSha256": "a3946fd4448f7be0e537b7dfc9a1cb637811ace3c832f6ba444d5d0904b05dc2",
+      "matchedBytes": 20,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 117,
+      "matchSha256": "28d1d6bb9479b90aa1574d205e23d440ad2f16a8f6884c7eaa4139a0fcef3baf",
+      "matchedBytes": 24,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+      "kind": "email_or_package_coordinate",
+      "line": 122,
+      "matchSha256": "27862e7293e219bd22d0737723dfc41ee65a5a0cb71d97a11897dc0137f5ff4f",
+      "matchedBytes": 28,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merge-guards.tap",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "0091ac1dc0891f181bdfbcc57a86d1c02d57c0679ac9fe3f4eef85be549be010",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merge-guards.tap",
+      "kind": "email_or_package_coordinate",
+      "line": 7,
+      "matchSha256": "0091ac1dc0891f181bdfbcc57a86d1c02d57c0679ac9fe3f4eef85be549be010",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merge-guards.tap",
+      "kind": "email_or_package_coordinate",
+      "line": 8,
+      "matchSha256": "0091ac1dc0891f181bdfbcc57a86d1c02d57c0679ac9fe3f4eef85be549be010",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merge-guards.tap",
+      "kind": "email_or_package_coordinate",
+      "line": 9,
+      "matchSha256": "0091ac1dc0891f181bdfbcc57a86d1c02d57c0679ac9fe3f4eef85be549be010",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merge-guards.tap",
+      "kind": "email_or_package_coordinate",
+      "line": 10,
+      "matchSha256": "0091ac1dc0891f181bdfbcc57a86d1c02d57c0679ac9fe3f4eef85be549be010",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merge-guards.tap",
+      "kind": "email_or_package_coordinate",
+      "line": 11,
+      "matchSha256": "0091ac1dc0891f181bdfbcc57a86d1c02d57c0679ac9fe3f4eef85be549be010",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merge-guards.tap",
+      "kind": "email_or_package_coordinate",
+      "line": 12,
+      "matchSha256": "0091ac1dc0891f181bdfbcc57a86d1c02d57c0679ac9fe3f4eef85be549be010",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merge-guards.tap",
+      "kind": "email_or_package_coordinate",
+      "line": 13,
+      "matchSha256": "0091ac1dc0891f181bdfbcc57a86d1c02d57c0679ac9fe3f4eef85be549be010",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merge-guards.tap",
+      "kind": "email_or_package_coordinate",
+      "line": 14,
+      "matchSha256": "0091ac1dc0891f181bdfbcc57a86d1c02d57c0679ac9fe3f4eef85be549be010",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merged-typecheck.log",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merged-typecheck.log",
+      "kind": "email_or_package_coordinate",
+      "line": 6,
+      "matchSha256": "be95d465725002a72d28ad84f8e175fd1cd4eb97cff2086904f84078b2ace61a",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merged-typecheck.log",
+      "kind": "email_or_package_coordinate",
+      "line": 32,
+      "matchSha256": "be95d465725002a72d28ad84f8e175fd1cd4eb97cff2086904f84078b2ace61a",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merged-typecheck-4096.log",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-merged-typecheck-4096.log",
+      "kind": "email_or_package_coordinate",
+      "line": 6,
+      "matchSha256": "be95d465725002a72d28ad84f8e175fd1cd4eb97cff2086904f84078b2ace61a",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-test-api.log",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-test-device-gateway.log",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-test-live-lists.log",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-final-typecheck.log",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-final-typecheck.log",
+      "kind": "email_or_package_coordinate",
+      "line": 6,
+      "matchSha256": "be95d465725002a72d28ad84f8e175fd1cd4eb97cff2086904f84078b2ace61a",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-final-api.log",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/c849-clean-lint.log",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/c849-clean-lint.log",
+      "kind": "email_or_package_coordinate",
+      "line": 6,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/c849-clean-lint.log",
+      "kind": "email_or_package_coordinate",
+      "line": 10,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/c849-clean-lint.log",
+      "kind": "email_or_package_coordinate",
+      "line": 15,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/c849-clean-lint.log",
+      "kind": "email_or_package_coordinate",
+      "line": 86,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/c849-clean-lint.log",
+      "kind": "email_or_package_coordinate",
+      "line": 91,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/c849-clean-lint-runtime.log",
+      "kind": "email_or_package_coordinate",
+      "line": 2,
+      "matchSha256": "d87210d164c5bda3d1c4642b201f9e4893546e0961a483fa4029f868a2f89a0e",
+      "matchedBytes": 14,
+      "classification": "exact_package_coordinate",
+      "proof": "Exact package.json workspace identity or fixed pnpm-lock coordinate; not an account email."
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/web-transport-trace/application.test.ts.before",
+      "kind": "assignment_secret",
+      "line": 34,
+      "matchSha256": "e4e36e993a702e4cd54064fe4ee575e4f1b68aedf5fc9fd32056c5f8156aa084",
+      "matchedBytes": 23,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "477dc1090c33b26889ed73655f8b581a88979acc",
+      "proofPath": "apps/api/src/application.test.ts",
+      "proofSha256": "aec9e3f4cff8c4df79b014d470313b7c58293bd0ca32f83d5f18746a0ed0c901",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/web-transport-trace/application.test.ts.before",
+      "kind": "assignment_secret",
+      "line": 118,
+      "matchSha256": "0460ab1ac342ec09290ad71ccf4f860672fb0e27024f2e1295fdb40036b1abd7",
+      "matchedBytes": 17,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "477dc1090c33b26889ed73655f8b581a88979acc",
+      "proofPath": "apps/api/src/application.test.ts",
+      "proofSha256": "aec9e3f4cff8c4df79b014d470313b7c58293bd0ca32f83d5f18746a0ed0c901",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/web-transport-trace/application.test.ts.before",
+      "kind": "assignment_secret",
+      "line": 119,
+      "matchSha256": "b1daf8baeefa346cb4645814e74648bd8bafed1efd25a4ebfdb9abc901d3f585",
+      "matchedBytes": 17,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "477dc1090c33b26889ed73655f8b581a88979acc",
+      "proofPath": "apps/api/src/application.test.ts",
+      "proofSha256": "aec9e3f4cff8c4df79b014d470313b7c58293bd0ca32f83d5f18746a0ed0c901",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/web-transport-trace/patch.diff",
+      "kind": "assignment_secret",
+      "line": 32,
+      "matchSha256": "ce9909719ba8fdd5aa34b1f2e896d9608b1ed60aecd8330bf2be28818c938d9b",
+      "matchedBytes": 37,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "proofPath": "apps/api/src/application.test.ts",
+      "proofSha256": "98176f15cf56ecc19fb38c3cd773e247b7f32f62151042404d308d217cdcdc9d",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/web-transport-trace/regression-addition.ts",
+      "kind": "assignment_secret",
+      "line": 12,
+      "matchSha256": "ce9909719ba8fdd5aa34b1f2e896d9608b1ed60aecd8330bf2be28818c938d9b",
+      "matchedBytes": 37,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "proofPath": "apps/api/src/application.test.ts",
+      "proofSha256": "98176f15cf56ecc19fb38c3cd773e247b7f32f62151042404d308d217cdcdc9d",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/web-transport-trace/source/apps/api/src/application.test.ts",
+      "kind": "assignment_secret",
+      "line": 38,
+      "matchSha256": "e4e36e993a702e4cd54064fe4ee575e4f1b68aedf5fc9fd32056c5f8156aa084",
+      "matchedBytes": 23,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "proofPath": "apps/api/src/application.test.ts",
+      "proofSha256": "98176f15cf56ecc19fb38c3cd773e247b7f32f62151042404d308d217cdcdc9d",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/web-transport-trace/source/apps/api/src/application.test.ts",
+      "kind": "assignment_secret",
+      "line": 122,
+      "matchSha256": "0460ab1ac342ec09290ad71ccf4f860672fb0e27024f2e1295fdb40036b1abd7",
+      "matchedBytes": 17,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "proofPath": "apps/api/src/application.test.ts",
+      "proofSha256": "98176f15cf56ecc19fb38c3cd773e247b7f32f62151042404d308d217cdcdc9d",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/web-transport-trace/source/apps/api/src/application.test.ts",
+      "kind": "assignment_secret",
+      "line": 123,
+      "matchSha256": "b1daf8baeefa346cb4645814e74648bd8bafed1efd25a4ebfdb9abc901d3f585",
+      "matchedBytes": 17,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "proofPath": "apps/api/src/application.test.ts",
+      "proofSha256": "98176f15cf56ecc19fb38c3cd773e247b7f32f62151042404d308d217cdcdc9d",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/web-transport-trace/source/apps/api/src/application.test.ts",
+      "kind": "assignment_secret",
+      "line": 221,
+      "matchSha256": "ce9909719ba8fdd5aa34b1f2e896d9608b1ed60aecd8330bf2be28818c938d9b",
+      "matchedBytes": 37,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "proofPath": "apps/api/src/application.test.ts",
+      "proofSha256": "98176f15cf56ecc19fb38c3cd773e247b7f32f62151042404d308d217cdcdc9d",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/archive-a65-c849-integration/sources/lib/web-connection/client.test.ts",
+      "kind": "bearer_value",
+      "line": 58,
+      "matchSha256": "96b8cbbfb3e212776ccdb9bb16d174ba279ec1f8d985b41097a64b424528eba9",
+      "matchedBytes": 18,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "proofPath": "lib/web-connection/client.test.ts",
+      "proofSha256": "4d37302fea3cc367a3cb0dfd969e88be0f3fb2cce6953f8baa6eb25e5ccf38cd",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/archive-a65-c849-integration/sources/lib/web-connection/client.test.ts",
+      "kind": "bearer_value",
+      "line": 146,
+      "matchSha256": "a1d93e3adceb80b5c4a625bb3a288a3fe10cccf7560e7956ddec7004ab1199a4",
+      "matchedBytes": 21,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "proofPath": "lib/web-connection/client.test.ts",
+      "proofSha256": "4d37302fea3cc367a3cb0dfd969e88be0f3fb2cce6953f8baa6eb25e5ccf38cd",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    },
+    {
+      "source": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/archive-a65-c849-integration/sources/lib/web-connection/client.test.ts",
+      "kind": "assignment_secret",
+      "line": 58,
+      "matchSha256": "f1221650588154b33f3390bdf6fdb864a87b1c76220f3941264f3e3e878450f8",
+      "matchedBytes": 22,
+      "classification": "exact_source_only_request_fixture",
+      "proofRevision": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "proofPath": "lib/web-connection/client.test.ts",
+      "proofSha256": "4d37302fea3cc367a3cb0dfd969e88be0f3fb2cce6953f8baa6eb25e5ccf38cd",
+      "literalExistsInFixedSource": true,
+      "runtimeCredential": false
+    }
+  ],
+  "matchedFixtureValuesCopiedIntoReview": false,
+  "signedUrlsPersisted": false,
+  "zipRetained": false,
+  "rawMixedCiLogsIncluded": false,
+  "localTestAndValidationStdoutIncluded": true,
+  "sourceBundleOrBase64Included": false,
+  "cacheOrDependencyFileBodiesIncluded": false,
+  "scope": "Narrow privacy review of the exact 52 files, not a guarantee about arbitrary future additions. Local stdout comes from owned tests/build checks, not mixed production workflow logs. No original bytes were redacted or rewritten."
+}

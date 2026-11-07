@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: credentials live only in browser session storage, public metadata never contains a token
+ok 1 - credentials live only in browser session storage, public metadata never contains a token
+  ---
+  duration_ms: 12.353653
+  type: 'test'
+  ...
+# Subtest: RPC, live ticket, upload and download route to the active account; bearer never follows redirects or foreign origins
+ok 2 - RPC, live ticket, upload and download route to the active account; bearer never follows redirects or foreign origins
+  ---
+  duration_ms: 10.988412
+  type: 'test'
+  ...
+# Subtest: an identical user id from another server or the cloud is rejected rather than merged
+ok 3 - an identical user id from another server or the cloud is rejected rather than merged
+  ---
+  duration_ms: 3.683161
+  type: 'test'
+  ...
+# Subtest: switching aborts/fences old responses and disconnect clears only the selected server
+ok 4 - switching aborts/fences old responses and disconnect clears only the selected server
+  ---
+  duration_ms: 3.737574
+  type: 'test'
+  ...
+# Subtest: an unprobed stored address cannot start sign-in, and public input cannot provide a verifier or credential
+ok 5 - an unprobed stored address cannot start sign-in, and public input cannot provide a verifier or credential
+  ---
+  duration_ms: 0.509103
+  type: 'test'
+  ...
+# Subtest: a cloud read already in flight is also aborted and cannot populate the selected self-hosted account
+ok 6 - a cloud read already in flight is also aborted and cannot populate the selected self-hosted account
+  ---
+  duration_ms: 1.860339
+  type: 'test'
+  ...
+# Subtest: a late successful exchange cannot undo a later disconnect and its new session is revoked
+ok 7 - a late successful exchange cannot undo a later disconnect and its new session is revoked
+  ---
+  duration_ms: 2.368256
+  type: 'test'
+  ...
+# Subtest: account switching invalidates pending login proofs before any exchange request
+ok 8 - account switching invalidates pending login proofs before any exchange request
+  ---
+  duration_ms: 1.654248
+  type: 'test'
+  ...
+# Subtest: official renderer version checks stay anonymous and cloud-bound when a self-hosted backend is active
+ok 9 - official renderer version checks stay anonymous and cloud-bound when a self-hosted backend is active
+  ---
+  duration_ms: 1.458943
+  type: 'test'
+  ...
+# Subtest: official correlation stays cloud-bound when tracing is installed before the directory
+ok 10 - official correlation stays cloud-bound when tracing is installed before the directory
+  ---
+  duration_ms: 3.934647
+  type: 'test'
+  ...
+# Subtest: official correlation stays cloud-bound when tracing is installed after the directory
+not ok 11 - official correlation stays cloud-bound when tracing is installed after the directory
+  ---
+  duration_ms: 7.604233
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/lib/web-connection/client.test.ts:1:8971'
+  failureType: 'testCodeFailure'
+  error: |-
+    x-posthog-session-id
+    + actual - expected
+    
+    + 'synthetic-cloud-session'
+    - null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual: 'synthetic-cloud-session'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/Mikka/lib/web-connection/client.test.ts:184:69)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 10
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 348.186333

@@ -1,0 +1,46 @@
+{
+  "candidate": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+  "tree": "4cd678adf6b84a72b2e9e6fa123a45a1938112bb",
+  "baseMain": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+  "checkpoint": "d19322510fd940fbc277ca4d95ba0f8269a22d94",
+  "commits": [
+    {
+      "sha": "3cd2296ef0795644b2f30abf65a3df4ea428eece",
+      "files": [
+        "apps/api/src/application.ts",
+        "apps/api/src/application.test.ts"
+      ],
+      "message": "fix: trace web transport authentication and early responses"
+    },
+    {
+      "sha": "23c06c6a5872e1ddc825d6d10f41b870adb579e4",
+      "files": [
+        "lib/web-connection/client.ts",
+        "lib/web-connection/client.test.ts"
+      ],
+      "message": "fix: keep official telemetry identity on the cloud origin"
+    },
+    {
+      "sha": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+      "files": [
+        "docs/operations/tracing.md",
+        "scripts/acceptance/run-observability.md"
+      ],
+      "message": "docs: bind browser acceptance to the selected cloud backend"
+    }
+  ],
+  "sourceHashes": {
+    "apps/api/src/application.ts": "3f7f1cec43009acd2778dcfdbb0557f4956de0a0e49ea930861caa2a97c3d315",
+    "apps/api/src/application.test.ts": "98176f15cf56ecc19fb38c3cd773e247b7f32f62151042404d308d217cdcdc9d",
+    "lib/web-connection/client.ts": "57c246ffa01d78689a354cc89a03dca0b5c18061178ef910d08a307fb023b642",
+    "lib/web-connection/client.test.ts": "4d37302fea3cc367a3cb0dfd969e88be0f3fb2cce6953f8baa6eb25e5ccf38cd"
+  },
+  "rootReviewedDiffs": true,
+  "fullTypecheckExit": 0,
+  "fullApiTests": 126,
+  "fullApiSkipped": 0,
+  "fullApiExit": 0,
+  "fullLintPending": true,
+  "ciAndNativePending": true,
+  "productionAcceptance": false
+}

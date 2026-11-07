@@ -1,0 +1,190 @@
+TAP version 13
+# Subtest: official web bearer adaptation is installed before the API scope and strips handler cookies afterward
+ok 1 - official web bearer adaptation is installed before the API scope and strips handler cookies afterward
+  ---
+  duration_ms: 23.442271
+  type: 'test'
+  ...
+# Subtest: request cookies match the installed SDK for duplicates and malformed encoding without rewriting auth headers
+ok 2 - request cookies match the installed SDK for duplicates and malformed encoding without rewriting auth headers
+  ---
+  duration_ms: 3.779938
+  type: 'test'
+  ...
+# Subtest: exact routes, decoded parameters, HEAD and OPTIONS preserve method contracts
+ok 3 - exact routes, decoded parameters, HEAD and OPTIONS preserve method contracts
+  ---
+  duration_ms: 8.883365
+  type: 'test'
+  ...
+# Subtest: API slash redirects preserve POST replay and never execute a handler or decode an encoded route
+ok 4 - API slash redirects preserve POST replay and never execute a handler or decode an encoded route
+  ---
+  duration_ms: 4.944737
+  type: 'test'
+  ...
+# Subtest: parallel requests retain their own cookie, locale, React cache and all after ALS
+ok 5 - parallel requests retain their own cookie, locale, React cache and all after ALS
+  ---
+  duration_ms: 2.336619
+  type: 'test'
+  ...
+# Subtest: multiple raw Set-Cookie fields retain Expires, chunks and deletion attributes
+ok 6 - multiple raw Set-Cookie fields retain Expires, chunks and deletion attributes
+  ---
+  duration_ms: 2.106652
+  type: 'test'
+  ...
+# Subtest: real Web stream complete schedules after once and retains waitUntil
+ok 7 - real Web stream complete schedules after once and retains waitUntil
+  ---
+  duration_ms: 1.32485
+  type: 'test'
+  ...
+# Subtest: real Web stream cancel schedules after once and retains waitUntil
+ok 8 - real Web stream cancel schedules after once and retains waitUntil
+  ---
+  duration_ms: 1.289648
+  type: 'test'
+  ...
+# Subtest: real Web stream error schedules after once and retains waitUntil
+ok 9 - real Web stream error schedules after once and retains waitUntil
+  ---
+  duration_ms: 1.610993
+  type: 'test'
+  ...
+# Subtest: native Request facade retains URL, query, clone, body and cancellation without global patch
+ok 10 - native Request facade retains URL, query, clone, body and cancellation without global patch
+  ---
+  duration_ms: 3.252442
+  type: 'test'
+  ...
+# Subtest: actual srvx NodeRequest backing preserves POST and rejects stale canonical authority
+ok 11 - actual srvx NodeRequest backing preserves POST and rejects stale canonical authority
+  ---
+  duration_ms: 4.10578
+  type: 'test'
+  ...
+# Subtest: locale and translations use actual ICU formatter; localized URL keeps query/hash
+ok 12 - locale and translations use actual ICU formatter; localized URL keeps query/hash
+  ---
+  duration_ms: 1.372793
+  type: 'test'
+  ...
+# Subtest: web transport accepted belongs to the original request trace before any business scope
+ok 13 - web transport accepted belongs to the original request trace before any business scope
+  ---
+  duration_ms: 13.993052
+  type: 'test'
+  ...
+# Subtest: web transport expired belongs to the original request trace before any business scope
+ok 14 - web transport expired belongs to the original request trace before any business scope
+  ---
+  duration_ms: 5.869653
+  type: 'test'
+  ...
+# Subtest: web transport unavailable belongs to the original request trace before any business scope
+ok 15 - web transport unavailable belongs to the original request trace before any business scope
+  ---
+  duration_ms: 3.293153
+  type: 'test'
+  ...
+# Subtest: web transport disabled belongs to the original request trace before any business scope
+ok 16 - web transport disabled belongs to the original request trace before any business scope
+  ---
+  duration_ms: 2.280504
+  type: 'test'
+  ...
+# Subtest: web transport preflight belongs to the original request trace before any business scope
+ok 17 - web transport preflight belongs to the original request trace before any business scope
+  ---
+  duration_ms: 1.789492
+  type: 'test'
+  ...
+# Subtest: a rejected transport preparation keeps the original H3 error response and finishes its trace once
+ok 18 - a rejected transport preparation keeps the original H3 error response and finishes its trace once
+  ---
+  duration_ms: 2.795882
+  type: 'test'
+  ...
+# Subtest: adapted Web stream complete retains tracing and after disposal
+ok 19 - adapted Web stream complete retains tracing and after disposal
+  ---
+  duration_ms: 1.1057
+  type: 'test'
+  ...
+# Subtest: adapted Web stream cancel retains tracing and after disposal
+ok 20 - adapted Web stream cancel retains tracing and after disposal
+  ---
+  duration_ms: 0.649491
+  type: 'test'
+  ...
+# Subtest: adapted Web stream error retains tracing and after disposal
+ok 21 - adapted Web stream error retains tracing and after disposal
+  ---
+  duration_ms: 0.745676
+  type: 'test'
+  ...
+# Subtest: request, deferred job, durable queue carrier and remote run share ancestry and safe session metadata
+ok 22 - request, deferred job, durable queue carrier and remote run share ancestry and safe session metadata
+  ---
+  duration_ms: 11.768592
+  type: 'test'
+  ...
+# Subtest: ordinary errors and slow requests retain their local child timeline; fast success stays sampled
+ok 23 - ordinary errors and slow requests retain their local child timeline; fast success stays sampled
+  ---
+  duration_ms: 7.664775
+  type: 'test'
+  ...
+# Subtest: an after scheduler without an async context still keeps the scheduling request
+ok 24 - an after scheduler without an async context still keeps the scheduling request
+  ---
+  duration_ms: 2.168695
+  type: 'test'
+  ...
+# Subtest: head-sampled ordinary failures use effective rate one for the entire local tree
+ok 25 - head-sampled ordinary failures use effective rate one for the entire local tree
+  ---
+  duration_ms: 3.468908
+  type: 'test'
+  ...
+# Subtest: a critical failure is retained, preserves safe cause detail and never exports the message
+ok 26 - a critical failure is retained, preserves safe cause detail and never exports the message
+  ---
+  duration_ms: 1.775612
+  type: 'test'
+  ...
+# Subtest: durable SDK stage labels and run identity survive attributes added after span start
+ok 27 - durable SDK stage labels and run identity survive attributes added after span start
+  ---
+  duration_ms: 2.047262
+  type: 'test'
+  ...
+# Subtest: CORS preflight has exact origin/header allowlists and never enables cookie credentials
+ok 28 - CORS preflight has exact origin/header allowlists and never enables cookie credentials
+  ---
+  duration_ms: 7.466736
+  type: 'test'
+  ...
+# Subtest: fresh bearer validation precedes adaptation; cookie/cache authority and response cookies are removed
+ok 29 - fresh bearer validation precedes adaptation; cookie/cache authority and response cookies are removed
+  ---
+  duration_ms: 9.375398
+  type: 'test'
+  ...
+# Subtest: public discovery never receives ambient authority, and disabling blocks an existing bearer
+ok 30 - public discovery never receives ambient authority, and disabling blocks an existing bearer
+  ---
+  duration_ms: 1.816473
+  type: 'test'
+  ...
+1..30
+# tests 30
+# suites 0
+# pass 30
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 893.631712

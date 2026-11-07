@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "kind": "source_only_posthog_selected_backend_header_fix",
+  "frozenAt": "2026-11-07T17:07:06.734145+00:00",
+  "sourceBase": {
+    "sha": "477dc1090c33b26889ed73655f8b581a88979acc",
+    "tree": "83ba6ec57c28dce54b19fe8b900065a99a62b430",
+    "productAndTestBeforeEditEqualMain": "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+  },
+  "scope": [
+    "lib/web-connection/client.ts",
+    "lib/web-connection/client.test.ts"
+  ],
+  "change": "Only for an active selected backend whose origin differs from the official app, remove x-posthog-session-id, x-posthog-window-id and x-posthog-distinct-id from the forwarded request. The default Cloud branch is untouched.",
+  "unchanged": [
+    "Remote CORS allowlist",
+    "All authority/version headers and cookie handling",
+    "Business headers, request method/body and abort signal",
+    "traceparent/tracestate handling",
+    "Production driver and measurement windows",
+    "Official Cloud correlation headers"
+  ],
+  "cause": {
+    "installedPostHog": "1.438.13",
+    "defaultLazyExtension": "The extension can wrap the already installed directory fetch, decorate an official URL, and pass that decorated request into selected-backend rewriting.",
+    "initialFailure": "Three official PostHog headers survived the rewrite and were not allowed by the new remote CORS boundary.",
+    "reviewSources": [
+      {
+        "path": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-observability-compatibility-review.json",
+        "bytes": 26299,
+        "sha256": "ce4ce33881113c12c6d4f0c26b9ba28d56292cc65356ee272e5061c96de0db5d",
+        "gitBlob": "d5c4e57d44caf6c6f94fd09157f905f9480f8765"
+      },
+      {
+        "path": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-posthog-fetch-order-review.json",
+        "bytes": 9125,
+        "sha256": "f2b737b20fe57107201a4ed4e28e09c69b42c68073e6fa7b6aa2c7d6a407aea0",
+        "gitBlob": "e4d648075da6f78e33e17172a3a5f6a2602c1ceb"
+      }
+    ]
+  },
+  "validation": [
+    {
+      "phase": "actual_shared_source_red",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/web-connection/client.test.ts"
+      ],
+      "actualExit": 1,
+      "tests": 11,
+      "passed": 10,
+      "failed": 1,
+      "skipped": 0,
+      "productBeforeEdit": true,
+      "failureTest": "official correlation stays cloud-bound when tracing is installed after the directory",
+      "failureCode": "ERR_ASSERTION",
+      "observedSyntheticHeaderPresent": true,
+      "log": {
+        "path": "/dev/shm/issue1512-ops-812e3b7d6d45/a65-posthog-header-fix/actual-source-red.tap",
+        "bytes": 3555,
+        "sha256": "16ad64cd7a23c2248a470142559ff5026db0e07f047d73e90eec80a3314467c6",
+        "gitBlob": "d01c6d6b3320ce170840d52750106cce85e226d5"
+      }
+    },
+    {
+      "phase": "actual_shared_source_green",
+      "command": [
+        "node",
+        "--test-reporter=tap",
+        "--import",
+        "./tests/support/server-only.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "lib/web-connection/client.test.ts"
+      ],
+      "actualExit": 0,
+      "tests": 11,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "log": {
+        "path": "/dev/shm/issue1512-ops-812e3b7d6d45/a65-posthog-header-fix/actual-source-green.tap",
+        "bytes": 2928,
+        "sha256": "e2fc59322f8586573fa56006f6651ceee5dedb2ced81f7274f6019f04c802eda",
+        "gitBlob": "1e901cadb11af19a9773e5c04b7a2dee3771cdef"
+      }
+    },
+    {
+      "phase": "direct_lint",
+      "command": [
+        "./node_modules/.bin/oxlint",
+        "--deny-warnings",
+        "lib/web-connection/client.ts",
+        "lib/web-connection/client.test.ts"
+      ],
+      "actualExit": 0,
+      "log": {
+        "path": "/dev/shm/issue1512-ops-812e3b7d6d45/a65-posthog-header-fix/lint.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    {
+      "phase": "owned_diff_check",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "lib/web-connection/client.ts",
+        "lib/web-connection/client.test.ts"
+      ],
+      "actualExit": 0,
+      "log": {
+        "path": "/dev/shm/issue1512-ops-812e3b7d6d45/a65-posthog-header-fix/diffcheck.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    }
+  ],
+  "newRegressionCoverage": [
+    "Real WebServerDirectory with a pure exact three-header/official-host SDK decorator installed before the directory",
+    "Real WebServerDirectory with the same decorator installed after the directory",
+    "Selected remote outgoing request contains none of the official person/session/window identifiers",
+    "Switch back to Cloud retains all three identifiers",
+    "Remote request retains its selected bearer, desktop protocol, content-type, locale, stream key, POST body and live abort signal"
+  ],
+  "testBoundary": "The decorator models the inspected SDK header injection, not the full SDK or a browser. Tests use synthetic in-memory Request/Response fixtures only; no browser CORS exchange, remote service, account login or provider was executed.",
+  "ciInclusion": "The existing test:api command includes lib/web-connection/*.test.ts, including this modified file.",
+  "sources": [
+    {
+      "path": "lib/web-connection/client.ts",
+      "bytes": 17768,
+      "sha256": "57c246ffa01d78689a354cc89a03dca0b5c18061178ef910d08a307fb023b642",
+      "gitBlob": "0f939639da15f2e8b20a5b71f31cbd218e16794d"
+    },
+    {
+      "path": "lib/web-connection/client.test.ts",
+      "bytes": 11684,
+      "sha256": "4d37302fea3cc367a3cb0dfd969e88be0f3fb2cce6953f8baa6eb25e5ccf38cd",
+      "gitBlob": "865ef27fe57720520dd10d73f9adb49f370c62fb"
+    }
+  ],
+  "diffNumstat": [
+    "52\t2\tlib/web-connection/client.test.ts",
+    "5\t0\tlib/web-connection/client.ts"
+  ],
+  "privacy": {
+    "testHeaderValuesSynthetic": true,
+    "rawLogsContainProductionPayload": false,
+    "credentialsRead": false
+  },
+  "execution": {
+    "staged": false,
+    "committed": false,
+    "pushed": false,
+    "stateOrRefChanged": false,
+    "resourcesCreated": 0,
+    "productionAcceptancePerformed": false,
+    "newNativeBudgetMeasured": false
+  },
+  "remaining": "Normal integrated CI and exact-source production/Native acceptance remain the owner workflow; previous 1bd budget evidence is not relabeled for this new code."
+}

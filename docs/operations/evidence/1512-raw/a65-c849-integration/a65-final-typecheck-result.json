@@ -1,0 +1,7 @@
+{
+  "command": "NODE_OPTIONS=--max-old-space-size=4096 pnpm typecheck",
+  "exitCode": 0,
+  "elapsedMs": 48967,
+  "bytes": 289,
+  "sha256": "f2eaa7542b5c0c3e76881ea0954a639b6a53716a41ddf0052d074d5c06f1aaeb"
+}

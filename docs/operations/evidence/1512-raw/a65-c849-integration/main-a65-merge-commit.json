@@ -1,0 +1,39 @@
+{
+  "mainMerge": "fde786dcedff68ea18ca4c02595a29b1e0f9c571",
+  "mainMergeParents": [
+    "bd5f23536fb64f5db81668e60f2353678832550f",
+    "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+  ],
+  "tree": "83ba6ec57c28dce54b19fe8b900065a99a62b430",
+  "workflowCheckpoint": "d19322510fd940fbc277ca4d95ba0f8269a22d94",
+  "checkpointTree": "a7a15b234eac20e4938f424d4ff09aaf86e93bf3",
+  "checkpointOriginalTextRemoteVerified": true,
+  "checkpointMerge": "477dc1090c33b26889ed73655f8b581a88979acc",
+  "checkpointMergeParents": [
+    "fde786dcedff68ea18ca4c02595a29b1e0f9c571",
+    "d19322510fd940fbc277ca4d95ba0f8269a22d94"
+  ],
+  "checkpointMergeChangesNoProductBytes": true,
+  "fullTypecheckExit": 0,
+  "fullTypecheckHeapMb": 4096,
+  "initialTypecheckHeapOomPreserved": true,
+  "targetedSourceScripts": [
+    "test:api",
+    "test:device-gateway",
+    "test:live-lists"
+  ],
+  "targetedSourceExit": 0,
+  "authBootstrapAndRuntimeAndDbInventoryExit": 0,
+  "testFixtureUpdate": "Expose existing cloudAuthClient export through the existing shared SDK fixture atom; original behavior assertions retained",
+  "mergeStageWhitespace": {
+    "inheritedMainPath": "lib/web-connection/browser.ts",
+    "identicalToMain": true,
+    "featureDiffAgainstCurrentMainExit": 0,
+    "unrelatedMainBytesPreserved": true
+  },
+  "additionalIntegrationFixesPending": [
+    "prepareWebTransport outside request trace",
+    "official PostHog IDs forwarded to selected remote backend"
+  ],
+  "published": false
+}

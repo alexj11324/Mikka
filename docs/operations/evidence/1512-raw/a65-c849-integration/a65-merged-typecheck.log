@@ -1,0 +1,34 @@
+
+> next-app@0.0.1 typecheck /workspace/scratch/812e3b7d6d45/Mikka
+> tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck
+
+
+> @mikka/frontend@0.0.1 typecheck /workspace/scratch/812e3b7d6d45/Mikka/apps/frontend
+> tsc --noEmit -p tsconfig.json
+
+
+<--- Last few GCs --->
+
+[91:0x1b49f000]    48283 ms: Mark-Compact 2036.0 (2053.3) -> 2033.8 (2060.8) MB, pooled: 0 MB, 694.08 / 0.00 ms  (average mu = 0.163, current mu = 0.039) allocation failure; scavenge might not succeed
+[91:0x1b49f000]    49042 ms: Mark-Compact (reduce) 2041.8 (2060.8) -> 2041.6 (2053.0) MB, pooled: 0 MB, 148.00 / 0.00 ms  (+ 498.5 ms in 112 steps since start of marking, biggest step 5.2 ms, walltime since start of marking 683 ms) (average mu = 0.156, cu
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0x91d810  [node]
+ 2: 0x75bb1b node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]
+ 3: 0xc755c0  [node]
+ 4: 0xc756bf  [node]
+ 5: 0xf24835  [node]
+ 6: 0xf372ac  [node]
+ 7: 0xf09aab  [node]
+ 8: 0xede634  [node]
+ 9: 0xec6084  [node]
+10: 0x1296fae  [node]
+11: 0x1299612  [node]
+12: 0x13fba65  [node]
+13: 0x7fdd2fe769b6 
+Aborted
+/workspace/scratch/812e3b7d6d45/Mikka/apps/frontend:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @mikka/frontend@0.0.1 typecheck: `tsc --noEmit -p tsconfig.json`
+Exit status 134
+ ELIFECYCLE  Command failed with exit code 134.

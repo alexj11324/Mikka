@@ -1,0 +1,14 @@
+Auto-merging apps/api/generated/routes.json
+CONFLICT (content): Merge conflict in apps/api/generated/routes.json
+Auto-merging apps/api/generated/routes.ts
+CONFLICT (content): Merge conflict in apps/api/generated/routes.ts
+Auto-merging apps/frontend/src/web/auth-routing.ts
+Auto-merging apps/frontend/src/web/platform.tsx
+Auto-merging apps/frontend/src/web/rpc.ts
+CONFLICT (content): Merge conflict in apps/frontend/src/web/rpc.ts
+Auto-merging lib/live/browser-runtime.ts
+CONFLICT (content): Merge conflict in lib/live/browser-runtime.ts
+Auto-merging lib/live/ticket.test.ts
+Auto-merging package.json
+CONFLICT (content): Merge conflict in package.json
+Automatic merge failed; fix conflicts and then commit the result.

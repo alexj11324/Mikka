@@ -1,0 +1,26 @@
+[
+  {
+    "command": "pnpm test:api",
+    "exitCode": 0,
+    "elapsedMs": 13535,
+    "path": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-test-api.log",
+    "bytes": 14561,
+    "sha256": "94a32de0bc2315d922e1c0ad7f02d1fc185dfe57917062bebe50d390707665d4"
+  },
+  {
+    "command": "pnpm test:device-gateway",
+    "exitCode": 0,
+    "elapsedMs": 95558,
+    "path": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-test-device-gateway.log",
+    "bytes": 20015,
+    "sha256": "66ad09058fd38b701df864db63f00bf9613c7c2d30d969cac6ceef60d9228b52"
+  },
+  {
+    "command": "pnpm test:live-lists",
+    "exitCode": 0,
+    "elapsedMs": 110543,
+    "path": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/a65-test-live-lists.log",
+    "bytes": 7926,
+    "sha256": "92415656942a97d4a8630d4e60d5f542b546001d14cbf4851c1e7abef3e5d020"
+  }
+]

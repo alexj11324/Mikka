@@ -1,0 +1,241 @@
+TAP version 13
+# /workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1752
+#   let error = new Error(text);
+#               ^
+# Error: Build failed with 1 error:
+# apps/frontend/src/web/platform.tsx:11:21: ERROR: No matching export in "auth-fixture:@/lib/auth-client" for import "cloudAuthClient"
+#     at failureErrorWithLog (/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1752:15)
+#     at /workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1211:25
+#     at runOnEndCallbacks (/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1592:45)
+#     at buildResponseToResult (/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1209:7)
+#     at /workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:1236:16
+#     at responseCallbacks.<computed> (/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:886:9)
+#     at handleIncomingPacket (/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:941:12)
+#     at Socket.readFromStdout (/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js:864:7)
+#     at Socket.emit (node:events:514:28)
+#     at addChunk (node:internal/streams/readable:569:12) {
+#   errors: [Getter/Setter],
+#   warnings: [Getter/Setter]
+# }
+# Node.js v24.22.1
+# Subtest: apps/frontend/scripts/auth-only-bootstrap.test.mjs
+not ok 1 - apps/frontend/scripts/auth-only-bootstrap.test.mjs
+  ---
+  duration_ms: 757.814789
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/apps/frontend/scripts/auth-only-bootstrap.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: web RPC keeps the shared codec but uses only normal same-origin cookie transport
+ok 2 - web RPC keeps the shared codec but uses only normal same-origin cookie transport
+  ---
+  duration_ms: 128.149155
+  type: 'test'
+  ...
+# Subtest: an old web owner delayed 401 cannot clear the newly authenticated owner
+ok 3 - an old web owner delayed 401 cannot clear the newly authenticated owner
+  ---
+  duration_ms: 58.737188
+  type: 'test'
+  ...
+# Subtest: an old web owner network rejection does not overwrite the new owner transport
+ok 4 - an old web owner network rejection does not overwrite the new owner transport
+  ---
+  duration_ms: 39.601608
+  type: 'test'
+  ...
+# Subtest: web owner changes fence both asynchronous response bodies and pre-request encoding
+ok 5 - web owner changes fence both asynchronous response bodies and pre-request encoding
+  ---
+  duration_ms: 30.443455
+  type: 'test'
+  ...
+# Subtest: web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior
+ok 6 - web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior
+  ---
+  duration_ms: 14.649295
+  type: 'test'
+  ...
+# Subtest: identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations
+ok 7 - identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations
+  ---
+  duration_ms: 16.844866
+  type: 'test'
+  ...
+# Subtest: web session owner watches the actual SDK atom without mutating it or treating an error as logout
+ok 8 - web session owner watches the actual SDK atom without mutating it or treating an error as logout
+  ---
+  duration_ms: 3.660257
+  type: 'test'
+  ...
+# Subtest: deployment fetch pins actual API Requests while preserving method, body, headers and abort signal
+ok 9 - deployment fetch pins actual API Requests while preserving method, body, headers and abort signal
+  ---
+  duration_ms: 7.396819
+  type: 'test'
+  ...
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node lifecycle] start
+# Subtest: runner bounds concurrency and still reports every suite when one fails
+ok 10 - runner bounds concurrency and still reports every suite when one fails
+  ---
+  duration_ms: 32.111237
+  type: 'test'
+  ...
+# Subtest: a suite whose clone failed or is missing never runs, and the gate fails
+ok 11 - a suite whose clone failed or is missing never runs, and the gate fails
+  ---
+  duration_ms: 2.162815
+  type: 'test'
+  ...
+# Subtest: clone names stay loopback *_e2e databases within the identifier limit
+ok 12 - clone names stay loopback *_e2e databases within the identifier limit
+  ---
+  duration_ms: 0.406444
+  type: 'test'
+  ...
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node stderr] err
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node stdout] out
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node lifecycle] exit code=3 signal=none
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node lifecycle] close code=3 signal=none
+# [db-runner /nonexistent/command lifecycle] start
+# Subtest: the default runner buffers a suite's output and reports its exit status
+ok 13 - the default runner buffers a suite's output and reports its exit status
+  ---
+  duration_ms: 103.605804
+  type: 'test'
+  ...
+# [db-runner /nonexistent/command lifecycle] close code=-2 signal=none
+# ::error::Missing/invalid E2E_DATABASE_URL
+# Subtest: the CLI streams bounded attributed progress before a suite exits and retains its complete failure
+ok 14 - the CLI streams bounded attributed progress before a suite exits and retains its complete failure
+  ---
+  duration_ms: 208.239876
+  type: 'test'
+  ...
+# Subtest: the CLI drains large failed-suite diagnostics before exiting with the failure status
+ok 15 - the CLI drains large failed-suite diagnostics before exiting with the failure status
+  ---
+  duration_ms: 309.361069
+  type: 'test'
+  ...
+# Subtest: runner validates all expected and discovered suites before sharding and before subprocesses
+ok 16 - runner validates all expected and discovered suites before sharding and before subprocesses
+  ---
+  duration_ms: 1.457791
+  type: 'test'
+  ...
+# Subtest: runner rejects invalid shards before execution and preserves per-shard summary failures
+ok 17 - runner rejects invalid shards before execution and preserves per-shard summary failures
+  ---
+  duration_ms: 2.649651
+  type: 'test'
+  ...
+# Subtest: parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions
+ok 18 - parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions
+  ---
+  duration_ms: 0.263207
+  type: 'test'
+  ...
+# Subtest: only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess
+ok 19 - only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess
+  ---
+  duration_ms: 0.425482
+  type: 'test'
+  ...
+# Subtest: feature inventory fails on deleted suite, removed script or zero enrollment
+ok 20 - feature inventory fails on deleted suite, removed script or zero enrollment
+  ---
+  duration_ms: 0.443279
+  type: 'test'
+  ...
+# Subtest: discovers every present pg/DB suite and rejects unregistered or ambiguous files
+ok 21 - discovers every present pg/DB suite and rejects unregistered or ambiguous files
+  ---
+  duration_ms: 0.40429
+  type: 'test'
+  ...
+# Subtest: type-only pg imports do not enroll source-only tests as database suites
+ok 22 - type-only pg imports do not enroll source-only tests as database suites
+  ---
+  duration_ms: 0.21203
+  type: 'test'
+  ...
+# Subtest: self-managed suites are excluded only with a reason and a live dedicated runner
+ok 23 - self-managed suites are excluded only with a reason and a live dedicated runner
+  ---
+  duration_ms: 0.439073
+  type: 'test'
+  ...
+# Subtest: dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests
+ok 24 - dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests
+  ---
+  duration_ms: 0.683032
+  type: 'test'
+  ...
+# Subtest: real-driver offline exclusions require the actual source guard and the explicit pure script
+ok 25 - real-driver offline exclusions require the actual source guard and the explicit pure script
+  ---
+  duration_ms: 1.70844
+  type: 'test'
+  ...
+# Subtest: offline guard must be on the same step that runs the guarded file (GM3)
+ok 26 - offline guard must be on the same step that runs the guarded file (GM3)
+  ---
+  duration_ms: 0.543851
+  type: 'test'
+  ...
+# Subtest: live database authentication schema inspection finishes before temporary-schema fixtures start
+ok 27 - live database authentication schema inspection finishes before temporary-schema fixtures start
+  ---
+  duration_ms: 23.078469
+  type: 'test'
+  ...
+# Subtest: test:personal-mailbox-core runs the runtime-off step even when the first step fails, and still fails overall
+ok 28 - test:personal-mailbox-core runs the runtime-off step even when the first step fails, and still fails overall
+  ---
+  duration_ms: 8.102034
+  type: 'test'
+  ...
+# Subtest: offline guard import is resolved relative to the suite file
+ok 29 - offline guard import is resolved relative to the suite file
+  ---
+  duration_ms: 0.429419
+  type: 'test'
+  ...
+# Subtest: this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates
+ok 30 - this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates
+  ---
+  duration_ms: 578.114262
+  type: 'test'
+  ...
+# Subtest: self-improvement DB suite stays mandatory when its feature exists
+ok 31 - self-improvement DB suite stays mandatory when its feature exists
+  ---
+  duration_ms: 0.312612
+  type: 'test'
+  ...
+# Subtest: isolated fixture databases reject application targets before I/O
+ok 32 - isolated fixture databases reject application targets before I/O
+  ---
+  duration_ms: 32.499675
+  type: 'test'
+  ...
+# Subtest: isolated fixture databases create distinct empty databases and close admin pools on success or failure
+ok 33 - isolated fixture databases create distinct empty databases and close admin pools on success or failure
+  ---
+  duration_ms: 1.120422
+  type: 'test'
+  ...
+1..33
+# tests 33
+# suites 0
+# pass 32
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1484.687379

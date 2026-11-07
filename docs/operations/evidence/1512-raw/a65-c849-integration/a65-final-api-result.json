@@ -1,0 +1,25 @@
+{
+  "command": "pnpm test:api",
+  "exitCode": 0,
+  "elapsedMs": 13918,
+  "bytes": 15639,
+  "sha256": "17b02bb06eb4f56a2e0c27db33438e60d35f6da9e6feff2a94750cd62ae6273f",
+  "summaryBlocks": {
+    "tests": [
+      73,
+      53
+    ],
+    "pass": [
+      73,
+      53
+    ],
+    "fail": [
+      0,
+      0
+    ],
+    "skipped": [
+      0,
+      0
+    ]
+  }
+}

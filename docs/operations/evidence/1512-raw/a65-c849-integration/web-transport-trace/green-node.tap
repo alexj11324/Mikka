@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: official-Origin GET /api/desktop/discovery adapts the real Node facade without losing its body or after lifetime
+ok 1 - official-Origin GET /api/desktop/discovery adapts the real Node facade without losing its body or after lifetime
+  ---
+  duration_ms: 34.726502
+  type: 'test'
+  ...
+# Subtest: official-Origin POST /api/web/begin adapts the real Node facade without losing its body or after lifetime
+ok 2 - official-Origin POST /api/web/begin adapts the real Node facade without losing its body or after lifetime
+  ---
+  duration_ms: 16.165844
+  type: 'test'
+  ...
+# Subtest: official-Origin POST /api/web/revoke adapts the real Node facade without losing its body or after lifetime
+ok 3 - official-Origin POST /api/web/revoke adapts the real Node facade without losing its body or after lifetime
+  ---
+  duration_ms: 6.821741
+  type: 'test'
+  ...
+# Subtest: authenticated Node POST stream complete retains body, scoped Origin and the original disposal lifetime
+ok 4 - authenticated Node POST stream complete retains body, scoped Origin and the original disposal lifetime
+  ---
+  duration_ms: 5.672606
+  type: 'test'
+  ...
+# Subtest: authenticated Node POST stream cancel retains body, scoped Origin and the original disposal lifetime
+ok 5 - authenticated Node POST stream cancel retains body, scoped Origin and the original disposal lifetime
+  ---
+  duration_ms: 7.965129
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 441.366382

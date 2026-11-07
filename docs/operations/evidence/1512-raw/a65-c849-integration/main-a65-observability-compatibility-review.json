@@ -1,0 +1,644 @@
+{
+  "schemaVersion": 1,
+  "kind": "main_increment_observability_compatibility_review",
+  "reviewedAt": "2026-11-07T16:59:45.761550+00:00",
+  "mode": "read_only_fixed_git_source",
+  "base": {
+    "sha": "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+    "tree": "05d37a9751a53b4e30112b99141d3b4e4f7107ff"
+  },
+  "main": {
+    "sha": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+    "tree": "95d35d741dd076a0bb96ecd8549976251f93c6d1",
+    "parents": [
+      "d75bee79966ff55c881e9f96b73ce51a98fb290c",
+      "a6b448631b7ca0ce8c68dc50cc0de828b7ec7e61"
+    ]
+  },
+  "featureReference": {
+    "sha": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+    "tree": "67262992599d8de8a0aa04d35bbee3b98add277d"
+  },
+  "delta": {
+    "files": 70,
+    "nameStatusSha256": "fcf024df71972b9e802aaf2f11a496abb3b323172d8e23f4a46a82e442f26f46",
+    "repositoryInstructionsChanged": false
+  },
+  "scope": [
+    "production_acceptance_driver",
+    "default_cloud_authentication",
+    "selected_backend_transport",
+    "browser_trace_and_session_carrier",
+    "live_revocation_and_scope",
+    "native_query_budget_compatibility"
+  ],
+  "conclusion": {
+    "defaultCloudDriverHardBlockerObserved": false,
+    "explicitNewTransportObservabilityGap": true,
+    "automaticMergeSemanticsVerified": false,
+    "productionAccepted": false,
+    "newMainQueryBudgetAccepted": false
+  },
+  "findings": [
+    {
+      "id": "cross_origin_auth_before_trace",
+      "classification": "confirmed_observability_gap",
+      "paths": [
+        "apps/api/src/application.ts:59-64",
+        "apps/api/src/index.ts:10-15",
+        "lib/web-connection/transport.ts:84-100",
+        "lib/tracing/node.ts:90-120"
+      ],
+      "facts": [
+        "The new prepared transport awaits fresh bearer authentication before beginTrace and request-scope creation.",
+        "Prepared 401/403/503 and OPTIONS responses return before beginTrace.",
+        "The feature tracing provider registers PostgreSQL instrumentation with requireParentSpan=true; it does not register an inbound HTTP instrumentation fallback."
+      ],
+      "impact": "New selected-backend cross-origin authentication and early rejection lack the normal API trace/route context.",
+      "defaultCloudBoundary": "No-Origin or same-Origin requests return null at transport line54, before authentication. The existing official Cloud driver and native same-server protocol do not enter this new authentication branch.",
+      "mergeReviewAction": "Preserve the original H3 request as trace source and its disposal/after lifetime; if closing this gap, establish the existing trace around transport preparation without weakening fresh authentication."
+    },
+    {
+      "id": "new_backend_carrier_not_enabled",
+      "classification": "confirmed_scope_limit",
+      "paths": [
+        "lib/web-connection/transport.ts:4-8,65-71",
+        "instrumentation-client.ts",
+        "apps/frontend/src/web/runtime.ts"
+      ],
+      "facts": [
+        "The CORS request-header allowlist does not include traceparent, tracestate, x-posthog-session-id or x-posthog-distinct-id.",
+        "The feature browser tracing host configuration is scoped to the current/official hostname; no self-hosted host is newly added by this delta."
+      ],
+      "impact": "The new self-hosted browser lane cannot be described as having verified browser-to-backend trace/Replay continuity. An explicitly supplied omitted header would be rejected by preflight; normal functionality is not asserted to fail merely because no such header is sent.",
+      "mergeReviewAction": "Do not add arbitrary hosts or forward correlation to unapproved destinations to silence this finding; any new-backend telemetry policy needs an explicit supported-host contract."
+    },
+    {
+      "id": "version_is_renderer_not_selected_backend",
+      "classification": "production_operator_precondition",
+      "paths": [
+        "lib/web-connection/client.ts:203-238",
+        "lib/web-connection/selection.ts"
+      ],
+      "facts": [
+        "Official /api/version remains anonymous and official-cloud-bound even while a remote backend is selected.",
+        "Other application API calls are rewritten to the selected backend, including /api/rpc to /api/desktop/rpc."
+      ],
+      "check": "Before the Claude browser-ready task, select Cloud/null through the normal UI and verify that credential-free selected-backend state; an official URL or servedSHA alone is insufficient. The independent driver remains bound to its exact official API origin."
+    },
+    {
+      "id": "builtin_live_session_authority",
+      "classification": "intentional_new_runtime_and_budget_boundary",
+      "paths": [
+        "app/api/live/ticket/route.ts",
+        "lib/live/scope.ts",
+        "lib/live/session-ticket.ts",
+        "apps/api/routes/builtin-gateway.ts:10-18",
+        "lib/builtin-gateway/hub.ts:53-74",
+        "lib/builtin-gateway/postgres.ts:137-145",
+        "drizzle/20261107160000_live_session_revocation.sql"
+      ],
+      "facts": [
+        "Builtin tickets bind the real authenticated session; worker/device ticket protocol remains unchanged.",
+        "Builtin upgrade and open each perform a fresh session-existence/expiry query.",
+        "Deletion notifications are delivered after commit; exact-session revocation cannot be undone by a late successful open check.",
+        "The normal release must apply the new migration and deploy mutually compatible ticket/receiver code."
+      ],
+      "queryBoundary": "There are two explicit session-authority SQL reads per builtin live connection and no new per-frame or polling read in this implementation. This is not an estimate of the full Native window; worker mode is unchanged."
+    },
+    {
+      "id": "merge_fences_and_identity_scope",
+      "classification": "required_merge_constraints",
+      "paths": [
+        "apps/frontend/src/web/auth-routing.ts",
+        "apps/frontend/src/web/platform.tsx",
+        "apps/frontend/src/web/rpc.ts",
+        "apps/desktop/src/renderer/app.tsx",
+        "components/authenticated-read-cache.tsx",
+        "lib/swr/persistent-cache.ts",
+        "package.json",
+        ".github/workflows/ui-policy.yml"
+      ],
+      "requirements": [
+        "Retain feature bootstrapScope/isDesktopHandoffPage and the authentication-to-workspace fresh authorization fence while incorporating main webFlow and directory/cloud subscriptions.",
+        "Keep desktopFlow PKCE validation and existing OAuth/Composio priority; do not classify every sign-in page as identity-only.",
+        "AND the existing owner/request-generation guard with webSelectionVersion; preserve selected-backend abort/late-response checks.",
+        "Cloud-null persistent namespaces remain the existing v1 form; remote namespaces include the server identity.",
+        "Retain all feature tracing/Replay/read-batch/desktop-auth tests and add main web-auth and builtin revocation entries.",
+        "Keep the feature atomic desktop grant consumption; main web grants use a domain-separated state hash and do not replace the desktop exchange."
+      ]
+    }
+  ],
+  "priorEvidenceBoundary": {
+    "candidate": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+    "nativeLogin": 209,
+    "webLogin": 210,
+    "firstStartupBundled": 169,
+    "firstStartupHosted": 201,
+    "source": "parent/acceptance-review fixed 1bd artifact report; not re-downloaded or executed by this reviewer",
+    "canTransferToNewMain": false,
+    "fixedE7SqlProfiles": "Remain explanatory only for their exact e7 source, not a new-main baseline."
+  },
+  "unchangedMainDeltaProofs": [
+    {
+      "path": "AGENTS.md",
+      "sameBytes": true,
+      "baseSha256": "5c6ed942c827a66f50a2aa847536efecbb67ba80f8e2e9d476847854ea531b3c",
+      "mainSha256": "5c6ed942c827a66f50a2aa847536efecbb67ba80f8e2e9d476847854ea531b3c"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sameBytes": true,
+      "baseSha256": "1a7bc3cc9f0f4e4020a144eb414a22a5384b88cb85bba79af8830fcbc5055bd6",
+      "mainSha256": "1a7bc3cc9f0f4e4020a144eb414a22a5384b88cb85bba79af8830fcbc5055bd6"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "sameBytes": true,
+      "baseSha256": "01c7aeeef7298805bd7a6eb359d0581795300d0bad8d913fb03a556321a0d74f",
+      "mainSha256": "01c7aeeef7298805bd7a6eb359d0581795300d0bad8d913fb03a556321a0d74f"
+    },
+    {
+      "path": "lib/auth.ts",
+      "sameBytes": true,
+      "baseSha256": "9046b8252bc8d9ca7f31a4a5326b53bbdf9b945783654312c27283cc7f258c85",
+      "mainSha256": "9046b8252bc8d9ca7f31a4a5326b53bbdf9b945783654312c27283cc7f258c85"
+    },
+    {
+      "path": "lib/api-auth.ts",
+      "sameBytes": true,
+      "baseSha256": "6ffd944bab6c8d0aed2bff26f07b0c75369fbbdf55b5ce88fe805bcb30f8f9ef",
+      "mainSha256": "6ffd944bab6c8d0aed2bff26f07b0c75369fbbdf55b5ce88fe805bcb30f8f9ef"
+    },
+    {
+      "path": "lib/desktop-auth.ts",
+      "sameBytes": true,
+      "baseSha256": "67cfebf33be94b73224fe37c08d4a956f6bdad6d991e6ebe82e6c572e0ca703b",
+      "mainSha256": "67cfebf33be94b73224fe37c08d4a956f6bdad6d991e6ebe82e6c572e0ca703b"
+    },
+    {
+      "path": "lib/desktop-auth-server.ts",
+      "sameBytes": true,
+      "baseSha256": "63c4cc77c6cb3426d7b7b1cf9d7eb520c9ac8c9d4de9fd21c488022eb16bba95",
+      "mainSha256": "63c4cc77c6cb3426d7b7b1cf9d7eb520c9ac8c9d4de9fd21c488022eb16bba95"
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "sameBytes": true,
+      "baseSha256": "43903d35852e0b20eddc00c2d3d167fab1b1e3e0a1292f185b4e4ced3a1c15b1",
+      "mainSha256": "43903d35852e0b20eddc00c2d3d167fab1b1e3e0a1292f185b4e4ced3a1c15b1"
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "sameBytes": true,
+      "baseSha256": "4282d897ea86ac7af34fcacf67f821fcf7332b7603b2066206821d859f23056b",
+      "mainSha256": "4282d897ea86ac7af34fcacf67f821fcf7332b7603b2066206821d859f23056b"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "sameBytes": true,
+      "baseSha256": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7",
+      "mainSha256": "d68014bb7b052af013207e4eaebc0130ffdb9e58cd5f61b54b13dfc49f6ef9f7"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "sameBytes": true,
+      "baseSha256": "8370d2606fe0e1bc939a2c73f5b45b310148e805e79726522a522d79517d35ac",
+      "mainSha256": "8370d2606fe0e1bc939a2c73f5b45b310148e805e79726522a522d79517d35ac"
+    },
+    {
+      "path": "apps/api/runtime/request-trace.ts",
+      "sameBytes": true,
+      "baseSha256": "bb2fccdd253223e97b1bc444625d3845b478a8c6a069bc71ac26e7cd7bdb2f33",
+      "mainSha256": "bb2fccdd253223e97b1bc444625d3845b478a8c6a069bc71ac26e7cd7bdb2f33"
+    }
+  ],
+  "recommendedFocusedTests": [
+    {
+      "execution": "merged-source",
+      "path": "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+      "existsAt": [
+        "1bd4f8a60010664cde2ec113e41e42f35067c1e4"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "apps/frontend/scripts/runtime.test.mjs",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+        "1bd4f8a60010664cde2ec113e41e42f35067c1e4"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "lib/web-connection/auth.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "lib/web-connection/client.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "lib/web-connection/selection.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "lib/web-connection/transport.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "lib/swr/session-lifecycle.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+        "1bd4f8a60010664cde2ec113e41e42f35067c1e4"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "apps/api/src/application.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+        "1bd4f8a60010664cde2ec113e41e42f35067c1e4"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "apps/api/src/web-transport-node.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "lib/live/session-ticket.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "lib/live/ticket.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+        "1bd4f8a60010664cde2ec113e41e42f35067c1e4"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "lib/builtin-gateway/session-revocation.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "merged-source",
+      "path": "lib/live/channel.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+        "1bd4f8a60010664cde2ec113e41e42f35067c1e4"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "normal-postgres-ci",
+      "path": "tests/web-auth-handoff.db.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "normal-postgres-ci",
+      "path": "lib/builtin-gateway/session-revocation.db.test.ts",
+      "existsAt": [
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ],
+      "runByReviewer": false
+    },
+    {
+      "execution": "normal-postgres-ci",
+      "path": "tests/desktop-auth-exchange.test.ts",
+      "existsAt": [
+        "1bd4f8a60010664cde2ec113e41e42f35067c1e4"
+      ],
+      "runByReviewer": false
+    }
+  ],
+  "specificCoverageGap": "Existing web-transport Node tests preserve request/stream/disposal behavior but do not establish a real active OTel HTTP parent during fresh transport authentication or verify early rejection tracing.",
+  "sources": [
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "AGENTS.md",
+      "bytes": 20245,
+      "sha256": "5c6ed942c827a66f50a2aa847536efecbb67ba80f8e2e9d476847854ea531b3c",
+      "gitBlob": "245281562212902f5042649bd41d2a3573121824"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "CONTRIBUTING.md",
+      "bytes": 8934,
+      "sha256": "1a7bc3cc9f0f4e4020a144eb414a22a5384b88cb85bba79af8830fcbc5055bd6",
+      "gitBlob": "5d6803e937f97ed38ab653fdc65c3c08e72f3649"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/api/src/application.ts",
+      "bytes": 4962,
+      "sha256": "5ec5eeee353766eaf120239441ac7b743a06cd0e6802ee143924ecd9307c708c",
+      "gitBlob": "ca15978735ff7ba31921e40cd0491798debf26a5"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/api/src/index.ts",
+      "bytes": 845,
+      "sha256": "39592e554967565b6aa9cb6a79287f5f467be4164402adecf85afd94cdb30ed5",
+      "gitBlob": "25292ffadf0063809d124139c66869f3ba2c2cf8"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/api/src/web-transport-node.test.ts",
+      "bytes": 8877,
+      "sha256": "1e1057732fef5a2f67c66b5bb19e04b292b5827a492042af329d0b4593046c1b",
+      "gitBlob": "fe670f9f3d1ba53533b7671b4cab1a10dce0a84e"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/frontend/src/web/auth-routing.ts",
+      "bytes": 2903,
+      "sha256": "e940e609021a395d09f4763bf5fb076fe2774cbef07d9e51f9a9152e6b1b8832",
+      "gitBlob": "18098a75bc518b1c71f8561735811e2b14600433"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/frontend/src/web/platform.tsx",
+      "bytes": 4527,
+      "sha256": "19fd988bc49d410ea9513df78150e7fd64e66c4d4219abfaf6bee2bb48d6c8ca",
+      "gitBlob": "d993d9cec032baa61b7a4ed6756471f9dd209895"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/frontend/src/web/rpc.ts",
+      "bytes": 857,
+      "sha256": "29373101c43909a42785b25913a01272fb66c34858b8178ffd6dd0ded14cb95a",
+      "gitBlob": "0e59a2796e59cc84d3313f1fc4b9a854a9ab8cc2"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/frontend/src/web/runtime.ts",
+      "bytes": 233,
+      "sha256": "8897806fef60017196da2f7dbc9a02f3a0ef7756a3bd901c8a4f7eaab9cd2efc",
+      "gitBlob": "932fcec46a32fabec27c0bb5e0eca837ca2995b1"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/auth-client.ts",
+      "bytes": 3071,
+      "sha256": "02971de9a7b6eff7d9804fa4a9c7b7e0792a407a079b9afa4897f447a0495e31",
+      "gitBlob": "dc82853b7452c18948fc4002ac76106f7bae9b98"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/client.ts",
+      "bytes": 17438,
+      "sha256": "895524ceec9789e6843657c93eb4ef7af438038241b7264e0dd6663221504326",
+      "gitBlob": "96669085af1f9e60d119e044c1c85274386f0e71"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/browser.ts",
+      "bytes": 4896,
+      "sha256": "0339f4c9b1862e799c9fb44662c934ccbd98fe85672c0da27c3d42cbf25ec656",
+      "gitBlob": "275058b0316573d3248935fbd20ec6169c933ce8"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/transport.ts",
+      "bytes": 6804,
+      "sha256": "7b04c0cb4792efdbef079a5b380d0bf59c41f68251d623a5cbf8ad01a0341831",
+      "gitBlob": "91121842ee9c0ad6b70030669b870e0ee397671c"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/policy.ts",
+      "bytes": 2215,
+      "sha256": "8a78f86e8ee4b2c158b911762f553fad1473348cece26e038043f2c79d0ea910",
+      "gitBlob": "f1fe856f8067c92cee2d75dfdd04ee2f0dfe6962"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/selection.ts",
+      "bytes": 1135,
+      "sha256": "93a06522eaecc0726d8b19b44c3531972cb953666088bbc85b5e1e54beebe467",
+      "gitBlob": "1e0d7d6513abc34654d5718269c124276dad47fc"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/auth.ts",
+      "bytes": 1243,
+      "sha256": "75a80035526f7eabe7499b251612f325752f5d559c206381ff98771f8f0245eb",
+      "gitBlob": "3a5ccbf90e406cf75502fbfb4b8a02aa8f86b41a"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/auth-server.ts",
+      "bytes": 1014,
+      "sha256": "06540039865e3c51a49431bba887c4202645c68cf56394b513721b55cc38717a",
+      "gitBlob": "07049b341b3a50b650c4802006381afe4d3436e9"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/live/browser-runtime.ts",
+      "bytes": 2369,
+      "sha256": "1b6979835b2fe9f7dde473f28b5c5081172b8860e69aa1d3d6d17ed804b3214c",
+      "gitBlob": "0ed835494e77b0c11bf8d5e26ac8c330156795df"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/live/scope.ts",
+      "bytes": 1345,
+      "sha256": "b323f66c5c01440d72e3ce1627a4c0a523e019895e71cf3da61c09a1ad056511",
+      "gitBlob": "1dc1a84095f6b59c806be1ca3e2e9f2b43ccb2c2"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/live/session-ticket.ts",
+      "bytes": 2366,
+      "sha256": "57bf9c7de70246b7e1b8ec54799c398d75626e3b7312597380ee0e4c1c78fa33",
+      "gitBlob": "584d2416b15530c0047e91bccfd3a5968813a774"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "app/api/live/ticket/route.ts",
+      "bytes": 2494,
+      "sha256": "846569d41cb1ade9f9449fb2cb2e500eb3389c8a0a3b5f14b57880ffa1dd0880",
+      "gitBlob": "ac053b943ad49b343cbef59b87554da207b09f85"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/api/routes/builtin-gateway.ts",
+      "bytes": 1725,
+      "sha256": "43a643e04f118bb5001c52a8ef578586d0e213959cc09aacce5fed2e067b9296",
+      "gitBlob": "c57ad4b9c5bac11fe312722438fbf394f415ee66"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/builtin-gateway/hub.ts",
+      "bytes": 15992,
+      "sha256": "837f8bf0fe1f724c4da5902e7054a9c3b35335eae59cd704564f26c1ce8aa821",
+      "gitBlob": "17bd7342f05184a1f17bb49ef528d60cf9d25408"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/builtin-gateway/postgres.ts",
+      "bytes": 14993,
+      "sha256": "86234f03a7cb2fb9df9675ece9391e23cb5a6f67b294c44a0cd55edbe6378678",
+      "gitBlob": "b34653115bef0519e1908c8032b29129995a12f9"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/builtin-gateway/runtime.ts",
+      "bytes": 824,
+      "sha256": "ad7f0cc223a41163a337be1b82c84ce190ca233d3b12b6a7bd549bb4b895a39d",
+      "gitBlob": "05820d1c2bac02398d89a7d9ac08f05f2c8296d3"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "drizzle/20261107160000_live_session_revocation.sql",
+      "bytes": 687,
+      "sha256": "fdd4fb58fa1ee0899c4837aea9cea8bbc52edffe13e935ca32ddeed11583197d",
+      "gitBlob": "5613c86955d5014c4eebc1df67c5d172bbf3860d"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "components/authenticated-read-cache.tsx",
+      "bytes": 4167,
+      "sha256": "186b86f223636a4391cc54a0e76a25280e527a50cd4cbedde55ee8685798ae41",
+      "gitBlob": "e76bfbd5c5897696bf6301431c4f1fee7ab4407a"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/swr/persistent-cache.ts",
+      "bytes": 10622,
+      "sha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+      "gitBlob": "df7d4d1b5f2c744061236c54d766f68aa2137830"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "package.json",
+      "bytes": 74898,
+      "sha256": "f73113750e0cbf139f873f397168a36e513ee562f18d12f1efb5fc0a58fe9095",
+      "gitBlob": "d170825c8222d6b9ccf3d41d2ea81503d2d6e138"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": ".github/workflows/ui-policy.yml",
+      "bytes": 24913,
+      "sha256": "88be5026a5d4d6362eadc9e5140a844d3d789d86add3812755b5021450159c2b",
+      "gitBlob": "007a8e377efc2fb0448927cf60ca44b714f8f51e"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "apps/frontend/src/web/auth-routing.ts",
+      "bytes": 3143,
+      "sha256": "c4761f47e106d865058dc6e0fe0df72ff6a6b904fea74d2cdbe73918abe53f02",
+      "gitBlob": "3cf3d640e734631a295fac71b0704b95176be366"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "apps/frontend/src/web/platform.tsx",
+      "bytes": 4376,
+      "sha256": "34d4108fae7b136c63932959031ff20426af3e2ad1a5c62e2d1f9d1db4fdd68f",
+      "gitBlob": "7e1cab30220ff55b34992ed59a20f902c8ca8db6"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "bytes": 13984,
+      "sha256": "f95db2def2a0926857782ce2f68032d0a1dc708d0e2f629595b8d5885600d3e1",
+      "gitBlob": "b1959fb58fd36901cea130f947bbe7199d82f127"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "bytes": 3596,
+      "sha256": "1aac5eb7968426e8ec6158f4c2d511b13993d392e4f204111e631ccc6d58a333",
+      "gitBlob": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "apps/api/runtime/request-trace.ts",
+      "bytes": 2883,
+      "sha256": "a7c9c6bcb0b5e68dfebb96d7841171f4dc07c09061d0889404482d2594124ca9",
+      "gitBlob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "lib/tracing/node.ts",
+      "bytes": 7106,
+      "sha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+      "gitBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "instrumentation-client.ts",
+      "bytes": 2100,
+      "sha256": "550beb415d322af712f4b518799541964f68b97bc0574e913c86c5b21b232f4c",
+      "gitBlob": "ae7c2cc9c72fa11e13c09721bfe24629362ea26c"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "lib/tracing/labels.ts",
+      "bytes": 2278,
+      "sha256": "39d29ed6eba5cfd364e50a78c21b940136636eb887934170df003217be94da7d",
+      "gitBlob": "4eddcee8197d25708e18fc1070ce13b4e0125126"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "lib/tracing/sanitize.ts",
+      "bytes": 5477,
+      "sha256": "790c87370c1184511e200eb5d49626cc7ca832c642795c25da15a29f6679cb9c",
+      "gitBlob": "93524d78d4063be72f486afff3d24e8d5e46b7f3"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "apps/desktop/test/db-query-operations.cjs",
+      "bytes": 529,
+      "sha256": "03632f635faceb39a1e764f5680680d0829ce98635e17d49276957a684e9d575",
+      "gitBlob": "9011b6edb7296c8872d3e311074529a49987b575"
+    }
+  ],
+  "execution": {
+    "sourceEdited": false,
+    "gitFetchMergeCheckoutCommitOrRefWrite": false,
+    "testsRun": false,
+    "serviceStarted": false,
+    "productionLoginOrApiCall": false,
+    "providerOrVmCall": false,
+    "secretRead": false,
+    "resourcesCreated": 0
+  }
+}

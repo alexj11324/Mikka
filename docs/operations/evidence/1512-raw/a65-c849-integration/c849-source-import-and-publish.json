@@ -1,0 +1,24 @@
+{
+  "observedAt": "2026-11-07T17:27:56.518079+00:00",
+  "candidate": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+  "tree": "4cd678adf6b84a72b2e9e6fa123a45a1938112bb",
+  "parents": [
+    "23c06c6a5872e1ddc825d6d10f41b870adb579e4"
+  ],
+  "reviewedMain": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+  "workflowCheckpoint": "d19322510fd940fbc277ca4d95ba0f8269a22d94",
+  "transportHead": "8912be73baffa88b708d6a897889e302e78957b6",
+  "transportTree": "f5b526956d436c6d3cf4094d81e862968561c452",
+  "importRun": 42396343488,
+  "importAttempt": 1,
+  "importConclusion": "success",
+  "previousSource": "d19322510fd940fbc277ca4d95ba0f8269a22d94",
+  "previousFeature": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "ownerFeatureFastForward": true,
+  "sourceObjectsExactReadback": true,
+  "commitTreeParentsReadback": true,
+  "bundleBytes": 13074,
+  "bundleSha256": "a6348db23749a08d880cdd340b0e3146f214a397456e649085d6a97174d7c761",
+  "ciAndNative": "pending",
+  "production": false
+}

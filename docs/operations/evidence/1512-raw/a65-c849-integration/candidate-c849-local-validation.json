@@ -1,0 +1,104 @@
+{
+  "candidate": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+  "tree": "4cd678adf6b84a72b2e9e6fa123a45a1938112bb",
+  "main": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+  "workflowCheckpoint": "d19322510fd940fbc277ca4d95ba0f8269a22d94",
+  "mainMerge": "fde786dcedff68ea18ca4c02595a29b1e0f9c571",
+  "checkpointMerge": "477dc1090c33b26889ed73655f8b581a88979acc",
+  "fullTypesExit": 0,
+  "fullApiTests": 126,
+  "fullApiExit": 0,
+  "fullLintExit": 0,
+  "runtimeLintExit": 0,
+  "preIntegrationUnchangedGatewayTests": 169,
+  "preIntegrationUnchangedLiveListTests": 65,
+  "frontendAndDbContracts": 49,
+  "transportTracingFocusedTests": 30,
+  "realNodeTransportTests": 5,
+  "headerBoundaryTests": 11,
+  "initialFailuresPreserved": [
+    "1bd requiredPG schema race",
+    "a65 default Node heap 2GB exhausted",
+    "a65 auth fixture missing new cloudAuthClient export",
+    "new tracing transport and header regressions"
+  ],
+  "currentCiAndNative": "pending",
+  "previousNativeScope": "1bd/d75 only: login209/210, startup169/201",
+  "files": [
+    {
+      "path": "evidence/a65-integration-final-source.json",
+      "bytes": 1689,
+      "sha256": "2997992640e64b933f55e705942336931b20859f71cb3e76a84bf28d42526933"
+    },
+    {
+      "path": "evidence/main-a65-merge-commit.json",
+      "bytes": 1474,
+      "sha256": "85c675907335e05a0c3ef1e91af39e5c271eb2dc2368def505a836fd16809b72"
+    },
+    {
+      "path": "evidence/a65-final-typecheck.log",
+      "bytes": 289,
+      "sha256": "f2eaa7542b5c0c3e76881ea0954a639b6a53716a41ddf0052d074d5c06f1aaeb"
+    },
+    {
+      "path": "evidence/a65-final-typecheck-result.json",
+      "bytes": 208,
+      "sha256": "67eb24994c9924883b1758092c24405b4cab10a1e4787dd0fe78b8144844e23c"
+    },
+    {
+      "path": "evidence/a65-final-api.log",
+      "bytes": 15639,
+      "sha256": "17b02bb06eb4f56a2e0c27db33438e60d35f6da9e6feff2a94750cd62ae6273f"
+    },
+    {
+      "path": "evidence/a65-final-api-result.json",
+      "bytes": 355,
+      "sha256": "f2b724d1ce1f3468b69172c77956f16d34ec35f0f0fb93b6717e83e307658263"
+    },
+    {
+      "path": "evidence/c849-clean-lint.log",
+      "bytes": 6477,
+      "sha256": "c3ce0033aef16b4e17805ac97adfabcd456a639e8e6e244d047f18d4f216d8ff"
+    },
+    {
+      "path": "evidence/c849-clean-lint-runtime.log",
+      "bytes": 335,
+      "sha256": "8e61ce73a2854d99a4db4410ee5e0b6fc913333e4cf74e206a9e386cff203aec"
+    },
+    {
+      "path": "evidence/c849-clean-lint-result.json",
+      "bytes": 942,
+      "sha256": "e8b38c46e98f9e6573148c730306736aa8203f8dcf517a8f8ff4afe0c9256d4a"
+    },
+    {
+      "path": "evidence/a65-test-device-gateway.log",
+      "bytes": 20015,
+      "sha256": "66ad09058fd38b701df864db63f00bf9613c7c2d30d969cac6ceef60d9228b52"
+    },
+    {
+      "path": "evidence/a65-test-live-lists.log",
+      "bytes": 7926,
+      "sha256": "92415656942a97d4a8630d4e60d5f542b546001d14cbf4851c1e7abef3e5d020"
+    },
+    {
+      "path": "evidence/a65-merge-guards-green.tap",
+      "bytes": 11714,
+      "sha256": "8045b09df0a3261c00857b502c198d782ffe462b292c16f7f14e6b294eb69128"
+    },
+    {
+      "path": "evidence/main-a65-posthog-header-fix.json",
+      "bytes": 6685,
+      "sha256": "a3eea4d362f9a977740b5dce480d19fddc0ccc507594dcf701042870b2b8e9df"
+    },
+    {
+      "path": "web-transport-trace/source-receipt.json",
+      "bytes": 9149,
+      "sha256": "d3caffa1875375dbb04be7eb7212e180b3a55e1421abe433d21d3832ff806dd9"
+    },
+    {
+      "path": "source-c8499fc2-verify.log",
+      "bytes": 379,
+      "sha256": "978822716144620860a6618880aede2823a83bc039a627e1f1e33f15ae3cd84d"
+    }
+  ]
+}

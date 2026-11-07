@@ -1,0 +1,26 @@
+{
+  "candidate": "c8499fc2c59d779ffd8e7e5de4618b409b6e776f",
+  "tree": "4cd678adf6b84a72b2e9e6fa123a45a1938112bb",
+  "worktree": "/dev/shm/issue1512-ops-812e3b7d6d45/lint-candidate-c8499fc2",
+  "checks": [
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "elapsedMs": 10777,
+      "bytes": 6477,
+      "sha256": "c3ce0033aef16b4e17805ac97adfabcd456a639e8e6e244d047f18d4f216d8ff",
+      "path": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/c849-clean-lint.log"
+    },
+    {
+      "command": "pnpm lint:runtime",
+      "exitCode": 0,
+      "elapsedMs": 465,
+      "bytes": 335,
+      "sha256": "8e61ce73a2854d99a4db4410ee5e0b6fc913333e4cf74e206a9e386cff203aec",
+      "path": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/c849-clean-lint-runtime.log"
+    }
+  ],
+  "worktreeRemoved": true,
+  "retainedFixtures": "Explicit test-retained fixtures under the task TMPDIR were not deleted",
+  "originalUntrackedCacheUntouched": true
+}

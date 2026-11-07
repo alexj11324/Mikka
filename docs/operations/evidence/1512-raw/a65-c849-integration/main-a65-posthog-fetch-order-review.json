@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "kind": "browser_fetch_patch_order_source_appendix",
+  "reviewedAt": "2026-11-07T17:02:58.168565+00:00",
+  "mainSha": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+  "featureSha": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+  "priorReview": {
+    "path": "/dev/shm/issue1512-ops-812e3b7d6d45/evidence/main-a65-observability-compatibility-review.json",
+    "bytes": 26299,
+    "sha256": "ce4ce33881113c12c6d4f0c26b9ba28d56292cc65356ee272e5061c96de0db5d"
+  },
+  "finding": "confirmed_source_composition_conflict_conditional_on_enabled_posthog_and_loaded_extension",
+  "browserReproductionExecuted": false,
+  "package": {
+    "name": "posthog-js",
+    "version": "1.438.13",
+    "sameExactVersionInBothLocks": true,
+    "moduleEntry": "dist/module.mjs",
+    "defaultModuleContainsTracingHeaderLiteral": false,
+    "defaultModuleLoadsTracingExtensionDynamically": true
+  },
+  "sourceSequence": [
+    {
+      "order": 1,
+      "source": "feature instrumentation-client.ts:11-30",
+      "action": "posthog.init enables tracing_headers for the official/current hostname; main a65 does not configure this option."
+    },
+    {
+      "order": 2,
+      "source": "posthog-js/lib/src/extensions/tracing-headers.js:58-70,107-110; lib/src/entrypoints/external-scripts-loader.js:52-68",
+      "action": "When the extension is not already installed, its script load callback installs the fetch wrapper later. A cached script still uses an asynchronous load event."
+    },
+    {
+      "order": 3,
+      "source": "main apps/frontend/src/web/runtime.ts:1-6; lib/web-connection/browser.ts:24-34",
+      "action": "The synchronous runtime installs deployment fetch then directory fetch, capturing the previously installed fetch."
+    },
+    {
+      "order": 4,
+      "source": "@posthog/browser-common/dist/utils/patch.js:39-63",
+      "action": "The later patch captures the current window.fetch as layer.next and replaces the property; it does not unwrap the directory."
+    },
+    {
+      "order": 5,
+      "source": "posthog-js/lib/src/entrypoints/tracing-headers.js:131-194",
+      "action": "The outer wrapper observes the original official request URL, adds only X-POSTHOG-SESSION-ID, X-POSTHOG-WINDOW-ID and X-POSTHOG-DISTINCT-ID, and passes the resulting Request/init to directory fetch."
+    },
+    {
+      "order": 6,
+      "source": "main lib/web-connection/client.ts:224-238",
+      "action": "The selected-backend branch rewrites official /api/rpc to remote /api/desktop/rpc while deleting authority/pin headers but retaining those three telemetry headers."
+    },
+    {
+      "order": 7,
+      "source": "main lib/web-connection/transport.ts:4-8,65-71",
+      "action": "The remote CORS preflight rejects these unlisted request-header names with web_connection_preflight_refused."
+    }
+  ],
+  "orderCases": [
+    {
+      "extension": "lazy_after_directory",
+      "result": "Official request is decorated before the remote rewrite; retained telemetry headers are outside the remote CORS allowlist."
+    },
+    {
+      "extension": "already_loaded_before_directory",
+      "result": "The captured inner PostHog wrapper sees the final remote URL and does not add official-host-only headers. This is why module import order alone is insufficient."
+    },
+    {
+      "extension": "disabled_or_load_failed",
+      "result": "This SDK adds no tracing headers; this specific preflight conflict does not arise."
+    }
+  ],
+  "explicitLimits": [
+    "This is fixed-source and installed-package composition evidence, not a captured production or browser network failure.",
+    "The SDK code examined adds three X-PostHog headers, not traceparent or tracestate. No failure is attributed to an unobserved W3C header.",
+    "Normal official Cloud requests remain same-origin; their telemetry headers should be preserved.",
+    "The current default-production acceptance driver is still official-Cloud-bound; the operator must independently confirm the browser has no active self-hosted backend."
+  ],
+  "minimalRecommendation": {
+    "boundary": "selected-backend request rewrite",
+    "change": "Strip the three proven official X-PostHog correlation headers only when adapting traffic to the selected backend; preserve the official Cloud path. Do not widen remote CORS merely to transmit official person/session identifiers.",
+    "regression": [
+      "Late SDK wrapper -> directory rewrite -> remote request has none of the three official correlation headers.",
+      "Already-installed SDK wrapper -> directory rewrite remains valid.",
+      "Default official Cloud keeps the three headers.",
+      "Existing method/body/signal and native authority/version behavior remain unchanged."
+    ],
+    "implementationOwner": "root to assign; reviewer did not edit source"
+  },
+  "installedSources": [
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/posthog-js@1.438.13_@types+react@19.3.0_react@19.3.1/node_modules/posthog-js/package.json",
+      "bytes": 7228,
+      "sha256": "86050c7c7aae8602f3e70c97ab933af5ef40602ed4fb81687c62b9834b64578e"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/posthog-js@1.438.13_@types+react@19.3.0_react@19.3.1/node_modules/posthog-js/dist/module.mjs",
+      "bytes": 338483,
+      "sha256": "1147944c6bb1bcb702e90c9f6e99d4ed55fa95c29e97bd99e297514800b6ea3f"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/posthog-js@1.438.13_@types+react@19.3.0_react@19.3.1/node_modules/posthog-js/lib/src/entrypoints/module.es.js",
+      "bytes": 1164,
+      "sha256": "ee4775781c3ae060cf4e18ce846b710dcfac162dd6b5721393959ab713fc96c9"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/posthog-js@1.438.13_@types+react@19.3.0_react@19.3.1/node_modules/posthog-js/lib/src/extensions/tracing-headers.js",
+      "bytes": 5643,
+      "sha256": "68bec79feb96d8db869b47038e1c4707336ae4a94b354d91aa0c1af6ba74ecee"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/posthog-js@1.438.13_@types+react@19.3.0_react@19.3.1/node_modules/posthog-js/lib/src/entrypoints/tracing-headers.js",
+      "bytes": 10228,
+      "sha256": "11050733d00a393f7112d294464a3e301f7327387a3a72affbefaac58128bae1"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/posthog-js@1.438.13_@types+react@19.3.0_react@19.3.1/node_modules/posthog-js/lib/src/entrypoints/external-scripts-loader.js",
+      "bytes": 7572,
+      "sha256": "e19568143d038947db83e800cfad2ad3d703303c32f25d10ec126f43bbb27f68"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@posthog+browser-common@0.9.5/node_modules/@posthog/browser-common/dist/utils/patch.js",
+      "bytes": 2944,
+      "sha256": "f4323abe460827d07e1b5b1eb1b8c8cc8d089b9c620a07fe02153fbe81057266"
+    }
+  ],
+  "repositorySources": [
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "instrumentation-client.ts",
+      "bytes": 2100,
+      "sha256": "550beb415d322af712f4b518799541964f68b97bc0574e913c86c5b21b232f4c"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "instrumentation-client.ts",
+      "bytes": 1261,
+      "sha256": "01c7aeeef7298805bd7a6eb359d0581795300d0bad8d913fb03a556321a0d74f"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/frontend/src/web/runtime.ts",
+      "bytes": 233,
+      "sha256": "8897806fef60017196da2f7dbc9a02f3a0ef7756a3bd901c8a4f7eaab9cd2efc"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "apps/frontend/src/web/deployment-fetch.ts",
+      "bytes": 1162,
+      "sha256": "65f3d5cf7e8ecefce8d73c8cbe98a048c7ffaa031ce2db62e96628f6d12836c2"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/browser.ts",
+      "bytes": 4896,
+      "sha256": "0339f4c9b1862e799c9fb44662c934ccbd98fe85672c0da27c3d42cbf25ec656"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/client.ts",
+      "bytes": 17438,
+      "sha256": "895524ceec9789e6843657c93eb4ef7af438038241b7264e0dd6663221504326"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "lib/web-connection/transport.ts",
+      "bytes": 6804,
+      "sha256": "7b04c0cb4792efdbef079a5b380d0bf59c41f68251d623a5cbf8ad01a0341831"
+    },
+    {
+      "revision": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+      "path": "pnpm-lock.yaml",
+      "bytes": 955597,
+      "sha256": "110ae7379e2dd51ab782e7d9d227f2ee2f741d7ec36ceadbfa2c175e33bd57f4"
+    },
+    {
+      "revision": "1bd4f8a60010664cde2ec113e41e42f35067c1e4",
+      "path": "pnpm-lock.yaml",
+      "bytes": 957312,
+      "sha256": "c25dcec973162a2e91bb8efead27f92cb9021b53a3afb4ef0215538ba1690f6a"
+    }
+  ],
+  "execution": {
+    "testsRun": false,
+    "browserStarted": false,
+    "networkRequestMade": false,
+    "sourceEdited": false,
+    "refOrStateChanged": false,
+    "resourcesCreated": 0
+  }
+}

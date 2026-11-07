@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "node",
+    "--test",
+    "--test-reporter=tap",
+    "apps/frontend/scripts/auth-only-bootstrap.test.mjs",
+    "apps/frontend/scripts/runtime.test.mjs",
+    "scripts/run-db-tests.test.mjs"
+  ],
+  "exitCode": 0,
+  "elapsedMs": 1402,
+  "bytes": 11714,
+  "sha256": "8045b09df0a3261c00857b502c198d782ffe462b292c16f7f14e6b294eb69128"
+}

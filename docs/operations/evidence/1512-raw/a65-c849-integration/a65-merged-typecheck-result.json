@@ -1,0 +1,7 @@
+{
+  "command": "pnpm typecheck",
+  "exitCode": 134,
+  "elapsedMs": 59895,
+  "bytes": 1451,
+  "sha256": "cf8ba7387378489cf88d1d90cbd5f3d63954d56758dc7ca28ebb3731edf5a641"
+}

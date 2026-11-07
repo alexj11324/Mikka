@@ -1,0 +1,316 @@
+TAP version 13
+# Subtest: a valid system-browser PKCE page reads only the existing session and public login methods
+ok 1 - a valid system-browser PKCE page reads only the existing session and public login methods
+  ---
+  duration_ms: 69.739779
+  type: 'test'
+  ...
+# Subtest: leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts
+ok 2 - leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts
+  ---
+  duration_ms: 29.494247
+  type: 'test'
+  ...
+# Subtest: malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap
+    # Subtest: duplicate state
+    ok 1 - duplicate state
+      ---
+      duration_ms: 14.021293
+      type: 'test'
+      ...
+    # Subtest: Electron host
+    ok 2 - Electron host
+      ---
+      duration_ms: 13.143057
+      type: 'test'
+      ...
+    1..2
+ok 3 - malformed handoffs and an Electron-hosted page retain the ordinary full bootstrap
+  ---
+  duration_ms: 28.186943
+  type: 'test'
+  ...
+# Subtest: pending identity and workspace reads never join across phases or mount from a late identity result
+ok 4 - pending identity and workspace reads never join across phases or mount from a late identity result
+  ---
+  duration_ms: 15.787759
+  type: 'test'
+  ...
+# Subtest: a late full bootstrap cannot replace a newly opened PKCE identity page or its anonymous configuration
+ok 5 - a late full bootstrap cannot replace a newly opened PKCE identity page or its anonymous configuration
+  ---
+  duration_ms: 12.991337
+  type: 'test'
+  ...
+# Subtest: a retired workspace request cannot expire or disconnect the current PKCE identity page
+    # Subtest: 401
+    ok 1 - 401
+      ---
+      duration_ms: 17.030316
+      type: 'test'
+      ...
+    # Subtest: 503
+    ok 2 - 503
+      ---
+      duration_ms: 18.523912
+      type: 'test'
+      ...
+    1..2
+ok 6 - a retired workspace request cannot expire or disconnect the current PKCE identity page
+  ---
+  duration_ms: 36.286954
+  type: 'test'
+  ...
+# Subtest: account and same-account session changes invalidate a pending identity response and clear prior caches
+    # Subtest: different owner
+    ok 1 - different owner
+      ---
+      duration_ms: 13.403685
+      type: 'test'
+      ...
+    # Subtest: same owner, new session
+    ok 2 - same owner, new session
+      ---
+      duration_ms: 15.132856
+      type: 'test'
+      ...
+    1..2
+ok 7 - account and same-account session changes invalidate a pending identity response and clear prior caches
+  ---
+  duration_ms: 29.216948
+  type: 'test'
+  ...
+# Subtest: only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable
+    # Subtest: 401
+    ok 1 - 401
+      ---
+      duration_ms: 11.805973
+      type: 'test'
+      ...
+    # Subtest: 503
+    ok 2 - 503
+      ---
+      duration_ms: 13.104678
+      type: 'test'
+      ...
+    1..2
+ok 8 - only a confirmed session expiry renders signed-out PKCE; network failure remains unavailable
+  ---
+  duration_ms: 25.480321
+  type: 'test'
+  ...
+# Subtest: a new session for the same owner retires the actual in-memory SWR cache
+ok 9 - a new session for the same owner retires the actual in-memory SWR cache
+  ---
+  duration_ms: 14.600357
+  type: 'test'
+  ...
+# Subtest: web RPC keeps the shared codec but uses only normal same-origin cookie transport
+ok 10 - web RPC keeps the shared codec but uses only normal same-origin cookie transport
+  ---
+  duration_ms: 82.043177
+  type: 'test'
+  ...
+# Subtest: an old web owner delayed 401 cannot clear the newly authenticated owner
+ok 11 - an old web owner delayed 401 cannot clear the newly authenticated owner
+  ---
+  duration_ms: 40.462319
+  type: 'test'
+  ...
+# Subtest: an old web owner network rejection does not overwrite the new owner transport
+ok 12 - an old web owner network rejection does not overwrite the new owner transport
+  ---
+  duration_ms: 34.502099
+  type: 'test'
+  ...
+# Subtest: web owner changes fence both asynchronous response bodies and pre-request encoding
+ok 13 - web owner changes fence both asynchronous response bodies and pre-request encoding
+  ---
+  duration_ms: 37.571374
+  type: 'test'
+  ...
+# Subtest: web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior
+ok 14 - web auth routing preserves real PKCE, refused handoff, account addition and signed OAuth return behavior
+  ---
+  duration_ms: 12.229837
+  type: 'test'
+  ...
+# Subtest: identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations
+ok 15 - identity-only bootstrap is limited to a validated PKCE sign-in without other OAuth continuations
+  ---
+  duration_ms: 13.732847
+  type: 'test'
+  ...
+# Subtest: web session owner watches the actual SDK atom without mutating it or treating an error as logout
+ok 16 - web session owner watches the actual SDK atom without mutating it or treating an error as logout
+  ---
+  duration_ms: 4.35771
+  type: 'test'
+  ...
+# Subtest: deployment fetch pins actual API Requests while preserving method, body, headers and abort signal
+ok 17 - deployment fetch pins actual API Requests while preserving method, body, headers and abort signal
+  ---
+  duration_ms: 12.256853
+  type: 'test'
+  ...
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node lifecycle] start
+# Subtest: runner bounds concurrency and still reports every suite when one fails
+ok 18 - runner bounds concurrency and still reports every suite when one fails
+  ---
+  duration_ms: 33.33392
+  type: 'test'
+  ...
+# Subtest: a suite whose clone failed or is missing never runs, and the gate fails
+ok 19 - a suite whose clone failed or is missing never runs, and the gate fails
+  ---
+  duration_ms: 2.075104
+  type: 'test'
+  ...
+# Subtest: clone names stay loopback *_e2e databases within the identifier limit
+ok 20 - clone names stay loopback *_e2e databases within the identifier limit
+  ---
+  duration_ms: 0.430159
+  type: 'test'
+  ...
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node stderr] err
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node stdout] out
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node lifecycle] exit code=3 signal=none
+# [db-runner /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node lifecycle] close code=3 signal=none
+# [db-runner /nonexistent/command lifecycle] start
+# Subtest: the default runner buffers a suite's output and reports its exit status
+ok 21 - the default runner buffers a suite's output and reports its exit status
+  ---
+  duration_ms: 78.070403
+  type: 'test'
+  ...
+# [db-runner /nonexistent/command lifecycle] close code=-2 signal=none
+# ::error::Missing/invalid E2E_DATABASE_URL
+# Subtest: the CLI streams bounded attributed progress before a suite exits and retains its complete failure
+ok 22 - the CLI streams bounded attributed progress before a suite exits and retains its complete failure
+  ---
+  duration_ms: 211.73393
+  type: 'test'
+  ...
+# Subtest: the CLI drains large failed-suite diagnostics before exiting with the failure status
+ok 23 - the CLI drains large failed-suite diagnostics before exiting with the failure status
+  ---
+  duration_ms: 276.150991
+  type: 'test'
+  ...
+# Subtest: runner validates all expected and discovered suites before sharding and before subprocesses
+ok 24 - runner validates all expected and discovered suites before sharding and before subprocesses
+  ---
+  duration_ms: 1.133842
+  type: 'test'
+  ...
+# Subtest: runner rejects invalid shards before execution and preserves per-shard summary failures
+ok 25 - runner rejects invalid shards before execution and preserves per-shard summary failures
+  ---
+  duration_ms: 4.167313
+  type: 'test'
+  ...
+# Subtest: parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions
+ok 26 - parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions
+  ---
+  duration_ms: 0.300954
+  type: 'test'
+  ...
+# Subtest: only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess
+ok 27 - only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess
+  ---
+  duration_ms: 0.586225
+  type: 'test'
+  ...
+# Subtest: feature inventory fails on deleted suite, removed script or zero enrollment
+ok 28 - feature inventory fails on deleted suite, removed script or zero enrollment
+  ---
+  duration_ms: 0.381906
+  type: 'test'
+  ...
+# Subtest: discovers every present pg/DB suite and rejects unregistered or ambiguous files
+ok 29 - discovers every present pg/DB suite and rejects unregistered or ambiguous files
+  ---
+  duration_ms: 0.407756
+  type: 'test'
+  ...
+# Subtest: type-only pg imports do not enroll source-only tests as database suites
+ok 30 - type-only pg imports do not enroll source-only tests as database suites
+  ---
+  duration_ms: 0.169926
+  type: 'test'
+  ...
+# Subtest: self-managed suites are excluded only with a reason and a live dedicated runner
+ok 31 - self-managed suites are excluded only with a reason and a live dedicated runner
+  ---
+  duration_ms: 0.409698
+  type: 'test'
+  ...
+# Subtest: dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests
+ok 32 - dedicated browser inventory requires its spec, config and script, without exempting adjacent DB tests
+  ---
+  duration_ms: 0.492124
+  type: 'test'
+  ...
+# Subtest: real-driver offline exclusions require the actual source guard and the explicit pure script
+ok 33 - real-driver offline exclusions require the actual source guard and the explicit pure script
+  ---
+  duration_ms: 0.458592
+  type: 'test'
+  ...
+# Subtest: offline guard must be on the same step that runs the guarded file (GM3)
+ok 34 - offline guard must be on the same step that runs the guarded file (GM3)
+  ---
+  duration_ms: 0.342006
+  type: 'test'
+  ...
+# Subtest: live database authentication schema inspection finishes before temporary-schema fixtures start
+ok 35 - live database authentication schema inspection finishes before temporary-schema fixtures start
+  ---
+  duration_ms: 21.394992
+  type: 'test'
+  ...
+# Subtest: test:personal-mailbox-core runs the runtime-off step even when the first step fails, and still fails overall
+ok 36 - test:personal-mailbox-core runs the runtime-off step even when the first step fails, and still fails overall
+  ---
+  duration_ms: 9.179261
+  type: 'test'
+  ...
+# Subtest: offline guard import is resolved relative to the suite file
+ok 37 - offline guard import is resolved relative to the suite file
+  ---
+  duration_ms: 0.341375
+  type: 'test'
+  ...
+# Subtest: this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates
+ok 38 - this tree has explicit complete DB inventory and retains bootstrap ordering and pure gates
+  ---
+  duration_ms: 460.00346
+  type: 'test'
+  ...
+# Subtest: self-improvement DB suite stays mandatory when its feature exists
+ok 39 - self-improvement DB suite stays mandatory when its feature exists
+  ---
+  duration_ms: 0.475438
+  type: 'test'
+  ...
+# Subtest: isolated fixture databases reject application targets before I/O
+ok 40 - isolated fixture databases reject application targets before I/O
+  ---
+  duration_ms: 27.133202
+  type: 'test'
+  ...
+# Subtest: isolated fixture databases create distinct empty databases and close admin pools on success or failure
+ok 41 - isolated fixture databases create distinct empty databases and close admin pools on success or failure
+  ---
+  duration_ms: 1.036615
+  type: 'test'
+  ...
+1..41
+# tests 49
+# suites 0
+# pass 49
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1337.288114

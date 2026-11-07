@@ -1,0 +1,25 @@
+{
+  "sourceParent": "bd5f23536fb64f5db81668e60f2353678832550f",
+  "main": "a65a0f623edfe545d5406f0a1d58ff14dec864fb",
+  "initialAttempt": {
+    "guardFailure": "missing_test_self_hosting",
+    "packageWriteOccurred": false,
+    "routesGenerationContinued": true,
+    "routes": 228,
+    "methods": 298
+  },
+  "resolution": {
+    "liveDbGroups": [
+      2,
+      28
+    ],
+    "allOriginalAndNewLiveDbFilesExactlyOnce": true,
+    "allScriptKeysFromBothParentsPreserved": true,
+    "duplicateJsonKeys": 0,
+    "webRpc": "Owner version, selected backend version and caller read boundary all required",
+    "liveRuntime": "Keep both telemetry observer and selected endpoint/generation validation",
+    "generatedRoutes": 228,
+    "generatedMethods": 298
+  },
+  "packageSha256": "2fe651c8ebecf7668df5d6cfa47b7dfcebcbea0af50802ecb4d9016b430f2687"
+}
