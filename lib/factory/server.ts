@@ -42,7 +42,7 @@ const authorize: FactoryAuthorize = (userId, issueId, tx, lockedIssue) => withDa
     if (workspaceId) {
       if (lockedIssue.id !== issueId || lockedIssue.deleted !== false || lockedIssue.ownershipState !== 'bound'
         || lockedIssue.workspaceId !== workspaceId) return false;
-      // The store read this row after acquiring its APP lock. Recheck links and
+      // The store supplied its current APP issue snapshot. Recheck links and
       // canonical authorization now; never reuse the route's preflight row.
       const link = await issueTeamAccess(issueId, userId);
       const allowed = await activeTaskWorkspaces(reader, workspaceId);
