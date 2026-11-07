@@ -93,7 +93,7 @@ jobs:
 
   private-production-readiness:
     if: >-
-      github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && startsWith(github.event.head_commit.message, 'ops: inspect private cloud production') && !endsWith(github.event.head_commit.message, 'subscriptions')
+      github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && startsWith(github.event.head_commit.message, 'ops: inspect private cloud production') && !startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -155,7 +155,7 @@ jobs:
           recursive: false
           include-imports: false
       - name: Read existing ASC_API_KEY_P8 only for TestFlight status
-        if: endsWith(github.event.head_commit.message, 'public')
+        if: startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public')
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -168,7 +168,7 @@ jobs:
           recursive: false
           include-imports: false
       - name: Read existing ASC_API_KEY_ID only for TestFlight status
-        if: endsWith(github.event.head_commit.message, 'public')
+        if: startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public')
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -181,7 +181,7 @@ jobs:
           recursive: false
           include-imports: false
       - name: Read existing ASC_API_ISSUER_ID only for TestFlight status
-        if: endsWith(github.event.head_commit.message, 'public')
+        if: startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public')
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -196,15 +196,15 @@ jobs:
       - run: node scripts/ops/self-hosting-release.mjs --business
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          MIKKA_METERING_ONLY: ${{ endsWith(github.event.head_commit.message, 'metering') && '1' || '0' }}
-          MIKKA_CLOUD_ACCEPTANCE_PUBLIC: ${{ endsWith(github.event.head_commit.message, 'public') && '1' || '0' }}
+          MIKKA_METERING_ONLY: ${{ startsWith(github.event.head_commit.message, 'ops: inspect private cloud production metering') && '1' || '0' }}
+          MIKKA_CLOUD_ACCEPTANCE_PUBLIC: ${{ startsWith(github.event.head_commit.message, 'ops: inspect private cloud production public') && '1' || '0' }}
 
   community-subscriptions:
     if: >-
       github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
-      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production') && endsWith(github.event.head_commit.message, 'subscriptions')
+      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production') && startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     concurrency:
