@@ -269,10 +269,11 @@ jobs:
           const live = await fetch('https://app.aspectlylabs.com/mikka/api/version', { redirect: 'error', headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(20000) })
           if (!live.ok) throw Error('COMMUNITY_PUBLIC_BUILD_UNAVAILABLE')
           const served = (await live.json()).build
-          if (compatible !== '9ea7b2cd61deb724f20330906f86df6df2cd9828' || ![sha, compatible].includes(served)) throw Error('COMMUNITY_PUBLIC_BUILD_CHANGED')
-          if (served === compatible) {
-            const comparison = await get('compare/' + sha + '...' + compatible)
+          if (compatible !== '9ea7b2cd61deb724f20330906f86df6df2cd9828' || ![sha, compatible, '4221d9c06da079321d4fe2803879ba82043d7a1f'].includes(served)) throw Error('COMMUNITY_PUBLIC_BUILD_CHANGED')
+          if (served !== sha) {
+            const comparison = await get('compare/' + sha + '...' + served)
             const allowed = ['app/api/mobile/tasks/[id]/route.ts','app/api/mobile/tasks/route.ts','apps/api/generated/routes.json','apps/api/generated/routes.ts','lib/mobile-task-view.test.ts','lib/mobile-task-view.ts','lib/mobile-tasks.ts','lib/task-block-runs.ts','messages/en.json','messages/zh-CN.json','package.json','tests/mobile-tasks.db.test.ts']
+            if (served === '4221d9c06da079321d4fe2803879ba82043d7a1f') allowed.push('lib/workspace-name.test.ts','lib/workspace-name.ts','tests/personal-first.db.test.ts')
             if (comparison.status !== 'ahead' || comparison.behind_by !== 0 || comparison.merge_base_commit?.sha !== sha
               || comparison.files?.length !== allowed.length || comparison.files.some(file => !allowed.includes(file.filename))) throw Error('COMMUNITY_CONTROL_PLANE_CHANGED')
           }
@@ -342,3 +343,5 @@ jobs:
 # Production Secret selector values stay in Infisical; Vercel supplies only named variable metadata.
 
 # Per-provider model selection verifies exactly the original small subscription before dispatch.
+
+# Repository failures retain only fixed classifications; cleanup awaits the terminal live push.

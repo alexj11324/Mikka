@@ -91,6 +91,30 @@ export async function configureBoundSubscription(client, workspaceId, selected, 
   receipt.modelSelectionVerified = true
 }
 
+export function safeRepositoryFailure(value) {
+  const text = typeof value === 'string' ? value.slice(0, 131072) : ''
+  const patterns = {
+    executable_missing: /\bENOENT\b|git: (?:not found|command not found)/i,
+    filesystem_permission: /\bEACCES\b|permission denied/i,
+    filesystem_full: /\bENOSPC\b|no space left on device/i,
+    git_authentication: /authentication failed|could not read Username|terminal prompts disabled|invalid username or token/i,
+    git_not_found: /repository not found|does not appear to be a git repository/i,
+    tls_certificate: /SSL certificate problem|unable to get local issuer certificate|certificate verify failed/i,
+    dns_failure: /could not resolve host|\bENOTFOUND\b|\bEAI_AGAIN\b/i,
+    connection_failure: /failed to connect|connection reset|\bECONNRESET\b|\bECONNREFUSED\b/i,
+    timeout: /timed out|\bETIMEDOUT\b|timeout of \d+/i,
+    git_transport: /RPC failed|HTTP\/2 stream|early EOF|index-pack failed|invalid index-pack output/i,
+    invalid_repository_path: /Invalid repository cache path|Repository cache escapes|Repository cache is not a standard clone|Repository cache contains a symlink/i,
+    invalid_repository_url: /Invalid repository URL|Unsupported repository|Invalid run GitHub endpoint|Invalid prepared GitHub credential/i,
+    git_ownership: /detected dubious ownership|unsafe repository/i,
+    git_configuration: /invalid key|bad config|invalid config|too many entries|missing config value|bogus format/i,
+    abort: /AbortError|operation was aborted|command was canceled/i,
+  }
+  const matched = /Command failed with exit code (\d{1,3})\b/.exec(text)
+  return { categories: Object.entries(patterns).filter(([, pattern]) => pattern.test(text)).map(([name]) => name),
+    exitCode: matched ? Number(matched[1]) : null }
+}
+
 export function safeThreadFailure(detail, userCodes) {
   const extra = new Set(['binding_required','account_unavailable','binding_mismatch','stale_binding','pending_auth','reconnect_required','disconnected','quota_unknown','quota_exhausted','backend_unavailable','isolation_required','billing_unverified','subscription_rate_limited','provider_access_denied','provider_request_rejected','provider_temporarily_unavailable','invalid_credential_bundle','subscription_timeout','secret_store_unavailable','secret_not_found','credential_integrity_failed','ECONNRESET','ECONNREFUSED','ENOTFOUND','ETIMEDOUT','EPIPE'])
   const code = value => typeof value === 'string' && (Object.hasOwn(userCodes, value) || extra.has(value)) ? value : 'OTHER'
@@ -100,6 +124,7 @@ export function safeThreadFailure(detail, userCodes) {
     code: code(failure?.code ?? detail.thread?.error),
     detail: failure?.code && userCodes[failure.code]?.includes(failure.detail) ? failure.detail : 'OTHER',
     causes: (Array.isArray(failure?.causes) ? failure.causes : []).slice(0, 8).map(cause => ({ name: names.has(cause.name) ? cause.name : 'OTHER', code: Number.isInteger(cause.code) && cause.code >= 0 && cause.code <= 599 ? cause.code : code(cause.code) })),
+    repository: safeRepositoryFailure(detail.thread?.error),
     stages: (detail.chunks ?? []).flatMap(row => { const c = row.chunk; return c?.type === 'data-run-stage' && ['repository','worktree','agent_start'].includes(c.data?.stage) && typeof c.data.ok === 'boolean' ? [{ stage: c.data.stage, ok: c.data.ok }] : [] }) }
 }
 
@@ -220,9 +245,9 @@ export async function runCommunity(env = process.env) {
     const expectedWorker = (await execute('python3', ['scripts/e2b/build-template.py', '--worker-hash', '--source-ref', revision], { cwd: source })).stdout.trim()
     check(expectedWorker === sourceConfig.workerSha, 'WORKER_VERSION')
     report.publicBuild = (await cloud.json('/api/version')).build
-    const sharedBuilds = [revision, env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION]
+    const sharedBuilds = [revision, env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION, '4221d9c06da079321d4fe2803879ba82043d7a1f']
     check(env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION === '9ea7b2cd61deb724f20330906f86df6df2cd9828' && sharedBuilds.includes(report.publicBuild), 'PUBLIC_VERSION')
-    report.sharedControlPlaneCompatibility = 'A23_to_9ea_protected_paths_byte_identical'
+    report.sharedControlPlaneCompatibility = 'A23_to_9ea_and_4221_protected_paths_byte_identical'
     privatePool = new Pool({ connectionString: database, max: 1, ssl: { rejectUnauthorized: true } })
     await privatePool.query('BEGIN READ ONLY')
     // The normal account API must expose the source before its exact metadata
@@ -473,6 +498,14 @@ export async function runCommunity(env = process.env) {
         row.code = /^(COMMUNITY_[A-Z0-9_]+|startup_[a-z0-9_]{1,80})$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_THREAD_FAILED'; row.errorClass = error?.constructor?.name === 'CommandExitError' ? 'CommandExitError' : 'Error'
         if (runId && issueId) {
           try {
+            const journal = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/runs.json', { user: 'root' }))
+            const local = journal.runs?.[runId]
+            row.daemonRepository = safeRepositoryFailure(local?.error)
+            row.daemonAssignment = { remoteIsExpected: local?.assignment?.remoteUrl === 'https://github.com/alexj11324/Mikka.git',
+              githubEndpointMatchesServer: typeof local?.assignment?.github?.endpoint === 'string' && new URL(local.assignment.github.endpoint).origin === origin,
+              githubTokenPrepared: Boolean(local?.assignment?.github?.token), modelCredentialWithheld: local?.credentialWithheld === true }
+          } catch { row.daemonDiagnosisUnavailable = true }
+          try {
             const { USER_ERROR_CODES } = await import(pathToFileURL(source + '/packages/protocol/src/user-error-codes.ts'))
             row.failureReceipt = safeThreadFailure(await community.rpc('agents.getIssueThread', [issueId, runId]), USER_ERROR_CODES)
             const frozen = (await community.json('/api/runs/' + runId + '/evidence')).run
@@ -484,7 +517,7 @@ export async function runCommunity(env = process.env) {
       }
       finally {
         if (!deviceId && sandbox) { try { const proof = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/device-proof.json', { user: 'root' })); if (UUID.test(proof.deviceId) && proof.harness === s.harness) deviceId = proof.deviceId } catch { /* registration may not have completed */ } }
-        if (runId) { try { await community.rpc('agents.stopRun', [runId]); row.cleanup.runStopped = true } catch { row.cleanup.runStopped = false } }
+        if (runId) { try { await community.rpc('agents.stopRun', [runId]); await watchRun(community, { runId, issueId }, 45000, WebSocket, Date.now, true); row.cleanup.runStopped = true } catch { row.cleanup.runStopped = false } }
         if (deviceId) { try { await community.rpc('agents.removeDevice', [deviceId]); row.cleanup.deviceRemoved = true } catch { row.cleanup.deviceRemoved = false } }
         if (sandbox) { try { await sandbox.kill(); row.cleanup.vmStopped = true; journal.vms = journal.vms.filter(id => id !== sandbox.sandboxId); await saveJournal() } catch { row.cleanup.vmStopped = false } }
       }

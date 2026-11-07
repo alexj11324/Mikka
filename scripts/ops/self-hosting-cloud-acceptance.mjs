@@ -238,3 +238,5 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
 // Model list materializes virtual IDs before removal; failure receipts exclude provider text.
 
 // Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.
+
+// Repository failures retain only fixed classifications; cleanup awaits the terminal live push.

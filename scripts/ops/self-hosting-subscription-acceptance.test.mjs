@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, safeThreadFailure } from './self-hosting-subscription-acceptance.mjs'
+import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, safeThreadFailure, safeRepositoryFailure } from './self-hosting-subscription-acceptance.mjs'
 const target = { ownerId: 'owned-local-user', workspaceId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222' }
 const row = { id: '33333333-3333-4333-8333-333333333333', ownerId: 'authorized-owner', workspaceId: '44444444-4444-4444-8444-444444444444', provider: 'codex' }
 const bundle = () => ({ schema: 1, connectionId: row.id, ownerId: row.ownerId, workspaceId: row.workspaceId, provider: row.provider,
@@ -143,3 +143,13 @@ test('failed thread receipts retain only registered codes and stages, excluding 
 })
 
 // Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.
+
+// Repository diagnosis projects fixed classifications, never arbitrary git output.
+test('repository errors retain the cause class without retaining repository credentials', () => {
+ const privateValue = 'github_pat_SYNTHETIC_PRIVATE_VALUE';
+ assert.deepEqual(safeRepositoryFailure('Command failed with ENOENT: git ' + privateValue), { categories: ['executable_missing'], exitCode: null });
+ assert.deepEqual(safeRepositoryFailure('Command failed with exit code 128: git clone https://x-access-token:' + privateValue + '@github.com/a/b.git\nfatal: could not read Username for https://github.com: terminal prompts disabled'), { categories: ['git_authentication'], exitCode: 128 });
+ const detail = safeRepositoryFailure('fatal: unable to access https://' + privateValue + ': SSL certificate problem: unable to get local issuer certificate');
+ assert.deepEqual(detail.categories, ['tls_certificate']); assert.ok(!JSON.stringify(detail).includes(privateValue));
+ assert.deepEqual(safeRepositoryFailure(privateValue), { categories: [], exitCode: null });
+})
