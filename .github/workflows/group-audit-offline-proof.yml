@@ -15,7 +15,7 @@ concurrency:
 jobs:
   proof:
     # Root-reviewed one-shot isolated PG17 proof; no production access or model calls.
-    if: ${{ github.ref == 'refs/heads/diagnostic/issue-1506-group-audit-proof-20261107-02' }}
+    if: ${{ false && github.ref == 'refs/heads/diagnostic/issue-1506-group-audit-proof-20261107-02' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     services:
