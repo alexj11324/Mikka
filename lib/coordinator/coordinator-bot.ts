@@ -179,9 +179,13 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
  * A run's frozen identity is execution authority, not a display/chat key. Keep
  * its tasks, sibling attempts and source/terminal events in that same domain.
  * A source may start several tasks, so retention follows those shared links.
+ * Runs owned by a different computer/group or barred by issue retirement must
+ * seed that retention too; merely excluding their UPDATE would split the family.
  *
- * Factory writes lock task -> source (sourceAllowed); repository admission
- * locks its request event, and completion/fallback locks the existing run.
+ * Publication/completion lock issue -> run, and the run's scope trigger takes
+ * an issue SHARE lock even when only botId changes. Take that lock first.
+ * Factory writes lock task -> issue -> source (sourceAllowed); repository
+ * admission locks its request event. Every subsequent lock is NOWAIT too.
  * Never wait in the opposite direction: NOWAIT rolls this whole best-effort
  * migration back before it can obstruct an in-flight admission. Only the ids
  * locked here are moved. A row committed between these lock statements is a
@@ -189,12 +193,15 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
  * reads the newly committed family and updates all three tables in one snapshot.
  */
 async function moveExecutionRows(client: PoolClient, ownerId: string, botId: string): Promise<number> {
+  const issues = (await client.query<{ id: string }>(`SELECT i.id FROM issues i WHERE EXISTS (
+    SELECT 1 FROM agent_runs r WHERE r."userId"=$1 AND r."botId" IS NULL AND r."issueId"=i.id
+  ) ORDER BY i.id FOR SHARE OF i NOWAIT`, [ownerId])).rows.map(row => row.id)
   const tasks = (await client.query<{ id: string }>('SELECT id FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
   const events = (await client.query<{ id: string }>('SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
   const runs = (await client.query<{ id: string }>('SELECT id FROM agent_runs WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
   const moved = await client.query(`WITH RECURSIVE
     own_tasks AS MATERIALIZED (SELECT id,"sourceEventId" FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL),
-    own_runs AS MATERIALIZED (SELECT id,"botId","agentDefinition" FROM agent_runs WHERE "userId"=$1),
+    own_runs AS MATERIALIZED (SELECT id,"botId","agentDefinition","issueId",kind FROM agent_runs WHERE "userId"=$1),
     own_events AS MATERIALIZED (SELECT id,"botId","runId",payload FROM coordinator_events WHERE "userId"=$1),
     task_sources AS (
       SELECT id AS "taskId","sourceEventId"::text AS "eventId" FROM own_tasks
@@ -219,7 +226,11 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
       SELECT 'event',e.id::text,'event',origin.id::text FROM own_events e JOIN own_events origin ON origin.id::text=e.payload->>'originEventId'
     ), edges AS (SELECT * FROM links UNION ALL SELECT other_kind,other_id,kind,id FROM links),
     seeds(kind,id) AS (
-      SELECT 'run',id::text FROM own_runs WHERE "agentDefinition" ? 'executionIdentity' OR ("botId" IS NULL AND NOT id=ANY($5::uuid[]))
+      SELECT 'run',r.id::text FROM own_runs r WHERE r."agentDefinition" ? 'executionIdentity'
+        OR r.kind='group_chat'
+        OR EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)
+        OR EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i.scope='personal' AND i."userId"<>$1)
+        OR (r."botId" IS NULL AND (NOT r.id=ANY($5::uuid[]) OR (r."issueId" IS NOT NULL AND NOT r."issueId"=ANY($6::uuid[]))))
       UNION ALL
       SELECT 'event',id::text FROM own_events WHERE "botId" IS NULL AND NOT id=ANY($4::uuid[])
       UNION ALL
@@ -238,7 +249,7 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
     UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL AND r.id=ANY($5::uuid[])
       AND r.kind <> 'group_chat'
       AND NOT EXISTS (SELECT 1 FROM retained p WHERE p.kind='run' AND p.id=r.id::text)
-      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId, tasks, events, runs])
+      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId, tasks, events, runs, issues])
   return moved.rowCount ?? 0
 }
 

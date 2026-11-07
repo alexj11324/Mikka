@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import test from 'node:test'
-import { assertFixtureEnvironment, fixtureHttp } from './self-hosted-services.mjs'
+import { assertFixtureEnvironment, chatObservation, fixtureHttp } from './self-hosted-services.mjs'
 import { createModelFixture } from './self-hosted-model.mjs'
 
 const fixture = {
@@ -27,6 +27,24 @@ test('the mutating driver refuses public origins, remote databases, cloud creden
     { MIKKA_DEFAULT_MODEL_API_KEY: 'real-key' }, { VERCEL: '1' }, { AI_GATEWAY_API_KEY: 'real-key' },
     { GITHUB_APP_PRIVATE_KEY: 'real-key' }, { DEVICE_GATEWAY_URL: 'https://gateway.example.test' },
   ]) assert.throws(() => assertFixtureEnvironment({ ...fixture, ...overrides }))
+})
+
+test('chat diagnostics distinguish unavailable reads without retaining error, content or identity values', () => {
+  const secret = 'private-fixture-value-that-must-not-be-retained'
+  const observed = chatObservation({ enabled: true, working: false, error: null, failure: { kind: 'failed', message: secret },
+    streamRunId: secret, items: [{ from: 'person', text: secret, id: secret }] }, 'SELF_HOSTED_REPLY_01')
+  assert.deepEqual(observed, { enabled: true, working: false, error: 'none', failure: 'failed', failureCode: 'none',
+    itemCount: 1, lastFrom: 'person', lastPending: false, streamPresent: true, expectedReplyPresent: false })
+  const unknown = chatObservation({ enabled: secret, working: secret, error: secret,
+    failure: { kind: secret, code: secret }, items: [{ from: secret, text: secret, id: secret }] }, 'SELF_HOSTED_REPLY_01')
+  assert.equal(unknown.error, 'unclassified')
+  assert.equal(unknown.failure, 'unclassified')
+  assert.equal(unknown.failureCode, 'unclassified')
+  assert.equal(unknown.lastFrom, 'unclassified')
+  assert.equal(JSON.stringify([observed, unknown]).includes(secret), false)
+  const explicit = chatObservation({ enabled: true, working: false, error: 'wake_failed', failure: { kind: 'wake', code: 'wake_failed' } }, 'SELF_HOSTED_REPLY_01')
+  assert.equal(explicit.error, 'wake_failed')
+  assert.equal(explicit.failureCode, 'wake_failed')
 })
 
 test('replica requests preserve the canonical authority, individual cookies and manual redirects', async t => {

@@ -15,6 +15,15 @@ import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { dropTestDatabase } from '../../tests/support/drop-test-database';
 
+type UploadedFile = { path: string; data: string };
+function uploadedFiles(path: string | UploadedFile[], body?: unknown): UploadedFile[] {
+  return typeof path === 'string' ? [{ path, data: typeof body === 'string' ? body : '' }] : path;
+}
+function uploadedBootstrap(path: string | UploadedFile[], body?: unknown): { deviceId: string; credential: string } | undefined {
+  const file = uploadedFiles(path, body).find(file => /^\/run\/mikka-viewer\/thread-[\w-]+\.json$/.test(file.path));
+  return file ? JSON.parse(file.data) : undefined;
+}
+
 const url = process.env.E2E_DATABASE_URL;
 if (url) {
   const u = new URL(url);
@@ -206,7 +215,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       try {
         fixture.provider.connect=async id=>{
           fixture.calls.push(`connect:${id}`);
-          return {sandboxId:id,files:{read:async()=> 'a'.repeat(40),write:async(path:string,body:string)=>{if(path.startsWith('/run/mikka-viewer/thread-'))bootstrap=JSON.parse(body);}},
+          return {sandboxId:id,files:{read:async()=> 'a'.repeat(40),write:async(path:string|UploadedFile[],body:unknown)=>{bootstrap=uploadedBootstrap(path,body)??bootstrap;}},
             commands:{run:async(command:string)=>{
               if(command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')){
                 assert.ok(bootstrap);assert.equal(bootstrap.deviceId,f.prior.device);
@@ -369,9 +378,9 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         fixture.calls.push(`connect:${id}`);
         return {
           sandboxId: id,
-          files: { read: async () => sha, write: async (path: string, body: string) => {
-            assert.match(path, /^\/run\/mikka-viewer\/thread-/);
-            bootstrap = JSON.parse(body);
+          files: { read: async () => sha, write: async (path: string | UploadedFile[], body: unknown) => {
+            bootstrap = uploadedBootstrap(path,body);
+            assert.ok(bootstrap);
           } },
           commands: { run: async (command: string) => {
             let stdout = '';
@@ -1150,18 +1159,29 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
       try {
         const runId = await run(await task()), fixture = fake();
-        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0;
+        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0, uploads = 0;
         fixture.provider.create = async (_source, op) => ({
           sandboxId: `sandbox-${op}`,
           files: {
             read: async () => 'a'.repeat(40),
-            write: async (path: string, body: string) => {
-              if (path.startsWith('/run/mikka-viewer/thread-')) bootstrap = JSON.parse(body);
+            write: async (path: string | UploadedFile[], body: unknown) => {
+              uploads++;
+              const files = uploadedFiles(path,body), primary = files.find(file => file.path.endsWith('.json'));
+              bootstrap = uploadedBootstrap(path,body);
+              assert.ok(primary); assert.ok(bootstrap);
+              assert.deepEqual(body, { user: 'root', useOctetStream: false });
+              const locator = files.find(file => file.path === primary.path + '.run');
+              assert.ok(locator);
+              assert.deepEqual(JSON.parse(locator.data), { version: 1, runId, bootstrapSha256: createHash('sha256').update(primary.data).digest('hex') });
+              assert.ok(!locator.data.includes(bootstrap.credential));
+              assert.equal('initialRunId' in JSON.parse(primary.data), false, 'old strict bootstrap consumers retain the original schema');
             },
           },
           commands: { run: async (command: string) => {
             if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
               assert.ok(bootstrap);
+              assert.equal(uploads, 1, 'the optional locator shares the existing upload RPC');
+              assert.ok(command.indexOf('mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json') < command.indexOf('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json'));
               const used = await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
               assert.equal(used.rowCount, 1);
               await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
@@ -1205,9 +1225,11 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
           sandboxId: `sandbox-${op}`,
           files: {
             read: async () => 'a'.repeat(40),
-            write: async (path: string, body: string) => {
-              if (path.startsWith('/run/mikka-viewer/thread-')) { steps.push('handoff'); throw new Error('fixture reached worker handoff'); }
-              files.set(path, body);
+            write: async (path: string | UploadedFile[], body: unknown) => {
+              for (const file of uploadedFiles(path,body)) {
+                if (file.path.startsWith('/run/mikka-viewer/thread-')) { steps.push('handoff'); throw new Error('fixture reached worker handoff'); }
+                files.set(file.path, file.data);
+              }
             },
           },
           commands: { run: async (command: string) => {
@@ -1245,7 +1267,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         } };
         provider.create = async (_source, op) => ({
           sandboxId: `sandbox-${op}`,
-          files: { read: async () => 'a'.repeat(40), write: async (path: string) => { if (path.startsWith('/run/mikka-viewer/thread-')) throw new Error('fixture reached worker handoff'); } },
+          files: { read: async () => 'a'.repeat(40), write: async (path: string | UploadedFile[]) => { if (uploadedFiles(path).some(file => file.path.startsWith('/run/mikka-viewer/thread-'))) throw new Error('fixture reached worker handoff'); } },
           commands,
         }) as never;
         await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), /fixture reached worker handoff/);

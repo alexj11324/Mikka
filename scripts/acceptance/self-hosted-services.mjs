@@ -99,6 +99,28 @@ export async function createFixtureBucket(env) {
   await response.body?.cancel()
 }
 
+/** Diagnose a failed read without retaining any chat text, identity, provider
+ * message or arbitrary error value. This projection never changes admission. */
+export function chatObservation(chat, expectedReply) {
+  const items = Array.isArray(chat?.items) ? chat.items : []
+  const last = items.at(-1)
+  const kinds = ['person', 'coordinator', 'event']
+  const failures = ['hosted', 'subscription', 'wake', 'failed']
+  const codes = ['wake_failed', 'wake_start_unconfirmed', 'wake_exhausted', 'verification_required', 'free_allowance_used', 'points_exhausted', 'model_tool_unavailable']
+  return {
+    enabled: typeof chat?.enabled === 'boolean' ? chat.enabled : null,
+    working: typeof chat?.working === 'boolean' ? chat.working : null,
+    error: !chat?.error ? 'none' : codes.includes(chat.error) ? chat.error : 'unclassified',
+    failure: !chat?.failure ? 'none' : failures.includes(chat.failure.kind) ? chat.failure.kind : 'unclassified',
+    failureCode: codes.includes(chat?.failure?.code) ? chat.failure.code : chat?.failure?.code ? 'unclassified' : 'none',
+    itemCount: items.length,
+    lastFrom: kinds.includes(last?.from) ? last.from : last ? 'unclassified' : 'none',
+    lastPending: last?.pending === true,
+    streamPresent: typeof chat?.streamRunId === 'string' && chat.streamRunId.length > 0,
+    expectedReplyPresent: items.some(item => item?.from === 'coordinator' && typeof item.text === 'string' && item.text.includes(expectedReply)),
+  }
+}
+
 export async function runAcceptance(env = process.env) {
   assertFixtureEnvironment(env)
   const report = { kind: 'isolated-self-hosted-services', revision: env.MIKKA_EXPECTED_REVISION, origin,
@@ -197,6 +219,9 @@ export async function runAcceptance(env = process.env) {
       const deadline = Date.now() + 45_000
       for (;;) {
         const chat = await (await request(`/mikka/api/mobile/chat?bot=${bot.id}`)).json()
+        if (!(chat.enabled === true && !chat.error && !chat.failure)) {
+          report.chatObservation = { turn, ...chatObservation(chat, reply) }
+        }
         check(chat.enabled === true && !chat.error && !chat.failure, 'CHAT_UNAVAILABLE')
         if (!chat.working && chat.items?.some(item => item.from === 'coordinator' && item.text?.includes(reply))) break
         check(Date.now() < deadline, 'CHAT_REPLY_TIMEOUT')
@@ -213,6 +238,11 @@ export async function runAcceptance(env = process.env) {
     } finally { await pool.end() }
     report.checks.chat = { messages: 31, replies: 31, provider: 'synthetic-openai-compatible', hostedUsageRows: 0, subscriptionAcceptance: false }
     await request(`/mikka/api/chat/attachments/${upload.id}`, { method: 'DELETE' })
+    // Private one-run handoff to the same-revision source daemon on the CI
+    // runner. Never include this file in reports or retained artifacts.
+    await writeFile('/data/self-hosted-daemon-session.private.json', JSON.stringify({ revision: version.build, origin,
+      ownerId: session.user.id, workspaceId: workspace.workspace.id,
+      cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') }), { flag: 'wx', mode: 0o600 })
     report.status = 'passed'; report.stage = 'complete'
   } catch (error) {
     report.status = 'failed'

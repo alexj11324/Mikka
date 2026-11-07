@@ -13,6 +13,8 @@ test-results
 playwright-report
 apps/*/dist
 packages/*/dist
+packages/subscription-worker/.upstream
+packages/subscription-worker/bin
 apps/mobile/ios
 apps/mobile/android
 **/.DS_Store

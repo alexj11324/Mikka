@@ -21,6 +21,7 @@ targets before issuing a write.
 | S3-compatible storage | An authenticated chat attachment uploads through the application into MinIO. The application returns a Signature V4 download URL, its bytes match the original UTF-8 file, and the same object without its signature refuses anonymous access. |
 | Built-in live, two replicas | A real owner/workspace ticket opens a WebSocket on application 1. Creating a bot through application 2 produces the workspace's bot-list invalidation on that socket through shared PostgreSQL. No Cloudflare variables are configured. |
 | Community chat | The created bot accepts 31 serial user messages and completes 31 corresponding replies through a local OpenAI-compatible fixture. The test waits for live events between reads. That workspace has no `hosted_usage` rows. |
+| Source daemon process | The same checkout starts a real daemon on the CI runner for that registered community user. Normal enrollment, HTTP registration/heartbeat and the daemon's own built-in gateway socket must succeed. The owner revokes its exact token; the old credential returns 401, the next real daemon sync becomes unregistered, and only that device is removed. |
 | Image and restart | The existing smoke verifies exact revision, community discovery/config, sign-in HTML and compiled assets, then repeats after restarting the persistent installation. |
 
 The retained `self-hosted-services-<revision>` artifact contains only the exact
@@ -28,6 +29,15 @@ revision, fixed local origin, check outcomes and counts. It excludes user email,
 cookies, passwords, email contents, tokenized links, object URLs and provider
 input. A failed stage emits a closed error code; it never dumps a raw provider
 or authentication response.
+
+The daemon phase receives a one-run session handoff in a mode-0600 file under
+a mode-0700 runner directory. It consumes and deletes the file, passes the
+one-use enrollment grant only over child stdin, and closes that login session
+after cleanup. Private process logs, device credentials and the data directory
+are never artifacts and are removed in both driver cleanup and an always-run
+workflow step. The daemon uses its real `HttpServerLink`; automatic CLI model
+probing is disabled through its existing `modelProbe` option. Its receipt
+explicitly records `taskCompletion: false` and `subscriptionAcceptance: false`.
 
 The local model is explicitly reported as `synthetic-openai-compatible`.
 These results prove the configured HTTP/streaming protocol, local Workflow

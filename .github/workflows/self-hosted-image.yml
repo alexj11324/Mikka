@@ -30,6 +30,8 @@ jobs:
         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
       - name: Build the public standalone application
         run: docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --tag mikka-self-hosted:check .
+      - name: Verify packaged subscription binaries without network or credentials
+        run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
       - name: Start with an empty database and no Mikka credentials
         run: |
           node --input-type=module <<'JS'
@@ -52,6 +54,25 @@ jobs:
       - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
         run: docker compose exec -T app node scripts/acceptance/self-hosted-services.mjs
+      - name: Install the same-revision source daemon dependencies
+        uses: ./.github/actions/pnpm-install
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Exercise the real daemon against the registered community user
+        timeout-minutes: 6
+        run: |
+          node --import tsx --test scripts/acceptance/self-hosted-daemon.test.mjs
+          umask 077
+          mkdir -m 700 "$RUNNER_TEMP/mikka-selfhost-daemon"
+          docker compose cp app:/data/self-hosted-daemon-session.private.json "$RUNNER_TEMP/mikka-selfhost-daemon/session.json"
+          chmod 600 "$RUNNER_TEMP/mikka-selfhost-daemon/session.json"
+          docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})'
+          node --import tsx scripts/acceptance/self-hosted-daemon.mjs
+      - name: Remove private daemon fixture material
+        if: always()
+        run: |
+          rm -rf -- "$RUNNER_TEMP/mikka-selfhost-daemon"
+          docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})' || true
       - name: Retain secret-free application acceptance evidence
         if: always()
         run: |
@@ -62,7 +83,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: self-hosted-services-${{ github.sha }}
-          path: .artifacts/self-hosted/evidence.json
+          path: |
+            .artifacts/self-hosted/evidence.json
+            .artifacts/self-hosted/daemon.json
           if-no-files-found: warn
           retention-days: 14
       - name: Verify the same persistent installation restarts
