@@ -70,10 +70,11 @@ test('daemon owner polling and removal satisfy the real browser RPC transport', 
 test('presence acceptance keeps the actual owner grant and ticket on the fixed loopback channel', () => {
   const now = 1_800_000_000_000, scope = { ownerId: session.ownerId, workspaceId: session.workspaceId }
   const secret = 'isolated-presence-unit-fixture'
-  const ticket = liveTicket(scope, { url: session.origin + '/mikka', secret }, now)
+  const ticket = liveTicket(scope, { url: session.origin + '/mikka', secret, mode: 'builtin' }, now, 'fixture-browser-session')
   const live = { ...scope, presence: devicePresenceGrant(scope, [['b0000000-0000-4000-8000-000000000002', true, now + 90_000]], secret, now) }
   const target = presenceTarget(ticket, live, session.ownerId, now)
   assert.equal(target.protocol, ticket.protocol)
+  assert.match(target.protocol, /^mikka-live-v2-/)
   assert.equal(target.proof.token, live.presence.token)
   assert.equal(new URL(target.url).searchParams.get('presence'), '1')
   assert.equal(new URL(target.url).searchParams.get('revisions'), '1')
@@ -87,4 +88,15 @@ test('presence acceptance keeps the actual owner grant and ticket on the fixed l
   assert.throws(() => presenceTarget(ticket, { ...live, presence: null }, session.ownerId, now), /PRESENCE_PROOF/)
   assert.throws(() => presenceTarget(ticket, { ...live, presence: { ...live.presence, expiresAt: now } }, session.ownerId, now), /PRESENCE_PROOF/)
   assert.throws(() => presenceTarget({ ...ticket, expiresAt: ticket.expiresAt + 1000 }, live, session.ownerId, now), /PRESENCE_TICKET/)
+  const [expiry, encoded, signature] = ticket.protocol.slice('mikka-live-v2-'.length).split('.')
+  for (const patch of [
+    { protocol: `mikka-ticket-${expiry}-${signature}` },
+    { protocol: `mikka-live-v2-${expiry}..${signature}` },
+    { protocol: `mikka-live-v2-${expiry}.${encoded}=.${signature}` },
+    { protocol: `mikka-live-v2-${expiry}.${Buffer.from('\n').toString('base64url')}.${signature}` },
+    { protocol: `mikka-live-v2-${Math.floor(now / 1000)}.${encoded}.${signature}`, expiresAt: now },
+    { protocol: `mikka-live-v2-${Math.floor((now + 306_000) / 1000)}.${encoded}.${signature}`, expiresAt: now + 306_000 },
+    { protocol: `mikka-live-v2-${expiry}.${encoded}.${'g'.repeat(64)}` },
+  ]) assert.throws(() => presenceTarget({ ...ticket, ...patch }, live, session.ownerId, now), /PRESENCE_TICKET/)
+
 })
