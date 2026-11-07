@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "inputFixtureSha256": "b67ffd12caaaaf8cb5d91d8191e0cda85be547be09908a7c7e2cc14d5a676d91",
+  "inputFixtureSha256": "f90cb691131d2ca7e25bfd1c71c1067485adbafac639f113ef43868b78a2fda0",
   "version": 1,
   "issue": 1503,
   "phase": "github_scoped_child_rotation",
@@ -8,7 +8,7 @@
   "workspaceId": "93f38d33-9447-4eaf-8a46-0d8889165bcd",
   "smokeUserId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
   "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
-  "startedAt": "2026-11-07T13:56:22.101Z",
+  "startedAt": "2026-11-07T16:13:47.416Z",
   "changed": true,
   "installAttempted": true,
   "before": {
@@ -25,10 +25,10 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-07T15:07:53.000Z",
-    "connectionExpiresAt": "2026-11-07T15:07:42.785Z",
-    "connectionUpdatedAt": "2026-11-07T11:32:58.786Z",
-    "tokenSha256": "89203678a1bd0309e0785e1f54c9975408838aed1374a1fc7d0ee378a115d94a"
+    "providerExpiresAt": "2026-11-07T21:56:24.000Z",
+    "connectionExpiresAt": "2026-11-07T17:56:16.280Z",
+    "connectionUpdatedAt": "2026-11-07T13:56:26.281Z",
+    "tokenSha256": "96d51747751667a75cc216f29bc6a3afe826310f76de7bf0299d9ce978e7c356"
   },
   "activityBefore": {
     "activeRuns": 0,
@@ -44,14 +44,14 @@
     "userId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
     "githubAccountId": "183887963",
     "githubLogin": "alexj11324",
-    "updatedAt": "2026-11-07T07:07:49.518Z",
-    "expiresAt": "2026-11-07T15:07:49.516Z",
+    "updatedAt": "2026-11-07T15:30:34.779Z",
+    "expiresAt": "2026-11-07T23:30:34.777Z",
     "hasRefreshToken": true
   },
   "stage": "new_child_committed",
   "ownerProvider": {
-    "providerExpiresAt": "2026-11-07T15:07:49.000Z",
-    "checkedAt": "2026-11-07T13:56:22.868Z"
+    "providerExpiresAt": "2026-11-07T23:30:34.000Z",
+    "checkedAt": "2026-11-07T16:13:48.156Z"
   },
   "providerStage": "mint_scoped_token",
   "newChild": {
@@ -64,8 +64,8 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-07T21:56:24.000Z",
-    "tokenSha256": "96d51747751667a75cc216f29bc6a3afe826310f76de7bf0299d9ce978e7c356"
+    "providerExpiresAt": "2026-11-08T00:13:49.000Z",
+    "tokenSha256": "f0ecaed2ece63611d05ae39e76ae7926ccc27c0ef5fb65565f664bfaeacdaa2d"
   },
   "activityAtSave": {
     "activeRuns": 0,
@@ -96,10 +96,10 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-07T21:56:24.000Z",
-    "connectionExpiresAt": "2026-11-07T17:56:16.280Z",
-    "connectionUpdatedAt": "2026-11-07T13:56:26.281Z",
-    "tokenSha256": "96d51747751667a75cc216f29bc6a3afe826310f76de7bf0299d9ce978e7c356"
+    "providerExpiresAt": "2026-11-08T00:13:49.000Z",
+    "connectionExpiresAt": "2026-11-07T20:13:41.400Z",
+    "connectionUpdatedAt": "2026-11-07T16:13:51.401Z",
+    "tokenSha256": "f0ecaed2ece63611d05ae39e76ae7926ccc27c0ef5fb65565f664bfaeacdaa2d"
   },
   "after": {
     "version": 1,
@@ -115,17 +115,17 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-07T21:56:24.000Z",
-    "connectionExpiresAt": "2026-11-07T17:56:16.280Z",
-    "connectionUpdatedAt": "2026-11-07T13:56:26.281Z",
-    "tokenSha256": "96d51747751667a75cc216f29bc6a3afe826310f76de7bf0299d9ce978e7c356"
+    "providerExpiresAt": "2026-11-08T00:13:49.000Z",
+    "connectionExpiresAt": "2026-11-07T20:13:41.400Z",
+    "connectionUpdatedAt": "2026-11-07T16:13:51.401Z",
+    "tokenSha256": "f0ecaed2ece63611d05ae39e76ae7926ccc27c0ef5fb65565f664bfaeacdaa2d"
   },
   "ownerAfter": {
     "userId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
     "githubAccountId": "183887963",
     "githubLogin": "alexj11324",
-    "updatedAt": "2026-11-07T07:07:49.518Z",
-    "expiresAt": "2026-11-07T15:07:49.516Z",
+    "updatedAt": "2026-11-07T15:30:34.779Z",
+    "expiresAt": "2026-11-07T23:30:34.777Z",
     "hasRefreshToken": true
   },
   "ownerUnchanged": true,
@@ -139,5 +139,5 @@
     "activeThreadMachines": 0,
     "activeCloudMachines": 0
   },
-  "completedAt": "2026-11-07T13:56:26.455Z"
+  "completedAt": "2026-11-07T16:13:51.608Z"
 }

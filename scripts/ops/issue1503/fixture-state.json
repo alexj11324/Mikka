@@ -27,9 +27,9 @@
     "listedRepositoryCount": 53,
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
-    "providerExpiresAt": "2026-11-07T21:56:24.000Z",
-    "connectionExpiresAt": "2026-11-07T17:56:16.280Z",
-    "connectionUpdatedAt": "2026-11-07T13:56:26.281Z",
-    "tokenSha256": "96d51747751667a75cc216f29bc6a3afe826310f76de7bf0299d9ce978e7c356"
+    "providerExpiresAt": "2026-11-08T00:13:49.000Z",
+    "connectionExpiresAt": "2026-11-07T20:13:41.400Z",
+    "connectionUpdatedAt": "2026-11-07T16:13:51.401Z",
+    "tokenSha256": "f0ecaed2ece63611d05ae39e76ae7926ccc27c0ef5fb65565f664bfaeacdaa2d"
   }
 }
