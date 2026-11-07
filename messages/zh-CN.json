@@ -5526,6 +5526,20 @@
       "failed": "操作失败，请重试"
     }
   },
+  "HostedConnections": {
+    "appsTitle": "应用",
+    "appsNote": "你已连接的应用。Bot 只能在你开启时使用它们。",
+    "addMore": "在插件中添加",
+    "emptyNote": "在插件中连接 GitHub、Linear、Slack 等应用后，会在这里出现。",
+    "state": {
+      "on": "已开启",
+      "off": "已停用",
+      "expired": "需要重新连接",
+      "connected": "已连接",
+      "paused": "已暂停",
+      "pending": "读取中"
+    }
+  },
   "HostedSettings": {
     "back": "返回",
     "general": {

@@ -315,7 +315,8 @@ export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
 }
 
 /** The app's overall state from its accounts. */
-function appState(accounts: ConnectedAccountView[]) {
+/** One app's accounts read as one row: usable ones, all expired, on or off. Shared with UI layers. */
+export function appState(accounts: ConnectedAccountView[]) {
   const usable = accounts.filter(account => !needsReconnect(account))
   const expired = accounts.length > 0 && usable.length === 0
   const on = usable.some(account => account.enabled)

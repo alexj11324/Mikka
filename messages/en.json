@@ -5526,6 +5526,20 @@
       "failed": "That didn't work"
     }
   },
+  "HostedConnections": {
+    "appsTitle": "Apps",
+    "appsNote": "Apps you've connected. Bots can use them only while they're on.",
+    "addMore": "Add in Plugins",
+    "emptyNote": "Apps you connect in Plugins, such as GitHub, Linear or Slack, appear here.",
+    "state": {
+      "on": "On",
+      "off": "Turned off",
+      "expired": "Needs reconnecting",
+      "connected": "Connected",
+      "paused": "Paused",
+      "pending": "Loading"
+    }
+  },
   "HostedSettings": {
     "back": "Back",
     "general": {
