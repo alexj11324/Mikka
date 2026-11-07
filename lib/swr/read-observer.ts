@@ -5,12 +5,13 @@ type Read = {
   settled: Promise<Outcome>
   received: boolean
   value?: unknown
+  committedValue?: WeakRef<object>
   accepted: boolean
   superseded: boolean
   callbackFailure?: { error: unknown }
   applied(): boolean
 }
-const pending = new WeakMap<Cache, Map<string, Read>>()
+const latest = new WeakMap<Cache, Map<string, Read>>()
 let order = 0
 
 /** A same-realm ordering barrier, not a transport timestamp. Fetcher entry is
@@ -18,10 +19,11 @@ let order = 0
  * a conservative boundary even when those steps delay the actual request. */
 export const readBoundary = () => ++order
 
-/** Observe only the actual SWR fetcher lifetime. Settled results are not kept. */
+/** Keep only the latest actual read per cache/key. A completed proof weakly
+ * names the object already in SWR; it retains no separate response value. */
 export function observeSWRRead<T>(cache: Cache, key: string, fetcher: () => T | Promise<T>): Promise<T> {
-  const reads = pending.get(cache) ?? new Map<string, Read>()
-  pending.set(cache, reads)
+  const reads = latest.get(cache) ?? new Map<string, Read>()
+  latest.set(cache, reads)
   const previous = reads.get(key)
   if (previous) previous.superseded = true
   let finish!: (outcome: Outcome) => void
@@ -31,9 +33,11 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: () => T | 
     applied: () => {
       try {
         const state = cache.get(key)
+        const value = read.committedValue ? read.committedValue.deref() : read.value
         // A custom SWR comparator may retain different/older data. Only an
         // actual committed object (or identical primitive) certifies this read.
-        return read.accepted && !read.superseded && state?.error === undefined && Object.is(state?.data, read.value)
+        return (!read.committedValue || value !== undefined) && read.accepted && !read.superseded
+          && state?.error === undefined && Object.is(state?.data, value)
       } catch { return false }
     },
   }
@@ -42,7 +46,10 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: () => T | 
   // commits the cache synchronously; the following microtask checks both.
   const promise = (async () => fetcher())()
   const complete = (outcome: Outcome) => {
-    if (reads.get(key) === read) reads.delete(key)
+    if (outcome.status === 'committed' && read.value !== null && typeof read.value === 'object') {
+      read.committedValue = new WeakRef(read.value)
+      read.value = undefined
+    } else if (reads.get(key) === read) reads.delete(key)
     finish(outcome)
   }
   void promise.then(value => {
@@ -59,22 +66,22 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: () => T | 
 
 /** SWR does not call onSuccess for results discarded by a later read/mutation. */
 export function acceptSWRRead(cache: Cache, key: string, value: unknown) {
-  const read = pending.get(cache)?.get(key)
+  const read = latest.get(cache)?.get(key)
   if (read?.received && Object.is(read.value, value)) read.accepted = true
 }
 
 /** Preserve an original onSuccess exception without turning it into a retry. */
 export function failSWRRead(cache: Cache, key: string, value: unknown, error: unknown) {
-  const read = pending.get(cache)?.get(key)
+  const read = latest.get(cache)?.get(key)
   if (read?.received && Object.is(read.value, value)) read.callbackFailure = { error }
 }
 
-/** One in-flight read may cover several obligations created before it began.
+/** One in-flight or still-committed read may cover obligations predating it.
  * A discarded result, an older read, or an uncovered revision still needs the
  * ordinary SWR revalidation. Failures propagate without an extra retry. */
 export async function readFresh(cache: Cache, key: string, after: number, revalidate: () => Promise<unknown>, accepts: (data: unknown) => boolean, current: () => boolean): Promise<unknown> {
   while (current()) {
-    const read = pending.get(cache)?.get(key)
+    const read = latest.get(cache)?.get(key)
     if (!read || read.began <= after) return revalidate()
     const outcome = await read.settled
     if (!current()) return
@@ -85,6 +92,7 @@ export async function readFresh(cache: Cache, key: string, after: number, revali
     }
     // A later read can itself cover this obligation; never return the old
     // result or let its completion erase the newer read's observation.
-    if (!pending.get(cache)?.has(key)) return revalidate()
+    const next = latest.get(cache)?.get(key)
+    if (!next || next === read) return revalidate()
   }
 }

@@ -408,6 +408,17 @@ so parallel reads cannot overwrite another action's SQL attribution. Shared
 queries are attributed once to the action that starts them, without multiplying
 their query count by the number of waiting readers.
 
+The same primary-process snapshots also include `queryOperations`: actual SQL
+call counts partitioned by the existing innermost database-operation or request
+route at `pg.Client.query` entry. Only a fixed allowlist of authentication,
+workspace, Live ticket and list-read labels is retained; absent or unrecognized
+contexts go into `unattributed`. Every snapshot and window delta must sum exactly
+to its original `queryCalls`, and each bucket must remain monotonic. No query,
+request, checkpoint or exclusion is added. These labels identify the operation
+that issued a shared query, not every logical batch item that awaits it; connection
+bytes are not allocated to individual operations. Historical reports without this
+partition remain unavailable for this breakdown, rather than acquiring zeroes.
+
 ### Changing them
 
 `scripts/ops/posthog-observability.mjs` holds the dashboard, its insights

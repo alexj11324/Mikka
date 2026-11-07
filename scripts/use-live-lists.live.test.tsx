@@ -44,6 +44,7 @@ let useListExpiry: typeof import('../hooks/use-list-expiry')['useListExpiry']
 let root: Root, container: HTMLDivElement, cache: Map<string, State>, tickets: string[]
 let refresh: Partial<Record<Kind, () => Promise<unknown>>>
 let replaceObserved: (value: Read) => Promise<unknown>
+let automaticReadiness = true
 const sockets: FakeSocket[] = []
 
 /** Real React, SWR and LiveChannels; only authenticated read and WS boundaries
@@ -64,7 +65,7 @@ class FakeSocket {
     queueMicrotask(() => {
       if (this.readyState !== 0) return
       this.readyState = 1; this.onopen?.()
-      this.message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS })
+      if (automaticReadiness) this.message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS })
     })
   }
   send(value: string) { if (value === 'ping') this.onmessage?.({ data: 'pong' }); else this.sent.push(JSON.parse(value)) }
@@ -95,7 +96,7 @@ before(async () => {
   ;({ useListExpiry } = await import('../hooks/use-list-expiry'))
 })
 beforeEach(() => {
-  reads = []; cursors = []; scopeError = null; tickets = []; sockets.length = 0; refresh = {}; cache = new Map(); replies.clear()
+  reads = []; cursors = []; scopeError = null; automaticReadiness = true; tickets = []; sockets.length = 0; refresh = {}; cache = new Map(); replies.clear()
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   for (const kind of ['issues', 'threads', 'tasks', 'bots', 'groups', 'roster'] as const) replies.set(kind, async () => snapshot(kind))
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
@@ -146,11 +147,103 @@ function ObservedReader({ enabled, scopes, owner, compare }: { enabled: boolean;
     revisions: { [serialized]: result.data?.live.revisions?.[`issue_list:${scope}`] } })), [serialized])
   return <Items kind="issues" value={result} />
 }
-async function renderObserved(enabled: boolean, scopes = [team], owner = 'owner', compare?: ReadCompare, onSuccess?: () => void) {
+function ChannelAnchor() {
+  useLiveKeys([{ kind: 'bot_list', id: team, workspaceId: team }], ['observed-live-anchor'])
+  return null
+}
+async function renderObserved(enabled: boolean, scopes = [team], owner = 'owner', compare?: ReadCompare, onSuccess?: () => void, anchor = false) {
   await act(async () => root.render(<SWRConfig key={owner} value={{ provider: () => cache, use: [staleOnFocus], dedupingInterval: 0, shouldRetryOnError: false, ...(onSuccess ? { onSuccess } : {}) }}>
-    <LiveProvider ownerId={owner} workspaceId={team}><ObservedReader enabled={enabled} scopes={scopes} owner={owner} compare={compare} /></LiveProvider>
+    <LiveProvider ownerId={owner} workspaceId={team}>{anchor && <ChannelAnchor />}<ObservedReader enabled={enabled} scopes={scopes} owner={owner} compare={compare} /></LiveProvider>
   </SWRConfig>))
 }
+
+test('a committed SWR read after connection readiness covers the pending live flush', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false)
+  await renderObserved(true)
+  assert.equal(count('issues'), 1)
+  assert.ok(view('issues')?.includes('revision-5'), 'the real SWR cache has already committed the read')
+  await settled()
+  assert.equal(count('issues'), 1, 'finishing before the existing flush does not require the same read again')
+  await act(async () => emit(team, 'issue_list')); await settled()
+  assert.equal(count('issues'), 2, 'a later unversioned event cannot reuse the earlier commit')
+})
+
+test('a late live subscription shares the committed read from its continuously ready connection', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  assert.equal(count('issues'), 1)
+  assert.ok(view('issues')?.includes('revision-5'))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(sockets.length, 1, 'the unrelated existing subscriber keeps this exact connection alive')
+  assert.equal(count('issues'), 1, 'subscribing itself is not a data change after the already committed read')
+})
+
+for (const revision of [undefined, 6]) test(`a ${revision ? 'higher-revision' : 'new unversioned'} push while unsubscribed invalidates the committed read before a late subscription`, async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await act(async () => sockets[0].message({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['issue_list'] }))
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  await act(async () => {
+    sockets[0].message({ kind: 'issue_list', id: team, ...(revision ? { rev: revision } : {}) })
+  })
+  replies.set('issues', async () => issueAt(6))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(count('issues'), 2)
+  assert.ok(view('issues')?.includes('revision-6'))
+})
+
+for (const ready of [false, true]) test(`a late subscription cannot reuse a read from ${ready ? 'before' : 'without'} the capability acknowledgement`, async () => {
+  automaticReadiness = false
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  if (ready) await act(async () => sockets[0].message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS }))
+  replies.set('issues', async () => issueAt(6))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(count('issues'), 2)
+  assert.ok(view('issues')?.includes('revision-6'))
+})
+
+test('a committed read from an earlier connection generation cannot cover a late subscription', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  for (const visibility of ['hidden', 'visible']) await act(async () => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: visibility })
+    document.dispatchEvent(new browser.Event('visibilitychange') as unknown as Event)
+  })
+  assert.equal(sockets.length, 2)
+  replies.set('issues', async () => issueAt(6))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(count('issues'), 2)
+  assert.ok(view('issues')?.includes('revision-6'))
+})
+
+test('a replaced committed cache object cannot satisfy the pending live flush', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false); await renderObserved(true)
+  await act(async () => { await replaceObserved(issueAt(9)) })
+  replies.set('issues', async () => issueAt(10))
+  await settled()
+  assert.equal(count('issues'), 2, 'a different cache object needs one ordinary read, without a proof retry loop')
+  assert.ok(view('issues')?.includes('revision-10'))
+})
+
+test('a newer failed SWR read cannot resurrect an earlier committed provenance', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  const error = new Error('fixture latest read failed')
+  replies.set('issues', async () => { throw error })
+  await act(async () => { await refresh.issues!() })
+  assert.equal(cache.get(unstableSerialize(['observed-live-reader', 'owner']))?.error, error)
+  replies.set('issues', async () => issueAt(6))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(count('issues'), 3)
+  assert.ok(view('issues')?.includes('revision-6'))
+})
 
 test('live catch-ups share an ordinary SWR read that starts after both scoped connections open', async () => {
   const held = deferred<Read>(), next = deferred<Read>()
@@ -265,6 +358,21 @@ test('a shared read cannot replace the revision held when the live obligation be
     assert.equal(count('issues'), 2, 'post-commit revision 5 cannot erase the earlier revision 9 requirement')
     assert.ok(view('issues')?.includes('revision-10'))
   } finally { await act(async () => held.resolve(issueAt(5))) }
+})
+
+test('a completed read cannot erase the higher revision still held by the active live subscription', async () => {
+  replies.set('issues', async () => issueAt(9))
+  await renderObserved(false); await renderObserved(true); await settled()
+  assert.equal(count('issues'), 1)
+  await act(async () => emit(team, 'issue_list'))
+  replies.set('issues', async () => issueAt(5))
+  await act(async () => { await refresh.issues!() })
+  assert.equal(count('issues'), 2)
+  assert.ok(view('issues')?.includes('revision-5'), 'the actual SWR commit precedes the pending live flush')
+  replies.set('issues', async () => issueAt(10))
+  await settled()
+  assert.equal(count('issues'), 3, 'the subscription still requires revision 9 after cache commit 5')
+  assert.ok(view('issues')?.includes('revision-10'))
 })
 
 test('an original onSuccess exception remains a SWR error without a shared-read retry', async () => {

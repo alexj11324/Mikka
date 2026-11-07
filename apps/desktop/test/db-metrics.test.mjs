@@ -8,6 +8,7 @@ import { promisify } from 'node:util'
 import test from 'node:test'
 import { EventEmitter } from 'node:events'
 import { createLifecycleQueryCounter, projectQuerySnapshot, queryCountDelta } from './lifecycle-query-counts.mjs'
+import queryOperations from './db-query-operations.cjs'
 
 const require = createRequire(import.meta.url)
 const run = promisify(execFile)
@@ -37,6 +38,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const Module = require('node:module')
 const vm = require('node:vm')
+const { AsyncLocalStorage } = require('node:async_hooks')
 const { EventEmitter } = require('node:events')
 const { pathToFileURL } = require('node:url')
 const { join } = require('node:path')
@@ -55,12 +57,14 @@ const context = vm.createContext({ URL, process: { pid: process.pid, cwd: () => 
   DATABASE_URL: 'postgresql://fixture@127.0.0.1/metrics_e2e',
   MIKKA_DATABASE_URL: 'postgresql://fixture@127.0.0.1/metrics_e2e', MIKKA_LOCAL_TEST_ACCOUNTS: '1',
 } } })
+const routeScope = new AsyncLocalStorage()
+context[Symbol.for('mikka.requestRoute')] = routeScope
 const localRequire = id => id === 'node:http' ? { createServer: callback => {
   handler = callback
   return { on() { return this }, listen(path, ready) { assert.equal(path, '/tmp/mikka-fixture.sock'); listening++; ready() }, unref() {} }
 } } : id === 'node:fs' ? { ...fs, chmodSync: (path, mode) => {
   assert.equal(path, '/tmp/mikka-fixture.sock'); assert.equal(mode, 0o600); chmods++
-} } : require(id)
+} } : Module.createRequire(metricsPath)(id)
 const source = fs.readFileSync(metricsPath, 'utf8')
 const load = () => vm.runInContext('(function(require) {' + source + '\n})', context)(localRequire)
 const snapshot = (reset = false) => {
@@ -119,11 +123,24 @@ assert.equal(require.cache[selectedEntry], undefined, 'tracing setup itself does
   assert.equal(first.unknownReadings, 0)
   await provider.forceFlush()
   assert.equal(exporter.getFinishedSpans().filter(span => span.attributes['db.system'] === 'postgresql' || span.attributes['db.system.name'] === 'postgresql').length, 1, 'exactly one real OTel query wrapper remains active')
+  const privateRoute = '/PRIVATE_OPERATION_CANARY?secret=PRIVATE_VALUE_CANARY'
+  await Promise.all(['/actions/coordinator/poll', '/api/live/ticket', privateRoute].map(route => routeScope.run(route, async () => {
+    await Promise.resolve()
+    await new Promise(resolve => client.query('SELECT 1', () => resolve()))
+  })))
+  const attributed = snapshot()
+  assert.equal(attributed.queryCalls, 4)
+  assert.equal(attributed.queryOperations['/actions/coordinator/poll'], 1)
+  assert.equal(attributed.queryOperations['/api/live/ticket'], 1)
+  assert.equal(attributed.queryOperations.unattributed, 2, 'missing and unrecognized contexts remain counted')
+  assert.equal(Object.values(attributed.queryOperations).reduce((total, count) => total + count, 0), attributed.queryCalls)
+  assert.equal(JSON.stringify(attributed).includes('PRIVATE_'), false)
   const outsider = new other.Client()
   outsider._queryable = false
   await new Promise(resolve => outsider.query('SELECT 1', () => resolve()))
-  assert.equal(snapshot().queryCalls, 1, 'the unselected source/traced copy must not be counted')
+  assert.equal(snapshot().queryCalls, 4, 'the unselected source/traced copy must not be counted')
   assert.equal(snapshot(true).pgProtocolReceiveBytes, 0)
+  assert.equal(Object.values(snapshot().queryOperations).reduce((total, count) => total + count, 0), 0)
   stream.bytesRead += 19; stream.bytesWritten += 7; stream.emit('close')
   const end = snapshot()
   assert.equal(end.pgProtocolReceiveBytes, 19); assert.equal(end.pgProtocolSendBytes, 7)
@@ -183,6 +200,36 @@ test('lifecycle query windows retain exact counter deltas and omit unrelated con
   assert.deepEqual(queryCountDelta(before, after), { startedAt: new Date(2000).toISOString(), finishedAt: new Date(2500).toISOString(),
     durationMs: 500, queryCalls: 4, pgProtocolReceiveBytes: 80, pgProtocolSendBytes: 30, closedConnections: 1, unknownReadings: 0 })
   assert.equal(JSON.stringify(before).includes('counter-private-canary'), false)
+})
+
+const operationCounts = (overrides = {}) => ({ ...Object.fromEntries(queryOperations.map(key => [key, 0])), ...overrides })
+
+test('operation SQL counts partition the original full window without removing unknown or background work', () => {
+  const before = projectQuerySnapshot(counterSample({ queryOperations: operationCounts({ '/api/live/ticket': 2, unattributed: 3 }) }), counterIdentity)
+  const after = projectQuerySnapshot(counterSample({ endedAt: 2500, queryCalls: 10,
+    queryOperations: operationCounts({ '/api/live/ticket': 3, '/actions/threads/poll': 2, unattributed: 5 }) }), counterIdentity)
+  const delta = queryCountDelta(before, after)
+  assert.equal(delta.queryCalls, 5)
+  assert.deepEqual(delta.queryOperations, operationCounts({ '/api/live/ticket': 1, '/actions/threads/poll': 2, unattributed: 2 }))
+  assert.equal(Object.values(delta.queryOperations).reduce((sum, count) => sum + count, 0), delta.queryCalls)
+  assert.equal(before.queryOperations.unattributed, 3)
+})
+
+test('operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories', () => {
+  const counts = operationCounts({ unattributed: 5 })
+  const before = projectQuerySnapshot(counterSample({ queryOperations: counts }), counterIdentity)
+  const missing = { ...counts }; delete missing.unattributed
+  for (const value of [null, [], missing, { ...counts, PRIVATE_OPERATION_CANARY: 0 },
+    operationCounts({ unattributed: 4 }), operationCounts({ unattributed: 5.5 }), operationCounts({ unattributed: -1 })]) {
+    assert.throws(() => projectQuerySnapshot(counterSample({ queryOperations: value }), counterIdentity), /LIFECYCLE_QUERY_COUNTER_SNAPSHOT_INVALID/)
+  }
+  const legacy = projectQuerySnapshot(counterSample(), counterIdentity)
+  assert.equal('queryOperations' in legacy, false, 'historical absence is not a synthetic zero partition')
+  assert.throws(() => queryCountDelta(before, legacy), /LIFECYCLE_QUERY_COUNTER_CHANGED/)
+  assert.throws(() => queryCountDelta(legacy, before), /LIFECYCLE_QUERY_COUNTER_CHANGED/)
+  const decreased = projectQuerySnapshot(counterSample({ endedAt: 2500, queryCalls: 6,
+    queryOperations: operationCounts({ '/api/live/ticket': 2, unattributed: 4 }) }), counterIdentity)
+  assert.throws(() => queryCountDelta(before, decreased), /LIFECYCLE_QUERY_COUNTER_CHANGED/)
 })
 
 test('lifecycle query windows refuse a changed process, reset, missing driver and unknown readings', () => {

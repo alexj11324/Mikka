@@ -4,6 +4,7 @@ import { constants } from 'node:fs'
 import { open, readFile } from 'node:fs/promises'
 import { request } from 'node:http'
 import { dirname, resolve } from 'node:path'
+import queryOperations from './db-query-operations.cjs'
 
 const fields = ['pid', 'startedAt', 'endedAt', 'instrumentedClients', 'queryCalls',
   'pgProtocolReceiveBytes', 'pgProtocolSendBytes', 'activeConnections', 'closedConnections', 'unknownReadings']
@@ -259,7 +260,18 @@ export function projectQuerySnapshot(value, expected) {
     || value.instrumentedClients < 1 || value.endedAt < value.startedAt) {
     throw new Error('LIFECYCLE_QUERY_COUNTER_SNAPSHOT_INVALID')
   }
-  return { version: 1, runtime: value.runtime, ...Object.fromEntries(fields.map(key => [key, value[key]])) }
+  let operations
+  if (value.queryOperations !== undefined) {
+    const counts = value.queryOperations
+    if (!counts || Array.isArray(counts) || Object.keys(counts).length !== queryOperations.length
+      || queryOperations.some(key => !Object.hasOwn(counts, key) || !Number.isSafeInteger(counts[key]) || counts[key] < 0)
+      || queryOperations.reduce((sum, key) => sum + counts[key], 0) !== value.queryCalls) {
+      throw new Error('LIFECYCLE_QUERY_COUNTER_SNAPSHOT_INVALID')
+    }
+    operations = Object.fromEntries(queryOperations.map(key => [key, counts[key]]))
+  }
+  return { version: 1, runtime: value.runtime, ...Object.fromEntries(fields.map(key => [key, value[key]])),
+    ...(operations ? { queryOperations: operations } : {}) }
 }
 
 export function queryCountDelta(before, after) {
@@ -268,6 +280,17 @@ export function queryCountDelta(before, after) {
     throw new Error('LIFECYCLE_QUERY_COUNTER_CHANGED')
   }
   if (before.unknownReadings !== 0 || after.unknownReadings !== 0) throw new Error('LIFECYCLE_QUERY_COUNTER_UNKNOWN')
+  let operations
+  if (before.queryOperations !== undefined || after.queryOperations !== undefined) {
+    if (!before.queryOperations || !after.queryOperations
+      || queryOperations.some(key => after.queryOperations[key] < before.queryOperations[key])) {
+      throw new Error('LIFECYCLE_QUERY_COUNTER_CHANGED')
+    }
+    operations = Object.fromEntries(queryOperations.map(key => [key, after.queryOperations[key] - before.queryOperations[key]]))
+    if (Object.values(operations).reduce((sum, count) => sum + count, 0) !== after.queryCalls - before.queryCalls) {
+      throw new Error('LIFECYCLE_QUERY_COUNTER_CHANGED')
+    }
+  }
   return {
     startedAt: new Date(before.endedAt).toISOString(), finishedAt: new Date(after.endedAt).toISOString(),
     durationMs: after.endedAt - before.endedAt,
@@ -275,6 +298,7 @@ export function queryCountDelta(before, after) {
     pgProtocolReceiveBytes: after.pgProtocolReceiveBytes - before.pgProtocolReceiveBytes,
     pgProtocolSendBytes: after.pgProtocolSendBytes - before.pgProtocolSendBytes,
     closedConnections: after.closedConnections - before.closedConnections, unknownReadings: 0,
+    ...(operations ? { queryOperations: operations } : {}),
   }
 }
 
