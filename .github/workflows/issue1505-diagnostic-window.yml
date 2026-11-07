@@ -1,10 +1,11 @@
 # Fresh diagnostic window after exact removal of the preceding window.
 # Reuse only the same independently verified idle Bot. No task/Profile/model/VM creation.
-# Normal child of ee1d2679; original Bot receipt identity remains 5cd03921.
+# Normal child of e33f18f4; original Bot receipt identity remains 5cd03921.
+# Prepared before merge; create this helper ref only after latest CI and actual writers permit release.
 name: Issue 1505 prepare scoped diagnostic window
 on:
   push:
-    branches: [ops/1505-diagnostic-window-1638]
+    branches: [ops/1505-diagnostic-window-e33e3a91]
 permissions:
   contents: write
   id-token: write
@@ -25,7 +26,7 @@ jobs:
       run:
         working-directory: source
     env:
-      DIAGNOSTIC_WINDOW_GO: root-reviewed-1505-diagnostic-window-1638
+      DIAGNOSTIC_WINDOW_GO: root-reviewed-1505-diagnostic-window-e33e3a91
     steps:
       - name: Check out the exact temporary helper
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -37,7 +38,7 @@ jobs:
       - name: Check out the reviewed application source without credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 4c756faf5fb6e6fcf0bda4935c9f602b1ffc716a
+          ref: e33e3a91d4011efbe768b11b428a5d152ede744a
           path: source
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -45,11 +46,11 @@ jobs:
           node-version: 24
       - name: Verify immutable source and explicit root review before credentials
         run: |
-          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-diagnostic-window-1638'
+          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-diagnostic-window-e33e3a91'
           test "$GITHUB_RUN_ATTEMPT" = '1'
-          test "$(git rev-parse HEAD)" = '4c756faf5fb6e6fcf0bda4935c9f602b1ffc716a'
-          test "$(git rev-parse HEAD^{tree})" = 'ea88b8e12370875672a37cd8b4dc068d3df12d57'
-          printf '%s  %s\n' 'a2bbe3fa092dcae61123b0669b532189d5ba8f1bbc888dcc12ff5976285b36dc' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
+          test "$(git rev-parse HEAD)" = 'e33e3a91d4011efbe768b11b428a5d152ede744a'
+          test "$(git rev-parse HEAD^{tree})" = 'b2e36d3351654fceec59fe138a55de31cb155df9'
+          printf '%s  %s\n' 'c03cffbf9c07ee7df3d49f2ddae1881a798be8066a76cade905b3b78d96d022e' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
           node ../ops/scripts/ops/issue1505-diagnostic-window.mjs verify "$RUNNER_TEMP/diagnostic-window-preflight.json"
       - name: Read the existing SMOKE email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -110,7 +111,7 @@ jobs:
         run: |
           import json, os, urllib.request, urllib.error
           from pathlib import Path
-          repo, branch = 'alexj11324/Mikka', 'ops/1505-diagnostic-window-1638'
+          repo, branch = 'alexj11324/Mikka', 'ops/1505-diagnostic-window-e33e3a91'
           assert os.environ['GITHUB_REPOSITORY'] == repo and os.environ['GITHUB_REF'] == 'refs/heads/' + branch
           receipt = {'branch': branch, 'expectedSha': os.environ['GITHUB_SHA'], 'status': 'failed'}
           class NoRedirect(urllib.request.HTTPRedirectHandler):

@@ -5,16 +5,16 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
-export const SOURCE = '4c756faf5fb6e6fcf0bda4935c9f602b1ffc716a'
-export const TREE = 'ea88b8e12370875672a37cd8b4dc068d3df12d57'
-export const BRANCH = 'ops/1505-diagnostic-window-1638'
-export const HELPER_PARENT = 'ee1d2679a07bd3b6c07105574add9c267faac1cf'
-export const HELPER_PARENT_TREE = '97af039fea797e01e6ffa4d8ed9fc59638e4aac4'
+export const SOURCE = 'e33e3a91d4011efbe768b11b428a5d152ede744a'
+export const TREE = 'b2e36d3351654fceec59fe138a55de31cb155df9'
+export const BRANCH = 'ops/1505-diagnostic-window-e33e3a91'
+export const HELPER_PARENT = 'e33f18f4a210391d3e14f15364a4d7db2d8565a2'
+export const HELPER_PARENT_TREE = 'c12094723dfe6cf149fd92588ba977a6f9ee4472'
 export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
 export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
 export const KEY = 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW'
 export const ORIGIN = 'https://app.aspectlylabs.com'
-export const GO = 'root-reviewed-1505-diagnostic-window-1638'
+export const GO = 'root-reviewed-1505-diagnostic-window-e33e3a91'
 export const ORIGINAL = Object.freeze({
   receiptSha256: '12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5',
   helperCommit: '5cd039213a531476cde35500a2498bd3a5089556', helperTree: 'a841f19b0bab028bc386d6c768cce35496ca306b',
