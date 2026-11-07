@@ -5260,6 +5260,7 @@
   },
   "HostedSettings": {
     "security": {
+      "othersDone": "其他设备已退出",
       "othersTitle": "退出其他设备",
       "othersHint": "除这台设备外，所有已登录的设备都会退出，需要重新登录。",
       "othersConfirm": "立即退出"

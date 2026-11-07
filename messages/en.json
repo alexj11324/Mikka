@@ -5260,6 +5260,7 @@
   },
   "HostedSettings": {
     "security": {
+      "othersDone": "Other devices are signed out",
       "othersTitle": "Sign out other devices",
       "othersHint": "Every device but this one is signed out and has to sign in again.",
       "othersConfirm": "Sign out now"
