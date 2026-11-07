@@ -4240,6 +4240,8 @@
         "saved": "已保存"
       },
       "threads": "线程",
+      "tasks": "任务",
+      "back": "返回",
       "prs": "PR",
       "computer": "电脑",
       "routines": "例行",

@@ -4240,6 +4240,8 @@
         "saved": "Saved"
       },
       "threads": "Threads",
+      "tasks": "Tasks",
+      "back": "Back",
       "prs": "PRs",
       "computer": "Computer",
       "routines": "Routines",
