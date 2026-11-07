@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { CalendarClock, ChevronDown, ChevronRight } from 'lucide-react-native'
-import { BotAvatar, Spinner } from '@/components/icons'
+import { ChevronDown, ChevronRight } from 'lucide-react-native'
+import { Spinner } from '@/components/icons'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Text } from '@/components/Text'
 import { underBar } from '@/components/NavBar'
@@ -16,7 +16,7 @@ import { useHome } from '@/lib/home'
 import { tap } from '@/lib/haptics'
 import { colors, LIST_INSET, ROW_SURFACE_INSET } from '@/lib/theme'
 import { rowState, taskListRows, type TaskFilter, type TaskListRow } from '../model/task-groups'
-import { BOARD_LABEL, GROUP_LABEL, PriorityIcon, STATE_LABEL, TaskGroupIcon, TaskStateIcon } from './task-icons'
+import { BOARD_LABEL, GROUP_LABEL, STATE_LABEL, TaskGroupIcon, TaskStateIcon } from './task-icons'
 
 /** The person's tasks (GET /api/mobile/tasks), read again when a task or one of its threads changes (the live channel). */
 export function useTasks(enabled = true) {
@@ -74,34 +74,26 @@ export function TaskGroupBar({ id, count, folded, onToggle }: { id: TaskGroup; c
 }
 
 /**
- * A task: priority, its own state's icon (never its group's, 2026-11-07-2230), the dispatching bot's avatar, number,
- * title and date. A grey line under it gives the reason (等你回复, 待审阅, 等 MIK-12) and a scheduled task's rule
- * (「每天 09:00」), in the server's words. It opens the task's detail, where its threads are (never a thread directly).
+ * A task (Figma 1085:2 M1): its own state's icon (never its group's, 2026-11-07-2230), number, title and date. A grey
+ * line under it gives the reason (等你回复, 待审阅, 等 MIK-12), the dispatching bot and a scheduled task's rule
+ * (「每天 09:00」). Priority stays in the detail. It opens the task's detail, where its threads are.
  */
 export function TaskRowView({ task }: { task: Task }) {
   const router = useRouter()
   const { state, reason } = rowState(task)
   const when = task.createdAt ?? task.updatedAt
-  const grey = [reason, task.schedule?.label].filter(Boolean).join(' · ')
+  const grey = [reason, task.bot?.name, task.schedule?.label].filter(Boolean).join(' · ')
   return (
     <Pressable accessibilityRole="link" accessibilityLabel={[task.identifier, task.title, state ? STATE_LABEL[state] : BOARD_LABEL[task.status], grey].filter(Boolean).join('，')}
       onPress={() => router.push(`/task/${task.id}`)}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       <View style={styles.line}>
-        <PriorityIcon priority={task.priority} />
         <TaskStateIcon state={state} status={task.status} />
-        {/* The avatar keeps its place without a bot, so numbers line up. */}
-        {task.bot ? <BotAvatar color={task.bot.color} shape={task.bot.shape} size={18} /> : <View style={styles.noBot} />}
         {task.identifier ? <Text style={styles.key}>{task.identifier}</Text> : null}
         <Text style={styles.title} numberOfLines={1}>{displayTitle(task.title)}</Text>
         {when ? <Text style={styles.date}>{shortWhen(when)}</Text> : null}
       </View>
-      {grey ? (
-        <View style={styles.grey}>
-          {task.schedule && !reason ? <CalendarClock size={13} color={colors.secondary} strokeWidth={2} /> : null}
-          <Text style={styles.greyText} numberOfLines={1}>{grey}</Text>
-        </View>
-      ) : null}
+      {grey ? <Text style={styles.grey} numberOfLines={1}>{grey}</Text> : null}
     </Pressable>
   )
 }
@@ -115,11 +107,9 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   row: { justifyContent: 'center', gap: 2, minHeight: 48, paddingVertical: 8, marginHorizontal: ROW_SURFACE_INSET, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
   line: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  noBot: { width: 18, height: 18 },
   key: { fontSize: 14, color: colors.secondary, fontVariant: ['tabular-nums'] },
   title: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 21 },
   date: { fontSize: 14, color: colors.secondary, fontVariant: ['tabular-nums'] },
-  /** Under the title, past the two icons and the avatar. */
-  grey: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingLeft: 16 + 18 + 18 + 24 },
-  greyText: { flexShrink: 1, fontSize: 13, color: colors.secondary },
+  /** Under the title, past the state icon. */
+  grey: { paddingLeft: 18 + 8, fontSize: 13, color: colors.secondary },
 })

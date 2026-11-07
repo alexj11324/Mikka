@@ -91,8 +91,11 @@ export function attemptState(attempt: { group?: ThreadGroup; failed?: boolean; s
   }
 }
 
-/** The word for an attempt's state, as 活动 and a chat card say it. */
-export const ATTEMPT_WORD: Record<TaskState | 'done' | 'todo', string> = { waiting: '等你处理', failed: '失败', running: '运行中', queued: '排队中', done: '完成', todo: '空闲' }
+/**
+ * The word for an attempt's state, as 活动 and a chat card say it. 等你处理 is the state's name, never shown: a
+ * waiting attempt says its reason (待审阅, 等你回复) when it is known, else nothing.
+ */
+export const ATTEMPT_WORD: Record<TaskState | 'done' | 'todo', string> = { waiting: '', failed: '失败', running: '运行中', queued: '排队中', done: '完成', todo: '空闲' }
 
 export type TaskFilter = 'all' | TaskGroup
 
