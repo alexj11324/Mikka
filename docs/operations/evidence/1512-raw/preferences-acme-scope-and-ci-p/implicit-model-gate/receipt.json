@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "model_restoration_gate_readonly",
+  "status": "implicit_preference_absent_confirmed_no_mutation",
+  "sourceCommit": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+  "query": {
+    "count": 1,
+    "startedAt": "2026-11-07 22:06:23 UTC",
+    "endedAt": "2026-11-07 22:06:25 UTC",
+    "projectId": "autumn-fire-21908520",
+    "branchId": "br-autumn-rain-b5leflom",
+    "database": "orvilo_mvp",
+    "maxRows": 1,
+    "readOnly": true,
+    "scope": "Exact supplied bot/workspace; JOIN bots and coordinator_bots on botId, ownerId and workspaceId; matching bot_model_choices only.",
+    "returnedColumns": [
+      "target_scope_matches",
+      "stored_choice_rows",
+      "persisted_choice_kind",
+      "has_binding",
+      "has_api_key",
+      "has_api_model"
+    ]
+  },
+  "result": {
+    "target_scope_matches": 1,
+    "stored_choice_rows": 0,
+    "persisted_choice_kind": "implicit_default",
+    "has_binding": false,
+    "has_api_key": false,
+    "has_api_model": false
+  },
+  "sources": [
+    {
+      "path": "app/api/mobile/model/route.ts",
+      "bytes": 3642,
+      "sha256": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09",
+      "gitBlob": "3b6d4ae8bb734fd8ee95d04872aa44f9075f3732"
+    },
+    {
+      "path": "lib/bot-model-menu.ts",
+      "bytes": 11523,
+      "sha256": "20917335fa4941c41a59228bad81a0420dcc3e9ddb9437726bd9fe2671a1cf0b",
+      "gitBlob": "384c2d5fadcb6e1f2798eb244ac07543dd7f5af6"
+    },
+    {
+      "path": "lib/bot-model-menu-view.ts",
+      "bytes": 4384,
+      "sha256": "5b62aafc1c46a9bea2b0b677ad74fe5f0bf2732fd1829bf33fae43dcb52c23a6",
+      "gitBlob": "e67085a6a5f070fe94c635f6efaeaec5795b3f62"
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "bytes": 20499,
+      "sha256": "ac564db188c004fb76408cc4e52028353ff93672d0bca030219553e3acdecd63",
+      "gitBlob": "48068b9cfc04c0ad4e1cdb9fe8059bf4d48774e7"
+    },
+    {
+      "path": "lib/bot-model-choice.ts",
+      "bytes": 6389,
+      "sha256": "dcc19eb482a437ebfc13502c3c77b443f1df30c2665c0dfbf7aad7268edcc3ea",
+      "gitBlob": "c13aba66ffe939c8e479db1eca87b25493327ce6"
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "bytes": 21237,
+      "sha256": "fa1ae6aaf4f8271bb620e97d90ed425a9727026d8861675d67dab2930fccb238",
+      "gitBlob": "561752eef3ab1d5a439d39d61be8da7a41ed0a45"
+    }
+  ],
+  "findings": [
+    {
+      "name": "preflight_gate",
+      "source": "scripts/acceptance/run-observability.mjs:preflightCase",
+      "detail": "Current must be chosen=true, available=true, no fallback, string id and present in offered groups. sameModel also compares chosen during restoration."
+    },
+    {
+      "name": "source_of_truth",
+      "source": "lib/bot-model-choice.ts:botModelPreference",
+      "detail": "The preference is bot_model_choices keyed by ownerId/workspaceId/botKey. Explicit bot ID is the key; it is not a bots.model field. Missing row means selected undefined and no saved API key choice."
+    },
+    {
+      "name": "implicit_default",
+      "source": "lib/bot-model-choice.ts:resolveBotModelChoice",
+      "detail": "With no saved preference, default resolution can select an effective subscription/hosted choice but chosen remains false. Reading the menu does not save that default."
+    },
+    {
+      "name": "normal_restore_contract",
+      "source": "app/api/mobile/model/route.ts:handlePUT -> chooseBotModel -> ExecutionSettings.setBotModel",
+      "detail": "PUT requires a nonempty option id. HOSTED_CHOICE writes a row with no binding, deliberately explicit hosted choice. null/auto is rejected by setBotModel. Restoring a displayed default id would preserve neither absent-row state nor chosen=false."
+    },
+    {
+      "name": "explicit_default_is_different",
+      "source": "lib/bot-model-menu-view.ts:HOSTED_CHOICE",
+      "detail": "A row with no binding/key is an explicitly saved hosted default and can be chosen=true; it must not be confused with the observed absent preference row."
+    },
+    {
+      "name": "closed_production_result",
+      "detail": "At the one query snapshot the trusted target matches exactly one Coordinator and has zero preference rows. If unchanged when the menu is read, current chosen=false fails the existing restoration gate. No effective provider/model or quota availability was queried."
+    }
+  ],
+  "supplementaryCodeSearch": {
+    "query": "DELETE FROM bot_model_choices",
+    "count": 6,
+    "incomplete": false,
+    "paths": [
+      "lib/coordinator/coordinator-bot.ts",
+      "tests/run-quota.db.test.ts",
+      "tests/api-key-runs.db.test.ts",
+      "tests/coordinator-bot.db.test.ts",
+      "lib/subscription-repository.db.test.ts",
+      "tests/run-provider-fallback.db.test.ts"
+    ],
+    "limit": "This exact SQL text search is supplementary, not an exhaustive proof of every possible ORM operation. The supported GET/PUT call chain itself has no unset operation."
+  },
+  "safety": {
+    "credentialsRead": false,
+    "emailsRead": false,
+    "promptsOrMessagesRead": false,
+    "rawSettingObjectsRead": false,
+    "databaseWrites": 0,
+    "apiWrites": 0,
+    "modelCalls": 0,
+    "resourcesCreated": 0,
+    "sourceOrRefChanges": false,
+    "testsRun": false,
+    "quietFixUnchanged": true
+  },
+  "evidence": [
+    {
+      "path": "gate.sql",
+      "bytes": 1641,
+      "sha256": "a8add36b245a4c092030e5b117a18d7b20228f7517641aab1ec86c6d98c271b9",
+      "gitBlob": "d1594c9b75798d36cf58949cf563e25bb001df56",
+      "readbackVerified": true
+    },
+    {
+      "path": "request.json",
+      "bytes": 1858,
+      "sha256": "049acbe3e117f5d71977ac18204d74ece5b9e4f0791dad7c7ce733cc11dd0393",
+      "gitBlob": "fd69d6fa98ff95ebd70a1d2d71364469d6b713ec",
+      "readbackVerified": true
+    },
+    {
+      "path": "result.txt",
+      "bytes": 199,
+      "sha256": "40b091ceddc6123948acfc2fdd0e2e5d6ebf5d3a165cb503842c5f25176dbf4d",
+      "gitBlob": "0bc7489d6d641aafeb408282811fd56595817659",
+      "readbackVerified": true
+    },
+    {
+      "path": "mcp-response.json",
+      "bytes": 345,
+      "sha256": "3c891d408e5e3b85ad3f49e837c1c3ff47f03321eca3ec9dd7cef4af536cf34d",
+      "gitBlob": "f536cccefe1c464e56351e47c73a010ca12e16a1",
+      "readbackVerified": true
+    }
+  ],
+  "conclusion": "This gate is not safely solved by relabeling an implicit default as an explicit choice. No driver change or setting mutation was made. Root can evaluate a supported exact restoration operation separately; no reset API is introduced here.",
+  "remainingUnknown": [
+    "Effective live menu/provider/model/availability/fallback were not queried.",
+    "Concurrent normal user activity may change the saved preference after this point-in-time read.",
+    "Legacy coordinator-key migration is a separate normal code path; no additional production row scan was authorized or performed."
+  ]
+}

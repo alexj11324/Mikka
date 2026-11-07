@@ -1,0 +1,18 @@
+{
+  "phase": "green",
+  "node": "v24.22.1",
+  "command": [
+    "node",
+    "--test",
+    "--test-reporter=tap",
+    "scripts/acceptance/run-observability.test.mjs"
+  ],
+  "status": 0,
+  "signal": null,
+  "error": null,
+  "elapsedMs": 1095,
+  "stdoutBytes": 8058,
+  "stdoutSha256": "4b8649b1883c99042d0c564f037f9aee8470231cfa2348a55b743958db117e12",
+  "stderrBytes": 0,
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "pullRequest": 1675,
+  "kind": "independent_acme_scope_review_and_unreferenced_integration",
+  "status": "no_blocking_findings",
+  "base": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+  "sources": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 57426,
+      "sha256": "d3f27a23c5989af940c14146f491f52bc6fd43e33fdce2c103eaa1fb53935e94",
+      "gitBlob": "71281216d2ac2ac4a75683e84cdd29c7dddfaafe",
+      "additions": 16,
+      "deletions": 2
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 49760,
+      "sha256": "36b3a27027adce98f4d693255d150a0d728ed1f585b425d4a1d6218d067947e0",
+      "gitBlob": "911d8fe775ba16cc11bdfc512e9861798a7bef00",
+      "additions": 70,
+      "deletions": 2
+    }
+  ],
+  "references": [
+    {
+      "path": "app/api/factory/tasks/[taskId]/route.ts",
+      "bytes": 1892,
+      "sha256": "39fc9291d69eb3ba43118d2a113a99144b5a6d849645bac2476ddb9b6b0c0b1f",
+      "gitBlob": "765fc699a7c1463309b0957e1d13609aab283c2f"
+    },
+    {
+      "path": "app/api/factory/tasks/route.ts",
+      "bytes": 3901,
+      "sha256": "1e37c85da0c2e619dda37b2a1ee1192d8a09b0e2970522bd8178ae98cd82994c",
+      "gitBlob": "20869b39ac12f9761150cb59343145b1fb623563"
+    },
+    {
+      "path": "lib/live/factory.ts",
+      "bytes": 5095,
+      "sha256": "8b6989d38e933803c49ef519af2c103a63351a16df9ac35e0c0fd3ae01dff70a",
+      "gitBlob": "fac72d5437b0334daa91ee8ce6aa2425252a6349"
+    },
+    {
+      "path": "lib/factory/http.ts",
+      "bytes": 4211,
+      "sha256": "69e8c355436e243b50912d4d7946a314858247267aeb5a9408e5048de0e8f00c",
+      "gitBlob": "ddac750aa31e5280ad7addc7891cfa4caa5f3bfd"
+    }
+  ],
+  "findings": [
+    {
+      "id": "actual_detail_scope",
+      "result": "pass",
+      "basis": "The authenticated detail adapter reads the owner-scoped task body and then factoryLiveScopes(..., taskId, session.user.id). Task scope uses the persisted Bot workspace and active owner membership; the list's live scope belongs to the visible issue and is not used to exclude tasks."
+    },
+    {
+      "id": "closed_task_binding",
+      "result": "pass",
+      "basis": "Only unsettled list rows with valid task ID, exact issue ID, safe nonnegative revision, closed stage/status and nullable valid attempt/candidate IDs are read. Detail must have the authenticated owner and exactly match id, issueId, revision, stage, status, attemptId and candidateId."
+    },
+    {
+      "id": "explicit_other_workspace",
+      "result": "pass",
+      "basis": "Only a valid UUID liveWorkspaceId different from the current workspace permits exclusion. Same, null, absent, malformed or mismatched proof remains blocked. HTTP/read failures are not converted into permission to proceed."
+    },
+    {
+      "id": "limited_read",
+      "result": "pass",
+      "basis": "Each unsettled historical list row receives one existing authenticated GET per quiet call. Already settled rows skip detail GET. Existing batching remains at ten issues concurrently, with task details sequential within each issue."
+    },
+    {
+      "id": "unchanged_authority_and_cleanup",
+      "result": "pass",
+      "basis": "The driver diff is restricted to quiet(). settledTask, ownerIdle, the explicit ACME credentials, workspace/subscription checks and owned task cancellation / machine cleanup are byte-identical to a23."
+    },
+    {
+      "id": "sequential_not_atomic",
+      "result": "limitation",
+      "basis": "Task body and live workspace are sequential reads, not an atomic database snapshot. The list/detail version equality guards observed row changes but does not claim transaction-wide or future-idle guarantees. The historical issue is not assumed to be personal."
+    },
+    {
+      "id": "direct_tests",
+      "result": "pass",
+      "basis": "Five new tests cover exact other-workspace exclusion without writes, thirteen rejecting proof variants, failed/blocked same-workspace tasks, six unchanged settled variants, and cancelling only this acceptance's own failed task while leaving historical tasks untouched."
+    }
+  ],
+  "testEvidence": {
+    "executor": "implementation_agent",
+    "independentReviewerReranTests": false,
+    "finalReceipt": {
+      "gitBlob": "fd0f207993a40dd4763d4dfbdaa26a7d87d22b01",
+      "bytes": 9636,
+      "sha256": "d86e6e847d005e627747ae2e145e2322cbca9d003d4bf968ea58782f3510c7cb",
+      "readbackVerified": true
+    },
+    "independentlyReadOriginals": [
+      {
+        "path": "evidence/acme-workspace-scope/red.tap",
+        "bytes": 4562,
+        "sha256": "ffa15ef389b4e340e40634bda104bb2d818d501e748759a82fc11f3e8816eca9",
+        "gitBlob": "0610cf47632d999c2d465693542ba4f68ddfd1c8",
+        "readbackVerified": true
+      },
+      {
+        "path": "evidence/acme-workspace-scope/green.tap",
+        "bytes": 8058,
+        "sha256": "4b8649b1883c99042d0c564f037f9aee8470231cfa2348a55b743958db117e12",
+        "gitBlob": "1da4a6452b3a44a300f8aa102a130e6743e890c1",
+        "readbackVerified": true
+      },
+      {
+        "path": "evidence/acme-workspace-scope/resource-cleanup.json",
+        "bytes": 598,
+        "sha256": "e023d60d54e60b62296aa24b48b633e8f57510c61abf8bd4ee28edd24cd44c0e",
+        "gitBlob": "2de8289006f5a86ee142c9ea7298a57fc86c55cc",
+        "readbackVerified": true
+      }
+    ],
+    "red": {
+      "tests": 5,
+      "pass": 3,
+      "fail": 2,
+      "exitCode": 1
+    },
+    "green": {
+      "tests": 31,
+      "pass": 31,
+      "fail": 0,
+      "skip": 0,
+      "exitCode": 0
+    },
+    "sandbox": {
+      "sessionId": "sbx_W42yU1vw1yi8a9kBmUL0L4GMPIvZ",
+      "status": "stopped",
+      "durationMs": 261023,
+      "stopRequested": true,
+      "independentGetConfirmedByImplementer": true
+    },
+    "fullLintExecuted": false,
+    "fullTypecheckExecuted": false,
+    "productionPreflightExecuted": false,
+    "modelOrBrowserExecuted": false,
+    "nodeBoundary": "Implementation fixture Node 24.22.1; normal final-candidate CI remains required."
+  },
+  "integration": {
+    "branch": "test/1512-native-query-sources-78-20261107",
+    "remoteHeadReadback": "6af6c032c9b4a0e807dbe9c9424b8dfaf3d11685",
+    "parent": "1f441187a01a6fe423a6bdfc6e94f7ac452db605",
+    "commit": "7fc2cb53557d0d3d072f657e7dadbfcc187f40cc",
+    "tree": "72c73ecfd959dbe7d47daee9882ca067a9126b68",
+    "parents": [
+      "1f441187a01a6fe423a6bdfc6e94f7ac452db605"
+    ],
+    "vsParent": {
+      "files": 2,
+      "additions": 86,
+      "deletions": 4,
+      "allBlobsMatched": true
+    },
+    "vsMain": {
+      "files": 9,
+      "additions": 242,
+      "deletions": 17,
+      "allBlobsMatched": true
+    },
+    "remoteGitMetadataVerified": true,
+    "refsUpdated": false,
+    "ciTriggered": false,
+    "finalFiles": [
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "gitBlob": "e9e60ee1555658b49cc4336b426c07156e96bfbe"
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "gitBlob": "5856e85262e22354ffafb88d7cd60e4a94d1a29c"
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.test.mjs",
+        "gitBlob": "034972a235975d43eb2e002a7556c79dc120bc99"
+      },
+      {
+        "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+        "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a"
+      },
+      {
+        "path": "lib/live/list-read.ts",
+        "gitBlob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969"
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "gitBlob": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "gitBlob": "71281216d2ac2ac4a75683e84cdd29c7dddfaafe"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "gitBlob": "911d8fe775ba16cc11bdfc512e9861798a7bef00"
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "gitBlob": "a01974956bc21284a3ec0319cd20cdddbf0df420"
+      }
+    ]
+  },
+  "privacy": {
+    "credentialsRead": false,
+    "personalDataQueried": false,
+    "rawProductionLogsRead": false
+  },
+  "limitations": [
+    "No new full CI, real Native budget or production preflight is claimed for this unreferenced candidate.",
+    "Historical a907 and 6af6 login failures remain unchanged.",
+    "Preferences patch and final single-push authorization remain pending; no PR merge is authorized."
+  ]
+}

@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "acme_workspace_preflight_scope_source_validation",
+  "status": "frozen_offline_verified_production_pending",
+  "sourceCommit": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+  "recordedAt": "2026-11-07 21:55:41 UTC",
+  "scope": "Only scripts/acceptance/run-observability.mjs and its existing test; no product API/runtime/DB edits, no refs or production calls.",
+  "sources": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "blob": "71281216d2ac2ac4a75683e84cdd29c7dddfaafe",
+      "bytes": 57426,
+      "sha256": "d3f27a23c5989af940c14146f491f52bc6fd43e33fdce2c103eaa1fb53935e94",
+      "verified": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "blob": "911d8fe775ba16cc11bdfc512e9861798a7bef00",
+      "bytes": 49760,
+      "sha256": "36b3a27027adce98f4d693255d150a0d728ed1f585b425d4a1d6218d067947e0",
+      "verified": true
+    }
+  ],
+  "baseSources": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 56471,
+      "sha256": "9d4fedec81a52211de809b2ebc7ef950102138378c349ab82dc7ef1cd5ec0398",
+      "gitBlob": "1eedff30eee7021fa6503c760253fe499664c7d0"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 44891,
+      "sha256": "109c22a0ac01c984af315c35e6b39ea680996c5bd2af72e374462575f6960bb0",
+      "gitBlob": "1a8697345e5aa2c06442538f7eba264e6572eb59"
+    }
+  ],
+  "implementation": {
+    "productionHunks": 1,
+    "removedLines": 2,
+    "addedLines": 16,
+    "otherProductionBytesUnchanged": true,
+    "proof": "Existing authenticated task-detail liveWorkspaceId, never the issue-list liveWorkspaceId.",
+    "binding": [
+      "task.id",
+      "task.issueId",
+      "task.userId == current owner",
+      "task.revision",
+      "task.stage",
+      "task.status",
+      "task.attemptId",
+      "task.candidateId"
+    ],
+    "scopeRule": "Only valid UUID explicitly different from the current workspace can exclude an unsettled task from quiet(); same/null/missing/invalid/mismatch remains blocked.",
+    "boundedReads": {
+      "existingIssueBatch": 10,
+      "detailsSequentialWithinEachIssue": true,
+      "requestTimeoutMs": 30000,
+      "serverListMaximum": 50,
+      "newPolling": false,
+      "newRetry": false
+    },
+    "unchanged": [
+      "settledTask definition and all owned cleanup callers",
+      "ownerIdle",
+      "issue inventory and baseline issue IDs",
+      "native run and machine cleanup",
+      "credentials/authentication/authorization",
+      "model and submission budget"
+    ],
+    "snapshotLimit": "Task body and liveWorkspaceId are sequential authorized reads, not an atomic DB snapshot; this is the existing bounded preflight, not a lock or a claim that foreign tasks are terminal."
+  },
+  "validation": {
+    "runtime": "Node v24.22.1 Linux isolated fixture",
+    "red": {
+      "exitCode": 1,
+      "tests": 5,
+      "pass": 3,
+      "fail": 2,
+      "skip": 0,
+      "failures": [
+        "other-workspace blocked historical task wrongly prevents preflight",
+        "same historical task wrongly prevents reaching owned acceptance cleanup fixture"
+      ],
+      "source": "exact a23 driver with new tests"
+    },
+    "green": {
+      "exitCode": 0,
+      "tests": 31,
+      "pass": 31,
+      "fail": 0,
+      "skip": 0,
+      "cancelled": 0,
+      "originalTests": 26,
+      "newTests": 5,
+      "command": "node --test --test-reporter=tap scripts/acceptance/run-observability.test.mjs"
+    },
+    "negativeMatrix": {
+      "proofVariants": 13,
+      "currentWorkspaceNonterminalStatuses": [
+        "failed",
+        "blocked"
+      ],
+      "settledVariants": 6,
+      "ownedFailureCancelsOnlyOwnTask": true
+    },
+    "syntax": {
+      "files": 2,
+      "exitCodes": [
+        0,
+        0
+      ]
+    },
+    "whitespace": {
+      "command": "git diff --no-index --check -- baseline/<path> <path>",
+      "exitCodes": [
+        1,
+        1
+      ],
+      "stdoutEmpty": true,
+      "stderrEmpty": true,
+      "interpretation": "No whitespace diagnostics. no-index implies exit-code behavior and returns 1 for changed files; this is not claimed as exit 0."
+    },
+    "fullLintExecuted": false,
+    "fullTypecheckExecuted": false,
+    "realBackendExecuted": false,
+    "productionPreflightExecuted": false,
+    "modelOrBrowserExecuted": false,
+    "nodeMinorBoundary": "Fixture Node v24.22.1; normal candidate CI remains required and is not replaced by this fixture.",
+    "countCorrection": "A preliminary source regex counted four RegExp.test calls as tests; the preserved full TAP is authoritative at 31/31."
+  },
+  "privacy": {
+    "signedURLsOrPrivateKeysOrJWTsDetected": false,
+    "sourceDiffFixedMarkers": 5,
+    "exception": "The five PRIVATE_* occurrences in source.diff and other canaries in the full test source are fixed synthetic test literals. No production credential, email, task body or row data was read or stored.",
+    "rawTestOutputsHavePrivateMarkers": false
+  },
+  "evidence": [
+    {
+      "path": "evidence/acme-workspace-scope/red.tap",
+      "bytes": 4562,
+      "sha256": "ffa15ef389b4e340e40634bda104bb2d818d501e748759a82fc11f3e8816eca9",
+      "gitBlob": "0610cf47632d999c2d465693542ba4f68ddfd1c8",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/red.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/red-summary.json",
+      "bytes": 608,
+      "sha256": "5c9bb4324bc526d8398dd5cd369f931c838dd8ff202f86a926b0a27d180b7628",
+      "gitBlob": "fe45c81b1d5a47f684629566aed81cce6b28c3db",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/green.tap",
+      "bytes": 8058,
+      "sha256": "4b8649b1883c99042d0c564f037f9aee8470231cfa2348a55b743958db117e12",
+      "gitBlob": "1da4a6452b3a44a300f8aa102a130e6743e890c1",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/green.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/green-summary.json",
+      "bytes": 456,
+      "sha256": "443e29ba0b2fb5b00c83a04b6b09490c15b36fa6880928aec72f29b72ea39322",
+      "gitBlob": "e8a11aff35660c6bbbb8175cc513e38c636736b6",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/syntax.json",
+      "bytes": 802,
+      "sha256": "fd3f284dc0291b21c68b24940dee589c583c6bbbeb81957a51ffc2e7fe4541c8",
+      "gitBlob": "6edeb9fe0e4c50b5c77d659f0edad539df757bef",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/source.diff",
+      "bytes": 11524,
+      "sha256": "3cf5c94ed4b6c313a99f4eb536d544ea9165fb8f6889c9f0f695c6fa65cb56dc",
+      "gitBlob": "cd35a972c99858decf3af1f4d0932263eae274de",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/diff-check.json",
+      "bytes": 370,
+      "sha256": "e2c8972f607531c4f3f8a4e274e7078ace6b472ed914a30366b5a42bf00f2e12",
+      "gitBlob": "722fbe0f9cd75042398ce63790a82a6f671ce790",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/api-contract.json",
+      "bytes": 3383,
+      "sha256": "c0fc903359096867485a212a47ddedeb271bbab18637b1a8df7c4e87f74ec3d0",
+      "gitBlob": "ca4cb530742035f8d086f70afaafc4b37ac1a615",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/fixture-manifest.json",
+      "bytes": 2453,
+      "sha256": "9ca36f017a9bd64280d281a1e67f2f0b02de20198e82dbdcab02d86759c12388",
+      "gitBlob": "8ff89e083a35de0479b6fd53f6e71ba2651cdb04",
+      "readbackVerified": true
+    },
+    {
+      "path": "evidence/acme-workspace-scope/resource-cleanup.json",
+      "bytes": 598,
+      "sha256": "e023d60d54e60b62296aa24b48b633e8f57510c61abf8bd4ee28edd24cd44c0e",
+      "gitBlob": "2de8289006f5a86ee142c9ea7298a57fc86c55cc",
+      "readbackVerified": true
+    }
+  ],
+  "isolatedPackageFixture": {
+    "gitBlob": "f84528506796fb565716eaf2798e653919e3aa33",
+    "bytes": 33,
+    "readbackVerified": true
+  },
+  "previousBusyAudit": {
+    "gitBlob": "c690e2c8f92ffc56724892e104781fba37df390d",
+    "bytes": 6041,
+    "sha256": "c9a4cb2a15f34b19bedde11ce65eabc0ca05649e344d04fcab40aac235fa1280"
+  },
+  "resource": {
+    "version": 1,
+    "sessionId": "sbx_W42yU1vw1yi8a9kBmUL0L4GMPIvZ",
+    "status": "stopped",
+    "startedAt": 1794088107059,
+    "stoppedAt": 1794088368082,
+    "durationMs": 261023,
+    "activeCpuDurationMs": 7332,
+    "resources": {
+      "vcpus": 1,
+      "memoryMiB": 2048,
+      "timeoutMs": 600000
+    },
+    "persistent": false,
+    "networkPolicy": {
+      "mode": "deny-all"
+    },
+    "ports": 0,
+    "stopRequested": true,
+    "independentGetConfirmed": true,
+    "createInputValidationError": "First create request rejected invalid networkPolicy string before resource creation; retried with explicit {mode:deny-all}."
+  },
+  "limitations": [
+    "No live preflight rerun or provider/DB/model/browser work.",
+    "Foreign task was not mutated or reclassified as terminal.",
+    "Existing full task/issue scan semantics and its API limits are unchanged.",
+    "Caller must retain current-source CI and real production acceptance; Native budget results are unaffected by this harness fix."
+  ]
+}

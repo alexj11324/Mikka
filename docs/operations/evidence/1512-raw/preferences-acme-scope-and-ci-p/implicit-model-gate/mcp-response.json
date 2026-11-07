@@ -1,0 +1,10 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "[\n  {\n    \"target_scope_matches\": 1,\n    \"stored_choice_rows\": 0,\n    \"persisted_choice_kind\": \"implicit_default\",\n    \"has_binding\": false,\n    \"has_api_key\": false,\n    \"has_api_model\": false\n  }\n]"
+    }
+  ],
+  "structuredContent": null,
+  "isError": false
+}

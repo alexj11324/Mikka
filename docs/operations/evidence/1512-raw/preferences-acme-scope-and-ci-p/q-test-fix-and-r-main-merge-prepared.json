@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "pullRequest": 1675,
+  "kind": "session_regression_fix_and_main9ea_unreferenced_integration",
+  "status": "verified_not_pushed",
+  "sourceFix": {
+    "path": "tests/desktop-session-cache.db.test.ts",
+    "blob": "8325fadbe9f3ba5f942f67dcfdb857c1ee0eeb1f",
+    "bytes": 23692,
+    "sha256": "e61ff39bb3591afb3fee07ebc2d26e35c0fc876e00dd80d79fcef85c556a5809",
+    "diff": {
+      "blob": "ce66c362fd2212781326d1efe0d24d5515dcdaef",
+      "bytes": 991,
+      "sha256": "57c4a2a13910a896fa6c8809a11607caf94db1829180ec4b23b716db4bb2c4fb"
+    },
+    "independentReview": {
+      "baseTestBytes": 23658,
+      "baseTestSha256": "3381e741f6eafcdf6988e3b4b8ee1731e1abfba5efff904da2702ebe1bdacc22",
+      "fixedTestBytes": 23692,
+      "fixedTestSha256": "e61ff39bb3591afb3fee07ebc2d26e35c0fc876e00dd80d79fcef85c556a5809",
+      "exactTwoLineReplacement": true,
+      "otherBytesUnchanged": true,
+      "closedExpectations": {
+        "businessStatements": 1,
+        "oldTransportExtraStatements": 2,
+        "totalOldTransport": 3
+      },
+      "unchangedAssertions": [
+        "native SQL count equals baseline",
+        "native PG response bytes equals baseline",
+        "native data equals baseline",
+        "browser data/SQL/PG response bytes equals baseline",
+        "previous response bytes greater than baseline",
+        "all other fresh-auth revocation and privacy guards"
+      ],
+      "upstreamFiles": 12,
+      "candidateFiles": 12,
+      "intersection": []
+    },
+    "executedAfterCorrection": false
+  },
+  "main": {
+    "commit": "9ea7b2cd61deb724f20330906f86df6df2cd9828",
+    "tree": "a7b5247f03b56a6f4f87c7d799c45c5caaeb262d",
+    "comparisonBase": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+    "commitsSinceBase": 9,
+    "files": [
+      {
+        "path": "app/api/mobile/tasks/[id]/route.ts",
+        "blob": "e46473c7fc23fab4f242240b4fb2699a2c1ddf1e",
+        "status": "added"
+      },
+      {
+        "path": "app/api/mobile/tasks/route.ts",
+        "blob": "bb75a9e3c878253b5412f41d3178395d9a4c7569",
+        "status": "modified"
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "blob": "4464d4375cafccb1ca02eb770869b51fb0708e74",
+        "status": "modified"
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "blob": "4c9a7c6a30ffb283c0b93cadf1345efd749e9792",
+        "status": "modified"
+      },
+      {
+        "path": "lib/mobile-task-view.test.ts",
+        "blob": "438b42483cbfaff387f657fc611f6ad2116c7ae6",
+        "status": "added"
+      },
+      {
+        "path": "lib/mobile-task-view.ts",
+        "blob": "6fed3270b86342d9f2aa6cb9ad5c783807417c84",
+        "status": "added"
+      },
+      {
+        "path": "lib/mobile-tasks.ts",
+        "blob": "5132329bd2ff1ddf9c3f3ef9d82de57207eb7dcd",
+        "status": "added"
+      },
+      {
+        "path": "lib/task-block-runs.ts",
+        "blob": "cc4af844a6720e2d594f81f152133823ad8e1182",
+        "status": "modified"
+      },
+      {
+        "path": "messages/en.json",
+        "blob": "4c7ea499f22114b44e5cabbc55bc147efa5a1cfe",
+        "status": "modified"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "blob": "cab02b2af33a8e8dee654e7935081ed9579473d1",
+        "status": "modified"
+      },
+      {
+        "path": "package.json",
+        "blob": "173aa7bdac027e76329d9ee43e5922073f7e3ad8",
+        "status": "modified"
+      },
+      {
+        "path": "tests/mobile-tasks.db.test.ts",
+        "blob": "d037ccc5f81ba38f6db593fccfaad5efe3d75b69",
+        "status": "added"
+      }
+    ]
+  },
+  "integration": {
+    "Q": {
+      "commit": "3405f86dc2843b0e482258c117591a2e059de641",
+      "tree": "e078ae36bff138e9497470f657e706b5c181e274",
+      "parent": "d73bbaa3d42115c4c8491a24439c3647d96c689d"
+    },
+    "R": {
+      "commit": "5df3fc316c87cd282e182d0c3f54592bfc586885",
+      "tree": "aa23294514b6cc5c7e0642dc88fc105ed7c1a9a9",
+      "parents": [
+        "3405f86dc2843b0e482258c117591a2e059de641",
+        "9ea7b2cd61deb724f20330906f86df6df2cd9828"
+      ]
+    },
+    "vsMain": {
+      "files": 12,
+      "additions": 314,
+      "deletions": 26,
+      "allBlobsMatched": true
+    },
+    "vsQ": {
+      "files": 12,
+      "allBlobsMatched": true
+    },
+    "branchUnchanged": true,
+    "refsUpdated": false
+  },
+  "candidateFiles": [
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "blob": "e9e60ee1555658b49cc4336b426c07156e96bfbe",
+      "additions": 2,
+      "deletions": 1
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "blob": "5856e85262e22354ffafb88d7cd60e4a94d1a29c",
+      "additions": 6,
+      "deletions": 1
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.test.mjs",
+      "blob": "034972a235975d43eb2e002a7556c79dc120bc99",
+      "additions": 21,
+      "deletions": 4
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "blob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+      "additions": 3,
+      "deletions": 0
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "blob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+      "additions": 3,
+      "deletions": 1
+    },
+    {
+      "path": "lib/preferences.ts",
+      "blob": "0a01960901e60bd66cf86e1a6733e2dc0e953c15",
+      "additions": 11,
+      "deletions": 7
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "blob": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+      "additions": 24,
+      "deletions": 0
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "blob": "71281216d2ac2ac4a75683e84cdd29c7dddfaafe",
+      "additions": 16,
+      "deletions": 2
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "blob": "911d8fe775ba16cc11bdfc512e9861798a7bef00",
+      "additions": 70,
+      "deletions": 2
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "blob": "a01974956bc21284a3ec0319cd20cdddbf0df420",
+      "additions": 97,
+      "deletions": 6
+    },
+    {
+      "path": "tests/desktop-session-cache.db.test.ts",
+      "blob": "8325fadbe9f3ba5f942f67dcfdb857c1ee0eeb1f",
+      "additions": 2,
+      "deletions": 2
+    },
+    {
+      "path": "tests/settings-preferences.db.test.ts",
+      "blob": "3b54cf58a62eccae2517426e87a52e40336f9f00",
+      "additions": 59,
+      "deletions": 0
+    }
+  ],
+  "remote": {
+    "branch": "test/1512-native-query-sources-78-20261107",
+    "headReadback": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+    "refsUpdated": false,
+    "pullRequestUpdated": false,
+    "workflowTriggered": false
+  },
+  "originalPFailure": {
+    "workflow": 42419060300,
+    "receiptBlob": "f1b21d68c02ac2e5c0ee6aed09650b94a7477dde",
+    "native": "skipped_no_actual_attempt",
+    "queryCounts": null
+  },
+  "priorCiReceipt": {
+    "blob": "89447ee68f1864630c3027ae946f45ddba0ef99a",
+    "suppliedBy": "daemon_impl",
+    "scope": "P exact source 042 / tree fb422; PG1 one-statement preferences passed, PG3 stale absolute assertion failed. The corrected test has not been executed."
+  },
+  "nextPending": "Independently review the frozen implicit model-default restoration implementation and real SQL tests. Draft blobs must not be integrated until approved; root authorizes the later single normal push.",
+  "resources": {
+    "created": 0,
+    "modelCalls": 0,
+    "productionRequests": 0
+  },
+  "limitations": [
+    "Both change sets are preserved exactly by Git blob and normal two-parent ancestry; this is not a full runtime compatibility test.",
+    "No new CI or Native budget is claimed for Q/R.",
+    "No default model restoration draft has been included."
+  ]
+}

@@ -1,0 +1,72 @@
+TAP version 13
+# Subtest: preflight excludes only a version-bound Factory task proven to belong to another workspace
+not ok 1 - preflight excludes only a version-bound Factory task proven to belong to another workspace
+  ---
+  duration_ms: 134.256733
+  type: 'test'
+  location: '/vercel/sandbox/acme-scope/scripts/acceptance/run-observability.test.mjs:258:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"preflight","status":"blocked","startedAt":"2026-11-07T21:49:01.157Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"blocked","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[]},"code":"workspace_busy","durationMs":7}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-07T21:49:01.284Z"}
+    
+    'blocked' !== 'ready'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'ready'
+  actual: 'blocked'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/sandbox/acme-scope/scripts/acceptance/run-observability.test.mjs:260:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+ok 2 - preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+  ---
+  duration_ms: 49.494985
+  type: 'test'
+  ...
+# Subtest: preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+ok 3 - preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+  ---
+  duration_ms: 10.845781
+  type: 'test'
+  ...
+# Subtest: preflight does not request scope details for already settled Factory tasks
+ok 4 - preflight does not request scope details for already settled Factory tasks
+  ---
+  duration_ms: 30.628303
+  type: 'test'
+  ...
+# Subtest: foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+not ok 5 - foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+  ---
+  duration_ms: 2.703483
+  type: 'test'
+  location: '/vercel/sandbox/acme-scope/scripts/acceptance/run-observability.test.mjs:306:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"blocked","startedAt":"2026-11-07T21:49:01.378Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"blocked","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[]},"code":"workspace_busy","durationMs":0}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-07T21:49:01.380Z"}
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/sandbox/acme-scope/scripts/acceptance/run-observability.test.mjs:308:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 3
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 507.70788

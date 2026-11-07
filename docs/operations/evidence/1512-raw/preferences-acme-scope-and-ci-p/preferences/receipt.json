@@ -1,0 +1,266 @@
+{
+  "schemaVersion": 1,
+  "task": "preferences-single-statement",
+  "createdAt": "2026-11-07T22:01:32Z",
+  "baseline": {
+    "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+    "nativeEvidenceSource": "da0fe543b41f679b6a4e3f123036de8f018c225f",
+    "readerBlob": "5076bfec71434bba9c8d345ab32335eafe00285b",
+    "readerUnchangedBetweenThoseSources": true
+  },
+  "authorization": {
+    "unreferencedBlobsOnly": true,
+    "refChanged": false,
+    "productDependenciesChanged": false,
+    "productionRequests": 0,
+    "providerRequests": 0
+  },
+  "change": {
+    "files": [
+      {
+        "path": "lib/preferences.ts",
+        "bytes": 4726,
+        "sha256": "f2bf9a295ebf5733c24314e562bab6e2b806f5ab621a214091d6c09c0d7b0534",
+        "blob": "0a01960901e60bd66cf86e1a6733e2dc0e953c15",
+        "readbackExact": true
+      },
+      {
+        "path": "tests/settings-preferences.db.test.ts",
+        "bytes": 22978,
+        "sha256": "372214a8c768e316c7137fcfacfff5d59fbdf8b8dbcae5c14b5c61b32b0d8f83",
+        "blob": "3b54cf58a62eccae2517426e87a52e40336f9f00",
+        "readbackExact": true
+      }
+    ],
+    "function": "readPreferences",
+    "ownerType": "text",
+    "query": "bound constant owner row; two owner-primary-key LEFT JOINs on the same database",
+    "userTableRead": false,
+    "crossRequestCache": false,
+    "requestTimingChanged": false,
+    "authFlowChanged": false,
+    "returnShapeChanged": false,
+    "savePathUnchanged": true,
+    "expectedStatementsSavedPerRead": 1,
+    "notAnEndToEndBudgetClaim": true
+  },
+  "validation": {
+    "environment": {
+      "node": "v24.22.1",
+      "@electric-sql/pglite": "0.3.14",
+      "drizzle-orm": "0.45.4",
+      "zod": "4.6.7",
+      "tsx": "4.23.15",
+      "oxlint": "1.89.0"
+    },
+    "exactProductionReaderAndSchema": true,
+    "exactNewRepositoryTestBody": true,
+    "realDatabaseEngine": "PGlite PostgreSQL WASM",
+    "adapter": "drizzle-orm/pglite",
+    "boundaries": [
+      "The production Node-PG adapter and full existing settings database suite were not executed here.",
+      "The isolated support module binds the same Drizzle API to one owned in-memory PGlite engine; withDatabaseClient is a pass-through in this support only.",
+      "ActionFailureError and unused setAttentionEnabled are support stubs; readPreferences does not call either.",
+      "The full repository schema and its two runtime re-export modules were copied byte-for-byte from the fixed baseline.",
+      "No root canonical typecheck was run in this minimal fixture. Normal CI remains required."
+    ],
+    "oldRed": {
+      "exitCode": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "failureCode": "ERR_ASSERTION",
+      "reason": "All seven otherwise-correct reads issued two statements where the regression requires one.",
+      "queryCounts": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "artifact": {
+        "path": "evidence/old-red.stdout",
+        "bytes": 1387,
+        "sha256": "22773ebfae57aafe4e169a092825a74eac4376882abee499bd7d1eec0f51f489",
+        "blob": "ce4540581bdb171b53ea381940858de1c70bb189",
+        "readbackExact": true
+      }
+    },
+    "newGreen": {
+      "exitCode": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "readCases": 7,
+      "queryCounts": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "artifact": {
+        "path": "evidence/new-green.stdout",
+        "bytes": 469,
+        "sha256": "6c114d57d098338d2d3b20ff2407d95fc2cd2e70cee9500e470c9f4e2b1cf8c0",
+        "blob": "9647a45540b40e4d5300289adc8706e65a011482",
+        "readbackExact": true
+      }
+    },
+    "semanticChecks": [
+      "neither optional row: complete defaults and no peer borrowing",
+      "attention row only: disabled proactive flag retained",
+      "preferences row only: all stored flags retained and proactive defaults true",
+      "both rows: independent false flags retained",
+      "write then read: fresh memory/daily and proactive state",
+      "peer owner isolation",
+      "quoted malformed owner remains a bound parameter",
+      "database failure propagates as the same error or its retained cause with one query and no retry",
+      "metadata-only preference columns stay excluded from the DTO"
+    ],
+    "cleanupChecks": {
+      "ownedRowsRemoved": true,
+      "pgliteClosed": true,
+      "checkedBy": "actual after hook on both red and green runs"
+    },
+    "lint": {
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0,
+      "files": 2,
+      "rules": 97,
+      "configuration": "exact baseline .oxlintrc.json",
+      "artifact": {
+        "path": "evidence/lint.stdout",
+        "bytes": 89,
+        "sha256": "db4a9d99418323c168a1930f38f9c1c7778bc1e0cd18d9644ae734856b0e288b",
+        "blob": "5e02e238bb647173cf407bb368bfa1cd8917dae5",
+        "readbackExact": true
+      }
+    },
+    "whitespace": {
+      "commands": [
+        "git diff --no-index --check baseline/lib/preferences.ts lib/preferences.ts",
+        "git diff --no-index --check baseline/tests/settings-preferences.db.test.ts tests/settings-preferences.db.test.ts"
+      ],
+      "actualExitCodes": [
+        1,
+        1
+      ],
+      "stdoutBytes": [
+        0,
+        0
+      ],
+      "stderrBytes": [
+        0,
+        0
+      ],
+      "interpretation": "git --no-index returns 1 for differing files; both checks emitted no whitespace diagnostics. Exit codes are preserved, not rewritten to zero."
+    },
+    "initialFixtureAttempt": {
+      "enteredSqlTest": false,
+      "moduleFailure": "ERR_MODULE_NOT_FOUND",
+      "missingRuntimeReexports": [
+        "lib/db/project-map-schema.ts",
+        "lib/db/agent-profile-schema.ts"
+      ],
+      "lintWarnings": 1,
+      "lintReason": "unused eq import in the initial candidate",
+      "correctedWithoutChangingProductionSchema": true,
+      "artifacts": [
+        {
+          "path": "initial-fixture-run/old-red.stdout",
+          "bytes": 1736,
+          "sha256": "29bd5266ad2ebb96f99923e4b6bc244932542171a47a87d276ae87c6329d9607",
+          "blob": "fc7968e3efb4c2ad158c1d7519faa65ad26e2005",
+          "readbackExact": true
+        },
+        {
+          "path": "initial-fixture-run/new-green.stdout",
+          "bytes": 1736,
+          "sha256": "0ed26fc69313ebc10c0dfd82339b75dc59ad8f1cb0d265d88ce52052db1890b6",
+          "blob": "1db311a7ae39f2e3112961abc7b6b49c5d00d4d6",
+          "readbackExact": true
+        },
+        {
+          "path": "initial-fixture-run/lint.stdout",
+          "bytes": 397,
+          "sha256": "1186481f37d0c8ef1be7cf3adf2ab79177e6dddbb30ac50c135bb81d6a85faa7",
+          "blob": "b3b7dfc0b16b0c9865aad6effc637729a29af662",
+          "readbackExact": true
+        },
+        {
+          "path": "initial-fixture-run/validation.json",
+          "bytes": 781,
+          "sha256": "5d828aab5c40a20cda6dcccce494203b8c83561d11fb900f2372b2747bbcb8a5",
+          "blob": "c8f143232388935150f7b3ba68df5f2d19c2f46e",
+          "readbackExact": true
+        }
+      ]
+    }
+  },
+  "ciIntegration": {
+    "existingScript": "test:settings-prefs-db",
+    "command": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/settings-preferences.db.test.ts",
+    "packageChangeRequired": false,
+    "liveNetworkPgPending": true
+  },
+  "workerHash": {
+    "method": "exact static input membership",
+    "sourcePath": "scripts/e2b/build-template.py",
+    "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+    "outsideWorkerAndRecipeInputs": [
+      "lib/preferences.ts",
+      "tests/settings-preferences.db.test.ts"
+    ],
+    "packageOrLockChange": false,
+    "hashInputsUnchanged": true,
+    "workerBuildExecuted": false
+  },
+  "priorNativeEvidence": {
+    "runId": 42413691202,
+    "login": {
+      "native": 212,
+      "web": 209,
+      "result": "failed"
+    },
+    "preferencesSql": {
+      "native": 2,
+      "web": 0,
+      "phase": "workspace-selection-to-usable"
+    },
+    "limit": "These are SQL counts, not proof of repeated HTTP requests. This candidate saves one reader statement; it does not prove that the complete Native login budget now passes."
+  },
+  "sandbox": {
+    "id": "sbx_LYcReMKJbpGKfnxhzeSAcQhgtlNx",
+    "resources": {
+      "vcpus": 1,
+      "memoryMb": 2048
+    },
+    "persistent": false,
+    "ports": [],
+    "installNetworkAllowlist": [
+      "registry.npmjs.org"
+    ],
+    "executionNetwork": "deny-all",
+    "status": "stopped",
+    "independentGetConfirmed": true,
+    "startedAt": 1794088671697,
+    "stoppedAt": 1794088887530,
+    "durationMs": 215833,
+    "activeCpuDurationMs": 18289,
+    "snapshotsCreated": 0,
+    "activeOwnedResources": 0
+  },
+  "index": {
+    "path": "preferences-one-query/index.json",
+    "bytes": 13567,
+    "sha256": "3debd817ef27310592b1bf9e1304f0d7f6cc50782f24cfba6d81081f21c2a98d",
+    "blob": "2f28b619b1a569042a002b8b0dee0e5890388172",
+    "readbackExact": true
+  }
+}

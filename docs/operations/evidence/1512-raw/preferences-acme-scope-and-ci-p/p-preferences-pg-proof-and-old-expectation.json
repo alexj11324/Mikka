@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "kind": "preferences-query-count-dependent-test-maintenance",
+  "observedAt": "2026-11-07T22:14:29Z",
+  "repository": "alexj11324/Mikka",
+  "ci": {
+    "runId": 42419060254,
+    "attempt": 1,
+    "head": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+    "jobId": 128543491717,
+    "jobName": "Database checks (3/4)",
+    "status": "completed",
+    "conclusion": "failure",
+    "failedStep": {
+      "number": 15,
+      "name": "Required DB suites (temporary Postgres 17, no skips)"
+    },
+    "actualCheckout": [
+      "042a85ecbfb4e00dcf3280b987d5735aeb9ed97f"
+    ],
+    "source": {
+      "sha": "042a85ecbfb4e00dcf3280b987d5735aeb9ed97f",
+      "tree": "fb4220c0d31b4c8d235144a75633ce7ad9258ed0",
+      "parents": [
+        "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+        "d73bbaa3d42115c4c8491a24439c3647d96c689d"
+      ],
+      "actualCheckoutObservedInJob": 128543491731,
+      "logRawPersisted": false
+    },
+    "rawLogChars": 1741675,
+    "rawLogSha256": "74502fdf9c972a56254b7f8d6dea22468d0b734b069f0235ad33399f130ce532",
+    "rawLogPersisted": false
+  },
+  "failure": {
+    "script": "test:desktop-auth",
+    "file": "tests/desktop-session-cache.db.test.ts",
+    "line": 146,
+    "test": "full original web read and cached native RPC have identical queries, PostgreSQL bytes and data",
+    "code": "ERR_ASSERTION",
+    "actual": 1,
+    "expected": 2,
+    "uniqueLeafCause": true,
+    "parentTestAlsoMarkedFailed": true,
+    "otherFailingScripts": [],
+    "canonicalGroupSummaries": [
+      {
+        "metric": "tests",
+        "count": 61
+      },
+      {
+        "metric": "suites",
+        "count": 0
+      },
+      {
+        "metric": "pass",
+        "count": 61
+      },
+      {
+        "metric": "fail",
+        "count": 0
+      },
+      {
+        "metric": "cancelled",
+        "count": 0
+      },
+      {
+        "metric": "skipped",
+        "count": 0
+      },
+      {
+        "metric": "todo",
+        "count": 0
+      },
+      {
+        "metric": "tests",
+        "count": 3
+      },
+      {
+        "metric": "suites",
+        "count": 0
+      },
+      {
+        "metric": "pass",
+        "count": 3
+      },
+      {
+        "metric": "fail",
+        "count": 0
+      },
+      {
+        "metric": "cancelled",
+        "count": 0
+      },
+      {
+        "metric": "skipped",
+        "count": 0
+      },
+      {
+        "metric": "todo",
+        "count": 0
+      },
+      {
+        "metric": "tests",
+        "count": 11
+      },
+      {
+        "metric": "suites",
+        "count": 0
+      },
+      {
+        "metric": "pass",
+        "count": 11
+      },
+      {
+        "metric": "fail",
+        "count": 0
+      },
+      {
+        "metric": "cancelled",
+        "count": 0
+      },
+      {
+        "metric": "skipped",
+        "count": 0
+      },
+      {
+        "metric": "todo",
+        "count": 0
+      },
+      {
+        "metric": "tests",
+        "count": 44
+      },
+      {
+        "metric": "suites",
+        "count": 0
+      },
+      {
+        "metric": "pass",
+        "count": 42
+      },
+      {
+        "metric": "fail",
+        "count": 2
+      },
+      {
+        "metric": "cancelled",
+        "count": 0
+      },
+      {
+        "metric": "skipped",
+        "count": 0
+      },
+      {
+        "metric": "todo",
+        "count": 0
+      }
+    ],
+    "cleanup": [
+      {
+        "name": "Post Run ./.github/actions/pnpm-install",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Stop containers",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "rootCause": {
+    "classification": "stale absolute business-query expectation after verified preferences consolidation",
+    "originalSource": {
+      "bytes": 23658,
+      "sha256": "3381e741f6eafcdf6988e3b4b8ee1731e1abfba5efff904da2702ebe1bdacc22",
+      "blob": "913f010467a69c34ecc2d169362190b86505faf2"
+    },
+    "oldExpectedBusinessStatements": 2,
+    "actualBusinessStatements": 1,
+    "unchangedFreshAuthStatements": 2,
+    "subsequentHardcodedOldTransportExpectation": 4,
+    "necessaryNewOldTransportExpectation": 3,
+    "secondAssertionObserved": false,
+    "nativeBrowserStatementAndByteEquivalenceAfterLine146Observed": false
+  },
+  "fix": {
+    "files": [
+      {
+        "path": "tests/desktop-session-cache.db.test.ts",
+        "bytes": 23692,
+        "sha256": "e61ff39bb3591afb3fee07ebc2d26e35c0fc876e00dd80d79fcef85c556a5809",
+        "blob": "8325fadbe9f3ba5f942f67dcfdb857c1ee0eeb1f",
+        "readbackExact": true
+      },
+      {
+        "path": "desktop-session-cache-preference-count.patch",
+        "bytes": 991,
+        "sha256": "57c4a2a13910a896fa6c8809a11607caf94db1829180ec4b23b716db4bb2c4fb",
+        "blob": "ce66c362fd2212781326d1efe0d24d5515dcdaef",
+        "readbackExact": true
+      }
+    ],
+    "changedLines": [
+      146,
+      147
+    ],
+    "baselineExpectation": 1,
+    "oldFreshTransportExpression": "baseline.statements + 2",
+    "oldFreshTransportStillExactly": 3,
+    "allOtherSourceBytesUnchanged": true,
+    "queryCountsOrWindowsModified": false,
+    "productSourceModified": false,
+    "allNativeWebDataByteQueryEqualityAssertionsRetained": true,
+    "allFreshAuthorizationCsrfOwnerAssertionsRetained": true
+  },
+  "independentValidation": {
+    "source": {
+      "sha": "042a85ecbfb4e00dcf3280b987d5735aeb9ed97f",
+      "tree": "fb4220c0d31b4c8d235144a75633ce7ad9258ed0",
+      "parents": [
+        "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+        "d73bbaa3d42115c4c8491a24439c3647d96c689d"
+      ],
+      "actualCheckoutObservedInJob": 128543491731,
+      "logRawPersisted": false
+    },
+    "runId": 42419060254,
+    "jobId": 128543491699,
+    "shard": "1/4",
+    "script": "test:settings-prefs-db",
+    "groupMatched": true,
+    "completeRawGroupSelected": true,
+    "target": [
+      {
+        "at": "2026-11-07T22:12:03.3450692Z",
+        "passed": true,
+        "name": "preferences read both optional owner rows in one statement without losing defaults or isolation"
+      }
+    ],
+    "queryCounts": [
+      {
+        "kind": "preferences_statement_count",
+        "readCases": 7,
+        "queryCounts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "summary": [
+      {
+        "metric": "tests",
+        "count": 11
+      },
+      {
+        "metric": "suites",
+        "count": 0
+      },
+      {
+        "metric": "pass",
+        "count": 11
+      },
+      {
+        "metric": "fail",
+        "count": 0
+      },
+      {
+        "metric": "cancelled",
+        "count": 0
+      },
+      {
+        "metric": "skipped",
+        "count": 0
+      },
+      {
+        "metric": "todo",
+        "count": 0
+      }
+    ],
+    "suiteOk": true,
+    "postgresVersions": [
+      "PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2)"
+    ],
+    "rawPersisted": false
+  },
+  "verificationBoundary": {
+    "newFixExecuted": false,
+    "newFixLintExecuted": false,
+    "newResourceCreated": false,
+    "noRerunRequested": true,
+    "reason": "The exact real PG failure and actual 1-statement reader already establish the stale baseline. Normal next-head CI must execute the preserved checks that follow the first failure.",
+    "oldCiFailurePreserved": true
+  },
+  "ownership": {
+    "unreferencedBlobsOnly": true,
+    "refsModified": false,
+    "desktopLinuxFailure": "Reported separately by acceptance_review as the same test; no Desktop raw log was fetched by this agent."
+  }
+}

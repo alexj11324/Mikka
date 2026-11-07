@@ -1,0 +1,196 @@
+TAP version 13
+# Subtest: preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+ok 1 - preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+  ---
+  duration_ms: 95.924224
+  type: 'test'
+  ...
+# Subtest: preflight excludes only a version-bound Factory task proven to belong to another workspace
+ok 2 - preflight excludes only a version-bound Factory task proven to belong to another workspace
+  ---
+  duration_ms: 7.418936
+  type: 'test'
+  ...
+# Subtest: preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+ok 3 - preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+  ---
+  duration_ms: 51.490207
+  type: 'test'
+  ...
+# Subtest: preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+ok 4 - preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+  ---
+  duration_ms: 7.575137
+  type: 'test'
+  ...
+# Subtest: preflight does not request scope details for already settled Factory tasks
+ok 5 - preflight does not request scope details for already settled Factory tasks
+  ---
+  duration_ms: 24.966492
+  type: 'test'
+  ...
+# Subtest: foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+ok 6 - foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+  ---
+  duration_ms: 29.546789
+  type: 'test'
+  ...
+# Subtest: a default team switches only this login session to its verified personal workspace before reading Coordinator
+ok 7 - a default team switches only this login session to its verified personal workspace before reading Coordinator
+  ---
+  duration_ms: 4.946627
+  type: 'test'
+  ...
+# Subtest: workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+ok 8 - workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+  ---
+  duration_ms: 32.784352
+  type: 'test'
+  ...
+# Subtest: workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+ok 9 - workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+  ---
+  duration_ms: 10.011663
+  type: 'test'
+  ...
+# Subtest: unsafe configuration blocks before any model call and reports only closed failure codes
+ok 10 - unsafe configuration blocks before any model call and reports only closed failure codes
+  ---
+  duration_ms: 9.264941
+  type: 'test'
+  ...
+# Subtest: two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+ok 11 - two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+  ---
+  duration_ms: 30.6862
+  type: 'test'
+  ...
+# Subtest: successful terminal runs close only their own machines and retain task evidence
+ok 12 - successful terminal runs close only their own machines and retain task evidence
+  ---
+  duration_ms: 10.381036
+  type: 'test'
+  ...
+# Subtest: a missing machine requires a fresh owned run and an explicit null machine read
+ok 13 - a missing machine requires a fresh owned run and an explicit null machine read
+  ---
+  duration_ms: 13.205842
+  type: 'test'
+  ...
+# Subtest: machine failures never turn a completed task green and do not prevent closing another owned machine
+ok 14 - machine failures never turn a completed task green and do not prevent closing another owned machine
+  ---
+  duration_ms: 152.371204
+  type: 'test'
+  ...
+# Subtest: legacy Factory tasks still require review and verify before the normal deliverable acceptance
+ok 15 - legacy Factory tasks still require review and verify before the normal deliverable acceptance
+  ---
+  duration_ms: 10.369546
+  type: 'test'
+  ...
+# Subtest: missing, failed or stale Factory checks never reach approval, including legacy verify
+ok 16 - missing, failed or stale Factory checks never reach approval, including legacy verify
+  ---
+  duration_ms: 44.433524
+  type: 'test'
+  ...
+# Subtest: deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+ok 17 - deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+  ---
+  duration_ms: 37.221388
+  type: 'test'
+  ...
+# Subtest: uncertain mutation responses never resubmit and still reconcile own temporary settings
+ok 18 - uncertain mutation responses never resubmit and still reconcile own temporary settings
+  ---
+  duration_ms: 9.779698
+  type: 'test'
+  ...
+# Subtest: wrong provider/model and an extra native attempt stop the case without retrying
+ok 19 - wrong provider/model and an extra native attempt stop the case without retrying
+  ---
+  duration_ms: 19.594286
+  type: 'test'
+  ...
+# Subtest: pure source and budget guards reject shared credentials, inherited model choices and retries
+ok 20 - pure source and budget guards reject shared credentials, inherited model choices and retries
+  ---
+  duration_ms: 0.562758
+  type: 'test'
+  ...
+# Subtest: cleanup preserves a concurrent model edit and reports incomplete restoration
+ok 21 - cleanup preserves a concurrent model edit and reports incomplete restoration
+  ---
+  duration_ms: 10.40326
+  type: 'test'
+  ...
+# Subtest: prepare is explicit, requires execution and restores only its acknowledged settings
+ok 22 - prepare is explicit, requires execution and restores only its acknowledged settings
+  ---
+  duration_ms: 18.100689
+  type: 'test'
+  ...
+# Subtest: prepare refuses owner-wide activity and inherited model choices without changing settings
+ok 23 - prepare refuses owner-wide activity and inherited model choices without changing settings
+  ---
+  duration_ms: 6.354012
+  type: 'test'
+  ...
+# Subtest: a blocked case does not prevent preparation and execution of another available model
+ok 24 - a blocked case does not prevent preparation and execution of another available model
+  ---
+  duration_ms: 19.978638
+  type: 'test'
+  ...
+# Subtest: preparation failures restore acknowledged writes but never guess after a lost response
+ok 25 - preparation failures restore acknowledged writes but never guess after a lost response
+  ---
+  duration_ms: 9.042045
+  type: 'test'
+  ...
+# Subtest: restoration failures and concurrent edits remain visible without overwriting them
+ok 26 - restoration failures and concurrent edits remain visible without overwriting them
+  ---
+  duration_ms: 58.587183
+  type: 'test'
+  ...
+# Subtest: issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+ok 27 - issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+  ---
+  duration_ms: 2.219052
+  type: 'test'
+  ...
+# Subtest: browser submission requires one executed case and does not authenticate on invalid options
+ok 28 - browser submission requires one executed case and does not authenticate on invalid options
+  ---
+  duration_ms: 0.404301
+  type: 'test'
+  ...
+# Subtest: browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+ok 29 - browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+  ---
+  duration_ms: 35.443706
+  type: 'test'
+  ...
+# Subtest: browser waiting times out or blocks changed UI text without sending or repeating a task
+ok 30 - browser waiting times out or blocks changed UI text without sending or repeating a task
+  ---
+  duration_ms: 6.840256
+  type: 'test'
+  ...
+# Subtest: live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+ok 31 - live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+  ---
+  duration_ms: 3.10585
+  type: 'test'
+  ...
+1..31
+# tests 31
+# suites 0
+# pass 31
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1039.866924

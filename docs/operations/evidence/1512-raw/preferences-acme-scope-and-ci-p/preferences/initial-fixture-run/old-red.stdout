@@ -1,0 +1,40 @@
+TAP version 13
+# node:internal/modules/run_main:107
+#     triggerUncaughtException(
+#     ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/tmp/issue1512-preferences/lib/db/project-map-schema.ts' imported from /tmp/issue1512-preferences/lib/db/schema.ts
+#     at finalizeResolution (node:internal/modules/esm/resolve:272:11)
+#     at moduleResolve (node:internal/modules/esm/resolve:879:10)
+#     at defaultResolve (node:internal/modules/esm/resolve:1006:11)
+#     at nextResolve (node:internal/modules/esm/hooks:785:28)
+#     at resolve (data:text/javascript,%0Aexport%20async%20function%20resolve(specifier%2C%20context%2C%20next)%20%7B%0A%20%20if%20(specifier%20%3D%3D%3D%20'server-only')%20return%20%7B%20url%3A%20'data%3Atext%2Fjavascript%2Cexport%20%7B%7D'%2C%20shortCircuit%3A%20true%20%7D%0A%20%20return%20next(specifier%2C%20context)%0A%7D:4:10)
+#     at nextResolve (node:internal/modules/esm/hooks:785:28)
+#     at AsyncLoaderHooksOnLoaderHookWorker.resolve (node:internal/modules/esm/hooks:269:30)
+#     at handleMessage (node:internal/modules/esm/worker:251:24)
+#     at checkForMessages (node:internal/modules/esm/worker:193:28)
+#     at process.<anonymous> (node:internal/modules/esm/worker:212:5) {
+#   code: 'ERR_MODULE_NOT_FOUND',
+#   url: 'file:///tmp/issue1512-preferences/lib/db/project-map-schema.ts'
+# }
+# Node.js v24.22.1
+# Subtest: isolated.test.ts
+not ok 1 - isolated.test.ts
+  ---
+  duration_ms: 1055.88325
+  type: 'test'
+  location: '/tmp/issue1512-preferences/isolated.test.ts:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1064.297075

@@ -1,0 +1,10 @@
+[
+  {
+    "target_scope_matches": 1,
+    "stored_choice_rows": 0,
+    "persisted_choice_kind": "implicit_default",
+    "has_binding": false,
+    "has_api_key": false,
+    "has_api_model": false
+  }
+]

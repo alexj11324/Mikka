@@ -1,0 +1,31 @@
+{
+  "node": "v24.22.1",
+  "checks": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "files": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 57426,
+      "sha256": "d3f27a23c5989af940c14146f491f52bc6fd43e33fdce2c103eaa1fb53935e94",
+      "gitBlob": "71281216d2ac2ac4a75683e84cdd29c7dddfaafe"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 49760,
+      "sha256": "36b3a27027adce98f4d693255d150a0d728ed1f585b425d4a1d6218d067947e0",
+      "gitBlob": "911d8fe775ba16cc11bdfc512e9861798a7bef00"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "kind": "preflight_factory_scope_membership_read_only_followup",
+  "observedAt": "2026-11-07 21:57:00 UTC",
+  "precedingEvidence": "40115d26ae3476a4778058af722829395c0b3d08",
+  "queries": [
+    {
+      "database": "orvilo_mvp",
+      "sql": "WITH account_scope AS (\n SELECT b.\"ownerId\" AS owner_id\n FROM bots b JOIN coordinator_bots c ON c.\"botId\"=b.id AND c.\"ownerId\"=b.\"ownerId\" AND c.\"workspaceId\"=b.\"workspaceId\"\n WHERE b.id='d51efc47-1c61-4758-8c05-fd7a07e3d7b2' AND b.\"workspaceId\"='4ae2a643-b09e-43eb-816c-1e5557bef170'\n)\nSELECT f.id AS task_id, f.revision, f.stage, f.status, i.scope AS issue_scope,\n b.\"workspaceId\" AS task_workspace_id,\n EXISTS(SELECT 1 FROM mikka_workspace_members m WHERE m.\"workspaceId\"=b.\"workspaceId\" AND m.\"userId\"=f.\"userId\" AND m.status='active') AS task_workspace_active_membership,\n (SELECT w.id FROM mikka_workspaces w WHERE w.\"userId\"=f.\"userId\" AND w.kind='personal' LIMIT 1)='4ae2a643-b09e-43eb-816c-1e5557bef170' AS personal_issue_scope_matches_preflight,\n f.\"candidateId\" IS NULL AS candidate_is_null\nFROM factory_tasks f JOIN account_scope s ON s.owner_id=f.\"userId\"\n JOIN issues i ON i.id=f.\"issueId\"\n JOIN bots b ON b.id=f.\"botId\" AND b.\"ownerId\"=f.\"userId\"\nWHERE f.id='b2e96bca-9287-4ed7-92e7-68d9b8a3285f'",
+      "originalToolResponse": {
+        "content": [
+          {
+            "type": "text",
+            "text": "[\n  {\n    \"task_id\": \"b2e96bca-9287-4ed7-92e7-68d9b8a3285f\",\n    \"revision\": 3,\n    \"stage\": \"execute\",\n    \"status\": \"blocked\",\n    \"issue_scope\": \"workspace\",\n    \"task_workspace_id\": \"de300001-ece6-4021-8214-c986ea306bde\",\n    \"task_workspace_active_membership\": true,\n    \"personal_issue_scope_matches_preflight\": true,\n    \"candidate_is_null\": true\n  }\n]"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    },
+    {
+      "database": "neondb",
+      "sql": "SELECT count(*)::integer AS matching_workspace_rows FROM mikka_workspaces WHERE id IN ('4ae2a643-b09e-43eb-816c-1e5557bef170','de300001-ece6-4021-8214-c986ea306bde')",
+      "originalToolResponse": {
+        "content": [
+          {
+            "type": "text",
+            "text": "[\n  {\n    \"matching_workspace_rows\": 0\n  }\n]"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    }
+  ],
+  "interpretation": [
+    "The same historical task remained revision 3, execute/blocked, with a null candidate.",
+    "Its Bot workspace differs from the authenticated preflight workspace, and the owner has an active membership in that persisted task workspace.",
+    "The actual issue scope is workspace. The personal_issue_scope_matches_preflight column only tests this owner's personal workspace ID; it does not say the historical issue is personal.",
+    "The default database contains neither of these workspace IDs. No production DATABASE_URL or connection string was read, so this is not an environment-binding receipt.",
+    "The authenticated Factory detail must still return matching task identity/revision and a non-null other liveWorkspaceId before the acceptance driver can continue.",
+    "Read-only statements were separate snapshots. No task, configuration, profile or run was modified."
+  ],
+  "productionAcceptance": null
+}

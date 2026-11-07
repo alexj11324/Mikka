@@ -1,0 +1,13 @@
+
+  ! eslint(no-unused-vars): Identifier 'eq' is imported but never used.
+   ,-[lib/preferences.ts:2:10]
+ 1 | import 'server-only'
+ 2 | import { eq, sql } from 'drizzle-orm'
+   :          ^|
+   :           `-- 'eq' is imported here
+ 3 | import { z } from 'zod'
+   `----
+  help: Consider removing this import.
+
+Found 1 warning and 0 errors.
+Finished in 5ms on 2 files with 96 rules using 1 threads.

@@ -1,0 +1,19 @@
+{
+  "phase": "red",
+  "node": "v24.22.1",
+  "command": [
+    "node",
+    "--test",
+    "--test-reporter=tap",
+    "--test-name-pattern=preflight excludes only|preflight keeps same-workspace|preflight does not convert|preflight does not request|foreign historical",
+    "scripts/acceptance/run-observability.test.mjs"
+  ],
+  "status": 1,
+  "signal": null,
+  "error": null,
+  "elapsedMs": 562,
+  "stdoutBytes": 4562,
+  "stdoutSha256": "ffa15ef389b4e340e40634bda104bb2d818d501e748759a82fc11f3e8816eca9",
+  "stderrBytes": 0,
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

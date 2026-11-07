@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "sourceCommit": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+  "evidenceKind": "source_contract_only",
+  "productionReadsPerformed": false,
+  "files": [
+    {
+      "path": "app/api/factory/tasks/[taskId]/route.ts",
+      "bytes": 1892,
+      "sha256": "39fc9291d69eb3ba43118d2a113a99144b5a6d849645bac2476ddb9b6b0c0b1f",
+      "gitBlob": "765fc699a7c1463309b0957e1d13609aab283c2f"
+    },
+    {
+      "path": "app/api/factory/tasks/route.ts",
+      "bytes": 3901,
+      "sha256": "1e37c85da0c2e619dda37b2a1ee1192d8a09b0e2970522bd8178ae98cd82994c",
+      "gitBlob": "20869b39ac12f9761150cb59343145b1fb623563"
+    },
+    {
+      "path": "lib/live/factory.ts",
+      "bytes": 5095,
+      "sha256": "8b6989d38e933803c49ef519af2c103a63351a16df9ac35e0c0fd3ae01dff70a",
+      "gitBlob": "fac72d5437b0334daa91ee8ce6aa2425252a6349"
+    },
+    {
+      "path": "lib/factory/human-store.ts",
+      "bytes": 2831,
+      "sha256": "5e2bb9f9f67cdb206490a93ab09060a0dbb97d1451352d38d70140ad130aa9a5",
+      "gitBlob": "eb689ae7cffe2572bf0e9982975f8d63a3a3260c"
+    },
+    {
+      "path": "lib/factory/store.ts",
+      "bytes": 82613,
+      "sha256": "eebf736fa966b7de322dc4b3dd9bb2f15f372279fa644a72e34ec245f6331260",
+      "gitBlob": "ed53fba310b0c4f2c69a3654deb14893479c50e3"
+    },
+    {
+      "path": "lib/issue-visibility.ts",
+      "bytes": 3987,
+      "sha256": "5ede4ca70ab8c8ed6b04352d186719084f83df967da56dcabff6811a35591c28",
+      "gitBlob": "a1b26134fc23dea47059b44187d0b34804aa8ffe"
+    },
+    {
+      "path": "lib/issue-search.ts",
+      "bytes": 13944,
+      "sha256": "a19367cb0f18a9ef8df0f8ee86bd8e74cabb3326c2bd3c23463810358cbeb997",
+      "gitBlob": "290af92993a7413bac11b297f566edac70457a72"
+    }
+  ],
+  "bindings": {
+    "list": "Authenticated listForIssue selects any Bot of the visible issue. FactoryTaskSummary exposes id, issueId, stage, status, revision, attemptId, candidateId. revision is the task version field, not version.",
+    "detail": "Authenticated session -> actAs -> handleFactory -> factoryHumanStore.read selects the persisted Bot and checks task/issue ownership. Result body.task includes userId and the same task bindings.",
+    "workspace": "Detail liveWorkspaceId is factoryLiveScopes(...).task.workspaceId. For a Bot task, this is the persisted Bot workspace with active owner membership. Null/unavailable scope is not proof.",
+    "listScope": "List liveWorkspaceId comes from factoryIssueLiveScope and describes the issue list scope, which can differ from the persisted Bot workspace for a personal issue. It must not be used to exclude a task.",
+    "snapshotBoundary": "The detail body and live scope are sequential reads in one HTTP handler, not an atomic database snapshot. This change only scopes the existing bounded preflight; it is not a lock or terminal-state proof."
+  },
+  "guard": "Only an unsettled task with exact list/detail identity, owner, revision, stage/status and attempt/candidate binding plus valid non-target workspace may be ignored by quiet(). Same/missing/invalid/mismatched proofs remain busy.",
+  "unchanged": [
+    "settledTask",
+    "ownerIdle",
+    "issueInventory and baseline visible issue set",
+    "owned Factory cancellation and machine cleanup",
+    "authentication and API authorization",
+    "production runtime and database code",
+    "model/credential/submit budgets"
+  ]
+}

@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "task": "preferences-single-statement",
+  "baseline": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+  "candidateFiles": [
+    {
+      "path": "lib/preferences.ts",
+      "bytes": 4726,
+      "sha256": "f2bf9a295ebf5733c24314e562bab6e2b806f5ab621a214091d6c09c0d7b0534",
+      "blob": "0a01960901e60bd66cf86e1a6733e2dc0e953c15",
+      "readbackExact": true
+    },
+    {
+      "path": "tests/settings-preferences.db.test.ts",
+      "bytes": 22978,
+      "sha256": "372214a8c768e316c7137fcfacfff5d59fbdf8b8dbcae5c14b5c61b32b0d8f83",
+      "blob": "3b54cf58a62eccae2517426e87a52e40336f9f00",
+      "readbackExact": true
+    }
+  ],
+  "exactTestInputs": [
+    {
+      "path": "baseline/lib/preferences.ts",
+      "bytes": 4288,
+      "sha256": "9bef69646f2ed2f9669a63b08eb7b6f80899aad007bcab674b6d9b90555d8c80",
+      "blob": "5076bfec71434bba9c8d345ab32335eafe00285b",
+      "role": "baseline",
+      "repository": "alexj11324/Mikka",
+      "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "repositoryPath": "lib/preferences.ts"
+    },
+    {
+      "path": "lib/preferences.ts",
+      "bytes": 4726,
+      "sha256": "f2bf9a295ebf5733c24314e562bab6e2b806f5ab621a214091d6c09c0d7b0534",
+      "blob": "0a01960901e60bd66cf86e1a6733e2dc0e953c15",
+      "role": "candidate"
+    },
+    {
+      "path": "baseline/tests/settings-preferences.db.test.ts",
+      "bytes": 18767,
+      "sha256": "b304a2d08f7d0e9344b788d8eb5bfc26c428935e624edcc666891636b59a6ecf",
+      "blob": "64e0768794a500aac27a12a4798e9587173ff5bf",
+      "role": "baseline",
+      "repository": "alexj11324/Mikka",
+      "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "repositoryPath": "tests/settings-preferences.db.test.ts"
+    },
+    {
+      "path": "tests/settings-preferences.db.test.ts",
+      "bytes": 22978,
+      "sha256": "372214a8c768e316c7137fcfacfff5d59fbdf8b8dbcae5c14b5c61b32b0d8f83",
+      "blob": "3b54cf58a62eccae2517426e87a52e40336f9f00",
+      "role": "candidate"
+    },
+    {
+      "path": "lib/db/schema.ts",
+      "bytes": 88064,
+      "sha256": "8b9d4fc48436efa65052f29b993501440862018d37c00b342af02688ccc28305",
+      "blob": "d537271bb2bde1c2fc4028e80d073e821cf5fe7c",
+      "role": "unchanged_repository_input",
+      "repository": "alexj11324/Mikka",
+      "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "repositoryPath": "lib/db/schema.ts"
+    },
+    {
+      "path": "lib/send-key.ts",
+      "bytes": 890,
+      "sha256": "3b584fb98b10fc21e6e4514a9c5e62cf561133fda846b991948447578ced7837",
+      "blob": "52763c0538d13e702ad28f3adabf85239f2cd3c9",
+      "role": "unchanged_repository_input",
+      "repository": "alexj11324/Mikka",
+      "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "repositoryPath": "lib/send-key.ts"
+    },
+    {
+      "path": "tests/support/server-only.mjs",
+      "bytes": 470,
+      "sha256": "acb095e77a48511ebefadba47142e23d411aae3d4c355acc18cb6b24d2c0d281",
+      "blob": "0824d2931a1c6c67b1f34c3a7ce94fa5ad217fd4",
+      "role": "unchanged_repository_input",
+      "repository": "alexj11324/Mikka",
+      "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "repositoryPath": "tests/support/server-only.mjs"
+    },
+    {
+      "path": "package.json",
+      "bytes": 249,
+      "sha256": "1c50628f0672b587bb97b94ea2fbd42976aa627d95f9358d6812e6029a56b7e2",
+      "blob": "ef279ccb2628c53bcd393c05bd3ee08d7dee210b",
+      "role": "isolated_test_support"
+    },
+    {
+      "path": "tsconfig.json",
+      "bytes": 192,
+      "sha256": "3e305426573dac3a1b428c673923aead7630ffee163afd70293eaa9a1dc9bd8a",
+      "blob": "736660bc1c7c724eb2a220bdf7d3c7f8b456f6f6",
+      "role": "isolated_test_support"
+    },
+    {
+      "path": "lib/action-error.ts",
+      "bytes": 49,
+      "sha256": "207ce98466d580287796a5c8624ecc1a06ee68eecb3acfc8f1b661c9a5fd3209",
+      "blob": "54cd0a8bdddeb9c727bcf5dede2021e57f5b37ba",
+      "role": "isolated_test_support"
+    },
+    {
+      "path": "lib/db/index.ts",
+      "bytes": 400,
+      "sha256": "47c67682c496a7ce7594fdc196756a055b5e41ab683fa8c7d007b68313418701",
+      "blob": "d1027feac7ef570173e93cb9c6bf97febe10fe35",
+      "role": "isolated_test_support"
+    },
+    {
+      "path": "lib/attention/store.ts",
+      "bytes": 522,
+      "sha256": "dcd484c1800a8e82e9dc14f61bc138e59a0dffb8cb7cc24620a6cd9cd169bf3a",
+      "blob": "2b379ac13f30fcb6082317992b9b047e21941468",
+      "role": "isolated_test_support"
+    },
+    {
+      "path": "isolated.test.ts",
+      "bytes": 6112,
+      "sha256": "3159d456cea8cb360958dde34dd478884f0c915caa3507bec92f8e88c1e41a85",
+      "blob": "2891b4cc54cfc539c05c0a30e15613d29da57a4b",
+      "role": "isolated_test_support"
+    },
+    {
+      "path": "verify.py",
+      "bytes": 2739,
+      "sha256": "4429ec4b59e85266c784dd0708a74a854743dabfa5ba8f7484e1e6982da84c9f",
+      "blob": "0c91a60626752b7ee7916db9340e2a0a264b642b",
+      "role": "isolated_test_support"
+    },
+    {
+      "path": "lib/db/project-map-schema.ts",
+      "bytes": 4205,
+      "sha256": "12d796c0275717373afa6709aa98fb64f387f8193aa2e62734734ad461e1509f",
+      "blob": "a9682dccdb621df2d4a1032c847a54afeb6e7716",
+      "role": "unchanged_repository_input",
+      "repository": "alexj11324/Mikka",
+      "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "repositoryPath": "lib/db/project-map-schema.ts"
+    },
+    {
+      "path": "lib/db/agent-profile-schema.ts",
+      "bytes": 1618,
+      "sha256": "95bfa74fa772d1cb9259f962b11d01c6b52eee242a8b1a74a6f70a286a97ed9b",
+      "blob": "b102892b19e6031a2dd9508cbe92aded494d9a97",
+      "role": "unchanged_repository_input",
+      "repository": "alexj11324/Mikka",
+      "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "repositoryPath": "lib/db/agent-profile-schema.ts"
+    },
+    {
+      "path": ".oxlintrc.json",
+      "bytes": 899,
+      "sha256": "8b23eb05fa1495c5e5faf871a01c5a22483845084ad6b74e692ddd97c49498e2",
+      "blob": "42edbae82af95c335d45f316c494091950b1b82e",
+      "role": "unchanged_repository_input",
+      "repository": "alexj11324/Mikka",
+      "revision": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "repositoryPath": ".oxlintrc.json"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "evidence/old-red.stdout",
+      "bytes": 1387,
+      "sha256": "22773ebfae57aafe4e169a092825a74eac4376882abee499bd7d1eec0f51f489",
+      "blob": "ce4540581bdb171b53ea381940858de1c70bb189",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/old-red.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/new-green.stdout",
+      "bytes": 469,
+      "sha256": "6c114d57d098338d2d3b20ff2407d95fc2cd2e70cee9500e470c9f4e2b1cf8c0",
+      "blob": "9647a45540b40e4d5300289adc8706e65a011482",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/new-green.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/lint.stdout",
+      "bytes": 89,
+      "sha256": "db4a9d99418323c168a1930f38f9c1c7778bc1e0cd18d9644ae734856b0e288b",
+      "blob": "5e02e238bb647173cf407bb368bfa1cd8917dae5",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/lint.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/source-whitespace.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/source-whitespace.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/test-whitespace.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/test-whitespace.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/lib_preferences.ts.patch",
+      "bytes": 1910,
+      "sha256": "439593eee53f7ab7ed8d2f19e68fe87f39955763fed30bc98c81e2d39acf3c16",
+      "blob": "24e94bf1b7e07eafc470f8deeba15ebe2cc3cede",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/tests_settings-preferences.db.test.ts.patch",
+      "bytes": 4747,
+      "sha256": "c12e6d67df7c4cad57c78de43bc712d8abe63cd16c90edf1e57bb9075e72dd78",
+      "blob": "280f7effa1f64da1065bc979184e1437f5e21806",
+      "readbackExact": true
+    },
+    {
+      "path": "evidence/validation.json",
+      "bytes": 779,
+      "sha256": "a8d8d5e75ccdf3e54da71f776adce91d3d0ade4191244304f7da97ecb5e8d37b",
+      "blob": "6b8f663fe0279a4b936b2402b8cab47485755e6b",
+      "readbackExact": true
+    },
+    {
+      "path": "initial-fixture-run/old-red.stdout",
+      "bytes": 1736,
+      "sha256": "29bd5266ad2ebb96f99923e4b6bc244932542171a47a87d276ae87c6329d9607",
+      "blob": "fc7968e3efb4c2ad158c1d7519faa65ad26e2005",
+      "readbackExact": true
+    },
+    {
+      "path": "initial-fixture-run/new-green.stdout",
+      "bytes": 1736,
+      "sha256": "0ed26fc69313ebc10c0dfd82339b75dc59ad8f1cb0d265d88ce52052db1890b6",
+      "blob": "1db311a7ae39f2e3112961abc7b6b49c5d00d4d6",
+      "readbackExact": true
+    },
+    {
+      "path": "initial-fixture-run/lint.stdout",
+      "bytes": 397,
+      "sha256": "1186481f37d0c8ef1be7cf3adf2ab79177e6dddbb30ac50c135bb81d6a85faa7",
+      "blob": "b3b7dfc0b16b0c9865aad6effc637729a29af662",
+      "readbackExact": true
+    },
+    {
+      "path": "initial-fixture-run/validation.json",
+      "bytes": 781,
+      "sha256": "5d828aab5c40a20cda6dcccce494203b8c83561d11fb900f2372b2747bbcb8a5",
+      "blob": "c8f143232388935150f7b3ba68df5f2d19c2f46e",
+      "readbackExact": true
+    },
+    {
+      "path": "install.stdout",
+      "bytes": 24,
+      "sha256": "881fa96ffbb7709d398edc95a1312b740811ab29f505320e71d5f7cee6fa52f3",
+      "blob": "ec85b59cdcbb5c4d6e1954423a3288769f71dde7",
+      "readbackExact": true
+    },
+    {
+      "path": "install.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "readbackExact": true
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 30989,
+      "sha256": "d6a17dd87045b3540282ec79f30e23b19eb7a53279327587d54ecc33cb5a12fb",
+      "blob": "c54be41ac7e0553897c7c9627caa595a83e6e90e",
+      "readbackExact": true
+    },
+    {
+      "path": "test-support/package.json",
+      "bytes": 249,
+      "sha256": "1c50628f0672b587bb97b94ea2fbd42976aa627d95f9358d6812e6029a56b7e2",
+      "blob": "ef279ccb2628c53bcd393c05bd3ee08d7dee210b",
+      "readbackExact": true
+    },
+    {
+      "path": "test-support/tsconfig.json",
+      "bytes": 192,
+      "sha256": "3e305426573dac3a1b428c673923aead7630ffee163afd70293eaa9a1dc9bd8a",
+      "blob": "736660bc1c7c724eb2a220bdf7d3c7f8b456f6f6",
+      "readbackExact": true
+    },
+    {
+      "path": "test-support/lib/action-error.ts",
+      "bytes": 49,
+      "sha256": "207ce98466d580287796a5c8624ecc1a06ee68eecb3acfc8f1b661c9a5fd3209",
+      "blob": "54cd0a8bdddeb9c727bcf5dede2021e57f5b37ba",
+      "readbackExact": true
+    },
+    {
+      "path": "test-support/lib/db/index.ts",
+      "bytes": 400,
+      "sha256": "47c67682c496a7ce7594fdc196756a055b5e41ab683fa8c7d007b68313418701",
+      "blob": "d1027feac7ef570173e93cb9c6bf97febe10fe35",
+      "readbackExact": true
+    },
+    {
+      "path": "test-support/lib/attention/store.ts",
+      "bytes": 522,
+      "sha256": "dcd484c1800a8e82e9dc14f61bc138e59a0dffb8cb7cc24620a6cd9cd169bf3a",
+      "blob": "2b379ac13f30fcb6082317992b9b047e21941468",
+      "readbackExact": true
+    },
+    {
+      "path": "test-support/isolated.test.ts",
+      "bytes": 6112,
+      "sha256": "3159d456cea8cb360958dde34dd478884f0c915caa3507bec92f8e88c1e41a85",
+      "blob": "2891b4cc54cfc539c05c0a30e15613d29da57a4b",
+      "readbackExact": true
+    },
+    {
+      "path": "test-support/verify.py",
+      "bytes": 2739,
+      "sha256": "4429ec4b59e85266c784dd0708a74a854743dabfa5ba8f7484e1e6982da84c9f",
+      "blob": "0c91a60626752b7ee7916db9340e2a0a264b642b",
+      "readbackExact": true
+    }
+  ],
+  "rawExport": {
+    "inputFiles": 17,
+    "inputHashMatch": true,
+    "files": 20,
+    "bytes": 49917,
+    "sha256": "4211f39b072abd6fa56781aff08eb2dfcaacb381dc8f12eb56654bd8dd4b7816",
+    "chunks": 36,
+    "verified": true
+  },
+  "privacy": {
+    "productionData": false,
+    "credentials": false,
+    "signedUrls": false,
+    "syntheticExamples": [
+      "random synthetic owner/peer fixture IDs",
+      "example.invalid and pre-existing fixture emails",
+      "synthetic preference text and deliberately malformed owner parameter"
+    ],
+    "sql": "fixed synthetic DDL and parameterized test statements only",
+    "rawWorkflowLogs": false
+  }
+}

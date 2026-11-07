@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "sourceCommit": "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+  "files": [
+    {
+      "path": "package.json",
+      "bytes": 33,
+      "sha256": "a90fc33418afa2b9cbf4768524b021135b965ecdf993457505bfae3ac44a8428",
+      "gitBlob": "f84528506796fb565716eaf2798e653919e3aa33",
+      "role": "isolated module fixture"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 56471,
+      "sha256": "9d4fedec81a52211de809b2ebc7ef950102138378c349ab82dc7ef1cd5ec0398",
+      "gitBlob": "1eedff30eee7021fa6503c760253fe499664c7d0",
+      "role": "exact base dependency"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 49760,
+      "sha256": "36b3a27027adce98f4d693255d150a0d728ed1f585b425d4a1d6218d067947e0",
+      "gitBlob": "911d8fe775ba16cc11bdfc512e9861798a7bef00",
+      "role": "new regression tests"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "role": "exact base dependency"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "bytes": 4679,
+      "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+      "gitBlob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a",
+      "role": "exact base dependency"
+    },
+    {
+      "path": "scripts/acceptance/response-cookie-jar.mjs",
+      "bytes": 2277,
+      "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178",
+      "gitBlob": "2bb8fa35a4432c2245a744c6cac1c80b715da7a8",
+      "role": "exact base dependency"
+    },
+    {
+      "path": "messages/en.json",
+      "bytes": 242738,
+      "sha256": "caf861daca2c9c6931215284bced65eeba0e5bb4eb942e8502ec4b80fb3091a5",
+      "gitBlob": "342938b09a019dcca8c80b2e9019eaefe176371f",
+      "role": "exact base dependency"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "bytes": 233758,
+      "sha256": "ceaf201fc46a57062ac6bc61190fea2f22b555bba7b5472af4559c002bc0bf84",
+      "gitBlob": "2edc1ba94678de93517e04200c4b2800ebdfee09",
+      "role": "exact base dependency"
+    }
+  ],
+  "packageNote": "The 33-byte package.json only marks this isolated fixture as ESM; no product package/dependencies were installed.",
+  "network": "deny-all",
+  "backend": "fetchImpl fixture only; no real HTTP, DB, model, browser or credential supplied"
+}

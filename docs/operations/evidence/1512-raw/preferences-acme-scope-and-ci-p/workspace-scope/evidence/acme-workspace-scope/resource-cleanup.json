@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "sessionId": "sbx_W42yU1vw1yi8a9kBmUL0L4GMPIvZ",
+  "status": "stopped",
+  "startedAt": 1794088107059,
+  "stoppedAt": 1794088368082,
+  "durationMs": 261023,
+  "activeCpuDurationMs": 7332,
+  "resources": {
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "timeoutMs": 600000
+  },
+  "persistent": false,
+  "networkPolicy": {
+    "mode": "deny-all"
+  },
+  "ports": 0,
+  "stopRequested": true,
+  "independentGetConfirmed": true,
+  "createInputValidationError": "First create request rejected invalid networkPolicy string before resource creation; retried with explicit {mode:deny-all}."
+}

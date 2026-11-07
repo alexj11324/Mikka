@@ -1,0 +1,20 @@
+{
+  "checks": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "status": 1,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "status": 1,
+      "signal": null,
+      "error": null,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

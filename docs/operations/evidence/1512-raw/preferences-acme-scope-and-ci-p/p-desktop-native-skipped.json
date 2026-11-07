@@ -1,0 +1,273 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "pullRequest": 1675,
+  "kind": "desktop_P_linux_auth_regression_native_not_started",
+  "status": "failed_before_native_acceptance",
+  "binding": {
+    "head": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+    "synthetic": "042a85ecbfb4e00dcf3280b987d5735aeb9ed97f",
+    "tree": "fb4220c0d31b4c8d235144a75633ce7ad9258ed0",
+    "parents": [
+      "a23b2e0b48dc5cb2dac8bb9ecde734a03537339e",
+      "d73bbaa3d42115c4c8491a24439c3647d96c689d"
+    ],
+    "actualChecksCheckoutVerified": true,
+    "actualLinuxSmokeCheckoutVerified": true,
+    "actualMacCheckout": null
+  },
+  "workflow": {
+    "id": 42419060300,
+    "attempt": 1,
+    "path": ".github/workflows/desktop.yml",
+    "status": "completed",
+    "conclusion": "failure",
+    "createdAt": "2026-11-07T22:06:55Z",
+    "updatedAt": "2026-11-07T22:11:18Z"
+  },
+  "jobs": [
+    {
+      "id": 128543344920,
+      "name": "icon",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T22:07:23Z",
+      "completedAt": "2026-11-07T22:07:55Z"
+    },
+    {
+      "id": 128543345097,
+      "name": "smoke",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-07T22:07:38Z",
+      "completedAt": "2026-11-07T22:11:18Z",
+      "steps": [
+        {
+          "number": 13,
+          "name": "Build the production web backend",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T22:09:06Z",
+          "completedAt": "2026-11-07T22:10:39Z"
+        },
+        {
+          "number": 14,
+          "name": "Archive the compiled Linux backend",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T22:10:39Z",
+          "completedAt": "2026-11-07T22:10:43Z"
+        },
+        {
+          "number": 15,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T22:10:43Z",
+          "completedAt": "2026-11-07T22:10:46Z"
+        },
+        {
+          "number": 16,
+          "name": "Build the dev Electron shell",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T22:10:46Z",
+          "completedAt": "2026-11-07T22:10:52Z"
+        },
+        {
+          "number": 17,
+          "name": "Isolated Electron authentication and runtime acceptance",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T22:10:52Z",
+          "completedAt": "2026-11-07T22:11:15Z"
+        },
+        {
+          "number": 18,
+          "name": "Audit runtime evidence before upload",
+          "status": "completed",
+          "conclusion": "failure",
+          "startedAt": "2026-11-07T22:11:15Z",
+          "completedAt": "2026-11-07T22:11:15Z"
+        },
+        {
+          "number": 19,
+          "name": "Keep audited Electron evidence",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T22:11:15Z",
+          "completedAt": "2026-11-07T22:11:15Z"
+        },
+        {
+          "number": 38,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T22:11:15Z",
+          "completedAt": "2026-11-07T22:11:16Z"
+        }
+      ]
+    },
+    {
+      "id": 128543345143,
+      "name": "checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T22:07:38Z",
+      "completedAt": "2026-11-07T22:09:24Z"
+    },
+    {
+      "id": 128544417621,
+      "name": "Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T22:11:18Z",
+      "completedAt": "2026-11-07T22:11:18Z"
+    }
+  ],
+  "primaryFailure": {
+    "jobId": 128543345097,
+    "step": 17,
+    "command": "REQUIRE_DB=1 pnpm test:desktop-auth",
+    "testFile": "tests/desktop-session-cache.db.test.ts",
+    "line": 146,
+    "parentTest": "native reads use the same signed cache and complete PostgreSQL budget as the original web action; sensitive reads revalidate",
+    "failedSubtest": "full original web read and cached native RPC have identical queries, PostgreSQL bytes and data",
+    "code": "ERR_ASSERTION",
+    "operator": "strictEqual",
+    "actual": 1,
+    "expected": 2,
+    "sourceAssertion": "assert.equal(baseline.statements, 2, 'the actual preferences action reads preferences and attention only')",
+    "cause": "The original regression fixes the business preference read at two SQL statements. P deliberately merges that owner read into one statement, so this stale absolute expectation fails.",
+    "followingAssertion": {
+      "line": 147,
+      "expectedInP": 4,
+      "notReached": true,
+      "proposedContract": "previous.statements === baseline.statements + 2",
+      "basis": "The old fresh authentication transport retains its two session/user statements in addition to the one-statement business read; retain this as a strict regression, along with all SQL/bytes/data equivalence checks."
+    },
+    "processExitCode": 1,
+    "parentError": "DESKTOP_TEST_SETUP_EXIT_1",
+    "parentSource": "apps/desktop/test/environment.mjs:82",
+    "acceptanceCommandAfterFailure": {
+      "command": "node apps/desktop/test/run-acceptance.mjs bundled-smoke",
+      "reached": false,
+      "basis": "The source workflow executes native-viewport tests, then the failed test:desktop-auth command, then bundled-smoke in bash -euc."
+    },
+    "unrelatedEarlyDependencyEnoentExcluded": true
+  },
+  "secondaryFailure": {
+    "jobId": 128543345097,
+    "step": 18,
+    "command": "node scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/desktop-evidence",
+    "ifCondition": "always()",
+    "code": "ENOENT",
+    "evidencePath": ".cache/desktop-evidence",
+    "explanation": "The runtime acceptance command did not run after the authentication test failed, so its evidence directory was not produced. The always audit fails on that missing evidence; upload is then skipped.",
+    "evidenceUploadStep": 19,
+    "evidenceUploadConclusion": "skipped"
+  },
+  "resources": {
+    "isolatedRuntimeReadyObserved": true,
+    "sourceFinallyAwaits": [
+      "stopOwnedApplication for the owned API children",
+      "worker.close for the owned local Live worker"
+    ],
+    "finalObservedParentError": "DESKTOP_TEST_SETUP_EXIT_1",
+    "environmentStopFailedErrorObserved": false,
+    "explicitPerProcessCleanupReceipt": null,
+    "processStopInterpretation": "The original setup error remains after the awaited finally path; no environment-stop aggregate error was observed. This is not an independent PID inventory or lifecycle cleanup receipt.",
+    "serviceContainers": {
+      "step": 38,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T22:11:15Z",
+      "completedAt": "2026-11-07T22:11:16Z"
+    },
+    "runtimeAcceptanceLeaseReceipt": null,
+    "quarantineReceipt": null,
+    "agentCreatedSandbox": false,
+    "additionalCloudVmCreatedByInvestigation": false,
+    "additionalProviderOrModelCallsTriggeredByInvestigation": false
+  },
+  "native": {
+    "jobId": 128544417621,
+    "conclusion": "skipped",
+    "steps": [],
+    "acceptanceActuallyStarted": false,
+    "actualAttemptDefined": false,
+    "loginQueryCounts": null,
+    "startupQueryCounts": null,
+    "sourceConservation": null,
+    "rpcCrossWindow": null,
+    "lifecycleCleanup": null
+  },
+  "availableArtifacts": [
+    {
+      "id": 13592473387,
+      "name": "desktop-icon",
+      "sizeInBytes": 1753544,
+      "digest": "sha256:c32521da2b0dbf01daf56a218c3dbfa53ec964f23d06bedf2418b11803f09638",
+      "expired": false,
+      "runId": 42419060300,
+      "head": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+      "downloaded": false
+    },
+    {
+      "id": 13591944883,
+      "name": "desktop-api-build-042a85ecbfb4e00dcf3280b987d5735aeb9ed97f",
+      "sizeInBytes": 48177714,
+      "digest": "sha256:c898bdb66920b9f27e0f2c97151ed47009922e5d25f9453ed905e4047f24067c",
+      "expired": false,
+      "runId": 42419060300,
+      "head": "d73bbaa3d42115c4c8491a24439c3647d96c689d",
+      "downloaded": false
+    }
+  ],
+  "evidenceAvailability": {
+    "safeRuntimeJsonArtifactPresent": false,
+    "nativeArtifactPresent": false,
+    "compiledArtifactDownloaded": false,
+    "reason": "Only icon and compiled Linux backend artifacts exist. Neither is a Native runtime report."
+  },
+  "exactSourceReferences": [
+    {
+      "path": "tests/desktop-session-cache.db.test.ts",
+      "commit": "042a85ecbfb4e00dcf3280b987d5735aeb9ed97f",
+      "bytes": 23658,
+      "sha256": "3381e741f6eafcdf6988e3b4b8ee1731e1abfba5efff904da2702ebe1bdacc22",
+      "gitBlob": "913f010467a69c34ecc2d169362190b86505faf2"
+    },
+    {
+      "path": "apps/desktop/test/environment.mjs",
+      "commit": "042a85ecbfb4e00dcf3280b987d5735aeb9ed97f",
+      "bytes": 9174,
+      "sha256": "8b9934b86758b5494677744d0f346b204d53e7aef9e3a0e0c3aee5806cb80120",
+      "gitBlob": "cf1dcee34ea2edeb9e0ed32110966726049246e5"
+    },
+    {
+      "path": ".github/workflows/desktop.yml",
+      "commit": "042a85ecbfb4e00dcf3280b987d5735aeb9ed97f",
+      "bytes": 14734,
+      "sha256": "3b5809a3a2f083ec71570e5390ca2ba0f2b3b75ce6601cfad29110ee3bb30e22",
+      "gitBlob": "ab003d0b12686183ad5d1841cb01e8ff97f636d5"
+    }
+  ],
+  "remediation": {
+    "owner": "daemon_impl",
+    "scope": "test-only baseline 1 and old fresh transport baseline + 2; preserve all data/bytes/native/browser/fresh-session checks",
+    "frozenCandidateBlob": "8325fadbe9f3ba5f942f67dcfdb857c1ee0eeb1f",
+    "appliedToThisRun": false,
+    "rerunRequested": false,
+    "nextNormalHeadRequired": true
+  },
+  "priorMeasurementBoundary": "a907 login 210/188 and 6af6 login 212/209 remain historical failures. P preferences PG1/PGlite validation is not a Native budget result.",
+  "privacy": {
+    "rawLogsReadOnlyInRam": true,
+    "rawLogsPersisted": false,
+    "rawLogBuffersCleared": true,
+    "credentialsOrAccountFieldsOutput": false,
+    "artifactsDownloaded": false
+  },
+  "productionAcceptance": null
+}

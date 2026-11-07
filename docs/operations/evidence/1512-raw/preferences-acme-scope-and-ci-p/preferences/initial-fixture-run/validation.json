@@ -1,0 +1,39 @@
+{
+  "versions": {
+    "node": "v24.22.1",
+    "@electric-sql/pglite": "0.3.14",
+    "drizzle-orm": "0.45.4",
+    "zod": "4.6.7",
+    "tsx": "4.23.15",
+    "oxlint": "1.89.0"
+  },
+  "results": {
+    "old-red": {
+      "exitCode": 1,
+      "stdoutBytes": 1736,
+      "stderrBytes": 0
+    },
+    "new-green": {
+      "exitCode": 1,
+      "stdoutBytes": 1736,
+      "stderrBytes": 0
+    },
+    "lint": {
+      "exitCode": 1,
+      "stdoutBytes": 397,
+      "stderrBytes": 0
+    },
+    "source-whitespace": {
+      "exitCode": 1,
+      "stdoutBytes": 0,
+      "stderrBytes": 0
+    },
+    "test-whitespace": {
+      "exitCode": 1,
+      "stdoutBytes": 0,
+      "stderrBytes": 0
+    }
+  },
+  "scope": "actual-reader-and-schema-with-isolated-pglite-adapter",
+  "externalServices": false
+}
