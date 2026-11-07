@@ -182,13 +182,18 @@ export interface Task { id: string; identifier: string | null; title: string; st
   /** A scheduled task's next run. */
   schedule?: TaskSchedule | null
   createdAt?: string
-  /** Its current attempt's state in 等待你 and 进行中; null when the board status decides (decisions/2026-11-07-2230). Absent from an older server. */
-  state?: TaskState | null
-  /** The grey line's reason, in the server's words: 等你回复, 待审阅, 额度用完, 等 MIK-12. */
-  reason?: string | null }
+  /** Its state (decisions/2026-11-07-2230): an attempt's in 等待你 and 进行中, else its board status. Absent from an older server. */
+  state?: ServerTaskState | null
+  /** Why, as a code; the app writes the words (features/tasks/model/task-groups.ts REASON_WORD). */
+  reason?: TaskReason | null
+  /** The blocking task's identifier when `reason` is blocked_by. */
+  blockedBy?: string | null }
 
 /** One icon per state (decisions/2026-11-07-2230-one-icon-per-task-state.md); open and closed tasks show their board status. */
 export type TaskState = 'waiting' | 'failed' | 'running' | 'queued'
+/** The API's `state`: the four attempt states, or the board status of an open or closed task. */
+export type ServerTaskState = TaskState | 'todo' | 'done' | 'canceled' | 'duplicate'
+export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'blocked_by' | 'flagged'
 
 /** 待处理 · 进行中 · 待办 · 已完成 (decisions/2026-11-07-2045-tasks-only-threads-inside.md). */
 export type TaskGroup = 'pending' | 'running' | 'todo' | 'done'
@@ -197,13 +202,15 @@ export interface TaskSchedule { label: string; nextAt: string | null }
 
 /** One entry of a task's 活动, newest first. */
 export type TaskActivity =
-  | { kind: 'attempt'; runId: string; n: number; group: ThreadGroup; harness: string; createdAt: string; failed: boolean }
+  | { kind: 'attempt'; runId: string; n: number; group: ThreadGroup; harness: string; createdAt: string; failed: boolean
+    /** Its own result (2026-11-07-2230); absent from an older server. */
+    state?: 'running' | 'waiting' | 'failed' | 'done' }
   | { kind: 'replaced'; runId: string; createdAt: string }
   | { kind: 'created'; by: string | null; createdAt: string }
 
 /** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
 export interface TaskDetail {
-  task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason'> & {
+  task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
     bot: TaskBot | null
     schedule: TaskSchedule | null
     description: string | null

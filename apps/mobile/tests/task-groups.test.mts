@@ -45,9 +45,15 @@ test('an attempt is titled by its number and Agent', () => {
 })
 
 // 2026-11-07-2230: each row shows its own state's icon; the hand is only 等你处理.
-test('a row shows the server\'s state and reason when it sends them', () => {
-  assert.deepEqual(rowState({ group: 'pending', status: 'todo', state: 'failed', reason: '失败' }), { state: 'failed', reason: '失败' })
-  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: null, reason: '等 MIK-12' }), { state: null, reason: '等 MIK-12' })
+test('a row shows the API\'s state; the app writes the reason\'s words', () => {
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'failed', reason: null }), { state: 'failed', reason: '失败' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'review', state: 'waiting', reason: 'pr_review' }), { state: 'waiting', reason: '待审阅' })
+  assert.deepEqual(rowState({ group: 'pending', status: 'doing', state: 'waiting', reason: 'approval' }), { state: 'waiting', reason: '等你确认' })
+  assert.deepEqual(rowState({ group: 'running', status: 'doing', state: 'queued', reason: null }), { state: 'queued', reason: null })
+  // todo, done, canceled and duplicate show the board's icon.
+  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'blocked_by', blockedBy: 'MIK-12' }), { state: null, reason: '等 MIK-12' })
+  assert.deepEqual(rowState({ group: 'done', status: 'canceled', state: 'canceled', reason: null }), { state: null, reason: null })
+  assert.deepEqual(rowState({ group: 'todo', status: 'todo', state: 'todo', reason: 'flagged' }), { state: null, reason: '已标记受阻' })
 })
 
 test('until then, a failed attempt is a triangle, not a hand, and waiting rows say why', () => {
@@ -71,4 +77,6 @@ test('an attempt\'s icon comes from its own result', () => {
   assert.equal(attemptState({ group: 'resolved' }), 'done')
   assert.equal(attemptState({ group: 'idle' }), 'todo')
   assert.equal(attemptState({ status: 'failed' }), 'failed')
+  // The API's own attempt state wins.
+  assert.equal(attemptState({ group: 'waiting', state: 'done' }), 'done')
 })

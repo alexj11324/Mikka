@@ -1,4 +1,4 @@
-import type { Task, TaskActivity, TaskGroup, TaskState, ThreadGroup } from '@/lib/types'
+import type { Task, TaskActivity, TaskGroup, TaskReason, TaskState, ThreadGroup } from '@/lib/types'
 
 /**
  * A task list's groups, in order (decisions/2026-11-07-2045 and 2026-11-07-2230): 等待你 is what waits on the person
@@ -39,22 +39,39 @@ export function groupOf(task: Pick<Task, 'group' | 'status' | 'blocked'>): TaskG
 /** What a row shows: its own state's icon (null: the board status's icon) and the grey line's reason. */
 export type RowState = { state: TaskState | null; reason: string | null }
 
-const BLOCK_WORD = { question: '等你回复', quota: '额度用完', run: '受阻' } as const
+/** The grey line's words for the API's reason codes; the app owns the wording. */
+export function reasonWord(reason: TaskReason, blockedBy?: string | null): string {
+  switch (reason) {
+    case 'needs_input': return '等你回复'
+    case 'approval': return '等你确认'
+    case 'pr_review': return '待审阅'
+    case 'blocked': return '受阻'
+    case 'quota': return '额度用完'
+    case 'blocked_by': return blockedBy ? `等 ${blockedBy}` : '等其他任务'
+    case 'flagged': return '已标记受阻'
+  }
+}
+
+const ATTEMPT_STATES = new Set<string>(['waiting', 'failed', 'running', 'queued'])
 
 /**
- * A row's state (decisions/2026-11-07-2230): the server's `state` and `reason` when it sends them. Until then they
- * are read from `group`, `blocked` and the board status: a failed attempt is 失败, anything else waiting on the
- * person is 等你处理 with its reason, a running group is 运行中, and the rest show their board status. Waiting on
- * another task, or flagged, is never 等你处理: it keeps its own icon and says why.
+ * A row's state (decisions/2026-11-07-2230): the API's `state` and `reason` when it sends them; todo, done, canceled
+ * and duplicate show the board's icon (null here). A failed attempt's grey line says 失败. Until the server sends
+ * them they are read from `group`, `blocked` and the board status: a failed attempt is 失败, anything else waiting
+ * on the person is 等你处理 with its reason, a running group is 运行中, and the rest show their board status.
+ * Waiting on another task, or flagged, is never 等你处理: it keeps its own icon and says why.
  */
-export function rowState(task: Pick<Task, 'group' | 'status' | 'blocked' | 'state' | 'reason'>): RowState {
-  if (task.state !== undefined) return { state: task.state ?? null, reason: task.reason ?? null }
+export function rowState(task: Pick<Task, 'group' | 'status' | 'blocked' | 'state' | 'reason' | 'blockedBy'>): RowState {
+  if (task.state !== undefined && task.state !== null) {
+    const state = ATTEMPT_STATES.has(task.state) ? task.state as TaskState : null
+    return { state, reason: state === 'failed' ? '失败' : task.reason ? reasonWord(task.reason, task.blockedBy) : null }
+  }
   const block = task.blocked ?? null
-  const elsewhere = block?.reason === 'dependency' ? (block.blocker ? `等 ${block.blocker}` : '等其他任务') : block?.reason === 'flagged' ? '已标记受阻' : null
+  const elsewhere = block?.reason === 'dependency' ? reasonWord('blocked_by', block.blocker) : block?.reason === 'flagged' ? reasonWord('flagged') : null
   const group = groupOf(task)
   if (group === 'pending' && !elsewhere) {
     if (block?.reason === 'failed') return { state: 'failed', reason: '失败' }
-    const reason = block && block.reason in BLOCK_WORD ? BLOCK_WORD[block.reason as keyof typeof BLOCK_WORD] : task.status === 'review' ? '待审阅' : null
+    const reason = block?.reason === 'question' ? reasonWord('needs_input') : block?.reason === 'quota' ? reasonWord('quota') : block?.reason === 'run' ? reasonWord('blocked') : task.status === 'review' ? reasonWord('pr_review') : null
     return { state: 'waiting', reason }
   }
   if (group === 'running') return { state: 'running', reason: elsewhere }
@@ -62,7 +79,8 @@ export function rowState(task: Pick<Task, 'group' | 'status' | 'blocked' | 'stat
 }
 
 /** An attempt in 活动 or a chat card: its own result as a state; a settled one shows done (✓) or open (○). */
-export function attemptState(attempt: { group?: ThreadGroup; failed?: boolean; status?: string }): TaskState | 'done' | 'todo' {
+export function attemptState(attempt: { group?: ThreadGroup; failed?: boolean; status?: string; state?: 'running' | 'waiting' | 'failed' | 'done' }): TaskState | 'done' | 'todo' {
+  if (attempt.state) return attempt.state
   if (attempt.failed || attempt.status === 'failed') return 'failed'
   switch (attempt.group) {
     case 'waiting': case 'blocked': return 'waiting'
