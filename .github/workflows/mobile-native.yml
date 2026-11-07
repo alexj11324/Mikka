@@ -39,8 +39,10 @@ jobs:
     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -53,8 +55,6 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Require the existing Expo credential
-        run: node -e "if (!process.env.EXPO_TOKEN) { console.error('EXPO_TOKEN is missing; no native release was published.'); process.exit(1) }"
       - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
       - run: pnpm --filter @mikka/mobile typecheck
       - name: Require successful checks for the workflow and binary source commits
@@ -64,12 +64,62 @@ jobs:
           EXISTING_BUILD_ID: ${{ inputs.existing_build_id }}
           EXPECTED_BUILD_COMMIT: ${{ inputs.expected_commit }}
         run: node scripts/release/mobile-native.mjs source
+      - name: Verify production credential delivery boundaries
+        run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
+      - name: Read existing EXPO_TOKEN through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: EXPO_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Read existing ASC_API_KEY_P8 through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: ASC_API_KEY_P8
+          recursive: false
+          include-imports: false
+      - name: Read existing ASC_API_KEY_ID through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: ASC_API_KEY_ID
+          recursive: false
+          include-imports: false
+      - name: Read existing ASC_API_ISSUER_ID through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: ASC_API_ISSUER_ID
+          recursive: false
+          include-imports: false
+      - name: Map existing Apple credential names in the trusted runner
+        run: node scripts/release/apple-credentials.mjs
+      - name: Require the existing Expo credential
+        run: node -e "if (!process.env.EXPO_TOKEN) { console.error('EXPO_TOKEN is missing; no native release was published.'); process.exit(1) }"
       - name: Require the existing App Store Connect credential inputs
         if: github.event_name == 'push' || inputs.submit
-        env:
-          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: node scripts/release/mobile-native.mjs credentials
       - name: Build iOS with existing signing credentials
         if: steps.source.outputs.build_id == ''
@@ -91,9 +141,6 @@ jobs:
         if: github.event_name == 'push' || inputs.submit
         env:
           NATIVE_BUILD_ID: ${{ steps.build.outputs.id }}
-          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: node scripts/release/mobile-native.mjs submit
       - name: Remove temporary App Store Connect key
         if: always()
