@@ -17,7 +17,10 @@ export type TaskRunSnapshot = { issueId: string; runId: string | null; status: s
 
 /** Schedule definitions explicitly linked to this task. Never attach every schedule of its Bot. */
 export function taskSchedule(issueId: typeof issues.id, userId: string, workspaceId?: string) {
-  return sql<MobileTaskSchedule | null>`(select jsonb_build_object('label', s.definition->>'title', 'nextAt', s.next_at)
+  return sql<MobileTaskSchedule | null>`(select jsonb_build_object('label', case s.definition->'timing'->>'kind'
+      when 'daily' then '每天 ' || (s.definition->'timing'->>'time')
+      when 'interval' then '每 ' || (s.definition->'timing'->>'minutes') || ' 分钟'
+      else s.definition->>'title' end, 'nextAt', s.next_at)
     from user_schedules s where s.owner_id=${userId} and s.definition->'task'->>'kind'='issue_snapshot'
       and s.definition->'task'->>'issueId'=${issueId}::text and s.status in ('active','paused')
       ${workspaceId ? sql`and s.workspace_id=${workspaceId}::uuid` : sql``}

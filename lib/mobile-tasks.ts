@@ -7,7 +7,7 @@ import { issueTeamAccess } from '@/lib/issue-team-access'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { displayTaskTitle } from '@/lib/short-title'
-import { tiptapToText } from '@/lib/tiptap-text'
+import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { runBotId } from '@/lib/run-bot-name'
 import { taskSchedule } from '@/lib/task-block-runs'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
@@ -49,7 +49,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, workspace: 
     : newest?.location === 'cloud' ? { kind: 'cloud' as const, name: 'Cloud' } : null
   return {
     task: {
-      id, identifier: identifiers.get(id) ?? null, title: displayTaskTitle({ ...issue, shortTitle: issue.shortTitleFrom === issue.title ? issue.shortTitle : null }), description: tiptapToText(issue.content),
+      id, identifier: identifiers.get(id) ?? null, title: displayTaskTitle({ ...issue, shortTitle: issue.shortTitleFrom === issue.title ? issue.shortTitle : null }), description: issueContentToMarkdown(issue.content).trim() || null,
       status: issue.status, priority: issue.priority, group: mobileTaskGroup(task, newest), bot: newest?.bot ?? null,
       agent: newest ? { harness: newest.harness, model: newest.model } : null, place, schedule: decoration?.schedule ?? null,
     },

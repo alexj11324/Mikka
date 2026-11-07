@@ -36,9 +36,18 @@ test('activity numbers chronologically, sorts newest first, and keeps same-time 
   const result = mobileTaskActivity(task(), [last, first, second], created)
   assert.deepEqual(result.map(row => [row.kind, 'runId' in row ? row.runId : row.by]), [['attempt', 'c'], ['attempt', 'b'], ['replaced', 'b'], ['attempt', 'a'], ['created', 'Owner']])
   assert.deepEqual(result.filter(row => row.kind === 'attempt').map(row => [row.n, row.failed]), [[3, false], [2, true], [1, true]])
+  assert.deepEqual(result.filter(row => row.kind === 'attempt').map(row => row.group), ['idle', 'blocked', 'idle'])
   assert.equal(result[2].createdAt, second.createdAt.toISOString())
   assert.deepEqual(mobileTaskActivity(task(), [second, last, first], created), result)
   assert.deepEqual(mobileTaskActivity(task(), [], created), [{ kind: 'created', by: 'Owner', createdAt: new Date(0).toISOString() }])
   const ties = [attempt('b', 1000), attempt('a', 1000)]
   assert.deepEqual(mobileTaskActivity(task(), ties, created), mobileTaskActivity(task(), ties.toReversed(), created))
+})
+
+test('attempt groups preserve the R-52 vocabulary expected by the iOS attempt status labels', () => {
+  const expected = ['running', 'waiting', 'blocked', 'idle', 'resolved']
+  const runs: MobileTaskAttempt[] = [run('running'), run('waiting_input'), run('paused'), run('succeeded', 'idle'), run('succeeded', 'done')]
+    .map((item, index) => ({ ...item, runId: String(index), harness: 'codex', createdAt: new Date(index + 1), threadReplacedBy: null }))
+  const activity = mobileTaskActivity(task(), runs, { by: null, createdAt: new Date(0) })
+  assert.deepEqual(activity.filter(row => row.kind === 'attempt').toReversed().map(row => row.group), expected)
 })
