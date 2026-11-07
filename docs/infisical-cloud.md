@@ -1,6 +1,6 @@
 # Infisical cloud migration
 
-Verified on 2026-10-22. Organization: Aspectly Labs. Project: Mikka (`89850d6a-f020-4936-863e-df77380dfe40`). This inventory contains names and migration status only.
+Initial migration verified on 2026-10-22; identity discovery and private production delivery reverified on 2026-11-07 below. Organization: Aspectly Labs. Project: Mikka (`89850d6a-f020-4936-863e-df77380dfe40`). This inventory contains names and migration status only.
 
 ## Required identity reuse
 
@@ -49,7 +49,7 @@ Neon integration-managed `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are snapshot
 | Worker `mikka-linear-sync-preview` | Native sync `mikka-workers-staging` succeeded and automatic sync is enabled. Deployed signature checks returned 401 for an invalid signature and 200 for a valid signature. |
 | Worker `mikka-suggestions-cron` | Verified 2026-10-27: native sync `mikka-suggestions-cron-prod` succeeded and automatic sync is enabled. Dedicated source `prod:/cloudflare/suggestions-cron` contains only `CRON_SECRET`, referencing `prod:/vercel`; its expanded value matches Production. Worker and version preview URLs are disabled. Release and scheduled-run evidence are recorded in [PR #329](https://github.com/alexj11324/Mikka/pull/329); see [suggestions schedules](suggestions-cron.md). |
 | Cloudflare Pages | No existing Mikka Pages project; no destination was invented. |
-| Cloud workload | GitHub OIDC identity `mikka-github-cloud` configured with 900-second tokens, no organization access and read-only Mikka project membership. Existing CI successfully verified one injected Composio credential against its issuer on a GitHub-hosted runner, without a Mac service. The old local MCP credential belongs to the deleted organization. |
+| Cloud workload | GitHub OIDC identity `mikka-github-cloud` uses 900-second tokens. On 2026-11-07 its existing Mikka project role was admin; its organization role was restored to `no-access` after controlled setup. Existing CI verified production native Sync readback without organization connection permissions. The older deleted-organization MCP record is migration history, not the current environment Universal Auth administrator; see the verified identity map below. |
 
 Each Worker source `/cloudflare` contains only `CRON_SECRET`, `LINEAR_CLIENT_ID`, `LINEAR_CLIENT_SECRET`, `LINEAR_TOKEN_ENCRYPTION_KEY` and `LINEAR_WEBHOOK_SECRET`, referencing the matching environment in `/vercel`. Expanded references were compared to their base values. The existing Linear branch also references the default Preview credentials instead of owning duplicate shared values. Sync options prevent secret deletion. Worker settings were read before and after sync; unmanaged bindings, including Hyperdrive, were verified unchanged. No custom dispatch workflow was created.
 
@@ -57,7 +57,7 @@ The fixed OAuth hub is `https://app.aspectlylabs.com`. PR #46 was merged at `ae4
 
 Vercel's exact `VERCEL_BRANCH_URL` is trusted alongside the immutable deployment URL. An authenticated Better Auth regression verifies branch-alias sign-out while rejecting an unrelated deployment origin. No shared-host wildcard is added.
 
-The OIDC trust pins the current numeric GitHub repository and owner IDs and immutable subject prefix, and accepts only branch refs in that repository. Pull request refs and forks cannot use this identity. Only `oidc-auth` is enabled; no persistent identity client secret was created.
+The OIDC trust pins the current numeric GitHub repository and owner IDs and immutable subject prefix, and accepts only the explicitly bound branch subjects. Existing hosted-UI main and private `mikka-cloud` main are also bound by numeric repository IDs; the private initial release branch is authorized temporarily until rollout completes. Pull request refs and forks cannot use this identity. Only `oidc-auth` is enabled; no persistent identity client secret was created.
 
 ## Issue #328 Preview isolation
 
@@ -150,3 +150,15 @@ application secrets locally. Production setup, deployment, migrations and
 acceptance run through the existing GitHub Actions workflows with OIDC and
 Infisical. Log names and closed status summaries only; no secret values, raw
 provider responses, private source, or credentials in public artifacts.
+
+
+Final permission-restoration receipt: [Actions 42373968401](https://github.com/alexj11324/Mikka/actions/runs/42373968401)
+succeeded at 2026-11-07T12:50:14Z, after the OIDC organization's previous
+`no-access` role was restored. Source `84212867` requires connection Connect
+only when creating/retargeting a Sync; the existing native Sync needs none.
+Its `syncStatus` was `succeeded`, and metadata readback found all 26 private
+production variables, including both Neon workspace variables, Expo access and
+the retained data key. No new keys were created on this repeated run.
+The private `core.yml` release also authenticated with the same existing OIDC
+identity and applied the actual production cloud migrations on 2026-11-07;
+publication and business acceptance have their own source-bound PR receipts.
