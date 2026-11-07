@@ -50,7 +50,7 @@ class Response:
     status=200
     def __enter__(self): return self
     def __exit__(self,*args): pass
-    def read(self): return json.dumps({'expiresAt':'2099-01-01T00:00:00Z','modelId':'gpt-6-luna','accessToken':'PRIVATE_PROVIDER'}).encode()
+    def read(self): return json.dumps({'expiresAt':'2099-01-01T00:00:00Z','modelId':'gpt-6-luna','route':'codex_cli','accountId':'PRIVATE_ACCOUNT','revision':1,'accessToken':'PRIVATE_PROVIDER'}).encode()
 class Client:
     def open(self, request, timeout):
         assert request.full_url.endswith('/v1/devices/own-device/runs/${runId}/subscription-lease')

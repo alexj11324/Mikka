@@ -38,11 +38,14 @@ def probe(marker, harness, max_wait=540):
                 expires = datetime.datetime.fromisoformat(value['expiresAt'].replace('Z', '+00:00')).timestamp()
                 valid = response.status == 200 and bool(value.get('accessToken')) and expires > time.time()
                 valid = valid and value['modelId'] == ('gpt-6-luna' if harness == 'codex' else 'claude-haiku-5-5')
-                return response.status, valid, expires
+                valid = valid and value.get('route') == ('codex_cli' if harness == 'codex' else 'claude_code_cli')
+                identity = (value.get('accountId'), value.get('revision'))
+                valid = valid and isinstance(identity[0], str) and bool(identity[0])
+                return response.status, valid, expires, identity
         except urllib.error.HTTPError as error:
-            return error.code, False, 0
+            return error.code, False, 0, None
 
-    status, valid, expires = lease()
+    status, valid, expires, identity = lease()
     receipt = {'runId': run['runId'], 'harness': harness, 'httpStatus': status, 'valid': valid,
                'expiresAt': int(expires), 'naturalWindowObserved': False}
     if not valid:
@@ -52,8 +55,8 @@ def probe(marker, harness, max_wait=540):
         return {**receipt, 'status': 'outside_natural_window'}
     # One real expiry event; no fake clock, shortened lease or explicit refresh.
     time.sleep(wait)
-    next_status, next_valid, next_expiry = lease()
-    return {**receipt, 'status': 'renewed' if next_valid and next_expiry > expires else 'renewal_failed',
+    next_status, next_valid, next_expiry, next_identity = lease()
+    return {**receipt, 'status': 'renewed' if next_valid and next_expiry > expires and identity == next_identity else 'renewal_failed',
             'renewHttpStatus': next_status, 'renewValid': next_valid, 'renewExpiresAt': int(next_expiry),
             'naturalWindowObserved': True}
 
