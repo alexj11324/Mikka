@@ -4728,6 +4728,7 @@
     "mergeConfirm": "合并"
   },
   "ArtifactReview": {
+    "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · 线程完成后生成",
       "preparing": "Artifact · 正在准备 PR",

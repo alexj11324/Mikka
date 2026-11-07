@@ -11,6 +11,7 @@ import { assertCurrentMain, assertProductionSource } from '../release/web-deploy
 import { isDeepStrictEqual } from 'node:util'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { mcpBusinessEvidence } from '../acceptance/cloud-startup-evidence.mjs'
 
 const finalizationBytes = readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))
 const finalizationPolicy = JSON.parse(finalizationBytes)
@@ -122,7 +123,14 @@ export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, s
       || ack?.kind !== (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack')
       || !Number.isSafeInteger(ack?.at) || ack.at <= 0 || !Number.isFinite(ack?.ms) || ack.ms < 0
       || authorization?.source !== 'http_server_link' || authorization.complete !== true || authorization.truncated !== false
-      || authorization.extraRemoteCalls !== 0) fail(`runtime_release_subscription_missing ${kind}`)
+      || authorization.scope !== 'daemon_http_server_link_and_task_fetch'
+      || authorization.hostAuthorizationComplete !== true || authorization.allFirstPartyHttpComplete !== false
+      || authorization.basis !== 'host_authorization_census_and_closed_mcp_business_paths'
+      || authorization.extraRemoteCalls !== 0
+      || !Number.isSafeInteger(authorization.observedProviderEvents) || authorization.observedProviderEvents < 1
+      || authorization.officialDelivery !== 'best_effort_not_a_complete_call_count'
+      || mcpBusinessEvidence(authorization.mcpHttpTiming, { runIdHash: ack.runIdHash, harness }).status !== 'observed')
+      fail(`runtime_release_subscription_missing ${kind}`)
   }
 }
 

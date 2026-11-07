@@ -109,6 +109,8 @@ export interface RunContextOptions {
   /** The run's app entries; their Mikka server host joins the sandbox's reachable hosts. */
   apps?: RunApps
   mcp?: RunMcp
+  /** Acceptance-only loopback receiver supplied by the host, never a task variable. */
+  mcpHttpObservationUrl?: string
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** A task VM uses its ordinary HOME, git and gh environment. */
   machineEnvironment?: true
@@ -407,7 +409,8 @@ export class RunContext {
         ...(repositoryExecution ? ['--repository-selection', this.worktree] : []),
       ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
-      env: { ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}), ...this.decisionMcpEnv() },
+      env: { ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}), ...this.decisionMcpEnv(),
+        ...(this.options.mcpHttpObservationUrl ? { MIKKA_MCP_HTTP_OBSERVATION_URL: this.options.mcpHttpObservationUrl } : {}) },
     }
   }
 

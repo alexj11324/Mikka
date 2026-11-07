@@ -58,7 +58,7 @@ it("marks missing, malformed, truncated and duplicate evidence explicitly rather
 
 it("accepts a real loopback JSON export and attaches the bounded receipt to the existing runtime finish", async () => {
   const run = runRuntimeTimings.begin("official-receiver-test", "device", "codex")
-  const receiver = await startCliTimingCollector({ runId: "official-receiver-test", harness: "codex" })
+  const receiver = await startCliTimingCollector({ runId: "official-receiver-test", harness: "codex", remoteMcpServerCount: 0 })
   try {
     expect(receiver.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/v1\/logs\/[a-f0-9]{32}$/)
     expect(receiver.args).toContain("otel.log_user_prompt=false")
