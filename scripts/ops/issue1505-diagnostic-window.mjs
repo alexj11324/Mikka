@@ -7,12 +7,14 @@ import { execFileSync } from 'node:child_process'
 
 export const SOURCE = '4c756faf5fb6e6fcf0bda4935c9f602b1ffc716a'
 export const TREE = 'ea88b8e12370875672a37cd8b4dc068d3df12d57'
-export const BRANCH = 'ops/1505-diagnostic-window-reuse-620a3647'
+export const BRANCH = 'ops/1505-diagnostic-window-1638'
+export const HELPER_PARENT = 'ee1d2679a07bd3b6c07105574add9c267faac1cf'
+export const HELPER_PARENT_TREE = '97af039fea797e01e6ffa4d8ed9fc59638e4aac4'
 export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
 export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
 export const KEY = 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW'
 export const ORIGIN = 'https://app.aspectlylabs.com'
-export const GO = 'root-reviewed-1505-diagnostic-window-reuse-620a3647'
+export const GO = 'root-reviewed-1505-diagnostic-window-1638'
 export const ORIGINAL = Object.freeze({
   receiptSha256: '12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5',
   helperCommit: '5cd039213a531476cde35500a2498bd3a5089556', helperTree: 'a841f19b0bab028bc386d6c768cce35496ca306b',
@@ -203,12 +205,11 @@ async function main() {
     && execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim() === TREE, 'source_not_pinned')
   const opsRoot = fileURLToPath(new URL('../../', import.meta.url))
   check(execFileSync('git', ['-C', opsRoot, 'rev-list', '--parents', '-n', '1', 'HEAD'], { encoding: 'utf8' }).trim()
-    === `${process.env.GITHUB_SHA} ${ORIGINAL.helperCommit}`
-    && execFileSync('git', ['-C', opsRoot, 'rev-parse', `${ORIGINAL.helperCommit}^{tree}`], { encoding: 'utf8' }).trim() === ORIGINAL.helperTree,
+    === `${process.env.GITHUB_SHA} ${HELPER_PARENT}`
+    && execFileSync('git', ['-C', opsRoot, 'rev-parse', `${HELPER_PARENT}^{tree}`], { encoding: 'utf8' }).trim() === HELPER_PARENT_TREE,
     'helper_parent_not_pinned')
-  check(JSON.stringify(execFileSync('git', ['-C', opsRoot, 'diff', '--name-only', ORIGINAL.helperCommit, 'HEAD'], { encoding: 'utf8' }).trim().split('\n').sort())
-    === JSON.stringify(['.github/workflows/issue1505-diagnostic-window.yml', 'scripts/ops/issue1505-diagnostic-window-original-42366750743.json',
-      'scripts/ops/issue1505-diagnostic-window.mjs']), 'helper_files_not_pinned')
+  check(JSON.stringify(execFileSync('git', ['-C', opsRoot, 'diff', '--name-only', HELPER_PARENT, 'HEAD'], { encoding: 'utf8' }).trim().split('\n').sort())
+    === JSON.stringify(['.github/workflows/issue1505-diagnostic-window.yml', 'scripts/ops/issue1505-diagnostic-window.mjs']), 'helper_files_not_pinned')
   const reuse = readOriginalBot(await readFile(new URL('./issue1505-diagnostic-window-original-42366750743.json', import.meta.url)))
   check(['verify', 'prepare', 'remove'].includes(mode) && typeof output === 'string' && output.length > 0, 'arguments_invalid')
   const save = async data => { await mkdir(dirname(resolve(output)), { recursive: true }); await writeFile(output, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 }) }
