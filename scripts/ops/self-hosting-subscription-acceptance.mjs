@@ -218,10 +218,10 @@ export async function runCommunity(env = process.env) {
   check(/^[a-f0-9]{40}$/.test(revision) && revision === env.MIKKA_COMMUNITY_REVISION, 'REVISION')
   const report = { kind: 'real-community-subscriptions', revision, cases: [], cleanup: {}, stage: 'source', status: 'failed',
     sourceRequests: [], credentialFixture: 'existing_authorized_access_projection', freshProviderOAuth: false, refreshGrantCopied: false, canonicalGrantPresent: false }
-  const publicErrors = (await execute('git', ['grep', '-n', '-E', '(Error|Refusal)\\(|error:|summary:|msg:', '--', 'lib', 'app', 'packages/daemon/src', 'packages/protocol/src'], { cwd: source, maxBuffer: 8 * 1024 * 1024 })).stdout
+  const publicErrors = (await execute('git', ['grep', '-n', '-E', '(Error|Refusal)\\(|error:|summary:|msg:|reason:', '--', 'lib', 'app', 'packages/daemon/src', 'packages/protocol/src'], { cwd: source, maxBuffer: 8 * 1024 * 1024 })).stdout
   const signatures = publicErrors.split('\n').flatMap(line => {
     const location = /^([^:]+):(\d+):/.exec(line)
-    return location && !/\.(test|spec)\./.test(location[1]) ? [...line.matchAll(/(?:(?:Error|CodedError|ActionFailureError|Refusal)\(|\b(?:error|summary|msg):)\s*(['"])([^'"\n\\]{8,180})\1/g)]
+    return location && !/\.(test|spec)\./.test(location[1]) ? [...line.matchAll(/(?:(?:Error|CodedError|ActionFailureError|Refusal)\(|\b(?:error|summary|msg|reason):)\s*(['"])([^'"\n\\]{8,180})\1/g)]
       .map(match => ({ source: location[1], line: Number(location[2]), literal: match[2] })) : []
   })
   const name = 'mikka-community-' + env.GITHUB_RUN_ID
@@ -375,6 +375,27 @@ export async function runCommunity(env = process.env) {
     check(own.email === email && own.emailVerified === true, 'COMMUNITY_IDENTITY')
     const workspace = (await community.json('/api/workspace')).workspace
     localPool = new Pool({ connectionString: `postgres://mikka:${databasePassword}@127.0.0.1:55439/community_release_e2e`, max: 2 })
+    // Temporary observation in this isolated disposable database only. Keep
+    // no SQL text or arguments: classify the real stop writer and retain its
+    // query fingerprint. The trigger never changes the run being observed.
+    await localPool.query(`CREATE TABLE release_control_audit ("runId" uuid NOT NULL,kind text NOT NULL,fingerprint text NOT NULL,
+      "leaseChanged" boolean NOT NULL,"observedAt" timestamptz NOT NULL DEFAULT clock_timestamp());
+      CREATE FUNCTION release_control_observe() RETURNS trigger LANGUAGE plpgsql AS $$
+      DECLARE q text := current_query();
+      BEGIN
+        IF OLD."stopRequestedAt" IS NULL AND NEW."stopRequestedAt" IS NOT NULL THEN
+          INSERT INTO release_control_audit("runId",kind,fingerprint,"leaseChanged") VALUES(NEW.id,
+            CASE WHEN q LIKE '%factory_attempts%' THEN 'factory_attempts'
+              WHEN q LIKE '%thread_machines%' THEN 'thread_machine'
+              WHEN q LIKE '%deviceTokenId%' THEN 'device_token'
+              WHEN q LIKE '%model_api_key_runs%' THEN 'model_key'
+              WHEN q LIKE '%leaseExpiresAt%' THEN 'lease_mutation' ELSE 'run_control' END,
+            md5(q),NEW."leaseExpiresAt" IS DISTINCT FROM OLD."leaseExpiresAt");
+        END IF;
+        RETURN NEW;
+      END $$;
+      CREATE TRIGGER release_control_observer AFTER UPDATE OF "stopRequestedAt" ON agent_runs
+        FOR EACH ROW EXECUTE FUNCTION release_control_observe()`)
     appEnv.MIKKA_SERVER_ADMIN_USER_IDS = own.id
     await docker(['rm', '-f', '-v', name + '-app']); await startApp()
     for (let i = 0; i < 30; i++) { try { if ((await community.json('/api/version')).build === revision) break } catch {} await new Promise(r => setTimeout(r, 1000)) }
@@ -591,6 +612,20 @@ export async function runCommunity(env = process.env) {
             row.serverSourceFailures = safeSourceFailures(JSON.stringify(ownRun), signatures)
             row.serverErrorClasses = safeRepositoryFailure(ownRun?.error)
           } catch { row.serverDiagnosisUnavailable = true }
+          try {
+            row.stopWriter = (await localPool.query(`SELECT a.kind,a.fingerprint,a."leaseChanged",
+              round(extract(epoch from(a."observedAt"-r."createdAt"))*1000)::int AS "sinceRunMs"
+              FROM release_control_audit a JOIN agent_runs r ON r.id=a."runId" WHERE a."runId"=$1 AND r."userId"=$2 ORDER BY a."observedAt" LIMIT 8`, [runId, own.id])).rows
+            const factory = (await localPool.query(`SELECT t.status,t.stage,t.reason,a.status AS "attemptStatus",a.reason AS "attemptReason",a.output
+              FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2`, [runId, own.id])).rows
+            const states = ['pending','running','waiting','blocked','passed','failed','cancelled','revoked','superseded','completed']
+            row.factoryBeforeCleanup = factory.map(value => ({ status: states.includes(value.status) ? value.status : 'OTHER',
+              stage: ['clarify','spec','execute','review','verify','monitor','close','finished'].includes(value.stage) ? value.stage : 'OTHER',
+              attemptStatus: states.includes(value.attemptStatus) ? value.attemptStatus : 'OTHER',
+              supersededOwnerRequest: /Superseded by an authenticated owner request/.test(value.attemptReason ?? ''),
+              sourceMatches: safeSourceFailures(JSON.stringify(value), signatures) }))
+            row.ownerEventCount = Number((await localPool.query(`SELECT count(*) AS count FROM coordinator_events WHERE "userId"=$1 AND "issueId"=$2 AND kind='user_message'`, [own.id, issueId])).rows[0].count)
+          } catch { row.stopWriterUnavailable = true }
           try { row.serverLogSourceFailures = safeSourceFailures(await docker(['logs', '--tail', '150', name + '-app']), signatures) } catch { row.serverLogUnavailable = true }
           try {
             const { USER_ERROR_CODES } = await import(pathToFileURL(source + '/packages/protocol/src/user-error-codes.ts'))

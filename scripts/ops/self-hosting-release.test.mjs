@@ -158,3 +158,5 @@ test('Apple API denial preserves action/status without exposing raw provider err
 // Verify the normal fixture reader before VMs; source-only error matches retain no runtime messages.
 
 // Lease diagnosis uses the frozen authority function read-only and unchanged heartbeat responses.
+
+// Isolated stop-writer observation retains fixed query kinds/fingerprints only, never SQL or arguments.
