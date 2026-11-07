@@ -4,9 +4,15 @@ import { afterDatabaseCommit } from '../db/commit-effects'
 export const coordinatorWakeTransport: { wake?: (userId: string) => Promise<unknown> } = {}
 
 const wake = async (userId: string) => {
-  if (coordinatorWakeTransport.wake) return coordinatorWakeTransport.wake(userId)
-  const { wakeCoordinator } = await import('./wake')
-  return wakeCoordinator(userId)
+  const { withoutDatabaseClient } = await import('../db/request-scope')
+  // The commit observer and Next after() retain the writer's async context.
+  // Keep its database/authority scope, but never reuse its released SQL client
+  // or finished transaction for the independent inbox consumer.
+  return withoutDatabaseClient(async () => {
+    if (coordinatorWakeTransport.wake) return coordinatorWakeTransport.wake(userId)
+    const { wakeCoordinator } = await import('./wake')
+    return wakeCoordinator(userId)
+  })
 }
 
 const pending = (event: { tier?: string | null; deliveredAt?: unknown }) => !event.deliveredAt && event.tier !== 'background'

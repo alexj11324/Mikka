@@ -31,12 +31,22 @@ test('panel notifications follow actual committed writes and persisted owner/wor
   const listMock = mock.module(new URL('./lists.ts', import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(lists).map(([name, value]) =>
     [name, name.endsWith('ScopesBeforeChange') ? async () => [] : name.endsWith('Changed') ? async () => {} : value])) })
   const channelScopes = new Map<string, LiveScope>(), unexpectedPaths: string[] = []
+  const devicePaths = new Set<string>(), deviceWakes: string[] = []
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'
   process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-panel-test-secret'
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, options?: RequestInit) => {
     const target = new URL(String(input))
     assert.equal(target.hostname, 'gateway.example.invalid', 'no provider or production request is allowed')
+    // Queuing the fixture's local run also wakes its own device. This is the
+    // device protocol (no body), separate from the live panel keys below.
+    if (devicePaths.has(target.pathname)) {
+      assert.equal(options?.method, 'POST')
+      assert.equal(options?.body, undefined)
+      assert.equal(new Headers(options?.headers).get('authorization'), 'Bearer isolated-panel-test-secret')
+      deviceWakes.push(target.pathname)
+      return new Response(null, { status: 204 })
+    }
     const scope = channelScopes.get(target.pathname)
     if (!scope) unexpectedPaths.push(target.pathname)
     sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events: wireKeys(JSON.parse(String(options?.body))) })
@@ -276,6 +286,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
       const { factoryCheckIndependent } = await import('../factory/check-independence')
       const { createFactoryQuestions } = await import('../factory/questions/store')
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = agentIds.get('owner')!
+      devicePaths.add(`/v1/devices/${deviceId}/push`)
       await databasePool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
       await databasePool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
       await databasePool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/fixture/repo')`, [repoId, deviceId])
@@ -362,5 +373,6 @@ test('panel notifications follow actual committed writes and persisted owner/wor
     await dropTestDatabase(admin, database, databasePool)
     await admin.end()
     assert.deepEqual(unexpectedPaths, [], 'the real notifier can address only the fixture scopes')
+    assert.deepEqual(new Set(deviceWakes), devicePaths, 'queued work wakes only the fixture device without sending panel data')
   }
 })

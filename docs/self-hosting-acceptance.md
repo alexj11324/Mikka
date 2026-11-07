@@ -37,6 +37,48 @@ hosted billing. Those remain separate acceptance cases. The desktop discovery
 and backend handoff suites also do not substitute for the packaged desktop
 application and real Google login required by #1556/#1557.
 
+## Existing Mikka cloud compatibility
+
+The separate `Mikka cloud core compatibility` workflow starts after a
+successful main `Web deploy`. Its real `workflow_run` guard verifies the exact
+current main commit, the public `/mikka/api/version`, the completed publication
+job and its cloud-edition/build/upload/version steps. It runs only while at
+least one of #1560, #1561, #1562 or #1556 remains open. An all-closed result is an
+explicit skip, before owner credentials; a stale or unproven target cannot
+start the business checks. The target is checked again after cleanup.
+
+This job accepts compatibility of the already-deployed Mikka cloud application.
+The independent `Self-hosted image` workflow above accepts the community
+deployment. A passing cloud compatibility report does not complete that
+community deployment's registration, chat or daemon-task acceptance.
+
+The existing GitHub OIDC identity delivers only `SMOKE_OWNER_EMAIL` and
+`SMOKE_OWNER_PASSWORD` from `prod:/`. GitHub's built-in read-only job token reads
+release and issue metadata. No Vercel, Worker, database or provider credential
+is delivered to this driver, and no identity or trust policy is created.
+
+| Production check | Evidence required |
+| --- | --- |
+| Edition and desktop discovery | The live discovery reports the accepted build, `cloud`, the current protocol range, login-method booleans, mobile readiness and the cloud-connection boolean. |
+| Normal account and flags | The existing owner signs in, selects the authorized shared team through ordinary membership checks, and reads its own desktop bootstrap. Cloud computer availability remains on; computer-time billing and its tab kill switch remain off. |
+| Read-only billing configuration | An administrator can read `billing.getBilling` and requires Stripe to remain configured. A team member is reported as `not_authorized`; the driver never elevates that account. Hosted usage and card-status readers are excluded because they can perform legacy verification writes. |
+| Existing Worker live channel | A ticket for the device reader's actual owner/personal-workspace scope opens the existing gateway, receives `live_ready`, and receives `device_list` when this attempt registers its new device. Selecting a team does not substitute the team ID for that owner channel. |
+| Source daemon HTTP and gateway | The repository's real `HttpServerLink` performs enrollment, registration, disabled scheduling and heartbeat. Its own device ticket opens a WebSocket and exchanges `ping`/`pong`. No harness or OS service is installed. |
+| Exact cleanup | Both sockets close; only the newly identified credential is revoked; the original credential receives the client's typed 401; only the nonce device is removed after normal offline expiry. Existing devices and credentials retain their original state, and the run closes its own login session. |
+
+This is bounded API/CLI transport acceptance. It sends no model request, starts
+no cloud computer, accesses no database directly and runs no browser or OAuth
+flow. It does not establish quota/card enforcement, a billing settlement,
+native desktop UI behavior or a daemon task. Those claims remain separate.
+
+The closed report records deployment/run identity, capability booleans,
+cleanup checks and explicit coverage boundaries. It contains no raw account,
+device, billing, provider or WebSocket response, ticket, credential or cookie.
+The job log and step summary retain that report; optional artifact retention
+does not hide a business failure or turn a storage-quota failure into lost
+evidence. Offline guards and a real disposable loopback WebSocket test run on
+pull requests before the production entry can reach main.
+
 ## Fixture provenance
 
 Mailpit uses the official `axllent/mailpit:v1.27.4` image and its documented

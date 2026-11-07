@@ -5143,19 +5143,45 @@
       "connection_failed": "The device could not connect to the signed-in account. Check your connection and retry.",
       "command_failed": "An installation command failed. Open the installation log for the full error."
     },
-    "model_tool_unavailable": { "default": "This reply could not be completed. Please try again." },
-    "desktop_client_update_required": { "default": "Update Mikka to continue" },
-    "desktop_session_expired": { "default": "Sign in to Mikka again" },
-    "desktop_session_changed": { "default": "The account or workspace changed. Try again" },
-    "desktop_account_limit_reached": { "default": "Five accounts are already signed in" },
-    "desktop_request_failed": { "default": "The desktop request failed. Try again" },
-    "desktop_backend_unreachable": { "default": "Cannot connect to Mikka" },
-    "desktop_rpc_request_invalid": { "default": "Check the information and try again" },
-    "desktop_rpc_action_unknown": { "default": "This action is unavailable in this version of Mikka" },
-    "desktop_rpc_failed": { "default": "The action could not be completed" },
-    "desktop_rpc_request_rejected": { "default": "Mikka could not accept this request" },
-    "desktop_rpc_response_invalid": { "default": "Mikka returned an unreadable response" },
-    "desktop_rpc_value_invalid": { "default": "This content could not be sent" },
+    "model_tool_unavailable": {
+      "default": "This reply could not be completed. Please try again."
+    },
+    "desktop_client_update_required": {
+      "default": "Update Mikka to continue"
+    },
+    "desktop_session_expired": {
+      "default": "Sign in to Mikka again"
+    },
+    "desktop_session_changed": {
+      "default": "The account or workspace changed. Try again"
+    },
+    "desktop_account_limit_reached": {
+      "default": "Five accounts are already signed in"
+    },
+    "desktop_request_failed": {
+      "default": "The desktop request failed. Try again"
+    },
+    "desktop_backend_unreachable": {
+      "default": "Cannot connect to Mikka"
+    },
+    "desktop_rpc_request_invalid": {
+      "default": "Check the information and try again"
+    },
+    "desktop_rpc_action_unknown": {
+      "default": "This action is unavailable in this version of Mikka"
+    },
+    "desktop_rpc_failed": {
+      "default": "The action could not be completed"
+    },
+    "desktop_rpc_request_rejected": {
+      "default": "Mikka could not accept this request"
+    },
+    "desktop_rpc_response_invalid": {
+      "default": "Mikka returned an unreadable response"
+    },
+    "desktop_rpc_value_invalid": {
+      "default": "This content could not be sent"
+    },
     "subscription_local_runtime_unavailable": {
       "default": "The subscription run could not start on this computer",
       "assignment_invalid": "This thread's subscription setting is no longer valid. Please choose the model again.",
@@ -5418,6 +5444,34 @@
       "appUpdate": "Update Mikka to {version} or later",
       "appUpdateUnknown": "Update Mikka to the latest version",
       "mobile_not_ready": "Allow Mikka iOS on this server"
+    }
+  },
+  "DesktopServer": {
+    "title": "Choose a server",
+    "server": "Server",
+    "cloud": "Mikka Cloud",
+    "selfHosted": "Self-hosted server",
+    "address": "Server address",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "change": "Change",
+    "switch": "Switch",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting…",
+    "disconnectTitle": "Disconnect {name} and sign out of its accounts?",
+    "version": "Version {version}",
+    "errors": {
+      "invalidAddress": "This address isn't valid",
+      "httpsRequired": "The address must start with https://",
+      "unreachable": "Can't reach this server",
+      "notMikka": "This address isn't a Mikka server",
+      "serverUpdate": "This server runs {version}, which is too old. Update the server to the latest version",
+      "serverUpdateUnknown": "This server is too old. Update the server to the latest version",
+      "appUpdate": "Update Mikka to {version} or later",
+      "appUpdateUnknown": "Update Mikka to the latest version",
+      "failed": "That didn't work"
     }
   }
 }
