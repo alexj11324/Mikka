@@ -281,37 +281,41 @@ class OfficialFiles(unittest.TestCase):
         with patch.object(files, 'entry', return_value={**certificate, 'mode': 0o777}):
             self.assertEqual(files.verify({'version': 1, 'entries': [certificate]}, 'codex')['providerChanges'][0]['after'], {'mode': 0o777})
 
-    def test_claude_provider_ca_digest_changes_only_during_finalization_with_unchanged_identity(self):
+    def test_provider_ca_digest_changes_only_during_finalization_with_unchanged_identity(self):
         path = '/usr/local/share/ca-certificates/e2b-ca.crt'
-        original = {'path': path, 'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}
-        baseline = {'version': 1, 'entries': [original]}
-        updated = {**original, 'mode': 0o777, 'sha256': 'b' * 64}
-        with patch.object(files, 'entry', return_value=original):
-            installation = files.verify(baseline)
-        with patch.object(files, 'entry', return_value=updated):
-            final = files.verify(baseline, 'claude')
-            self.assertEqual(final['before'], final['after'])
-            self.assertNotEqual(final['originalBefore'], final['originalAfter'])
-            self.assertEqual(final['providerChanges'], [{'path': path, 'kind': 'file',
-                'before': {'mode': 0o644, 'sha256': 'a' * 64}, 'after': {'mode': 0o777, 'sha256': 'b' * 64}}])
-            # The same bytes remain forbidden during ordinary installation,
-            # and this Claude observation grants nothing to desktop.
-            for kind in (None, 'desktop'):
-                with self.subTest(kind=kind), self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                    files.verify(baseline, kind)
-        proof = {**installation, 'finalization': final}
-        self.assertIs(files.validate_receipt(proof, 'claude'), proof)
-        with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
-            files.validate_receipt({**proof, 'after': final['originalAfter']}, 'claude')
-        for change in [{'mode': 0o755}, {'uid': 1000}, {'gid': 1000}, {'kind': 'link', 'target': '/tmp/replaced'},
-                       {'sha256': 'not-a-digest'}]:
-            with self.subTest(change=change), patch.object(files, 'entry', return_value={**updated, **change}):
-                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                    files.verify(baseline, 'claude')
-        other = {**original, 'path': '/usr/local/share/ca-certificates/unobserved.crt'}
-        with patch.object(files, 'entry', return_value={**other, 'sha256': 'b' * 64}):
-            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                files.verify({'version': 1, 'entries': [other]}, 'claude')
+        cases = [('claude', 'a' * 64, 'b' * 64),
+                 # Actual desktop fresh_scan failure from main run 42334937454.
+                 ('desktop', '4e067e215d0664f4cfeb733d74824a4ba52eb57635a6e365fd27bac0b19e5a9e',
+                  '98d3ae906242016c071b5d1902c7b5c6fd5fe56b277c51b407d80d14cf6dde2d')]
+        for template, before_sha, after_sha in cases:
+            with self.subTest(template=template):
+                original = {'path': path, 'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': before_sha}
+                baseline = {'version': 1, 'entries': [original]}
+                updated = {**original, 'mode': 0o777, 'sha256': after_sha}
+                with patch.object(files, 'entry', return_value=original):
+                    installation = files.verify(baseline)
+                with patch.object(files, 'entry', return_value=updated):
+                    # Ordinary installation still rejects the exact observed difference.
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify(baseline)
+                    final = files.verify(baseline, template)
+                    self.assertEqual(final['before'], final['after'])
+                    self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+                    self.assertEqual(final['providerChanges'], [{'path': path, 'kind': 'file',
+                        'before': {'mode': 0o644, 'sha256': before_sha}, 'after': {'mode': 0o777, 'sha256': after_sha}}])
+                proof = {**installation, 'finalization': final}
+                self.assertIs(files.validate_receipt(proof, template), proof)
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt({**proof, 'after': final['originalAfter']}, template)
+                for change in [{'mode': 0o755}, {'uid': 1000}, {'gid': 1000}, {'kind': 'link', 'target': '/tmp/replaced'},
+                               {'sha256': 'not-a-digest'}]:
+                    with self.subTest(change=change), patch.object(files, 'entry', return_value={**updated, **change}):
+                        with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                            files.verify(baseline, template)
+                other = {**original, 'path': '/usr/local/share/ca-certificates/unobserved.crt'}
+                with patch.object(files, 'entry', return_value={**other, 'sha256': after_sha}):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [other]}, template)
 
     def test_finalization_receipt_cannot_replace_strict_installation_proof(self):
         original = {'path': '/.e2b', 'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}

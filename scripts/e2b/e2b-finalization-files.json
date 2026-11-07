@@ -65,6 +65,7 @@
     },
     "desktop": {
       "/usr/local/share/ca-certificates/e2b-ca.crt": {
+        "sha256": "per-boot",
         "mode": {
           "before": 420,
           "after": 511

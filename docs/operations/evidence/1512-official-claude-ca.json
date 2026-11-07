@@ -200,5 +200,93 @@
       "These observations do not claim that every fresh create changes this file or fails conservation.",
       "The allowance applies only to the existing Claude CA SHA256 field during provider finalization. Ordinary installation verification remains strict."
     ]
+  },
+  "desktopSupplement": {
+    "purpose": "Record the separate Desktop CA digest allowance supported by its real fresh-scan failure and the shared provider initialization mechanism. The preceding Claude scope, observations, control and attribution remain their original evidence; they are not a Desktop control.",
+    "policyScope": {
+      "template": "desktop",
+      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "changedField": "sha256",
+      "allowedChange": "per-boot",
+      "existingModeRuleUnchanged": {
+        "before": 420,
+        "after": 511
+      },
+      "ordinaryInstallVerification": "strict_before_and_after",
+      "uidGidAndFileTypeChangesAllowed": false,
+      "otherPathsOrTemplateRulesChanged": false,
+      "wholePolicyFileStillBoundBySha256": true
+    },
+    "releaseObservation": {
+      "run": "https://github.com/alexj11324/Mikka/actions/runs/42334937454",
+      "runAttempt": 1,
+      "job": "https://github.com/alexj11324/Mikka/actions/runs/42334937454/job/128289718639",
+      "sourceCommit": "250c036512971583b2a29dfc3d45db328a3b7637",
+      "observedAt": "2026-11-07T03:45:58.1792386Z",
+      "template": "desktop",
+      "phase": "fresh_scan",
+      "error": "official_files_changed",
+      "exitCode": 1,
+      "strictInstallationAndPreloadReceiptValidationPassed": true,
+      "diagnosticScope": "The diagnostic lists policy-refused changes only; already allowed provider-finalization changes are omitted.",
+      "rejectedChangedPaths": [
+        "/usr/local/share/ca-certificates/e2b-ca.crt"
+      ],
+      "before": {
+        "mode": 420,
+        "sha256": "4e067e215d0664f4cfeb733d74824a4ba52eb57635a6e365fd27bac0b19e5a9e"
+      },
+      "after": {
+        "mode": 511,
+        "sha256": "98d3ae906242016c071b5d1902c7b5c6fd5fe56b277c51b407d80d14cf6dde2d"
+      },
+      "baseTemplateAndBuildIdentity": "unknown",
+      "subscriptionAndPublicationJobs": "skipped"
+    },
+    "cleanup": {
+      "buildCleanupObservedAt": "2026-11-07T03:46:00.4417567Z",
+      "buildCleanup": [
+        {
+          "kind": "desktop",
+          "name": "mikka-250c03651297-42334937454-1-desktop",
+          "templateId": "q9tvzvvrthruammomcbb",
+          "status": "deleted"
+        },
+        {
+          "kind": "claude",
+          "name": "mikka-250c03651297-42334937454-1-claude",
+          "templateId": "2b823ijvje2yrqanwz29",
+          "status": "deleted"
+        },
+        {
+          "kind": "codex",
+          "name": "mikka-250c03651297-42334937454-1-codex",
+          "templateId": "gyh9o0w940yp1gp9ec9j",
+          "status": "deleted"
+        }
+      ],
+      "absenceEvidence": "The fixed source emits deleted only after deleting a private identity-checked candidate and confirming HTTP 404 from GET /templates/{templateID}. The final cleanup job then reported an empty sandbox inventory, all three exact run-owned candidate names absent, and no errors.",
+      "cleanupSource": "https://github.com/alexj11324/Mikka/blob/250c036512971583b2a29dfc3d45db328a3b7637/scripts/e2b/build-template.py",
+      "finalCleanupJob": "https://github.com/alexj11324/Mikka/actions/runs/42334937454/job/128291314728",
+      "finalCleanupStatus": "success",
+      "finalSandboxCount": 0,
+      "finalAbsentCandidateCount": 3,
+      "finalErrors": []
+    },
+    "attribution": {
+      "basis": "shared_provider_mechanism_and_desktop_fresh_scan",
+      "providerMechanismSource": "https://github.com/e2b-dev/runtime/blob/91d09e4b17ddde628d6b37e1b923aba2e9430531/packages/envd/internal/host/cacerts.go",
+      "mechanismScope": "The fixed provider implementation changes this certificate on sandbox creation and writes the fixed path without branching on Claude, Codex or Desktop. This supports the same digest mechanism for the observed Desktop path.",
+      "newControlCreated": false,
+      "sameBuildNoInstallationControl": false,
+      "deployedProviderRevisionVerified": false,
+      "limits": [
+        "The Desktop observation comes from the derived candidate's fresh_scan, not a new unmodified-template or same-build before/after control.",
+        "The historical provider implementation is mechanism evidence; it does not prove the currently deployed provider revision or the origin of the existing mode change.",
+        "The original Claude control retains its unknown provenance and build attribution; it is not retrospectively reclassified as a Desktop control.",
+        "Only the existing Desktop CA SHA256 field gains a provider-finalization allowance. The mode rule is unchanged, and ordinary installation, uid, gid, file type and all other paths remain protected.",
+        "This diagnostic evidence does not constitute subscription, release or production tracing acceptance."
+      ]
+    }
   }
 }
