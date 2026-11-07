@@ -38,7 +38,7 @@ export function UsageSettings({ workspaceId, personal = false }: { workspaceId: 
 
   function exportCsv() {
     if (!data) return
-    const header = [view === 'members' ? t('member') : t('bot'), t('threads'), t('runSeconds')]
+    const header = [view === 'members' ? t('member') : t('bot'), t('runs'), t('runSeconds')]
     const lines = rows.map(row => [rowName(row), String(row.threads), String(row.seconds)].map(csvField).join(','))
     const link = downloadRef.current
     if (!link) return

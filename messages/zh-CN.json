@@ -2518,6 +2518,8 @@
       "byBot": "按 Bot",
       "byMember": "按成员",
       "exportCsv": "导出 CSV",
+      "runs": "运行次数",
+      "runsPerDay": "每天的运行次数",
       "threads": "新线程",
       "runTime": "运行时长",
       "runSeconds": "运行秒数",
