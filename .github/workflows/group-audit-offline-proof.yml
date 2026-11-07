@@ -1,0 +1,60 @@
+name: Issue 1506 isolated group audit SQL proof
+on:
+  push:
+    branches: [diagnostic/issue-1506-group-audit-proof-20261107-02]
+    paths:
+      - .github/workflows/group-audit-offline-proof.yml
+      - scripts/diagnostics/group-audit-offline-proof.mjs
+      - scripts/diagnostics/group-audit-offline-proof.json
+      - scripts/diagnostics/group-stop-audit.sql
+permissions:
+  contents: read
+concurrency:
+  group: issue-1506-isolated-group-audit-proof
+  cancel-in-progress: false
+jobs:
+  proof:
+    # Root-reviewed one-shot isolated PG17 proof; no production access or model calls.
+    if: ${{ github.ref == 'refs/heads/diagnostic/issue-1506-group-audit-proof-20261107-02' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      REQUIRE_DB: '1'
+      GROUP_AUDIT_OFFLINE_EXECUTE: '1'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      ORVILO_DATABASE_URL: ''
+      VERCEL: ''
+      VERCEL_ENV: ''
+      NEXT_TELEMETRY_DISABLED: '1'
+      OPENUI_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+      - name: Exact SQL against tracked migrations and synthetic public/private scopes
+        run: node --import tsx scripts/diagnostics/group-audit-offline-proof.mjs
+      - name: Preserve isolated proof and cleanup result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1506-group-audit-proof-${{ github.sha }}
+          path: ${{ runner.temp }}/group-audit-offline-proof
+          if-no-files-found: warn
