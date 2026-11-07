@@ -555,3 +555,11 @@ test('private-push exact-source wait keeps matching overlay behavior', async () 
   assert.equal((await fixture.run({ expectedOverlay: SHA })).publicBuild, SHA)
   assert.equal(fixture.elapsed(), 200)
 })
+
+test('every fromJSON of a workflow input has a fallback, since a push run has no inputs', () => {
+  // A push run sees '' for every input, and GitHub evaluates `env:` expressions while validating the
+  // workflow, even for a step whose `if` is false: fromJSON('') failed the whole Web deploy (#1523).
+  const workflow = readFileSync(fileURLToPath(new URL('../../.github/workflows/web-deploy.yml', import.meta.url)), 'utf8')
+  const bare = [...workflow.matchAll(/fromJSON\(\s*inputs\.[\w-]+\s*\)/g)].map(match => match[0])
+  assert.deepEqual(bare, [])
+})

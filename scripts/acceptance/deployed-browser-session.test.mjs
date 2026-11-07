@@ -10,8 +10,9 @@ const env = { MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target' }
 const teamProof = Object.freeze({
   teamWorkspaceConfirmed: true,
   teamWorkspaceHash: 'd'.repeat(64),
-  teamSelectionBasis: 'unique-active-team-membership',
-  teamOwnerAttribution: 'AGENTS.md-shared-account-team',
+  teamAdminMembershipVerified: true,
+  teamSelectionBasis: 'unique-active-admin-identity-match',
+  teamOwnerAttribution: 'AGENTS.md-and-owner-comment-1504-6691409495',
 })
 const proof = Object.freeze({
   targetMode: 'deployed-target', applicationSha: 'a'.repeat(40), driverRevision: 'b'.repeat(40),
@@ -62,7 +63,7 @@ function fixture(options = {}) {
       scope.signInAttempted()
       if (!options.beforeIdentityError) {
         scope.identityConfirmed()
-        if (!options.withoutTeam) scope.teamWorkspaceConfirmed?.(teamProof)
+        if (!options.withoutTeam) scope.teamWorkspaceConfirmed?.(options.teamProof ?? teamProof)
       }
       if (options.beforeIdentityError) throw options.beforeIdentityError
       if (options.uiError) throw options.uiError
@@ -77,6 +78,7 @@ test('real assertion path is bracketed by target proofs and current-cookie logou
   assert.equal(report.status, 'pass')
   assert.equal(report.sessionClosed, true)
   assert.equal(report.teamWorkspaceConfirmed, true)
+  assert.equal(report.teamAdminMembershipVerified, true)
   assert.equal(report.teamWorkspaceHash, teamProof.teamWorkspaceHash)
   assert.equal(report.cleanupSucceeded, true)
   assert.equal(report.driverRevision, proof.driverRevision)
@@ -180,6 +182,7 @@ test('aggregate pass requires all four business results and their explicit clean
     reports: completedReports(), assertTarget: async () => { checks++; return { ...proof } } })
   assert.equal(report.status, 'pass')
   assert.equal(report.allRequiredCleanupProven, true)
+  assert.equal(report.teamAdminMembershipVerified, true)
   assert.equal(report.teamWorkspaceHash, teamProof.teamWorkspaceHash)
   assert.equal(report.teamBindingScope, 'authenticated-sessions')
   assert.equal(report.mcpCatalogueWorkspaceDataVerified, false)
@@ -208,18 +211,23 @@ test('all passing reports still cannot pass when the live target has changed bef
   { code: 'target_changed' })
 })
 
-test('a normal session alone cannot pass without confirmed team selection and still logs out', async () => {
-  const f = fixture({ withoutTeam: true })
-  await assert.rejects(runDeployedBrowserSmoke(f.args), { code: 'browser_team_workspace_failed' })
-  assert.equal(f.saved[0].teamWorkspaceConfirmed, false)
-  assert.equal(f.saved[0].sessionClosed, true)
-  assert.equal(f.saved[0].status, 'fail')
+test('a normal session cannot pass without confirmed team and canonical administrator membership, and still logs out', async () => {
+  for (const options of [{ withoutTeam: true }, { teamProof: { ...teamProof, teamAdminMembershipVerified: false } }]) {
+    const f = fixture(options)
+    await assert.rejects(runDeployedBrowserSmoke(f.args), { code: 'browser_team_workspace_failed' })
+    assert.equal(f.saved[0].teamWorkspaceConfirmed, false)
+    assert.equal(f.saved[0].teamAdminMembershipVerified, false)
+    assert.equal(f.saved[0].sessionClosed, true)
+    assert.equal(f.saved[0].status, 'fail')
+  }
 })
 test('aggregate rejects personal-only or different team facts across independent session reports', async () => {
   const mutations = [
     r => { delete r.managed.teamWorkspaceConfirmed; r.managed.personalWorkspaceConfirmed = true },
     r => { r.browser.teamWorkspaceHash = 'e'.repeat(64) },
     r => { r.mobileDaemon.teamSelectionBasis = 'first-team' },
+    r => { delete r.managed.teamAdminMembershipVerified },
+    r => { r.mobileDaemon.teamAdminMembershipVerified = false },
     r => { r.mcp.teamOwnerAttribution = 'guessed-by-name' },
     r => { r.mcp.catalogueWorkspaceDataVerified = true },
   ]
@@ -236,6 +244,9 @@ test('aggregate rejects personal-only or different team facts across independent
 const ownerId = 'synthetic-shared-account'
 const teamId = '10000000-0000-4000-8000-000000000001'
 const personalId = '10000000-0000-4000-8000-000000000002'
+const otherTeamId = '10000000-0000-4000-8000-000000000003'
+// Public canonical identity from Owner comment #1504/6691409495; not a smoke credential.
+const policyAdminEmail = 'alex@acme.aspectlylabs.com'
 function teamContext(options = {}) {
   const calls = [], drained = [], disposed = []
   const state = { selected: false }
@@ -244,7 +255,14 @@ function teamContext(options = {}) {
     currentUserId: ownerId,
     workspace: { id: selected ? teamId : personalId, kind: selected ? 'team' : 'personal' },
     role: 'member',
-    choices: [{ id: personalId, kind: 'personal' }, { id: teamId, kind: 'team' }],
+    members: selected
+      ? [{ userId: 'policy-admin', email: policyAdminEmail, role: 'admin', status: 'active' }]
+      : [{ userId: ownerId, email: 'synthetic-smoke@example.invalid', role: 'admin', status: 'active' }],
+    choices: [
+      { id: personalId, name: 'Synthetic personal', kind: 'personal' },
+      { id: otherTeamId, name: 'Synthetic other team', kind: 'team' },
+      { id: teamId, name: 'Synthetic selected team', kind: 'team' },
+    ],
   })
   const response = (url, value, status = 200) => ({
     status: () => status,
@@ -258,6 +276,14 @@ function teamContext(options = {}) {
       if (options.transportError) throw options.transportError
       if (url === origin + '/mikka/api/workspace') return response(url,
         workspace(state.selected && !options.ignoreCookie), options.status ?? 200)
+      for (const id of [otherTeamId, teamId]) {
+        if (url === origin + '/mikka/api/workspace?workspace=' + id) return response(url, {
+          ...workspace(true), workspace: { id, kind: 'team' },
+          members: [{ userId: id === teamId ? 'policy-admin' : 'other-admin',
+            email: id === teamId ? policyAdminEmail : 'synthetic-other@example.invalid',
+            role: 'admin', status: 'active' }],
+        })
+      }
       assert.equal(url, origin + '/mikka/api/auth/get-session')
       return response(url, { user: { id: ownerId } })
     },
@@ -276,32 +302,38 @@ function teamContext(options = {}) {
   }
   return { page: { request }, calls, drained, disposed, origin }
 }
-test('browser adapter uses one normal context for switch and no-query team/session readback, including members', async () => {
+test('browser adapter reads every candidate admin scope then uses one normal context for switch and no-query team/session readback', async () => {
   for (const origin of [ORIGIN, 'https://synthetic-preview.example.invalid']) {
     const f = teamContext({ origin })
     const result = await selectBrowserTeamWorkspace({ page: f.page, baseURL: origin, ownerId })
     assert.deepEqual(result, {
       teamWorkspaceConfirmed: true,
       teamWorkspaceHash: createHash('sha256').update('team-workspace\0' + teamId).digest('hex'),
-      teamSelectionBasis: 'unique-active-team-membership',
-      teamOwnerAttribution: 'AGENTS.md-shared-account-team',
+      teamAdminMembershipVerified: true,
+      teamSelectionBasis: 'unique-active-admin-identity-match',
+      teamOwnerAttribution: 'AGENTS.md-and-owner-comment-1504-6691409495',
     })
     assert.deepEqual(f.calls.map(call => [call.method, new URL(call.url).pathname]), [
+      ['GET', '/mikka/api/workspace'], ['GET', '/mikka/api/workspace'],
       ['GET', '/mikka/api/workspace'], ['POST', '/mikka/api/rpc'],
       ['GET', '/mikka/api/workspace'], ['GET', '/mikka/api/auth/get-session'],
     ])
-    for (const { method, url, init } of f.calls) {
-      assert.equal(new URL(url).search, '')
+    assert.deepEqual(f.calls.slice(1, 3).map(call => new URL(call.url).search).sort(),
+      [otherTeamId, teamId].map(id => '?workspace=' + id).sort())
+    for (const [index, { method, url, init }] of f.calls.entries()) {
+      if (index !== 1 && index !== 2) assert.equal(new URL(url).search, '')
       assert.equal(init.maxRedirects, 0)
       assert.equal(init.failOnStatusCode, false)
       assert.equal(init.timeout, 30_000)
       assert.deepEqual(init.headers, { origin, 'cache-control': 'no-store',
         ...(method === 'POST' ? { 'x-mikka-rpc': '1' } : {}) })
     }
-    assert.equal(f.drained.length, 4)
-    assert.equal(f.disposed.length, 4)
+    assert.equal(f.drained.length, 6)
+    assert.equal(f.disposed.length, 6)
     assert.equal(JSON.stringify(result).includes(ownerId), false)
     assert.equal(JSON.stringify(result).includes(teamId), false)
+    assert.equal(JSON.stringify(result).includes(policyAdminEmail), false)
+    assert.equal(JSON.stringify(result).includes('policy-admin'), false)
   }
 })
 test('browser adapter rejects failed or redirected HTTP while draining and disposing the response', async () => {
@@ -319,8 +351,8 @@ test('browser readback must observe the normal switch cookie; a successful RPC a
   await assert.rejects(selectBrowserTeamWorkspace({ page: f.page, baseURL: ORIGIN, ownerId }),
     { code: 'team_workspace_failed', detail: 'workspace_changed' })
   assert.equal(f.calls.filter(call => call.method === 'POST').length, 1)
-  assert.equal(f.calls.length, 3)
-  assert.equal(f.disposed.length, 3)
+  assert.equal(f.calls.length, 5)
+  assert.equal(f.disposed.length, 5)
 })
 test('a team transport failure is closed before the default reporter and still triggers deployed logout', async () => {
   const privateValue = 'private-response-owner-and-session-details'
