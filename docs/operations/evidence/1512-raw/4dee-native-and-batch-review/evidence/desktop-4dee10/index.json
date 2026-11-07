@@ -1,0 +1,296 @@
+{
+  "version": 1,
+  "purpose": "issue1512 immutable Desktop4dee evidence and bounded recovery",
+  "status": "actual_budgets_failed",
+  "repository": "alexj11324/Mikka",
+  "workflowRunId": 42399391047,
+  "attempt": 1,
+  "candidate": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+  "actualSource": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+  "tree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+  "parents": [
+    "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+    "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431"
+  ],
+  "harnessSha256": "36ed7202e05b11cafb1c5f2f2264c9a6ad4c536672b455ad3c1378fc2e56ae7a",
+  "findings": {
+    "desktopJobsPassed": 4,
+    "loginNative": 210,
+    "loginChromiumWeb": 209,
+    "loginBudgetPassed": false,
+    "startupBundled": 184,
+    "startupHostedElectron": 132,
+    "startupBudgetPassed": false,
+    "originalWholeWindowsPreserved": true,
+    "operationKeys": 17,
+    "sourceKeys": 75,
+    "refinementRowsVerified": 24,
+    "snapshotCount": 12,
+    "unknownReadings": 0,
+    "rpcUnknownActions": 0,
+    "nativeStartupCrossesEnd": 1,
+    "hostedStartupCrossesEnd": 4,
+    "lifecyclePassed": true,
+    "parityPassed": true,
+    "smokePassed": true,
+    "cryptoPassed": true,
+    "allRecordedCleanupStagesPassed": true,
+    "aggregateCleanupKnown": false,
+    "leaseReleased": true,
+    "ownerAndPeerAfterBaseline": true,
+    "ownedRecoverySandboxStopped": true,
+    "productionAcceptance": null
+  },
+  "files": [
+    {
+      "path": "evidence/desktop-4dee10/lifecycle.json",
+      "bytes": 267082,
+      "sha256": "a1306eddccad36547d0f40b38dffcfd914b5fb3031975a895b606541408fb231",
+      "gitBlob": "d3860a980d763e2a36eefe611cea63e5ef9b7857",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/parity/parity.json",
+      "bytes": 106426,
+      "sha256": "c768d68fdf71e8d7daacbfd13aa1923b6e43794bb2e57733595e100449fa08a2",
+      "gitBlob": "0b72453decc39fd5f37498483b4d5c071f48a094",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/smoke.json",
+      "bytes": 3105,
+      "sha256": "999f5f09d5204b828d91e8cb181d7716cca9252b081d19816bbf7c93525cde99",
+      "gitBlob": "c12a4f049b59d7c8b58c44dbf7e408d2d466a242",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "d4ea0b33ba08410fd9a1b9e7932d65167f2a1ea293dafdef5a92fd768d27c0dd",
+      "gitBlob": "a6b18aafb9d2cdda1eaa6c87fc29108245d5b77b",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "50302a84b4aa046edd7fb50fe39917cd7e6add9a84d4a222f9198c9fabe2f0b7",
+      "gitBlob": "08f88bf27d71ff50c0f96bf612eea5faa8820ddd",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/compiled/mikka-build.json",
+      "bytes": 8431,
+      "sha256": "c9eba487cc864c3c3e0aeb46c28e1847404f26e1eac8e260280312fa6ca84c46",
+      "gitBlob": "f25d6494aa5bdb197c0f96665786042930d72701",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/download-validation.json",
+      "bytes": 3826,
+      "sha256": "462130696d4ef8c82b3de4cb813a099d7730b1073ff40391f7eafa22b5802122",
+      "gitBlob": "cac63e30dfcf68afb2e26850bfcd81bd2e85f85a",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/privacy.json",
+      "bytes": 1516,
+      "sha256": "27639a0c6c23391e50042066dc2754cb56433af9fc3b0f72fa72771f3fe065e1",
+      "gitBlob": "aa47c71532cbe21e1ef76373264de3e26fc3bc02",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/summary.json",
+      "bytes": 100632,
+      "sha256": "816ea5ce1e2ef15dcd8387cab1f47aae976dd9c7d09bc69dd04145676c517e77",
+      "gitBlob": "6c1cedb90a9edea62c464945b0b8452d279c9963",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/query-operations.json",
+      "bytes": 14781,
+      "sha256": "b36277c3709562c0096ec3ffce40e647b675833ca5e4701ac9a9781e1c5335ec",
+      "gitBlob": "9d9b02c05e03eaf9bce80b577652900b7d5fe6d0",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/unattributed-sources.json",
+      "bytes": 13277,
+      "sha256": "06d862decaac4d19a0f3315ce501cb3ac2c5f3dd19b6b87c40b42652e7013afd",
+      "gitBlob": "f38d6377d1b8ae0eccec97884f9cef416838903e",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/summary.stdout.json",
+      "bytes": 589,
+      "sha256": "f9db26004a0a692e7b2316f8950f76f5dacb762742fb5f7d658fee00b88bee64",
+      "gitBlob": "d84d5b11f3b7dbe226324c000dee4b2aac7e7da0",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/query-operations.stdout.json",
+      "bytes": 401,
+      "sha256": "380dc8bf9790595c07d62687cb2b8e53fc0ba2b652649dc70dc9b3ac3edc1b08",
+      "gitBlob": "ad9ca293473da728a537255f54bdd61df22d998b",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/unattributed-sources.stdout.json",
+      "bytes": 423,
+      "sha256": "abdd5e84d245386f60085cfe14e9eae172ff18b0d7b33b4546ef92e6fa668c65",
+      "gitBlob": "8537457642a7ddcb8cd8b6a7fafcc9256c76ac4b",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/closed-diagnostic.json",
+      "bytes": 11316,
+      "sha256": "88db16179f6acec472a7bd53223f78bf98cef4d2bd1dceac020c9da9a43b868c",
+      "gitBlob": "5e07afda38772925f3a90bf7ca5b3f6a9f7048b7",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/ci-final.json",
+      "bytes": 22888,
+      "sha256": "0a33072c0c705fb13cce1529f96ece090509cc18e35d9b1ecc7aa0ff0e7a314a",
+      "gitBlob": "0ed048f84ebc40802d5747789e4163aed48eb994",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/source-binding.json",
+      "bytes": 6138,
+      "sha256": "d684eb4044a227105b9b247ecc1bbdf25722142b2e116f18f0a26b977bcbb3c7",
+      "gitBlob": "392761ff1be253f05fab6abf4d682a792cb8fd31",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/integration-difference.json",
+      "bytes": 29858,
+      "sha256": "8c09e707147939eb92f9525a85bc191a22fdfdb7bd99f6c2938b734a5533393c",
+      "gitBlob": "e36d6b8397ade582fabba96e145f7ec0a752c51e",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/recovery-receipt.json",
+      "bytes": 2680,
+      "sha256": "2cd1469a7e64ea5bf6d1830c927ab4d42303ce3e130f9da0b9515117ce487407",
+      "gitBlob": "e3bdba3f1adf2855911f9503f532f04283dfc709",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    },
+    {
+      "path": "evidence/desktop-4dee10/observer-cleanup.json",
+      "bytes": 1699,
+      "sha256": "eecf9556538e9977c0be96f4d17e38e61f05084a10823e0210120b6e40bf6d72",
+      "gitBlob": "e1f3a4c71577628ae53eca207cfaa060359c29cb",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      }
+    }
+  ],
+  "payloadCount": 20,
+  "payloadBytes": 598893,
+  "relatedEvidence": [
+    {
+      "path": "evidence/main687-cloud-core-42399230228-readonly.json",
+      "bytes": 5860,
+      "sha256": "c84026d6e61c47eab7a5a5c657f8c655e6d4d87e75e500c736e2c116db567b2d",
+      "gitBlob": "a04c0013ca41f3bd5a41935f968fb576c6fbeb22",
+      "readback": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true
+      },
+      "privacy": {
+        "email": 0,
+        "bearer": 0,
+        "privateKey": 0,
+        "signedQuery": 0
+      },
+      "referenceUpdated": false
+    }
+  ],
+  "boundaries": [
+    "All files are exact original bytes or explicitly labeled offline projections, each Git blob re-read byte-for-byte.",
+    "Six original JSON files were extracted only after exact GitHub ZIP size/SHA checks and privacy scan.",
+    "Native/package/compiled identities are bound to actual checkout817; latest batch or main0c12 measurements are not inferred.",
+    "Historical c849/1bd passed budgets do not replace these 4dee failures.",
+    "RPC actions are not interpreted as per-action SQL.",
+    "No source edit, CI retry, production model call, provider task or remote ref update was made during recovery."
+  ]
+}

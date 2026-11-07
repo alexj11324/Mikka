@@ -1,0 +1,763 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "base_tree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+  "ours": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+  "merge_base": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+  "theirs": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+  "theirs_tree": "1f1108a9a133643c8c45e2bae28682eff8d400fa",
+  "tree_elements": [
+    {
+      "path": "app/actions/agents.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "467e83de6b5d2b6ad404b7d085921e3fe6a62435"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ae3974497f8c0573dd9c8d0ec5ba880f5a5c72ef"
+    },
+    {
+      "path": "app/api/mobile/chat/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7610aa359967de502d6a6c6f53dd9a8f1d073312"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7906950df21dc3fa25f53ea0693f7fd9c0409822"
+    },
+    {
+      "path": "app/v1/runs/[runId]/complete/route.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9f42a40b8087f88d6d68c4657fa4751ffa1b2a1c"
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a63c3d20dd2218298dd2b1645d08ac445a5fbafb"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "95e80af48bf0801cc5c0a660d48cf431187052f8"
+    },
+    {
+      "path": "drizzle/20261107170000_run_failure_details.sql",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e09cd5a9bcf561b2c182cfd28199aa994654f190"
+    },
+    {
+      "path": "lib/abuse/workflow-model.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "31cfd5d6904bdbcaa48f5485891f6f8a3bd2f962"
+    },
+    {
+      "path": "lib/agent-kit/core-entry.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2c694d25449be6fcf5651e1b53fe20764639ecbb"
+    },
+    {
+      "path": "lib/agent-runs.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4247ac4bf1e31b597a8c2864e8c16b2ffaedabef"
+    },
+    {
+      "path": "lib/chat-failure.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0266bebe1af6eed18137434fc634b822851aae97"
+    },
+    {
+      "path": "lib/chat-failure.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0ec10dfd27410c236fb493608e328a3a66e8f3e7"
+    },
+    {
+      "path": "lib/coordinator/bot-chats.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a54e735408659acfd4b202daa2a9f4c0d08f93e8"
+    },
+    {
+      "path": "lib/coordinator/chat-projection.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "10a40ab8df8d07782dbd75fb64f1c81e3079e1f8"
+    },
+    {
+      "path": "lib/coordinator/chat-state.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3a6f6ce8a4500b9ee060b6eebbb0bdbc2ab0191e"
+    },
+    {
+      "path": "lib/coordinator/chat-state.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c26e743c89120e10cb6bbc4e02224b029f6273f"
+    },
+    {
+      "path": "lib/coordinator/chat-version.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "08db1e003690a39516a49b46ca5322cc0c28c18f"
+    },
+    {
+      "path": "lib/coordinator/context.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ce0647f956fe1a222a2890d5393e23673ca8749f"
+    },
+    {
+      "path": "lib/coordinator/group-turns.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8b71731bfd97fecdf1096ce9ad3e13667926b27c"
+    },
+    {
+      "path": "lib/coordinator/group-turns.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5bca6e204cbf6fc4f7e436b371c4a812e95df75b"
+    },
+    {
+      "path": "lib/coordinator/native-relay.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "400b51578e7a05ca2db7a54d83b5e78998297c71"
+    },
+    {
+      "path": "lib/coordinator/native-store.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fe6eaad753c2470d7deccf7713c71be4dae83711"
+    },
+    {
+      "path": "lib/coordinator/native-store.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b3addb5ffd8e7d95c950ee423bbf64f1c5ae8efb"
+    },
+    {
+      "path": "lib/coordinator/store.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a157480ac92f047f3e1e37728a96f0e92cc86a7a"
+    },
+    {
+      "path": "lib/db/schema.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d537271bb2bde1c2fc4028e80d073e821cf5fe7c"
+    },
+    {
+      "path": "lib/factory/cloud-stage-handoff.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fc8914e0735642e2179ded3e5a65f15c5312cd26"
+    },
+    {
+      "path": "lib/factory/questions/retry.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b1d7ccbfc822b8f427fe44b2435aa44cde26d70b"
+    },
+    {
+      "path": "lib/issue-thread-list-projection.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0d6c6c97d6b944c9b8407e64738f868c9b4b1f6d"
+    },
+    {
+      "path": "lib/issue-threads.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7b00a74893097082c82a26857e3f402103647e11"
+    },
+    {
+      "path": "lib/issue-threads.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5dace523eb8ea2241d84e51a80ac7b21506a0a26"
+    },
+    {
+      "path": "lib/run-chain.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "704b01d13fc9e774bb50014efdd7daa862031454"
+    },
+    {
+      "path": "lib/run-completion.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bcd9bbd8114ae3ee7e7fc48c08c5441093f9d743"
+    },
+    {
+      "path": "lib/run-failure-details.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "58429d31886d2eba84503475142cae8af122a879"
+    },
+    {
+      "path": "lib/run-failure-details.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7ab44e846b890855a0df9ec9d924552e8b832d8e"
+    },
+    {
+      "path": "lib/run-failure-projection.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6a5e799949eccdead9bce50bfeec100b087c72ca"
+    },
+    {
+      "path": "lib/run-failure-view.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c5793edd373f08c51c4ef43c3c5c20a57f0553b"
+    },
+    {
+      "path": "lib/run-leases.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dcb2b3e883ee24577eec264413253f01085a8fc5"
+    },
+    {
+      "path": "lib/run-publications.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7e34fc24f630cdc2c69cc5e92caf3d8ea6e8bbde"
+    },
+    {
+      "path": "lib/run-quota.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f7972322ae9124e073829062f49214d5b111e53c"
+    },
+    {
+      "path": "lib/run-repository-retry.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb99269e518e5b572f9280864e8fc871cc6fbcbf"
+    },
+    {
+      "path": "lib/run-visibility.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0325c11c8995bcc047ebaafc22d66ccd6c576bd3"
+    },
+    {
+      "path": "lib/self-improvement/benchmark-claim.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3abf42d3d542e64e5a7ac2894cb0d18d57946e74"
+    },
+    {
+      "path": "lib/subscription-service.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0ff029a0caa91fd0a5549d6601f914733a260201"
+    },
+    {
+      "path": "lib/subscription-workflow-model.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0830a52d106ed78535990e22a87c32a82bb42f07"
+    },
+    {
+      "path": "lib/task-block-runs.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e898e73924df725b64604d187a552668d757b67a"
+    },
+    {
+      "path": "lib/workflow-run-failure.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ccab7d28c97bb4d65cd519ac59cf686b98d56443"
+    },
+    {
+      "path": "lib/workflow-run-failure.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "551897df46351fedb12264251662f6cd1132ba17"
+    },
+    {
+      "path": "messages/en.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8e23674c6d14077a3f1e5b85c985e5287b8a2839"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "95d22743b8376a0b6633375bb98d8736ccdf4b4d"
+    },
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ae2f54ce1db63d44571b32aafd7ee8c1da98a02f"
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a9d4efe3d6908070abf20b1f1d15330252303932"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "706bc1e3970dfe4bb0500c29bbc004fec8c1a05d"
+    },
+    {
+      "path": "packages/daemon/src/adapters/types.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cd027b6286ef7726c95cfd6563d5b420a16402e1"
+    },
+    {
+      "path": "packages/daemon/src/coordinator/claude.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "73f2c9e12d62a3d2a7e7535665a7b822b9437311"
+    },
+    {
+      "path": "packages/daemon/src/coordinator/claude.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ea50f87f580610afba4d425d69436ae74348ff2c"
+    },
+    {
+      "path": "packages/daemon/src/coordinator/codex.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "df2388c8011a03294af8ad5c151fde9486ce1478"
+    },
+    {
+      "path": "packages/daemon/src/coordinator/codex.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c63f94f608c2a299eafa9319d3c6e98465407b49"
+    },
+    {
+      "path": "packages/daemon/src/coordinator/runner.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "15da2e086b8a0f3ab8363f2e2d09374e2b769e3f"
+    },
+    {
+      "path": "packages/daemon/src/coordinator/runner.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "25b3666e8b1d671e49ccc1578e1b3186d3353ff3"
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f33d7a10ba1be34321ecbd9dd14a6df3b9bcd297"
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ed7ffbb1b00fbec73fd81f4c1a6b9d2ba1b068a0"
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "664c0ba0e358c4daa31af278164d06f2e15f4f0b"
+    },
+    {
+      "path": "packages/daemon/src/subscription-worker-client.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b89eb88df727c78fb2fb3d7f7f42e28d1527aef2"
+    },
+    {
+      "path": "packages/daemon/test/codex-subscription.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "85c80302e563d9b7a16e468befb629afe481ddf5"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "decf9596be80806b0f314031b2231d88b682047d"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4f6eaad867b24c8425e50440a8fcea8b9bf1cb6a"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-coordinator-claude.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "4bf1d7059ef7e7125e61af2dade8f5834a3305c9"
+    },
+    {
+      "path": "packages/daemon/test/provider-failure-adapters.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f458ee16244d35fbbf895b4a27c5968bfdf0729c"
+    },
+    {
+      "path": "packages/daemon/test/subscription-worker-client.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "05356046958df69cb47376757ac2b72199f06269"
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "017ad921e7066bde986ffb17cf7b6fcc33228dc7"
+    },
+    {
+      "path": "packages/protocol/src/coordinator.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b477eced2a2d015ed141a609acdd374b5f19dfb"
+    },
+    {
+      "path": "packages/protocol/src/run-failure.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dcf3999d7dbebd8d4ce7c003931984bcbd0a8a38"
+    },
+    {
+      "path": "packages/protocol/src/run-failure.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8e476a6b9f6fcbabc2747b9d52e6e5bd6dde186d"
+    },
+    {
+      "path": "packages/protocol/src/run.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e1a3ba58d4f00d58876c59462c5a489c7155b17b"
+    },
+    {
+      "path": "packages/protocol/src/user-error-codes.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "31802988c4a7bf2293af1bda0160becd542c6748"
+    },
+    {
+      "path": "packages/subscription-worker/errors.go",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "612689ba47f70568d3116046ac72542eacac2805"
+    },
+    {
+      "path": "packages/subscription-worker/failure_diagnostics_test.go",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "07d3fafd4e66873bd66d5f14f41573a0fc2a9528"
+    },
+    {
+      "path": "packages/subscription-worker/failure_diagnostics.go",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2ed6458b4493b9240be21d4bc6f0e36b6761907b"
+    },
+    {
+      "path": "packages/subscription-worker/native_broker.go",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8419e2095db13f0adb548ad04fbd56bc34eb33cf"
+    },
+    {
+      "path": "packages/subscription-worker/plain_model.go",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6ac05a5de6ae8d9fdc81f512d68932f490b94308"
+    },
+    {
+      "path": "packages/subscription-worker/rpc.go",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "22df9ef78aa0e9e8a6fdce4cbaa32bb05bcee1fd"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8240935f0a4bc4bd389fc376bc0628f5d85602a3"
+    },
+    {
+      "path": "tests/action-read-egress.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7504f30caabe2c87b41c33d3b13eff0b562dbb5f"
+    },
+    {
+      "path": "tests/native-coordinator-relay.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8e402aac6656c58610ba047c68d6208d8bc6c968"
+    },
+    {
+      "path": "tests/run-chain.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "570d7312a689ae88968c3113eaca613175c588f0"
+    },
+    {
+      "path": "tests/run-completion-route.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d6c883b391b11a7a6d041113b3d2d31866ef51bd"
+    },
+    {
+      "path": "tests/run-publications.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "18c4e45d78926aac71430594ffcbab333495dc63"
+    },
+    {
+      "path": "tests/team-visibility.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8552ec35bf34a426c59a5f1d44a14b0a49d0b46a"
+    },
+    {
+      "path": "tests/thread-list-egress.db.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "40fd2ca1428051de59052fb4d3f93d3133d09c68"
+    },
+    {
+      "path": "workflows/coordinator/native-turn.test.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2327fd9a047cc44e56c40aa4086afdfadd9926fe"
+    },
+    {
+      "path": "workflows/coordinator/native-turn.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2d4f978b411585630bc428b9ca1cd7dd919a0640"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "01e9ce194c44f0dde732b21f612284f256670fdd"
+    },
+    {
+      "path": "workflows/coordinator/workflow.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "77c3351ec7550e21f73f257983090a8e6beb52b9"
+    }
+  ],
+  "mainUnmodifiedBlobPaths": [
+    "app/actions/agents.ts",
+    "app/api/mobile/chat/route.ts",
+    "app/v1/runs/[runId]/complete/route.ts",
+    "drizzle/20261107170000_run_failure_details.sql",
+    "lib/agent-kit/core-entry.test.ts",
+    "lib/agent-runs.ts",
+    "lib/chat-failure.test.ts",
+    "lib/chat-failure.ts",
+    "lib/coordinator/bot-chats.db.test.ts",
+    "lib/coordinator/chat-projection.ts",
+    "lib/coordinator/chat-state.test.ts",
+    "lib/coordinator/chat-state.ts",
+    "lib/coordinator/chat-version.db.test.ts",
+    "lib/coordinator/context.ts",
+    "lib/coordinator/group-turns.test.ts",
+    "lib/coordinator/group-turns.ts",
+    "lib/coordinator/native-relay.db.test.ts",
+    "lib/coordinator/native-store.test.ts",
+    "lib/coordinator/native-store.ts",
+    "lib/coordinator/store.ts",
+    "lib/db/schema.ts",
+    "lib/factory/cloud-stage-handoff.ts",
+    "lib/factory/questions/retry.ts",
+    "lib/issue-thread-list-projection.ts",
+    "lib/issue-threads.test.ts",
+    "lib/issue-threads.ts",
+    "lib/run-chain.ts",
+    "lib/run-completion.ts",
+    "lib/run-failure-details.test.ts",
+    "lib/run-failure-details.ts",
+    "lib/run-failure-projection.ts",
+    "lib/run-failure-view.ts",
+    "lib/run-leases.ts",
+    "lib/run-publications.ts",
+    "lib/run-quota.ts",
+    "lib/run-repository-retry.ts",
+    "lib/run-visibility.ts",
+    "lib/self-improvement/benchmark-claim.test.ts",
+    "lib/subscription-service.ts",
+    "lib/subscription-workflow-model.ts",
+    "lib/task-block-runs.ts",
+    "lib/workflow-run-failure.test.ts",
+    "lib/workflow-run-failure.ts",
+    "messages/en.json",
+    "messages/zh-CN.json",
+    "packages/daemon/src/coordinator/claude.test.ts",
+    "packages/daemon/src/coordinator/claude.ts",
+    "packages/daemon/src/coordinator/codex.test.ts",
+    "packages/daemon/src/coordinator/codex.ts",
+    "packages/daemon/src/coordinator/runner.test.ts",
+    "packages/daemon/src/coordinator/runner.ts",
+    "packages/daemon/src/runs/supervisor.test.ts",
+    "packages/daemon/src/subscription-worker-client.ts",
+    "packages/daemon/test/codex-subscription.test.ts",
+    "packages/daemon/test/fakes/fake-claude.mjs",
+    "packages/daemon/test/fakes/fake-codex.mjs",
+    "packages/daemon/test/fakes/fake-coordinator-claude.mjs",
+    "packages/daemon/test/provider-failure-adapters.test.ts",
+    "packages/daemon/test/subscription-worker-client.test.ts",
+    "packages/protocol/package.json",
+    "packages/protocol/src/coordinator.ts",
+    "packages/protocol/src/run-failure.test.ts",
+    "packages/protocol/src/run-failure.ts",
+    "packages/protocol/src/run.ts",
+    "packages/protocol/src/user-error-codes.ts",
+    "packages/subscription-worker/errors.go",
+    "packages/subscription-worker/failure_diagnostics.go",
+    "packages/subscription-worker/failure_diagnostics_test.go",
+    "packages/subscription-worker/native_broker.go",
+    "packages/subscription-worker/plain_model.go",
+    "packages/subscription-worker/rpc.go",
+    "tests/native-coordinator-relay.test.mjs",
+    "tests/run-chain.db.test.ts",
+    "tests/run-completion-route.test.ts",
+    "tests/run-publications.db.test.ts",
+    "tests/team-visibility.db.test.ts",
+    "tests/thread-list-egress.db.test.ts",
+    "workflows/coordinator/native-turn.test.ts",
+    "workflows/coordinator/native-turn.ts",
+    "workflows/coordinator/steps.ts",
+    "workflows/coordinator/workflow.ts"
+  ],
+  "resolvedSources": [
+    {
+      "path": "app/actions/task-runs.ts",
+      "bytes": 13692,
+      "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8",
+      "gitBlobSha": "ae3974497f8c0573dd9c8d0ec5ba880f5a5c72ef"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "bytes": 41660,
+      "sha256": "93793b318041663537d68407ee42bfeaa51213e9ed34b8b494c27778bbb8f2d9",
+      "gitBlobSha": "7906950df21dc3fa25f53ea0693f7fd9c0409822"
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "bytes": 71894,
+      "sha256": "eb329f6017e89631785e802fbd30fe71829baab2453bc576ba6573feee5139ad",
+      "gitBlobSha": "a63c3d20dd2218298dd2b1645d08ac445a5fbafb"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 74133,
+      "sha256": "ab72d994bc96fbeb38ba895802607554054e60ff83b5873ea0a33d4f21960243",
+      "gitBlobSha": "95e80af48bf0801cc5c0a660d48cf431187052f8"
+    },
+    {
+      "path": "lib/abuse/workflow-model.ts",
+      "bytes": 3337,
+      "sha256": "fb9caf8380b671275666c9b6dc6fcf75af8deca8d1ee2e97e737c78a34a3ea25",
+      "gitBlobSha": "31cfd5d6904bdbcaa48f5485891f6f8a3bd2f962"
+    },
+    {
+      "path": "package.json",
+      "bytes": 75771,
+      "sha256": "3e2f9d05b2ded42b2d0698fb84a62e2d884c09b5d4702fb901194dfc3abb34c3",
+      "gitBlobSha": "ae2f54ce1db63d44571b32aafd7ee8c1da98a02f"
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "bytes": 49098,
+      "sha256": "b6fb5a954bf0b5382d0e040ede3527f59fe39668d185003f305f5caf69a0521a",
+      "gitBlobSha": "a9d4efe3d6908070abf20b1f1d15330252303932"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "bytes": 50045,
+      "sha256": "eb2160a0da70ee718b78839fb8b8dd7f42c69fb7fd697c0b25c1cb66cd99e9da",
+      "gitBlobSha": "706bc1e3970dfe4bb0500c29bbc004fec8c1a05d"
+    },
+    {
+      "path": "packages/daemon/src/adapters/types.ts",
+      "bytes": 8585,
+      "sha256": "7170d967e28569565062268b74b9f6f78cb4e68c364248c6f4d2358b23eacd71",
+      "gitBlobSha": "cd027b6286ef7726c95cfd6563d5b420a16402e1"
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "bytes": 92927,
+      "sha256": "1d4b325086fbf6ef3c3e82c099cf68191e682047bac0453f37866df49a6b69be",
+      "gitBlobSha": "f33d7a10ba1be34321ecbd9dd14a6df3b9bcd297"
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "bytes": 100299,
+      "sha256": "8835a8608e4bddfad376c9edb657aefed5d3c4077a4a467e4f1bd7e264efc75f",
+      "gitBlobSha": "664c0ba0e358c4daa31af278164d06f2e15f4f0b"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "bytes": 957400,
+      "sha256": "916b7b20b1da44670882894f628b2a7dfb98fc6bc7ffaee310ec4fa5afe13e62",
+      "gitBlobSha": "8240935f0a4bc4bd389fc376bc0628f5d85602a3"
+    },
+    {
+      "path": "tests/action-read-egress.db.test.ts",
+      "bytes": 34373,
+      "sha256": "1e0ba28789803b67b2c65eacbb6a1826366d95e0f178c8fac30c40072e2f207d",
+      "gitBlobSha": "7504f30caabe2c87b41c33d3b13eff0b562dbb5f"
+    }
+  ],
+  "preservedExecutablePaths": [
+    "packages/daemon/test/fakes/fake-claude.mjs",
+    "packages/daemon/test/fakes/fake-codex.mjs",
+    "packages/daemon/test/fakes/fake-coordinator-claude.mjs"
+  ],
+  "validation": {
+    "inputFiles": 33,
+    "inputHashesMatched": true,
+    "actualGitMergeFiles": 11,
+    "conflictingFiles": 5,
+    "conflictBlocks": 6,
+    "automaticOutputsUnmodified": 6,
+    "generatedFiles": 2,
+    "routeCount": 229,
+    "routeBaselineRenderExact": true,
+    "typescriptGeneratorExecuted": false,
+    "all13GitBlobsReadBackExactly": true,
+    "fullTestsOrTypesExecuted": false
+  },
+  "mutations": {
+    "unreferencedSourceBlobsOnly": true,
+    "treeCreated": false,
+    "commitCreated": false,
+    "refChanged": false
+  }
+}

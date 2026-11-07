@@ -1,0 +1,559 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_api_alias_diagnostic_and_batch_comparison",
+  "recordedAt": "2026-11-07T18:46:04.575Z",
+  "repository": "alexj11324/Mikka",
+  "scope": {
+    "readOnlyAfterRootPublishedDiagnostic": true,
+    "productionAcceptance": false,
+    "providerCalls": 0,
+    "databaseCalls": 0,
+    "workflowReruns": 0,
+    "repositoryRefMutations": 0,
+    "sourceEdits": 0,
+    "rawMixedLogPersistence": false,
+    "signedUrlPersistence": false
+  },
+  "originalFailure": {
+    "candidate": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+    "actualCheckout": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+    "tree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+    "runId": 42399391020,
+    "attempt": 1,
+    "jobId": 128483737003,
+    "step": "Run pnpm test:api",
+    "safeReceipt": {
+      "file": "ci-4dee10cc-owned-final.json",
+      "bytes": 160783,
+      "sha256": "0291e300d9edffe0e1616fb5630fd41d151bb5871ecf51cafbfd4431cb7e5c6c",
+      "gitBlobSha1": "3d185121b8056b258b8d00ac16a67a1ff331ec5c"
+    },
+    "observedFailure": {
+      "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+      "node": "24.22.2",
+      "classification": "file_level_ERR_TEST_FAILURE",
+      "goDeadlockOccurrences": 1,
+      "exitCode": null,
+      "signal": null,
+      "rootCauseConfirmed": false
+    }
+  },
+  "diagnostic": {
+    "opsCommit": "31b36561049cd685e30af413590a8ab3f4b8648b",
+    "opsTree": "1acf09d987cfa5cb783d74383b5c668500489889",
+    "fixedSource": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+    "tree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+    "runId": 42401735369,
+    "attempt": 1,
+    "event": "push",
+    "job": {
+      "id": 128490797734,
+      "name": "diagnose",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T18:31:48Z",
+      "completedAt": "2026-11-07T18:33:00Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Checkout exact failed synthetic source",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Checkout this diagnostic revision",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Install pinned pnpm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Select exact failing Node version",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Locate existing pnpm store",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Restore existing read-only dependency cache",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Install exact dependency lock",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run one original API test sequence with closed diagnostics",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Preserve safe diagnostic projection",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Remove only this diagnostic's private output",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Post Select exact failing Node version",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Post Install pinned pnpm",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Post Checkout this diagnostic revision",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Post Checkout exact failed synthetic source",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "actualCheckoutProjection": {
+      "jobId": 128490797734,
+      "rawStringCodeUnits": 39215,
+      "rawLogPersisted": false,
+      "actualCheckouts": [
+        "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+        "31b36561049cd685e30af413590a8ab3f4b8648b"
+      ],
+      "nodeVersions": [
+        "24.22.2"
+      ]
+    },
+    "artifact": {
+      "id": 13586195354,
+      "name": "issue1512-api-diagnostic-42401735369-1",
+      "archiveBytes": 2462,
+      "archiveSha256": "926938a2ed4e0052a77a863cb3acb952287d548e1182dcdb4b58e699b7843aaf",
+      "exactMember": "api-test-diagnostic.json",
+      "memberBytes": 14586,
+      "memberSha256": "58fdfc34aaf1c44e1a238794e19ab3e7808eba134699fe9360536a24c16dd6f6",
+      "gitBlobSha1": "ed5c7013160b7bc9fa06bb687e870ddf422d5977",
+      "remoteOriginalBytesReadbackVerified": true
+    },
+    "environment": {
+      "node": "24.22.2",
+      "processVersion": "v24.22.2",
+      "pnpm": "10.34.3",
+      "runner": "ubuntu-22.04",
+      "testEnvironment": "the same public static fixture values as the fixed Source checks job"
+    },
+    "sourceHashes": {
+      "originalAlias": "1db8226a7a15d47e385d971c0f59fea93bd22677dcd1752c9a502b52743abefd",
+      "patchedAlias": "f852fba6f783343bf4983b74af77cc1a1260a9dacf854147083828b5c601de2c",
+      "package": "5cf0c81d21ff3a8ebba68c7174486a37fb509446781403fcc00c4941f218f49a",
+      "phasePatch": "b4c3086f59a63e533e3dd3bf484284a9272f0511cce6f8fcf1921857d3c7f2ec",
+      "reporter": "3de38bf0d47d5f18001814a321ce05573d5234c65940bdb9294085446fc431ad"
+    },
+    "originalTestCommandSha256": "2398b50345fba8357c82de127b94eb9b3cb60fcc3e74c2429d41c2663836d310",
+    "diagnosticTestCommandSha256": "f05d7d62c833234e66b0d60a665e2e071e4970bcb3313ef92e131b97f8bcf20c",
+    "prechecks": [
+      {
+        "label": "lint_code",
+        "exitCode": 0,
+        "signal": null,
+        "stdoutBytes": 5897,
+        "stderrBytes": 0,
+        "durationMs": 4935.747,
+        "launcherError": false
+      },
+      {
+        "label": "route_check",
+        "exitCode": 0,
+        "signal": null,
+        "stdoutBytes": 29,
+        "stderrBytes": 0,
+        "durationMs": 555.426,
+        "launcherError": false
+      },
+      {
+        "label": "lint_runtime",
+        "exitCode": 0,
+        "signal": null,
+        "stdoutBytes": 403,
+        "stderrBytes": 0,
+        "durationMs": 415.732,
+        "launcherError": false
+      }
+    ],
+    "test": {
+      "label": "test_api",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutBytes": 8453,
+      "stderrBytes": 0,
+      "durationMs": 15889.896,
+      "launcherError": false
+    },
+    "groups": [
+      {
+        "kind": "summary",
+        "file": null,
+        "aggregate": true,
+        "counts": {
+          "cancelled": 0,
+          "failed": 0,
+          "passed": 77,
+          "skipped": 0,
+          "suites": 0,
+          "tests": 77,
+          "todo": 0,
+          "topLevel": 77
+        },
+        "durationMs": 4989.442059,
+        "success": true
+      },
+      {
+        "kind": "summary",
+        "file": null,
+        "aggregate": true,
+        "counts": {
+          "cancelled": 0,
+          "failed": 0,
+          "passed": 53,
+          "skipped": 0,
+          "suites": 0,
+          "tests": 53,
+          "todo": 0,
+          "topLevel": 47
+        },
+        "durationMs": 10462.626547,
+        "success": true
+      }
+    ],
+    "aliasFileSummary": [
+      {
+        "kind": "summary",
+        "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+        "aggregate": false,
+        "counts": {
+          "cancelled": 0,
+          "failed": 0,
+          "passed": 3,
+          "skipped": 0,
+          "suites": 0,
+          "tests": 3,
+          "todo": 0,
+          "topLevel": 3
+        },
+        "durationMs": 3470.305958,
+        "success": true
+      }
+    ],
+    "aliasCases": [
+      {
+        "kind": "alias_pass",
+        "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+        "line": 41,
+        "durationMs": 1444.346381
+      },
+      {
+        "kind": "alias_pass",
+        "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+        "line": 93,
+        "durationMs": 2016.156469
+      },
+      {
+        "kind": "alias_pass",
+        "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+        "line": 149,
+        "durationMs": 0.859499
+      }
+    ],
+    "projection": {
+      "invalid": 0,
+      "overLimit": 0,
+      "incompleteTail": 0
+    },
+    "recordKindCounts": {
+      "summary": 30,
+      "alias_pass": 3
+    },
+    "phaseRecords": 0,
+    "phaseBoundaryObservation": "unavailable_not_inferred_from_success",
+    "cgroupBefore": {
+      "available": false,
+      "memoryEvents": {},
+      "currentBytes": null,
+      "peakBytes": null,
+      "limitBytes": null
+    },
+    "cgroupAfter": {
+      "available": false,
+      "memoryEvents": {},
+      "currentBytes": null,
+      "peakBytes": null,
+      "limitBytes": null
+    },
+    "cleanup": {
+      "sourceRestored": true,
+      "packageRestored": true,
+      "launcherClosed": true
+    },
+    "extraction": {
+      "onlyAlreadyOwnedSandboxUsed": true,
+      "newSandboxCreated": false,
+      "zipSizeAndShaVerified": true,
+      "memberAllowlistVerified": true,
+      "fullUtf8BytesReconstructedFrom15Chunks": true,
+      "shaVerifiedAfterReconstruction": true,
+      "sandboxCleanup": {
+        "status": "stopped",
+        "stoppedAt": "2026-11-07T18:40:45.022Z",
+        "verification": "independent_owner_readback_reported_by_acceptance_review"
+      }
+    },
+    "reproducedOriginalFailure": false,
+    "observerCoverage": {
+      "kind": "diagnostic_only_relative_stderr_path_gap",
+      "absoluteRecordCount": 1,
+      "relativeRecordCount": 0,
+      "source": "scripts/ops/issue1512-api-test-reporter.mjs",
+      "sourceSha256": "3de38bf0d47d5f18001814a321ce05573d5234c65940bdb9294085446fc431ad",
+      "officialNodeSource": "https://github.com/nodejs/node/blob/v24.22.2/lib/internal/test_runner/runner.js",
+      "evidence": {
+        "file": "api-diagnostic-relative-path-coverage.json",
+        "bytes": 1570,
+        "sha256": "75fc583d5c29fd78ac6e27d49f94e853770a3a9a95083eb2b06d50cef159c4ed",
+        "gitBlobSha1": "c833f99717acf457b3aef7d31baace10563ec294",
+        "remoteBytesVerified": true,
+        "refMutation": false
+      },
+      "actualDiscardedEventPayloadCaptured": false,
+      "scope": "This validates a diagnostic coverage defect for relative stderr paths; it does not prove why the original alias test process failed.",
+      "proposedFutureChange": "Accept only the known exact relative alias path in addition to the already guarded absolute source-root path; do not infer missing phases or rerun now.",
+      "pureProjectorGuard": {
+        "absoluteAliasPhaseRecords": 1,
+        "relativeAliasPhaseRecords": 0
+      },
+      "originalResultUnchanged": true,
+      "missingPhasesBackfilled": false
+    }
+  },
+  "batchComparisons": [
+    {
+      "head": "01004a4333e4bed17540dab41b0287337d67a2f3",
+      "runId": 42401778700,
+      "attempt": 1,
+      "sourceJobId": 128491080885,
+      "status": "completed",
+      "conclusion": "failure",
+      "step": "Run pnpm test:api",
+      "actualCheckout": {
+        "sha": "060b043c5f23a6d4f929bd3e49c7ff50c4419fdc",
+        "tree": "530799e0d37674de2bc49e4740d24081d918e8e3",
+        "parents": [
+          "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+          "01004a4333e4bed17540dab41b0287337d67a2f3"
+        ]
+      },
+      "nodeVersions": [
+        "24.22.2"
+      ],
+      "apiGroups": {
+        "lineStart": 728,
+        "lineEnd": 960,
+        "summaryBlocks": [
+          {
+            "lineStart": 833,
+            "tests": 84,
+            "suites": 0,
+            "pass": 84,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 5363.701789,
+            "lineEnd": 840
+          },
+          {
+            "lineStart": 945,
+            "tests": 57,
+            "suites": 0,
+            "pass": 56,
+            "fail": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 11529.391586,
+            "lineEnd": 952
+          }
+        ]
+      },
+      "aliasSource": {
+        "bytes": 6868,
+        "sha256": "1db8226a7a15d47e385d971c0f59fea93bd22677dcd1752c9a502b52743abefd",
+        "gitBlobSha1": "4bbc2b791f4aef326810ec9e2db4916fc505e06e",
+        "equalsOriginal": true
+      },
+      "failure": {
+        "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+        "goDeadlockOccurrences": 1,
+        "exitCode": null,
+        "signal": null,
+        "rootCauseConfirmed": false
+      }
+    },
+    {
+      "head": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "runId": 42402361267,
+      "attempt": 1,
+      "sourceJobId": 128492832488,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T18:40:01Z",
+      "completedAt": "2026-11-07T18:42:37Z",
+      "step": "Run pnpm test:api",
+      "actualCheckout": {
+        "sha": "a222a9b3d88b3e27bb47b3acf6c3ce2eb17e37d7",
+        "tree": "c2c05659855b6627c6d833aef0145f21a70ed9fe",
+        "parents": [
+          "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+          "5ded063f58d4edfbe51492e3e403170d79e17472"
+        ]
+      },
+      "nodeVersions": [
+        "24.22.2"
+      ],
+      "apiGroups": {
+        "lineStart": 737,
+        "lineEnd": 1254,
+        "summaryBlocks": [
+          {
+            "lineStart": 842,
+            "tests": 84,
+            "suites": 0,
+            "pass": 84,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 4041.765478,
+            "lineEnd": 849
+          },
+          {
+            "lineStart": 1247,
+            "tests": 58,
+            "suites": 0,
+            "pass": 58,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 8786.178219,
+            "lineEnd": 1254
+          }
+        ]
+      },
+      "aliasSource": {
+        "bytes": 6868,
+        "sha256": "1db8226a7a15d47e385d971c0f59fea93bd22677dcd1752c9a502b52743abefd",
+        "gitBlobSha1": "4bbc2b791f4aef326810ec9e2db4916fc505e06e",
+        "equalsOriginal": true
+      },
+      "aliasCases": [
+        {
+          "case": 1,
+          "status": "passed",
+          "line": 1077,
+          "durationMs": 870.464084
+        },
+        {
+          "case": 2,
+          "status": "passed",
+          "line": 1084,
+          "durationMs": 2241.084937
+        },
+        {
+          "case": 3,
+          "status": "passed",
+          "line": 1090,
+          "durationMs": 0.642586
+        }
+      ],
+      "goDeadlockOccurrences": 0,
+      "wholeWorkflowStatus": "in_progress_at_last_metadata_read_not_inferred_from_source_success"
+    }
+  ],
+  "batchDelta": {
+    "commit": "5ded063f58d4edfbe51492e3e403170d79e17472",
+    "parent": "01004a4333e4bed17540dab41b0287337d67a2f3",
+    "path": "package.json",
+    "oneFile": true,
+    "oneAddedOneRemoved": true,
+    "onlyInsertedStandardTapFlag": true,
+    "oldApiLineSha256": "dba40fb785950087ea265a4d813bd6e440514f41c8a3a3530f9fe065ee88ffd9",
+    "newApiLineSha256": "49bd5734e0f17768925aa0bc09c703c5855d259e08a8fc0d0809d4afccda2f99",
+    "allAssertionsConcurrencyTimeoutsAndFilesRetained": true
+  },
+  "conclusions": {
+    "sameAliasFileHashAcrossOriginalAndBothBatchCheckouts": true,
+    "originalFailureRepeatsOnBatch01004": true,
+    "diagnosticAndBatchTapRunPass": true,
+    "causeOfIntermittentProcessFailure": "unknown",
+    "goDeadlockIsRootCause": "not_proven",
+    "oomOrSignalCause": "not_proven",
+    "reporterFlagResolvesFailure": "not_proven",
+    "productOrTestLifecycleFixJustifiedByTheseResults": false,
+    "noAssertionTimeoutConcurrencyOrTestListRelaxation": true,
+    "nextEvidenceBoundary": "Retain standard TAP on subsequent normally authorized CI to expose a future failing process exitCode/signal; do not schedule another run solely to obtain a pass."
+  },
+  "limitations": [
+    "The diagnostic observer emitted no phase records. Patched source hashes alone do not establish phase coverage.",
+    "Both cgroup snapshots reported available=false. Null counters must not be interpreted as zero OOM events or adequate memory.",
+    "The diagnostic source and batch sources differ in other files and test counts; they are not interchangeable validation runs.",
+    "Only Source checks of the latest batch is finalized here; this receipt does not declare all workflows or native budgets passed.",
+    "Safe projections omit raw test names/messages/stacks, environment values, SQL, credentials and signed download URLs."
+  ],
+  "updatedAt": "2026-11-07T18:47:52.442Z",
+  "previousReadback": {
+    "bytes": 15975,
+    "sha256": "4cce6ee4275dc7cd3c16f9d2ad7e956160df5e2d065dfd99bb4280b6629b5b28",
+    "gitBlobSha1": "2676d48558bd9c2f859f9bfce505b07e2705fc66",
+    "preserved": true
+  }
+}

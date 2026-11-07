@@ -1,0 +1,523 @@
+{
+  "version": 1,
+  "kind": "desktop_unattributed_sources_summary",
+  "status": "complete",
+  "valid": true,
+  "source": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+  "scope": "whole_primary_api_process",
+  "subtractPkceOrBackground": false,
+  "startupScope": "first_pair_only",
+  "vocabulary": {
+    "keys": 75,
+    "sourceFileSha256": "0eeb18be931fdc4d8ddb908dff9a0b4a94a6596a992fcc9a1c5fd635a935a0bb",
+    "keysSha256": "6cbbd09d1b58598a3ec3f78349a4a0ed41498f01b70992541c51f23e6090e71a"
+  },
+  "integrity": {
+    "baseValid": true,
+    "counterIdentityMatched": true,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "originalCumulativeNondecreasing": true,
+    "sourceCumulativeNondecreasing": true,
+    "refinementRowsPresent": 24,
+    "refinementRowsExpected": 24
+  },
+  "windows": {
+    "nativeLogin": {
+      "queryCalls": 210,
+      "unattributed": 49,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/agent/sessions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/conversations",
+          "queryCalls": 10
+        },
+        {
+          "source": "/api/pending-actions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 30
+        }
+      ],
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 14,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 177,
+          "unattributed": 49,
+          "nonzeroSources": [
+            {
+              "source": "/api/agent/sessions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/conversations",
+              "queryCalls": 10
+            },
+            {
+              "source": "/api/pending-actions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 30
+            }
+          ]
+        }
+      ]
+    },
+    "webLogin": {
+      "queryCalls": 209,
+      "unattributed": 46,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/agent/sessions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/conversations",
+          "queryCalls": 10
+        },
+        {
+          "source": "/api/pending-actions",
+          "queryCalls": 2
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 32
+        }
+      ],
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 190,
+          "unattributed": 46,
+          "nonzeroSources": [
+            {
+              "source": "/api/agent/sessions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/conversations",
+              "queryCalls": 10
+            },
+            {
+              "source": "/api/pending-actions",
+              "queryCalls": 2
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 32
+            }
+          ]
+        }
+      ]
+    },
+    "startup-bundled": {
+      "queryCalls": 184,
+      "unattributed": 50,
+      "pair": 1,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/agent/sessions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/conversations",
+          "queryCalls": 10
+        },
+        {
+          "source": "/api/pending-actions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        },
+        {
+          "source": "after:factory-dispatch-recovery",
+          "queryCalls": 1
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 30
+        }
+      ],
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 184,
+          "unattributed": 50,
+          "nonzeroSources": [
+            {
+              "source": "/api/agent/sessions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/conversations",
+              "queryCalls": 10
+            },
+            {
+              "source": "/api/pending-actions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            },
+            {
+              "source": "after:factory-dispatch-recovery",
+              "queryCalls": 1
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 30
+            }
+          ]
+        }
+      ]
+    },
+    "startup-hosted": {
+      "queryCalls": 132,
+      "unattributed": 37,
+      "pair": 1,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/conversations",
+          "queryCalls": 5
+        },
+        {
+          "source": "/api/pending-actions",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 25
+        }
+      ],
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 132,
+          "unattributed": 37,
+          "nonzeroSources": [
+            {
+              "source": "/api/conversations",
+              "queryCalls": 5
+            },
+            {
+              "source": "/api/pending-actions",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 25
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "comparisons": {
+    "loginNativeVsWeb": {
+      "first": "nativeLogin",
+      "second": "webLogin",
+      "queryDifference": 1,
+      "unattributedDifference": 3,
+      "sources": [
+        {
+          "source": "/api/agent/sessions",
+          "first": 2,
+          "second": 2,
+          "difference": 0
+        },
+        {
+          "source": "/api/conversations",
+          "first": 10,
+          "second": 10,
+          "difference": 0
+        },
+        {
+          "source": "/api/pending-actions",
+          "first": 2,
+          "second": 2,
+          "difference": 0
+        },
+        {
+          "source": "/api/settings/preferences",
+          "first": 2,
+          "second": 0,
+          "difference": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "first": 3,
+          "second": 0,
+          "difference": 3
+        },
+        {
+          "source": "otherScoped",
+          "first": 30,
+          "second": 32,
+          "difference": -2
+        }
+      ],
+      "sourceDifferenceSum": 3,
+      "segments": [
+        {
+          "firstPhase": "common-email-authentication",
+          "secondPhase": "common-email-authentication",
+          "queryDifference": 0,
+          "unattributedDifference": 0,
+          "sources": [],
+          "sourceDifferenceSum": 0
+        },
+        {
+          "firstPhase": "native-pkce-and-automatic-renderer-to-public-session",
+          "secondPhase": "web-navigation-to-dom-content-loaded",
+          "queryDifference": 14,
+          "unattributedDifference": 0,
+          "sources": [],
+          "sourceDifferenceSum": 0
+        },
+        {
+          "firstPhase": "workspace-selection-to-usable",
+          "secondPhase": "workspace-selection-to-usable",
+          "queryDifference": -13,
+          "unattributedDifference": 3,
+          "sources": [
+            {
+              "source": "/api/agent/sessions",
+              "first": 2,
+              "second": 2,
+              "difference": 0
+            },
+            {
+              "source": "/api/conversations",
+              "first": 10,
+              "second": 10,
+              "difference": 0
+            },
+            {
+              "source": "/api/pending-actions",
+              "first": 2,
+              "second": 2,
+              "difference": 0
+            },
+            {
+              "source": "/api/settings/preferences",
+              "first": 2,
+              "second": 0,
+              "difference": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "first": 3,
+              "second": 0,
+              "difference": 3
+            },
+            {
+              "source": "otherScoped",
+              "first": 30,
+              "second": 32,
+              "difference": -2
+            }
+          ],
+          "sourceDifferenceSum": 3
+        }
+      ]
+    },
+    "startupBundledVsHosted": {
+      "first": "startup-bundled",
+      "second": "startup-hosted",
+      "queryDifference": 52,
+      "unattributedDifference": 13,
+      "sources": [
+        {
+          "source": "/api/agent/sessions",
+          "first": 2,
+          "second": 0,
+          "difference": 2
+        },
+        {
+          "source": "/api/conversations",
+          "first": 10,
+          "second": 5,
+          "difference": 5
+        },
+        {
+          "source": "/api/pending-actions",
+          "first": 2,
+          "second": 2,
+          "difference": 0
+        },
+        {
+          "source": "/api/settings/preferences",
+          "first": 2,
+          "second": 2,
+          "difference": 0
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "first": 3,
+          "second": 3,
+          "difference": 0
+        },
+        {
+          "source": "after:factory-dispatch-recovery",
+          "first": 1,
+          "second": 0,
+          "difference": 1
+        },
+        {
+          "source": "otherScoped",
+          "first": 30,
+          "second": 25,
+          "difference": 5
+        }
+      ],
+      "sourceDifferenceSum": 13,
+      "segments": [
+        {
+          "firstPhase": "launch-to-usable",
+          "secondPhase": "launch-to-usable",
+          "queryDifference": 52,
+          "unattributedDifference": 13,
+          "sources": [
+            {
+              "source": "/api/agent/sessions",
+              "first": 2,
+              "second": 0,
+              "difference": 2
+            },
+            {
+              "source": "/api/conversations",
+              "first": 10,
+              "second": 5,
+              "difference": 5
+            },
+            {
+              "source": "/api/pending-actions",
+              "first": 2,
+              "second": 2,
+              "difference": 0
+            },
+            {
+              "source": "/api/settings/preferences",
+              "first": 2,
+              "second": 2,
+              "difference": 0
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "first": 3,
+              "second": 3,
+              "difference": 0
+            },
+            {
+              "source": "after:factory-dispatch-recovery",
+              "first": 1,
+              "second": 0,
+              "difference": 1
+            },
+            {
+              "source": "otherScoped",
+              "first": 30,
+              "second": 25,
+              "difference": 5
+            }
+          ],
+          "sourceDifferenceSum": 13
+        }
+      ]
+    }
+  },
+  "issues": [],
+  "productionAcceptance": null,
+  "limitations": [
+    "Lifecycle revision is checked; checkout and harness identity require their separate artifact receipts.",
+    "Closed source counts do not retain SQL, request bodies, IDs or arbitrary route values.",
+    "Legacy missing refinement is unavailable, not zero; whole-window totals are never reduced."
+  ],
+  "input": {
+    "bytes": 267082,
+    "sha256": "a1306eddccad36547d0f40b38dffcfd914b5fb3031975a895b606541408fb231"
+  }
+}

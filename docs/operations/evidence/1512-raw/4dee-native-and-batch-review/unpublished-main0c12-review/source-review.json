@@ -1,0 +1,514 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_recovered_candidate_and_main_merge_source_review",
+  "createdAt": "2026-11-07T18:34:33.689Z",
+  "repository": "alexj11324/Mikka",
+  "candidateRecovery": {
+    "localCommitReportedByRoot": "725dddbb9cd47f32589ed90fa5ba66035e78c803",
+    "localObjectIndependentlyFetched": false,
+    "localTreeReportedBeforeExecutorLoss": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+    "remoteCandidate": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+    "remoteTree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+    "treeMatchesReportedLocalTree": true,
+    "parents": [
+      "7089c70ccbc268200fc6679bd69d803b6491f2f6",
+      "df53871ce8c3203f46b663735fd4867900b389ee"
+    ],
+    "main687IsAncestor": true,
+    "featureRef": "feat/1512-run-observability",
+    "sourceRef": "ops/1512-source-objects",
+    "bothRefsObservedAtCandidate": true,
+    "originalC849AncestorRetained": true,
+    "ownerCheckpoint": "df53871ce8c3203f46b663735fd4867900b389ee",
+    "ownerCheckpointAncestorRetained": true,
+    "ownerCheckpointWorkflowChanges": [
+      ".github/workflows/analytics-ssr.yml",
+      ".github/workflows/read-cache.yml",
+      ".github/workflows/self-hosted-image.yml"
+    ],
+    "checkpointToCandidateWorkflowDiff": [],
+    "frozenAuthOnlyTestBlob": "1c8ac57d4929fc538b8ff5dfe1e75c9f061d58e0",
+    "frozenAuthOnlyTestSha256": "e5f41bc3f285d2124cc419c31210d526c9c1f51b332adb12d8ac7edf87c7b5f3",
+    "auditBoundary": "Commit trees, current refs and ancestry were independently read. Original local 725 identity and the historical no-force update transport are root attestations; GET ancestry proves fast-forward compatibility, not a complete ref-operation audit. This reviewer made no tree/commit/ref/PR changes."
+  },
+  "prObservations": [
+    {
+      "baseRef": "main",
+      "baseSha": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+      "headSha": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+      "draft": true,
+      "mergeable": false,
+      "mergeableState": "dirty"
+    },
+    {
+      "observedAt": "2026-11-07T18:32:25.749Z",
+      "baseRef": "batch/20261107-audit-auth-lease-sources",
+      "baseSha": "308f662fe5e67a48e1ac4545f3908ca488c6dd7e",
+      "headSha": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+      "draft": true,
+      "mergeable": null,
+      "mergeableState": "unknown",
+      "mergeCommitSha": "f672cdab8e14570b4f6064b611fede6836b58a11"
+    }
+  ],
+  "mainIntegration": {
+    "exactMain": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "mainTree": "1f1108a9a133643c8c45e2bae28682eff8d400fa",
+    "mainPr": 1656,
+    "commonBase": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+    "mainChangedPaths": 94,
+    "overlappingPaths": 13,
+    "unchangedMainBlobsCopied": 81,
+    "sourcePlan": {
+      "sha": "453b80fa96b7d4d52bc75e4ab5352727226e38b1",
+      "sha256": "1a52f9b87942327aed4228c012c9f6dcac3ad23b957a1840cc3cb68c0d7606d6",
+      "bytes": 23153
+    },
+    "actualGitVersion": "2.53.0",
+    "actualGitMergeFiles": 11,
+    "inputFiles": 33,
+    "inputBytes": 4237889,
+    "inputSha256Checks": 33,
+    "independentOursAndTheirsTreeGitBlobChecks": 22,
+    "automaticFiles": 6,
+    "conflictingFiles": 5,
+    "conflictBlocks": 6,
+    "generatedFiles": 2,
+    "resolvedSources": [
+      {
+        "path": "app/actions/task-runs.ts",
+        "bytes": 13692,
+        "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8",
+        "gitBlobSha": "ae3974497f8c0573dd9c8d0ec5ba880f5a5c72ef"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+        "bytes": 41660,
+        "sha256": "93793b318041663537d68407ee42bfeaa51213e9ed34b8b494c27778bbb8f2d9",
+        "gitBlobSha": "7906950df21dc3fa25f53ea0693f7fd9c0409822"
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "bytes": 71894,
+        "sha256": "eb329f6017e89631785e802fbd30fe71829baab2453bc576ba6573feee5139ad",
+        "gitBlobSha": "a63c3d20dd2218298dd2b1645d08ac445a5fbafb"
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "bytes": 74133,
+        "sha256": "ab72d994bc96fbeb38ba895802607554054e60ff83b5873ea0a33d4f21960243",
+        "gitBlobSha": "95e80af48bf0801cc5c0a660d48cf431187052f8"
+      },
+      {
+        "path": "lib/abuse/workflow-model.ts",
+        "bytes": 3337,
+        "sha256": "fb9caf8380b671275666c9b6dc6fcf75af8deca8d1ee2e97e737c78a34a3ea25",
+        "gitBlobSha": "31cfd5d6904bdbcaa48f5485891f6f8a3bd2f962"
+      },
+      {
+        "path": "package.json",
+        "bytes": 75771,
+        "sha256": "3e2f9d05b2ded42b2d0698fb84a62e2d884c09b5d4702fb901194dfc3abb34c3",
+        "gitBlobSha": "ae2f54ce1db63d44571b32aafd7ee8c1da98a02f"
+      },
+      {
+        "path": "packages/daemon/src/adapters/claude.ts",
+        "bytes": 49098,
+        "sha256": "b6fb5a954bf0b5382d0e040ede3527f59fe39668d185003f305f5caf69a0521a",
+        "gitBlobSha": "a9d4efe3d6908070abf20b1f1d15330252303932"
+      },
+      {
+        "path": "packages/daemon/src/adapters/codex.ts",
+        "bytes": 50045,
+        "sha256": "eb2160a0da70ee718b78839fb8b8dd7f42c69fb7fd697c0b25c1cb66cd99e9da",
+        "gitBlobSha": "706bc1e3970dfe4bb0500c29bbc004fec8c1a05d"
+      },
+      {
+        "path": "packages/daemon/src/adapters/types.ts",
+        "bytes": 8585,
+        "sha256": "7170d967e28569565062268b74b9f6f78cb4e68c364248c6f4d2358b23eacd71",
+        "gitBlobSha": "cd027b6286ef7726c95cfd6563d5b420a16402e1"
+      },
+      {
+        "path": "packages/daemon/src/main.ts",
+        "bytes": 92927,
+        "sha256": "1d4b325086fbf6ef3c3e82c099cf68191e682047bac0453f37866df49a6b69be",
+        "gitBlobSha": "f33d7a10ba1be34321ecbd9dd14a6df3b9bcd297"
+      },
+      {
+        "path": "packages/daemon/src/runs/supervisor.ts",
+        "bytes": 100299,
+        "sha256": "8835a8608e4bddfad376c9edb657aefed5d3c4077a4a467e4f1bd7e264efc75f",
+        "gitBlobSha": "664c0ba0e358c4daa31af278164d06f2e15f4f0b"
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "bytes": 957400,
+        "sha256": "916b7b20b1da44670882894f628b2a7dfb98fc6bc7ffaee310ec4fa5afe13e62",
+        "gitBlobSha": "8240935f0a4bc4bd389fc376bc0628f5d85602a3"
+      },
+      {
+        "path": "tests/action-read-egress.db.test.ts",
+        "bytes": 34373,
+        "sha256": "1e0ba28789803b67b2c65eacbb6a1826366d95e0f178c8fac30c40072e2f207d",
+        "gitBlobSha": "7504f30caabe2c87b41c33d3b13eff0b562dbb5f"
+      }
+    ],
+    "all13RemoteBlobsReadBackExactly": true,
+    "sourceByteTotal": 1573214,
+    "unresolvedMarkers": false
+  },
+  "resolutionDecisions": [
+    {
+      "path": "app/actions/task-runs.ts",
+      "decision": "保留先选200个issue、DISTINCT/排序/retention、同main DB owner-filtered bot一对一LEFT JOIN和三层bot身份回退。runFailureBrief在latest子查询显式as('failureDetails')，outer SELECT继续投影；readCompactRunFailure并入原items映射。不恢复第二次bot look查询。"
+    },
+    {
+      "path": "lib/abuse/workflow-model.ts",
+      "decision": "采用main的workflowFailureCall/workflowFailureStream和原SDK错误身份/冷恢复路径；doGenerate与移入try的doStream hostedModel都保留bot/coordinator operation元数据。"
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "decision": "同一catch同时保留generations.fail()及main failureDetails捕获；不替换现有prewarm、consume或退出顺序。"
+    },
+    {
+      "path": "tests/action-read-egress.db.test.ts",
+      "decision": "保留真实botLooks和既有200行/排序/owner/查询预算断言，仅把main新增的failureDetails:null加入原预期。"
+    },
+    {
+      "path": "package.json",
+      "decision": "保留全部feature scripts token，加入main workflow-run-failure及run-failure-details测试和固定gateway4.0.121；锁文件精确追加同一3行importer项。"
+    },
+    {
+      "path": "apps/api/generated/routes.json + routes.ts",
+      "decision": "三路sourceHash合并；先用原渲染公式逐字复现candidate两份旧输出，再用最终claim源UTF8 SHA及两个经完整main原文核验的SHA重建。229路声明不变。未运行依赖TypeScript的真实generator。"
+    }
+  ],
+  "staticTracePreservationChecks": [
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "const traceContext = options.traceContext ?? daemonTracer.capture()",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "daemonTracer.registerGenerationDrain(drain)",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "void drain.then(() => daemonTracer.flush())",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "nativeGenerations.collector.observeFallback(metrics, sessionId)",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "if (notification.threadId !== sessionId) return",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "generations.observe(notification.tokenUsage, runtimeModel)",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "generations.endTurn()",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "generations.startTurn()",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "failureDetails = capture(error)",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "needle": "sensitiveText.push(auth.accessToken)",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "needle": "active?.span?.fail({ name: 'RunFailure' }, stopReason)",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "needle": "traceContext: assignment?.traceContext",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "needle": "void daemonTracer.flush()",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "needle": "traceContext: daemonTracer.capture()",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "needle": "event.failureDetails",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "needle": "failureFrom(error)",
+      "present": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "needle": "generations.fail() followed by if (!ending) failureDetails capture",
+      "present": true
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "needle": "persisted traceContext and authoritative runId in claim result",
+      "present": true
+    }
+  ],
+  "validation": {
+    "productOrTestCodeExecuted": false,
+    "fullTypecheck": false,
+    "fullTests": false,
+    "realDatabase": false,
+    "providerCall": false,
+    "browserOperation": false,
+    "whitespace": {
+      "command": "git diff --no-index --check -- <ours> <merged>",
+      "files": 13,
+      "actualExitCodes": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "wrapperExit": 1,
+      "interpretation": "All 13 changed-file comparisons returned 1 with no whitespace diagnostics. Preserve actual nonzero status; do not claim canonical git diff --check exit 0."
+    },
+    "transport": {
+      "firstOversizeWrite": {
+        "status": 413,
+        "code": "entity_too_large",
+        "applied": false
+      },
+      "boundedSplitWritesSucceeded": true,
+      "lzwRoundtripInSandbox": true,
+      "downloadedParts": 134,
+      "payloadSha256": "583642e569af2fc1b3f5cfa5aefa264f092f8855408bd0d2c45682fd27176952",
+      "allDecodedSourceBytesMatchedSandbox": true
+    }
+  },
+  "candidateCiSnapshot": {
+    "head": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+    "final": false,
+    "runCount": 16,
+    "runs": [
+      {
+        "id": 42399391099,
+        "name": "Self-hosted image",
+        "path": ".github/workflows/self-hosted-image.yml",
+        "attempt": 1,
+        "status": "in_progress",
+        "conclusion": null
+      },
+      {
+        "id": 42399391147,
+        "name": "E2B additive runtime release",
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391037,
+        "name": "Browser gate",
+        "path": ".github/workflows/browser-gate.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391027,
+        "name": "Site search read contract",
+        "path": ".github/workflows/site-search.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399390929,
+        "name": "SSH device backend",
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391126,
+        "name": "Analytics SSR",
+        "path": ".github/workflows/analytics-ssr.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391047,
+        "name": "Desktop shell",
+        "path": ".github/workflows/desktop.yml",
+        "attempt": 1,
+        "status": "in_progress",
+        "conclusion": null
+      },
+      {
+        "id": 42399391020,
+        "name": "CI",
+        "path": ".github/workflows/ui-policy.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure"
+      },
+      {
+        "id": 42399391054,
+        "name": "Community settings UI evidence",
+        "path": ".github/workflows/community-settings-ui.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391280,
+        "name": "Unattended sandbox acceptance",
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391026,
+        "name": "Mobile OTA update",
+        "path": ".github/workflows/mobile-update.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391318,
+        "name": "Device gateway",
+        "path": ".github/workflows/device-gateway.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391083,
+        "name": "Cloud computer backend",
+        "path": ".github/workflows/cloud-computer.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399390990,
+        "name": "E2B subscription custody",
+        "path": ".github/workflows/e2b-byos.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391068,
+        "name": "Read cache API acceptance",
+        "path": ".github/workflows/read-cache.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 42399391242,
+        "name": "Local device Node 22",
+        "path": ".github/workflows/local-device-node22.yml",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "checkCount": 45,
+    "checkCounts": {
+      "failure": 2,
+      "in_progress": 2,
+      "success": 33,
+      "skipped": 8
+    },
+    "failedChecks": [
+      {
+        "name": "UI policy (strict)",
+        "conclusion": "failure"
+      },
+      {
+        "name": "Source checks",
+        "conclusion": "failure"
+      }
+    ],
+    "logsRead": false
+  },
+  "riskReview": {
+    "decision": "Source merge prepared and hash-verified; not ready to approve a final merge or production acceptance.",
+    "mergeRisk": "medium",
+    "alignment": "Retains both existing observability and main structured-failure contracts.",
+    "impact": "Failure capture, SQL list projection, Workflow error codecs, daemon adapters and new nullable diagnostic persistence.",
+    "verification": "Real dependency-free three-way merge, source assertions and full remote byte readback completed. New integrated tree still needs canonical types, generator, privacy/protocol/Workflow tests and real PG gates.",
+    "rollback": "Keep main's nullable failure columns and account for native failureDetailsVersion capability/in-flight compatibility; do not drop diagnostic persistence or regress owner/lease checks.",
+    "detection": "Existing tracing and safe cause metadata remain; new main structured failure details must not be spread wholesale into telemetry.",
+    "specificRemainingGates": [
+      "Root must confirm intended PR target after the observed external retarget to batch/20261107-audit-auth-lease-sources; actual main remains0c12.",
+      "Resolve the existing 4dee Source checks failure using its actual evidence; this review did not diagnose its logs.",
+      "Run full normal CI against the final integrated source, including the real route generator and real PG SQL/egress tests.",
+      "New exact-source Native query/performance evidence and Claude/Codex production acceptance remain separate gates; old successful budgets or source hash equality are not production proof."
+    ]
+  },
+  "sandboxCleanup": {
+    "id": "sbx_V4n0RsRncpOxCiHGuit6tvsnwyeC",
+    "status": "stopped",
+    "denyAll": true,
+    "vcpus": 1,
+    "memory": 2048,
+    "timeoutMs": 900000,
+    "startedAtMs": 1794075694478,
+    "stoppedAtMs": 1794076248171,
+    "activeCpuDurationMs": 8200,
+    "exposedRoutes": [],
+    "readbackConfirmedStopped": true
+  },
+  "mutations": {
+    "createdUnreferencedSourceBlobs": 13,
+    "treeCreated": false,
+    "commitCreated": false,
+    "refUpdated": false,
+    "prCommentPosted": false,
+    "mainPushed": false,
+    "forceUsed": false,
+    "rebasePerformed": false
+  },
+  "privacy": "Only fixed source excerpts, file hashes, closed workflow/check metadata and owned sandbox cleanup fields. No raw API/provider traffic, prompt, account, token, cookie, signed URL or mixed private CI log."
+}

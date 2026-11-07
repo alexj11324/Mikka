@@ -1,0 +1,630 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-owned-api-process-diagnostic",
+  "status": "passed",
+  "source": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+  "tree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+  "originalRun": 42399391020,
+  "originalJob": 128483737003,
+  "opsSha": "31b36561049cd685e30af413590a8ab3f4b8648b",
+  "runId": "42401735369",
+  "attempt": 1,
+  "diagnosticOnly": true,
+  "productionAcceptance": false,
+  "providerCallsRequested": false,
+  "environment": {
+    "node": "24.22.2",
+    "processVersion": "v24.22.2",
+    "pnpm": "10.34.3",
+    "runner": "ubuntu-22.04",
+    "testEnvironment": "the same public static fixture values as the fixed Source checks job"
+  },
+  "sourceHashes": {
+    "originalAlias": "1db8226a7a15d47e385d971c0f59fea93bd22677dcd1752c9a502b52743abefd",
+    "patchedAlias": "f852fba6f783343bf4983b74af77cc1a1260a9dacf854147083828b5c601de2c",
+    "package": "5cf0c81d21ff3a8ebba68c7174486a37fb509446781403fcc00c4941f218f49a",
+    "phasePatch": "b4c3086f59a63e533e3dd3bf484284a9272f0511cce6f8fcf1921857d3c7f2ec",
+    "reporter": "3de38bf0d47d5f18001814a321ce05573d5234c65940bdb9294085446fc431ad"
+  },
+  "originalTestCommandSha256": "2398b50345fba8357c82de127b94eb9b3cb60fcc3e74c2429d41c2663836d310",
+  "diagnosticTestCommandSha256": "f05d7d62c833234e66b0d60a665e2e071e4970bcb3313ef92e131b97f8bcf20c",
+  "prechecks": [
+    {
+      "label": "lint_code",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutBytes": 5897,
+      "stderrBytes": 0,
+      "durationMs": 4935.747,
+      "launcherError": false
+    },
+    {
+      "label": "route_check",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutBytes": 29,
+      "stderrBytes": 0,
+      "durationMs": 555.426,
+      "launcherError": false
+    },
+    {
+      "label": "lint_runtime",
+      "exitCode": 0,
+      "signal": null,
+      "stdoutBytes": 403,
+      "stderrBytes": 0,
+      "durationMs": 415.732,
+      "launcherError": false
+    }
+  ],
+  "test": {
+    "label": "test_api",
+    "exitCode": 0,
+    "signal": null,
+    "stdoutBytes": 8453,
+    "stderrBytes": 0,
+    "durationMs": 15889.896,
+    "launcherError": false
+  },
+  "records": [
+    {
+      "kind": "summary",
+      "file": "apps/api/runtime/builtin-gateway.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 1,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 1,
+        "todo": 0,
+        "topLevel": 1
+      },
+      "durationMs": 118.547142,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/runtime/dev-mcp.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 1,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 1,
+        "todo": 0,
+        "topLevel": 1
+      },
+      "durationMs": 1820.650811,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/runtime/docker-node.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 2,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 2,
+        "todo": 0,
+        "topLevel": 2
+      },
+      "durationMs": 50.064958,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/runtime/request-authority.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 7,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 7,
+        "todo": 0,
+        "topLevel": 7
+      },
+      "durationMs": 399.869307,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/runtime/server-page.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 4,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 4,
+        "todo": 0,
+        "topLevel": 4
+      },
+      "durationMs": 91.415035,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/src/after.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 2,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 2,
+        "todo": 0,
+        "topLevel": 2
+      },
+      "durationMs": 51.513569,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/src/application.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 21,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 21,
+        "todo": 0,
+        "topLevel": 21
+      },
+      "durationMs": 129.49997,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/src/web-transport-node.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 5,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 5,
+        "todo": 0,
+        "topLevel": 5
+      },
+      "durationMs": 192.705948,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "lib/agent-image-cache.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 2,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 2,
+        "todo": 0,
+        "topLevel": 2
+      },
+      "durationMs": 44.696092,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "lib/browser-rpc/session.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 7,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 7,
+        "todo": 0,
+        "topLevel": 7
+      },
+      "durationMs": 92.985697,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "lib/web-connection/auth.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 3,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 3,
+        "todo": 0,
+        "topLevel": 3
+      },
+      "durationMs": 96.820696,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "lib/web-connection/client.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 11,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 11,
+        "todo": 0,
+        "topLevel": 11
+      },
+      "durationMs": 133.344088,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "lib/web-connection/discovery.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 3,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 3,
+        "todo": 0,
+        "topLevel": 3
+      },
+      "durationMs": 79.981946,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "lib/web-connection/policy.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 2,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 2,
+        "todo": 0,
+        "topLevel": 2
+      },
+      "durationMs": 30.233149,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "lib/web-connection/selection.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 3,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 3,
+        "todo": 0,
+        "topLevel": 3
+      },
+      "durationMs": 33.804363,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "lib/web-connection/transport.test.ts",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 3,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 3,
+        "todo": 0,
+        "topLevel": 3
+      },
+      "durationMs": 40.77468,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": null,
+      "aggregate": true,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 77,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 77,
+        "todo": 0,
+        "topLevel": 77
+      },
+      "durationMs": 4989.442059,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/build-contract.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 6,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 6,
+        "todo": 0,
+        "topLevel": 6
+      },
+      "durationMs": 909.285354,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/runtime/dev-tracing.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 1,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 1,
+        "todo": 0,
+        "topLevel": 1
+      },
+      "durationMs": 1344.133656,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/runtime/http-policy.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 5,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 5,
+        "todo": 0,
+        "topLevel": 5
+      },
+      "durationMs": 59.310064,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/scripts/dev-http.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 7,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 7,
+        "todo": 0,
+        "topLevel": 1
+      },
+      "durationMs": 331.305425,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/scripts/dev.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 11,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 11,
+        "todo": 0,
+        "topLevel": 11
+      },
+      "durationMs": 58.293369,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/scripts/finalize-build.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 2,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 2,
+        "todo": 0,
+        "topLevel": 2
+      },
+      "durationMs": 413.121584,
+      "success": true
+    },
+    {
+      "kind": "alias_pass",
+      "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+      "line": 41,
+      "durationMs": 1444.346381
+    },
+    {
+      "kind": "alias_pass",
+      "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+      "line": 93,
+      "durationMs": 2016.156469
+    },
+    {
+      "kind": "alias_pass",
+      "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+      "line": 149,
+      "durationMs": 0.859499
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/scripts/workflow-development-aliases.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 3,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 3,
+        "todo": 0,
+        "topLevel": 3
+      },
+      "durationMs": 3470.305958,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/scripts/workflow-local.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 2,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 2,
+        "todo": 0,
+        "topLevel": 2
+      },
+      "durationMs": 8622.163472,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "apps/api/scripts/workflow-routing.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 1,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 1,
+        "todo": 0,
+        "topLevel": 1
+      },
+      "durationMs": 8474.075578,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "scripts/release/build-vercel.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 7,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 7,
+        "todo": 0,
+        "topLevel": 7
+      },
+      "durationMs": 22.669492,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "scripts/start-app.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 3,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 3,
+        "todo": 0,
+        "topLevel": 3
+      },
+      "durationMs": 111.448476,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": "scripts/test-subscription-enrollment-app.test.mjs",
+      "aggregate": false,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 5,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 5,
+        "todo": 0,
+        "topLevel": 5
+      },
+      "durationMs": 79.190184,
+      "success": true
+    },
+    {
+      "kind": "summary",
+      "file": null,
+      "aggregate": true,
+      "counts": {
+        "cancelled": 0,
+        "failed": 0,
+        "passed": 53,
+        "skipped": 0,
+        "suites": 0,
+        "tests": 53,
+        "todo": 0,
+        "topLevel": 47
+      },
+      "durationMs": 10462.626547,
+      "success": true
+    }
+  ],
+  "projection": {
+    "invalid": 0,
+    "overLimit": 0,
+    "incompleteTail": 0
+  },
+  "cgroupBefore": {
+    "available": false,
+    "memoryEvents": {},
+    "currentBytes": null,
+    "peakBytes": null,
+    "limitBytes": null
+  },
+  "cgroupAfter": {
+    "available": false,
+    "memoryEvents": {},
+    "currentBytes": null,
+    "peakBytes": null,
+    "limitBytes": null
+  },
+  "cleanup": {
+    "sourceRestored": true,
+    "packageRestored": true,
+    "launcherClosed": true
+  },
+  "limitations": [
+    "Temporary diagnostic checkout only; no candidate source or refs are updated.",
+    "All original test groups, assertions, per-test timeouts and default concurrency remain.",
+    "A new passing diagnostic run would not itself explain the original failures.",
+    "Cgroup counters cover the runner cgroup, not uniquely the alias test process.",
+    "Only fixed metadata is retained; raw child stdout/stderr is discarded in bounded memory."
+  ]
+}

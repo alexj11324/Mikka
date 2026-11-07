@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "purpose": "issue1512_readonly_existing_cloud_core_failure",
+  "observedAt": "2026-11-07T18:23:00Z",
+  "workflow": {
+    "repository": "alexj11324/Mikka",
+    "runId": 42399230228,
+    "attempt": 1,
+    "source": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+    "path": ".github/workflows/self-hosted-production.yml",
+    "jobId": 128483403816,
+    "step": 7,
+    "status": "completed",
+    "conclusion": "failure",
+    "stepStartedAt": "2026-11-07T18:03:45Z",
+    "stepCompletedAt": "2026-11-07T18:03:51Z"
+  },
+  "evidence": {
+    "source": "existing job log closed JSON report; original artifact not downloaded",
+    "rawLogBytesStoredOnDisk": 0,
+    "rawLogPrinted": false,
+    "closedReport": {
+      "version": 1,
+      "scope": "mikka-cloud-core-compatibility",
+      "status": "fail",
+      "applicationSha": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+      "runnerSha": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+      "teamAdminMembershipVerified": true,
+      "client": {
+        "version": "0.0.1",
+        "protocolVersion": 3,
+        "osInstallationExercised": false,
+        "sourceRevision": "687479154d7d5264c60e5e0d4343e370dbc4e89e"
+      },
+      "checks": {
+        "deployment": true,
+        "sessionOwner": true,
+        "mobileHomeOwner": true,
+        "publishedActions": false,
+        "enrollment": false,
+        "registration": false,
+        "deviceOwner": false,
+        "schedulingDisabled": false,
+        "heartbeat": false,
+        "finalDeployment": true,
+        "discoveryAndFlags": false,
+        "liveHandshake": false,
+        "liveDeviceList": false,
+        "deviceGateway": false
+      },
+      "resources": {
+        "enrollmentAttempts": 0,
+        "issuedGrants": 0,
+        "credentialExchangeAttempts": 0,
+        "issuedCredentials": 0,
+        "registeredDevices": 0
+      },
+      "cleanup": {
+        "credentialRevoked": false,
+        "oldCredentialRejected": false,
+        "deviceRemoved": true,
+        "originalDevicesPreserved": false,
+        "originalCredentialsPreserved": false,
+        "sessionClosed": true,
+        "liveSocketClosed": true,
+        "deviceSocketClosed": true
+      },
+      "requests": {
+        "owner": 14,
+        "device": 0
+      },
+      "errors": [
+        {
+          "phase": "core-capabilities",
+          "code": "core_features",
+          "detail": "flags"
+        }
+      ],
+      "boundaries": {
+        "modelRequestsByDriver": 0,
+        "cloudComputerBoots": 0,
+        "databaseAccessByDriver": false,
+        "browserExercised": false,
+        "providerLoginExercised": false,
+        "quotaEnforcementExercised": false,
+        "settlementExercised": false
+      },
+      "targetMode": "self-hosted-core",
+      "driverRevision": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+      "driverRunId": 42399230228,
+      "driverRunAttempt": 1,
+      "webDeployRunId": 42397416342,
+      "webAttempt": 1,
+      "webDeployJobId": 128477683191,
+      "openIssues": [
+        1560,
+        1561,
+        1562,
+        1556
+      ],
+      "teamWorkspaceConfirmed": true,
+      "teamWorkspaceHash": "fb00a1d8c63a0ae1c56ff3273bd259fd0756b8631b83e42f226926d389b3dade",
+      "teamSelectionBasis": "unique-active-admin-identity-match",
+      "teamOwnerAttribution": "AGENTS.md-and-owner-comment-1504-6691409495",
+      "targetAfter": {
+        "verified": true,
+        "status": "ready"
+      }
+    }
+  },
+  "failure": {
+    "phase": "core-capabilities",
+    "code": "core_features",
+    "detail": "flags",
+    "failingConjunct": "unknown",
+    "checksBeforeFailure": {
+      "discoveryShape": true,
+      "discoveryApplicationVersion": true,
+      "cloudEdition": true,
+      "bootstrapOwnerWorkspaceRoleEdition": true
+    },
+    "requiredFlagConjunction": [
+      "flags object and all values boolean",
+      "features.cloudComputer true",
+      "mikka-computer-billing false",
+      "mikka-computer-tab-off false",
+      "emailEnabled true"
+    ],
+    "source": {
+      "path": "scripts/acceptance/self-hosted-production-probes.mjs",
+      "lines": "20-36"
+    }
+  },
+  "sequencing": {
+    "failureBefore": "resource-baseline; Live ticket/socket; enrollment; credential exchange; device registration/gateway",
+    "source": {
+      "path": "scripts/ops/production-mobile-daemon.mjs",
+      "lines": "241-307"
+    },
+    "scope": "shared SMOKE team; not issue1512 ACME preflight"
+  },
+  "cleanupInterpretation": {
+    "sessionClosedAndFormerCookieRejected": true,
+    "noEnrollmentOrCredentialOrRegistrationAttempt": true,
+    "noOwnedCloudVmOrModelCalls": true,
+    "deviceRemovedFlagMeaning": "registration never attempted; no deletion claimed",
+    "socketClosedFlagsMeaning": "default true, sockets never opened",
+    "originalResourcePreservationAudits": "not reached; false is not evidence of preexisting resource change"
+  },
+  "earlierLogObservation": {
+    "at": "2026-11-07T18:03:41.0766839Z",
+    "code": "ENOENT",
+    "operation": "open",
+    "sourceOwnedPath": "packages/daemon/dist/mikka.js",
+    "attribution": "earlier log event; attestation subsequently ready, not the actual acceptance failure code",
+    "missingFileRootCauseEvaluated": false
+  },
+  "implicationFor1512": {
+    "directDriverGate": false,
+    "driverSource": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+    "driverPath": "scripts/acceptance/run-observability.mjs",
+    "potentialCloudAvailabilityImpact": "unknown; no individual flag returned by closed report",
+    "ACMEIdentityWorkspaceSubscriptionsVerified": false,
+    "productionModelPathVerified": false,
+    "automaticRetry": false
+  },
+  "privacy": {
+    "rawPrompts": false,
+    "rawErrors": false,
+    "accounts": false,
+    "credentials": false,
+    "privateLogsStored": false
+  },
+  "actions": {
+    "providerCalls": 0,
+    "createdResources": 0,
+    "remoteWrites": 0,
+    "workflowRetries": 0
+  }
+}

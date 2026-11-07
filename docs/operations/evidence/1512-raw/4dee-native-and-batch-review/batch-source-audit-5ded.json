@@ -1,0 +1,491 @@
+{
+  "schemaVersion": 1,
+  "kind": "source_only_independent_batch_audit",
+  "repository": "alexj11324/Mikka",
+  "reviewedCommit": "01004a4333e4bed17540dab41b0287337d67a2f3",
+  "tree": "530799e0d37674de2bc49e4740d24081d918e8e3",
+  "basis": {
+    "featureCommit": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+    "featureTree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+    "structuredFailureMain": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "startupSource": "6d7d993a6bca4bf3f69b2736fd5c3ecbebfdb3f7",
+    "startupOriginalBase": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+    "independentMergeReviewBlob": "e9144e4d30c3fc744596abe35e3d095ac76b8de3",
+    "independentMergeReviewSha256": "5be2903c9d8e696f2b51c414a7a945294bb2a199a067dbc655564d4ef147a1b4",
+    "independentMergePublished": false
+  },
+  "result": {
+    "blockingFindings": [],
+    "requiredPatches": [],
+    "sourceCompatibility": "no_blocker_identified",
+    "overallAcceptance": null
+  },
+  "mergeFiles": [
+    {
+      "path": "app/actions/task-runs.ts",
+      "reference": "ae3974497f8c0573dd9c8d0ec5ba880f5a5c72ef",
+      "batch": "ae3974497f8c0573dd9c8d0ec5ba880f5a5c72ef",
+      "same": true,
+      "bytes": 13692
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "reference": "7906950df21dc3fa25f53ea0693f7fd9c0409822",
+      "batch": "d859c48f644d61dd1b9ad3c61d8aba3e92558a7a",
+      "same": false,
+      "bytes": 41634
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "reference": "a63c3d20dd2218298dd2b1645d08ac445a5fbafb",
+      "batch": "9988c6c882b6167298a179628f36515793c4fdd6",
+      "same": false,
+      "bytes": 74198
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "reference": "95e80af48bf0801cc5c0a660d48cf431187052f8",
+      "batch": "07dd910b67018dfcec9e32ba746f9b866257edf6",
+      "same": false,
+      "bytes": 76491
+    },
+    {
+      "path": "lib/abuse/workflow-model.ts",
+      "reference": "31cfd5d6904bdbcaa48f5485891f6f8a3bd2f962",
+      "batch": "31cfd5d6904bdbcaa48f5485891f6f8a3bd2f962",
+      "same": true,
+      "bytes": 3337
+    },
+    {
+      "path": "package.json",
+      "reference": "ae2f54ce1db63d44571b32aafd7ee8c1da98a02f",
+      "batch": "183685d87969cba2fee4cb95a75cd027163e32b1",
+      "same": false,
+      "bytes": 77361
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "reference": "a9d4efe3d6908070abf20b1f1d15330252303932",
+      "batch": "a9d4efe3d6908070abf20b1f1d15330252303932",
+      "same": true,
+      "bytes": 49098
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "reference": "706bc1e3970dfe4bb0500c29bbc004fec8c1a05d",
+      "batch": "706bc1e3970dfe4bb0500c29bbc004fec8c1a05d",
+      "same": true,
+      "bytes": 50045
+    },
+    {
+      "path": "packages/daemon/src/adapters/types.ts",
+      "reference": "cd027b6286ef7726c95cfd6563d5b420a16402e1",
+      "batch": "cd027b6286ef7726c95cfd6563d5b420a16402e1",
+      "same": true,
+      "bytes": 8585
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "reference": "f33d7a10ba1be34321ecbd9dd14a6df3b9bcd297",
+      "batch": "e8cdae3052490047d4bd44880250a2323aa82184",
+      "same": false,
+      "bytes": 93667
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "reference": "664c0ba0e358c4daa31af278164d06f2e15f4f0b",
+      "batch": "664c0ba0e358c4daa31af278164d06f2e15f4f0b",
+      "same": true,
+      "bytes": 100299
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "reference": "8240935f0a4bc4bd389fc376bc0628f5d85602a3",
+      "batch": "8240935f0a4bc4bd389fc376bc0628f5d85602a3",
+      "same": true,
+      "bytes": 957400
+    },
+    {
+      "path": "tests/action-read-egress.db.test.ts",
+      "reference": "7504f30caabe2c87b41c33d3b13eff0b562dbb5f",
+      "batch": "7504f30caabe2c87b41c33d3b13eff0b562dbb5f",
+      "same": true,
+      "bytes": 34373
+    }
+  ],
+  "criticalTraceFiles": [
+    {
+      "path": "apps/api/src/application.ts",
+      "priorSha": "6fe5ed716899e34c0860e69295ecbec99669b293",
+      "batchSha": "6fe5ed716899e34c0860e69295ecbec99669b293",
+      "identical": true
+    },
+    {
+      "path": "instrumentation.ts",
+      "priorSha": "e6635a158cc7f502f84cca60a2154605260646e4",
+      "batchSha": "e6635a158cc7f502f84cca60a2154605260646e4",
+      "identical": true
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "priorSha": "f3bd51f601bb6cc77cc955aa8c74b232d5bb774b",
+      "batchSha": "c488c68537a844d691a82fd4d1e1606d01ee63e7",
+      "identical": false
+    },
+    {
+      "path": "lib/computer/official-runtime.ts",
+      "priorSha": "2348bd2784daef599e6dc47f374919e50eacc839",
+      "batchSha": "2348bd2784daef599e6dc47f374919e50eacc839",
+      "identical": true
+    },
+    {
+      "path": "lib/request-log.ts",
+      "priorSha": "3e6a99e4b6e63a5e491e44d4ad2379cf9d0e75a7",
+      "batchSha": "3e6a99e4b6e63a5e491e44d4ad2379cf9d0e75a7",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/ai.ts",
+      "priorSha": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+      "batchSha": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/config.ts",
+      "priorSha": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "batchSha": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/context.ts",
+      "priorSha": "fe005d26c2ea903250683d9351334b95ef328383",
+      "batchSha": "fe005d26c2ea903250683d9351334b95ef328383",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/flush.ts",
+      "priorSha": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "batchSha": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/jobs.ts",
+      "priorSha": "6cec226926da96c89acc06479a6b6c13902b0470",
+      "batchSha": "6cec226926da96c89acc06479a6b6c13902b0470",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/labels.ts",
+      "priorSha": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "batchSha": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/logs.ts",
+      "priorSha": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "batchSha": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "priorSha": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "batchSha": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/sampling.ts",
+      "priorSha": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "batchSha": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "priorSha": "93524d78d4063be72f486afff3d24e8d5e46b7f3",
+      "batchSha": "93524d78d4063be72f486afff3d24e8d5e46b7f3",
+      "identical": true
+    },
+    {
+      "path": "lib/tracing/spans.ts",
+      "priorSha": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "batchSha": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "identical": true
+    },
+    {
+      "path": "packages/daemon/bin/cloud-worker.ts",
+      "priorSha": "680467e4bbe77e6e4c237b98572d34076d00909b",
+      "batchSha": "680467e4bbe77e6e4c237b98572d34076d00909b",
+      "identical": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/generation-metrics.ts",
+      "priorSha": "66e6054ae2acdbfc4a462b3de422643c35f76da0",
+      "batchSha": "66e6054ae2acdbfc4a462b3de422643c35f76da0",
+      "identical": true
+    },
+    {
+      "path": "packages/daemon/src/cloud-bootstrap.ts",
+      "priorSha": "382e4627cccf8c6f71397b6a0d9bcb0eaf071949",
+      "batchSha": "382e4627cccf8c6f71397b6a0d9bcb0eaf071949",
+      "identical": true
+    },
+    {
+      "path": "packages/daemon/src/codex-generation-telemetry.ts",
+      "priorSha": "730035a20c2349ab1dc655e3e7e0bed436f42240",
+      "batchSha": "730035a20c2349ab1dc655e3e7e0bed436f42240",
+      "identical": true
+    },
+    {
+      "path": "packages/daemon/src/outbox.ts",
+      "priorSha": "764b3cfae981dd2ba3f19616ce5782bbb9fcc67a",
+      "batchSha": "764b3cfae981dd2ba3f19616ce5782bbb9fcc67a",
+      "identical": true
+    },
+    {
+      "path": "packages/daemon/src/tracing-ai.ts",
+      "priorSha": "6f7d7414fb07809880603dc4c20f6525616219ab",
+      "batchSha": "6f7d7414fb07809880603dc4c20f6525616219ab",
+      "identical": true
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "priorSha": "e0694c3efcaeaed113d87a37b4bd3a8afe623955",
+      "batchSha": "e0694c3efcaeaed113d87a37b4bd3a8afe623955",
+      "identical": true
+    },
+    {
+      "path": "packages/protocol/src/daemon.ts",
+      "priorSha": "d22e9b6fc77ffe302f53530fd5798ae9e900f650",
+      "batchSha": "d22e9b6fc77ffe302f53530fd5798ae9e900f650",
+      "identical": true
+    },
+    {
+      "path": "packages/protocol/src/device.ts",
+      "priorSha": "cd6dbbd23e05aa06ecef6a54e2ce3c7298729441",
+      "batchSha": "cd6dbbd23e05aa06ecef6a54e2ce3c7298729441",
+      "identical": true
+    },
+    {
+      "path": "packages/protocol/src/trace-context.ts",
+      "priorSha": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "batchSha": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "identical": true
+    },
+    {
+      "path": "packages/protocol/src/tracing.ts",
+      "priorSha": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "batchSha": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "identical": true
+    }
+  ],
+  "otherTraceFiles": [
+    {
+      "path": "lib/abuse/model.ts",
+      "batchSha": "4d08e10fa47118d0d7f340fd107936ca9e3ed35d",
+      "priorSha": "4e9406a4e7b71b569004cf0ff33a9996a878eb72",
+      "main0c12Sha": "97ecbef828ed5617acaabe5a5ffe0ad458e40ac7",
+      "samePrior": false,
+      "sameMain": false
+    },
+    {
+      "path": "lib/model-call-timing.ts",
+      "batchSha": "f5d5a9cae9f792e2b1b4a5573abcbc7579264f12",
+      "priorSha": "1b86dbbba01c38c9c685537f1bd59500cd28bb52",
+      "main0c12Sha": "cdf7d171c01766fedcce9122ad1fdbad3f4cb3f7",
+      "samePrior": false,
+      "sameMain": false
+    },
+    {
+      "path": "lib/subscription-workflow-model.ts",
+      "batchSha": "c47738974f8692ebd30a1736e8d39ea7a35ff7f4",
+      "priorSha": "180dcc97624cbf87c21677d908b9a13fb236f7f5",
+      "main0c12Sha": "0830a52d106ed78535990e22a87c32a82bb42f07",
+      "samePrior": false,
+      "sameMain": false
+    },
+    {
+      "path": "workflows/coordinator/workflow.ts",
+      "batchSha": "2c8e5786a253b52ff1382baa1f929dae0cfcef53",
+      "priorSha": "239886a2be739474ff2de22b24063b8c2d25d247",
+      "main0c12Sha": "77c3351ec7550e21f73f257983090a8e6beb52b9",
+      "samePrior": false,
+      "sameMain": false
+    },
+    {
+      "path": "packages/daemon/src/server-link-http.ts",
+      "batchSha": "ed282904dd1c3ce9867c923f5170a8dfb5539a4e",
+      "priorSha": "ed282904dd1c3ce9867c923f5170a8dfb5539a4e",
+      "main0c12Sha": "ed282904dd1c3ce9867c923f5170a8dfb5539a4e",
+      "samePrior": true,
+      "sameMain": true
+    },
+    {
+      "path": "packages/daemon/src/server-link.ts",
+      "batchSha": "0e36561960b6c735a67b20c7182905e770aaf301",
+      "priorSha": "0e36561960b6c735a67b20c7182905e770aaf301",
+      "main0c12Sha": "0e36561960b6c735a67b20c7182905e770aaf301",
+      "samePrior": true,
+      "sameMain": true
+    }
+  ],
+  "startupFiles": [
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "batchSha": "c488c68537a844d691a82fd4d1e1606d01ee63e7",
+      "authored1658Sha": "b335e4c7b389fbbd5fd56084f1b9a47c4f7e43dd",
+      "identical": false
+    },
+    {
+      "path": "lib/computer/native-run-binding.ts",
+      "batchSha": "730620c181a53974b9d4e3fc7374f808fc5fc7a5",
+      "authored1658Sha": "730620c181a53974b9d4e3fc7374f808fc5fc7a5",
+      "identical": true
+    },
+    {
+      "path": "lib/computer/worker-command.ts",
+      "batchSha": "369c7f762df70aae736bfade41484ce979e8192d",
+      "authored1658Sha": "369c7f762df70aae736bfade41484ce979e8192d",
+      "identical": true
+    },
+    {
+      "path": "lib/factory/claim.ts",
+      "batchSha": "0f264337f24c1a421d76e47f384cb66d6d3490f1",
+      "authored1658Sha": "0f264337f24c1a421d76e47f384cb66d6d3490f1",
+      "identical": true
+    },
+    {
+      "path": "lib/factory/profile-admission.ts",
+      "batchSha": "e033a7542a30290db804e3209f1dbc22b1978590",
+      "authored1658Sha": "e033a7542a30290db804e3209f1dbc22b1978590",
+      "identical": true
+    },
+    {
+      "path": "lib/model-dispatch.ts",
+      "batchSha": "54dcc810f244dc8cabebe1b46cfffdc32af2d4c3",
+      "authored1658Sha": "54dcc810f244dc8cabebe1b46cfffdc32af2d4c3",
+      "identical": true
+    },
+    {
+      "path": "lib/subscription-repository.ts",
+      "batchSha": "4dd54caefd1a4bfae399ad4471b259d8fbf8d84c",
+      "authored1658Sha": "4dd54caefd1a4bfae399ad4471b259d8fbf8d84c",
+      "identical": true
+    },
+    {
+      "path": "packages/daemon/src/hosted-cli-prefetch.ts",
+      "batchSha": "d3136a1667e96faed8e19cc5952f1c06d8bb2fcb",
+      "authored1658Sha": "d3136a1667e96faed8e19cc5952f1c06d8bb2fcb",
+      "identical": true
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "batchSha": "e8cdae3052490047d4bd44880250a2323aa82184",
+      "authored1658Sha": "e6ed0b262f76e8fda9c3baa0948d8b35c732c3ab",
+      "identical": false
+    }
+  ],
+  "routeManifest": {
+    "count": 237,
+    "methods": 308,
+    "claimSourceHash": "586ced81afbb37c2215ffac487cdac1f0a92286902ada4c1536fdab5157e4d1d",
+    "claimManifestHash": "586ced81afbb37c2215ffac487cdac1f0a92286902ada4c1536fdab5157e4d1d",
+    "claimMatches": true,
+    "jsonCanonical": true,
+    "tsCanonical": true
+  },
+  "missingPriorPackageScriptTokens": [],
+  "checks": [
+    {
+      "id": "joined_task_query",
+      "result": "preserved",
+      "paths": [
+        "app/actions/task-runs.ts",
+        "tests/action-read-egress.db.test.ts"
+      ],
+      "detail": "Same 200 issue subquery precedes owner-filtered one-to-one bot left join; original runBotId fallback, ordering, revision-before-data, and expiry remain. Structured failure projection is included without restoring a second bot query."
+    },
+    {
+      "id": "generation_and_structured_failure",
+      "result": "preserved",
+      "paths": [
+        "packages/daemon/src/adapters/claude.ts",
+        "packages/daemon/src/adapters/codex.ts",
+        "packages/daemon/src/runs/supervisor.ts"
+      ],
+      "detail": "Claude generation failure accounting and structured failure capture coexist; Codex native/fallback collector, session filtering, registered generation drain, and flush remain. Supervisor retains run carrier, fail/end lifecycle, completion failure metadata, and flush."
+    },
+    {
+      "id": "durable_run_context",
+      "result": "preserved",
+      "paths": [
+        "lib/cloud-computer/thread-machines.ts",
+        "packages/daemon/src/cloud-bootstrap.ts",
+        "packages/daemon/bin/cloud-worker.ts",
+        "packages/daemon/src/server-link-http.ts",
+        "packages/daemon/src/server-link.ts"
+      ],
+      "detail": "Provision span still uses persisted run context. JSON includes traceContext/tracing before exact-byte initial-run hash; handoff remains private-file based. HTTP and daemon bootstrap propagation files are unchanged."
+    },
+    {
+      "id": "preloaded_worker_wake",
+      "result": "preserved_authority",
+      "paths": [
+        "lib/cloud-computer/thread-machines.ts",
+        "lib/computer/worker-command.ts"
+      ],
+      "detail": "A successful signal receipt alone suppresses redundant remote start. Credential use, owner/device identity, token revocation, token last use, and fresh lastSeen are still independently checked before ready."
+    },
+    {
+      "id": "prefetch_shutdown",
+      "result": "preserved",
+      "paths": [
+        "packages/daemon/src/main.ts",
+        "packages/daemon/src/hosted-cli-prefetch.ts"
+      ],
+      "detail": "Optional resolver-selected read-only software prefetch is not awaited by registration/claim. Stop aborts it first, then keeps claims/supervisor/outbox/tracer shutdown before awaiting descriptor drain."
+    },
+    {
+      "id": "model_wrapper_composition",
+      "result": "preserved",
+      "paths": [
+        "lib/abuse/model.ts",
+        "lib/abuse/workflow-model.ts",
+        "lib/subscription-workflow-model.ts",
+        "lib/model-call-timing.ts",
+        "workflows/coordinator/workflow.ts"
+      ],
+      "detail": "Billing adapter composition preserves AiMetadata and observedModel for cloud/self-hosted branches. Bot/coordinator operation tags, per-generation provider boundary, workflow step identity and numeric cache receipt helper remain alongside failure wrappers, subscription timing, and scoped stream changes."
+    }
+  ],
+  "successorApplicability": {
+    "commit": "5ded063f58d4edfbe51492e3e403170d79e17472",
+    "tree": "c2c05659855b6627c6d833aef0145f21a70ed9fe",
+    "parents": [
+      "01004a4333e4bed17540dab41b0287337d67a2f3"
+    ],
+    "changedFiles": [
+      {
+        "path": "package.json",
+        "sha": "91180d10ca9646d7c75b3786eaaebccfbdd29343",
+        "status": "modified"
+      }
+    ],
+    "change": "Only the second Node test:api group adds --test-reporter=tap. Reviewed product and harness source files are unchanged.",
+    "independentlyReadCommitDiff": true
+  },
+  "limitations": [
+    "Read-only fixed-Git-source review; no test, typecheck, generator, database, browser, model, VM, CI rerun, or production execution was performed.",
+    "Current batch CI, Native SQL budgets, and production tracing acceptance remain separate gates; no earlier revision result is transferred.",
+    "Successful preloader wake does not attach the fallback command's transient workerOutputForwarder. Direct daemon OTLP and native collector code is unchanged; the sandbox tee file and failure-tail retrieval remain. This review does not prove receipt delivery.",
+    "Prefetch's 10-second cancellation budget is checked between file operations and is not a hard bound on an individual kernel-stalled read. Descriptor drain follows telemetry shutdown.",
+    "Route rendering and sourceHash were checked by deterministic source-level reconstruction, not by executing the TypeScript generator.",
+    "The original PR1658 patch was isolated via exact 687-to-6d7d99 comparison; its retargeted pull-request files list was not treated as the 21-file authored change."
+  ],
+  "resources": {
+    "newResourcesCreated": 0,
+    "activeOwnedResources": 0,
+    "refsChanged": [],
+    "filesModified": [],
+    "priorMergeSandbox": "stopped_and_readback_verified"
+  },
+  "generatedAt": "2026-11-07T18:41:53.244Z"
+}

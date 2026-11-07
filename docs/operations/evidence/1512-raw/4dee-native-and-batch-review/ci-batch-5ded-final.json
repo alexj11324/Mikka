@@ -1,0 +1,432 @@
+{
+  "schemaVersion": 1,
+  "kind": "exact_head_batch_ci_metadata_final",
+  "recordedAt": "2026-11-07T18:50:48.637Z",
+  "repository": "alexj11324/Mikka",
+  "head": "5ded063f58d4edfbe51492e3e403170d79e17472",
+  "workflowCount": 17,
+  "workflowConclusions": {
+    "success": 13,
+    "cancelled": 4
+  },
+  "allWorkflowTerminal": true,
+  "allWorkflowsPassed": false,
+  "cancellationCause": "unknown_not_inferred_from_later_push",
+  "workflows": [
+    {
+      "id": 42402361090,
+      "name": "Browser gate",
+      "path": ".github/workflows/browser-gate.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:39:32Z"
+    },
+    {
+      "id": 42402361086,
+      "name": "E2B additive runtime release",
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:39:56Z"
+    },
+    {
+      "id": 42402360990,
+      "name": "Community settings UI evidence",
+      "path": ".github/workflows/community-settings-ui.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:41:13Z"
+    },
+    {
+      "id": 42402361070,
+      "name": "Mobile OTA update",
+      "path": ".github/workflows/mobile-update.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:41:46Z"
+    },
+    {
+      "id": 42402361143,
+      "name": "Device gateway",
+      "path": ".github/workflows/device-gateway.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:41:49Z"
+    },
+    {
+      "id": 42402361072,
+      "name": "Unattended sandbox acceptance",
+      "path": ".github/workflows/unattended-sandbox.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:41:50Z"
+    },
+    {
+      "id": 42402360909,
+      "name": "Self-hosting UI evidence",
+      "path": ".github/workflows/self-hosting-ui.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:41:52Z"
+    },
+    {
+      "id": 42402361271,
+      "name": "Cloud computer backend",
+      "path": ".github/workflows/cloud-computer.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:42:05Z"
+    },
+    {
+      "id": 42402361087,
+      "name": "Read cache API acceptance",
+      "path": ".github/workflows/read-cache.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:42:45Z"
+    },
+    {
+      "id": 42402361003,
+      "name": "E2B subscription custody",
+      "path": ".github/workflows/e2b-byos.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:44:04Z"
+    },
+    {
+      "id": 42402360987,
+      "name": "Local device Node 22",
+      "path": ".github/workflows/local-device-node22.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:44:26Z"
+    },
+    {
+      "id": 42402361028,
+      "name": "Analytics SSR",
+      "path": ".github/workflows/analytics-ssr.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:44:40Z"
+    },
+    {
+      "id": 42402361049,
+      "name": "SSH device backend",
+      "path": ".github/workflows/ssh-device-backend.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:45:41Z"
+    },
+    {
+      "id": 42402360900,
+      "name": "Desktop shell",
+      "path": ".github/workflows/desktop.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:44:51Z"
+    },
+    {
+      "id": 42402361095,
+      "name": "Self-hosted image",
+      "path": ".github/workflows/self-hosted-image.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:45:04Z"
+    },
+    {
+      "id": 42402361059,
+      "name": "Site search read contract",
+      "path": ".github/workflows/site-search.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:45:03Z"
+    },
+    {
+      "id": 42402361267,
+      "name": "CI",
+      "path": ".github/workflows/ui-policy.yml",
+      "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-07T18:39:25Z",
+      "updatedAt": "2026-11-07T18:45:02Z"
+    }
+  ],
+  "ci": {
+    "runId": 42402361267,
+    "attempt": 1,
+    "jobCount": 12,
+    "jobConclusions": {
+      "success": 8,
+      "cancelled": 3,
+      "skipped": 1
+    },
+    "jobs": [
+      {
+        "id": 128492769374,
+        "name": "Changed files",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:39:46Z",
+        "completedAt": "2026-11-07T18:39:59Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128492832468,
+        "name": "Core unit checks",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "startedAt": "2026-11-07T18:40:00Z",
+        "completedAt": "2026-11-07T18:45:01Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128492832488,
+        "name": "Source checks",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:40:01Z",
+        "completedAt": "2026-11-07T18:42:37Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128492832514,
+        "name": "Database checks (4/4)",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:40:01Z",
+        "completedAt": "2026-11-07T18:43:31Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128492832516,
+        "name": "Daemon checks",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:40:01Z",
+        "completedAt": "2026-11-07T18:43:12Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128492832537,
+        "name": "Database checks (1/4)",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:40:01Z",
+        "completedAt": "2026-11-07T18:43:31Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128492832563,
+        "name": "Database checks (2/4)",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:40:01Z",
+        "completedAt": "2026-11-07T18:43:47Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128492832597,
+        "name": "Integration unit checks",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "startedAt": "2026-11-07T18:40:01Z",
+        "completedAt": "2026-11-07T18:44:49Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128492832711,
+        "name": "Database checks (3/4)",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:40:01Z",
+        "completedAt": "2026-11-07T18:43:30Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128492833809,
+        "name": "Cloud credential access (OIDC)",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-07T18:39:59Z",
+        "completedAt": "2026-11-07T18:39:59Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128493772335,
+        "name": "Production build and browser interactions",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-07T18:43:49Z",
+        "completedAt": "2026-11-07T18:43:53Z",
+        "failedSteps": []
+      },
+      {
+        "id": 128494074734,
+        "name": "UI policy (strict)",
+        "headSha": "5ded063f58d4edfbe51492e3e403170d79e17472",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "startedAt": "2026-11-07T18:45:01Z",
+        "completedAt": "2026-11-07T18:45:01Z",
+        "failedSteps": []
+      }
+    ]
+  },
+  "sourceEvidence": {
+    "jobId": 128492832488,
+    "actualCheckout": "a222a9b3d88b3e27bb47b3acf6c3ce2eb17e37d7",
+    "tree": "c2c05659855b6627c6d833aef0145f21a70ed9fe",
+    "parents": [
+      "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "5ded063f58d4edfbe51492e3e403170d79e17472"
+    ],
+    "node": "24.22.2",
+    "apiGroups": [
+      {
+        "lineStart": 842,
+        "tests": 84,
+        "suites": 0,
+        "pass": 84,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4041.765478,
+        "lineEnd": 849
+      },
+      {
+        "lineStart": 1247,
+        "tests": 58,
+        "suites": 0,
+        "pass": 58,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 8786.178219,
+        "lineEnd": 1254
+      }
+    ],
+    "aliasCases": [
+      {
+        "case": 1,
+        "status": "passed",
+        "line": 1077,
+        "durationMs": 870.464084
+      },
+      {
+        "case": 2,
+        "status": "passed",
+        "line": 1084,
+        "durationMs": 2241.084937
+      },
+      {
+        "case": 3,
+        "status": "passed",
+        "line": 1090,
+        "durationMs": 0.642586
+      }
+    ],
+    "aliasSource": {
+      "bytes": 6868,
+      "sha256": "1db8226a7a15d47e385d971c0f59fea93bd22677dcd1752c9a502b52743abefd",
+      "gitBlobSha1": "4bbc2b791f4aef326810ec9e2db4916fc505e06e",
+      "equalsOriginal": true
+    },
+    "comparisonReceipt": {
+      "file": "api-test-diagnostic-42401735369-readback.json",
+      "bytes": 17570,
+      "sha256": "0d029f79dcfbc814085aa2c5041551ab061d710954e39d63bdfd8c0401ef12a9",
+      "gitBlobSha1": "5d712d0f6b46377d78cdd80e9a7377ac39a507bb",
+      "remoteBytesVerified": true,
+      "refMutation": false
+    }
+  },
+  "boundaries": {
+    "conditionalOidcSkipNotProductionAcceptance": true,
+    "prE2bWorkflowSuccessNotSubscriptionProof": true,
+    "nativeBudgetNotReadOrInferred": true,
+    "pgJobsSuccessMetadataOnlyNoNewSuiteCountProjection": true,
+    "noRerunOrCancelPerformed": true,
+    "noRefMutation": true,
+    "rawLogPersisted": false
+  }
+}

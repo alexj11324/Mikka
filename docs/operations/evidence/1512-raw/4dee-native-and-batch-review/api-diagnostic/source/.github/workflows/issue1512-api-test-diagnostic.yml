@@ -1,0 +1,96 @@
+name: Issue 1512 API process diagnostic
+
+on:
+  push:
+    branches: [ops/1512-git-transport]
+    paths:
+      - .github/workflows/issue1512-api-test-diagnostic.yml
+      - scripts/ops/issue1512-api-test-diagnostic.mjs
+      - scripts/ops/issue1512-api-test-reporter.mjs
+      - scripts/ops/issue1512-api-test-phases.patch
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: >-
+      github.repository == 'alexj11324/Mikka' &&
+      github.ref == 'refs/heads/ops/1512-git-transport' &&
+      github.event.head_commit.message == 'issue1512: api-test diagnostic 817480a7' &&
+      github.run_attempt == '1'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 6
+    env:
+      MIKKA_EDITION: cloud
+      SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+      MIKKA_SIGNUP_IP_HOURLY: '1000'
+      MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+      MIKKA_VERIFICATION_IP_HOURLY: '1000'
+      MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+      # These are the same public, isolated CI fixture constants as the fixed Source checks job.
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Checkout exact failed synthetic source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 817480a70ada3b66fca2cf55e9cf7b0d5e2d350a
+          path: source
+          persist-credentials: false
+      - name: Checkout this diagnostic revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          persist-credentials: false
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+          package_json_file: source/package.json
+      - name: Select exact failing Node version
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.2
+      - name: Locate existing pnpm store
+        id: store
+        working-directory: source
+        shell: bash
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore existing read-only dependency cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ steps.store.outputs.path }}
+          key: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('source/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-
+      - name: Install exact dependency lock
+        working-directory: source
+        shell: bash
+        run: |
+          umask 077
+          pnpm install --frozen-lockfile > "$RUNNER_TEMP/issue1512-api-install.private.log" 2>&1
+      - name: Run one original API test sequence with closed diagnostics
+        shell: bash
+        run: |
+          umask 077
+          node "$GITHUB_WORKSPACE/ops/scripts/ops/issue1512-api-test-diagnostic.mjs" \
+            --source "$GITHUB_WORKSPACE/source" \
+            --output "$GITHUB_WORKSPACE/evidence/api-test-diagnostic.json" \
+            > "$RUNNER_TEMP/issue1512-api-driver.private.log" 2>&1
+      - name: Preserve safe diagnostic projection
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-api-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/api-test-diagnostic.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Remove only this diagnostic's private output
+        if: always()
+        shell: bash
+        run: |
+          rm -f -- "$RUNNER_TEMP/issue1512-api-install.private.log" "$RUNNER_TEMP/issue1512-api-driver.private.log"

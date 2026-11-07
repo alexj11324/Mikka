@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-api-diagnostic-preparation",
+  "status": "prepared_not_executed",
+  "preparedAt": "2026-11-07T18:31:25.035Z",
+  "repository": "alexj11324/Mikka",
+  "source": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+  "tree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+  "candidate": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+  "failedCi": {
+    "run": 42399391020,
+    "job": 128483737003,
+    "receipt": {
+      "path": "ci-4dee10cc-owned-final.json",
+      "bytes": 160783,
+      "sha256": "0291e300d9edffe0e1616fb5630fd41d151bb5871ecf51cafbfd4431cb7e5c6c",
+      "gitBlobSha1": "3d185121b8056b258b8d00ac16a67a1ff331ec5c",
+      "verified": true,
+      "unreferenced": true,
+      "refMutation": false
+    }
+  },
+  "publication": {
+    "branch": "ops/1512-git-transport",
+    "exactCommitMessage": "issue1512: api-test diagnostic 817480a7",
+    "attempt": 1,
+    "permissions": {
+      "contents": "read"
+    },
+    "jobTimeoutMinutes": 6,
+    "automaticRetries": false,
+    "refUpdated": false
+  },
+  "files": [
+    {
+      "path": ".github/workflows/issue1512-api-test-diagnostic.yml",
+      "bytes": 3895,
+      "sha256": "cf9082ace5bd692f6a33065055881d9caca6a6c0e25b9b3cfcdf9a645d054a5b",
+      "gitBlobSha1": "f32e9afa28c8dc7c676da710f64a38e477ec8bc2",
+      "verified": true
+    },
+    {
+      "path": "scripts/ops/issue1512-api-test-diagnostic.mjs",
+      "bytes": 13294,
+      "sha256": "0f00d3aa14604b2a052e7859ad464a00acd38db93f3424c2d2e18f0a37ccb4f4",
+      "gitBlobSha1": "cf51a755505d672d5346bb110cbb39e8d154b5c6",
+      "verified": true
+    },
+    {
+      "path": "scripts/ops/issue1512-api-test-reporter.mjs",
+      "bytes": 7752,
+      "sha256": "3de38bf0d47d5f18001814a321ce05573d5234c65940bdb9294085446fc431ad",
+      "gitBlobSha1": "a46a948ff1bf61ce090cad0c426fe566cca41270",
+      "verified": true
+    },
+    {
+      "path": "scripts/ops/issue1512-api-test-phases.patch",
+      "bytes": 5756,
+      "sha256": "b4c3086f59a63e533e3dd3bf484284a9272f0511cce6f8fcf1921857d3c7f2ec",
+      "gitBlobSha1": "9e03e6ef97812683843ee567fee6541ff79d6b96",
+      "verified": true
+    }
+  ],
+  "validation": {
+    "reporterPureJs": 15,
+    "patchExactApply": true,
+    "unchangedTimeouts": [
+      "timeout: 20_000",
+      "timeout: 120_000",
+      "timeout: 30_000"
+    ],
+    "patchHunks": 6,
+    "actionPins": 6,
+    "workflowScope": true,
+    "staticPublicCiFixtureUriExceptions": 1,
+    "nodeExecution": false,
+    "gitApplyExecution": false,
+    "actualTestsRun": 0,
+    "resourcesCreated": 0,
+    "syntax": "ECMAScript function compilation after stripping import/export; not a Node --check or GHA run",
+    "unchangedAssertionLines": 10,
+    "unchangedAssertionCalls": 16
+  },
+  "setup": {
+    "runner": "ubuntu-22.04",
+    "node": "24.22.2",
+    "pnpm": "10.34.3",
+    "dependencyLock": "frozen",
+    "cache": "same read-only pnpm-store-v1 key; no save",
+    "prechecks": [
+      "pnpm lint:code",
+      "node apps/api/scripts/generate-routes.mjs --check",
+      "pnpm lint:runtime"
+    ],
+    "test": "same full test:api command, only an explicit closed Node reporter added to both node invocations",
+    "identityBoundary": "The source SHA/tree and real ops workflow SHA are recorded separately. Workflow metadata is not rewritten to impersonate the failed PR run."
+  },
+  "observer": {
+    "phaseEmission": "fs.writeSync(2), fixed closed metadata only",
+    "reporter": "official Node TestStream events; no timer or keepalive",
+    "cancellation": "An outer driver timer exists only after SIGTERM/SIGINT to terminate its owned process group; no normal test timer or concurrency setting is added.",
+    "rawOutput": "No raw test output is uploaded; bounded in-memory projection only. Private dependency/driver output is removed by the workflow finalizer."
+  },
+  "scope": {
+    "providerRequests": false,
+    "databasesStarted": false,
+    "browsersStarted": false,
+    "virtualMachinesStarted": false,
+    "sourceCandidateChanged": false,
+    "refsChanged": false
+  },
+  "remainingUnknown": [
+    "No workflow, Node runtime, shell, real git apply or actual test command has run for this diagnostic draft.",
+    "Static lifecycle review has not established the cause of the repeated file-process failures.",
+    "A passing diagnostic run alone would not prove that the original failure is fixed."
+  ]
+}

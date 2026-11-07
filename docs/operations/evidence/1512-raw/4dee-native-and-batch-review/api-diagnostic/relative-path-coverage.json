@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T18:47:32.147Z",
+  "kind": "diagnostic_only_relative_stderr_path_gap",
+  "absoluteRecordCount": 1,
+  "relativeRecordCount": 0,
+  "source": "scripts/ops/issue1512-api-test-reporter.mjs",
+  "sourceSha256": "3de38bf0d47d5f18001814a321ce05573d5234c65940bdb9294085446fc431ad",
+  "officialNodeSource": "https://github.com/nodejs/node/blob/v24.22.2/lib/internal/test_runner/runner.js",
+  "evidence": {
+    "globReturnsInputRelativePathsWithoutAbsoluteConversion": true,
+    "stderrDataFileUsesRunTestFilePathDirectly": true,
+    "reporterAcceptsOnlySourceRootAbsolutePrefix": true
+  },
+  "actualDiscardedEventPayloadCaptured": false,
+  "scope": "This validates a diagnostic coverage defect for relative stderr paths; it does not prove why the original alias test process failed.",
+  "proposedFutureChange": "Accept only the known exact relative alias path in addition to the already guarded absolute source-root path; do not infer missing phases or rerun now.",
+  "upstreamSourceSha256": "b1bb09fb385d58ef4bc751153c3e36a8b95165f4768642bd273cc2d466fd0e1f",
+  "validation": {
+    "kind": "pure_javascript_projector_only",
+    "externalRequests": 0,
+    "subprocesses": 0,
+    "absoluteAliasPhaseRecords": 1,
+    "relativeAliasPhaseRecords": 0,
+    "productTestsRerun": false
+  },
+  "diagnosticOriginal": {
+    "bytes": 14586,
+    "sha256": "58fdfc34aaf1c44e1a238794e19ab3e7808eba134699fe9360536a24c16dd6f6",
+    "gitBlobSha1": "ed5c7013160b7bc9fa06bb687e870ddf422d5977"
+  },
+  "sourceChanged": false,
+  "workflowRerun": false
+}

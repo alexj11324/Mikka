@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "kind": "owned_offline_sandbox_cleanup",
+  "sessionId": "sbx_oKHhgH7c3PCiHff3ZYoxvVM3o0jb",
+  "createdAt": "2026-11-07T18:32:16.744Z",
+  "stoppedAt": "2026-11-07T18:40:45.022Z",
+  "durationMs": 508278,
+  "status": "stopped",
+  "method": "explicit_stop_session_then_independent_get_session",
+  "stopConfirmed": true,
+  "readbackConfirmed": true,
+  "autoTimeoutMs": 600000,
+  "stoppedBeforeAutoTimeout": true,
+  "resources": {
+    "vcpus": 1,
+    "memoryMB": 2048,
+    "persistent": false,
+    "ports": []
+  },
+  "tasks": [
+    {
+      "owner": "acceptance_review",
+      "purpose": "existing Desktop4dee artifact recovery and unchanged offline readers",
+      "originalFiles": 6,
+      "allFileHashesVerified": true,
+      "remainingNeed": false
+    },
+    {
+      "owner": "llm_impl",
+      "purpose": "existing fixed API diagnostic artifact extraction",
+      "runId": 42401735369,
+      "artifactId": 13586195354,
+      "reportedRawBytes": 14586,
+      "reportedRawSha256": "58fdfc34aaf1c44e1a238794e19ab3e7808eba134699fe9360536a24c16dd6f6",
+      "reportedGitBlob": "ed5c7013160b7bc9fa06bb687e870ddf422d5977",
+      "completionEvidence": "agent confirmed original bytes fully recovered and no remaining Sandbox need before stop",
+      "remainingNeed": false
+    }
+  ],
+  "providerRequestsByRecovery": 0,
+  "modelCallsByRecovery": 0,
+  "applicationRequestsByRecovery": 0,
+  "productionResourcesChanged": false,
+  "remoteGitRefsChanged": false,
+  "limitations": [
+    "This receipt proves closure of the temporary recovery Sandbox only; Native account/fixture cleanup comes from original lifecycle/parity/smoke reports.",
+    "No provider or model acceptance was rerun."
+  ]
+}

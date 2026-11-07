@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "kind": "owned_bounded_offline_recovery",
+  "source": {
+    "source": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+    "harnessRevision": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+    "harnessSha256": "36ed7202e05b11cafb1c5f2f2264c9a6ad4c536672b455ad3c1378fc2e56ae7a",
+    "identityMatched": true
+  },
+  "sessionId": "sbx_oKHhgH7c3PCiHff3ZYoxvVM3o0jb",
+  "resources": {
+    "vcpus": 1,
+    "memoryMB": 2048,
+    "timeoutMs": 600000,
+    "persistent": false,
+    "ports": [],
+    "networkHosts": [
+      "sdmntprsouthcentralus.oaiusercontent.com",
+      "sdmntpreastus3.oaiusercontent.com"
+    ]
+  },
+  "createdAt": "2026-11-07T18:32:16.867Z",
+  "transfer": {
+    "version": 1,
+    "codec": "lzw16be_dictionary_freezes_at_65536",
+    "parts": 107,
+    "partChars": 1400,
+    "encodedChars": 148456,
+    "compressedBytes": 111342,
+    "rawBytes": 588265,
+    "rawSha256": "9114757476ae7228876743a9ead39f064efa86ccff5f06614a323e33e06efb07",
+    "fileCount": 15,
+    "fileBytes": 535630,
+    "partsRead": 107,
+    "sha256Matched": true,
+    "allFileSha256Matched": true,
+    "allFileGitBlobsMatched": true
+  },
+  "helpers": {
+    "desktop-native-summary.mjs": {
+      "bytes": 19258,
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b",
+      "gitBlob": "dad196c96077ab1504fd8858343d31b00cf0da3a"
+    },
+    "desktop-query-operations-summary.mjs": {
+      "bytes": 7134,
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2",
+      "gitBlob": "17a54954b618fc3373715dbc73fa86669c2aa739"
+    },
+    "desktop-1bd4-unattributed-sources-summary.mjs": {
+      "bytes": 14948,
+      "sha256": "0d10210d5403a8e1efa6539a382872025d773fdbf949a1b6e4965dca952ab4f4",
+      "gitBlob": "28f3a63f0b9c4604b79f935dd82420f9994a9e4a"
+    },
+    "desktop-1bd4-query-sources.cjs": {
+      "bytes": 2686,
+      "sha256": "0eeb18be931fdc4d8ddb908dff9a0b4a94a6596a992fcc9a1c5fd635a935a0bb",
+      "gitBlob": "d470c1d71454dff12f60cf7e0dd373624bd8b314"
+    }
+  },
+  "readers": [
+    {
+      "reader": "summary",
+      "exitCode": 0,
+      "stderrBytes": 0
+    },
+    {
+      "reader": "query-operations",
+      "exitCode": 0,
+      "stderrBytes": 0
+    },
+    {
+      "reader": "unattributed-sources",
+      "exitCode": 0,
+      "stderrBytes": 0
+    }
+  ],
+  "downloadsVerified": 3,
+  "originalRawFiles": 6,
+  "sourceManifestVerified": true,
+  "rawFilesUnmodified": true,
+  "signedUrlsPrinted": false,
+  "signedUrlsPersisted": false,
+  "zipFilesPersisted": false,
+  "providerCalls": 0,
+  "modelCalls": 0,
+  "applicationRequests": 0,
+  "remoteRefsChanged": false,
+  "shutdownProof": "separate observer-cleanup.json; not assumed"
+}

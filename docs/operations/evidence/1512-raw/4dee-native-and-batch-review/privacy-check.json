@@ -1,0 +1,482 @@
+{
+  "schemaVersion": 1,
+  "scope": "51 frozen payloads before README/privacy/index addition",
+  "payloadCount": 51,
+  "payloadBytes": 2372810,
+  "checks": {
+    "privateKeyBlockMarkers": 0,
+    "providerSecretPatterns": 0,
+    "signedDownloadUrlSignatureParameters": 0,
+    "jwtPatterns": 0,
+    "longLiteralBearerTokens": 0,
+    "nonSourceEmailMatches": 0
+  },
+  "method": "Pure in-memory pattern scan of complete UTF-8 contents plus closed artifact/schema provenance already included in the payload receipts",
+  "boundaries": [
+    "These narrow pattern checks are not a proof that every possible secret format is absent.",
+    "Git-backed static source and test fixtures are preserved as source, not operational credentials.",
+    "Raw mixed job logs and signed download URLs were not archived.",
+    "No production messages, prompts, generated answers, runtime SQL payloads, screenshots, DMGs or artifact ZIPs are included."
+  ],
+  "files": [
+    {
+      "path": "evidence/desktop-4dee10/lifecycle.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/parity/parity.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/smoke.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/mac-acceptance-package.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/native-crypto.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/compiled/mikka-build.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/download-validation.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/privacy.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/summary.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/query-operations.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/unattributed-sources.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/summary.stdout.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/query-operations.stdout.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/unattributed-sources.stdout.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/closed-diagnostic.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/ci-final.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/source-binding.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/integration-difference.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/recovery-receipt.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/observer-cleanup.json",
+      "kind": "exact_native_artifact_or_closed_derivative",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/index.json",
+      "kind": "native_subindex",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "evidence/desktop-4dee10/root-counter-recomputation.json",
+      "kind": "independent_counter_check",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "api-diagnostic/original-api-test-diagnostic.json",
+      "kind": "exact_artifact_json",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "api-diagnostic/preparation.json",
+      "kind": "closed_receipt",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "api-diagnostic/diagnostic-readback-v1.json",
+      "kind": "closed_receipt",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "api-diagnostic/diagnostic-readback.json",
+      "kind": "closed_receipt",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "api-diagnostic/relative-path-coverage.json",
+      "kind": "closed_receipt",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "api-diagnostic/source/.github/workflows/issue1512-api-test-diagnostic.yml",
+      "kind": "diagnostic_source_never_product",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "api-diagnostic/source/scripts/ops/issue1512-api-test-diagnostic.mjs",
+      "kind": "diagnostic_source_never_product",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "api-diagnostic/source/scripts/ops/issue1512-api-test-reporter.mjs",
+      "kind": "diagnostic_source_never_product",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "api-diagnostic/source/scripts/ops/issue1512-api-test-phases.patch",
+      "kind": "diagnostic_source_never_product",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "main687-cloud-core-failure.json",
+      "kind": "closed_historical_deployment_failure",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/manifest.json",
+      "kind": "unpublished_reference_manifest",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source-review.json",
+      "kind": "unpublished_reference_review",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source-excerpts.json",
+      "kind": "unpublished_reference_review",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/app/actions/task-runs.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/apps/api/generated/routes.json",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/apps/api/generated/routes.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/lib/abuse/workflow-model.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/package.json",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/packages/daemon/src/adapters/claude.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/packages/daemon/src/adapters/codex.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/packages/daemon/src/adapters/types.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/packages/daemon/src/main.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/packages/daemon/src/runs/supervisor.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/pnpm-lock.yaml",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "unpublished-main0c12-review/source/tests/action-read-egress.db.test.ts",
+      "kind": "unpublished_reference_source",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "batch-source-audit-5ded.json",
+      "kind": "read_only_batch_source_audit",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "ci-batch-5ded-final.json",
+      "kind": "closed_final_workflow_receipt",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    },
+    {
+      "path": "main-0c12-cloud-core-readonly.json",
+      "kind": "closed_final_workflow_receipt",
+      "privateKey": 0,
+      "providerSecret": 0,
+      "signedUrlParameter": 0,
+      "jwt": 0,
+      "bearerLiteral": 0
+    }
+  ]
+}

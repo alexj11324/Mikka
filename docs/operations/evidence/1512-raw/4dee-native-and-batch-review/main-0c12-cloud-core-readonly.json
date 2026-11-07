@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "kind": "main_0c12_cloud_core_readonly_failure_projection",
+  "recordedAt": "2026-11-07T18:50:24.735Z",
+  "repository": "alexj11324/Mikka",
+  "head": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+  "run": {
+    "id": 42401535378,
+    "event": "workflow_run",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "failure"
+  },
+  "job": {
+    "id": 128490420652,
+    "name": "Core production API and gateway acceptance",
+    "status": "completed",
+    "conclusion": "failure",
+    "startedAt": "2026-11-07T18:30:24Z",
+    "completedAt": "2026-11-07T18:31:32Z",
+    "failedSteps": [
+      {
+        "number": 7,
+        "name": "Verify cloud discovery, owner flags, live and source-daemon gateways with exact cleanup",
+        "conclusion": "failure"
+      }
+    ]
+  },
+  "actualCheckout": [
+    "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4"
+  ],
+  "evidence": {
+    "kind": "closed_report_projection_from_job_log_in_memory",
+    "rawStringCodeUnits": 45596,
+    "rawLogPersisted": false,
+    "teamIdentityAndHashOmitted": true,
+    "credentialsAndResponsesOmitted": true
+  },
+  "report": {
+    "status": "fail",
+    "applicationSha": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "runnerSha": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "checks": {
+      "deployment": true,
+      "sessionOwner": true,
+      "mobileHomeOwner": true,
+      "publishedActions": false,
+      "enrollment": false,
+      "registration": false,
+      "deviceOwner": false,
+      "schedulingDisabled": false,
+      "heartbeat": false,
+      "finalDeployment": true,
+      "discoveryAndFlags": false,
+      "liveHandshake": false,
+      "liveDeviceList": false,
+      "deviceGateway": false
+    },
+    "resources": {
+      "enrollmentAttempts": 0,
+      "issuedGrants": 0,
+      "credentialExchangeAttempts": 0,
+      "issuedCredentials": 0,
+      "registeredDevices": 0
+    },
+    "cleanup": {
+      "credentialRevoked": false,
+      "oldCredentialRejected": false,
+      "deviceRemoved": true,
+      "originalDevicesPreserved": false,
+      "originalCredentialsPreserved": false,
+      "sessionClosed": true,
+      "liveSocketClosed": true,
+      "deviceSocketClosed": true
+    },
+    "errors": [
+      {
+        "phase": "core-capabilities",
+        "code": "core_features",
+        "detail": "flags",
+        "sourceBound": true
+      }
+    ],
+    "boundaries": {
+      "modelRequestsByDriver": 0,
+      "cloudComputerBoots": 0,
+      "databaseAccessByDriver": false,
+      "browserExercised": false,
+      "providerLoginExercised": false,
+      "quotaEnforcementExercised": false,
+      "settlementExercised": false
+    },
+    "targetAfter": {
+      "verified": true,
+      "status": "ready"
+    }
+  },
+  "sourceBindings": [
+    {
+      "path": ".github/workflows/self-hosted-production.yml",
+      "source": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "bytes": 4129,
+      "sha256": "5e3dae45ad29838efccb8a9f9c3294723120d35798ea2e5d8c0c336655948012"
+    },
+    {
+      "path": "scripts/acceptance/self-hosted-production.mjs",
+      "source": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "bytes": 2123,
+      "sha256": "abd355736fc8ffc4d4230ff84bc6a90ff5441362232f0cd3f0239b45462629c9"
+    },
+    {
+      "path": "scripts/ops/production-mobile-daemon.mjs",
+      "source": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "bytes": 30062,
+      "sha256": "4a758e6ec47235b1fee6cf49e5762f4090dc4db0e917da36f0b2dcc01db4c408"
+    },
+    {
+      "path": "scripts/acceptance/self-hosted-production-probes.mjs",
+      "source": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+      "bytes": 8771,
+      "sha256": "08c6a8eb24d1ef1481d488fc8cb3d02e5d02517cb4eaccdaca0f4e35f7500c72"
+    }
+  ],
+  "failingPredicate": {
+    "sourcePath": "scripts/acceptance/self-hosted-production-probes.mjs",
+    "sourceLines": [
+      33,
+      36
+    ],
+    "conditions": [
+      "features.flags is a non-array object with all values boolean",
+      "features.cloudComputer === true",
+      "features.flags['mikka-computer-billing'] === false",
+      "features.flags['mikka-computer-tab-off'] === false",
+      "emailEnabled === true"
+    ],
+    "actualReturnedValues": "not_recorded_in_closed_report",
+    "whichConditionFailed": "unknown"
+  },
+  "conclusions": {
+    "actualFailure": "core_features/flags",
+    "phase": "core-capabilities",
+    "notReusedFromHistorical687": true,
+    "gatewayChecksExecuted": false,
+    "allOwnedEnrollmentAndCredentialAndRegistrationCountersZero": true,
+    "sessionCloseConfirmed": true,
+    "socketCloseReportedTrue": true,
+    "baselinePreservationChecksFalseAreNotEvidenceOfDestruction": true,
+    "successfulFullCoreAcceptance": false
+  },
+  "mutations": {
+    "configuration": 0,
+    "models": 0,
+    "resourcesCreated": 0,
+    "workflowReruns": 0,
+    "repositoryRefs": 0
+  },
+  "limitations": [
+    "The combined flags predicate identifies a precise failure site but not the individual returned flag.",
+    "False downstream fields remain unexecuted or unverified; they are not rewritten to success.",
+    "This run is distinct from earlier 687 diagnostics. No earlier root cause is inferred."
+  ]
+}

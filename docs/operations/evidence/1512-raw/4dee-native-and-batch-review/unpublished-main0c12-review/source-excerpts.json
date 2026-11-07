@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "kind": "source_only_merge_review_excerpts",
+  "ours": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+  "theirs": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+  "treePlanBlob": "453b80fa96b7d4d52bc75e4ab5352727226e38b1",
+  "excerpts": [
+    {
+      "path": "app/actions/task-runs.ts",
+      "gitBlobSha": "ae3974497f8c0573dd9c8d0ec5ba880f5a5c72ef",
+      "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8",
+      "firstLine": 55,
+      "text": "async function readTaskRuns() {\n  const session = await auth.api.getSession({ headers: await headers() })\n  if (!session?.user) throw new ActionFailureError('authRequired')\n  const observedAt = Date.now()\n  const begun = await beginOwnerListRead(session.user.id, ['task_run_list'])\n  // A run whose device went offline is retried (or lands in 等你) by the minute\n  // run-recovery cron (sweepExpiredRunLeases), not by this poll.\n  const latest = db.selectDistinctOn([agentRuns.issueId], {\n    // A thread's name: its task's short title while the task keeps the title it was written from (lib/short-title.ts).\n    issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: sql<string>`coalesce(${issueShortTitle}, ${issues.title})`.as('issueTitle'), agentName: runAgentName.as('agentName'),\n    status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),\n    botId: runBotId.as('botId'),\n    expiresAt: sql<Date | null>`(select min(r.\"createdAt\")+interval '30 days' from agent_runs r where r.\"issueId\"=${agentRuns.issueId} and r.\"userId\"=${agentRuns.userId} and r.\"createdAt\">now()-interval '30 days')`.as('expiresAt'),\n    harnesses: sql<string[]>`array(select a.harness from agent_runs r join agents a on a.id=r.\"agentId\" where r.\"issueId\"=${agentRuns.issueId} and r.\"userId\"=${agentRuns.userId} and r.\"createdAt\" > now() - interval '30 days' group by a.harness order by max(r.\"createdAt\") desc)`.as('harnesses'),\n  }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).innerJoin(issues, eq(issues.id, agentRuns.issueId))\n    .where(and(eq(agentRuns.userId, session.user.id), isNotNull(agentRuns.issueId), sql`${agentRuns.createdAt} > now() - interval '30 days'`))\n    .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200).as('latest_task_runs')\n  // Select the same 200 issues first. Bot decoration is a one-to-one join in\n  // this database; a missing or foreign bot cannot remove or duplicate a task.\n  const rows = await db.select({\n    issueId: latest.issueId, runId: latest.runId, issueTitle: latest.issueTitle, agentName: latest.agentName,\n    status: latest.status, outcome: latest.outcome, failureDetails: latest.failureDetails, expiresAt: latest.expiresAt, harnesses: latest.harnesses,\n    bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape },\n  }).from(latest).leftJoin(bots, and(eq(bots.id, latest.botId), eq(bots.ownerId, session.user.id))).orderBy(latest.issueId)\n  const live = await ownerListRead(session.user.id, rows.map(row => row.expiresAt), observedAt, begun)\n  const items: TaskRun[] = rows.map(({ expiresAt: _expiresAt, ...row }) => ({ ...row, failureDetails: readCompactRunFailure(row.failureDetails), issueId: row.issueId! }))\n  return { items, live }\n}\n\n/** A thread: one run, newest first. Its name comes from its task, else its prompt. */\nexport interface Thread {\n  id: string"
+    },
+    {
+      "path": "lib/abuse/workflow-model.ts",
+      "gitBlobSha": "31cfd5d6904bdbcaa48f5485891f6f8a3bd2f962",
+      "sha256": "fb9caf8380b671275666c9b6dc6fcf75af8deca8d1ee2e97e737c78a34a3ea25",
+      "firstLine": 28,
+      "text": "  async doGenerate(options: Parameters<Model['doGenerate']>[0]) {\n    'use step'\n    const { executionWorkspace } = await import('../execution-settings')\n    const { hostedModel } = await import('./model')\n    const { workflowFailureCall } = await import('../workflow-run-failure')\n    const { stepIdentity } = await import('../model-call-timing')\n    const { APP_BUILD } = await import('../app-build')\n    const identity = await stepIdentity()\n    return workflowFailureCall(async () => (\n      await hostedModel(\n        await executionWorkspace(this.ownerId, this.botId),\n        this.modelId,\n        undefined,\n        this.ownerId,\n        { operation: this.botId ? 'bot' : 'coordinator' },\n      )\n    ).doGenerate(options), { runId: identity.workflowRunId, appVersion: APP_BUILD, credential: 'api_key', requestBodyValues: { prompt: options.prompt, tools: options.tools, providerOptions: options.providerOptions, headers: options.headers } })\n  }\n  async doStream(options: Parameters<Model['doStream']>[0]) {\n    'use step'\n    const startedAt = Date.now()\n    const { executionWorkspace } = await import('../execution-settings')\n    const { hostedModel } = await import('./model')"
+    },
+    {
+      "path": "lib/abuse/workflow-model.ts",
+      "gitBlobSha": "31cfd5d6904bdbcaa48f5485891f6f8a3bd2f962",
+      "sha256": "fb9caf8380b671275666c9b6dc6fcf75af8deca8d1ee2e97e737c78a34a3ea25",
+      "firstLine": 58,
+      "text": "    const result = await workflowFailureStream(async () => {\n      const model = await hostedModel(await executionWorkspace(this.ownerId, this.botId), this.modelId, undefined, this.ownerId, { operation: this.botId ? 'bot' : 'coordinator' })\n      requestedAt = Date.now()\n      return model.doStream({ ...options, prompt: withCacheBreakpoints(options.prompt, 'anthropic') })\n    }, { runId: identity.workflowRunId, appVersion: APP_BUILD, credential: 'api_key', requestBodyValues: { prompt: options.prompt, tools: options.tools, providerOptions: options.providerOptions, headers: options.headers } })\n    return timedModelStream(result, { route: 'hosted', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, ...identity })\n  }\n}\n"
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "gitBlobSha": "a9d4efe3d6908070abf20b1f1d15330252303932",
+      "sha256": "b6fb5a954bf0b5382d0e040ede3527f59fe39668d185003f305f5caf69a0521a",
+      "firstLine": 905,
+      "text": "        if (!ending) diedEarly(stderrTail())\n      } catch (error) {\n        generations.fail()\n        if (!ending) {\n          failureDetails = capture(error)\n          diedEarly(errorMessage(error), claudeProviderException(error))\n        }\n      } finally {\n        clearTimeout(authTimer)\n        spoke(false)\n        finished()\n      }\n    })()"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "gitBlobSha": "706bc1e3970dfe4bb0500c29bbc004fec8c1a05d",
+      "sha256": "eb2160a0da70ee718b78839fb8b8dd7f42c69fb7fd697c0b25c1cb66cd99e9da",
+      "firstLine": 456,
+      "text": "    const closeNativeGenerations = (cliExitObserved: boolean) => {\n      if (!nativeGenerations) return\n      const drain = nativeGenerations.close(cliExitObserved).then(receipt =>\n        daemonTracer.span('daemon.ai.collection', { 'mikka.harness': 'codex', ...codexGenerationReceiptAttributes(receipt) }, async () => {}, { traceContext }))\n      daemonTracer.registerGenerationDrain(drain)\n      void drain.then(() => daemonTracer.flush()).catch(() => {})\n    }\n    const argv = [\n      binary,\n      \"app-server\",\n      \"-c\", `features.shell_tool=${rawCliShellAvailable(runPolicy(options.policy))}`,"
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "gitBlobSha": "664c0ba0e358c4daa31af278164d06f2e15f4f0b",
+      "sha256": "8835a8608e4bddfad376c9edb657aefed5d3c4077a4a467e4f1bd7e264efc75f",
+      "firstLine": 1025,
+      "text": "    // A provider's terminal failure is an ordinary iterator result, not a\n    // throw. Mark its run span explicitly without passing private CLI text.\n    if (state === 'failed') active?.span?.fail({ name: 'RunFailure' }, stopReason)\n    else active?.span?.set('mikka.outcome', stopReason)\n    this.setState(runId, state, {\n      stopReason,\n      ...(error ? { error } : {}),\n    })\n    const terminalFailure = state === \"failed\" && !active?.cancelRequested && !active?.forcedStop\n      ? captureRunFailure(failureDetails ?? new Error(error ?? report.summary), {\n        runId, appVersion: DAEMON_VERSION, sensitiveText: [entry?.assignment.prompt ?? \"\"],\n      }) : undefined\n    this.push(runId, {\n      kind: \"complete\",\n      completion: { stopReason, report, ...(terminalFailure ? { failureDetails: terminalFailure } : {}) },\n    })\n    this.disposeMasker(runId)\n    const run = this.active.get(runId)\n    if (run) void this.closeMailbox(run).catch(() => this.deps.log.warn('Run mailbox shutdown failed'))\n    this.leases.delete(runId)\n    // A finished turn keeps no credential on the machine (decision 2026-10-31-2225);\n    // a resumed session writes its own again.\n    if (this.deps.adapterStateDir) {"
+    },
+    {
+      "path": "tests/action-read-egress.db.test.ts",
+      "gitBlobSha": "7504f30caabe2c87b41c33d3b13eff0b562dbb5f",
+      "sha256": "1e0ba28789803b67b2c65eacbb6a1826366d95e0f178c8fac30c40072e2f207d",
+      "firstLine": 83,
+      "text": "    assert.equal(result.reads.filter(read => read.text.includes('from (select distinct on')).length, 1)\n    assert.equal(result.reads.some(read => /from \"bots\" where/.test(read.text)), false, 'bot looks do not add a separate statement')\n    t.diagnostic(JSON.stringify({ read: 'task-runs', rowCount: selected.rows, beforeResultBytes: baseline.reads[0].bytes, resultBytes: selected.bytes, actionBytes: Buffer.byteLength(JSON.stringify(result.value)), fields: selected.fields }))\n    assert.deepEqual(result.value.items, baseline.value.map(({ agentId: _agentId, error: _error, finishedAt: _finishedAt, botId, expiresAt: _expiry, ...row }) => ({ ...row, issueId: row.issueId!, bot: botLooks.find(bot => bot.id === botId) ?? null, failureDetails: null })))\n    assert.equal(result.value.items.length, 200)\n    assert.equal(result.value.items.find(row => row.issueId === issueIds[0])?.runId, newest)\n    assert.deepEqual(issueIds.slice(0, 4).map(id => result.value.items.find(row => row.issueId === id)?.bot?.id ?? null), [boundBot, directBot, null, runtimeBot], 'binding wins, direct and runtime fallbacks survive, and foreign bots remain private')\n    assert.ok(result.value.items.every(row => row.runId !== peerRun && row.runId !== oldRun))\n    assert.ok(result.value.items.every(row => row.agentName === 'Codex' && row.harnesses.includes('codex')))\n    for (const field of ['agentId', 'error', 'finishedAt']) {"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "gitBlobSha": "7906950df21dc3fa25f53ea0693f7fd9c0409822",
+      "sha256": "93793b318041663537d68407ee42bfeaa51213e9ed34b8b494c27778bbb8f2d9",
+      "firstLine": 455,
+      "text": "    return NextResponse.json({\n    ...publication,\n    runId, issueId: run.issueId, deviceId, repoId: repo.id,\n    ...(run.agentDefinition?.traceContext ? { traceContext: { ...run.agentDefinition.traceContext, runId } } : {}),\n    ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),\n    ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: current.prompt,\n    kind: current.kind, leaseExpiresAt, policyRevision: cliPolicy.revision,\n    ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),"
+    }
+  ],
+  "package": {
+    "gatewayVersion": "4.0.121",
+    "addedScriptTokens": {
+      "test:lib-units": [
+        "lib/workflow-run-failure.test.ts"
+      ],
+      "test:run-publication": [
+        "lib/run-failure-details.test.ts"
+      ]
+    }
+  },
+  "generated": {
+    "routeCount": 229,
+    "changes": [
+      {
+        "source": "app/api/mobile/chat/route.ts",
+        "sourceHash": "479f666a4bbd214de0012e8b19e4ab64fb7a65dbe9fc27eac15e9b4208d509e0"
+      },
+      {
+        "source": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+        "sourceHash": "93793b318041663537d68407ee42bfeaa51213e9ed34b8b494c27778bbb8f2d9"
+      },
+      {
+        "source": "app/v1/runs/[runId]/complete/route.ts",
+        "sourceHash": "0174eb18a3003b554a4cfd996dc516ce36cef29dd868bfe5e72656b035967991"
+      }
+    ],
+    "typescriptGeneratorExecuted": false
+  },
+  "boundaries": [
+    "Static source excerpts only; no real account or provider data.",
+    "No full typecheck, database test or production run executed in this recovery sandbox."
+  ]
+}

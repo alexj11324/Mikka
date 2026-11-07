@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "kind": "desktop_source_and_harness_binding_final",
+  "recordedAt": "2026-11-07T18:29:19.086Z",
+  "candidate": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+  "source": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+  "tree": "b907cf48fc48c82351fe2e141970fbf77bc12ed8",
+  "parents": [
+    "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+    "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431"
+  ],
+  "harnessSha256": "36ed7202e05b11cafb1c5f2f2264c9a6ad4c536672b455ad3c1378fc2e56ae7a",
+  "orderedFiles": [
+    {
+      "path": "apps/desktop/test/parity.mjs",
+      "bytes": 34628,
+      "sha256": "c5f4cba993547a1d2893ab56f936fa8254426cebdbc7978aa161584776ab5ec0"
+    },
+    {
+      "path": "apps/desktop/test/parity-fixtures.mjs",
+      "bytes": 15162,
+      "sha256": "99941a8ab30a471030b0000089ab7fd920ef6dda7786501ea6aab88a1732ba6d"
+    },
+    {
+      "path": "apps/desktop/test/generated-workspace-name.mjs",
+      "bytes": 8508,
+      "sha256": "d0a99fe6ff036fca9fca55a18adab96ea40cbe117400ce11585909c3aad5481c"
+    },
+    {
+      "path": "apps/desktop/test/parity-images.mjs",
+      "bytes": 5493,
+      "sha256": "57147e1f1cb5eb2bdb70879bb99acf0b82737057ddfbf8261edb42386189cedc"
+    },
+    {
+      "path": "apps/desktop/test/parity-clock.mjs",
+      "bytes": 1771,
+      "sha256": "ded3031029e0793a3436c385bae34a6d8b380196216c3bbbd56ba80fd0699d3f"
+    },
+    {
+      "path": "apps/desktop/test/native-viewport.mjs",
+      "bytes": 3346,
+      "sha256": "291cc975f1970a4e7cc392a8fbfc1a87352ad614efd7553a683c7adb715dc496"
+    },
+    {
+      "path": "apps/desktop/test/native-auth-diagnostics.mjs",
+      "bytes": 21444,
+      "sha256": "78398dcd6eb48983a7bb3a128e0756a088cf3b5f9eec17de954f8d32433024af"
+    },
+    {
+      "path": "apps/desktop/test/parity-reader-defaults.mjs",
+      "bytes": 3446,
+      "sha256": "ac5d8ee6887454a65830d80c5cf37ffd7df584da999e1905d040b3a391ebd5a2"
+    },
+    {
+      "path": "apps/desktop/test/parity-page-ready.mjs",
+      "bytes": 13784,
+      "sha256": "d014eeb8d83d13cd449418b112f9777b7c38da919e5006666bd9fdab6fce1db4"
+    },
+    {
+      "path": "apps/desktop/test/parity-settings-ready.mjs",
+      "bytes": 10358,
+      "sha256": "52dde7b6c6b6f892a6d5c161ca23190ddbb139dd14c6d0bf9b164ce480e8d3f7"
+    },
+    {
+      "path": "apps/desktop/test/native-device-ready.mjs",
+      "bytes": 10502,
+      "sha256": "9b7c98ce34e617d324a28f99fe24eb43700b9e999c21bcfa6a88699df5e53264"
+    },
+    {
+      "path": "scripts/acceptance/read-action-transport.mjs",
+      "bytes": 3915,
+      "sha256": "126fead63e72d8d835dde62bda48927176399936ce7499fda39c52350b16e8b8"
+    }
+  ],
+  "method": "inherited exact 12-file bytes from c849/d933, immutable GitHub comparison c849 merge base to 817 has 27 complete changed paths and zero harness overlap; c849 and d933 identical trees independently verified",
+  "actualCheckoutJobs": [
+    128483669641,
+    128483669811,
+    128485780934
+  ],
+  "nativeCheckoutObserved": true,
+  "compiledManifestVerified": true,
+  "rawParityHarnessVerified": true,
+  "artifacts": [
+    {
+      "kind": "native",
+      "id": 13585616921,
+      "name": "desktop-native-evidence-817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+      "bytes": 14887128,
+      "sha256": "c98eefd3b1f71ff6e2c488af34b359e76fe39eb51d415ae189dab26a661a2e9b",
+      "expired": false,
+      "createdAt": "2026-11-07T18:26:20Z",
+      "headSha": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+      "runId": 42399391047
+    },
+    {
+      "kind": "package",
+      "id": 13585149370,
+      "name": "desktop-package-evidence-817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+      "bytes": 1593,
+      "sha256": "befadbe4cba0f190038a8fa91127728fb6baf845688ef330c28df1fb9d8ab38e",
+      "expired": false,
+      "createdAt": "2026-11-07T18:26:17Z",
+      "headSha": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+      "runId": 42399391047
+    },
+    {
+      "kind": "compiled",
+      "id": 13584852849,
+      "name": "desktop-api-build-817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+      "bytes": 48069155,
+      "sha256": "45c8b7646fa8f3eb1a88219b15f445af43a171d28248e40a118f82f318e71a09",
+      "expired": false,
+      "createdAt": "2026-11-07T18:11:18Z",
+      "headSha": "4dee10cc9fc4e29dd5859ae49bb3a8ea51d9b431",
+      "runId": 42399391047
+    }
+  ],
+  "boundaries": {
+    "mainAtCheckout": "687479154d7d5264c60e5e0d4343e370dbc4e89e",
+    "latestMainObserved": "0c12a8064c1ab350c9739fa4c6ad84129f8a12a4",
+    "noBudgetTransferFromPreviousCandidates": true,
+    "providerOrModelCallsByObserver": 0
+  },
+  "compiled": {
+    "version": 1,
+    "revision": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+    "appBuild": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+    "testDeploymentSha": "817480a70ada3b66fca2cf55e9cf7b0d5e2d350a",
+    "preset": "node-server",
+    "node": "v24.22.2",
+    "basePath": "/mikka"
+  },
+  "originalJsonFiles": [
+    {
+      "path": "lifecycle.json",
+      "bytes": 267082,
+      "sha256": "a1306eddccad36547d0f40b38dffcfd914b5fb3031975a895b606541408fb231",
+      "gitBlob": "d3860a980d763e2a36eefe611cea63e5ef9b7857"
+    },
+    {
+      "path": "parity/parity.json",
+      "bytes": 106426,
+      "sha256": "c768d68fdf71e8d7daacbfd13aa1923b6e43794bb2e57733595e100449fa08a2",
+      "gitBlob": "0b72453decc39fd5f37498483b4d5c071f48a094"
+    },
+    {
+      "path": "smoke.json",
+      "bytes": 3105,
+      "sha256": "999f5f09d5204b828d91e8cb181d7716cca9252b081d19816bbf7c93525cde99",
+      "gitBlob": "c12a4f049b59d7c8b58c44dbf7e408d2d466a242"
+    },
+    {
+      "path": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "d4ea0b33ba08410fd9a1b9e7932d65167f2a1ea293dafdef5a92fd768d27c0dd",
+      "gitBlob": "a6b18aafb9d2cdda1eaa6c87fc29108245d5b77b"
+    },
+    {
+      "path": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "50302a84b4aa046edd7fb50fe39917cd7e6add9a84d4a222f9198c9fabe2f0b7",
+      "gitBlob": "08f88bf27d71ff50c0f96bf612eea5faa8820ddd"
+    },
+    {
+      "path": "compiled/mikka-build.json",
+      "bytes": 8431,
+      "sha256": "c9eba487cc864c3c3e0aeb46c28e1847404f26e1eac8e260280312fa6ca84c46",
+      "gitBlob": "f25d6494aa5bdb197c0f96665786042930d72701"
+    }
+  ]
+}
