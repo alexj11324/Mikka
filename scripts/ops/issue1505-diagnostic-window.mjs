@@ -8,8 +8,8 @@ import { execFileSync } from 'node:child_process'
 export const SOURCE = 'e33e3a91d4011efbe768b11b428a5d152ede744a'
 export const TREE = 'b2e36d3351654fceec59fe138a55de31cb155df9'
 export const BRANCH = 'ops/1505-diagnostic-window-e33e3a91'
-export const HELPER_PARENT = 'e33f18f4a210391d3e14f15364a4d7db2d8565a2'
-export const HELPER_PARENT_TREE = 'c12094723dfe6cf149fd92588ba977a6f9ee4472'
+export const HELPER_PARENT = '9f9ad0d4e0424df488a5a2ac981fbdafbcffcc1f'
+export const HELPER_PARENT_TREE = '9b54db78ea828a61e97f3990011d54d2aad06bb3'
 export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
 export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
 export const KEY = 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW'
@@ -112,10 +112,21 @@ export async function prepareWindow({ env, helpers, reuse, fetchImpl = fetch, no
       stage = 'normal_bot_idle_read'
       // This registered read does not welcome/wake the chat; a failed/busy read never stops it.
       const chat = await client.rpc('coordinator.pollCoordinatorChat', [bot.id])
+      // Completed history survives stopCoordinatorTurn and task cleanup. It is
+      // not current work: require no active lease, pending item or chat error.
+      // Do not erase history or copy message bodies into the recovery record.
       check(chat?.botId === bot.id && chat.enabled === true && chat.working === false && chat.error === null
-        && chat.streamRunId === undefined && Array.isArray(chat.items) && chat.items.length === 0 && chat.cursor === 0
-        && chat.historyBefore === undefined && Array.isArray(chat.persistedStreamIds) && chat.persistedStreamIds.length === 0,
+        && chat.streamRunId === undefined && Array.isArray(chat.items)
+        && chat.items.every(item => item && typeof item === 'object' && !Array.isArray(item)
+          && (item.pending === undefined || item.pending === false)
+          && Number.isSafeInteger(item.position) && item.position >= 0)
+        && Number.isSafeInteger(chat.cursor) && chat.cursor >= 0
+        && (chat.historyBefore === undefined || (Number.isSafeInteger(chat.historyBefore) && chat.historyBefore >= 0))
+        && Array.isArray(chat.persistedStreamIds) && chat.persistedStreamIds.every(id => typeof id === 'string' && id.length > 0),
         'reused_bot_not_confirmed_idle')
+      report.botIdleHistory = { items: chat.items.length, cursor: chat.cursor,
+        persistedStreams: chat.persistedStreamIds.length, pendingItems: 0,
+        ...(chat.historyBefore === undefined ? {} : { historyBefore: chat.historyBefore }) }
       report.cleanup.botIdleVerified = true; report.botIdleObservedAt = new Date(now()).toISOString(); accountReady = true
       await save(report)
     } catch (error) { report.error = { stage, ...closedError(error) } }

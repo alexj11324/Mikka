@@ -1,6 +1,6 @@
 # Fresh diagnostic window after exact removal of the preceding window.
 # Reuse only the same independently verified idle Bot. No task/Profile/model/VM creation.
-# Normal child of e33f18f4; original Bot receipt identity remains 5cd03921.
+# Normal child of 9f9ad0d4; original Bot receipt identity remains 5cd03921.
 # Prepared before merge; create this helper ref only after latest CI and actual writers permit release.
 name: Issue 1505 prepare scoped diagnostic window
 on:
@@ -50,7 +50,7 @@ jobs:
           test "$GITHUB_RUN_ATTEMPT" = '1'
           test "$(git rev-parse HEAD)" = 'e33e3a91d4011efbe768b11b428a5d152ede744a'
           test "$(git rev-parse HEAD^{tree})" = 'b2e36d3351654fceec59fe138a55de31cb155df9'
-          printf '%s  %s\n' 'c03cffbf9c07ee7df3d49f2ddae1881a798be8066a76cade905b3b78d96d022e' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
+          printf '%s  %s\n' 'b47cf757a7ad3f9169992e0b8c4e857cbd3ff88579e1d0aefbb5a4324a9dc83b' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
           node ../ops/scripts/ops/issue1505-diagnostic-window.mjs verify "$RUNNER_TEMP/diagnostic-window-preflight.json"
       - name: Read the existing SMOKE email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
