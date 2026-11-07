@@ -229,6 +229,7 @@ function promptFor(record, source) {
     `为 Mikka issue #1593 形成真正有用的生命周期验收审查报告。案例 ${record.caseId}，发布源 ${record.sourceCommit}。`,
     '这是非 repository 的普通 Factory 交付工作区；只在当前 canonical 工作目录创建下述报告与 marker。不要访问 HOME、秘密/环境变量、外部网络或其他目录，不创建新仓库、远程 repo、PR，不提交/推送 Git，不派发其他 agents。不要改配置或其他文件。',
     `先根据下面实际源代码摘录写 issue-1593-${record.caseId}.md 草稿，300–2400 UTF8 bytes，用简短英文减少编码开销。标题含 #1593 和完整发布源 SHA；包含 Evidence、Risks、Limits 小节，至少列出真实 native exit、provider pause ack 丢失、原 VM/SID 连续性及 checkpoint 清理边界。区分代码推断与实际观测，不能声称尚未执行的验收通过。`,
+    '本任务的三段验证脚本各自必须独占一次原生 shell 工具调用：command 只能是给出的该段脚本全文。报告创建/修改必须使用另外的工具调用；不得把 cat/heredoc 写报告、cd、管道、其他前后命令或多个验证脚本拼进同一次调用。',
     '草稿完成后，原样执行以下原生 shell 命令。它仅建立本案例 marker，并记录当前 HEAD、已有 tracked 文件和状态的实际摘要：', before,
     `然后调用 Mikka 原生 ask_human，kind="decision"，question 必须含 ${record.caseId}；询问 Owner 本报告应优先深入 A) provider receipts / ambiguous pause，还是 B) stale epoch / execution lease；summary 简述已读源码与草稿。这个真正的报告重点由 Owner 决定，现在没有答案。调用后让本次 run 正常退出并等待，不调用 submit。`,
     'Owner 回答并在原 SID 续作后，第一项工作原样执行以下只读命令，证明 marker、原草稿与工作目录仍在：', after,
