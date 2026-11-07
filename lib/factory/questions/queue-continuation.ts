@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { agentRuns } from '../../db/schema';
 import { retryWorkerDefinition } from '../../agent-kit/worker';
+import { runMayUseCredentialSql } from '../../personal-policy';
 import { FactoryError } from '../contract';
 import type { FactoryQueue } from '../dispatch';
 import { factoryRunBotMatches } from '../run-scope';
@@ -25,7 +26,7 @@ export async function admitCloudQuestionContinuation(
     return null; // The original device continuation keeps its existing adapter.
   }
   const fail = (): never => { throw new FactoryError('factoryQuestionContinuationUnavailable'); };
-  const { rows: [origin] } = await tx.query<typeof agentRuns.$inferSelect & { machineState: string; sandboxId: string; snapshotId: string; machineEpoch: number; targetId: string | null }>(`SELECT r.*,m.state AS "machineState",m."sandboxId",m."snapshotId",m.epoch AS "machineEpoch",m."targetId"
+  const { rows: [origin] } = await tx.query<typeof agentRuns.$inferSelect & { machineState: string; sandboxId: string; snapshotId: string; templateKind: string | null; machineEpoch: number; targetId: string | null }>(`SELECT r.*,m.state AS "machineState",m."sandboxId",m."snapshotId",m."templateKind",m.epoch AS "machineEpoch",m."targetId"
     FROM agent_runs r
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
     JOIN bots bot ON bot.id=b."botId" AND bot."ownerId"=b."ownerId" AND bot."workspaceId"=b."workspaceId"
@@ -35,7 +36,8 @@ export async function admitCloudQuestionContinuation(
     JOIN thread_machines m ON m."runId"=r.id AND m."ownerId"=b."ownerId" AND m."workspaceId"=b."workspaceId" AND m."botId"=b."botId"
       AND m."issueId"=r."issueId" AND m."deviceId"=r."deviceId" AND m."repoId"=r."deviceRepoId"
     JOIN byos_bindings credential ON credential.id=(r."agentDefinition"->'subscription'->>'bindingId')::uuid
-      AND credential."ownerId"=r."userId" AND credential."workspaceId"=b."workspaceId"::text AND credential."consumerId"=r."agentId"::text
+      AND ${runMayUseCredentialSql('credential."ownerId"', 'r."userId"', 'b."workspaceId"')}
+      AND credential."workspaceId"=b."workspaceId"::text AND credential."consumerId"=r."agentId"::text
       AND credential."modelId"=r."agentDefinition"->>'model' AND credential.route=r."agentDefinition"->'subscription'->>'route'
       AND credential."modelId"=r."agentDefinition"->'subscription'->>'modelId'
     JOIN byos_connections c ON c.id=credential."connectionId" AND c."ownerId"=credential."ownerId"
@@ -87,8 +89,8 @@ export async function queueCloudQuestionContinuation(
   // the task's own new run takes custody of the existing sandbox.
   await tx.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL,
     "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL WHERE "runId"=$1`, [originId]);
-  await tx.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId",epoch,"targetId","runningSince")
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,CASE WHEN $8='running' THEN now() ELSE NULL END)`, [runId,binding.workspaceId,userId,binding.botId,origin.issueId,origin.snapshotId,randomUUID(),origin.machineState,origin.sandboxId,origin.deviceId,origin.deviceRepoId,origin.machineEpoch,origin.targetId]);
+  await tx.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId",epoch,"targetId","runningSince","templateKind")
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,CASE WHEN $8='running' THEN now() ELSE NULL END,$14)`, [runId,binding.workspaceId,userId,binding.botId,origin.issueId,origin.snapshotId,randomUUID(),origin.machineState,origin.sandboxId,origin.deviceId,origin.deviceRepoId,origin.machineEpoch,origin.targetId,origin.templateKind]);
   await tx.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")
     SELECT $1,"userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved"
     FROM run_publications WHERE "runId"=$2 AND "userId"=$3 AND "issueId"=$4`, [runId,originId,userId,origin.issueId]);

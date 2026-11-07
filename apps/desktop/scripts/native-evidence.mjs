@@ -19,17 +19,18 @@ const fuses = z.strictObject({
 const packageReport = z.strictObject({
   version: z.literal(1), variant: z.enum(['dev', 'acceptance', 'other']), passed: z.boolean(),
   signatureVerifiedStrictDeep: optionalYes,
-  bundleIdentifier: z.literal('com.aspectlylabs.mikka.dev').optional(), architecture: z.literal('arm64').optional(),
+  bundleIdentifier: z.literal('com.aspectlylabs.mikka.dev').optional(), urlScheme: z.literal('mikka-dev-auth').optional(),
+  architecture: z.literal('arm64').optional(),
   identity: z.strictObject({ adHoc: yes, teamIdentifier: z.literal('none'), hardenedRuntime: yes, cdHash: hash }).optional(),
   signedBundleCount: count.optional(),
   entitlements: z.strictObject({ hardenedRuntime: yes, devOnlyLibraryValidationException: yes, unexpected: z.literal(false), executables: count, libraries: count, librariesWithoutEntitlements: count }).optional(),
   fuses: fuses.optional(),
   failure: z.enum(['MAC_PACKAGE_ARGUMENTS', 'MAC_PACKAGE_PLATFORM', 'MAC_PACKAGE_SIGNATURE', 'MAC_PACKAGE_IDENTITY',
     'MAC_PACKAGE_HARDENED_RUNTIME', 'MAC_PACKAGE_ENTITLEMENTS', 'MAC_PACKAGE_ENTITLEMENTS_FORMAT', 'MAC_PACKAGE_MACHO_TYPE',
-    'MAC_PACKAGE_INFO', 'MAC_PACKAGE_ARCHITECTURE', 'MAC_PACKAGE_FUSES', 'MAC_PACKAGE_NESTED_SIGNATURE',
+    'MAC_PACKAGE_INFO', 'MAC_PACKAGE_URL_SCHEME', 'MAC_PACKAGE_ARCHITECTURE', 'MAC_PACKAGE_FUSES', 'MAC_PACKAGE_NESTED_SIGNATURE',
     'MAC_PACKAGE_COMMAND_FAILED', 'MAC_PACKAGE_VERIFICATION_FAILED']).optional(),
 }).refine(value => value.passed
-  ? value.signatureVerifiedStrictDeep && value.bundleIdentifier && value.architecture && value.identity && !value.failure
+  ? value.signatureVerifiedStrictDeep && value.bundleIdentifier && value.urlScheme && value.architecture && value.identity && !value.failure
     && value.entitlements?.executables >= 1 && value.entitlements?.libraries >= 1
     && value.signedBundleCount === value.entitlements.executables + value.entitlements.libraries
     && value.entitlements.librariesWithoutEntitlements <= value.entitlements.libraries

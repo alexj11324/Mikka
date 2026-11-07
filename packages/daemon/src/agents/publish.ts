@@ -50,6 +50,8 @@ export interface PublishOptions {
   push: { approved: boolean; remote: string; note?: string }
   /** The daemon's own env (git credentials, SSH agent). */
   env?: NodeJS.ProcessEnv
+  /** Local run cancellation or lease loss, including an in-flight push. */
+  signal?: AbortSignal
 }
 
 /** Git config that keeps agent-written files from running code here. */
@@ -77,8 +79,10 @@ const FALLBACK_IDENTITY = [
  */
 export async function worktreeGitDir(
   repoPath: string,
-  worktree: string
+  worktree: string,
+  signal?: AbortSignal,
 ): Promise<string> {
+  signal?.throwIfAborted()
   const common = realpathSync(
     (
       await execa(
@@ -92,6 +96,8 @@ export async function worktreeGitDir(
         {
           cwd: repoPath,
           stdin: "ignore",
+          cancelSignal: signal,
+          killDescendants: true,
         }
       )
     ).stdout.trim()
@@ -144,20 +150,26 @@ export type Git = (
 export async function pinnedGit(
   repoPath: string,
   worktree: string,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  signal?: AbortSignal,
 ): Promise<Git> {
-  const gitDir = await worktreeGitDir(repoPath, worktree)
+  const gitDir = await worktreeGitDir(repoPath, worktree, signal)
+  signal?.throwIfAborted()
   const workTree = realpathSync(worktree)
-  return (args, extra, options) =>
-    execa("git", [...SAFE_GIT, ...args], {
+  return (args, extra, options) => {
+    signal?.throwIfAborted()
+    return execa("git", [...SAFE_GIT, ...args], {
       cwd: workTree,
       env: { ...env, ...extra, GIT_DIR: gitDir, GIT_COMMON_DIR: resolve(gitDir, "..", ".."), GIT_WORK_TREE: workTree },
       extendEnv: false,
       stdin: "ignore",
+      cancelSignal: signal,
+      killDescendants: true,
       ...(options?.buffer
         ? { encoding: "buffer" as const, stripFinalNewline: false }
         : {}),
     })
+  }
 }
 
 /**
@@ -168,9 +180,10 @@ export async function pinnedGit(
 export async function snapshotTree(
   repoPath: string,
   worktree: string,
-  env?: NodeJS.ProcessEnv
+  env?: NodeJS.ProcessEnv,
+  signal?: AbortSignal,
 ): Promise<string> {
-  const git = await pinnedGit(repoPath, worktree, env)
+  const git = await pinnedGit(repoPath, worktree, env, signal)
   const dir = mkdtempSync(join(tmpdir(), "mikka-index-"))
   const index = { GIT_INDEX_FILE: join(dir, "index") }
   try {
@@ -186,9 +199,9 @@ export async function snapshotTree(
 }
 
 /** Keep actual delivery files in a local snapshot for a fresh independent session. No remote push. */
-export async function retainDeliverable(repoPath: string, worktree: string, runId: string): Promise<string> {
-  const tree = await snapshotTree(repoPath, worktree)
-  const git = await pinnedGit(repoPath, worktree)
+export async function retainDeliverable(repoPath: string, worktree: string, runId: string, signal?: AbortSignal): Promise<string> {
+  const tree = await snapshotTree(repoPath, worktree, undefined, signal)
+  const git = await pinnedGit(repoPath, worktree, undefined, signal)
   const head = String((await git(['rev-parse', 'HEAD'])).stdout).trim()
   const before = String((await git(['rev-parse', 'HEAD^{tree}'])).stdout).trim()
   if (tree === before) return head
@@ -225,7 +238,7 @@ export async function publishRun(options: PublishOptions): Promise<RunPublish> {
   const runBranchName = runBranch(options.runId)
   const target = options.pushBranch ?? runBranchName
   const remote = options.push.remote
-  const git = await pinnedGit(options.repoPath, options.worktree, options.env)
+  const git = await pinnedGit(options.repoPath, options.worktree, options.env, options.signal)
   const head = String((await git(["rev-parse", "HEAD"])).stdout).trim()
   const headTree = String(
     (await git(["rev-parse", "HEAD^{tree}"])).stdout
@@ -238,7 +251,7 @@ export async function publishRun(options: PublishOptions): Promise<RunPublish> {
     skipped?: "no_changes"
   ): Promise<RunPublish> => {
     try {
-      await assertBranchName(target)
+      await assertBranchName(target, options.signal)
       await git([
         "push",
         "--no-verify",
@@ -255,6 +268,7 @@ export async function publishRun(options: PublishOptions): Promise<RunPublish> {
         ...(skipped ? { skipped } : {}),
       }
     } catch (error) {
+      options.signal?.throwIfAborted()
       return {
         branch: target,
         commit,
@@ -310,6 +324,7 @@ export async function publishRun(options: PublishOptions): Promise<RunPublish> {
     await git(["update-ref", `refs/heads/${runBranchName}`, commit, head])
     await git(["read-tree", commit])
   } catch (error) {
+    options.signal?.throwIfAborted()
     return {
       branch: runBranchName,
       commit: null,
@@ -356,12 +371,14 @@ async function onBase(git: Git, head: string, baseBranch?: string) {
 }
 
 /** Branch names come from the server: only a plain branch name passes. */
-export async function assertBranchName(branch: string) {
+export async function assertBranchName(branch: string, signal?: AbortSignal) {
+  signal?.throwIfAborted()
   const { exitCode } = await execa(
     "git",
     ["check-ref-format", `refs/heads/${branch}`],
-    { reject: false, stdin: "ignore" }
+    { reject: false, stdin: "ignore", cancelSignal: signal, killDescendants: true }
   )
+  signal?.throwIfAborted()
   if (exitCode !== 0 || branch.startsWith("-")) {
     throw new Error(`Not a valid branch name: ${branch}`)
   }

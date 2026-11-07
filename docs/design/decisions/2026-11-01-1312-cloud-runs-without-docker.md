@@ -7,6 +7,7 @@
   worker gave it 30 s. Alex: 「肯定不会冲突，我明确说过一个任务一台机器。加 Docker 本来就是过度设计。」
 - Rule: —
 - Superseded by: [2026-11-01-2335 E2B official templates](2026-11-01-2335-e2b-official-templates.md) for the sandbox-runtime part and the device paragraph; one task, one machine stays
+- Superseded in part by: [2026-11-06-1800](2026-11-06-1800-machine-is-the-execution-boundary.md) for provider credential custody, run HOME/environment/Git isolation and per-call authority; one task, one machine stays.
 - Replaces: the Docker container per hosted run (network none, read-only root)
   in [unattended-sandbox.md](../unattended-sandbox.md) and the 「Mikka Cloud
   (E2B)」 column of the runner table in [orchestration.md](../orchestration.md)
@@ -14,6 +15,17 @@
 A cloud run happens on its task's own E2B machine, and that machine is the
 isolation boundary between tasks: no other task ever runs on it. The cloud
 worker no longer creates a Docker container per run.
+
+The current implementation uses the normal machine HOME, environment and real
+Git repository. Real credentials are prepared up front, official CLIs connect
+directly to providers, and revocation pushes a stop or reclaims the VM. See
+[1800](2026-11-06-1800-machine-is-the-execution-boundary.md) for the replacement contract.
+
+## Historical implementation, superseded
+
+The following describes the earlier implementation, not requirements for a new
+runner. The sandbox wrapper was replaced by 2335; the remaining credential,
+HOME, Git and verification isolation was replaced by 1800.
 
 Inside the machine, Anthropic's sandbox-runtime (bubblewrap) encloses the
 CLI's bootstrap, the CLI and everything they start, in their own process

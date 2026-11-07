@@ -18,6 +18,11 @@ const NOT_MODEL_OPTIONS = new Map<string, string>([
   // Alex, 2026-11-02 (decision 2026-11-02-1400): how an untouched 优先使用的模型 list is filled. A preference word
   // matched against reported ids and names; it never adds a model nothing reported (DEFAULT_ORDER_PREFERENCE).
   ['lib/model-order-plan.ts "opus"', 'default-order preference word'],
+  // Alex, 2026-11-06: a reported id's display name. These name the series parsed out of an id
+  // (claude-opus-5-5 → 「Opus 5.5」) and order the groups; they never add a model nothing reported.
+  ['lib/model-display-name.ts "Opus"', 'series display name'],
+  ['lib/model-display-name.ts "Sonnet"', 'series display name'],
+  ['lib/model-display-name.ts "Haiku"', 'series display name'],
 ])
 
 function sources(dir: string): string[] {

@@ -37,6 +37,8 @@ const DELTA_FOR_PREFIX: Record<string, string> = { text: "text-delta", reasoning
 const CHECKPOINT_MAX_INFLATED = 64 * 1024 * 1024
 
 export interface RunMasker {
+  /** Register a renewed run credential before it reaches a CLI. */
+  add(secrets: ReadonlyArray<{ name: string; value: string }>): void
   /** Masks one string. */
   text(value: string): string
   /** Masks every string (values and object keys) in a JSON-like value. */
@@ -58,16 +60,19 @@ export interface RunMasker {
 export function createRunMasker(secrets: ReadonlyArray<{ name: string; value: string }>): RunMasker | null {
   let needles: Array<[string, string]> = []
   const seen = new Set<string>()
-  for (const { name, value } of secrets) {
-    if (typeof value !== "string" || [...value].length < MASK_MIN_LENGTH) continue
-    for (const form of [value, Buffer.from(value, "utf8").toString("base64")]) {
-      if (seen.has(form)) continue
-      seen.add(form)
-      needles.push([form, `[secret:${name}]`])
+  const add = (secrets: ReadonlyArray<{ name: string; value: string }>) => {
+    for (const { name, value } of secrets) {
+      if (typeof value !== "string" || [...value].length < MASK_MIN_LENGTH) continue
+      for (const form of [value, Buffer.from(value, "utf8").toString("base64")]) {
+        if (seen.has(form)) continue
+        seen.add(form)
+        needles.push([form, `[secret:${name}]`])
+      }
     }
+    needles.sort((a, b) => b[0].length - a[0].length)
   }
+  add(secrets)
   if (!needles.length) return null
-  needles.sort((a, b) => b[0].length - a[0].length)
   let pending = new Map<string, string>()
 
   const text = (value: string) => {
@@ -127,6 +132,7 @@ export function createRunMasker(secrets: ReadonlyArray<{ name: string; value: st
   }
 
   return {
+    add,
     text,
     deep,
     flush,
@@ -163,6 +169,7 @@ export function createRunMasker(secrets: ReadonlyArray<{ name: string; value: st
     },
     dispose() {
       needles = []
+      seen.clear()
       pending = new Map()
     },
   }

@@ -252,6 +252,8 @@
     "continueGoogle": "使用 Google 继续",
     "googleLinkHint": "如果此邮箱已注册 Mikka，请先用邮箱密码登录，再到「设置 → 账户」关联 Google。",
     "continueGithub": "使用 GitHub 继续",
+    "continueAs": "以 {name} 继续",
+    "switchAccount": "换个账号",
     "orEmail": "或",
     "name": "称呼",
     "namePlaceholder": "怎么称呼你",
@@ -871,7 +873,6 @@
     "setup": "设置仓库和 Agent",
     "offlineSince": "离线 · {time}",
     "noAgent": "未检测到 Agent",
-    "sandboxBlocked": "已检测到 {agents}，但沙箱不可用",
     "sandboxMissing": "这台设备无法自动安装 {packages}。用系统包管理器安装后会自动恢复。",
     "sandboxRefused": "这台机器的系统设置不允许普通用户创建沙箱，需要管理员开启 user namespace。",
     "sandboxUserns": "Ubuntu 的 AppArmor 限制了普通用户创建沙箱（user namespace 限制）。在这台设备上解除限制后，Agent 会自动恢复。",
@@ -943,9 +944,12 @@
       "cancelled": "已取消",
       "manual": "手动连接"
     },
-    "runsModels": "能跑 {models}",
-    "runsCount": "能跑 {count} 个优先使用的模型",
-    "runsNone": "不能跑优先使用的模型",
+    "computers": "电脑",
+    "noRuns": "{reason} · 不会被派任务",
+    "noSubscriptionRuns": "{reason} · 不会被派订阅任务",
+    "notScheduling": "未参与调度",
+    "needsUpdate": "Mikka 需要更新",
+    "sandboxUnavailable": "沙箱不可用",
     "offlineNoRuns": "离线 · 不会被派任务",
     "local": {
       "adding": "正在添加这台电脑",
@@ -4726,6 +4730,7 @@
     "mergeConfirm": "合并"
   },
   "ArtifactReview": {
+    "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · 线程完成后生成",
       "preparing": "Artifact · 正在准备 PR",

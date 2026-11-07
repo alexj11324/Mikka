@@ -28,6 +28,8 @@ export const RUN_CREDENTIAL_PATHS: readonly string[] = [
 export function runCredentialGlobs(stateDir: string): string[] {
   return [
     ...RUN_CREDENTIAL_PATHS.map((path) => `${stateDir}/runs/*/${path}`),
+    // Local task-owned native gh logins (agents/local-github.ts).
+    `${stateDir}/github/*`,
     // Live native subscription brokers (subscription-native-broker.ts).
     `${stateDir}/native-brokers/*`,
   ]

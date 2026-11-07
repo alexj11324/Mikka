@@ -46,6 +46,8 @@ export async function frontendConfig({ target = 'web', command = 'build', outdir
     },
     plugins: [await applicationPlugin(target, { deploymentId }), react(), await deploymentPlugin({ repository, deploymentId })],
     experimental: deploymentId ? { renderBuiltUrl: filename => pinnedUrl(`/mikka/${filename}`, deploymentId) } : {},
+    // A hosted UI layer (docs/ui-overlay.md) may carry its own node_modules; React stays this repository's.
+    resolve: { dedupe: ['react', 'react-dom'] },
     css: { postcss: { plugins: sharedStylePlugins(repository, { development }) } },
     build: {
       outDir: outdir ?? resolve(frontend, `dist/${target}`),

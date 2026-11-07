@@ -53,7 +53,7 @@ for (const [name, source] of [
 ]) test(`allows ${name}`, () => assert.deepEqual(rules(source), [], source))
 
 test('an allowlisted file may listen, but not turn SWR focus on', () => {
-  const file = 'components/nav/bot-avatar.tsx'
+  const file = 'components/slots/bot-avatar.tsx'
   assert.deepEqual(rules("document.addEventListener('visibilitychange', resync)", file), [])
   assert.deepEqual(rules("useSWR(key, read, { revalidateOnFocus: true })", file), ['focus/swr-revalidate-on-focus'])
 })

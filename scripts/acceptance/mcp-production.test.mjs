@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
+import { encode, decode } from '../../lib/desktop-rpc/wire.ts'
 import { attestDeployedTarget } from './deployed-target.mjs'
 import { PROJECT, TEAM, PRODUCTION_ALIAS } from '../ops/deployment-regression.mjs'
 import { ORIGIN, OPS_REF, productionMcpGuard, runProductionMcpProof } from './mcp-production.mjs'
@@ -10,6 +11,11 @@ const APP = 'a'.repeat(40), SOURCE = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const EMAIL = 'owner+mikka-smoke@example.invalid', PASSWORD = 'SYNTHETIC_PASSWORD_FOR_MCP'
 const OWNER = 'synthetic-owner-identity', COOKIE = 'synthetic-private-cookie'
 const CLIENT = 'synthetic_new_client', PREVIOUS = 'synthetic_previous_client'
+const PERSONAL_WORKSPACE = '40000000-0000-4000-8000-000000000001'
+const TEAM_WORKSPACE = '40000000-0000-4000-8000-000000000002'
+const SECOND_TEAM = '40000000-0000-4000-8000-000000000003'
+// Public Owner identity from comment #1504/6691409495; fixture data, never a login.
+const POLICY_ADMIN_EMAIL = 'alex@acme.aspectlylabs.com', POLICY_ADMIN_ID = 'policy-admin'
 const ACCESS = 'mka_SYNTHETIC_PRIVATE_ACCESS_TOKEN'
 const event = { ref: OPS_REF, after: SOURCE, repository: { full_name: 'alexj11324/Mikka' } }
 const environment = () => ({ GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_EVENT_NAME: 'push',
@@ -21,10 +27,24 @@ function fixture(options = {}) {
   const requests = []
   let alive = false, client, registered = 0, revoked = false, deleted = false, authorization
   let versionReads = 0, mainReads = 0
-  const privateValues = [EMAIL, PASSWORD, OWNER, COOKIE, CLIENT, ACCESS]
+  const privateValues = [EMAIL, PASSWORD, OWNER, COOKIE, CLIENT, ACCESS, PERSONAL_WORKSPACE, TEAM_WORKSPACE, SECOND_TEAM,
+    POLICY_ADMIN_EMAIL, POLICY_ADMIN_ID, 'unrelated-admin@example.invalid']
+  const choices = [{ id: PERSONAL_WORKSPACE, name: 'Personal', kind: 'personal' },
+    ...(options.teamCount === 0 ? [] : [
+      { id: SECOND_TEAM, name: 'Other team', kind: 'team' },
+      { id: TEAM_WORKSPACE, name: 'Team', kind: 'team' },
+    ])]
+  const members = workspaceId => [
+    { userId: OWNER, email: EMAIL, role: 'member', status: 'active' },
+    { userId: POLICY_ADMIN_ID,
+      email: options.adminMatches !== 0 && (workspaceId === TEAM_WORKSPACE || options.adminMatches === 2)
+        ? POLICY_ADMIN_EMAIL : 'unrelated-admin@example.invalid',
+      role: 'admin', status: 'active' },
+  ]
+  const selectedTeam = headers => headers.get('cookie')?.split('; ').includes('mikka-workspace=' + TEAM_WORKSPACE)
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), method = init.method ?? 'GET', headers = new Headers(init.headers)
-    requests.push({ origin: url.origin, path: url.pathname, method })
+    requests.push({ origin: url.origin, path: url.pathname, search: url.search, method })
     assert.ok(['manual', 'error'].includes(init.redirect))
     if (url.origin === 'https://api.github.com') {
       assert.equal(method, 'GET')
@@ -62,6 +82,35 @@ function fixture(options = {}) {
       assert.equal(method, 'POST')
       alive = false
       return json({ success: true }, 200, { 'set-cookie': 'better-auth.session_token=; Path=/; Max-Age=0; Secure; HttpOnly' })
+    }
+    if (url.pathname === '/mikka/api/workspace' || url.pathname === '/mikka/api/rpc') {
+      assert.equal(alive, true)
+      assert.ok(headers.get('cookie')?.split('; ').includes('better-auth.session_token=' + COOKIE))
+      assert.equal(headers.get('origin'), ORIGIN)
+      assert.equal(headers.has('authorization'), false)
+      if (url.pathname.endsWith('/workspace')) {
+        assert.equal(method, 'GET')
+        if (url.search) {
+          const candidate = url.searchParams.get('workspace')
+          assert.ok([SECOND_TEAM, TEAM_WORKSPACE].includes(candidate))
+          assert.equal(url.search, '?workspace=' + candidate)
+          assert.equal(selectedTeam(headers), false)
+          return json({ currentUserId: OWNER, role: 'member', choices,
+            workspace: { id: candidate, kind: 'team' }, members: members(candidate) })
+        }
+        const selected = selectedTeam(headers)
+        return json({ currentUserId: OWNER, role: 'member', choices,
+          workspace: selected ? { id: TEAM_WORKSPACE, kind: 'team' } : { id: PERSONAL_WORKSPACE, kind: 'personal' },
+          members: selected ? members(TEAM_WORKSPACE) : [] })
+      }
+      assert.equal(url.search, '')
+      const body = JSON.parse(init.body)
+      assert.equal(method, 'POST'); assert.equal(headers.get('x-mikka-rpc'), '1')
+      assert.deepEqual(Object.keys(body).sort(), ['action', 'args', 'version'])
+      assert.equal(body.version, 1); assert.equal(body.action, 'workspace.switchWorkspace')
+      assert.deepEqual(decode(body.args), [TEAM_WORKSPACE])
+      return json({ version: 1, ok: true, result: encode({ ok: true, data: { workspaceId: TEAM_WORKSPACE } }) },
+        200, options.dropSwitchCookie ? {} : { 'set-cookie': 'mikka-workspace=' + TEAM_WORKSPACE + '; Path=/; Secure; HttpOnly; SameSite=Lax' })
     }
     if (url.pathname.startsWith('/mikka/api/auth/oauth2/') && !['token', 'revoke'].includes(url.pathname.split('/').at(-1))) {
       if (!alive) return json({ error: 'unauthorized' }, 401)
@@ -158,6 +207,17 @@ test('actual existing PKCE helper: one owned client, catalogue only, normal revo
   const f = fixture(), report = await f.run()
   assert.equal(report.status, 'passed')
   assert.equal(report.registrationMode, 'owner-managed')
+  assert.equal(report.teamWorkspaceConfirmed, true)
+  assert.equal(report.teamWorkspaceHash, createHash('sha256').update('team-workspace\0' + TEAM_WORKSPACE).digest('hex'))
+  assert.equal(report.teamAdminMembershipVerified, true)
+  assert.equal(report.teamSelectionBasis, 'unique-active-admin-identity-match')
+  assert.equal(report.teamOwnerAttribution, 'AGENTS.md-and-owner-comment-1504-6691409495')
+  assert.equal(report.teamBindingScope, 'owner-session')
+  assert.equal(report.catalogueWorkspaceDataVerified, false)
+  assert.deepEqual(f.requests.filter(row => row.path.endsWith('/api/workspace')).map(row => [row.method, row.search]),
+    [['GET', ''], ['GET', '?workspace=' + SECOND_TEAM], ['GET', '?workspace=' + TEAM_WORKSPACE], ['GET', '']])
+  const switchAt = f.requests.findIndex(row => row.path.endsWith('/api/rpc'))
+  assert.ok(switchAt > 0 && switchAt < f.requests.findIndex(row => row.path.endsWith('/oauth2/create-client')))
   assert.equal(report.registrationStatus, 201)
   assert.equal(report.loopbackCallbackObserved, true)
   assert.equal(report.browserConsentUI, false)
@@ -171,7 +231,8 @@ test('actual existing PKCE helper: one owned client, catalogue only, normal revo
   assert.equal(f.state().registered, 1); assert.equal(f.state().deleted, true); assert.equal(f.state().alive, false)
   const output = JSON.stringify(report)
   for (const value of f.privateValues) assert.equal(output.includes(value), false)
-  assert.equal(f.requests.some(row => row.path.includes('/admin/') || row.path.includes('/api/rpc')), false)
+  assert.equal(f.requests.some(row => row.path.includes('/admin/')), false)
+  assert.equal(f.requests.filter(row => row.path.endsWith('/api/rpc')).length, 1)
 })
 
 test('a lost registration response is not retried; only the unique new owned intent is reconciled and deleted', async () => {
@@ -393,4 +454,34 @@ test('failed MCP business or cleanup still observes drift without overwriting it
     assert.equal(f.requests.filter(row => row.path.endsWith('/sign-out')).length, 1)
     for (const value of f.privateValues) assert.equal(JSON.stringify(report).includes(value), false)
   }
+})
+
+test('MCP refuses missing or ambiguous admin-bound teams before client registration and closes its own session', async () => {
+  for (const [options, detail] of [[{ teamCount: 0 }, 'team_missing'],
+    [{ adminMatches: 0 }, 'team_admin_missing'], [{ adminMatches: 2 }, 'team_admin_ambiguous']]) {
+    const f = fixture(options), report = await f.run()
+    assert.equal(report.status, 'failed')
+    assert.equal(report.failureCode, 'team_workspace_failed')
+    assert.deepEqual(report.teamFailure, { code: 'team_workspace_failed', detail })
+    assert.equal(report.teamAdminMembershipVerified, false)
+    assert.equal(f.state().registered, 0)
+    assert.equal(f.requests.some(row => row.path.endsWith('/api/rpc')), false)
+    assert.equal(report.cleanup.normalSessionClosed, true)
+    assert.equal(report.cleanup.sessionAbsent, true)
+    assert.equal(report.cleanup.unresolvedResources, false)
+    for (const value of f.privateValues) assert.equal(JSON.stringify(report).includes(value), false)
+  }
+})
+
+test('MCP must use the switch response cookie for the no-query team readback before OAuth', async () => {
+  const f = fixture({ dropSwitchCookie: true }), report = await f.run()
+  assert.equal(report.status, 'failed')
+  assert.equal(report.failureCode, 'team_workspace_failed')
+  assert.deepEqual(report.teamFailure, { code: 'team_workspace_failed', detail: 'workspace_changed' })
+  assert.equal(f.state().registered, 0)
+  assert.equal(f.requests.filter(row => row.path.endsWith('/api/rpc')).length, 1)
+  assert.equal(report.cleanup.normalSessionClosed, true)
+  assert.equal(report.cleanup.sessionAbsent, true)
+  assert.equal(report.cleanup.unresolvedResources, false)
+  for (const value of f.privateValues) assert.equal(JSON.stringify(report).includes(value), false)
 })

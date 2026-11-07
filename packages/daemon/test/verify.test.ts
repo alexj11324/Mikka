@@ -2,14 +2,14 @@
 // (bwrap racing a rename of a file it masks) is started again; a command
 // that began is never run twice.
 import { randomUUID } from "node:crypto"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { afterEach, expect, it } from "vitest"
 
 import { NoSandbox, shellJoin, type AgentSandbox, type SandboxedCommand } from "../src/agents/sandbox"
 import { runVerify } from "../src/agents/verify"
-import { cleanupTempDirs, tempDir } from "./helpers"
+import { cleanupTempDirs, tempDir, waitFor } from "./helpers"
 
 const SETUP_ERROR =
   "bwrap: Can't bind mount /oldroot/dev/null on /newroot/data/runs.json: Unable to find \"/newroot/data/runs.json\" in mount table"
@@ -33,7 +33,7 @@ class SetupRaceSandbox implements AgentSandbox {
 
 afterEach(() => cleanupTempDirs())
 
-function verify(sandbox: AgentSandbox, command: string) {
+function verify(sandbox: AgentSandbox, command: string, signal?: AbortSignal) {
   const privateDir = tempDir("orvp-")
   const worktree = tempDir("orvw-")
   return {
@@ -46,6 +46,7 @@ function verify(sandbox: AgentSandbox, command: string) {
       pidFile: join(privateDir, `${randomUUID()}.pgid`),
       env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "/" },
       timeoutMs: 30_000,
+      signal,
     }),
   }
 }
@@ -74,4 +75,37 @@ it("reports the sandbox failure when setup keeps failing", async () => {
   expect(failed.exitCode).toBe(1)
   expect(failed.output).toContain("Can't bind mount")
   expect(sandbox.launches).toBe(3)
+})
+
+it('kills the real verification process when its run is cancelled', async () => {
+  const root = tempDir(), script = join(root, 'verify.cjs'), started = join(root, 'started'), stopped = join(root, 'stopped')
+  writeFileSync(script, `const fs = require('node:fs')\nprocess.on('SIGTERM', () => { fs.writeFileSync(${JSON.stringify(stopped)}, 'stopped'); process.exit(0) })\nfs.writeFileSync(${JSON.stringify(started)}, 'started')\nsetInterval(() => {}, 1000)\n`)
+  const controller = new AbortController()
+  const { result } = verify(new NoSandbox(), `exec ${shellJoin([process.execPath, script])}`, controller.signal)
+  try {
+    await waitFor(() => existsSync(started))
+    controller.abort()
+    await result
+    expect(existsSync(stopped)).toBe(true)
+  } finally { controller.abort(); await result.catch(() => undefined) }
+})
+
+it('never launches verification if cancellation arrives while its wrapper is prepared', async () => {
+  let entered!: () => void, release!: () => void, released = false
+  const ready = new Promise<void>(resolve => { entered = resolve }), pending = new Promise<void>(resolve => { release = resolve })
+  const controller = new AbortController(), marker = join(tempDir(), 'unexpected-start')
+  const sandbox: AgentSandbox = { kind: 'none', async wrap(argv) {
+    entered(); await pending
+    const wrapped = await new NoSandbox().wrap(argv)
+    return { ...wrapped, release() { released = true; wrapped.release() } }
+  } }
+  const { result } = verify(sandbox, `touch ${shellJoin([marker])}`, controller.signal)
+  void result.catch(() => undefined)
+  try {
+    await ready
+    controller.abort(); release()
+    await expect(result).rejects.toMatchObject({ name: 'AbortError' })
+    expect(released).toBe(true)
+    expect(existsSync(marker)).toBe(false)
+  } finally { controller.abort(); release(); await result.catch(() => undefined) }
 })

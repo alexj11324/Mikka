@@ -2,15 +2,21 @@
  * Which devices may take a run's subscription access lease
  * (`/v1/devices/:id/runs/:runId/subscription-lease`): a person's own device
  * running the daemon is a runner like E2B (docs/design/orchestration.md §3,
- * §6). It gets the access token only, never the refresh grant. The hosted
- * E2B runner keeps its server-side broker and never takes a lease. The lease
- * itself still checks that the run is the owner's, on this device, live and
- * bound to the subscription (SubscriptionService.nativeRun).
+ * §6). Both local and cloud runners receive the access token during run
+ * preparation, then connect directly to the provider. A cloud token must
+ * name this exact task machine. The lease still checks the initial run's
+ * owner, device, lifetime and subscription (SubscriptionService.nativeRun).
+ * Natural token expiry uses the same endpoint in the background; provider
+ * and tool operations do not call it for authorization (#1505).
  */
 export function leaseDevice(
   device: { enabled: boolean; kind: string; harnesses: { subscriptionBroker?: boolean; subscriptionPreflight?: unknown }[] } | null,
+  deviceId?: string,
+  scopeDeviceId?: string,
 ): boolean {
-  return Boolean(device?.enabled && device.kind === 'local' && device.harnesses.some(h => h.subscriptionBroker && !h.subscriptionPreflight))
+  if (!device?.enabled || !device.harnesses.some(h => h.subscriptionBroker && !h.subscriptionPreflight)) return false
+  if (scopeDeviceId && scopeDeviceId !== deviceId) return false
+  return device.kind === 'local' || (device.kind === 'cloud' && Boolean(deviceId) && scopeDeviceId === deviceId)
 }
 
 /**

@@ -68,6 +68,14 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   for (const harness of ['claude_code', 'codex'] as const) await pool.query('INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,$4)', [agents[harness], scope.ownerId, deviceId, harness])
   const definition = (name: string, harness: OrderHarness, sourceId: string, model: string) => ({ name, harness, description: `${name} public capability`, roles: [name], model: { mode: 'fixed', harness, model, source: { kind: 'subscription', connectionId: sourceId } }, instructions: 'PRIVATE_PROFILE_INSTRUCTIONS_DO_NOT_SEND_TO_DECISION', skills: ['systematic-debugging'], effort: 'low' })
 
+  // The two real 21-second waits must not age shared fixtures out of unrelated
+  // admission tests. Preserve quota usage and authorization; stale-quota cases own separate sources.
+  t.beforeEach(async () => {
+    await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb($2::text),false) WHERE id=ANY($1::uuid[])`,
+      [[claude, exactClaude, codex, foreignSource], new Date().toISOString()])
+    await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+  })
+
   await t.test('default dispatch survives a 21-second catalogue wait before final membership admission', { timeout: 45_000 }, async () => {
     const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, location: 'local' }, {
       modelDecision: async () => null,

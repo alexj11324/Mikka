@@ -5,6 +5,9 @@
 // account and other fields were removed, only `models` kept).
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
+import { EventEmitter } from "node:events"
+import { PassThrough } from "node:stream"
+import type { spawn } from "node:child_process"
 
 import { afterEach, describe, expect, it } from "vitest"
 
@@ -80,6 +83,26 @@ process.stdin.on("data", chunk => {
 }
 
 describe("probing a CLI", () => {
+  it("uses a direct kill for a PID-less spawn fixture and does not signal the daemon's process group", async () => {
+    const scratch = tempDir()
+    const events = new EventEmitter()
+    const child = Object.assign(events, {
+      pid: undefined, exitCode: null as number | null, signalCode: null,
+      stdin: new PassThrough(), stdout: new PassThrough(),
+      kill(signal: string) {
+        expect(signal).toBe('SIGKILL')
+        this.exitCode = 0
+        events.emit('exit', 0, null)
+        return true
+      },
+    })
+    child.stdin.on('data', () => child.stdout.write(JSON.stringify(claudeAnswer) + '\n'))
+    const spawnImpl = (() => child) as unknown as typeof spawn
+    expect(await probeHarnessModels('claude_code', 'fixture', { scratchDir: scratch, spawnImpl }))
+      .toEqual(parseClaudeInitialize(claudeAnswer.response.response))
+    expect(readdirSync(scratch)).toEqual([])
+  })
+
   it("runs it in a throwaway home under the scratch dir, never the person's, and removes that home", async () => {
     const dir = tempDir(), scratch = tempDir()
     for (const harness of ["codex", "claude_code"] as const) {

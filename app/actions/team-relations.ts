@@ -12,6 +12,8 @@ import { accessibleProjects } from '@/lib/project-access'
 import { lockTeamRelations, requireTeam } from '@/lib/team-access'
 import { WorkspaceError } from '@/lib/workspace-access'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
+import { pool } from '@/lib/db'
+import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
 
 async function result<T>(operation: () => Promise<T>) {
   const i18nText = await getTranslations();
@@ -40,6 +42,9 @@ export async function setIssueTeam(input: { issueId: string; teamId: string | nu
         if (links.length && (!destination || !links.some(link => link.teamId === destination.id))) throw new WorkspaceError(i18nText("FeatureCopy.c_482418a8"))
       }
       const previousLists = await issueListScopesBeforeChange(issue)
+      if ((current?.teamId ?? null) !== (destination?.id ?? null)) {
+        await stopRunsForPolicyChange(pool, { kind: 'task', issueId: issue.id })
+      }
       if (destination) await tx.insert(teamIssues).values({ issueId: issue.id, teamId: destination.id, workspaceId: destination.workspaceId, userId: issue.userId }).onConflictDoUpdate({ target: teamIssues.issueId, set: { teamId: destination.id, workspaceId: destination.workspaceId } })
       else await tx.delete(teamIssues).where(and(eq(teamIssues.issueId, issue.id), eq(teamIssues.userId, issue.userId)))
       if (current?.teamId !== destination?.id) await issueListScopeChanged(tx, issue.id, previousLists)

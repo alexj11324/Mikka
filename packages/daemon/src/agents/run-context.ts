@@ -104,10 +104,14 @@ export type ComputerSpecProvider = (runId: string, policy?: RunPolicy) => McpSer
 
 export interface RunContextOptions {
   github?: RunGitHub
+  /** Local daemon-owned native gh config, never supplied by an assignment. */
+  githubEnvironment?: Record<string, string>
   /** The run's app entries; their Mikka server host joins the sandbox's reachable hosts. */
   apps?: RunApps
   mcp?: RunMcp
   githubRuntime?: { nodeBinary: string; ghBinary: string }
+  /** A task VM uses its ordinary HOME, git and gh environment. */
+  machineEnvironment?: true
   /** Clean caller PATH, before adding a run-local gh wrapper. */
   childPath?: string
   /** Only the host may advertise this bound control-channel capability. */
@@ -265,8 +269,8 @@ export class RunContext {
     ownDir(this.capturesDir)
     this.writeSkills()
     // The owner's own GitHub credential reaches every run that has one, read-only and plan runs included.
-    if (options.github) {
-      this.githubEnv = prepareGitHubEnvironment(this.runDir, options.github, options.childPath ?? process.env.PATH ?? '', options.githubRuntime)
+    if (options.github && !options.machineEnvironment) {
+      this.githubEnv = options.githubEnvironment ?? prepareGitHubEnvironment(this.runDir, options.github, options.childPath ?? process.env.PATH ?? '', options.githubRuntime)
     }
   }
 
@@ -413,6 +417,7 @@ export class RunContext {
    * and zsh writes here-docs to `$TMPPREFIX` (default `/tmp/zsh`).
    */
   tempEnv(): Record<string, string> {
+    if (this.options.machineEnvironment) return this.options.policyHash ? { MIKKA_POLICY_HASH: this.options.policyHash } : {}
     return { TMPDIR: this.tmpDir, TMPPREFIX: join(this.tmpDir, "zsh"), ...withGitConfig(this.githubEnv, RUN_GIT_CONFIG), ...(this.options.policyHash ? { MIKKA_POLICY_HASH: this.options.policyHash } : {}) }
   }
 

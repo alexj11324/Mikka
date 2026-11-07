@@ -89,6 +89,40 @@ for (const route of ['codex_cpa', 'claude_cpa', 'codex_cli', 'claude_code_cli'] 
 }
 
 for (const route of ['codex_cli', 'claude_code_cli'] as const) {
+  test(`${route}: initial lease preserves admission and uses one custody handoff with natural expiry`, async () => {
+    const { use, access } = subscriptionFixture(route)
+    access.connection!.quota.observedAt = new Date().toISOString()
+    const row = { id: access.connection!.id, ownerId: use.ownerId, workspaceId: use.workspaceId,
+      provider: route === 'codex_cli' ? 'codex' : 'claude', state: 'connected', epoch: '1', quota: access.connection!.quota }
+    const repository = { binding: async () => ({ ...access.binding!, modelId: 'fixture-model' }), connection: async () => row, scope: () => ({}) } as unknown as SubscriptionService['repository']
+    const methods: string[] = [], admissions: boolean[] = []
+    let denyAt = 0
+    const refusal = new Error('fixture policy revoked')
+    const worker = { forUse() { return this }, async call(method: string) {
+      methods.push(method)
+      return { accessToken: 'fixture-access', expiresAt: '2030-01-01T00:00:00.000Z',
+        ...(route === 'codex_cli' ? { chatgptAccountId: 'fixture-account', chatgptPlanType: 'pro' } : { accountId: 'fixture-account' }) }
+    } }
+    const service = new SubscriptionService(repository, () => worker as never,
+      { ready: () => true, nativeIsolation: 'verified_runtime' }, undefined, async () => undefined,
+      async (_scope, _model, _route, _signal, auditAllowed) => {
+        admissions.push(auditAllowed !== false)
+        if (admissions.length === denyAt) throw refusal
+      })
+    const lease = await service.nativeLease(use)
+    assert.equal(lease.accessToken, 'fixture-access')
+    assert.equal(lease.accountId, 'fixture-account')
+    assert.equal(lease.expiresAt, '2030-01-01T00:00:00.000Z')
+    assert.equal(lease.route, route)
+    assert.deepEqual(methods, ['nativeAuth'], 'credential preparation must not spawn redundant prepare/context workers')
+    assert.deepEqual(admissions, [false, false])
+    for (denyAt of [1, 2]) {
+      methods.length = 0; admissions.length = 0
+      await assert.rejects(service.nativeLease(use), error => error === refusal)
+      assert.deepEqual(methods, [])
+    }
+  })
+
   test(`${route}: context checks both admissions without generation audit; actual requests retain audit`, async () => {
     const { use, access } = subscriptionFixture(route)
     access.connection!.quota.observedAt = new Date().toISOString()
