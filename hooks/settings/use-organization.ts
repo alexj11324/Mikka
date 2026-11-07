@@ -169,14 +169,41 @@ export const organizationApi = {
  */
 export async function linkExistingAccount(providerId: string, callbackURL: string) {
   await send<{ providerId: string; next: string }>('/api/enterprise/link', 'POST', { providerId })
-  return signInWithSso(providerId, callbackURL)
+  return signInWithSso({ providerId }, callbackURL)
 }
 
-/** Starts the provider's sign-in (Better Auth SSO) and returns where to send the browser. */
-export async function signInWithSso(providerId: string, callbackURL: string) {
-  const value = await send<{ url?: string }>('/api/auth/sign-in/sso', 'POST', { providerId, callbackURL })
-  if (!value.url) throw new GovernanceRequestError(400, 'invalid_request')
+/**
+ * Organizations whose workspaces this session cannot open until it signs in with
+ * their SSO (#1642 follow-up). The backend has not published the signal yet; it
+ * will be either `ssoRequired` on /api/workspace/switcher or a
+ * `workspaceAccessDenied` with detail `sso_required`. Until one of them arrives
+ * this returns nothing and no hint is shown; nothing is inferred from a plain 403.
+ */
+export type SsoRequiredOrganization = { organizationId: string; name?: string; providerId?: string }
+export function ssoRequiredOrganizations(switcher: unknown): SsoRequiredOrganization[] {
+  const value = (switcher as { ssoRequired?: unknown } | null | undefined)?.ssoRequired
+  return Array.isArray(value) ? value.filter((item): item is SsoRequiredOrganization => typeof (item as { organizationId?: unknown } | null)?.organizationId === 'string') : []
+}
+export const isSsoRequired = (error: unknown) => error instanceof GovernanceRequestError && error.detail === 'sso_required'
+
+/** Which company sign-in to start: a known method, or the one registered for an email's or a domain's verified domain. */
+export type SsoTarget = { providerId: string } | { email: string } | { domain: string }
+
+/**
+ * Starts company sign-in (Better Auth SSO, /sign-in/sso) and returns where to
+ * send the browser. Throws `SsoStartError` when no verified method matches.
+ */
+export async function signInWithSso(target: SsoTarget, callbackURL: string, errorCallbackURL?: string) {
+  const response = await fetch(withBasePath('/api/auth/sign-in/sso'), { method: 'POST', cache: 'no-store', credentials: 'same-origin',
+    headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...target, callbackURL, ...(errorCallbackURL ? { errorCallbackURL } : {}) }) })
+  const value = await response.json().catch(() => null) as { url?: string } | null
+  if (!response.ok || !value?.url) throw new SsoStartError(response.status)
   return value.url
+}
+
+/** No verified company sign-in for that email or domain (404), or the request was refused. */
+export class SsoStartError extends Error {
+  constructor(public status: number) { super(status === 404 ? 'not_found' : 'failed'); this.name = 'SsoStartError' }
 }
 
 /** OIDC RP-initiated logout. `upstream` says how far it got; local sign-out has happened in every case. */

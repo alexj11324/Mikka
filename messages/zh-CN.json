@@ -236,6 +236,18 @@
     "connectionStatusFailed": "无法读取 {names} 的连接状态"
   },
   "Auth": {
+    "sso": {
+      "open": "使用企业 SSO 登录",
+      "label": "工作邮箱或公司域名",
+      "placeholder": "you@company.com",
+      "hint": "会跳转到你们组织的身份提供方登录。",
+      "invalid": "请输入工作邮箱或域名，例如 acme.com。",
+      "notFound": "没有找到这个邮箱或域名的企业登录方式。请确认组织已完成域名验证，或改用其他方式登录。",
+      "failed": "没能开始企业 SSO 登录，请重试。",
+      "returnedFailed": "企业 SSO 登录没有完成。请重试，或联系你们组织的管理员。",
+      "cancel": "返回",
+      "continue": "继续"
+    },
     "haveAccount": "已经有账号？",
     "noAccountShort": "还没有账号？",
     "signIn": "去登录",
@@ -5165,6 +5177,7 @@
     "run_provider_error": { "default": "模型服务商未能完成这次请求，请重试。" },
     "run_failed": { "default": "任务未能完成，请查看错误详情或重试。" },
     "governance_denied": {
+      "sso_required": "此组织要求用 SSO 登录后才能访问。请用组织的 SSO 重新登录。",
       "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
       "default": "治理操作未完成，请重试。",
       "access_denied": "你没有管理此组织或工作区的权限。",
