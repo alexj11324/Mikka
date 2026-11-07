@@ -145,7 +145,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     hasAssignee={Boolean(assigneeGroup)}
     assignee={show('assignee') ? <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary> : null}
     status={<CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>}
-    chips={chips} runState={show('agentState') && agentState ? agentState : null} createdAt={show('createdAt') ? <CardCreatedAt createdAt={task.createdAt} /> : null}
+    chips={chips} runState={show('agentState') && agentState ? agentState : null} block={block ? { reason: block.reason, label: blockLabel(tCard, block) } : null} createdAt={show('createdAt') ? <CardCreatedAt createdAt={task.createdAt} /> : null}
     // Opened from the context menu: labels, project and PR editors, rendered off-card.
     editors={isOverlay ? null : <div hidden><IssueMetadataControls task={task} section="all" compact disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>} />
 
