@@ -5324,8 +5324,8 @@
       "retry": "Retry"
     },
     "usage": {
-      "title": "Team usage",
-      "description": "Settled hosted model usage and run counts for this workspace by date. Dates are UTC, both ends included, up to 93 days.",
+      "title": "Hosted usage report by date",
+      "description": "Settled hosted model usage and run counts for this workspace over a date range, with CSV export. Dates are UTC, both ends included, up to 93 days.",
       "from": "From",
       "to": "To",
       "show": "Show",
@@ -5342,8 +5342,8 @@
       "runsTitle": "Runs",
       "runsNone": "No runs in these dates.",
       "total": "Total",
-      "noEntitlement": "The team usage report and CSV export are part of Team Pro, which this plan doesn't include.",
-      "noAdmin": "Only workspace admins can see the team usage report.",
+      "noEntitlement": "The hosted usage report by date and its CSV export are part of Team Pro, which this plan doesn't include. This month's usage by bot and by member above, and its export, are unaffected.",
+      "noAdmin": "Only workspace admins can see the hosted usage report by date. This month's usage by bot and by member above is unaffected.",
       "loading": "Loading usage…"
     },
     "templates": {
