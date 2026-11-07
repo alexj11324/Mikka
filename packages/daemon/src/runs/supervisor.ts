@@ -127,7 +127,7 @@ export interface SupervisorDeps {
   /** The task VM prepares its actual API key and starts the official CLI directly. */
   startCredential?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
-  /** Authenticated policy validation before repository/setup effects, including resume. */
+  /** Fresh policy validation before worktree/setup/agent effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   /** Once per local run, retained through verification and publication. */
@@ -135,7 +135,9 @@ export interface SupervisorDeps {
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** Resolve only daemon-owned cache paths (or a trusted hosted workspace). */
   repository: (assignment: RunAssignment) => DeviceRepo
-  prepareRepository: (assignment: RunAssignment, signal: AbortSignal, githubEnvironment?: Record<string, string>) => Promise<void>
+  /** A fresh hosted claim may overlap remote reads with policyReady. Any
+   * empty-repository creation/push must await that same authorization. */
+  prepareRepository: (assignment: RunAssignment, signal: AbortSignal, githubEnvironment?: Record<string, string>, policyReady?: Promise<unknown>) => Promise<void>
   baseRef: (assignment: RunAssignment) => Promise<string>
   log: Logger
   /** Uploads what the run's agent queued with `submit_capture` (`captures.ts`). */
@@ -214,6 +216,8 @@ interface ActiveRun {
   mailboxPreparing?: Promise<RunMailbox | undefined>
   mailboxAbort?: AbortController
   mailboxClosing?: Promise<void>
+  /** Only a fresh hosted claim's read-only clone/fetch overlaps entry policy. */
+  repositoryPreparing?: { abort: AbortController; done: Promise<void>; allowEffects(): void; refuseEffects(reason: unknown): void }
   session: AgentSession | null
   /** Event consumption ended; cancellation grace cannot cover host publication. */
   sessionEnded?: boolean
@@ -430,6 +434,9 @@ export class RunSupervisor {
   /** Asks the session to stop; detaches it if it does not within the grace. */
   private requestCancel(runId: string, run: ActiveRun): Promise<void> {
     run.cancelRequested = true
+    // No CLI exists for speculative repository preparation; abort and reap
+    // its Git child immediately instead of borrowing the session kill grace.
+    run.repositoryPreparing?.abort.abort()
     run.toolApproval?.revoke()
     // Fence new calls and abort outstanding transport immediately; do not
     // leave a mailbox usable during the CLI's cancellation grace period.
@@ -591,7 +598,7 @@ export class RunSupervisor {
     }
     if (assignment.leaseExpiresAt)
       this.leases.set(assignment.runId, Date.parse(assignment.leaseExpiresAt))
-    this.launch(assignment.runId, repo)
+    this.launch(assignment.runId, repo, true)
     return this.get(assignment.runId)
   }
 
@@ -1016,18 +1023,24 @@ export class RunSupervisor {
    * shows which stage it reached. The stage's own result or error passes
    * through unchanged.
    */
-  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>): Promise<T> {
+  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>, reportAfter?: Promise<unknown>): Promise<T> {
     const started = performance.now()
     const attributes = { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": this.deps.journal.get(runId)?.assignment.harness }
     let startupTiming: DaemonStartupTiming | undefined
     try {
       const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(),
         this.active.get(runId)?.runtimeTiming ? { onStartupTiming: timing => { startupTiming = timing } } : undefined)
+      const elapsed = performance.now() - started
+      // Repository reads can finish before policy. Preserve their actual
+      // duration, but produce no speculative stage/user message before it.
+      if (reportAfter) await reportAfter
       if (stage === "agent_start") this.active.get(runId)?.runtimeTiming?.executing()
-      this.emit(runId, runStageChunk(stage, performance.now() - started, true, startupTiming))
+      this.emit(runId, runStageChunk(stage, elapsed, true, startupTiming))
       return value
     } catch (error) {
-      this.emit(runId, runStageChunk(stage, performance.now() - started, false, startupTiming))
+      const elapsed = performance.now() - started
+      if (reportAfter) await reportAfter
+      this.emit(runId, runStageChunk(stage, elapsed, false, startupTiming))
       throw error
     }
   }
@@ -1307,7 +1320,7 @@ export class RunSupervisor {
     return data
   }
 
-  private launch(runId: string, repo: DeviceRepo) {
+  private launch(runId: string, repo: DeviceRepo, initialClaim = false) {
     const run: ActiveRun = {
       repoPath: repo.path,
       session: null,
@@ -1323,9 +1336,12 @@ export class RunSupervisor {
       run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
     run.done = daemonTracer.span("daemon.run", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
       run.span = span
-      return this.drive(runId, repo, run)
+      return this.drive(runId, repo, run, initialClaim)
     }, { root: true })
       .catch(async (error: unknown) => {
+        run.repositoryPreparing?.refuseEffects(error)
+        run.repositoryPreparing?.abort.abort()
+        await run.repositoryPreparing?.done.catch(() => undefined)
         run.runtimeTiming?.finishing()
         const message = error instanceof Error ? error.message : String(error)
         this.deps.log.error({ run_id: runId, err: this.logError(runId, error) }, "run failed")
@@ -1347,6 +1363,8 @@ export class RunSupervisor {
         }
       })
       .finally(async () => {
+        run.repositoryPreparing?.abort.abort()
+        await run.repositoryPreparing?.done.catch(() => undefined)
         run.toolApproval?.revoke()
         try { await this.closeMailbox(run) }
         catch { this.deps.log.warn('Run mailbox shutdown failed') }
@@ -1358,7 +1376,7 @@ export class RunSupervisor {
       })
   }
 
-  private async drive(runId: string, repo: DeviceRepo, run: ActiveRun) {
+  private async drive(runId: string, repo: DeviceRepo, run: ActiveRun, initialClaim: boolean) {
     const log = this.deps.log.child({ run_id: runId }, { serializers: {
       err: error => this.logError(runId, error),
       stderr: value => typeof value === 'string' ? this.maskers.get(runId)?.text(value) ?? value : value,
@@ -1366,7 +1384,30 @@ export class RunSupervisor {
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
     if ((assignment.policySnapshotRequired || assignment.policySnapshot) && !this.deps.verifyRunPolicy) throw new Error('Run policy verification unavailable')
-    await this.deps.verifyRunPolicy?.(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal]))
+    // Claim already authorized this exact remote and, where needed, handed
+    // over its GitHub credential. Only a new hosted task can read ahead: local
+    // credential preparation, old claim helpers and every resume stay serial.
+    const readAhead = initialClaim && this.deps.verifyRunPolicy && assignment.remoteUrl && !this.deps.prepareRunGitHub
+      && !assignment.continuesRunId && !assignment.resumeSessionId && !assignment.resumeFrom
+      && (!assignment.github || Boolean(assignment.github.token))
+    const readAbort = readAhead ? new AbortController() : undefined
+    const preparationSignal = AbortSignal.any([this.stopController.signal, run.abort.signal, ...(readAbort ? [readAbort.signal] : [])])
+    const policyReady = Promise.resolve().then(async () => {
+      await this.deps.verifyRunPolicy?.(assignment, preparationSignal)
+      preparationSignal.throwIfAborted()
+    })
+    if (readAbort) {
+      let allowEffects!: () => void, refuseEffects!: (reason: unknown) => void
+      const entryReady = new Promise<void>((resolve, reject) => { allowEffects = resolve; refuseEffects = reject })
+      const authorized = Promise.all([policyReady, entryReady])
+      void authorized.catch(() => undefined)
+      const done = this.stage(runId, 'repository', () => this.deps.prepareRepository(assignment, preparationSignal, undefined, authorized), authorized)
+      run.repositoryPreparing = { abort: readAbort, done, allowEffects, refuseEffects }
+      // Preserve the original rejection for the join without an unhandled
+      // rejection while the independent policy transport is still pending.
+      void done.catch(() => undefined)
+    }
+    await policyReady
     verifySkillAssignment(assignment)
     if (assignment.skillReceipt && (this.leases.get(runId)??0)<=Date.now())
       throw new Error('Receipted Skill assignment requires a current server lease')
@@ -1398,8 +1439,10 @@ export class RunSupervisor {
       this.setState(runId, "preparing")
       entry = this.deps.journal.get(runId) as JournalEntry
     }
+    // Preserve the original entry order, including Skill/session checks and
+    // the preparing state, before any repository write or stored stage.
+    run.repositoryPreparing?.allowEffects()
 
-    const preparationSignal = AbortSignal.any([this.stopController.signal, run.abort.signal])
     const checkMailbox = () => {
       const lease = this.leases.get(runId)
       const current = this.deps.journal.get(runId)
@@ -1420,10 +1463,12 @@ export class RunSupervisor {
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
     if (this.stopping || run.cancelRequested) {
+      run.repositoryPreparing?.abort.abort()
+      await run.repositoryPreparing?.done.catch(() => undefined)
       if (!this.stopping) this.finish(runId, run.forcedStop ?? 'cancelled')
       return
     }
-    await this.stage(runId, "repository", () => this.deps.prepareRepository(assignment, preparationSignal, run.github?.env))
+    await (run.repositoryPreparing?.done ?? this.stage(runId, "repository", () => this.deps.prepareRepository(assignment, preparationSignal, run.github?.env)))
     if (this.stopping || run.cancelRequested) {
       if (!this.stopping) this.finish(runId, run.forcedStop ?? "cancelled")
       return
