@@ -50,7 +50,7 @@ test('only a missing local session is 401; a disconnected cloud binding cannot l
 
 test('stored cloud quota failures retain compatible chat shape and canonical bilingual copy', () => {
   const failure = chatFailure({ working: false, error: new CloudServiceError('cloud_quota_exhausted', 'response').message })
-  assert.deepEqual(failure, { kind: 'failed', cloudCode: 'cloud_quota_exhausted' })
+  assert.deepEqual(failure, { kind: 'failed', cloudCode: 'cloud_quota_exhausted', raw: 'cloud_quota_exhausted (response)' })
   assert.deepEqual(failureMessageKey(failure!), { namespace: 'RunErrors', key: 'cloud_quota_exhausted.default' })
   assert.ok(failureLine('cloud_quota_exhausted', 'zh-CN'))
   assert.ok(failureLine('cloud_quota_exhausted', 'en'))
