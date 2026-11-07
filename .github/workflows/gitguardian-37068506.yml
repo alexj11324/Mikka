@@ -1,4 +1,4 @@
-name: GitGuardian incident 37068506 inspection
+name: GitGuardian incident 37068506 occurrence inspection
 
 on:
   push:
@@ -48,5 +48,5 @@ jobs:
           secret-name: GITGUARDIAN_API_TOKEN
           recursive: false
           include-imports: false
-      - name: Inspect only closed metadata for the fixed incident, without any mutation
+      - name: Inspect at most five occurrence metadata records for the fixed incident, without any mutation
         run: node scripts/ops/gitguardian-37068506.mjs --inspect

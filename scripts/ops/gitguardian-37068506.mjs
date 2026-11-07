@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/gitguardian-37068506',
-  base: 'b81ba153ba9e20a8782cc8afc2adc3590ee70203',
+  base: '3bd9d7fb40b484cb83c4f914e60f8ed2a2e4859f',
   workspace: 837165, incident: 37068506,
   source: '518b9d32eb9315656173ae7a074c920546fdcb70',
   file: 'docker-compose.yml', blob: '80bf3b1e101f3f8fc34ae95640f2f3017a708ce8',
@@ -18,6 +18,7 @@ const INCIDENT = `/v1/incidents/secrets/${TARGET.incident}`
 export const ROUTES = Object.freeze({
   token: '/v1/api_tokens/self', incident: `${INCIDENT}?with_occurrences=0`,
   occurrences: `/v1/occurrences/secrets?incident_id=${TARGET.incident}&per_page=4`,
+  inspectionOccurrences: `/v1/occurrences/secrets?incident_id=${TARGET.incident}&per_page=5`,
   ignore: `${INCIDENT}/ignore`,
 })
 const OWNED = ['.github/workflows/gitguardian-37068506.yml', 'scripts/ops/gitguardian-37068506.mjs', 'scripts/ops/gitguardian-37068506.test.mjs']
@@ -108,7 +109,35 @@ export async function inspect({ request, report }) {
   validateToken((await request(ROUTES.token)).data)
   report.workspaceVerified = true
   report.inspection = inspectIncident((await request(ROUTES.incident)).data)
+  requireThat(report.inspection.idMatches, 'INSPECTION_INCIDENT_SCOPE')
+  const reply = await request(ROUTES.inspectionOccurrences)
+  report.occurrenceInspection = inspectOccurrences(reply.data, reply.headers)
   report.result = 'inspected'
+}
+
+export function inspectOccurrences(rows, headers) {
+  requireThat(Array.isArray(rows) && rows.length <= 5 && !/\bnext\b/i.test(headers.get('link') ?? ''), 'INSPECTION_OCCURRENCE_LIMIT')
+  const integerOrNull = value => Number.isSafeInteger(value) && value >= 0 ? value : null
+  const legalPath = value => typeof value === 'string' && value.length > 0 && value.length <= 512
+    && !/[\u0000-\u001f\u007f\\:?#<>|"*]/.test(value)
+    && value.split('/').every(part => part.length > 0 && part.length <= 255 && part !== '.' && part !== '..')
+  return { noNextPage: true, returnedCount: rows.length, rows: rows.map(row => {
+    requireThat(Array.isArray(row?.matches) && row.matches.length <= 32, 'INSPECTION_MATCH_LIMIT')
+    const repoNumericMatches = row.source?.external_id === TARGET.repositoryId || row.source?.external_id === String(TARGET.repositoryId)
+    return {
+      id: integerOrNull(row.id), incidentMatches: row.incident_id === TARGET.incident,
+      repoNumericMatches,
+      repoNameMatches: typeof row.source?.full_name === 'string' && row.source.full_name.toLowerCase() === TARGET.repository.toLowerCase(),
+      sourceID: integerOrNull(row.source?.id),
+      sha: typeof row.sha === 'string' && /^[a-f0-9]{40}$/i.test(row.sha) ? row.sha.toLowerCase() : null,
+      filePath: repoNumericMatches && legalPath(row.filepath) ? row.filepath : null,
+      changeType: ['addition', 'deletion'].includes(row.change_type) ? row.change_type : 'OTHER',
+      matches: row.matches.map(match => ({
+        preLineStart: integerOrNull(match?.pre_line_start), preLineEnd: integerOrNull(match?.pre_line_end),
+        postLineStart: integerOrNull(match?.post_line_start), postLineEnd: integerOrNull(match?.post_line_end),
+      })),
+    }
+  }) }
 }
 
 export function validateOccurrences(rows, headers) {
@@ -135,7 +164,7 @@ export function validateOccurrences(rows, headers) {
 export function guardianClient(token, fetcher = fetch, record = () => {}) {
   requireThat(typeof token === 'string' && token.length > 0, 'TOKEN_MISSING')
   return async function request(route, method = 'GET') {
-    requireThat((method === 'GET' && [ROUTES.token, ROUTES.incident, ROUTES.occurrences].includes(route))
+    requireThat((method === 'GET' && [ROUTES.token, ROUTES.incident, ROUTES.occurrences, ROUTES.inspectionOccurrences].includes(route))
       || (method === 'POST' && route === ROUTES.ignore), 'API_ROUTE')
     let response
     try {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import test from 'node:test'
 import { TARGET, ROUTES, validateExecution, validateSource, validateToken, validateIncident,
-  validateOccurrences, guardianClient, dispose, inspectIncident, inspect } from './gitguardian-37068506.mjs'
+  validateOccurrences, guardianClient, dispose, inspectIncident, inspectOccurrences, inspect } from './gitguardian-37068506.mjs'
 
 const clone = value => structuredClone(value)
 const code = expected => error => error.code === expected && error.message === expected
@@ -144,7 +144,7 @@ function fakeApi(overrides = {}) {
     assert.equal(options.headers['x-privacy-mode'], 'true')
     let value
     if (path === ROUTES.token) value = overrides.token ?? token()
-    else if (path === ROUTES.occurrences) value = overrides.occurrences ?? occurrences()
+    else if (path === ROUTES.occurrences || path === ROUTES.inspectionOccurrences) value = overrides.occurrences ?? occurrences()
     else if (path === ROUTES.incident) {
       incidentReads++
       value = overrides.incident?.(incidentReads, state) ?? incident(state)
@@ -254,14 +254,44 @@ test('inspection identifies field mismatches without serializing arbitrary provi
   assert.ok(Object.values(arbitrary).every(value => typeof value === 'boolean' || typeof value === 'number' || value === null || value === 'OTHER'))
 })
 
-test('inspection reads exactly token and projected incident metadata, even when the disposition guard rejects', async () => {
+test('inspection reads only token, projected incident and bounded occurrence metadata while the disposition guard stays unchanged', async () => {
   const api = fakeApi({ incident: () => ({ ...incident(), occurrences_count: 12 }) })
   await inspect({ request: api.request, report: api.receipt })
-  assert.deepEqual(api.calls, [{ path: ROUTES.token, method: 'GET' }, { path: ROUTES.incident, method: 'GET' }])
+  assert.deepEqual(api.calls, [{ path: ROUTES.token, method: 'GET' }, { path: ROUTES.incident, method: 'GET' },
+    { path: ROUTES.inspectionOccurrences, method: 'GET' }])
   assert.equal(api.receipt.result, 'inspected')
   assert.equal(api.receipt.writeAttempts, 0)
   assert.equal(api.receipt.inspection.countMatches, false)
   assert.throws(() => validateIncident({ ...incident(), occurrences_count: 12 }), code('INCIDENT_SCOPE'))
+})
+
+test('occurrence inspection reports only bounded source identifiers, allowed paths and integer positions', () => {
+  const rows = occurrences()
+  const fourth = clone(rows[0])
+  fourth.id = 103; fourth.sha = 'c'.repeat(40); fourth.filepath = 'docs/example.md'
+  fourth.matches[0].pre_line_start = 2; fourth.matches[0].pre_line_end = 2
+  rows.push(fourth)
+  const view = inspectOccurrences(rows, new Headers())
+  assert.equal(view.returnedCount, 4)
+  assert.equal(view.noNextPage, true)
+  assert.deepEqual(view.rows[3], { id: 103, incidentMatches: true, repoNumericMatches: true,
+    repoNameMatches: true, sourceID: 10, sha: 'c'.repeat(40), filePath: 'docs/example.md', changeType: 'addition',
+    matches: [{ preLineStart: 2, preLineEnd: 2, postLineStart: 13, postLineEnd: 13 }] })
+  assert.throws(() => validateOccurrences(rows, new Headers()), code('OCCURRENCE_COUNT'))
+  assert.throws(() => inspectOccurrences([...rows, fourth, fourth], new Headers()), code('INSPECTION_OCCURRENCE_LIMIT'))
+  assert.throws(() => inspectOccurrences(rows, new Headers({ link: '<https://api.gitguardian.com/v1/occurrences/secrets?page=2>; rel="prev next"' })), code('INSPECTION_OCCURRENCE_LIMIT'))
+  for (const filePath of ['/absolute', '../escape', 'dir/../escape', 'dir//file', 'unsafe\npath', 'a'.repeat(513), 'https://example.invalid']) {
+    const invalid = clone(fourth); invalid.filepath = filePath
+    assert.equal(inspectOccurrences([invalid], new Headers()).rows[0].filePath, null)
+  }
+  const outside = clone(fourth); outside.source.external_id = '1'; outside.filepath = 'outside.md'
+  assert.equal(inspectOccurrences([outside], new Headers()).rows[0].filePath, null)
+  const arbitrary = clone(fourth)
+  arbitrary.id = 'provider-string'; arbitrary.source.full_name = 'provider-string'; arbitrary.source.id = 'provider-string'
+  arbitrary.sha = 'provider-string'; arbitrary.filepath = 'provider-string\n'; arbitrary.change_type = 'provider-string'
+  arbitrary.matches = [{ name: 'provider-string', match: 'provider-string', post_line_start: 'provider-string' }]
+  arbitrary.secret_hash = 'provider-string'
+  assert.equal(JSON.stringify(inspectOccurrences([arbitrary], new Headers())).includes('provider-string'), false)
 })
 
 test('this diagnostic revision cannot invoke disposition through the CLI', () => {
