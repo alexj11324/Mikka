@@ -77,8 +77,21 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
       const observe = chunk => { buffer = (buffer + chunk.toString()).slice(-64000); const match = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(buffer); if (match && buffer.includes('Registered tunnel connection')) { clearTimeout(timer); resolve(match[0]) } }
       tunnel.stdout.on('data', observe); tunnel.stderr.on('data', observe); tunnel.on('error', () => { clearTimeout(timer); reject(Error('TUNNEL_START')) }); tunnel.on('exit', () => { if (!closed) { clearTimeout(timer); reject(Error('TUNNEL_START')) } })
     })
-    const publicReceiver = await fetcher(origin, { redirect: 'error', signal: AbortSignal.timeout(20000) })
-    check(publicReceiver.ok && (await publicReceiver.text()) === 'Mikka release acceptance receiver', 'TUNNEL_HTTP')
+    report.receiverOrigin = origin; report.receiverReadiness = []
+    let reachable = false
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const publicReceiver = await fetcher(origin, { redirect: 'error', signal: AbortSignal.timeout(10000) })
+        report.receiverReadiness.push({ status: publicReceiver.status })
+        reachable = publicReceiver.ok && (await publicReceiver.text()) === 'Mikka release acceptance receiver'
+      } catch (error) {
+        const codes = ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE']
+        report.receiverReadiness.push({ cause: codes.includes(error?.cause?.code) ? error.cause.code : 'OTHER' })
+      }
+      if (reachable) break
+      if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 3000))
+    }
+    check(reachable, 'TUNNEL_HTTP')
     report.checks.receiverReachableBeforeRegistration = true
     // The normal dynamic registration validates public HTTPS and resolves DNS.
     registration = await json('server_register', '/v1/servers/register', { method: 'POST', body: { origin, basePath: '/mikka', name: 'Mikka release acceptance ' + env.GITHUB_RUN_ID } }, 201)
