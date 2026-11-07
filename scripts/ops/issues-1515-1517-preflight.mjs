@@ -54,7 +54,7 @@ try {
     await query('demoRuns', `SELECT r.status, count(*)::int AS count FROM agent_runs r JOIN devices d ON d.id=r."deviceId"
       WHERE d.id::text LIKE 'de30000%' AND d."daemonVersion"='0.9.4' AND d.kind='local' GROUP BY r.status ORDER BY r.status`)
     await query('emptyConnections', `SELECT c.provider,c.state,EXISTS(SELECT 1 FROM account_deletion_guards g WHERE g."subjectId"=c."ownerId") AS guarded,count(*)::int AS count,count(DISTINCT c."ownerId")::int AS owners
-      FROM byos_connections c WHERE c."removedAt" IS NULL AND c.state IN ('pending','reconnect_required','disconnected')
+      FROM byos_connections c WHERE c."removedAt" IS NULL AND c.state='pending'
       AND c."providerSubject" IS NULL AND c."accountLabel" IS NULL
       AND c."secretName" IS NULL AND c."secretDigest" IS NULL AND c."accessSecretName" IS NULL AND c."accessDigest" IS NULL
       AND c."stagedSecretName" IS NULL AND c."stagedDigest" IS NULL AND c."stagedAccessName" IS NULL AND c."stagedAccessDigest" IS NULL
@@ -78,6 +78,7 @@ try {
   } finally { db.release() }
   if(process.env.APPLICATION_SHA && phase==='after_cleanup' && report.queries.emptyConnections.some(row=>row.count>0 && !row.guarded)) throw Error('abandoned_connections_remaining')
   if(process.env.APPLICATION_SHA && phase==='after_cleanup' && report.queries.devices[0]?.demoVisible!==0) throw Error('demo_devices_remaining')
+  if(process.env.APPLICATION_SHA && phase==='after_cleanup' && report.queries.demoRuns.some(row=>['queued','preparing','running','paused','waiting_input','finishing'].includes(row.status)&&row.count>0)) throw Error('demo_runs_remaining')
   const email=process.env.SMOKE_OWNER_EMAIL,password=process.env.SMOKE_OWNER_PASSWORD
   if (!email || !password) report.account={status:'credentials_unavailable'}
   else {

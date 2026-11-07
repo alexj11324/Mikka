@@ -16,7 +16,7 @@ try {
   const application = process.env.APPLICATION_SHA
   check(application && /^[a-f0-9]{40}$/.test(application), 'cleanup_application_required')
   execFileSync('git', ['merge-base', '--is-ancestor', application, 'HEAD'], { stdio: 'ignore' })
-  execFileSync('git', ['diff', '--quiet', application, '--', 'lib/demo-device-cleanup.ts', 'lib/subscription-acquire-expiry.ts', 'lib/device-presence.ts', 'packages/protocol/src/device.ts'], { stdio: 'ignore' })
+  execFileSync('git', ['diff', '--quiet', application, '--', 'lib/demo-device-cleanup.ts', 'lib/subscription-acquire-expiry.ts', 'lib/device-presence.ts', 'packages/protocol/src/device.ts', 'lib/run-control.ts', 'lib/run-completion.ts', 'lib/run-completion-effects.ts'], { stdio: 'ignore' })
   const mode = process.env.CLEANUP_MODE ?? 'dry-run'
   check(mode === 'dry-run' || mode === 'apply', 'cleanup_mode_invalid')
   report.mode = mode
@@ -34,6 +34,36 @@ try {
   close = () => Promise.all([pool.end(), workspacePool.end()])
   const demo = `id::text LIKE 'de30000%' AND "daemonVersion"='0.9.4' AND kind='local'`
   const active = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
+  // Earlier seed retirement may have left live runs on tombstoned devices.
+  // Those devices need no second removal, but their runs still need normal Stop.
+  const stopRemovedDemoRuns = async (apply: boolean) => {
+    const targets = (await pool.query(`SELECT d.id,d."ownerId" FROM devices d WHERE
+      d.id::text LIKE 'de30000%' AND d."daemonVersion"='0.9.4' AND d.kind='local' AND d."removedAt" IS NOT NULL
+      AND EXISTS(SELECT 1 FROM agent_runs r WHERE r."deviceId"=d.id AND r.status=ANY($1::text[])) ORDER BY d.id`,[active])).rows
+    const counts = {devices:targets.length,activeRuns:0,stoppedRuns:0}
+    for(const target of targets){
+      const [guard] = (await pool.query(`SELECT NOT d.enabled AS eligible,
+        EXISTS(SELECT 1 FROM device_tokens t WHERE t."userId"=d."ownerId" AND t."revokedAt" IS NULL
+          AND (t."expiresAt" IS NULL OR t."expiresAt">now()) AND (t."boundDeviceId"=d.id OR EXISTS(SELECT 1 FROM device_token_devices b WHERE b."tokenId"=t.id AND b."deviceId"=d.id))) AS credential,
+        EXISTS(SELECT 1 FROM agent_runs r WHERE r."deviceId"=d.id AND r.status=ANY($2::text[]) AND
+          (r."userId"<>d."ownerId" OR r."deviceTokenId" IS NOT NULL OR r."leaseExpiresAt">now()
+           OR EXISTS(SELECT 1 FROM thread_machines m WHERE m."runId"=r.id))) AS execution
+        FROM devices d WHERE d.id=$1 AND d.id::text LIKE 'de30000%' AND d."daemonVersion"='0.9.4' AND d.kind='local' AND d."removedAt" IS NOT NULL`,[target.id,active])).rows
+      check(guard?.eligible && !guard.credential && !guard.execution,'cleanup_removed_demo_refused')
+      const runs = (await pool.query(`SELECT id,"issueId" FROM agent_runs WHERE "deviceId"=$1 AND "userId"=$2 AND status=ANY($3::text[]) ORDER BY id`,[target.id,target.ownerId,active])).rows
+      counts.activeRuns += runs.length
+      if(!apply)continue
+      const [{db},{stopOwnedRun},{completeRunForDevice},{afterRunEnded}] = await Promise.all([
+        import('../../lib/db/index.ts'),import('../../lib/run-control.ts'),import('../../lib/run-completion.ts'),import('../../lib/run-completion-effects.ts'),
+      ])
+      for(const run of runs){
+        if(!await stopOwnedRun(db,target.ownerId,run.id)) check(await completeRunForDevice(target.ownerId,run,{stopReason:'cancelled'}),'cleanup_removed_demo_stop_failed')
+        await afterRunEnded(target.ownerId,run.id)
+        counts.stoppedRuns++
+      }
+    }
+    return counts
+  }
   const snapshot = async () => {
     const real = (await pool.query(`SELECT id,"ownerId",kind,name,enabled,"removedAt" FROM devices WHERE (${demo}) IS NOT TRUE ORDER BY id`)).rows
     const bindings = (await pool.query(`SELECT a.id,a."deviceId" FROM agents a WHERE a."deviceId" IS NOT NULL AND NOT EXISTS(SELECT 1 FROM devices d WHERE d.id=a."deviceId" AND d.id::text LIKE 'de30000%' AND d."daemonVersion"='0.9.4' AND d.kind='local') ORDER BY a.id`)).rows
@@ -43,6 +73,9 @@ try {
   const historical = (await pool.query(`SELECT r.id,md5(to_jsonb(r)::text) AS digest FROM agent_runs r JOIN devices d ON d.id=r."deviceId" WHERE d.id::text LIKE 'de30000%' AND d."daemonVersion"='0.9.4' AND d.kind='local' AND NOT (r.status=ANY($1::text[])) ORDER BY r.id`, [active])).rows
   const plan = await removeDemoDevices(false)
   report.devicePlan = plan
+  stage = 'removed_device_plan'
+  const removedPlan = await stopRemovedDemoRuns(false)
+  report.previouslyRemovedDevicePlan = removedPlan
   // The shared test account does not own Alex's old demo devices. Verify these
   // exact production rows through the unchanged deployed presence function,
   // separately from the normal account API proof, before removing them.
@@ -131,6 +164,11 @@ try {
 
   stage = 'device_apply'
   if (mode === 'apply') {
+    stage = 'removed_device_stop'
+    const stopped = await stopRemovedDemoRuns(true)
+    report.previouslyRemovedDevicesApplied = stopped
+    check(stopped.stoppedRuns === removedPlan.activeRuns,'cleanup_removed_demo_count_mismatch')
+    stage = 'device_apply'
     const applied = await removeDemoDevices(true)
     report.devicesApplied = applied
     check(applied.removedDevices === plan.devices && applied.stoppedRuns === plan.activeRuns, 'cleanup_device_count_mismatch')
@@ -140,6 +178,10 @@ try {
     check(same(historical, historyAfter), 'cleanup_historical_run_changed')
     const remaining = await removeDemoDevices(false)
     check(remaining.devices === 0 && remaining.activeRuns === 0, 'cleanup_demo_remaining')
+    const removedAfter = await stopRemovedDemoRuns(false)
+    check(removedAfter.activeRuns === 0,'cleanup_removed_demo_runs_remaining')
+    report.previouslyRemovedDevicesAfter = removedAfter
+    report.totalStoppedRuns = applied.stoppedRuns + stopped.stoppedRuns
     report.devicesAfter = remaining
     report.realDevicesAfter = after.real.filter(row => !row.removedAt).length
     report.realDeviceBindingsPreserved = after.bindings.length

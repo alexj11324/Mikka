@@ -4,10 +4,13 @@ import { test, mock } from 'node:test'
 // Exercise the actual ops runner without a database, credentials or network.
 // The fixture includes an eligible acquisition and an account deletion fence.
 const reports = [], calls = []
-let mode = 'dry-run', failExpiry = false, changedProtected = false, protectedReads = 0
+let mode = 'dry-run', failExpiry = false, changedProtected = false, protectedReads = 0, removedRunEnded = false, realCredential = false
 const originalExitCode = process.exitCode
 const query = async (sql, args) => {
   calls.push({ sql, args })
+  if(sql.startsWith('SELECT d.id,d."ownerId"'))return {rows:removedRunEnded?[]:[{id:'de30000-fixture',ownerId:'seed-owner'}]}
+  if(sql.startsWith('SELECT NOT d.enabled'))return {rows:[{eligible:true,credential:realCredential,execution:false}]}
+  if(sql.startsWith('SELECT id,"issueId" FROM agent_runs'))return {rows:[{id:'seed-run',issueId:null}]}
   if (sql.startsWith('SELECT c.id,c."ownerId"')) return { rows: [
     { id: 'eligible', ownerId: 'active-owner', provider: 'codex', guarded: false },
     { id: 'fenced', ownerId: 'deleting-owner', provider: 'claude', guarded: true },
@@ -24,7 +27,7 @@ const query = async (sql, args) => {
 const client = {query,release(){calls.push({sql:'release'})}}
 mock.module('node:child_process',{namedExports:{execFileSync(){}}})
 mock.module('node:fs',{namedExports:{mkdirSync(){},writeFileSync(path,body){reports.push(JSON.parse(body))}}})
-mock.module(new URL('../../lib/db/index.ts',import.meta.url).href,{namedExports:{pool:{query,connect:async()=>client,end:async()=>{}}}})
+mock.module(new URL('../../lib/db/index.ts',import.meta.url).href,{namedExports:{db:{fixture:true},pool:{query,connect:async()=>client,end:async()=>{}}}})
 mock.module(new URL('../../lib/workspace-db.ts',import.meta.url).href,{namedExports:{workspacePool:{end:async()=>{}}}})
 mock.module(new URL('../../lib/demo-device-cleanup.ts',import.meta.url).href,{namedExports:{removeDemoDevices:async apply=>{
   calls.push({sql:apply?'devices_apply':'devices_plan'})
@@ -37,16 +40,28 @@ mock.module(new URL('../../lib/subscription-acquire-expiry.ts',import.meta.url).
   if(failExpiry)throw Object.assign(new Error('private database text must never leave this process'),{code:'55000',routine:'exec_stmt_raise'})
   return {expired:1,ownerIds:[ownerId]}
 }}})
+mock.module(new URL('../../lib/run-control.ts',import.meta.url).href,{namedExports:{stopOwnedRun:async(_db,owner,id)=>{
+  assert.equal(owner,'seed-owner');assert.equal(id,'seed-run');calls.push({sql:'normal_stop'});return false
+}}})
+mock.module(new URL('../../lib/run-completion.ts',import.meta.url).href,{namedExports:{completeRunForDevice:async(owner,run,result)=>{
+  assert.equal(owner,'seed-owner');assert.equal(run.id,'seed-run');assert.equal(result.stopReason,'cancelled');removedRunEnded=true;calls.push({sql:'normal_complete'});return true
+}}})
+mock.module(new URL('../../lib/run-completion-effects.ts',import.meta.url).href,{namedExports:{afterRunEnded:async()=>{calls.push({sql:'normal_after_run'})}}})
 mock.method(globalThis,'fetch',async()=>({ok:true,json:async()=>({build:'a'.repeat(40)})}))
 
-for(const scenario of ['dry-run','apply','sql-failure','protected-change']) test(scenario,async()=>{
-  mode=scenario==='apply'?'apply':'dry-run';failExpiry=scenario==='sql-failure';changedProtected=scenario==='protected-change';protectedReads=0;calls.length=0
+for(const scenario of ['dry-run','apply','sql-failure','protected-change','removed-credential']) test(scenario,async()=>{
+  removedRunEnded=false;realCredential=scenario==='removed-credential';mode=scenario==='apply'?'apply':'dry-run';failExpiry=scenario==='sql-failure';changedProtected=scenario==='protected-change';protectedReads=0;calls.length=0
   const env = {...process.env}
   Object.assign(process.env,{GITHUB_REPOSITORY:'alexj11324/Mikka',GITHUB_REF:'refs/heads/ops/1515-1517-acceptance',APPLICATION_SHA:'a'.repeat(40),MIKKA_DATABASE_URL:'fixture',DATABASE_URL:'fixture',CLEANUP_MODE:mode})
   delete process.env.VERCEL;delete process.env.WORKFLOW_TARGET_WORLD;delete process.env.NODE_ENV
   try {
     await import('./issues-1515-1517-cleanup.ts?scenario='+scenario)
     const report=reports.at(-1)
+    if(realCredential){
+      assert.equal(report.status,'failed');assert.equal(report.error,'cleanup_removed_demo_refused')
+      assert.equal(calls.some(call=>call.sql==='BEGIN ISOLATION LEVEL REPEATABLE READ' || call.sql==='normal_stop'),false)
+      return
+    }
     assert.equal(report.emptyConnectionsFound,2)
     assert.equal(report.emptyConnectionsPreservedForAccountDeletion,1)
     const failed=failExpiry || changedProtected
@@ -54,6 +69,9 @@ for(const scenario of ['dry-run','apply','sql-failure','protected-change']) test
     assert.equal(calls.some(call=>call.sql==='COMMIT'),scenario==='apply')
     assert.equal(calls.some(call=>call.sql==='ROLLBACK'),scenario!=='apply')
     assert.equal(calls.some(call=>call.sql==='devices_apply'),scenario==='apply')
+    assert.equal(report.previouslyRemovedDevicePlan.activeRuns,1)
+    assert.equal(calls.filter(call=>call.sql==='normal_stop').length,scenario==='apply'?1:0)
+    if(scenario==='apply'){assert.equal(report.totalStoppedRuns,1);assert.equal(report.previouslyRemovedDevicesAfter.activeRuns,0);assert.ok(calls.findIndex(call=>call.sql==='normal_after_run')<calls.findIndex(call=>call.sql==='devices_apply'))}
     if(failExpiry){assert.equal(report.failedStage,'subscription_expire');assert.equal(report.sqlstate,'55000');assert.equal(report.subscriptionTransactionRolledBack,true)}
     if(changedProtected)assert.equal(report.error,'cleanup_protected_subscription_changed')
     assert.doesNotMatch(JSON.stringify(report),/private database text|deleting-owner|active-owner/)
