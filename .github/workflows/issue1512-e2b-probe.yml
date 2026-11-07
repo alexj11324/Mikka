@@ -1,4 +1,4 @@
-name: Issue 1512 desktop import and process diagnosis
+name: Issue 1512 standalone catalogue cold start validation
 
 on:
   push:
@@ -26,10 +26,10 @@ jobs:
     env:
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
-      - name: Check out the immutable production source
+      - name: Check out the immutable reviewed source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: b8045b5661bcbf51eeecc74ceef19eceead93a10
+          ref: e4f05ccace3721b591b98d94821bceec9efece98
           path: source
           persist-credentials: false
       - name: Check out this diagnostic revision separately

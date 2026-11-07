@@ -18,7 +18,7 @@ import time
 from urllib.error import HTTPError
 from urllib.parse import quote
 
-SOURCE_SHA = 'b8045b5661bcbf51eeecc74ceef19eceead93a10'
+SOURCE_SHA = 'e4f05ccace3721b591b98d94821bceec9efece98'
 REPOSITORY = 'alexj11324/Mikka'
 BRANCH = 'refs/heads/ops/1512-git-transport'
 APPLICATION = 'mikka-issue1512-desktop-probe'
@@ -102,7 +102,7 @@ def stage(ledger, path, phase):
 
 
 def new_ledger(context):
-    return {'version': 3, 'diagnosticOnly': True, 'releaseAccepted': False, 'identity': context,
+    return {'version': 4, 'diagnosticOnly': True, 'releaseAccepted': False, 'identity': context,
             'candidateOrigin': dict(context),
             'budget': {'candidates': 1, 'cpuCount': 2, 'memoryMiB': 4096, 'probeSandboxes': 1, 'sandboxSeconds': 60,
                        'commandSeconds': 45, 'internalProbeMilliseconds': 20000},
@@ -119,7 +119,7 @@ def validate_ledger(ledger, context):
     if (set(ledger) - {'version', 'diagnosticOnly', 'releaseAccepted', 'identity', 'budget', 'candidate',
                       'candidateOrigin', 'candidateChecks', 'sandboxes', 'events', 'ignoredDiagnosticLines',
                       'probe', 'cleanup', 'cleanupHistory', 'phase'}
-            or ledger.get('version') != 3 or ledger.get('diagnosticOnly') is not True
+            or ledger.get('version') != 4 or ledger.get('diagnosticOnly') is not True
             or ledger.get('releaseAccepted') is not False or ledger.get('identity') != context
             or ledger.get('candidateOrigin') != context or not isinstance(candidate, dict)
             or set(candidate) - {'kind', 'name', 'absenceConfirmed', 'buildStarted', 'templateId', 'buildId'}
@@ -391,7 +391,7 @@ def diagnose(builder, cleaner, sandbox_factory, context, api_key, hook_source, o
         sandbox.files.write(hook_path, hook_source, user='user')
         command = ('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; '
                    f'/opt/mikka/runtime/node/bin/node --import {hook_path} '
-                   '/opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --probe-models')
+                   '/opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js')
         started = time.monotonic()
         try:
             result = sandbox.commands.run(command, user='user', timeout=45, on_stderr=Collector(ledger, output))

@@ -1,7 +1,7 @@
 // Temporary anonymous catalogue boundaries, loaded with Node --import.
 // Transparent observation: no network/FS restriction or child-control change.
 import childProcess from 'node:child_process'
-import { writeSync } from 'node:fs'
+import { realpathSync, writeSync } from 'node:fs'
 import { registerHooks, syncBuiltinESMExports } from 'node:module'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -85,7 +85,10 @@ for (const api of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFi
 }
 syncBuiltinESMExports()
 
-const bundleURL = pathToFileURL(resolve(process.argv[1])).href
+// E2B's active worker is a symlink into a versioned release. Node's module
+// loader uses its real path, so observation must use that same canonical URL.
+const bundleURL = pathToFileURL(realpathSync(resolve(process.argv[1]))).href
+const standaloneProbe = bundleURL.endsWith('/cloud-model-probe.js')
 const classify = url => url === bundleURL ? 'worker_bundle'
   : url.endsWith('/@anthropic-ai/claude-agent-sdk/sdk.mjs') ? 'claude_sdk'
     : url.endsWith('/pino/pino.js') ? 'pino' : undefined
@@ -111,8 +114,9 @@ registerHooks({
     if (module) emit({ phase: 'module_load_return', module })
     if (url !== bundleURL || result.format !== 'module') return result
     let source = typeof result.source === 'string' ? result.source : Buffer.from(result.source).toString('utf8')
-    source = statement('bundle_evaluation_begin') + '\n' + source
-    source = mark(source, 'if (process.argv.includes("--probe-models")) {', 'probe_branch_enter')
+    source = statement('bundle_evaluation_begin') + '\n'
+      + (standaloneProbe ? statement('probe_branch_enter') + '\n' : '') + source
+    if (!standaloneProbe) source = mark(source, 'if (process.argv.includes("--probe-models")) {', 'probe_branch_enter')
     source = mark(source, 'async function probeHostedRuntimeModels(passed) {', 'hosted_probe_enter', true)
     source = mark(source, 'const binaries = hostedBinaries(passed);', 'binaries_resolved', true)
     source = mark(source, 'const before = fingerprint(binaries);', 'fingerprint_ready', true)

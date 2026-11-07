@@ -125,7 +125,9 @@ class Fake:
         self.calls.append(('command', command, kwargs))
         assert set(kwargs) == {'user', 'timeout', 'on_stderr'}
         assert kwargs['timeout'] == 45 and kwargs['user'] == 'user'
-        assert '--probe-models' in command and '--import /tmp/mikka-i1512-probe-' in command
+        assert command.endswith('/opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js')
+        assert 'cloud-worker.js' not in command and '--probe-models' not in command
+        assert '--import /tmp/mikka-i1512-probe-' in command
         assert PRIVATE not in command and 'bootstrap.json' not in command
         callback = kwargs['on_stderr']
         callback(PRIVATE + '\n')
