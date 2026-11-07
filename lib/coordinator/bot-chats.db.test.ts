@@ -677,8 +677,9 @@ dbTest('own task completion returns to the original Bot with an exhausted team t
   t.after(async () => { t.diagnostic(`Retained completion transport fixture ${owner}`); await scope.close() })
   await scope.run(async () => {
     await db.execute(sql`insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values(${owner},'Completion fixture',${`${owner}@example.invalid`},false,now(),now())`)
-    const { botId, workspaceId } = await seedCoordinator(owner)
-    await pool.query(`UPDATE mikka_workspaces SET kind='team' WHERE id=$1`, [workspaceId])
+    const workspaceId = await seedFixtureWorkspace(pool, owner, 'team')
+    const { botId } = await (await import('./coordinator-bot')).coordinatorBot(owner, workspaceId, { backfill: false })
+    // Model an existing over-limit team: completion transport must still work without a new paid classification.
     for (let n = 0; n < 7; n++) await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,'Member',$3,'member','active')`, [workspaceId, `${owner}-peer-${n}`, `peer-${n}@example.invalid`])
     await db.insert(schema.coordinatorEvents).values(Array.from({ length: 21 }, (_, n) => ({
       id: randomUUID(), userId: owner, botId, kind: 'user_message' as const, dedupeKey: `${owner}:${n}`, payload: { text: 'Earlier fixture input' }, tier: 'attention' as const, deliveredAt: new Date(),
