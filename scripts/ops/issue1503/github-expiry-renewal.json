@@ -5,10 +5,10 @@
   "workspaceId": "93f38d33-9447-4eaf-8a46-0d8889165bcd",
   "smokeUserId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
   "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
-  "startedAt": "2026-11-07T08:32:11.506Z",
+  "startedAt": "2026-11-07T11:32:54.738Z",
   "status": "passed",
   "changed": true,
-  "inputFixtureSha256": "b28b271245f16139628a64ce3c550fbf50e5ba5c265c232d0b15f4ddc0e8a31f",
+  "inputFixtureSha256": "25924143a7cad32de244292385ad2d027bd6b6b58af08f4b8f7211fe8406bf61",
   "before": {
     "version": 1,
     "issue": 1503,
@@ -24,8 +24,8 @@
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
     "providerExpiresAt": "2026-11-07T15:07:53.000Z",
-    "connectionExpiresAt": "2026-11-07T11:07:44.844Z",
-    "connectionUpdatedAt": "2026-11-07T07:07:54.845Z",
+    "connectionExpiresAt": "2026-11-07T12:32:05.327Z",
+    "connectionUpdatedAt": "2026-11-07T08:32:15.328Z",
     "tokenSha256": "89203678a1bd0309e0785e1f54c9975408838aed1374a1fc7d0ee378a115d94a"
   },
   "activityBefore": {
@@ -73,8 +73,8 @@
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
     "providerExpiresAt": "2026-11-07T15:07:53.000Z",
-    "connectionExpiresAt": "2026-11-07T12:32:05.327Z",
-    "connectionUpdatedAt": "2026-11-07T08:32:15.328Z",
+    "connectionExpiresAt": "2026-11-07T15:07:42.785Z",
+    "connectionUpdatedAt": "2026-11-07T11:32:58.786Z",
     "tokenSha256": "89203678a1bd0309e0785e1f54c9975408838aed1374a1fc7d0ee378a115d94a"
   },
   "sameToken": true,
@@ -90,5 +90,5 @@
   },
   "renewedFixtureStateWritten": true,
   "stage": "readback",
-  "completedAt": "2026-11-07T08:32:15.656Z"
+  "completedAt": "2026-11-07T11:32:59.111Z"
 }
