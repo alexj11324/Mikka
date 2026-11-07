@@ -147,7 +147,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     context.after(() => { for (const [key, value] of Object.entries(saved)) if (value === undefined) delete process.env[key]; else process.env[key] = value })
     let reads = 0
     context.mock.method(SubscriptionWorkerClient.prototype, 'call', async function<T>(this: InstanceType<typeof SubscriptionWorkerClient>, method: string, input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
-      assert.equal(method, 'usage'); assert.equal(input.revision, 1); assert.ok(signal)
+      assert.equal(method, 'allowance'); assert.equal(input.revision, 1); assert.ok(signal)
       const config = Reflect.get(this, 'config') as { scope: { ownerId: string; connectionId: string } }
       assert.equal(config.scope.ownerId, p.ownerId, 'the authorized lender, never the run principal, owns the quota read')
       assert.equal(config.scope.connectionId, p.connectionId, 'the preflight reads only the exact frozen connection')

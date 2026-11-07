@@ -73,6 +73,17 @@ export function sanitizeAttributes(attributes: Attributes): Attributes {
     const next = cleanValue(value)
     if (next !== undefined) clean[key] = next
   }
+  // PgInstrumentation 0.76 uses server.address, which must remain private.
+  // Keep only a closed regional projection for the two production candidates.
+  // Never trust a caller-supplied region label or export the endpoint/account.
+  delete clean['mikka.db_peer_region']
+  if (attributes['db.system.name'] === 'postgresql' || attributes['db.system'] === 'postgresql') {
+    const host = attributes['server.address'] ?? attributes['net.peer.name']
+    const region = typeof host === 'string'
+      ? /^ep-[a-z0-9-]+(?:\.c-\d+)?\.(us-east-[12])\.aws\.neon\.tech$/i.exec(host)?.[1]?.toLowerCase()
+      : undefined
+    if (region) clean['mikka.db_peer_region'] = `aws-${region}`
+  }
   // The root span learns its route only after it starts; give it the same grouping key as its children.
   if (clean['mikka.route'] === undefined && typeof clean['http.route'] === 'string') clean['mikka.route'] = clean['http.route']
   // Workflow SDK sets these after onStart. Preserve safe identifiers and
