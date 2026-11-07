@@ -49,7 +49,7 @@ const transport = {
       },
       orderBy() { return selection },
       limit() {
-        if (table === agentRuns && fields && 'workspaceId' in fields) {
+        if (table === agentRuns && fields && Object.keys(fields).length === 1 && 'workspaceId' in fields) {
           assert.ok(dialect.sqlToQuery(condition).params.includes(runId))
           // Initial tenant lookup succeeds; the locked read below still
           // exercises a concurrent ownership/STOP change before the write.
