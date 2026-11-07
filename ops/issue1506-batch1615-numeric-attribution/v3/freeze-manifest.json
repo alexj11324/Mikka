@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "analysisVersion": "batch1615-numeric-attribution-v3",
+  "baseVersion": "batch1615-numeric-attribution-v2",
+  "baseManifestSha256": "af7ba17b841491e032fbac80a5f321a86a391529442ee267da010eb83658d491",
+  "preservedV2ArtifactsVerified": 14,
+  "actualApplicationSha": null,
+  "actualDeploymentId": null,
+  "numericProducerSourceCommit": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "reviewedLiveSourceCommit": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+  "productionSamples": 0,
+  "gitWrites": 0,
+  "newTestCases": 1,
+  "red": {
+    "tests": 1,
+    "pass": 0,
+    "fail": 1,
+    "exitCode": 1
+  },
+  "green": {
+    "tests": 12,
+    "pass": 12,
+    "fail": 0,
+    "skip": 0,
+    "exitCode": 0
+  },
+  "artifacts": [
+    {
+      "path": "README.md",
+      "bytes": 3561,
+      "sha256": "cd63e96f2257044b911849cda48ede36c067c5083657e657e3520853f4a2b2bb"
+    },
+    {
+      "path": "aggregate.mjs",
+      "bytes": 20621,
+      "sha256": "bdb2539f60aee69db3d998003f1873fb6912291abc02bb140e8dd57e88223974"
+    },
+    {
+      "path": "aggregate.test.mjs",
+      "bytes": 14323,
+      "sha256": "d349bec8748c7b472329d1a7e793318a45c20a869fe80eb75ffea937faa55ff9"
+    },
+    {
+      "path": "green-v3-receipt.json",
+      "bytes": 335,
+      "sha256": "119cef5a18b0ffc5e04ff07f689cbff9ac828d7b23b730b01f5efc10cb5b0186"
+    },
+    {
+      "path": "green-v3.log",
+      "bytes": 1535,
+      "sha256": "6b630d48791d31f372e752af9ab4d41452312a8cef4cc724f96451e1a75d8d08"
+    },
+    {
+      "path": "manifest.example.json",
+      "bytes": 754,
+      "sha256": "0037614dd9746b3e042c450e4a627e06fcd764ddb20fbafb1293790973afd2fb"
+    },
+    {
+      "path": "red-v2-receipt.json",
+      "bytes": 401,
+      "sha256": "158956cf69bbc09cbd29f6f1134d3dd4718caf59c2e02b90530a370592a8fd01"
+    },
+    {
+      "path": "red-v2.log",
+      "bytes": 1071,
+      "sha256": "406a1c7384ee58b7ed6380fd4aff37777a0dbd0855f9462b42e2836e69e526c2"
+    },
+    {
+      "path": "source-proof.json",
+      "bytes": 1486,
+      "sha256": "b832a0f9696f7457142d51eb200e7cb3a5a43faedad03d3e7ab7811f39e2cb4b"
+    },
+    {
+      "path": "v3-v2.patch",
+      "bytes": 14896,
+      "sha256": "15b986f5c0c35156cc473ebeef92dbf80ab0bbc1f50c7f97e8cef8c5da15d001"
+    }
+  ]
+}

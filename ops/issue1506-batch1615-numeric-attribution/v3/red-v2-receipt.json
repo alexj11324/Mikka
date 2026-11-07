@@ -1,0 +1,15 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "--test-name-pattern",
+    "actual cache-live envelope",
+    "aggregate.test.mjs"
+  ],
+  "cwd": "/vercel/recovery/cache-attribution-batch1615/v3/red-v2",
+  "startedAt": "2026-11-07T20:27:01.019839+00:00",
+  "exitCode": 1,
+  "log": "red-v2.log",
+  "logSha256": "406a1c7384ee58b7ed6380fd4aff37777a0dbd0855f9462b42e2836e69e526c2",
+  "syntheticOnly": true
+}

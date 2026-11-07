@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "acceptanceContractHeadSuppliedByRoot": "5c18388ad5c622769233bad7c4494db21d6fc940",
+  "remoteSourceReadPerformed": false,
+  "sourceMethod": "read restored reviewed source files; no Git/API or production fetch",
+  "numericProducerSourceCommit": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "reviewedLiveSourceCommit": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8",
+  "v2ManifestSha256": "af7ba17b841491e032fbac80a5f321a86a391529442ee267da010eb83658d491",
+  "sources": [
+    {
+      "path": "/vercel/recovery/disabled-preparer-batch1615/green/scripts/acceptance/issue-1506-alex/live-cache-turns.mjs",
+      "bytes": 2917,
+      "sha256": "d388809bd5643cc37333fbf79f09ff40fd13dc7352243aa890c61c780f9654f9"
+    },
+    {
+      "path": "/vercel/recovery/disabled-preparer-batch1615/green/scripts/acceptance/issue-1506-alex/coordinator-cache-turns.mjs",
+      "bytes": 16773,
+      "sha256": "40772570d93f6ba3656ed7346fd610ae2320de61db26764da1a94213ec76e495"
+    },
+    {
+      "path": "/vercel/recovery/disabled-preparer-batch1615/green/scripts/acceptance/issue-1506-alex/live-consumer.mjs",
+      "bytes": 16525,
+      "sha256": "817b61f77dbc01dc8b5a9790e4bf6d3e93051bdd3f51ad7f59ada757200d455a"
+    },
+    {
+      "path": "/vercel/recovery/disabled-preparer-batch1615/prepared/actual-ce67/payload/scripts/acceptance/issue-1506-alex/live-source.mjs",
+      "bytes": 4847,
+      "sha256": "32d436e992ec7d3823f98cb497b56fcdb6c1ba7c27bc5035ed2e16fa991f08fd"
+    }
+  ]
+}

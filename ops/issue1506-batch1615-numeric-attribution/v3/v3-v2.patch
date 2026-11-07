@@ -1,0 +1,219 @@
+--- v2/aggregate.mjs
++++ v3/aggregate.mjs
+@@ -3,7 +3,7 @@
+ import { resolve, dirname } from 'node:path'
+ import { pathToFileURL } from 'node:url'
+ 
+-export const VERSION = 'batch1615-numeric-attribution-v2'
++export const VERSION = 'batch1615-numeric-attribution-v3'
+ export const PRODUCER = '0d379dd92fd2d7b3f2b307030c3bcd8234426d0e'
+ const SHA = /^[0-9a-f]{40}$/, HASH = /^[0-9a-f]{64}$/
+ const RUN = /^wrun_[A-Za-z0-9_-]{1,160}$/
+@@ -153,7 +153,36 @@
+   const inspect = v => !object(v)?'missing':v.matches===true && v.build===expectedSha?'matched':v.build && v.build!==expectedSha?'mismatched':'unconfirmed'
+   return {before:inspect(w?.before),after:inspect(w?.after)}
+ }
+-function receipts(entries,phase,expectedSha) {
++function cacheLiveObservation(w, kind, expectedSha, liveSourceCommit) {
++  const e=w.observation
++  if (e == null) return {observation:null,cacheLive:{state:'missing',passed:false}}
++  demand(object(e) && e.schemaVersion===1 && e.issue===1506 && e.phase==='alex-cache-and-live','cache_live_envelope_invalid')
++  demand(e.applicationSha===expectedSha && e.sourceCommit===liveSourceCommit,'cache_live_source_scope')
++  demand(e.fixtureKey===kind && typeof w.fixtureRunKey==='string' && e.fixtureRunKey===w.fixtureRunKey,'cache_live_fixture_scope')
++  demand(['observed','failed'].includes(e.status) && e.modelMessagesAddedForLive===0,'cache_live_status_or_send_contract')
++  const inner=e.observation, live=e.live
++  if (inner != null) {
++    demand(object(inner) && inner.schemaVersion===1 && inner.issue===1506 && inner.case==='complete-short-turns' &&
++      ['observed','failed'].includes(inner.status),'cache_live_inner_invalid')
++    demand(inner.applicationSha===expectedSha || inner.applicationSha===null && inner.status==='failed' &&
++      Array.isArray(inner.turns) && inner.turns.length===0,'observation_source_scope')
++    if (inner.fixture != null) demand(inner.fixture.key===kind && inner.fixture.runKey===e.fixtureRunKey,'cache_live_inner_fixture_scope')
++    else demand(inner.status==='failed' && Array.isArray(inner.turns) && inner.turns.length===0,'cache_live_inner_fixture_missing')
++  }
++  if (live != null) {
++    demand(object(live) && live.schemaVersion===1 && live.issue===1506 && live.case==='real-live-core-consumers','cache_live_consumer_invalid')
++    demand(live.applicationSha===expectedSha && live.sourceCommit===liveSourceCommit,'cache_live_consumer_source_scope')
++  }
++  const passed=e.status==='observed' && inner?.status==='observed' && live?.status==='live_evidence_captured'
++  return {observation:inner,cacheLive:{
++    state:'reported',sourceCommit:e.sourceCommit,applicationSha:e.applicationSha,fixtureKey:kind,
++    status:enumCell(e,'status',['observed','failed']),
++    cacheStatus:enumCell(inner,'status',['observed','failed']),
++    consumerStatus:enumCell(live,'status',['running','failed','live_evidence_captured','incomplete_coverage']),
++    modelMessagesAddedForLive:cell(e,'modelMessagesAddedForLive','count'),passed
++  }}
++}
++function receipts(entries,phase,expectedSha,liveSourceCommit) {
+   demand(Array.isArray(entries) && entries.length<=2,'receipt_count')
+   const out=new Map()
+   for (const e of entries) {
+@@ -162,7 +191,8 @@
+     demand(w.applicationSha===expectedSha && w.fixtureKey===e.kind && w.phase==='alex-continuation' && w.case===phase,'receipt_source_scope')
+     demand(w.observation==null || w.observation.applicationSha==null || w.observation.applicationSha===expectedSha,'observation_source_scope')
+     const fence=versionFence(w,expectedSha)
+-    out.set(e.kind,{wrapper:w,observation:w.observation,sha256:e.sha256,fence})
++    const normalized=phase==='cache-live'?cacheLiveObservation(w,e.kind,expectedSha,liveSourceCommit):{observation:w.observation}
++    out.set(e.kind,{wrapper:w,...normalized,sha256:e.sha256,fence})
+   }
+   return out
+ }
+@@ -177,13 +207,13 @@
+   demand(streamId==null || STREAM.test(streamId) && STREAM.exec(streamId)[1]===rawRun,'receipt_stream_scope')
+   return {slot:stop?'stop-'+kind:kind+'-'+index,kind,turn:stop?null:index,
+     receiptState:p?'present':'missing',receiptSha256:p?.sha256??null,
+-    wrapperStatus:wStatus,status:rStatus,wrapperAttempted:cell(p?.wrapper,'attempted','bool'),
++    wrapperStatus:wStatus,status:rStatus,liveEnvelope:p?.cacheLive??null,wrapperAttempted:cell(p?.wrapper,'attempted','bool'),
+     wrapperMessageSendAttempts:cell(p?.observation,'messageSendAttempts','count'),versionFence:p?.fence??{before:'missing',after:'missing'},
+     workflowRunId:rawRun??null,streamId:streamId??null,
+     sent:cell(r,'messageSendAttempted','bool'),messageSendAttempts:cell(r,'messageSendAttempts','count'),
+     durationMs:cell(r,'durationMs'),replyCharacters:cell(r,'replyCharacters','count'),
+     metrics:cells(r?.metrics,CLIENT_MS),
+-    failurePresent:!!r?.error || r?.status==='failed' || p?.wrapper?.status==='failed',
++    failurePresent:!!r?.error || r?.status==='failed' || p?.wrapper?.status==='failed' || p?.cacheLive?.passed===false,
+     ...(stop?{stopRequested:cell(r?.stop,'requested','bool'),stopAcknowledged:cell(r?.stop,'acknowledged','bool'),
+       textConsistency:{matches:cell(r?.textConsistency,'matches','bool'),...cells(r?.textConsistency,['liveCharacters','persistedCharacters'],'count')}}:{}),
+     runtime:null}
+@@ -192,7 +222,8 @@
+   demand(input?.schemaVersion===1 && SHA.test(input.expectedSha??'') && /^dpl_[A-Za-z0-9]+$/.test(input.deploymentId??''),'manifest_source_invalid')
+   demand(input.producerSourceCommit===PRODUCER,'unsupported_producer_source')
+   demand(['cache','cache-live'].includes(input.phase),'unsupported_phase')
+-  const cache=receipts(input.cacheReceipts??[],input.phase,input.expectedSha)
++  if (input.phase==='cache-live') demand(SHA.test(input.liveSourceCommit??''),'live_source_commit_required')
++  const cache=receipts(input.cacheReceipts??[],input.phase,input.expectedSha,input.liveSourceCommit)
+   const stops=receipts(input.stopReceipts??[],'ordinary-stop',input.expectedSha)
+   const stopKinds=input.stopKinds??[]
+   demand(Array.isArray(stopKinds) && stopKinds.length<=2 && new Set(stopKinds).size===stopKinds.length && stopKinds.every(k=>KINDS.includes(k)),'stop_plan_invalid')
+@@ -240,9 +271,10 @@
+     captureProof.push({workflowRunId:c.workflowRunId,sha256:c.sha256,declaredComplete:c.complete,since:c.since,until:c.until})
+   }
+   const warm=slots.filter(s=>s.turn>1).map(s=>({slot:s.slot,
+-    passed:s.sent.value===true && s.status.value==='observed' && s.wrapperStatus.value==='observed' && s.versionFence.before==='matched' && s.versionFence.after==='matched' && s.metrics.firstTextMs.state==='number' && s.metrics.firstTextMs.value<=3000}))
++    passed:(s.liveEnvelope===null || s.liveEnvelope.passed===true) && s.sent.value===true && s.status.value==='observed' && s.wrapperStatus.value==='observed' && s.versionFence.before==='matched' && s.versionFence.after==='matched' && s.metrics.firstTextMs.state==='number' && s.metrics.firstTextMs.value<=3000}))
+   return {schemaVersion:1,analysisVersion:VERSION,phase:input.phase,
+     applicationSha:input.expectedSha,deploymentId:input.deploymentId,producerSourceCommit:PRODUCER,
++    liveSourceCommit:input.phase==='cache-live'?input.liveSourceCommit:null,
+     clocks:{
+       client:'per-send performance.now; sole 3000ms acceptance clock',
+       model:'Node requestedAt reset after resolver; firstText is first SDK text-delta event, not an independent nonempty guarantee',
+--- v2/aggregate.test.mjs
++++ v3/aggregate.test.mjs
+@@ -186,3 +186,72 @@
+   assert.equal(JSON.stringify(out).includes(secret),false)
+   assert.equal(JSON.stringify(out).includes('a'.repeat(64)),false)
+ })
++
++test('actual cache-live envelope preserves nested six slots, validates both sources and cannot wash a failed live report into warm PASS',()=>{
++  const make=()=>{
++    const i=input();i.phase='cache-live';i.liveSourceCommit='b'.repeat(40)
++    i.cacheReceipts=i.cacheReceipts.map(entry=>{
++      const previous=JSON.parse(entry.text),kind=entry.kind,fixtureRunKey='synthetic-fixture-run'
++      const inner={...previous.observation,schemaVersion:1,issue:1506,case:'complete-short-turns',
++        fixture:{key:kind,runKey:fixtureRunKey}}
++      const envelope={schemaVersion:1,issue:1506,phase:'alex-cache-and-live',applicationSha:APP,
++        sourceCommit:i.liveSourceCommit,fixtureKey:kind,fixtureRunKey,status:'observed',
++        modelMessagesAddedForLive:0,observation:inner,
++        live:{schemaVersion:1,issue:1506,case:'real-live-core-consumers',status:'live_evidence_captured',
++          applicationSha:APP,sourceCommit:i.liveSourceCommit}}
++      return artifact({...wrapper(kind,'cache-live',envelope),fixtureRunKey},{kind})
++    })
++    i.captures=[capture(run('haiku',2),[model(run('haiku',2))])]
++    return i
++  }
++  const healthy=aggregate(make())
++  assert.equal(healthy.cache.length,6)
++  assert.deepEqual(healthy.cache.map(x=>x.workflowRunId),['haiku','luna'].flatMap(k=>[1,2,3].map(n=>run(k,n))))
++  assert.equal(healthy.cache[1].runtime.model.length,1)
++  assert.equal(healthy.cache[1].liveEnvelope.sourceCommit,'b'.repeat(40))
++  assert.equal(healthy.warmAcceptance.denominator,4)
++  assert.equal(healthy.warmAcceptance.passed,true)
++
++  let i=make()
++  reviseReceipt(i,'haiku',w=>{w.observation.observation.applicationSha='c'.repeat(40)})
++  assert.throws(()=>aggregate(i),/observation_source_scope/)
++  i=make()
++  reviseReceipt(i,'haiku',w=>{w.observation.sourceCommit='c'.repeat(40)})
++  assert.throws(()=>aggregate(i),/cache_live_source_scope/)
++  i=make()
++  reviseReceipt(i,'haiku',w=>{w.observation.fixtureKey='luna'})
++  assert.throws(()=>aggregate(i),/cache_live_fixture_scope/)
++  i=make()
++  reviseReceipt(i,'haiku',w=>{w.observation.live.applicationSha='c'.repeat(40)})
++  assert.throws(()=>aggregate(i),/cache_live_consumer_source_scope/)
++
++  i=make()
++  reviseReceipt(i,'haiku',w=>{w.observation.status='failed';w.observation.live.status='failed'})
++  const failed=aggregate(i)
++  assert.equal(failed.cache.length,6)
++  assert.equal(failed.cache[1].status.value,'observed')
++  assert.equal(failed.cache[1].liveEnvelope.status.value,'failed')
++  assert.equal(failed.cache[1].liveEnvelope.consumerStatus.value,'failed')
++  assert.equal(failed.cache[1].failurePresent,true)
++  assert.equal(failed.warmAcceptance.denominator,4)
++  assert.equal(failed.warmAcceptance.passed,false)
++
++  i=make();i.captures=[]
++  reviseReceipt(i,'haiku',w=>{w.status='failed';w.observation.status='failed';w.observation.observation=null;w.observation.live=null})
++  const early=aggregate(i)
++  assert.equal(early.cache.length,6)
++  assert.equal(early.cache[1].status.state,'missing')
++  assert.equal(early.cache[1].liveEnvelope.cacheStatus.state,'missing')
++  assert.equal(early.warmAcceptance.passed,false)
++
++  i=make()
++  reviseReceipt(i,'haiku',w=>{
++    w.status='failed';w.observation.status='failed';w.observation.observation.status='failed'
++    w.observation.observation.turns[2].status='failed'
++    w.observation.observation.turns[2].messageSendAttempted=false
++  })
++  const unsent=aggregate(i)
++  assert.equal(unsent.cache[2].sent.value,false)
++  assert.equal(unsent.cache[2].status.value,'failed')
++  assert.equal(unsent.warmAcceptance.passed,false)
++})
+--- /dev/null
++++ v3/README.md
+@@ -0,0 +1,44 @@
++# Batch 1615 离线归因器 v3：cache-live envelope 修正
++
++本目录是独立 v3 候选；父目录的 v2 源、日志、manifest 和 v1/ 全部保持原字节。无 Git 写入、生产查询、SQL、模型、CI 或资源创建。
++
++## 输入的实际层级
++
++phase=cache 时沿用原平面结构：
++continuation.observation.turns
++
++phase=cache-live 必须识别真实结构：
++continuation.observation.phase = alex-cache-and-live
++continuation.observation.observation.case = complete-short-turns
++continuation.observation.observation.turns
++
++外层 live envelope 另有 schemaVersion、issue、applicationSha、sourceCommit、fixtureRunKey、fixtureKey、status、modelMessagesAddedForLive=0、live。不能把 envelope 自己当作 runCacheTurns 报告。
++
++v3 先校验 envelope，再解包内层 cache 报告。内外 applicationSha 对 expectedSha；内外 fixture key/runKey 对齐；inner.fixture 若已存在也必须一致。早期失败、尚未得到 inner report 或尚无 fixture 的失败零发送报告保留为六个固定槽中的未观测/失败，不生成虚构 run。错误的非空 inner SHA 或 sourceCommit 拒绝。
++
++输出每个槽保留 liveEnvelope 的外层 status、cacheStatus、consumerStatus、modelMessagesAddedForLive 和 passed。即使 inner 三个 turn 都 observed，也不能把 failed/incomplete/running/missing 的 live 部分洗成 warm PASS。仍保留四个 warm 的固定分母与逐槽 ≤3000ms 门槛，不挑最快、不删失败。flat cache、ordinary-stop、日志解析、prefix、所有 attempt 及字段状态合同沿用 v2。
++
++## sourceCommit 是独立输入
++
++cache-live manifest 新增必填 liveSourceCommit，必须与 envelope.sourceCommit 及已有 live consumer report 的 sourceCommit 完全相等。它不是 numeric producerSourceCommit。
++
++本次实际读取的已审 loader 为：
++/vercel/recovery/disabled-preparer-batch1615/prepared/actual-ce67/payload/scripts/acceptance/issue-1506-alex/live-source.mjs
++
++其中 LIVE_SOURCE_COMMIT = ce67afe931e9b9d6e7b0d346a62aa4d9751195c8；
++prepareLiveSource 的 sourceBase 默认取此值，返回 sourceCommit: sourceBase。runLiveCacheTurns 的 sourceFactory 只传 sourceRoot，因此正常路径使用这个默认 pin。文件 SHA256 为 32d436e992ec7d3823f98cb497b56fcdb6c1ba7c27bc5035ed2e16fa991f08fd。
++
++manifest.example.json 已填这个已审 live source pin；expectedSha/deploymentId 仍空，必须由根绑定实际验收。numeric producerSourceCommit 仍是 0d379dd92fd2d7b3f2b307030c3bcd8234426d0e，时钟解释不变。本次只读恢复磁盘源，不重新访问 GitHub 或生产；active acceptance head 5c18388 的合同由根已读源码指定。
++
++## 使用与验证
++
++node aggregate.mjs manifest.json report.json
++node --test aggregate.test.mjs
++
++只新增一项实际 envelope 回归，含合法嵌套六槽/capture 绑定、错误 inner SHA/source/fixture/consumer SHA、live 失败不洗白、早失败空报告、未发送槽的子断言。
++
++完整 v2 原源码运行这项回归：实际 RED，unbound_capture_run，1 fail / 0 pass。
++最终 v3 跑原 11 项 + 新 1 项：12/12 PASS，0 skip，exit 0。
++原件在 red-v2.log、green-v3.log 及各自 receipt；未覆盖 v2 日志。临时 RED 源副本已清理。没有追加其他测试，没有真实生产样本。
++
++继承 v2 的限制：真实 Vercel Markdown 未识别布局不推测；capture 精确 scope/版本/部署/hash 校验、missing/null/invalid/overflow、不同 clock 不相减等全部保留。新代码是离线分析器，不是产品修复，不要求 PG。

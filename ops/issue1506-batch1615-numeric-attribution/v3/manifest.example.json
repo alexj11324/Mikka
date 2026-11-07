@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "expectedSha": "",
+  "deploymentId": "",
+  "producerSourceCommit": "0d379dd92fd2d7b3f2b307030c3bcd8234426d0e",
+  "phase": "cache-live",
+  "cacheReceipts": [
+    {
+      "kind": "haiku",
+      "path": "continuation-cache-live-haiku-APP8.json",
+      "sha256": ""
+    },
+    {
+      "kind": "luna",
+      "path": "continuation-cache-live-luna-APP8.json",
+      "sha256": ""
+    }
+  ],
+  "stopKinds": [],
+  "stopReceipts": [],
+  "captures": [
+    {
+      "workflowRunId": "",
+      "applicationSha": "",
+      "deploymentId": "",
+      "since": "",
+      "until": "",
+      "complete": false,
+      "path": "runtime-EXACT_WRUN.json",
+      "sha256": ""
+    }
+  ],
+  "liveSourceCommit": "ce67afe931e9b9d6e7b0d346a62aa4d9751195c8"
+}
