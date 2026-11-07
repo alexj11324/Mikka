@@ -131,9 +131,12 @@ type EnterpriseAuthenticationContext = {
 /** Runs before Better Auth publishes its result; an unaudited SSO success never returns a bearer cookie. */
 export async function completeEnterpriseSignIn(ctx: EnterpriseAuthenticationContext) {
   try { await finishEnterpriseAuthentication(ctx) }
-  catch {
+  catch (error) {
     const request = context.getStore()
     if (request) request.auditUnavailable = true
+    const { auditFailureSummary } = await import('../audit/record')
+    console.error('[enterprise] authentication intent unavailable', auditFailureSummary(error))
+    // error-cause: retain safe SQLSTATE/constraint diagnostics above; native auth errors must not carry query parameters or bearer values.
     throw new APIError('SERVICE_UNAVAILABLE', { code: 'ENTERPRISE_AUDIT_UNAVAILABLE', message: 'Authentication unavailable' })
   }
 }
@@ -145,11 +148,11 @@ async function finishEnterpriseAuthentication(ctx: EnterpriseAuthenticationConte
   if (proof && session?.user.id === proof.userId) {
     try {
       await (await import('./lifecycle')).synchronizeEnterpriseLogin(proof, { sessionId: session.session.id, correlationId: request.correlationId })
-    } catch {
+    } catch (error) {
       ctx.context.responseHeaders?.delete('set-cookie')
       ctx.context.newSession = null
       try { await ctx.context.internalAdapter.deleteSession(session.session.token) } catch { /* Withhold the bearer even if a database outage prevents cleanup. */ }
-      throw new APIError('SERVICE_UNAVAILABLE', { code: 'ENTERPRISE_AUDIT_UNAVAILABLE', message: 'Sign-in unavailable' })
+      throw error // The outer handler records safe cause fields and withholds the HTTP result.
     }
     return
   }

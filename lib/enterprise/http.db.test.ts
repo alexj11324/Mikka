@@ -260,16 +260,21 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal(unknown.headers.getSetCookie().some(value => value.startsWith('better-auth.session_token=')), false)
     assert.ok(Number((await pool.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1 and action=\'sso.sign_in_failed\' and result=\'denied\'', [organizationId])).rows[0].count) >= 3)
   })
-  await t.test('a signed OIDC login cannot publish a session cookie when its Organization audit transaction fails', async () => {
+  await t.test('a signed OIDC login cannot publish a session cookie when its Organization audit transaction fails', async t => {
     mode = 'valid'
     const before = Number((await pool.query('select count(*) from session where "enterpriseProviderId"=$1', [providerId])).rows[0].count)
     const constraint = `enterprise_login_audit_${randomUUID().replaceAll('-', '')}`
+    const report = t.mock.method(console, 'error', () => {})
     await pool.query(`alter table mikka_organization_audit_events add constraint "${constraint}" check ("organizationId"<>'${organizationId}'::uuid or action<>'sso.signed_in') not valid`)
     try {
       const denied = await oidcLogin()
       assert.equal(denied.callback.status, 503)
       assert.equal(denied.callback.headers.get('location'), null)
       assert.equal(denied.callback.headers.getSetCookie().length, 0)
+      assert.deepEqual(await denied.callback.json(), { code: 'ENTERPRISE_AUDIT_UNAVAILABLE', message: 'Authentication unavailable' })
+      assert.deepEqual(report.mock.calls.map(call => call.arguments), [
+        ['[enterprise] authentication intent unavailable', { name: 'DrizzleQueryError', code: '23514', constraint }],
+      ], 'authentication diagnostics keep the database cause classification without query text, parameters or credentials')
       assert.equal(await session(denied.jar), null)
       assert.equal(Number((await pool.query('select count(*) from session where "enterpriseProviderId"=$1', [providerId])).rows[0].count), before)
       assert.equal((await session(oidcCookies))?.user.id, userId)
