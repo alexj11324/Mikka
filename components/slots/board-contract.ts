@@ -4,7 +4,7 @@
 // arranges and styles the pieces it is handed. Opening a task stays a full page
 // (R-82). The right-hand panel and the top bar are not part of this slot.
 import type { ComponentType, ReactNode } from 'react'
-import type { BoardColumn } from '@/components/blocks/kanban-board-1/components/data'
+import type { AgentState, BoardColumn } from '@/components/blocks/kanban-board-1/components/data'
 
 export type BoardColumnFrameProps = {
   status: BoardColumn
@@ -45,8 +45,10 @@ export type BoardCardProps = {
   assignee: ReactNode
   /** Whether anyone owns the task; without an owner the control shows on hover and focus only. */
   hasAssignee: boolean
-  /** The third row: priority, labels, project, PR, subtasks, 受阻, agent state, due date; only what the task has. */
+  /** The third row: priority, labels, project, PR, subtasks, 受阻, agent state, due date; only what the task has. The agent state's chip has the key `agent`, so a layer that draws `runState` itself can leave it out. */
   chips: ReactNode[]
+  /** The current attempt's state when the 智能体状态 property is on (R-52): running, waiting for the person, or blocked on them; null for none. */
+  runState: AgentState | null
   /** 创建于 …, when the property is on. */
   createdAt: ReactNode
   /** The drag preview: tilted, no hover. */
