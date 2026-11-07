@@ -44,13 +44,13 @@ test('community signs its own base-path sockets and an explicit Worker remains a
   assert.deepEqual(gatewayConfig({ ...env, DEVICE_GATEWAY_URL: 'https://worker.example/discarded', DEVICE_GATEWAY_PUSH_SECRET: 'worker-secret' }), {
     mode: 'worker', url: 'https://worker.example', secret: 'worker-secret',
   })
-  const ticket = liveTicket(scope, config)
+  const ticket = liveTicket(scope, config, Date.now(), 'gateway-test-session')
   assert.equal(ticket.url, `wss://self.example/mikka/v1/live/${channel}/socket`)
   assert.equal(ticket.url.includes(ticket.protocol), false)
 })
 
 test('upgrade validates channel, ticket domain, expiry and configured host before accepting', () => {
-  const ticket = liveTicket(scope, config)
+  const ticket = liveTicket(scope, config, Date.now(), 'gateway-test-session')
   const request = (path = `/mikka/v1/live/${channel}/socket`, protocol = ticket.protocol, host = 'self.example') =>
     new Request(`http://${host}${path}`, { headers: { host, upgrade: 'websocket', 'sec-websocket-protocol': `other, ${protocol}` } })
   const accepted = gatewayUpgrade(request(), env)

@@ -23,6 +23,7 @@ test('discovery matches the desktop contract without a login or provider credent
   assert.deepEqual(JSON.parse(text), {
     name: 'Acme Mikka', version: revision, edition: 'community', basePath: '/mikka', desktopProtocol: { min: 0, max: 1 },
     signIn: { google: false, github: true, email: true }, minDesktopVersion: null, cloud: { connected: false }, mobileReady: false,
+    web: { enabled: true, protocol: { min: 1, max: 1 } },
   })
 })
 

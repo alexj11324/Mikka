@@ -9,6 +9,7 @@ import { SignInCard } from '@/components/blocks/auth-19/components/sign-in-card'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { withBasePath } from '@/lib/base-path'
 import { SELECT_ACCOUNT_PARAMS, desktopAuthCallbackURL, desktopAuthReturnPath, desktopBrowserStep } from '@/lib/desktop-auth'
+import { webAuthQuery, webAuthReturnPath, webAuthSignInPath, type WebAuthFlow } from '@/lib/web-connection/auth'
 import { DesktopAccountChoice, type SignedInAccount } from '@/components/auth/desktop-account-choice'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { Button } from '@/components/ui/button'
@@ -59,15 +60,15 @@ function desktopAutoStarted(state: string): boolean {
   return false
 }
 
-export function AuthForm({ mode, addAccount = false, googleEnabled = false, githubEnabled = false, oauthFailed = false, oauthAccountNotLinked, continueGoogle = false, continueGitHub = false, continueComposio = false, testWorkspaceEnabled = false, emailEnabled = true, next, continueURL, desktopFlow = null, signedInAs = null }: { mode: 'sign-in' | 'sign-up'; addAccount?: boolean; googleEnabled?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; oauthAccountNotLinked?: 'google' | 'github' | null; continueGoogle?: boolean; continueGitHub?: boolean; continueComposio?: boolean; testWorkspaceEnabled?: boolean; emailEnabled?: boolean; next?: string; continueURL?: string; desktopFlow?: DesktopFlow | null; signedInAs?: SignedInAccount | null }) {
+export function AuthForm({ mode, addAccount = false, googleEnabled = false, githubEnabled = false, oauthFailed = false, oauthAccountNotLinked, continueGoogle = false, continueGitHub = false, continueComposio = false, testWorkspaceEnabled = false, emailEnabled = true, next, continueURL, desktopFlow = null, webFlow = null, signedInAs = null }: { mode: 'sign-in' | 'sign-up'; addAccount?: boolean; googleEnabled?: boolean; githubEnabled?: boolean; oauthFailed?: boolean; oauthAccountNotLinked?: 'google' | 'github' | null; continueGoogle?: boolean; continueGitHub?: boolean; continueComposio?: boolean; testWorkspaceEnabled?: boolean; emailEnabled?: boolean; next?: string; continueURL?: string; desktopFlow?: DesktopFlow | null; webFlow?: WebAuthFlow | null; signedInAs?: SignedInAccount | null }) {
   const t = useTranslations('Auth')
   // A desktop handoff: start the provider the app asked for, or show the
   // browser's signed-in account before it goes to the app (lib/desktop-auth.ts).
   const [switchingAccount, setSwitchingAccount] = useState(false)
   const desktopProvider = continueGoogle && googleEnabled ? 'google' as const : continueGitHub && githubEnabled ? 'github' as const : null
-  const desktopStep = desktopBrowserStep({ desktop: Boolean(desktopFlow), signedIn: Boolean(signedInAs), addAccount, switchAccount: switchingAccount, refused: oauthFailed || Boolean(oauthAccountNotLinked), provider: desktopProvider })
+  const desktopStep = desktopBrowserStep({ desktop: Boolean(desktopFlow || webFlow), signedIn: Boolean(signedInAs), addAccount, switchAccount: switchingAccount, refused: oauthFailed || Boolean(oauthAccountNotLinked), provider: desktopProvider })
   // With a web session in this browser, the provider shows its account picker.
-  const providerParams = desktopFlow && signedInAs ? { additionalParams: SELECT_ACCOUNT_PARAMS } : {}
+  const providerParams = (desktopFlow || webFlow) && signedInAs ? { additionalParams: SELECT_ACCOUNT_PARAMS } : {}
   const locale = useLocale()
   const returnPath = safeAuthReturn(next)
   // Used for full-page navigations and OAuth callbacks, so they carry the base path.
@@ -76,7 +77,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     ? `${getPathname({ locale, href: '/' })}${returnPath.slice(1)}`
     : getPathname({ locale, href: returnPath }))
   // A desktop browser handoff must come back to the app, not stay in the browser.
-  const afterSignIn = desktopFlow ? desktopAuthReturnPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
+  const afterSignIn = webFlow ? webAuthSignInPath(webFlow) : desktopFlow ? desktopAuthReturnPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
   function desktopSignInURL(state: string, next: string, callback: string): string {
     const target = new URL(withBasePath(getPathname({ locale, href: '/sign-in' })), window.location.origin)
     target.search = new URLSearchParams({ desktop: '1', desktop_state: state, desktop_next: next, desktop_callback: callback }).toString()
@@ -155,7 +156,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
     if (!beginSubmit()) return
     try {
-      const callbackURL = desktopFlow ? desktopAuthCallbackURL(window.location.origin, desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
+      const callbackURL = webFlow ? new URL(webAuthSignInPath(webFlow), window.location.origin).href : desktopFlow ? desktopAuthCallbackURL(window.location.origin, desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
       const result = await authClient.signIn.social({ provider: 'google', callbackURL, errorCallbackURL: oauthErrorCallbackURL('google'), disableRedirect: true, ...providerParams })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
@@ -193,7 +194,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
     if (!beginSubmit()) return
     try {
-      const callbackURL = desktopFlow ? desktopAuthCallbackURL(window.location.origin, desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
+      const callbackURL = webFlow ? new URL(webAuthSignInPath(webFlow), window.location.origin).href : desktopFlow ? desktopAuthCallbackURL(window.location.origin, desktopFlow.state, desktopFlow.next, desktopFlow.callback) : home
       const result = await authClient.signIn.social({ provider: 'github', callbackURL, errorCallbackURL: oauthErrorCallbackURL('github'), disableRedirect: true, ...providerParams })
       if (result.error || !result.data?.url) throw new Error('OAuth initiation failed')
       window.location.assign(result.data.url)
@@ -272,11 +273,11 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     else if (desktopProvider === 'github') void signInWithGitHub()
     else setSwitchingAccount(true)
   }
-  if (desktopStep.kind === 'choose-account' && desktopFlow && signedInAs) return <Auth registering={registering} next={returnPath}>
-    <DesktopAccountChoice account={signedInAs} continueHref={desktopAuthReturnPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback)} pending={pending} error={error} onSwitch={switchAccount} />
+  if (desktopStep.kind === 'choose-account' && (desktopFlow || webFlow) && signedInAs) return <Auth registering={registering} next={returnPath}>
+    <DesktopAccountChoice account={signedInAs} continueHref={webFlow ? webAuthReturnPath(webFlow) : desktopAuthReturnPath(desktopFlow!.state, desktopFlow!.next, desktopFlow!.callback)} pending={pending} error={error} onSwitch={switchAccount} />
   </Auth>
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
-    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} authQuery={desktopFlow?.callback ? { desktop: '1', desktop_state: desktopFlow.state, desktop_next: desktopFlow.next, desktop_callback: desktopFlow.callback } : undefined} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
+    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} authQuery={webFlow ? webAuthQuery(webFlow) : desktopFlow?.callback ? { desktop: '1', desktop_state: desktopFlow.state, desktop_next: desktopFlow.next, desktop_callback: desktopFlow.callback } : undefined} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
       <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>

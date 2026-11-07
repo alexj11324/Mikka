@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type MouseEvent } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ChevronDown, Download, Globe, History, MessageSquare, SquareDashedMousePointer, X } from 'lucide-react'
 import { getArtifact, getArtifactText } from '@/app/actions/artifacts'
+import { openConnectedAsset } from '@/lib/web-connection/assets'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -105,6 +106,12 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
     setQuote({ artifactId, version, kind: 'text', text: words })
     setPane('chat')
   }
+  function openAsset(event: MouseEvent<HTMLAnchorElement>, kind: 'frame' | 'download') {
+    const pending = openConnectedAsset(versionPath(artifactId, version, kind), kind, downloadRef.current)
+    if (!pending) return
+    event.preventDefault()
+    void pending.catch(() => toast.error(t('loadError')))
+  }
 
   const rejected = useRef(new Set<string>())
   const detailReadKey = unstable_serialize(detailKey), textReadKey = unstable_serialize(textKey)
@@ -134,10 +141,12 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   }, [backgroundFailed, artifactId, version, readFailedMessage, retryLabel, retry])
   // The window itself takes focus on open, so Tab runs header, then body, then chat.
   const windowRef = useRef<HTMLDivElement>(null)
+  const downloadRef = useRef<HTMLAnchorElement>(null)
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
     <DialogContent ref={windowRef} initialFocus={windowRef} instant showCloseButton={false} aria-describedby={undefined}
       className="flex h-[min(53.75rem,calc(100dvh-2rem))] w-[min(80rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-2xl ring-0 sm:max-w-none">
       <header className="relative flex h-13 shrink-0 items-center gap-2 px-4">
+        <a ref={downloadRef} href={versionPath(artifactId, version, 'download')} download className="hidden" tabIndex={-1} aria-hidden="true">{t('download')}</a>
         {visible && <ArtifactKindIcon kind={visible.kind} className="size-4 shrink-0 text-muted-foreground" />}
         <DialogTitle className="truncate text-sm leading-5 font-medium">{accessBlocked ? '' : title ?? visible?.title ?? ''}</DialogTitle>
         {visible && <DropdownMenu>
@@ -159,10 +168,10 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
         <span className="flex-1" />
         {decision && <div ref={setActionsSlot} data-slot="artifact-actions" className="flex items-center gap-2 empty:hidden" />}
         {visible && <ArtifactShare artifactId={artifactId} shared={Boolean(visible.shared)} onChange={() => { void mutate() }} />}
-        {visible?.kind === 'markdown' && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('download')} render={<a href={versionPath(artifactId, version, 'download')} download />} />}><Download data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('download')}</TooltipContent></Tooltip>}
+        {visible?.kind === 'markdown' && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('download')} render={<a href={versionPath(artifactId, version, 'download')} onClick={event => openAsset(event, 'download')} download />} />}><Download data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('download')}</TooltipContent></Tooltip>}
         {visible?.kind === 'html' && <>
           {canQuote && <Button variant="ghost" size="sm" aria-pressed={selecting} onClick={() => setSelecting(on => !on)} className={cn('hidden md:inline-flex', selecting && 'bg-sidebar-primary-soft text-sidebar-primary-soft-foreground hover:bg-sidebar-primary-soft hover:text-sidebar-primary-soft-foreground')}><SquareDashedMousePointer data-icon="inline-start" />{t('selectElement')}</Button>}
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('openInBrowser')} render={<a href={versionPath(artifactId, version, 'frame')} target="_blank" rel="noopener noreferrer" />} />}><Globe data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('openInBrowser')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" nativeButton={false} aria-label={t('openInBrowser')} render={<a href={versionPath(artifactId, version, 'frame')} onClick={event => openAsset(event, 'frame')} target="_blank" rel="noopener noreferrer" />} />}><Globe data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('openInBrowser')}</TooltipContent></Tooltip>
         </>}
         <Button variant="ghost" size="icon-sm" className="aria-pressed:bg-muted aria-pressed:text-foreground md:hidden" aria-pressed={pane === 'chat'} aria-label={pane === 'chat' ? t('showContent') : t('showChat')} onClick={() => setPane(current => current === 'chat' ? 'content' : 'chat')}><MessageSquare data-icon="inline-start" /></Button>
         <Separator orientation="vertical" className="mx-1 data-vertical:h-5 data-vertical:self-center" />
