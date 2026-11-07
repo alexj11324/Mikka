@@ -124,6 +124,17 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   }
   const dispatch = (userId: string, issueId: string, botId: string) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId)
   const count = async (sql: string, values: unknown[]) => (await pool.query(sql, values)).rows[0].n as number
+  // The fixture has no native process. Record the daemon's terminal exit
+  // receipt explicitly; a status-only host transition must not authorize VM reuse.
+  const recordNativeExit = async (runId: string) => {
+    const result = await pool.query(`UPDATE agent_runs SET report=COALESCE(report,'{}'::jsonb)||$2::jsonb
+      WHERE id=$1 AND status IN ('succeeded','failed','stopped','cancelled')`, [runId,
+      JSON.stringify({ safePoint: { session: 'exited', checkpoint: 'unavailable', observedAt: new Date().toISOString() } })])
+    assert.equal(result.rowCount, 1)
+  }
+  const machinePlacement = async (runId: string) => (await pool.query(`SELECT repo."remoteUrl",m."sandboxId",m."deviceId"
+    FROM agent_runs r JOIN device_repos repo ON repo.id=r."deviceRepoId"
+    JOIN thread_machines m ON m."runId"=r.id WHERE r.id=$1`, [runId])).rows[0]
   // Another numbered task of the same person: a task has one thread (lib/thread-dispatch.ts), so reuse is shown on a second task.
   const anotherTask = async (userId: string, number: number) => {
     const issueId = await seedIssue(pool, userId)
@@ -167,6 +178,9 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const runtime = (await pool.query('SELECT * FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId])).rows[0]
     assert.notEqual(original.deviceRepoId, runtime.repoId, 'a task runs on its own machine, not the Bot computer')
     await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    await recordNativeExit(first.runId)
+    const originalMachine = (await pool.query('SELECT "sandboxId","deviceId" FROM thread_machines WHERE "runId"=$1', [first.runId])).rows[0]
+    const originalTokens = (await pool.query('SELECT id FROM device_tokens WHERE "boundDeviceId"=$1 AND "revokedAt" IS NULL', [originalMachine.deviceId])).rows.map(row => row.id)
     const before = lifecycleStarts
     const { sendThreadMessage } = await import('../lib/thread-continue')
     const next = await sendThreadMessage(a.id, first.runId, 'Continue with the missing edge case.')
@@ -179,6 +193,10 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(run.agentDefinition.readOnly, original.agentDefinition.readOnly)
     assert.match(run.prompt, /Continue with the missing edge case/)
     assert.equal(lifecycleStarts, before + 1)
+    assert.deepEqual((await pool.query('SELECT "sandboxId","deviceId" FROM thread_machines WHERE "runId"=$1', [next.runId])).rows[0], originalMachine,
+      'an immediate owner continuation reuses the still-running task VM before its idle timer')
+    assert.equal(await count('SELECT count(*)::int AS n FROM device_tokens WHERE id=ANY($1::uuid[]) AND "revokedAt" IS NULL', [originalTokens]), 0,
+      'the previous worker credential cannot operate after handoff')
   })
 
   await t.test('the public computer API continues a repository thread on its original repository and starts its task machine', async () => {
@@ -186,6 +204,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const issueId = await anotherTask(a.id,39);
     const first = await steps.dispatchRun(a.id,{issueId,repo:'octo/repo',readOnly:true,requestKey:`dispatch:${randomUUID()}`},undefined,a.botId) as unknown as {runId:string};
     await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`,[first.runId]);
+    await recordNativeExit(first.runId);
     const {POST} = await import('../app/api/bots/[botId]/computer/runs/route');
     httpOwner = a.id;
     try {
@@ -257,11 +276,13 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const writable = await dispatch(r.id, work, r.botId) as unknown as Continued
     assert.equal((await definitionOf(writable.runId)).agentDefinition.repositoryAdmission?.authority, 'owner_credential', 'the thread starts writable')
     await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [writable.runId])
+    await recordNativeExit(writable.runId)
     const look = await steps.dispatchRun(r.id, { issueId: work, repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, r.botId) as unknown as Continued
     assert.deepEqual([look.thread, look.threadId], ['continued', writable.runId])
     const looked = await definitionOf(look.runId)
     assert.deepEqual([looked.kind, looked.agentDefinition.readOnly, looked.agentDefinition.repositoryAdmission, looked.publications], ['cloud', true, undefined, 0])
     await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [look.runId])
+    await recordNativeExit(look.runId)
     const again = await dispatch(r.id, work, r.botId) as unknown as Continued
     assert.deepEqual([again.thread, again.threadId], ['continued', writable.runId])
     const kept = await definitionOf(again.runId)
@@ -273,6 +294,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(first.thread, 'new', JSON.stringify(first))
     assert.deepEqual([(await definitionOf(first.runId)).agentDefinition.readOnly, (await definitionOf(first.runId)).agentDefinition.repositoryAdmission], [true, undefined])
     await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [first.runId])
+    await recordNativeExit(first.runId)
     const next = await steps.dispatchComputerThread(r.id, { botId: r.botId, issueId: task, harness: 'codex', note: 'Look further.' }, `call-${randomUUID()}`, undefined, undefined, r.botId) as unknown as Continued
     assert.deepEqual([next.thread, next.threadId], ['continued', first.runId])
     assert.deepEqual([(await definitionOf(next.runId)).agentDefinition.readOnly, (await definitionOf(next.runId)).agentDefinition.repositoryAdmission], [true, undefined])
@@ -289,7 +311,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const firstDefinition = await frozen(first.runId!)
     assert.equal(firstDefinition.model, 'gpt-5')
     // The thread stops to ask the person; the Coordinator continues it.
-    await pool.query('UPDATE agent_runs SET status=\'completed\',"finishedAt"=now() WHERE id=$1', [first.runId])
+    await pool.query('UPDATE agent_runs SET status=\'stopped\',"finishedAt"=now() WHERE id=$1', [first.runId])
+    await recordNativeExit(first.runId!)
     const next = await steps.dispatchRun(m.id, { issueId: work, note: 'The person answered: use the mobile layout.', requestKey: `dispatch:${randomUUID()}` }, undefined, m.botId) as unknown as Result
     assert.deepEqual([next.thread, next.threadId], ['continued', first.runId], JSON.stringify(next))
     const nextDefinition = await frozen(next.runId!)
@@ -299,7 +322,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(nextDefinition.subscription.modelId, nextDefinition.model, 'the hosted runner starts it: its model is the subscription context\'s')
 
     // A thread whose runs were all frozen without a model (before the fix): told, not filled in, nothing queued.
-    await pool.query('UPDATE agent_runs SET status=\'completed\',"finishedAt"=now(),"agentDefinition"="agentDefinition"-\'model\' WHERE "issueId"=$1 AND "userId"=$2', [work, m.id])
+    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now(),"agentDefinition"="agentDefinition"-\'model\' WHERE "issueId"=$1 AND "userId"=$2', [work, m.id])
+    await recordNativeExit(next.runId!)
     const runs = async () => Number((await pool.query('SELECT count(*) FROM agent_runs WHERE "userId"=$1', [m.id])).rows[0].count)
     const before = await runs()
     const refused = await steps.dispatchRun(m.id, { issueId: work, note: 'Continue.', requestKey: `dispatch:${randomUUID()}` }, undefined, m.botId) as unknown as Result
@@ -322,13 +346,17 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       await order.changeOrder(pool, { ownerId: who.id, workspaceId: who.workspaceId }, { kind: 'add', entries: [{ harness: 'codex', model: 'gpt-5-next', source: { kind: 'subscription', connectionId: who.connection } }] })
       const first = await dispatch(who.id, who.issueId, who.botId) as { runId: string }
       const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
+      const originalMachine = await machinePlacement(first.runId)
+      assert.equal(originalMachine.remoteUrl, 'https://github.com/octo/repo.git')
       assert.equal(original.agentDefinition.agentProfile.source, 'default')
       assert.equal(original.agentDefinition.model, 'gpt-5')
-      await pool.query(`UPDATE agent_runs SET status='completed',"startedAt"=now(),"finishedAt"=now(),"sessionId"='native-default-original' WHERE id=$1`, [first.runId])
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"startedAt"=now(),"finishedAt"=now(),"sessionId"='native-default-original' WHERE id=$1`, [first.runId])
+      await recordNativeExit(first.runId)
       const next = await (entryPoint === 'coordinator'
         ? steps.dispatchRun(who.id, { issueId: who.issueId, model: { harness: 'codex', model: 'gpt-5-next' }, note: 'Continue with the explicitly chosen model.', requestKey: `default-model:${randomUUID()}` }, undefined, who.botId)
         : steps.dispatchComputerThread(who.id, { botId: who.botId, issueId: who.issueId, harness: 'codex', model: 'gpt-5-next', note: 'Continue with the explicitly chosen model.' }, `default-model:${randomUUID()}`, undefined, undefined, who.botId)) as unknown as { runId?: string; thread?: string; error?: string }
       assert.ok(next.runId, JSON.stringify(next)); assert.equal(next.thread, 'continued')
+      assert.deepEqual(await machinePlacement(next.runId), originalMachine, 'changing the selected model keeps this task\'s repository and VM')
       const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [next.runId])).rows[0]
       assert.equal(run.agentDefinition.model, 'gpt-5-next')
       assert.equal(run.agentDefinition.agentProfile.source, 'default')
@@ -350,14 +378,18 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5-next')`, [randomUUID(), who.id, who.workspaceId, who.connection])
       await order.changeOrder(pool, { ownerId: who.id, workspaceId: who.workspaceId }, { kind: 'add', entries: [{ harness: 'codex', model: 'gpt-5-next', source: { kind: 'subscription', connectionId: who.connection } }] })
       const first = await dispatch(who.id, who.issueId, who.botId) as { runId: string }
+      const originalMachine = await machinePlacement(first.runId)
+      assert.equal(originalMachine.remoteUrl, 'https://github.com/octo/repo.git')
       const legacy = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [first.runId])).rows[0].agentDefinition
       delete legacy.agentProfile; delete legacy.profileOriginRunId
       legacy.definitionDigest = (await import('../lib/agent-kit/worker-digest')).workerDefinitionDigest(legacy)
-      await pool.query(`UPDATE agent_runs SET status='completed',"startedAt"=now(),"finishedAt"=now(),"sessionId"='pre-profile-native-session',"agentDefinition"=$2 WHERE id=$1`, [first.runId, JSON.stringify(legacy)])
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"startedAt"=now(),"finishedAt"=now(),"sessionId"='pre-profile-native-session',"agentDefinition"=$2 WHERE id=$1`, [first.runId, JSON.stringify(legacy)])
+      await recordNativeExit(first.runId)
       const next = await (entryPoint === 'coordinator'
         ? steps.dispatchRun(who.id, { issueId: who.issueId, model: { harness: 'codex', model: askedModel }, note: 'Continue with the named model.', requestKey: `legacy:${randomUUID()}` }, undefined, who.botId)
         : steps.dispatchComputerThread(who.id, { botId: who.botId, issueId: who.issueId, harness: 'codex', model: askedModel, note: 'Continue with the named model.' }, `legacy:${randomUUID()}`, undefined, undefined, who.botId)) as unknown as { runId?: string; error?: string }
       assert.ok(next.runId, JSON.stringify(next))
+      assert.deepEqual(await machinePlacement(next.runId), originalMachine, 'either continuation entry preserves the historical thread\'s repository and VM')
       const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [next.runId])).rows[0]
       assert.equal(run.agentDefinition.model, askedModel)
       const same = askedModel === legacy.model

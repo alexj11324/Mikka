@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { appendFile, lstat, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { githubEvidenceFailure } from './github-error.mjs'
 
 // Only a same-repository PR can publish. There is no update-ref, delete, force
 // push, source-branch write, external credential or artifact-storage fallback.
@@ -44,7 +45,11 @@ async function api(path, body, missing = false) {
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
   if (missing && response.status === 404) return null
-  if (!response.ok) throw new Error(`EVIDENCE_GITHUB_HTTP_${response.status}`, { cause: { endpoint: path, requestId: response.headers.get('x-github-request-id') } })
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    throw new Error(`EVIDENCE_GITHUB_HTTP_${response.status}`, { cause: { endpoint: path,
+      requestId: response.headers.get('x-github-request-id'), ...githubEvidenceFailure(body, response.headers) } })
+  }
   return response.json()
 }
 if (await api(`/ref/heads/${branch}`, undefined, true)) throw new Error('EVIDENCE_BRANCH_ALREADY_EXISTS')

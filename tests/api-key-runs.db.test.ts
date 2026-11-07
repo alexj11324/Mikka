@@ -438,6 +438,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       assert.equal(refused.status, 409, await refused.text())
       assert.equal(await status(computerRun), 'queued')
       await pool.query("UPDATE agent_runs SET status='cancelled' WHERE id=$1", [computerRun])
+      await machines.park(actor, computerRun)
 
       // A person holding the Bot's desktop does not hold a run on a machine without one.
       await pool.query(`UPDATE bot_desktops SET control='user',"controlledBy"=$2,"controlUntil"=now()+interval '5 minutes' WHERE "botId"=$1`, [p.botId, p.id])
