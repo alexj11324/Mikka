@@ -155,6 +155,8 @@ export interface DaemonOptions {
   initialRunId?: string
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
+  /** Trusted acceptance launcher only; collect hosted CLI diagnostics without task-secret injection. */
+  collectCliTiming?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
   e2bContainerRuntime?: boolean
   /** Trusted infrastructure supplies its already-listening review broker. */
@@ -429,6 +431,7 @@ export class Daemon {
           link: this.options.link,
           journal: this.journal,
           binaries: this.options.harnessBinaries,
+          collectCliTiming: this.options.collectCliTiming,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
           computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
           // The cloud machine's own probe decides which subscription models a run may use here.

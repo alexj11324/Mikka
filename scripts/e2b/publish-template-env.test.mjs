@@ -14,6 +14,13 @@ const POLICY_SHA = createHash('sha256').update(readFileSync(new URL('./e2b-final
 const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
   kind, policySha256: POLICY_SHA, before: PROOF, after: PROOF, originalBefore: PROOF, originalAfter: PROOF, providerChanges: [],
 } })
+const mcpTiming = (runId, harness) => ({ version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children',
+  generationCoverage: 'unverified', allFirstPartyHttpComplete: false, remoteMcpServerCount: 0, childPathAuditVersion: 1,
+  runIdHash: createHash('sha256').update(runId).digest('hex').slice(0, 16), harness, startedAt: 1010, endedAt: 1900,
+  expectedChildren: 1, observedChildren: 1, closedChildren: 0, observedComplete: true, childLifecycleComplete: false,
+  rejectedEvents: 0, truncated: false,
+  children: [{ child: 1, startedAt: 1020, closedAt: null, lastSequence: 3, sent: 1, completed: 1, lost: 0 }],
+  requests: [{ child: 1, sequence: 1, operation: 'decision_catalogue', startedAt: 1040, endedAt: 1050, durationMs: 10, status: 200, outcome: 'ok' }] })
 const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
   templateId, buildId: `build-${kind}`, baseTemplate: kind, preinstalled: true, public: true, buildStatus: 'ready',
   conservation: conservation(kind), models: MODELS[kind],
@@ -24,7 +31,9 @@ const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromE
   officialBinarySha256: 'e'.repeat(64), officialCliVersion: 'fixture-version',
   agentAcceptance: { runIdHash: createHash('sha256').update(`run-${kind}`).digest('hex').slice(0, 16), harness,
     kind: harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack', at: 1100, ms: 100 },
-  runtimeAuthorization: { source: 'http_server_link', complete: true, truncated: false, extraRemoteCalls: 0 },
+  runtimeAuthorization: { source: 'http_server_link', scope: 'daemon_http_server_link_and_task_fetch', complete: true, truncated: false, extraRemoteCalls: 0,
+    hostAuthorizationComplete: true, basis: 'host_authorization_census_and_closed_mcp_business_paths', allFirstPartyHttpComplete: false,
+    mcpHttpTiming: mcpTiming(`run-${kind}`, harness), observedProviderEvents: 1, officialDelivery: 'best_effort_not_a_complete_call_count' },
 }])) }
 const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, sourceCommit: COMMIT, models: MODELS }).map(row => [row.key, row.value]))
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
@@ -303,6 +312,15 @@ test('publication requires both real subscriptions on these exact candidates bef
     value => { value.subscriptionAcceptance.claude.agentAcceptance.kind = 'claude_system_init' },
     value => { value.subscriptionAcceptance.codex.agentAcceptance.runIdHash = 'f'.repeat(16) },
     value => { value.subscriptionAcceptance.codex.runtimeAuthorization.extraRemoteCalls = 1 },
+    value => { delete value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.runIdHash = 'f'.repeat(16) },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.remoteMcpServerCount = 1 },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.childLifecycleComplete = true },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.requests[0].sequence = 2 },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.requests[0].status = 503 },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.allFirstPartyHttpComplete = true },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.basis = 'all_mikka_http_sends_during_execution_counted' },
+    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.observedProviderEvents = 0 },
     value => { delete value.subscriptionAcceptance.codex.replyVerifiedAfterTool },
     value => { value.subscriptionAcceptance.codex.replyVerifiedAfterTool = false },
     value => { delete value.subscriptionAcceptance.claude.toolEvidence },
