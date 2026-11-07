@@ -5277,6 +5277,7 @@
     "renderHint": "请重试打开页面。"
   },
   "HostedSettings": {
+    "back": "返回",
     "general": {
       "iconHint": "PNG、JPEG、WebP 或 GIF，最大 200 KB"
     },
