@@ -1,0 +1,12 @@
+test_application_tree_mismatch_is_rejected (__main__.RecoveryGuards.test_application_tree_mismatch_is_rejected) ... ok
+test_checkpoint_bytes_cannot_silently_change (__main__.RecoveryGuards.test_checkpoint_bytes_cannot_silently_change) ... ok
+test_decoder_drift_is_rejected (__main__.RecoveryGuards.test_decoder_drift_is_rejected) ... ok
+test_disabled_guards_reject_activation_and_legacy_resume_mutation (__main__.RecoveryGuards.test_disabled_guards_reject_activation_and_legacy_resume_mutation) ... ok
+test_eight_paths_remain_disabled_and_four_checkpoint_bytes_are_exact (__main__.RecoveryGuards.test_eight_paths_remain_disabled_and_four_checkpoint_bytes_are_exact) ... ok
+test_exact_checkpoint_tree_hash_without_writing_git_objects (__main__.RecoveryGuards.test_exact_checkpoint_tree_hash_without_writing_git_objects) ... ok
+test_unknown_pin_drift_is_rejected (__main__.RecoveryGuards.test_unknown_pin_drift_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.782s
+
+OK

@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "status": "local_frozen_disabled_only",
+  "recoveryVersion": "disabled-eight-path-recovery-v1",
+  "actualMergedApplicationPrepared": false,
+  "productionCalls": 0,
+  "remoteWrites": 0,
+  "tests": {
+    "count": 7,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+  },
+  "offlinePreview": {
+    "application": {
+      "sha": "83d2365feade7736a6691fb0d5b480fb7a7f8a45",
+      "tree": "668dceb058fe34655a77d9e60b5d973410df09b4",
+      "parents": [
+        "ffa564ba5f7e2a34c322d1b2f6a1d9feb7d64e5f",
+        "a65a0f623edfe545d5406f0a1d58ff14dec864fb"
+      ]
+    },
+    "expectedTree": "7ecf2ec35f394d222146b228d4d61780be873f7a",
+    "notActualMergedOrDeployedApplication": true
+  },
+  "artifacts": [
+    {
+      "path": "prepare.py",
+      "bytes": 12257,
+      "characters": 12257,
+      "sha256": "01e04a3efd5dcdc370ceb1b33834efcac220535affb6d0d7cf2107f242248db7"
+    },
+    {
+      "path": "contract.json",
+      "bytes": 8837,
+      "characters": 8837,
+      "sha256": "2f2954125ed0398b26673fe93a935baa78d7710618ac5f73321ad80cce4e913a"
+    },
+    {
+      "path": "LIVE-ACCEPTANCE.template.md",
+      "bytes": 4516,
+      "characters": 2492,
+      "sha256": "9d321bbf818749fa50339043bc88e60d9c2398dce6b1c4148d4b9695f1ef8da2"
+    },
+    {
+      "path": "test_prepare.py",
+      "bytes": 5538,
+      "characters": 5538,
+      "sha256": "d6a03696040091e04b4086bad71c000599c823051a1bcf8eebc4b46a9db1597a"
+    },
+    {
+      "path": "REPORT.md",
+      "bytes": 5434,
+      "characters": 3658,
+      "sha256": "83c4365b27428040670618dc96ba52edd538837be915953d3b8ff3c00deb6841"
+    },
+    {
+      "path": "peer-source-proof.json",
+      "bytes": 23938,
+      "characters": 23938,
+      "sha256": "997affe4d985371a9866bfa8bd14e3a40840fd4323b852f32f000bcdcf31e453"
+    },
+    {
+      "path": "offline-guards.log",
+      "bytes": 1027,
+      "characters": 1027,
+      "sha256": "26709082d839115980a7c35d69f34f2d83c7efde2cf23262339aa7e0e6dccbf4"
+    },
+    {
+      "path": "offline-guards-receipt.json",
+      "bytes": 311,
+      "characters": 311,
+      "sha256": "561b97c6a1d08d181a6f11648c65b4292c445c331c1516a56bd17fefd4f2d49d"
+    },
+    {
+      "path": "offline-preview-83.json",
+      "bytes": 79763,
+      "characters": 77447,
+      "sha256": "b14e4119673ec32804c75ccac003ed5caafebbaa7d67893dac86fd3c5368dc3e"
+    },
+    {
+      "path": "offline-preview-83.patch",
+      "bytes": 35455,
+      "characters": 29941,
+      "sha256": "9d18c548d3f410483f3be1f9863ddc954628a5c601c9d088153816fce71c3822"
+    }
+  ]
+}

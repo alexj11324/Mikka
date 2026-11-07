@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "test_prepare.py"
+  ],
+  "cwd": "/vercel/recovery/disabled-preparer-recovery",
+  "exitCode": 0,
+  "durationMs": 1132,
+  "sha256": "26709082d839115980a7c35d69f34f2d83c7efde2cf23262339aa7e0e6dccbf4",
+  "log": "offline-guards.log",
+  "productionCalls": 0,
+  "gitMutations": 0
+}
