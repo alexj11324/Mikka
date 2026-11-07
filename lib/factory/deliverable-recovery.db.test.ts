@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { createFactoryStore as createCurrentFactoryStore } from './store';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
@@ -45,6 +46,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
   const target = new URL(url!)
   target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
+  const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
   const flags = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
   try {
     const dir = new URL('../../drizzle/', import.meta.url)
@@ -395,6 +397,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
   } finally {
     if (flags.routing === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.routing
     if (flags.lifecycle === undefined) delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED; else process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = flags.lifecycle
+    await closeWorkspace()
     await dropTestDatabase(admin, database, pool)
     await admin.end()
   }

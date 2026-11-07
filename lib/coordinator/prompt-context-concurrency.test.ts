@@ -53,7 +53,7 @@ stub('../device-link.ts', { DEVICE_ONLINE_WINDOW_MS: 60000, WORKSPACE_ID: 'synth
 stub('../composio.ts', { runComposioAction: forbidden })
 stub('../github/user-access.ts', { readAuthorizedIssue: forbidden })
 stub('../pending-action-store.ts', { proposeAction: forbidden, writeAccountAction: forbidden, proposeRepositoryPush: forbidden })
-stub('../issue-access.ts', { issueForUser: forbidden })
+stub('../issue-access.ts', { issueForUser: forbidden, requireUser: forbidden })
 stub('../telegram/client.ts', { postTelegramText: forbidden })
 stub('../attention/store.ts', { recordDecision: forbidden, settleTurn: forbidden })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: forbidden })

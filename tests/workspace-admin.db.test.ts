@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { count, dbUrl, seedAgent, seedBot, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { count, dbUrl, seedAgent, seedBot, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedPersonalWorkspace, seedWorkspace } from './support/workspace-admin-db'
 
 test('workspace settings backend', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
@@ -99,8 +99,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
 
   await t.test('a personal workspace has its 常规 but is neither transferred nor deleted (decision 2026-11-02-0203)', async () => {
     const owner = await seedUser(pool, 'personal-owner')
-    const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
-    await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])
+    const ws = { id: await seedPersonalWorkspace(pool, owner) }
     const read = await general.readWorkspaceGeneral(owner, ws.id)
     assert.equal(read.personal, true)
     assert.equal(read.canEdit, true, 'its own name, icon and address stay editable')

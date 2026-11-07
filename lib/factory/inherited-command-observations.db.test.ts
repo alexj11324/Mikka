@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
 // below are explicit synthetic fixtures, never live-provider acceptance.
@@ -43,8 +44,10 @@ test('isolated PG: direct question recovery exposes historical native observatio
   const target = new URL(url!)
   target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
+  let closeWorkspaceDatabase: (() => Promise<void>) | undefined
   const flags = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
   try {
+    closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(pool)
     const dir = new URL('../../drizzle/', import.meta.url)
     for (const file of orderMigrations((await readdir(dir)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(file, dir), 'utf8'))
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','snapshot@example.invalid',true,now(),now())`)
@@ -410,6 +413,7 @@ test('isolated PG: direct question recovery exposes historical native observatio
   } finally {
     if (flags.routing === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.routing
     if (flags.lifecycle === undefined) delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED; else process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = flags.lifecycle
+    await closeWorkspaceDatabase?.()
     await dropTestDatabase(admin, database, pool)
     await admin.end()
   }

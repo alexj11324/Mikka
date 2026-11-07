@@ -31,12 +31,15 @@ test('normal demo cleanup stops active runs, preserves history and excludes pref
   await scope.run(async () => {
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Demo retirement fixture',$2,true,now(),now())`, [owner, `${owner}@example.invalid`])
     const workspaceId = await seedFixtureWorkspace(pool, owner)
+    // Completion wakes the real Coordinator, which may migrate legacy null-Bot
+    // history. Give these ordinary runs their persisted source before snapshots.
+    const { botId } = await (await import('./coordinator/coordinator-bot')).coordinatorBot(owner, workspaceId, { backfill: false })
     for (const [id, version] of [[demo, '0.9.4'], [prefixOnly, '0.0.503'], [real, '0.9.4']]) {
       await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType","daemonVersion",enabled,"lastSeenAt") VALUES($1,$2,'Same displayed name','local','laptop',$3,false,$4)`, [id, owner, version, new Date('2036-11-06')])
     }
     for (const [id, device] of [[agent, demo], [realAgent, real]]) await pool.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'codex',$4,$3)`, [id, owner, device, id])
     for (const [id, device, agentId, status] of [[active, demo, agent, 'running'], [historic, demo, agent, 'succeeded'], [realRun, real, realAgent, 'running']]) {
-      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"workspaceId") VALUES($1,$2,$3,$4,$5,$6)`, [id, owner, agentId, device, status, workspaceId])
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"workspaceId","botId") VALUES($1,$2,$3,$4,$5,$6,$7)`, [id, owner, agentId, device, status, workspaceId, botId])
     }
     const readReal = async () => (await pool.query(`SELECT row_to_json(d) AS device,(SELECT row_to_json(a) FROM agents a WHERE a.id=$2) AS agent FROM devices d WHERE d.id=$1`, [real, realAgent])).rows
     const beforeReal = await readReal()

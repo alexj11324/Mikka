@@ -37,7 +37,7 @@ stub('../agent-runs.ts',{addRunMessage:unavailable,queueRun:unavailable,queueFac
 stub('../search/index.ts',{webSearch:unavailable})
 stub('../composio.ts',{runComposioAction:unavailable})
 stub('../pending-action-store.ts',{proposeAction:unavailable,writeAccountAction:unavailable,proposeRepositoryPush:unavailable})
-stub('../issue-access.ts',{issueForUser:unavailable})
+stub('../issue-access.ts',{issueForUser:unavailable,requireUser:unavailable})
 stub('../telegram/client.ts',{postTelegramText:unavailable})
 stub('../attention/store.ts',{recordDecision:unavailable,settleTurn:unavailable})
 stub('../../workflows/coordinator/tool-scope.ts',{assertNativeToolScope:unavailable})

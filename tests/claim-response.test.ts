@@ -36,6 +36,7 @@ function fixture() {
     modelAdmissionCalls:[] as {scope:{workspaceId:string;ownerId:string};model:string}[],
     subscriptionAdmissionCalls:[] as {scope:{workspaceId:string;ownerId:string};model:string;route:string}[],
     memberAllowed:true,questionRetryBlocked:false,tokenError:false,locks:[] as string[],transactions:0,transactionErrors:[] as Error[],beforeToken:undefined as (()=>Promise<void>)|undefined,
+    appActive: 0, appCheckouts: 0, appReleases: 0,
     issueAccessError: undefined as Error | undefined,
     credentialCapability: false,
     catalogueCapability: false,
@@ -53,6 +54,8 @@ async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-pr
     // Trace the intended gate: an unrelated failed prerequisite must not
     // masquerade as a successful lineage, scope or lease rejection.
     assert.deepEqual(probe.preparation,preparation)
+    assert.equal(probe.appActive, 0, 'claim releases its APP client on success, refusal and retry')
+    assert.equal(probe.appCheckouts, probe.appReleases, 'every APP checkout is released exactly once')
   }
 }
 

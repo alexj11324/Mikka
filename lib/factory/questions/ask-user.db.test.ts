@@ -251,6 +251,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
         assert.equal((await within(store.read("owner", b.taskId), "task-detail read")).task.id, b.taskId);
         const issueId = (await pool.query<{ issueId: string }>('SELECT "issueId" FROM factory_tasks WHERE id=$1', [b.taskId])).rows[0].issueId;
         assert.ok((await within(store.listForIssue("owner", issueId), "listForIssue")).tasks.some((x) => x.id === b.taskId));
+        assert.ok((await within(store.listPublicForIssue("owner", issueId), "listPublicForIssue")).tasks.some((x) => x.id === b.taskId));
         // Control: a real write path (dispatch -> lockForDispatch, FOR UPDATE on the task) does wait.
         const snap = await store.read("owner", b.taskId);
         const write = dispatch("owner", { binding: factoryBinding(snap.task), agentId: fixture.owner.agentId, deviceRepoId: fixture.owner.repoId }).then(() => "done", () => "done");
@@ -328,7 +329,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     await t.test("public question GETs read the user's named Bots without changing scoped reads or writes", async () => {
       const firstBot = randomUUID(), secondBot = randomUUID(), foreignBot = randomUUID();
       for (const [id, user] of [[firstBot, "owner"], [secondBot, "owner"], [foreignBot, "intruder"]])
-        await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,'Question fixture')`, [id, await seedFixtureWorkspace(pool, user), user]);
+        await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)`, [id, await seedFixtureWorkspace(pool, user), user, `Question fixture ${id}`]);
       const first = await asked("permission", "Continue the original task?", ["Continue"], "owner", firstBot);
       const second = await asked("external", "Wait for the external service?", ["Continue"], "owner", secondBot);
       const foreign = await asked("permission", "Other person's task", ["Continue"], "intruder", foreignBot);

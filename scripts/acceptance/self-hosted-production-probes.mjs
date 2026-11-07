@@ -31,8 +31,9 @@ export async function readCoreCapabilities({ owner, rpc, ownerId, workspaceId, r
   check(bootstrap?.user?.id === ownerId && bootstrap.cacheWorkspace?.workspaceId === workspaceId
     && bootstrap.cacheWorkspace.role === role && bootstrap.edition === 'cloud', 'core_features', 'identity')
   const flags = bootstrap.features?.flags
+  // The per-person UI rollout is an observation, not a source-daemon capability gate.
   check(flags && typeof flags === 'object' && !Array.isArray(flags) && Object.values(flags).every(value => typeof value === 'boolean')
-    && bootstrap.features.cloudComputer === true && flags['mikka-computer-billing'] === false
+    && typeof bootstrap.features.cloudComputer === 'boolean' && flags['mikka-computer-billing'] === false
     && flags['mikka-computer-tab-off'] === false && bootstrap.emailEnabled === true, 'core_features', 'flags')
   const billing = { status: 'not_authorized', configured: null, quotaEnforcementExercised: false, settlementExercised: false }
   if (role === 'admin') {
@@ -44,7 +45,7 @@ export async function readCoreCapabilities({ owner, rpc, ownerId, workspaceId, r
   }
   return { discovery: { edition: 'cloud', versionMatches: true, mobileReady: true, cloudConnected: data.cloud.connected,
     signIn: { google: data.signIn.google, github: data.signIn.github, email: data.signIn.email } },
-    flags: { cloudComputer: true, computerBilling: false, computerTabDisabled: false, emailSignIn: true }, billing }
+    flags: { cloudComputer: bootstrap.features.cloudComputer, computerBilling: false, computerTabDisabled: false, emailSignIn: true }, billing }
 }
 
 function ticket(value, path, now) {
