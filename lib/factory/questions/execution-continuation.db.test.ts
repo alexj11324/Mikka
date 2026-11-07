@@ -243,7 +243,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       assert.equal((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [child.runId])).rows[0].stopRequestedAt, null)
     })
 
-    await t.test('native question wake generations are bounded, single-winner and preserve the unclaimed child and original session', async () => {
+    await t.test('native question wake generations are bounded, single-winner and preserve the unclaimed child and original session', async t => {
       const wake = await import('./wake')
       const f = await fixture({ native: true, separateChat: true }), child = await f.createContinuation()
       const sandboxId = `original-${child.runId}`
@@ -278,6 +278,25 @@ test('real PG: question receipts preserve one execution without opening a repair
         assert.equal(await wake.claimQuestionWake(pool, actor, child.runId, first.wake, 'duplicate-workflow'), false)
         await wake.finishQuestionWake(pool, actor, child.runId, first.wake, first.workflowRunId, true)
         assert.equal((await wake.questionWakeFailure(pool, 'owner', child.runId))?.generation, first.wake.generation)
+        await t.test('owner wake projection remains readable while a claim holds the child run', async () => {
+          const reader = new Pool({ connectionString: target.toString(), max: 1,
+            options: '-c statement_timeout=2000 -c lock_timeout=250' })
+          const claiming = await pool.connect()
+          try {
+            await claiming.query('BEGIN')
+            // The real claim acquires this run lock before asking the question store.
+            await claiming.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE', [child.runId])
+            assert.equal(await wake.questionWakeFailure(reader, 'other', child.runId), null)
+            assert.deepEqual(await wake.questionWakeFailure(reader, 'owner', child.runId), {
+              generation: first.wake.generation, error: 'Original session could not start',
+            }, 'a read-only projection does not contend with the claim transaction')
+          } finally {
+            await claiming.query('ROLLBACK')
+            claiming.release()
+            await reader.end()
+          }
+        })
+
         assert.equal((await snapshot()).run.sessionId, null, 'a launch failure is not an actual native SID claim')
         assert.equal((await snapshot()).run.status, 'queued')
         await assert.rejects(wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: humanSession }, child.runId, first.wake.generation), { code: 'factoryQuestionContinuationUnavailable' }, 'the original workflow must be terminal before replacement')

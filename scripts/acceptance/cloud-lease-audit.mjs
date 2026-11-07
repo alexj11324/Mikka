@@ -35,6 +35,11 @@ export function leaseAuditReceipt(chunks, runId, harness) {
   return { status: 'receipt_missing' }
 }
 
+const renewedLease = lease => lease?.status === 'renewed' && lease.valid && lease.renewValid && lease.naturalWindowObserved
+  && lease.httpStatus === 200 && lease.renewHttpStatus === 200 && lease.renewExpiresAt > lease.expiresAt
+const completedToolReply = sample => sample.requireReplyAfterTool === true && sample.replyVerifiedAfterTool === true
+  && ['succeeded', 'completed', 'stopped'].includes(sample.lastStatus)
+
 export function naturalRenewalEvidence(sample) {
   const lease = sample.leaseAudit
   const renewals = sample.runtimeTiming?.counts?.filter(row => row.endpoint === 'credential_refresh') ?? []
@@ -43,14 +48,11 @@ export function naturalRenewalEvidence(sample) {
     && observed.runIdHash === createHash('sha256').update(sample.runId).digest('hex').slice(0, 16)
     && observed.harness === sample.harness && observed.started > 0
     && observed.completed === observed.started && observed.errors === 0
-    && sample.requireReplyAfterTool === true && sample.replyVerifiedAfterTool === true
-    && ['succeeded', 'completed', 'stopped'].includes(sample.lastStatus)
+    && completedToolReply(sample)
   const timed = sample.runtimeTiming?.complete === true && sample.runtimeTiming.truncated === false
     && renewals.some(row => row.started > 0 && row.completed === row.started && row.errors === 0)
     && renewals.every(row => row.errors === 0)
-  return lease?.status === 'renewed' && lease.valid && lease.renewValid && lease.naturalWindowObserved
-    && lease.httpStatus === 200 && lease.renewHttpStatus === 200 && lease.renewExpiresAt > lease.expiresAt
-    && (timed || traced)
+  return renewedLease(lease) && (timed || traced)
 }
 
 /** Read only completed daemon refresh spans for this owned run's real expiry.
@@ -90,10 +92,15 @@ export async function readDaemonRenewal(sample, { env = process.env, fetchImpl =
 
 export async function runLeaseAudit(env = process.env, { runStartup = runCloudStartup, readRenewal = readDaemonRenewal } = {}) {
   const applicationSha = auditTarget(env)
+  const pluginEvidence = env.DAEMON_RENEWAL_EVIDENCE === 'posthog_plugin'
   const report = await runStartup({ origin: 'https://app.aspectlylabs.com', runs: 2, harness: 'both',
     mode: 'candidate', strategy: 'derived', revision: applicationSha, expectedBuild: applicationSha,
     timeoutMs: 600000, maxStartupMs: 60000, runtimeEvidence: 'optional', officialTiming: 'disabled', leaseAudit: true }, { env })
   for (const sample of report.samples) {
+    if (pluginEvidence) {
+      sample.daemonRenewal = { source: 'posthog_plugin', status: 'required', projectId: 670821 }
+      continue
+    }
     try { sample.daemonRenewal = await readRenewal(sample, { env }) }
     catch (error) {
       const match = /^lease_audit_trace_http_([45][0-9]{2})$/.exec(error?.message ?? '')
@@ -102,13 +109,19 @@ export async function runLeaseAudit(env = process.env, { runStartup = runCloudSt
   }
   const samples = report.samples.map(sample => ({ harness: sample.harness, model: sample.requestedModel,
     runId: sample.runId, status: sample.status, failure: sample.failure, cleanup: sample.cleanup,
-    lease: sample.leaseAudit, naturalRenewalVerified: naturalRenewalEvidence(sample),
+    lease: sample.leaseAudit, naturalRenewalVerified: !pluginEvidence && naturalRenewalEvidence(sample),
+    requireReplyAfterTool: sample.requireReplyAfterTool === true, replyVerifiedAfterTool: sample.replyVerifiedAfterTool === true,
+    lastStatus: sample.lastStatus,
     daemonRenewal: sample.daemonRenewal,
     credentialRefresh: sample.runtimeTiming?.counts?.filter(row => row.endpoint === 'credential_refresh') ?? [] }))
+  const executed = report.status === 'candidate_subscription_proved' && !report.cleanup.errors.length && samples.length === 2
+    && samples.every(sample => sample.status === 'execution_proved_awaiting_server_timing' && sample.cleanup?.status === 'passed')
+  const waitingForPlugin = pluginEvidence && executed && report.samples.every(sample => renewedLease(sample.leaseAudit) && completedToolReply(sample))
   return { issue: 1598, applicationSha, startedAt: report.startedAt, finishedAt: report.finishedAt,
-    status: report.status !== 'candidate_subscription_proved' || report.cleanup.errors.length || samples.length !== 2
-      || samples.some(sample => !sample.naturalRenewalVerified || sample.status !== 'execution_proved_awaiting_server_timing'
-        || sample.cleanup?.status !== 'passed') ? 'blocked' : 'passed',
+    status: executed && samples.every(sample => sample.naturalRenewalVerified) ? 'passed'
+      : waitingForPlugin ? 'awaiting_posthog_plugin' : 'blocked',
+    ...(pluginEvidence ? { requiredExternalEvidence: { source: 'posthog_plugin', projectId: 670821,
+      spanName: 'daemon.adapter.auth.refresh', scope: 'owned_run_hash_harness_and_expiry' } } : {}),
     failure: report.failure, samples, cleanup: report.cleanup }
 }
 
@@ -118,5 +131,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   await mkdir('production-lease-audit-report', { recursive: true })
   await writeFile('production-lease-audit-report/report.json', JSON.stringify(report, null, 2) + '\n')
   console.log(JSON.stringify(report))
-  if (report.status !== 'passed') process.exitCode = 1
+  // A successful collection job is not full acceptance: the explicit pending
+  // report still requires plugin spans and naturalRenewalEvidence for both runs.
+  if (!['passed', 'awaiting_posthog_plugin'].includes(report.status)) process.exitCode = 1
 }
