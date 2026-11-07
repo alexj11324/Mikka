@@ -1,0 +1,134 @@
+# Root-reviewed preparation only. It creates no model task, Profile or VM.
+name: Issue 1505 prepare scoped diagnostic window
+on:
+  push:
+    branches: [ops/1505-diagnostic-window-fb173d]
+permissions:
+  contents: write
+  id-token: write
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+  queue: max
+jobs:
+  prepare:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: e2b-official-runtime-release
+      cancel-in-progress: false
+      queue: max
+    defaults:
+      run:
+        working-directory: source
+    env:
+      DIAGNOSTIC_WINDOW_GO: root-reviewed-1505-diagnostic-window-fb173d
+    steps:
+      - name: Check out the exact temporary helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          persist-credentials: false
+      - name: Check out the reviewed application source without credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: fb173dcbdc2f2f02ebb98be2edf80df975c58d7f
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify immutable source and explicit root review before credentials
+        run: |
+          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-diagnostic-window-fb173d'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$(git rev-parse HEAD)" = 'fb173dcbdc2f2f02ebb98be2edf80df975c58d7f'
+          test "$(git rev-parse HEAD^{tree})" = '4a5724298b2a1a2a3b5c9ad1d1c9185fa5e03a67'
+          node --check ../ops/scripts/ops/issue1505-diagnostic-window.mjs
+      - name: Read the existing SMOKE email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing SMOKE password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read the existing project configuration token only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Prepare one idle Bot and one bounded diagnostic configuration
+        id: prepare
+        run: node ../ops/scripts/ops/issue1505-diagnostic-window.mjs prepare "$RUNNER_TEMP/diagnostic-window.json"
+      - name: Preserve the recovery record before any helper ref deletion
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1505-diagnostic-window
+          path: ${{ runner.temp }}/diagnostic-window.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove only this successfully completed immutable helper ref
+        id: ref_cleanup
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import json, os, urllib.request, urllib.error
+          from pathlib import Path
+          repo, branch = 'alexj11324/Mikka', 'ops/1505-diagnostic-window-fb173d'
+          assert os.environ['GITHUB_REPOSITORY'] == repo and os.environ['GITHUB_REF'] == 'refs/heads/' + branch
+          receipt = {'branch': branch, 'expectedSha': os.environ['GITHUB_SHA'], 'status': 'failed'}
+          def call(path, method='GET'):
+              request = urllib.request.Request('https://api.github.com/repos/' + repo + '/' + path, method=method,
+                  headers={'Authorization':'Bearer ' + os.environ['GH_TOKEN'], 'Accept':'application/vnd.github+json'})
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      body = response.read(); return response.status, json.loads(body) if body else None
+              except urllib.error.HTTPError as error:
+                  return error.code, None
+          try:
+              status, ref = call('git/ref/heads/' + branch)
+              assert status == 200 and ref['object']['sha'] == os.environ['GITHUB_SHA'], 'helper_ref_changed'
+              status, _ = call('git/refs/heads/' + branch, 'DELETE'); receipt['deleteStatus'] = status
+              assert status == 204, 'helper_delete_unconfirmed'
+              status, _ = call('git/ref/heads/' + branch); receipt['readbackStatus'] = status
+              assert status == 404, 'helper_absence_unconfirmed'
+              receipt['status'] = 'deleted_and_absent'
+          finally:
+              Path(os.environ['RUNNER_TEMP'], 'diagnostic-window-ref.json').write_text(json.dumps(receipt, indent=2) + '\n')
+      - name: Preserve exact ref cleanup evidence
+        if: always() && steps.ref_cleanup.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1505-diagnostic-window-ref
+          path: ${{ runner.temp }}/diagnostic-window-ref.json
+          if-no-files-found: error
+          retention-days: 14
