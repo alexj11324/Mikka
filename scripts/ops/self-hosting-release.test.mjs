@@ -134,3 +134,5 @@ test('Apple API denial preserves the action/status and does not parse or expose 
 })
 
 // Final release checkpoint: public ce67; production execution follows private main READY.
+
+// Public protocol checkpoint: ce67 bridge; native/full threads follow the final fixed source.

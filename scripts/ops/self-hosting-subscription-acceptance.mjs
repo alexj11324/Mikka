@@ -409,3 +409,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
 // Release checkpoint: Apple status is read-only, separate from device acceptance.
 
 // Final release checkpoint: public ce67; production execution follows private main READY.
+
+// Public protocol checkpoint: ce67 bridge; native/full threads follow the final fixed source.

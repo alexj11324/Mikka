@@ -281,3 +281,5 @@ jobs:
 # Community preparation redirects were verified on the exact published core image.
 
 # Staging checkpoint: access-only fixture constraints and owned volume cleanup verified.
+
+# Public bridge protocol covers published ce67; native/full-thread acceptance follows 1668.
