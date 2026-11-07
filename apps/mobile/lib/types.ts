@@ -84,11 +84,13 @@ export interface Chat {
 }
 
 /** lib/chat-failure.ts on the server. */
-export type ChatFailure =
+export type ChatFailure = (
   | { kind: 'hosted'; code: string }
   | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
   | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
   | { kind: 'failed'; reason?: 'balance' | 'tools' }
+  // The stored code(s), shown only under 详情 (the web's RunErrorDetails); older servers omit it.
+) & { raw?: string }
 
 /** Reactions on a message, by emoji (lib/reactions.ts on the server). */
 export interface Reaction { emoji: string; count: number; mine: boolean }
