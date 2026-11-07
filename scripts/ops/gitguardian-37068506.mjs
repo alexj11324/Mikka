@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/gitguardian-37068506',
-  base: 'a51ce3dc7a8c2017b0d07f28d5dae6a1c528fdb3',
+  base: 'ef73eaa6c82442b360e143be19f477ee62b7bcd2',
   workspace: 837165, incident: 37068506,
   source: '518b9d32eb9315656173ae7a074c920546fdcb70',
   file: 'docker-compose.yml', blob: '80bf3b1e101f3f8fc34ae95640f2f3017a708ce8',
@@ -152,7 +152,7 @@ export function inspectOccurrences(rows, headers) {
       matches: row.matches.map(match => ({
         preLineStart: integerOrNull(match?.pre_line_start), preLineEnd: integerOrNull(match?.pre_line_end),
         postLineStart: integerOrNull(match?.post_line_start), postLineEnd: integerOrNull(match?.post_line_end),
-        ...(repoNumericMatches?{metadataFields:Object.keys(match).filter(k=>/^[a-z_]{1,40}$/.test(k)),indexStart:integerOrNull(match.index_start),indexEnd:integerOrNull(match.index_end)}:{}),
+        ...(repoNumericMatches?{metadataFields:Object.keys(match).filter(k=>/^[a-z_]{1,40}$/.test(k)),indexStart:integerOrNull(match.indice_start),indexEnd:integerOrNull(match.indice_end)}:{}),
       })),
       ...(extraSource ? { extraSource } : {}),
     }

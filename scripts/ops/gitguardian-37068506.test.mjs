@@ -372,3 +372,5 @@ test('scoped rule access readback contains no provider values', async () => {
 })
 
 // Public Mikka match ranges may be projected; Cordy match content remains unrequested.
+
+// GitGuardian occurrence offsets use indice_start and indice_end.
