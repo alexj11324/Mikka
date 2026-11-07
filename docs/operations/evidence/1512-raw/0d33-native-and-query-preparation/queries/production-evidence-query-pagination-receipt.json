@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "status": "prepared_not_production_validated",
+  "prepared_at_utc": "2026-11-07T09:08:54Z",
+  "scope": "Static pagination/evidence preparation only; no product or CI changes and no PostHog, DB, model or remote calls.",
+  "reviewed_source_revision": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+  "before": {
+    "file": "production-evidence-query-templates.pre-pagination.json",
+    "sha256": "a9196ef5a1d98c817c2bc628ca3dc86ca18224b0fe2096b8256c93ea37f5c91b",
+    "bytes": 48343,
+    "byte_exact_backup": true
+  },
+  "after": {
+    "file": "production-evidence-query-templates.json",
+    "sha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+    "bytes": 56861
+  },
+  "query_count": 13,
+  "changed_query_count": 5,
+  "unchanged_query_count": 8,
+  "query_changes": [
+    {
+      "name": "lookup_trace_by_ids",
+      "before_sql_sha256": "052acb7435df267d7df4e72aab56b748dc47136998b61389bbf8c5cc30c9e372",
+      "after_sql_sha256": "9508fdb7327e3688a12377021e821bf7d6dbd3acb85ef956207091d3136d8fdb",
+      "live_compile_status": "not_executed_for_new_sql",
+      "diff": "--- before/lookup_trace_by_ids\n+++ after/lookup_trace_by_ids\n@@ -15,5 +15,5 @@\n         OR ('{{task_id}}' != '' AND attributes['mikka.task_id'] = '{{task_id}}')\n     )\n GROUP BY trace_id\n-ORDER BY min(timestamp)\n-LIMIT 20\n+ORDER BY min(timestamp), trace_id\n+LIMIT 500 OFFSET {{row_offset}}\n"
+    },
+    {
+      "name": "span_timeline",
+      "before_sql_sha256": "a417880f660cc1fe0f54f63e3e2da3a0729c907ffdefcdf0998cae51b1c3ee34",
+      "after_sql_sha256": "ea6a0f5e5a26dc82e9d44e2cf7707e316b89169265f49d52f79e871083c5d2b3",
+      "live_compile_status": "not_executed_for_new_sql",
+      "diff": "--- before/span_timeline\n+++ after/span_timeline\n@@ -1,5 +1,5 @@\n WITH selected_spans AS (\n-    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n+    SELECT timestamp, end_time, uuid, trace_id, span_id, parent_span_id, is_root_span,\n         service_name, name, duration_nano, status_code, attributes, resource_attributes\n     FROM posthog.trace_spans\n     WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n@@ -8,7 +8,7 @@\n       AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n       AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n )\n-SELECT formatDateTime(s.timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc,\n+SELECT formatDateTime(s.timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc, toString(s.uuid) AS span_row_uuid,\n     dateDiff('microsecond', min(s.timestamp) OVER (), s.timestamp) / 1000 AS offset_ms,\n     s.duration_nano / 1000000 AS duration_ms, s.service_name AS service,\n     s.name AS stage, nullIf(s.attributes['mikka.workflow'], '') AS workflow,\n@@ -25,5 +25,5 @@\n FROM selected_spans AS s\n LEFT ANY JOIN selected_spans AS parent_span\n     ON s.trace_id = parent_span.trace_id AND s.parent_span_id = parent_span.span_id\n-ORDER BY s.timestamp, s.span_id\n+ORDER BY s.timestamp, s.span_id, s.uuid\n LIMIT 500 OFFSET {{row_offset}}\n"
+    },
+    {
+      "name": "safe_native_logs",
+      "before_sql_sha256": "b542be547a537dda814d4702b315ebd9f651a2845ca41f71a47597f586bbacf6",
+      "after_sql_sha256": "8008fa8570622dd8a11d26968fd72f0392fab91521dc774ed432e8de5efde394",
+      "live_compile_status": "not_executed_for_new_sql",
+      "diff": "--- before/safe_native_logs\n+++ after/safe_native_logs\n@@ -8,7 +8,7 @@\n       AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n       AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n )\n-SELECT formatDateTime(l.timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS emitted_utc, l.service_name AS service, l.severity_text,\n+SELECT formatDateTime(l.timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS emitted_utc, toString(l.uuid) AS log_uuid, l.service_name AS service, l.severity_text,\n     multiIf(l.body = 'mikka.stage.completed', 'completed', l.body = 'mikka.stage.failed', 'failed', 'unexpected_body_redacted') AS body_code,\n     l.body IN ('mikka.stage.completed', 'mikka.stage.failed') AS safe_body_shape,\n     nullIf(l.attributes['mikka.stage'], '') AS stage,\n@@ -28,5 +28,5 @@\n     AND l.service_name IN ('mikka-web', 'mikka-daemon')\n     AND coalesce(nullIf(l.resource_attributes['deployment.environment.name'], ''), l.resource_attributes['deployment.environment']) = 'production'\n     AND l.trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n-ORDER BY l.timestamp, l.span_id\n+ORDER BY l.timestamp, l.span_id, l.uuid\n LIMIT 500 OFFSET {{row_offset}}\n"
+    },
+    {
+      "name": "apm_generation_spans",
+      "before_sql_sha256": "646dd331d7c971aed131db350a513fd0299d1178da9877389ccf01ced9b2b8e8",
+      "after_sql_sha256": "1d43fcc835476f143ba6c51c390a8cfbc5c522fc9a0c8184374046ec76050b40",
+      "live_compile_status": "not_executed_for_new_sql",
+      "diff": "--- before/apm_generation_spans\n+++ after/apm_generation_spans\n@@ -1,5 +1,5 @@\n WITH selected_spans AS (\n-    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n+    SELECT timestamp, end_time, uuid, trace_id, span_id, parent_span_id, is_root_span,\n         service_name, name, duration_nano, status_code, attributes, resource_attributes\n     FROM posthog.trace_spans\n     WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n@@ -8,7 +8,7 @@\n       AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n       AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n )\n-SELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc, service_name AS service, name AS stage,\n+SELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc, toString(uuid) AS span_row_uuid, service_name AS service, name AS stage,\n     lower(hex(base64Decode(span_id))) AS span_id_hex, lower(hex(base64Decode(parent_span_id))) AS parent_span_id_hex,\n     attributes['mikka.ai.model'] AS model, nullIf(attributes['mikka.ai.provider'], '') AS provider,\n     coalesce(nullIf(attributes['mikka.ai.outcome'], ''), nullIf(attributes['mikka.outcome'], '')) AS outcome,\n@@ -43,5 +43,5 @@\n     nullIf(attributes['sessionId'], '') AS session_id\n FROM selected_spans\n WHERE name IN ('mikka.ai.generation', 'daemon.ai.generation')\n-ORDER BY timestamp, span_id\n+ORDER BY timestamp, span_id, uuid\n LIMIT 500 OFFSET {{row_offset}}\n"
+    },
+    {
+      "name": "native_generation_collection",
+      "before_sql_sha256": "5a4f2aef8175f96efd08ff2289275263fdc782495f0fe02a4cd0a2cd716b620b",
+      "after_sql_sha256": "8de7a9e941869dc778ab5dd9bc61ac9a0484626d8d2e08518a2bbd17fc08bde4",
+      "live_compile_status": "not_executed_for_new_sql",
+      "diff": "--- before/native_generation_collection\n+++ after/native_generation_collection\n@@ -1,5 +1,5 @@\n WITH selected_spans AS (\n-    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n+    SELECT timestamp, end_time, uuid, trace_id, span_id, parent_span_id, is_root_span,\n         service_name, name, duration_nano, status_code, attributes, resource_attributes\n     FROM posthog.trace_spans\n     WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n@@ -8,7 +8,7 @@\n       AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n       AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n )\n-SELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS emitted_utc,\n+SELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS emitted_utc, toString(uuid) AS span_row_uuid,\n     lower(hex(base64Decode(span_id))) AS collection_span_id_hex,\n     lower(hex(base64Decode(parent_span_id))) AS parent_span_id_hex,\n     nullIf(attributes['mikka.run_id'], '') AS run_id,\n@@ -32,5 +32,5 @@\n     nullIf(attributes['mikka.ai.native_flush_confirmed'], '') AS native_flush_confirmed_raw\n FROM selected_spans\n WHERE service_name = 'mikka-daemon' AND name = 'daemon.ai.collection'\n-ORDER BY timestamp, span_id\n+ORDER BY timestamp, span_id, uuid\n LIMIT 500 OFFSET {{row_offset}}\n"
+    }
+  ],
+  "metadata_changes": [
+    "parameter_rules.row_offset",
+    "six notes appended, including physical span-row UUID reconciliation",
+    "pagination_review added; historical validation sections remain unchanged"
+  ],
+  "preserved_validation_sections": {
+    "baseline_validation": {
+      "unchanged": true,
+      "canonical_json_sha256": "bbf2908a81170892ca5ad9498dbf1eb8dd9a8798315db51f3b15921b31b4b273"
+    },
+    "live_schema_preflight": {
+      "unchanged": true,
+      "canonical_json_sha256": "98c07e6b086595f08d6f65187be1fbe277c7a3f8d756ef8f7142708e3212c20b"
+    }
+  },
+  "static_checks": {
+    "json_parse": true,
+    "query_names_and_count_unchanged": true,
+    "backup_bytes_unchanged": true,
+    "all_six_pages_use_500_and_offset": true,
+    "lookup_unique_sort_key": "min(timestamp), trace_id",
+    "detail_final_sort_key": "actual uuid",
+    "safe_logs_project_log_uuid": true,
+    "generation_receipts_unchanged": true,
+    "uuid_columns_present_in_saved_live_schema": true,
+    "single_cluster_queries_preserved": true,
+    "exact_id_and_time_scope_preserved": true,
+    "accepted_ids_remain_null": true,
+    "no_live_compile_or_execution": true,
+    "apm_details_project_span_row_uuid": true
+  },
+  "paginated_queries": [
+    "lookup_trace_by_ids",
+    "span_timeline",
+    "generation_receipts",
+    "safe_native_logs",
+    "apm_generation_spans",
+    "native_generation_collection"
+  ],
+  "remaining_validation": "First actual-trace read must validate the five changed SQL texts and then follow the documented stable-window, bidirectional, bucket and count checks. Historical zero-row/schema results are not production acceptance.",
+  "apm_row_identity": "span_row_uuid is the actual storage uuid in span_timeline, apm_generation_spans and native_generation_collection. It does not replace logical span_id_hex/collection_span_id_hex; compare physical UUID sets and logical span-ID sets separately."
+}

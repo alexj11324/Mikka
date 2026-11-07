@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42357032863,
+  "runAttempt": 1,
+  "workflow": "Desktop shell",
+  "workflowConclusion": "success",
+  "nativeJobId": 128358112381,
+  "nativeStep": 16,
+  "nativeConclusion": "success",
+  "nativeStartedAt": "2026-11-07T09:02:00Z",
+  "nativeCompletedAt": "2026-11-07T09:10:00Z",
+  "source": {
+    "sha": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+    "tree": "afe77de97310d38eb230d3ff0ee91f639ca5b8d1",
+    "parents": [
+      "a0675e4ee029da69380b13590923231ab93a9dfe",
+      "f631038348c83a7bfa8185b2c1232d11795d5858"
+    ]
+  },
+  "harness": {
+    "sha": "3ad0fe25438887fe04f6dc6bda140f35d0bf4a03",
+    "tree": "afe77de97310d38eb230d3ff0ee91f639ca5b8d1",
+    "parents": [
+      "f811448d805e7baa7b032fd6ae62d991f59966c8",
+      "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920"
+    ],
+    "sameTreeAsSource": true
+  },
+  "artifacts": [
+    {
+      "id": 13568329194,
+      "name": "desktop-package-evidence-3ad0fe25438887fe04f6dc6bda140f35d0bf4a03",
+      "bytes": 1596,
+      "sha256": "11c95210ba0a72c66882e83238341116c5598e86f0d6d5c5e37c10068cac406e",
+      "headSha": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "workflowRunId": 42357032863,
+      "digestVerified": true,
+      "zipRetained": false
+    },
+    {
+      "id": 13568259531,
+      "name": "desktop-native-evidence-3ad0fe25438887fe04f6dc6bda140f35d0bf4a03",
+      "bytes": 14878821,
+      "sha256": "1de29d16998bad236ff2b473796df4188aace0b910ddb6b91141f1e2ee914e5b",
+      "headSha": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+      "workflowRunId": 42357032863,
+      "digestVerified": true,
+      "zipRetained": false
+    }
+  ],
+  "scope": "Only known JSON members were read and preserved; no PNG, API build, DMG, raw runtime log or signed download URL retained."
+}

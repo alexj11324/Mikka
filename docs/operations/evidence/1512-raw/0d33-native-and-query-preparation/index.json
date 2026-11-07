@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "sourceCommit": "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920",
+  "sourceTree": "afe77de97310d38eb230d3ff0ee91f639ca5b8d1",
+  "appAndHarnessCommit": "3ad0fe25438887fe04f6dc6bda140f35d0bf4a03",
+  "syntheticMergeParents": [
+    "f811448d805e7baa7b032fd6ae62d991f59966c8",
+    "0d33e1bd7b170abe7cb0b8c9d1fef42bc951c920"
+  ],
+  "sameAppHarnessAndFeatureTree": true,
+  "evidenceParent": "1ada957819ca94f361cb38350b9a05535d785b30",
+  "additionalParents": [],
+  "retainedOpsCommitAlreadyAncestor": "be49cd8531258640d036bf4774bec031a9ce421f",
+  "ci": {
+    "state": "passed",
+    "workflowCount": 14,
+    "workflowSuccess": 14,
+    "checkCount": 43,
+    "checkSuccess": 35,
+    "checkSkipped": 8,
+    "desktopRunId": 42357032863,
+    "desktopNativeJobId": 128358112381,
+    "nativeAcceptanceStartedAt": "2026-11-07T09:02:00Z",
+    "nativeAcceptanceCompletedAt": "2026-11-07T09:10:00Z"
+  },
+  "nativeFunctionalAcceptance": {
+    "lifecycle": "passed",
+    "failure": null,
+    "parityScreensPassed": 100,
+    "parityScreensTotal": 100,
+    "smokeChecksPassed": 10,
+    "smokeChecksTotal": 10,
+    "cryptoDistinctProcesses": 3,
+    "crypto": "passed",
+    "packageIntegrity": "passed",
+    "cleanup": "passed",
+    "lease": "released",
+    "quarantined": false
+  },
+  "ordinaryLoginQueryRequirement": {
+    "state": "unmet_in_this_observation",
+    "nativeQueries": 213,
+    "chromiumWebQueries": 193,
+    "nativeMinusWebQueries": 20,
+    "nativePhases": {
+      "commonEmailAuthentication": 19,
+      "pkceAndAutomaticRenderer": 18,
+      "workspaceSelectionToUsable": 176
+    },
+    "webPhases": {
+      "commonEmailAuthentication": 19,
+      "navigationToDOMContentLoaded": 0,
+      "workspaceSelectionToUsable": 174
+    },
+    "interpretation": "Functional CI success does not establish the requested no-extra-query condition. Native has 20 more raw query calls in this observed ordinary-login pair. PKCE overlaps renderer requests; no subtraction is used to claim compliance."
+  },
+  "authenticatedStartupQueryObservation": {
+    "scope": "first pair of the unchanged five-pair Electron lifecycle; hosted is Electron hosted renderer, not standalone Chromium",
+    "bundledQueries": 183,
+    "hostedElectronQueries": 195,
+    "bundledMinusHostedQueries": -12,
+    "samplePairsUsedForQueryCounts": 1,
+    "noNewPerformanceThreshold": true
+  },
+  "rpcObservation": {
+    "state": "complete",
+    "nativeLoginCalls": 22,
+    "webLoginCalls": 18,
+    "bundledStartupCalls": 19,
+    "hostedStartupCalls": 20,
+    "duplicateRecords": 0,
+    "conflictingInvocations": 0,
+    "unpaired": 0,
+    "crossWindow": 0,
+    "nativeExtraActionObservations": [
+      {
+        "action": null,
+        "route": "/api/desktop/rpc",
+        "count": 1,
+        "httpStatus": 401
+      },
+      {
+        "action": "desktop.bootstrap",
+        "aggregateExtraCount": 1,
+        "routes": [
+          "/api/rpc",
+          "/api/desktop/rpc"
+        ]
+      },
+      {
+        "action": "task-runs.pollTaskRuns",
+        "extraCount": 2
+      }
+    ],
+    "limitation": "Invocation counts and registered action names do not attribute SQL calls; repetition is not by itself proof of unnecessary work."
+  },
+  "productionQueryPreparation": {
+    "state": "prepared_not_live_verified",
+    "filesAreOriginalBytes": true,
+    "queryTemplatesExecutedByThisArchive": false,
+    "productionPostHogEvidenceVerified": false,
+    "description": "Pre-pagination and pagination-aware templates plus their preparation receipt are archived as preparation evidence only. They are not live production validation."
+  },
+  "privacy": {
+    "state": "passed",
+    "filesScanned": 12,
+    "emailOrCredentialPatternMatches": 0,
+    "artifactUploadAudit": "passed",
+    "onlyKnownJsonMembersRead": true,
+    "excluded": [
+      "PNG",
+      "DMG",
+      "API build",
+      "raw runtime logs",
+      "signed download URLs",
+      "account credentials",
+      "SQL results or provider content"
+    ]
+  },
+  "resourceActions": {
+    "newServices": 0,
+    "newModels": 0,
+    "newDbRequests": 0,
+    "reruns": 0
+  },
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/desktop/lifecycle.json",
+      "bytes": 123585,
+      "sha256": "4ef55f4a1661524cd58646222ed38357476ecd3ab1bba1dfeed1e49f444045ee",
+      "gitBlobSha1": "720f89ae75ae7d8e2d4f041cd27d75bf7328081c",
+      "kind": "original_native_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/desktop/parity/parity.json",
+      "bytes": 106271,
+      "sha256": "9a7ca22f0c4e8b4cca7e7257a55ad0f1c1a5565edd48c10f27527235793f3523",
+      "gitBlobSha1": "1ea951339b382c8e923ce4f2f998888337e842be",
+      "kind": "original_native_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/desktop/smoke.json",
+      "bytes": 3125,
+      "sha256": "2c04b916dd6452497f276fad6284ab3f83127dab851cfa02104a953643577354",
+      "gitBlobSha1": "5d127757a37814ce7c3e9762b4cb607ac2db7f40",
+      "kind": "original_native_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/desktop/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "8b6bb8662666fed6f3c4e12fef64de298c4b1740c0a1548a63a4ee5f0c6d48f6",
+      "gitBlobSha1": "4953056fb05689e2cc9c610d9c53f8f9bc8deed0",
+      "kind": "original_native_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/desktop/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "718c7e3d96567f914642b00b6016b7732d85c6de5a1615c5b73f5541f031ba79",
+      "gitBlobSha1": "1a0421d3d2b439514d8bf555e15c4c9dbfdc75a8",
+      "kind": "original_native_report"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/desktop/summary.json",
+      "bytes": 68646,
+      "sha256": "c5a62b7f56329fa03d5f29438a348250107e3e4ab1b9337b6c863f3c9a87b771",
+      "gitBlobSha1": "bacd9959f34255b2f98b6546e35d0f6a777b9140",
+      "kind": "native_report_projection"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/desktop/artifact-provenance.json",
+      "bytes": 1795,
+      "sha256": "d0ea1892ae0642b975a89d9669c5fbeab7f14d10ba4799015165e27ff091d824",
+      "gitBlobSha1": "67b3ea10275a9de5c571c9950f8ede95db98bdf2",
+      "kind": "artifact_or_privacy_receipt"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/desktop/privacy-scan.json",
+      "bytes": 1940,
+      "sha256": "ec848ff639b2b46879e773626007e684c6e4f1654262ed806b7bafdcb189bd5d",
+      "gitBlobSha1": "a541020610718536a4d3395832e0a234201224b6",
+      "kind": "artifact_or_privacy_receipt"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/ci/final.json",
+      "bytes": 106269,
+      "sha256": "32d39ad1b62afb706f6ae996f4134282d15a3878a67e916c66c549f0a4e55982",
+      "gitBlobSha1": "cc42b005e104f21f16b2941e99eafcfd4da7b754",
+      "kind": "closed_github_ci_metadata"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/queries/production-evidence-query-templates.pre-pagination.json",
+      "bytes": 48343,
+      "sha256": "a9196ef5a1d98c817c2bc628ca3dc86ca18224b0fe2096b8256c93ea37f5c91b",
+      "gitBlobSha1": "7cfef73ce1c8dd47e636eb371470b60346f10da2",
+      "kind": "prepared_query_templates_or_offline_receipt"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/queries/production-evidence-query-templates.json",
+      "bytes": 56861,
+      "sha256": "888c37c15c600b87f8acd94cbfdb261bba839c63ea882164ce4d275bf1b00873",
+      "gitBlobSha1": "0b0f0f4c3eb129e90cf2f357762001e630103705",
+      "kind": "prepared_query_templates_or_offline_receipt"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/0d33-native-and-query-preparation/queries/production-evidence-query-pagination-receipt.json",
+      "bytes": 10288,
+      "sha256": "822041e22bbbfc0f48b757346bb485c76b28c334f83d424288a319f66fd11d05",
+      "gitBlobSha1": "e08508b0d267ddcfd2ee07a1e2128bc0a00dfc47",
+      "kind": "prepared_query_templates_or_offline_receipt"
+    }
+  ],
+  "priorFailure": "fe40 auth-initial-document timeout remains in its earlier immutable archive; this success does not rewrite it."
+}

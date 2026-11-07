@@ -1,0 +1,386 @@
+{
+  "project_id": 670821,
+  "region": "US",
+  "status": "prepared_not_production_validated",
+  "accepted_ids": null,
+  "baseline_validation_only": {
+    "trace_id_hex": "77cad3a99b9e154b27aaa2c6c0226283",
+    "window_start_utc": "2026-11-06 20:00:00",
+    "window_end_utc": "2026-11-06 20:10:00",
+    "row_offset": 0,
+    "run_id": "",
+    "thread_id": "",
+    "task_id": "",
+    "session_id": "schema-check-not-an-acceptance-session"
+  },
+  "parameter_rules": {
+    "trace_id_hex": "32 lowercase hex chars, nonzero",
+    "window_start_utc": "UTC YYYY-MM-DD HH:mm:ss; inclusive; keep ordinary evidence window <=1 hour",
+    "window_end_utc": "UTC YYYY-MM-DD HH:mm:ss; exclusive; >=start and <=1 hour after start unless the exact run duration requires widening",
+    "row_offset": "Non-negative integer for 500-row pages; keep paging until returned rows <500 and compare distinct total with integrity query",
+    "run_id": "Empty or Mikka telemetryId-safe opaque ID, <=128 characters",
+    "thread_id": "Empty or Mikka telemetryId-safe opaque ID, <=128 characters",
+    "task_id": "Empty or Mikka telemetryId-safe opaque ID, <=128 characters",
+    "session_id": "Real browser session ID; metadata alone never substitutes for browser playback proof"
+  },
+  "queries": {
+    "lookup_trace_by_ids": "SELECT lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n    formatDateTime(min(timestamp), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc, formatDateTime(max(end_time), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS ended_utc,\n    groupUniqArray(service_name) AS services, uniqExact(span_id) AS observed_span_ids,\n    groupUniqArray(nullIf(attributes['mikka.run_id'], '')) AS run_ids,\n    groupUniqArray(nullIf(attributes['mikka.thread_id'], '')) AS thread_ids,\n    groupUniqArray(nullIf(attributes['mikka.task_id'], '')) AS task_ids\nFROM posthog.trace_spans\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n    AND service_name IN ('mikka-web', 'mikka-daemon')\n    AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n    AND (\n        ('{{run_id}}' != '' AND attributes['mikka.run_id'] = '{{run_id}}')\n        OR ('{{thread_id}}' != '' AND attributes['mikka.thread_id'] = '{{thread_id}}')\n        OR ('{{task_id}}' != '' AND attributes['mikka.task_id'] = '{{task_id}}')\n    )\nGROUP BY trace_id\nORDER BY min(timestamp)\nLIMIT 20",
+    "span_timeline": "WITH selected_spans AS (\n    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n        service_name, name, duration_nano, status_code, attributes, resource_attributes\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n)\nSELECT formatDateTime(s.timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc,\n    dateDiff('microsecond', min(s.timestamp) OVER (), s.timestamp) / 1000 AS offset_ms,\n    s.duration_nano / 1000000 AS duration_ms, s.service_name AS service,\n    s.name AS stage, nullIf(s.attributes['mikka.workflow'], '') AS workflow,\n    nullIf(s.attributes['mikka.step'], '') AS workflow_step,\n    lower(hex(base64Decode(s.span_id))) AS span_id_hex, lower(hex(base64Decode(s.parent_span_id))) AS parent_span_id_hex,\n    parent_span.name AS parent_stage,\n    multiIf(s.is_root_span, 'root', length(coalesce(parent_span.span_id, '')) > 0, 'observed_parent', 'external_or_missing_parent') AS parent_presence,\n    s.status_code,\n    nullIf(s.attributes['mikka.run_id'], '') AS run_id,\n    nullIf(s.attributes['mikka.thread_id'], '') AS thread_id,\n    nullIf(s.attributes['mikka.task_id'], '') AS task_id,\n    nullIf(s.attributes['mikka.workflow_run_id'], '') AS workflow_run_id,\n    nullIf(s.attributes['sessionId'], '') AS session_id\nFROM selected_spans AS s\nLEFT ANY JOIN selected_spans AS parent_span\n    ON s.trace_id = parent_span.trace_id AND s.parent_span_id = parent_span.span_id\nORDER BY s.timestamp, s.span_id\nLIMIT 500 OFFSET {{row_offset}}",
+    "trace_integrity": "WITH selected_spans AS (\n    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n        service_name, name, duration_nano, status_code, attributes, resource_attributes\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n)\nSELECT count() AS span_rows, uniqExact(s.span_id) AS distinct_span_ids,\n    countIf(s.is_root_span) AS native_roots,\n    countIf(NOT s.is_root_span AND length(coalesce(parent_span.span_id, '')) = 0) AS external_or_missing_parent_rows,\n    countIf(s.parent_span_id = s.span_id) AS self_parent_rows,\n    groupUniqArray(s.service_name) AS services,\n    formatDateTime(min(s.timestamp), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc, formatDateTime(max(s.end_time), '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS ended_utc,\n    dateDiff('microsecond', min(s.timestamp), max(s.end_time)) / 1000 AS elapsed_ms,\n    groupUniqArray(nullIf(s.attributes['mikka.run_id'], '')) AS run_ids,\n    groupUniqArray(nullIf(s.attributes['mikka.task_id'], '')) AS task_ids,\n    groupUniqArray(nullIf(s.attributes['sessionId'], '')) AS session_ids\nFROM selected_spans AS s\nLEFT ANY JOIN selected_spans AS parent_span\n    ON s.trace_id = parent_span.trace_id AND s.parent_span_id = parent_span.span_id",
+    "generation_receipts": "SELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc, toString(uuid) AS event_uuid,\n    toString(properties.$ai_span_id) AS span_id_hex,\n    toString(properties.$ai_parent_id) AS parent_span_id_hex,\n    match(toString(properties.$ai_span_id), '^[0-9a-f]{16}$') AS valid_span_id,\n    properties.$ai_provider AS provider, properties.$ai_model AS model,\n    properties['mikka.ai.operation'] AS operation, properties['mikka.harness'] AS harness,\n    nullIf(toString(properties['mikka.ai.route']), '') AS route,\n    nullIf(toString(properties['mikka.ai.fallback_reason']), '') AS fallback_reason,\n    toFloatOrNull(toString(properties['mikka.ai.zerocat_ms'])) AS zerocat_ms,\n    nullIf(toString(properties['mikka.ai.tier']), '') AS tier,\n    toFloatOrNull(toString(properties['mikka.ai.tier_score'])) AS tier_score,\n    toFloatOrNull(toString(properties['mikka.ai.tier_confidence'])) AS tier_confidence,\n    nullIf(toString(properties['mikka.ai.effort']), '') AS effort,\n    toFloatOrNull(toString(properties['mikka.ai.effort_score'])) AS effort_score,\n    toFloatOrNull(toString(properties['mikka.ai.effort_confidence'])) AS effort_confidence,\n    nullIf(toString(properties['mikka.ai.timing_basis']), '') AS timing_basis,\n    nullIf(toString(properties['mikka.ai.ttft_basis']), '') AS ttft_basis,\n    nullIf(toString(properties['mikka.ai.model_basis']), '') AS model_basis,\n    nullIf(toString(properties['mikka.ai.native_unavailable_reason']), '') AS native_unavailable_reason,\n    toFloatOrNull(toString(properties['mikka.ai.first_output_item_ms'])) AS first_output_item_ms,\n    toFloatOrNull(toString(properties.$ai_input_tokens)) AS input_tokens,\n    toFloatOrNull(toString(properties.$ai_output_tokens)) AS output_tokens,\n    toFloatOrNull(toString(properties.$ai_cache_read_input_tokens)) AS cache_read_tokens,\n    toFloatOrNull(toString(properties.$ai_cache_creation_input_tokens)) AS cache_creation_tokens,\n    nullIf(toString(properties.$ai_cache_reporting_exclusive), '') AS cache_reporting_exclusive_raw,\n    1000 * toFloatOrNull(toString(properties.$ai_latency)) AS latency_ms,\n    1000 * toFloatOrNull(toString(properties.$ai_time_to_first_token)) AS ttft_ms,\n    toFloatOrNull(toString(properties.$ai_total_cost_usd)) AS total_cost_usd,\n    nullIf(toString(properties.$ai_cost_passthrough), '') AS cost_passthrough_raw,\n    nullIf(toString(properties.$ai_cost_model_source), '') AS cost_model_source,\n    nullIf(toString(properties.$ai_model_cost_used), '') AS cost_model_used,\n    nullIf(toString(properties.$ai_cost_model_provider), '') AS cost_model_provider,\n    multiIf(isNull(toFloatOrNull(toString(properties.$ai_total_cost_usd))), 'unknown',\n        toString(properties.$ai_cost_passthrough) IN ('1', 'true'), 'captured_per_call_amount',\n        toString(properties.$ai_cost_model_source) IN ('openrouter', 'manual'), 'catalog_api_equivalent_estimate',\n        toString(properties.$ai_cost_model_source) = 'custom', 'custom_api_equivalent_estimate',\n        'amount_with_unverified_provenance') AS cost_basis,\n    toString(properties.$ai_is_error) IN ('1', 'true') AS is_error,\n    nullIf(toString(properties['mikka.ai.outcome']), '') AS server_outcome,\n    coalesce(nullIf(toString(properties.$session_id), ''), nullIf(toString(properties.$ai_session_id), '')) AS session_id,\n    nullIf(toString(properties['mikka.run_id']), '') AS run_id,\n    nullIf(toString(properties['mikka.thread_id']), '') AS thread_id,\n    nullIf(toString(properties['mikka.task_id']), '') AS task_id\nFROM events\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n    AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n    AND event = '$ai_generation' AND properties.$ai_trace_id = '{{trace_id_hex}}'\nORDER BY timestamp, uuid\nLIMIT 500 OFFSET {{row_offset}}",
+    "tail_error_retention": "WITH selected_spans AS (\n    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n        service_name, name, duration_nano, status_code, attributes, resource_attributes\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n)\nSELECT service_name AS service, count() AS span_rows, uniqExact(span_id) AS span_ids,\n    countIf(status_code = 2) AS error_span_rows,\n    countIf(coalesce(toFloatOrNull(attributes['http.response.status_code']), toFloatOrNull(attributes['http.status_code'])) >= 400) AS http_failure_span_rows,\n    countIf(duration_nano >= 1000000000) AS slow_span_rows,\n    countIf(attributes['mikka.trace.retention'] = 'error_or_slow') AS tail_retained_span_rows,\n    countIf(attributes['mikka.trace.retention'] = 'critical_child') AS critical_child_retained_rows,\n    countIf(toFloatOrNull(attributes['mikka.trace.sample_rate']) = 1) AS full_rate_span_rows,\n    countIf(isNull(toFloatOrNull(attributes['mikka.trace.sample_rate']))) AS missing_rate_rows,\n    countIf(isNotNull(toFloatOrNull(attributes['mikka.trace.sample_rate'])) AND toFloatOrNull(attributes['mikka.trace.sample_rate']) != 1) AS nonfull_rate_rows,\n    groupUniqArray(nullIf(attributes['mikka.trace.retention'], '')) AS retention_reasons\nFROM selected_spans\nWHERE service_name = 'mikka-web'\nGROUP BY service_name",
+    "safe_native_logs": "WITH selected_spans AS (\n    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n        service_name, name, duration_nano, status_code, attributes, resource_attributes\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n)\nSELECT formatDateTime(l.timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS emitted_utc, l.service_name AS service, l.severity_text,\n    multiIf(l.body = 'mikka.stage.completed', 'completed', l.body = 'mikka.stage.failed', 'failed', 'unexpected_body_redacted') AS body_code,\n    l.body IN ('mikka.stage.completed', 'mikka.stage.failed') AS safe_body_shape,\n    nullIf(l.attributes['mikka.stage'], '') AS stage,\n    toFloatOrNull(l.attributes['mikka.duration_ms']) AS duration_ms,\n    lower(hex(base64Decode(l.trace_id))) AS trace_id_hex, lower(hex(base64Decode(l.span_id))) AS span_id_hex,\n    length(coalesce(s.span_id, '')) > 0 AS has_matching_apm_span,\n    nullIf(l.attributes['mikka.run_id'], '') AS run_id,\n    nullIf(l.attributes['mikka.thread_id'], '') AS thread_id,\n    nullIf(l.attributes['mikka.task_id'], '') AS task_id,\n    nullIf(l.attributes['sessionId'], '') AS session_id,\n    nullIf(l.attributes['mikka.error.code'], '') AS error_code,\n    nullIf(l.attributes['error.type'], '') AS error_type\nFROM logs AS l\nLEFT ANY JOIN selected_spans AS s ON l.trace_id = s.trace_id AND l.span_id = s.span_id\nWHERE l.timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n    AND l.timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n    AND l.service_name IN ('mikka-web', 'mikka-daemon')\n    AND coalesce(nullIf(l.resource_attributes['deployment.environment.name'], ''), l.resource_attributes['deployment.environment']) = 'production'\n    AND l.trace_id = base64Encode(unhex('{{trace_id_hex}}'))\nORDER BY l.timestamp, l.span_id\nLIMIT 500 OFFSET {{row_offset}}",
+    "source_correlation": "WITH selected_spans AS (\n    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n        service_name, name, duration_nano, status_code, attributes, resource_attributes\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n)\nSELECT service_name AS service,\n    coalesce(nullIf(resource_attributes['service.version'], ''), '(not stamped)') AS service_version,\n    count() AS span_rows, uniqExact(span_id) AS span_ids,\n    groupUniqArray(nullIf(attributes['mikka.client_kind'], '')) AS client_kinds,\n    groupUniqArray(nullIf(attributes['mikka.run_id'], '')) AS run_ids,\n    groupUniqArray(nullIf(attributes['mikka.thread_id'], '')) AS thread_ids,\n    groupUniqArray(nullIf(attributes['mikka.task_id'], '')) AS task_ids,\n    groupUniqArray(nullIf(attributes['mikka.workflow_run_id'], '')) AS workflow_run_ids,\n    groupUniqArray(nullIf(attributes['sessionId'], '')) AS session_ids\nFROM selected_spans\nGROUP BY service, service_version\nORDER BY service, service_version",
+    "replay_correlation": "WITH recording AS (\n    SELECT session_id, count() AS recording_chunks,\n        min(min_first_timestamp) AS started_at, max(max_last_timestamp) AS ended_at,\n        sum(size) AS recorded_bytes, sum(event_count) AS replay_events,\n        sum(console_log_count) AS console_logs, sum(console_warn_count) AS console_warnings,\n        sum(console_error_count) AS console_errors, max(is_deleted) AS deleted\n    FROM raw_session_replay_events\n    WHERE session_id = '{{session_id}}'\n        AND min_first_timestamp >= toDateTime('{{window_start_utc}}', 'UTC') - INTERVAL 1 DAY\n        AND min_first_timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n        AND max_last_timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n    GROUP BY session_id\n),\nai_sessions AS (\n    SELECT toString(properties.$session_id) AS session_id, uniqExact(uuid) AS correlated_generations\n    FROM events\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n    AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n        AND event = '$ai_generation' AND properties.$ai_trace_id = '{{trace_id_hex}}'\n        AND properties.$session_id = '{{session_id}}'\n    GROUP BY session_id\n)\nSELECT wanted.session_id, coalesce(recording.recording_chunks, 0) AS recording_chunks,\n    coalesce(recording.recorded_bytes, 0) AS recorded_bytes, coalesce(recording.replay_events, 0) AS replay_events,\n    if(coalesce(recording.recording_chunks, 0) > 0, formatDateTime(recording.started_at, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC'), NULL) AS recording_started_utc,\n    if(coalesce(recording.recording_chunks, 0) > 0, formatDateTime(recording.ended_at, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC'), NULL) AS recording_ended_utc,\n    if(coalesce(recording.recording_chunks, 0) > 0, recording.deleted, NULL) AS deleted,\n    recording.console_logs, recording.console_warnings, recording.console_errors,\n    coalesce(ai_sessions.correlated_generations, 0) AS correlated_generations\nFROM (SELECT '{{session_id}}' AS session_id) AS wanted\nLEFT ANY JOIN recording ON wanted.session_id = recording.session_id\nLEFT ANY JOIN ai_sessions ON wanted.session_id = ai_sessions.session_id",
+    "capture_summary": "WITH selected_spans AS (\n    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n        service_name, name, duration_nano, status_code, attributes, resource_attributes\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n)\nSELECT 'apm_span_ids' AS signal, uniqExact(span_id) AS observed_count FROM selected_spans\nUNION ALL\nSELECT 'native_log_rows', uniqExact(uuid) FROM logs\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\nUNION ALL\nSELECT 'unsafe_log_body_rows', countIf(body NOT IN ('mikka.stage.completed', 'mikka.stage.failed')) FROM logs\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))",
+    "apm_generation_spans": "WITH selected_spans AS (\n    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n        service_name, name, duration_nano, status_code, attributes, resource_attributes\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n)\nSELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc, service_name AS service, name AS stage,\n    lower(hex(base64Decode(span_id))) AS span_id_hex, lower(hex(base64Decode(parent_span_id))) AS parent_span_id_hex,\n    attributes['mikka.ai.model'] AS model, nullIf(attributes['mikka.ai.provider'], '') AS provider,\n    coalesce(nullIf(attributes['mikka.ai.outcome'], ''), nullIf(attributes['mikka.outcome'], '')) AS outcome,\n    nullIf(attributes['mikka.ai.operation'], '') AS operation,\n    nullIf(attributes['mikka.harness'], '') AS harness,\n    nullIf(attributes['mikka.ai.route'], '') AS route,\n    nullIf(attributes['mikka.ai.fallback_reason'], '') AS fallback_reason,\n    toFloatOrNull(attributes['mikka.ai.zerocat_ms']) AS zerocat_ms,\n    nullIf(attributes['mikka.ai.tier'], '') AS tier,\n    toFloatOrNull(attributes['mikka.ai.tier_score']) AS tier_score,\n    toFloatOrNull(attributes['mikka.ai.tier_confidence']) AS tier_confidence,\n    nullIf(attributes['mikka.ai.effort'], '') AS effort,\n    toFloatOrNull(attributes['mikka.ai.effort_score']) AS effort_score,\n    toFloatOrNull(attributes['mikka.ai.effort_confidence']) AS effort_confidence,\n    nullIf(attributes['mikka.ai.timing_basis'], '') AS timing_basis,\n    nullIf(attributes['mikka.ai.ttft_basis'], '') AS ttft_basis,\n    nullIf(attributes['mikka.ai.model_basis'], '') AS model_basis,\n    nullIf(attributes['mikka.ai.native_unavailable_reason'], '') AS native_unavailable_reason,\n    toFloatOrNull(attributes['mikka.ai.first_output_item_ms']) AS first_output_item_ms,\n    toFloatOrNull(attributes['mikka.trace.sample_rate']) AS sample_rate,\n    nullIf(attributes['mikka.run_id'], '') AS run_id,\n    nullIf(attributes['mikka.thread_id'], '') AS thread_id,\n    nullIf(attributes['mikka.task_id'], '') AS task_id,\n    duration_nano / 1000000 AS span_duration_ms,\n    toFloatOrNull(attributes['mikka.ai.latency_ms']) AS model_latency_ms,\n    toFloatOrNull(attributes['mikka.ai.ttft_ms']) AS ttft_ms,\n    toFloatOrNull(attributes['mikka.ai.input_tokens']) AS input_tokens,\n    toFloatOrNull(attributes['mikka.ai.output_tokens']) AS output_tokens,\n    toFloatOrNull(attributes['mikka.ai.cache_read_tokens']) AS cache_read_tokens,\n    toFloatOrNull(attributes['mikka.ai.cache_write_tokens']) AS cache_creation_tokens,\n    toFloatOrNull(attributes['mikka.ai.total_cost_usd']) AS captured_cost_usd,\n    nullIf(attributes['sessionId'], '') AS session_id\nFROM selected_spans\nWHERE name IN ('mikka.ai.generation', 'daemon.ai.generation')\nORDER BY timestamp, span_id\nLIMIT 500 OFFSET {{row_offset}}",
+    "ai_capture_summary": "SELECT count() AS generation_rows, uniqExact(uuid) AS generation_event_ids,\n    uniqExact(toString(properties.$ai_span_id)) AS generation_span_ids,\n    countIf(NOT match(coalesce(toString(properties.$ai_span_id), ''), '^[0-9a-f]{16}$')) AS invalid_span_id_rows,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_input_tokens)))) AS with_input_usage,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_output_tokens)))) AS with_output_usage,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_cache_read_input_tokens)))) AS with_cache_read_usage,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_cache_creation_input_tokens)))) AS with_cache_creation_usage,\n    countIf(toString(properties.$ai_cache_reporting_exclusive) IN ('0', 'false')) AS cache_inclusive_rows,\n    countIf(toString(properties.$ai_cache_reporting_exclusive) IN ('1', 'true')) AS cache_exclusive_rows,\n    countIf(coalesce(toString(properties.$ai_cache_reporting_exclusive), '') NOT IN ('0', 'false', '1', 'true')) AS cache_semantics_unknown_rows,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_latency)))) AS with_latency,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_time_to_first_token)))) AS with_ttft,\n    countIf(toString(properties['mikka.ai.timing_basis']) = 'official_cli_trace') AS native_request_generations,\n    countIf(toString(properties['mikka.ai.timing_basis']) = 'app_server_usage') AS app_server_fallback_generations,\n    groupUniqArray(nullIf(toString(properties['mikka.ai.ttft_basis']), '')) AS ttft_bases,\n    groupUniqArray(nullIf(toString(properties['mikka.ai.native_unavailable_reason']), '')) AS native_unavailable_reasons,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_total_cost_usd))) AND toString(properties.$ai_cost_passthrough) IN ('1', 'true')) AS captured_per_call_cost_rows,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_total_cost_usd))) AND coalesce(toString(properties.$ai_cost_passthrough), '') NOT IN ('1', 'true') AND toString(properties.$ai_cost_model_source) IN ('openrouter', 'manual')) AS catalog_api_estimate_rows,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_total_cost_usd))) AND coalesce(toString(properties.$ai_cost_passthrough), '') NOT IN ('1', 'true') AND toString(properties.$ai_cost_model_source) = 'custom') AS custom_api_estimate_rows,\n    countIf(isNotNull(toFloatOrNull(toString(properties.$ai_total_cost_usd))) AND coalesce(toString(properties.$ai_cost_passthrough), '') NOT IN ('1', 'true') AND coalesce(toString(properties.$ai_cost_model_source), '') NOT IN ('openrouter', 'manual', 'custom')) AS unverified_cost_provenance_rows,\n    groupUniqArray(nullIf(toString(properties.$ai_cost_passthrough), '')) AS cost_passthrough_values,\n    groupUniqArray(nullIf(toString(properties.$ai_cost_model_source), '')) AS cost_model_sources,\n    groupUniqArray(nullIf(toString(properties.$ai_model_cost_used), '')) AS cost_models_used,\n    groupUniqArray(nullIf(toString(properties.$ai_cost_model_provider), '')) AS cost_model_providers,\n    countIf(isNull(toFloatOrNull(toString(properties.$ai_total_cost_usd)))) AS unknown_cost_rows\nFROM events\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n    AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n    AND event = '$ai_generation' AND properties.$ai_trace_id = '{{trace_id_hex}}'",
+    "apm_session_links": "WITH selected_spans AS (\n    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n        service_name, name, duration_nano, status_code, attributes, resource_attributes\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n)\nSELECT attributes['sessionId'] AS session_id, service_name AS service,\n    uniqExact(span_id) AS correlated_span_ids,\n    groupUniqArray(nullIf(attributes['mikka.run_id'], '')) AS run_ids,\n    groupUniqArray(nullIf(attributes['mikka.task_id'], '')) AS task_ids\nFROM selected_spans\nWHERE length(coalesce(attributes['sessionId'], '')) > 0\nGROUP BY session_id, service_name\nORDER BY session_id, service_name",
+    "native_generation_collection": "WITH selected_spans AS (\n    SELECT timestamp, end_time, trace_id, span_id, parent_span_id, is_root_span,\n        service_name, name, duration_nano, status_code, attributes, resource_attributes\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n)\nSELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS emitted_utc,\n    lower(hex(base64Decode(span_id))) AS collection_span_id_hex,\n    lower(hex(base64Decode(parent_span_id))) AS parent_span_id_hex,\n    nullIf(attributes['mikka.run_id'], '') AS run_id,\n    nullIf(attributes['mikka.thread_id'], '') AS thread_id,\n    nullIf(attributes['mikka.task_id'], '') AS task_id,\n    nullIf(attributes['mikka.workflow_run_id'], '') AS workflow_run_id,\n    nullIf(attributes['sessionId'], '') AS session_id,\n    nullIf(attributes['mikka.harness'], '') AS harness,\n    nullIf(attributes['mikka.ai.native_unavailable_reason'], '') AS native_unavailable_reason,\n    toFloatOrNull(attributes['mikka.trace.sample_rate']) AS sample_rate,\n    toFloatOrNull(attributes['mikka.ai.native_generations']) AS native_generations,\n    toFloatOrNull(attributes['mikka.ai.fallback_generations']) AS fallback_generations,\n    toFloatOrNull(attributes['mikka.ai.matched_fallbacks']) AS matched_fallbacks,\n    toFloatOrNull(attributes['mikka.ai.missing_native']) AS missing_native,\n    toFloatOrNull(attributes['mikka.ai.incomplete_requests']) AS incomplete_requests,\n    toFloatOrNull(attributes['mikka.ai.invalid_spans']) AS invalid_spans,\n    toFloatOrNull(attributes['mikka.ai.rejected_batches']) AS rejected_batches,\n    toFloatOrNull(attributes['mikka.ai.duplicate_completions']) AS duplicate_completions,\n    nullIf(attributes['mikka.ai.collection_truncated'], '') AS collection_truncated_raw,\n    nullIf(attributes['mikka.ai.cli_exit_observed'], '') AS cli_exit_observed_raw,\n    nullIf(attributes['mikka.ai.native_flush_confirmed'], '') AS native_flush_confirmed_raw\nFROM selected_spans\nWHERE service_name = 'mikka-daemon' AND name = 'daemon.ai.collection'\nORDER BY timestamp, span_id\nLIMIT 500 OFFSET {{row_offset}}"
+  },
+  "notes": [
+    "No live dashboard/insight/export has been created by this preparation.",
+    "Baseline trace is only a SQL/schema compatibility fixture; never label it production acceptance for issue 1512.",
+    "No SELECT of prompt, output, tool arguments, arbitrary log bodies, URL fields or full properties/maps.",
+    "AI token/cache fields and TTFT/cost preserve unknown as NULL. Cache input counts are not additive to input tokens when cache_reporting_exclusive=false.",
+    "posthog-js tracing_headers guarantees X-POSTHOG-SESSION-ID and X-POSTHOG-DISTINCT-ID, not necessarily W3C traceparent. Inspect the real browser server entry; only the API acceptance driver explicitly creates an unexported W3C remote parent. Missing internal ancestors remain a defect.",
+    "Tail-retention query is scoped to mikka-web ordinary error/slow trace. Legacy/missing sample rates are not silently treated as full retention.",
+    "Replay uses raw recording metadata/bytes/events and trace-correlated real session ID. Require fresh actual browser evidence separately; never reuse an old recording as the current run.",
+    "Use current native URLs returned by apm-trace-get/query-llm-trace/query-logs or generate-app-url. Native APM observed route is /tracing?trace=<hex>. Do not guess per-span UI routes.",
+    "Live validation found APM/Logs on Logs cluster and events/Replay on Default cluster: HogQL cannot JOIN or UNION across these clusters. Verify cross-cluster correlation by exact hex trace_id + span_id/session_id sets from separate bounded query results; saved dashboard keeps these as separate tiles.",
+    "Current linking-errors-to-traces skill confirms query-logs filterGroup trace_id uses the validated HEX value (type=log, operator=exact), while raw logs.trace_id is base64. Scope by discovered services plus exact UTC window and take _posthogUrl from the native query response.",
+    "Cost basis preserves the raw passthrough/source/model/provider fields. Passthrough with an amount is captured_per_call_amount, not proof of an actual subscription charge; known openrouter/manual and custom sources are labelled separately as API-equivalent estimates. An amount without verified provenance remains explicitly unverified.",
+    "The AI event is authoritative for cache_reporting_exclusive and provider. Web generation APM spans currently omit mikka.ai.provider; daemon generation spans contain it. An empty web APM provider is not a missing AI event. Daemon AI events omit mikka.ai.outcome; read their APM mikka.outcome and $ai_is_error instead of treating server_outcome NULL as failure.",
+    "The native collection query returns only exported closed counters/flags. batches and spansReceived exist only in the in-memory collector receipt and are not exported; do not query invented attributes for them.",
+    "Raw cache provenance means the numeric mapping from the SDK raw usage receipt, not retrieval of raw provider payloads. No query selects raw usage, message/tool content or complete properties/maps.",
+    "Native/fallback counts concern observed request receipts, not a claim that the official CLI exporter flushed every request. native_flush_confirmed remains false by design. Claude currently has no independent per-child generation-count receipt; matching its AI/APM sets alone does not prove upstream completeness.",
+    "Missing route/tier/score/confidence or native effort remains NULL where that path has no corresponding receipt. Codex effort is native selected/default configuration and model_basis is requested sampling configuration, not a provider-served attestation."
+  ],
+  "source_urls": [
+    "https://posthog.com/docs/distributed-tracing/link-ai-observability",
+    "https://posthog.com/docs/ai-observability/generations",
+    "https://posthog.com/docs/ai-observability/link-session-replay"
+  ],
+  "scouts": {
+    "apm": {
+      "id": "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+      "enabled": true,
+      "status": "active",
+      "emit": true,
+      "interval_minutes": 1440
+    },
+    "ai": {
+      "id": "01a1b247-09d7-7388-be42-a8d96310c44b",
+      "enabled": true,
+      "status": "active",
+      "emit": true,
+      "interval_minutes": 1440
+    },
+    "check_description": "Live readback during this preparation on 2026-11-06: both enabled/active/emit; interval 1440 min, default precheck, Inbox only."
+  },
+  "cluster_layout": {
+    "Logs": [
+      "posthog.trace_spans",
+      "logs"
+    ],
+    "Default": [
+      "events",
+      "raw_session_replay_events"
+    ]
+  },
+  "correlation_checks": [
+    "Every AI $ai_span_id must occur in apm_generation_spans.span_id_hex for the same trace; match model/usage and compare parent span IDs; compare provider only where the APM span emits it, otherwise use the explicit AI event provider.",
+    "Both safe_native_logs.trace_id_hex and span_id_hex must match native APM IDs; safe_body_shape must remain true.",
+    "Use a real browser session ID from current request headers. Compare apm_session_links with generation_receipts session_id and replay_correlation actual bytes/events; no invented session identifier.",
+    "Compare trace_integrity distinct_span_ids with paginated span_timeline and apm-trace-get total/page count; inspect actual browser/server parentage and distinguish a known API-driver remote parent from missing internal ancestors.",
+    "Current failure trace's web tail retention must contain real failure/slow evidence, full_rate rows equal all relevant observed spans, zero missing/nonfull rates; external execution receipt establishes which deliberate failure was exercised.",
+    "For each Codex run, sum distinct native_generation_collection rows after pagination. Intended generation emissions = native_generations + fallback_generations; observed app-server request receipts = matched_fallbacks + fallback_generations. Compare intended emissions with both distinct daemon.ai.generation span IDs and distinct $ai_generation span IDs for that run/harness. Do not count matched_fallbacks again as generations.",
+    "For complete native timing coverage require no fallback/missing-native, no incomplete requests, no invalid spans or rejected batches, no collection truncation and observed CLI exit. A missing collection row or unknown count is not zero. duplicate_completions may be nonzero only while unique generation sets remain equal; native_flush_confirmed=false never becomes a flush guarantee.",
+    "Native Codex latency must agree with its APM native start/end interval within timestamp conversion precision (at most 1 ms), and TTFT must equal first_output_item_ms with request_to_first_output_item basis and satisfy 0 <= TTFT <= latency. Never substitute app-server receipt arrival time or enclosing tool-drain duration.",
+    "Across the selected trace, reconcile all operation/model buckets, including Coordinator/bot and built-in Decision, instead of filtering all evidence to only the user-selected agent model. Expected native runs are Factory-stage counts, not an expected model-generation count.",
+    "For every receipt that includes cache semantics require cache_reporting_exclusive_raw in (0,false). Compare event/APM input/output/cache counts exactly; 0 is a reported count and NULL remains unavailable. Cache buckets are included in input, never added twice.",
+    "Cost summary partitions amount-bearing rows into captured-per-call, known catalogue estimate, custom estimate and unverified provenance; rows without amounts remain unknown. Read exact model/provider and pricing match fields for both target models before making any cost-accuracy claim."
+  ],
+  "prepared_at_utc": "2026-11-06 20:19:23 UTC",
+  "baseline_validation": {
+    "only_for_schema_compatibility": true,
+    "queries": {
+      "lookup_trace_by_ids": {
+        "compiled": true,
+        "row_count": 0,
+        "taxonomy_warning": false
+      },
+      "span_timeline": {
+        "compiled": true,
+        "row_count": 27,
+        "taxonomy_warning": false
+      },
+      "trace_integrity": {
+        "compiled": true,
+        "row_count": 1,
+        "taxonomy_warning": false
+      },
+      "generation_receipts": {
+        "compiled": true,
+        "row_count": 0,
+        "taxonomy_warning": true
+      },
+      "tail_error_retention": {
+        "compiled": true,
+        "row_count": 1,
+        "taxonomy_warning": false
+      },
+      "safe_native_logs": {
+        "compiled": true,
+        "row_count": 0,
+        "taxonomy_warning": false
+      },
+      "source_correlation": {
+        "compiled": true,
+        "row_count": 1,
+        "taxonomy_warning": false
+      },
+      "replay_correlation": {
+        "compiled": true,
+        "row_count": 1,
+        "taxonomy_warning": true
+      },
+      "capture_summary": {
+        "compiled": true,
+        "row_count": 3,
+        "taxonomy_warning": false
+      },
+      "apm_generation_spans": {
+        "compiled": true,
+        "row_count": 0,
+        "taxonomy_warning": false
+      },
+      "ai_capture_summary": {
+        "compiled": true,
+        "row_count": 1,
+        "taxonomy_warning": true
+      },
+      "apm_session_links": {
+        "compiled": true,
+        "row_count": 0,
+        "taxonomy_warning": false
+      }
+    },
+    "notes": "Known baseline has 27 web spans; no AI generation, matching native log, or real current-browser recording rows. AI taxonomy is still empty. The replay query uses a deliberate nonacceptance placeholder and returns zero recording chunks/bytes. None of these counts qualify as issue 1512 production acceptance."
+  },
+  "cost_source_review": {
+    "reviewed_at_utc": "2026-11-07T01:29:00Z",
+    "public_catalog_commit": "89fe024b36426acdfbec69f746f7e1706f2522fa",
+    "matches": {
+      "anthropic:claude-haiku-5-5": "anthropic/claude-haiku-5.5",
+      "openai:gpt-6-luna": "openai/gpt-6-luna"
+    },
+    "project_ingestion_version_confirmed": false,
+    "subscription_actual_usd_confirmed": false,
+    "query_changes_since_baseline": [
+      "generation_receipts adds cost-model source/model/provider columns",
+      "ai_capture_summary adds cost-model source/model/provider arrays"
+    ],
+    "validation": "Read these new fields on the actual production trace; no zero-event query or fake event was sent for this update.",
+    "cost_semantics": "Catalog prices are API-equivalent estimates. Provider passthrough alone does not prove a subscription charge. Verify actual prompt size, served tier, cache TTL and rate basis before calling an estimate accurate."
+  },
+  "native_source_review": {
+    "status": "prepared_not_production_validated",
+    "ttft_basis": "request_to_first_output_item",
+    "model_basis": "native_sampling_config",
+    "note": "Cross-check native request count, missingNative, incomplete/truncated and flush-not-confirmed attributes on daemon.ai.collection in the APM cluster. Do not equate process exit with complete native exporter flush.",
+    "native_capture_platform": "linux; other platforms retain app-server usage with explicit reason",
+    "collection_query": "native_generation_collection",
+    "exported_numeric_fields": [
+      "mikka.ai.native_generations",
+      "mikka.ai.fallback_generations",
+      "mikka.ai.matched_fallbacks",
+      "mikka.ai.missing_native",
+      "mikka.ai.incomplete_requests",
+      "mikka.ai.invalid_spans",
+      "mikka.ai.rejected_batches",
+      "mikka.ai.duplicate_completions"
+    ],
+    "exported_boolean_fields": [
+      "mikka.ai.collection_truncated",
+      "mikka.ai.cli_exit_observed",
+      "mikka.ai.native_flush_confirmed"
+    ]
+  },
+  "local_query_review": {
+    "source_revision": "31d431cb1b3dd5836416c1dbf63b7688ca4d174f",
+    "status": "prepared_not_production_validated",
+    "validation": "JSON parse, exact source-field comparison and static single-cluster/time/trace/page-bound checks only; no PostHog query or real generation executed.",
+    "changed_queries": [
+      "generation_receipts",
+      "ai_capture_summary",
+      "apm_generation_spans",
+      "native_generation_collection"
+    ],
+    "baseline_scope": "baseline_validation describes historical pre-edit query text. live_schema_preflight records the four changed query texts compiled on 2026-11-07; the other nine unchanged queries were not reexecuted."
+  },
+  "live_schema_preflight": {
+    "validated_at_utc": "2026-11-07 03:22:38 UTC",
+    "project_id": 670821,
+    "project_name": "Mikka",
+    "project_timezone": "Asia/Shanghai",
+    "query_timezone": "UTC",
+    "status": "schema_compatible_not_production_validated",
+    "input_file_sha256": "25be109ed643dbbcc037d4c1fe82b51c21f61d8f7ad90fedfd00218f829f7755",
+    "source_revision": "e0eb1d56fdb01ba74387d594c47a7126ba1b2cc8",
+    "validation_scope": {
+      "trace_id_hex": "77cad3a99b9e154b27aaa2c6c0226283",
+      "window_start_utc": "2026-11-06 20:00:00",
+      "window_end_utc": "2026-11-06 20:10:00",
+      "row_offset": 0,
+      "only_for_schema_compatibility": true
+    },
+    "query_text_changed": false,
+    "queries": {
+      "generation_receipts": {
+        "compiled": true,
+        "executed_once": true,
+        "returned_rows": 0,
+        "column_count": 42,
+        "taxonomy_warning": true,
+        "acceptance_evidence": false,
+        "template_sha256": "621c07e4b85df37f0793f4dce6786c5447a8612d9b9f120f6129b093dcc206a5",
+        "executed_query_sha256": "cc7afd98d49e925180467d80984af5d8b9ffb19c7e0f6d2977f3be96996d5b9a"
+      },
+      "ai_capture_summary": {
+        "compiled": true,
+        "executed_once": true,
+        "returned_rows": 1,
+        "column_count": 26,
+        "taxonomy_warning": true,
+        "acceptance_evidence": false,
+        "generation_rows_in_fixture": 0,
+        "template_sha256": "d0f778fb375bdebc0de8643d79f74d2a17ba9125581409be58c55645afaf47ec",
+        "executed_query_sha256": "f76df0238d81742e3388c641967c32af5e2f9358169b95b21f338da52d739b92"
+      },
+      "apm_generation_spans": {
+        "compiled": true,
+        "executed_once": true,
+        "returned_rows": 0,
+        "column_count": 37,
+        "taxonomy_warning": false,
+        "acceptance_evidence": false,
+        "template_sha256": "646dd331d7c971aed131db350a513fd0299d1178da9877389ccf01ced9b2b8e8",
+        "executed_query_sha256": "33747179316b3c01419338de0254d0d1f032ba48d0089cbf0c1405353be18f79"
+      },
+      "native_generation_collection": {
+        "compiled": true,
+        "executed_once": true,
+        "returned_rows": 0,
+        "column_count": 22,
+        "taxonomy_warning": false,
+        "acceptance_evidence": false,
+        "template_sha256": "5a4f2aef8175f96efd08ff2289275263fdc782495f0fe02a4cd0a2cd716b620b",
+        "executed_query_sha256": "cf8110fafa706f8efdf27cf598af2b6671b7dcd02710b0e097c0a84c5ed0dfeb"
+      }
+    },
+    "live_schema_columns": {
+      "posthog.trace_spans": {
+        "attributes": "JSON",
+        "duration_nano": "Integer",
+        "end_time": "DateTime",
+        "is_root_span": "Boolean",
+        "name": "String",
+        "parent_span_id": "String",
+        "resource_attributes": "JSON",
+        "service_name": "String",
+        "span_id": "String",
+        "status_code": "Integer",
+        "timestamp": "DateTime",
+        "trace_id": "String",
+        "uuid": "String"
+      },
+      "logs": {
+        "attributes": "JSON",
+        "body": "String",
+        "resource_attributes": "JSON",
+        "service_name": "String",
+        "severity_text": "String",
+        "span_id": "String",
+        "timestamp": "DateTime",
+        "trace_id": "String",
+        "uuid": "String"
+      },
+      "events": {
+        "event": "String",
+        "properties": "JSON",
+        "timestamp": "DateTime",
+        "uuid": "UUID"
+      },
+      "raw_session_replay_events": {
+        "console_error_count": "Integer",
+        "console_log_count": "Integer",
+        "console_warn_count": "Integer",
+        "event_count": "Integer",
+        "is_deleted": "Integer",
+        "max_last_timestamp": "DateTime",
+        "min_first_timestamp": "DateTime",
+        "properties": "JSON",
+        "session_id": "String",
+        "size": "Integer"
+      }
+    },
+    "table_certification": "All four tables are present; certification is NULL, not a positive certification or deprecation result.",
+    "taxonomy": {
+      "event": "$ai_generation",
+      "properties_registered": false,
+      "validation": "read-data-schema returned no registered properties. The two AI SQL queries compiled with taxonomy warnings. No current data completeness or value-shape inference is made."
+    },
+    "cluster_queries": {
+      "Logs": [
+        "lookup_trace_by_ids",
+        "span_timeline",
+        "trace_integrity",
+        "tail_error_retention",
+        "safe_native_logs",
+        "source_correlation",
+        "capture_summary",
+        "apm_generation_spans",
+        "apm_session_links",
+        "native_generation_collection"
+      ],
+      "Default": [
+        "generation_receipts",
+        "replay_correlation",
+        "ai_capture_summary"
+      ]
+    },
+    "cluster_validation": "All 13 templates remain single-cluster according to the previously measured Logs/Default layout. This preflight successfully executed the two changed APM queries and two changed events queries separately. execute-sql does not return the physical cluster identifier; no cross-cluster query was attempted.",
+    "not_reexecuted": [
+      "lookup_trace_by_ids",
+      "span_timeline",
+      "trace_integrity",
+      "tail_error_retention",
+      "safe_native_logs",
+      "source_correlation",
+      "replay_correlation",
+      "capture_summary",
+      "apm_session_links"
+    ],
+    "inherited_validation": "The other nine unchanged query texts retain the earlier baseline_validation result only; Replay metadata, log-to-span joins and existing timelines were not re-read.",
+    "verified_cost_property_names": [
+      "$ai_total_cost_usd",
+      "$ai_cost_passthrough",
+      "$ai_cost_model_source",
+      "$ai_model_cost_used",
+      "$ai_cost_model_provider"
+    ],
+    "cost_property_reference": "Canonical MCP exploring-llm-costs/cost-sources and current PostHog documentation confirm the names; registered project values, matched pricing and actual subscription charges remain unconfirmed.",
+    "production_unknowns": [
+      "Actual generation and collection receipts, every upstream request's completeness and native exporter flush.",
+      "Input/output/cache count values and cache_reporting_exclusive representation on real ingested events.",
+      "Native request latency, TTFT/first-output agreement and route/tier/effort values on the target runs.",
+      "Cost model/source/provider values, ingestion pricing version, rate accuracy and actual subscription charges.",
+      "Real browser session Replay bytes/playback and exact same-run correlations."
+    ],
+    "source_urls": [
+      "https://posthog.com/docs/ai-observability/generations#event-properties",
+      "https://posthog.com/docs/ai-observability/calculating-costs"
+    ]
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "status": "passed",
+  "scope": "known JSON reports only; no PNG or raw log read",
+  "files": [
+    {
+      "member": "lifecycle.json",
+      "bytes": 123585,
+      "sha256": "4ef55f4a1661524cd58646222ed38357476ecd3ab1bba1dfeed1e49f444045ee",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "parity/parity.json",
+      "bytes": 106271,
+      "sha256": "9a7ca22f0c4e8b4cca7e7257a55ad0f1c1a5565edd48c10f27527235793f3523",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "smoke.json",
+      "bytes": 3125,
+      "sha256": "2c04b916dd6452497f276fad6284ab3f83127dab851cfa02104a953643577354",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "8b6bb8662666fed6f3c4e12fef64de298c4b1740c0a1548a63a4ee5f0c6d48f6",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    },
+    {
+      "member": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "718c7e3d96567f914642b00b6016b7732d85c6de5a1615c5b73f5541f031ba79",
+      "patternMatches": {
+        "email": 0,
+        "providerOrGitHubCredential": 0,
+        "privateKey": 0,
+        "bearer": 0,
+        "signedQuery": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    }
+  ]
+}
