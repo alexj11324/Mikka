@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { Window } from 'happy-dom'
 import { captureParityReadReceipts, parityBotReadKeys } from './parity-reads.mjs'
-import { observeReads } from './parity-page-ready.mjs'
+import { observeReads, pageReady } from './parity-page-ready.mjs'
 
 const ids = { coordinator: 'coordinator-bot', bot: 'bot', coordinatorUser: 'c1', coordinatorReply: 'c2', botUser: 'b1', botReply: 'b2' }
 const coordinator = { conversationId: 'coordinator', lastReadMessageId: 'c2', lastReadPosition: 2 }
@@ -117,4 +118,119 @@ test('only the exact successful Linear unavailable payload enables its existing 
   ]) {
     assert.deepEqual(await observedResponse({ path, status, json: async () => data }).finish(), { linearUnavailable: expected })
   }
+})
+
+const artifactFixture = { artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview' }
+const finalReply = 'The review is complete. Conversations, task details and artifacts are ready.'
+
+// Offline DOM locators: changes explicitly release visibility waits. No browser,
+// application request, sleep or screenshot is involved in this readiness check.
+function artifactPage(t, { reply = true, frameReady = true } = {}) {
+  const window = new Window()
+  const document = window.document
+  const pending = new Set()
+  const card = title => `<button data-slot="artifact-card"><span>${title}</span><span>Document · v1</span></button>`
+  document.body.innerHTML = `<div id="background">${finalReply}${card(artifactFixture.artifactTitle)}${card(artifactFixture.htmlTitle)}</div>
+    <div role="dialog"><main><h2>Desktop review</h2><iframe></iframe><div id="other-cards">${card(artifactFixture.artifactTitle)}${card(artifactFixture.htmlTitle)}</div></main>
+    <aside><p id="reply">${reply ? finalReply : ''}</p><div data-slot="thread-artifacts"></div></aside></div>`
+  const frame = document.querySelector('iframe').contentDocument
+  frame.body.innerHTML = frameReady ? '<h1>Desktop review</h1>' : ''
+  function locator(roots) {
+    const descendants = selector => roots().flatMap(root => [...root.querySelectorAll(selector)])
+    const matches = (node, value, exact) => exact ? node.textContent.trim() === value : node.textContent.includes(value)
+    const visible = () => roots().some(node => !node.closest?.('[hidden]'))
+    return {
+      locator: selector => locator(() => descendants(selector)),
+      frameLocator: selector => locator(() => descendants(selector).map(node => node.contentDocument)),
+      getByRole: (role, { name, exact = false } = {}) => locator(() => descendants(role === 'heading' ? 'h1,h2,h3,h4,h5,h6' : `[role="${role}"]`)
+        .filter(node => name === undefined || matches(node, name, exact))),
+      getByText: (value, { exact = false } = {}) => locator(() => descendants('*').filter(node => matches(node, value, exact)
+        && ![...node.children].some(child => matches(child, value, exact)))),
+      waitFor: async () => {
+        if (visible()) return
+        await new Promise((resolve, reject) => pending.add({ visible, resolve, reject }))
+      },
+    }
+  }
+  const update = change => {
+    change(document)
+    for (const wait of pending) if (wait.visible()) { pending.delete(wait); wait.resolve() }
+  }
+  const expire = () => {
+    for (const wait of pending) wait.reject(new Error('PARITY_FIXTURE_WAIT_TIMEOUT'))
+    pending.clear()
+  }
+  t.after(() => { expire(); window.close() })
+  const page = locator(() => [document])
+  return { update, expire, frame, addCard: (title, hidden = false) => update(() => {
+    const cards = document.querySelector('aside [data-slot="thread-artifacts"]')
+    cards.insertAdjacentHTML('beforeend', card(title))
+    cards.lastElementChild.hidden = hidden
+  }), start: name => {
+    const state = { completed: false }
+    const result = pageReady(page, name, artifactFixture, {}).then(() => { state.completed = true })
+    void result.catch(() => {})
+    return { state, result }
+  } }
+}
+
+const nextTurn = () => new Promise(resolve => setImmediate(resolve))
+
+for (const name of ['artifact-markdown', 'artifact-html']) {
+  test(`${name} waits for both visible thread cards, not background or partial matches`, { timeout: 1000 }, async t => {
+    const f = artifactPage(t)
+    const { state, result } = f.start(name)
+    await nextTurn()
+    assert.equal(state.completed, false, 'background and dialog-body cards cannot complete the thread')
+    f.addCard(artifactFixture.artifactTitle)
+    await nextTurn()
+    assert.equal(state.completed, false, 'one card is not the completed fixture')
+    f.addCard(`${artifactFixture.htmlTitle} incomplete`)
+    await nextTurn()
+    assert.equal(state.completed, false, 'a partial title match is not the fixture card')
+    f.update(document => document.querySelector('aside [data-slot="artifact-card"]:last-child').remove())
+    f.addCard(artifactFixture.htmlTitle, true)
+    await nextTurn()
+    assert.equal(state.completed, false, 'a hidden card cannot be captured')
+    f.update(document => { document.querySelector('aside [data-slot="artifact-card"]:last-child').hidden = false })
+    await result
+    assert.equal(state.completed, true)
+  })
+
+  test(`${name} requires the final reply in the dialog thread`, { timeout: 1000 }, async t => {
+    const f = artifactPage(t, { reply: false })
+    f.addCard(artifactFixture.artifactTitle)
+    f.addCard(artifactFixture.htmlTitle)
+    const { state, result } = f.start(name)
+    await nextTurn()
+    assert.equal(state.completed, false, 'a background reply does not complete the dialog thread')
+    f.update(document => document.querySelector('main').insertAdjacentHTML('beforeend', `<p>${finalReply}</p>`))
+    await nextTurn()
+    assert.equal(state.completed, false, 'the document is not the thread')
+    f.update(document => { document.querySelector('#reply').textContent = finalReply })
+    await result
+    assert.equal(state.completed, true)
+  })
+
+  test(`${name} fails when a required thread card never arrives`, { timeout: 1000 }, async t => {
+    const f = artifactPage(t)
+    f.addCard(artifactFixture.artifactTitle)
+    const { state, result } = f.start(name)
+    await nextTurn()
+    assert.equal(state.completed, false)
+    f.expire()
+    await assert.rejects(result, /PARITY_FIXTURE_WAIT_TIMEOUT/)
+  })
+}
+
+test('artifact HTML still requires the rendered iframe document', { timeout: 1000 }, async t => {
+  const f = artifactPage(t, { frameReady: false })
+  f.addCard(artifactFixture.artifactTitle)
+  f.addCard(artifactFixture.htmlTitle)
+  const { state, result } = f.start('artifact-html')
+  await nextTurn()
+  assert.equal(state.completed, false)
+  f.update(() => { f.frame.body.innerHTML = '<h1>Desktop review</h1>' })
+  await result
+  assert.equal(state.completed, true)
 })
