@@ -74,9 +74,13 @@ export class SubscriptionRepository {
       connection,
     }
   }
-  async saveQuota(row: ConnectionRow, quota: QuotaSnapshot) {
-    const { rows: [saved] } = await this.pool.query<{ previous: unknown }>(`with old as (select quota from byos_connections where id=$1 and "ownerId"=$2)
-      update byos_connections set quota=$3 where id=$1 and "ownerId"=$2 and epoch=$4 and state='connected' returning (select quota from old) as previous`, [row.id, row.ownerId, JSON.stringify(quotaSnapshotSchema.parse(quota)), row.epoch])
+  async saveQuota(row: ConnectionRow, quota: QuotaSnapshot, options: { preservePlan?: true } = {}) {
+    // SET preserves the current locked plan; RETURNING retains the original statement snapshot.
+    const sql = options.preservePlan
+      ? `update byos_connections set quota=$3||jsonb_build_object('plan',quota->'plan') where id=$1 and "ownerId"=$2 and epoch=$4 and state='connected' returning(select quota from byos_connections where id=$1 and "ownerId"=$2)as previous`
+      : `with old as (select quota from byos_connections where id=$1 and "ownerId"=$2)
+      update byos_connections set quota=$3 where id=$1 and "ownerId"=$2 and epoch=$4 and state='connected' returning (select quota from old) as previous`
+    const { rows: [saved] } = await this.pool.query<{ previous: unknown }>(sql, [row.id, row.ownerId, JSON.stringify(quotaSnapshotSchema.parse(quota)), row.epoch])
     // 待检查 / 额度用完 in 优先使用的模型 follow a new read wherever it came from (检查额度, the meters, dispatch),
     // pushed only when what the page shows changes.
     if (saved && quotaDisplayKey(saved.previous) !== quotaDisplayKey(quota)) await (await import('./live/lists')).ownerSettingsChanged(this.pool, row.ownerId)
