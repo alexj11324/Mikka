@@ -31,12 +31,13 @@ it('keeps claim credentials usable in memory and excludes them from every journa
 it('masks initial and renewed credentials in real logger Error serialization and journal terminal errors', async () => {
   const root = tempDir(), repo = await makeRepo(), file = join(root, 'journal.json'), journal = new RunJournal(file)
   const key = 'private-initial-model-key', github = 'private-initial-github-key', renewed = 'private-renewed-access-key'
+  const basic = Buffer.from(`x-access-token:${github}`).toString('base64')
   const lines: string[] = [], items: unknown[] = []
   const log = pino({ level: 'trace' }, { write(line: string) { lines.push(line) } })
   const start = async (options: StartOptions): Promise<never> => {
     options.onCredential?.('SUBSCRIPTION_ACCESS_TOKEN', renewed)
-    options.log.warn({ err: new AggregateError([new Error(key)], `native diagnostic ${renewed}`, { cause: new Error(github) }), stderr: `native stderr ${github} ${renewed}` }, 'synthetic native failure')
-    throw new Error(`failed ${key} ${github} ${renewed}`, { cause: new Error(`upstream ${renewed}`) })
+    options.log.warn({ err: new AggregateError([new Error(key)], `native diagnostic ${renewed}`, { cause: new Error(github) }), stderr: `native stderr ${github} ${renewed} Authorization: Basic ${basic}` }, 'synthetic native failure')
+    throw new Error(`failed ${key} ${github} ${renewed} ${basic}`, { cause: new Error(`upstream ${renewed}`) })
   }
   const adapter: AgentAdapter = { harness: 'mock', capabilities: { supportsResume: true, supportsInterject: false }, envAllow: [], start, resume: async (_session, options) => start({ ...options, prompt: '' }) }
   const outbox = { push(_runId: string, item: unknown) { items.push(item) }, lastChunkSeq() { return 0 }, async compact() {} } as unknown as SupervisorDeps['outbox']
@@ -53,7 +54,7 @@ it('masks initial and renewed credentials in real logger Error serialization and
     expect(journal.get('diagnostic-run')?.state).toBe('failed')
     expect(journal.get('diagnostic-run')?.error).toContain('[secret:SUBSCRIPTION_ACCESS_TOKEN]')
     const persisted = readFileSync(file, 'utf8') + lines.join('') + JSON.stringify(items)
-    for (const secret of [key, github, renewed]) expect(persisted).not.toContain(secret)
+    for (const secret of [key, github, renewed, basic]) expect(persisted).not.toContain(secret)
     expect(lines.some(line => line.includes('synthetic native failure'))).toBe(true)
     expect(lines.some(line => line.includes('run failed'))).toBe(true)
   } finally { await supervisor.stop() }
