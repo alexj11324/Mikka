@@ -30,6 +30,7 @@ export function gatewayMessage(value: unknown): GatewayMessage | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const item = value as Record<string, unknown>
   if (item.type === 'session_revoked' && liveSessionIdValid(item.sessionId)) return { type: 'session_revoked', sessionId: item.sessionId }
+  if (item.type === 'live_revoked' && typeof item.key === 'string' && LIVE_CHANNEL.test(item.key)) return { type: 'live_revoked', key: item.key }
   if (item.type === 'live' && typeof item.key === 'string' && LIVE_CHANNEL.test(item.key)) {
     const events = liveInvalidations(item.events, true)
     return events ? { type: 'live', key: item.key, events } : null

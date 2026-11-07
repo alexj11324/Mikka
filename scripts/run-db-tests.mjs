@@ -14,6 +14,10 @@ import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 export const REQUIRED_SUITES = [
   { marker: 'lib/factory/background-workspace.ts', file: 'tests/factory-background-workspace.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/factory/workspace-reader.ts', file: 'tests/factory-workspace-admission.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/enterprise/audit-outbox.ts', file: 'lib/enterprise/audit-outbox.db.test.ts', script: 'test:enterprise-db' },
+  { marker: 'lib/enterprise/live-authority.ts', file: 'lib/enterprise/live-authority.db.test.ts', script: 'test:enterprise-db' },
+  { marker: 'lib/enterprise/sso-plugin.ts', file: 'lib/enterprise/http.db.test.ts', script: 'test:enterprise-db' },
+  { marker: 'lib/governance/organizations.ts', file: 'lib/enterprise/governance.db.test.ts', script: 'test:enterprise-db' },
   { marker: 'lib/mobile-push.ts', file: 'tests/mobile-push-workspace.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/governance/templates.ts', file: 'tests/team-governance-api.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/governance/entitlements.ts', file: 'tests/governance-seats.db.test.ts', script: 'test:visibility-db' },

@@ -5,6 +5,7 @@ import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { measured, readMetrics } from './helpers/read-metrics'
 import { withActivitySession } from './fixtures/activity-runtime.mjs'
 import { seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { enterprisePrincipal } from '../lib/enterprise/principal'
 
 const enabled = disposableDatabase()
 if (process.env.REQUIRE_DB === '1' && !enabled) throw Error('Cache authorization requires a disposable loopback *_e2e database')
@@ -22,24 +23,29 @@ test('disk hydration authority follows actual membership, role, selected workspa
   const first = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   const second = await seedWorkspace(pool, owner, [{ userId: owner, role: 'member' }])
   const ids = [first.id, second.id]
+  const ownerSessionId = randomUUID(), strangerSessionId = randomUUID()
+  await pool.query('insert into session (id,"userId",token,"createdAt","updatedAt","expiresAt") values ($1,$2,$3,now(),now(),now()+interval \'1 hour\'),($4,$5,$6,now(),now(),now()+interval \'1 hour\')',
+    [ownerSessionId, owner, randomUUID(), strangerSessionId, stranger, randomUUID()])
+  const ownerReader = { id: owner, [enterprisePrincipal]: { kind: 'session' as const, sessionId: ownerSessionId } }
+  const strangerReader = { id: stranger, [enterprisePrincipal]: { kind: 'session' as const, sessionId: strangerSessionId } }
   try {
-    const cold = await measured(() => authorizedCacheWorkspace(owner, first.id))
+    const cold = await measured(() => authorizedCacheWorkspace(ownerReader, first.id))
     assert.deepEqual(cold.value, { workspaceId: first.id, role: 'admin' })
-    assert.equal(cold.statements, 1, 'the server gate adds one bounded membership query, without task/member payloads')
-    assert.deepEqual(await withActivitySession(owner, () => authorizedCacheWorkspace(owner), second.id), { workspaceId: second.id, role: 'member' })
-    assert.equal(await authorizedCacheWorkspace(stranger, first.id), null, 'another account never receives hydration authority')
-    assert.equal(await authorizedCacheWorkspace(owner, randomUUID()), null, 'an unauthorized explicit workspace never falls back to another cache')
-    assert.equal(await authorizedCacheWorkspace(stranger), null, 'a read does not create a workspace for a new account')
+    assert.equal(cold.statements, 2, 'Enterprise adds one canonical Organization-link check to the bounded membership read; neither query loads task/member payloads')
+    assert.deepEqual(await withActivitySession(owner, () => authorizedCacheWorkspace(ownerReader), second.id), { workspaceId: second.id, role: 'member' })
+    assert.equal(await authorizedCacheWorkspace(strangerReader, first.id), null, 'another account never receives hydration authority')
+    assert.equal(await authorizedCacheWorkspace(ownerReader, randomUUID()), null, 'an unauthorized explicit workspace never falls back to another cache')
+    assert.equal(await authorizedCacheWorkspace(strangerReader), null, 'a read does not create a workspace for a new account')
 
     await pool.query('UPDATE mikka_workspace_members SET role=\'member\' WHERE "workspaceId"=$1 AND "userId"=$2', [first.id, owner])
-    assert.deepEqual(await authorizedCacheWorkspace(owner, first.id), { workspaceId: first.id, role: 'member' }, 'downgrading the viewer changes the disk namespace')
+    assert.deepEqual(await authorizedCacheWorkspace(ownerReader, first.id), { workspaceId: first.id, role: 'member' }, 'downgrading the viewer changes the disk namespace')
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [first.id, owner])
-    assert.equal(await authorizedCacheWorkspace(owner, first.id), null, 'a suspended membership cannot hydrate its old read models')
+    assert.equal(await authorizedCacheWorkspace(ownerReader, first.id), null, 'a suspended membership cannot hydrate its old read models')
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [second.id, owner])
-    assert.equal(await authorizedCacheWorkspace(owner, second.id), null)
+    assert.equal(await authorizedCacheWorkspace(ownerReader, second.id), null)
     await pool.query('DELETE FROM mikka_workspace_members WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM "user" WHERE id=$1', [owner])
-    assert.equal(await authorizedCacheWorkspace(owner), null, 'deleted account membership cannot restore data')
+    assert.equal(await authorizedCacheWorkspace(ownerReader), null, 'deleted account membership cannot restore data')
     t.diagnostic(JSON.stringify({ scenario: 'authenticated_cache_scope_gate', ...readMetrics(cold) }))
   } finally {
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1)', [ids])

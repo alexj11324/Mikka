@@ -14,6 +14,8 @@ import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-
 import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-workspace'
 import type { ListLiveRead } from '@/lib/live/list-read'
 import { ownerLiveScope } from '@/lib/live/owner-scope'
+import { requireEnterpriseWorkspace } from '@/lib/enterprise/access'
+import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 import { getEdition, type MikkaEdition } from '@/lib/edition'
 import { isServerAdmin } from '@/lib/server-admin'
 import { currentRequestScope } from '@/apps/api/src/context'
@@ -29,13 +31,14 @@ export { WorkspaceError }
 export type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 type AuthenticatedUser = Awaited<ReturnType<typeof requireUser>>
 
-export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: string, userId: string, admin = false) {
+export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: string, userId: string, admin = false, principal?: EnterprisePrincipal) {
   z.uuid().parse(workspaceId)
   const [row] = await tx.select({ workspace: workspaces, membership: workspaceMembers }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(and(eq(workspaces.id, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
     .for('update').limit(1)
   if (!row || (admin && row.membership.role !== 'admin')) throw new WorkspaceError('workspaceAccessDenied')
+  await requireEnterpriseWorkspace(userId, workspaceId, principal, tx)
   return row
 }
 
@@ -50,6 +53,7 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
   // transport selection is exact: inaccessible choices never fall back home.
   const context = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? selection.workspaceId ?? '', locale)
   if (selection.present && !context.choices.some(choice => choice.id === selection.workspaceId)) throw new WorkspaceError('workspaceAccessDenied')
+  await requireEnterpriseWorkspace(user.id, context.workspace.id, (user as typeof user & { [enterprisePrincipal]?: EnterprisePrincipal })[enterprisePrincipal])
   return patWorkspace ? { ...context, choices: context.choices.filter(choice => choice.id === patWorkspace) } : context
 }
 

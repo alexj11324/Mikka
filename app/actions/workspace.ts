@@ -12,7 +12,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaceInvitations, workspaces } from '@/lib/db/workspace-schema'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { slugIsReserved } from '@/lib/workspace-admin/general'
-import { releaseDepartingMember, restoreReturningMember, transferOnSuspend } from '@/lib/workspace-admin/members'
+import { transferOnSuspend } from '@/lib/workspace-admin/members'
 import { auditRequestContext } from '@/lib/audit/record'
 import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 import { ensurePersonalWorkspace } from '@/lib/personal-workspace'
@@ -20,6 +20,7 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { ownerWorkspaceListsChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '@/lib/live/lists'
 
 import { acceptHumanInvitation, updateHumanMembership } from '@/lib/governance/member-admission'
+import { drainMemberLifecycleOutbox } from '@/lib/governance/member-outbox'
 import { GovernanceError } from '@/lib/governance/errors'
 
 const roleSchema = z.enum(['admin', 'member'])
@@ -174,8 +175,7 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
       return target.status
     })
     // §8.3: a suspended member's share and bots leave with them; reactivation brings their bots back.
-    if (previous !== 'suspended' && status === 'suspended') await releaseDepartingMember(input.workspaceId, input.userId)
-    if (previous === 'suspended' && status === 'active') await restoreReturningMember(input.workspaceId, input.userId)
+    if (previous !== status) await drainMemberLifecycleOutbox(input.workspaceId, input.userId)
   })
 }
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { mcpAuthoritySchema, PluginError, type McpAuthority, type McpServerGrant, type McpWorkspacePage, type McpWorkspaceServerView } from './contracts'
+import { assertOrganizationResourceShare, organizationResourceAllowed, workspaceResourcePolicy } from '@/lib/governance/resource-access'
 
 type Query = Pick<Pool | PoolClient, 'query'>
 type Workspace = { id: string; kind: 'personal' | 'team'; name: string }
@@ -38,7 +39,8 @@ export async function validateMcpAuthority(query: Query, userId: string, raw: Mc
     const row = rows.find(server => server.id === grant.id)
     if (!row?.enabled || row.user_id !== grant.ownerId || row.revision !== grant.revision) throw unavailable()
     if (row.user_id === userId) { if (grant.grantId !== null) throw unavailable() }
-    else if (workspace?.kind !== 'team' || !grant.grantId || row.grant_id !== grant.grantId || !names?.has(row.user_id)) throw unavailable()
+    else if (workspace?.kind !== 'team' || !grant.grantId || row.grant_id !== grant.grantId || !names?.has(row.user_id)
+      || !await organizationResourceAllowed(authority.workspaceId!, 'mcp', row.id, row.user_id, members!)) throw unavailable()
   }
   return authority
 }
@@ -66,7 +68,8 @@ export class WorkspaceMcpStore {
     if (!workspaceId) return rows
     const names = await this.activeNames(workspaceId, [userId, ...rows.map(row => row.user_id)])
     if (!names.has(userId)) throw unavailable()
-    return rows.filter(row => row.user_id === userId || names.has(row.user_id))
+    const grants = await Promise.all(rows.map(row => row.user_id === userId ? true : organizationResourceAllowed(workspaceId, 'mcp', row.id, row.user_id, this.membership)))
+    return rows.filter((row, index) => row.user_id === userId || (names.has(row.user_id) && grants[index]))
   }
 
   /** Owner controls stay private; members see only explicitly shared public metadata. */
@@ -80,7 +83,8 @@ export class WorkspaceMcpStore {
       createdAt: row.created_at.toISOString(), ownerId: row.user_id, ownerName: names.get(row.user_id) ?? null,
       mine: row.user_id === userId, shared: Boolean(row.grant_id),
     }))
-    return { workspaceId, workspaceKind: workspace.kind, canShare: workspace.kind === 'team', servers, count: servers.length }
+    const policy = await workspaceResourcePolicy(workspaceId, await this.members())
+    return { workspaceId, workspaceKind: workspace.kind, canShare: workspace.kind === 'team' && policy.mcpSharing !== 'deny', servers, count: servers.length }
   }
 
   /** Same owner/member boundary as API-key sharing. Only fresh-session HTTP calls invoke this mutation. */
@@ -91,6 +95,7 @@ export class WorkspaceMcpStore {
       await client.query('BEGIN')
       const { rowCount } = await client.query('SELECT 1 FROM personal_mcp_servers WHERE id=$1 AND user_id=$2 FOR UPDATE', [input.serverId, userId])
       if (!rowCount) throw new PluginError('mcpNotFound', 404)
+      if (input.shared) await assertOrganizationResourceShare(input.workspaceId, 'mcp', input.serverId, userId, await this.members())
       if (input.shared) await client.query(`INSERT INTO personal_mcp_workspace_shares(id,server_id,workspace_id)
         VALUES($1,$2,$3) ON CONFLICT(server_id,workspace_id) DO NOTHING`, [randomUUID(), input.serverId, input.workspaceId])
       else await client.query('DELETE FROM personal_mcp_workspace_shares WHERE server_id=$1 AND workspace_id=$2', [input.serverId, input.workspaceId])

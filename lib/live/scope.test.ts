@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { deviceGatewayTicketValid } from '../device-gateway-ticket'
 import { liveInvalidation, liveInvalidations, liveReadiness, liveReady, withoutRevisions } from './events'
-import { liveChannelId, liveGatewayConfig, liveTicket } from './scope'
+import { liveChannelId, liveChannelTicket, liveGatewayConfig, liveTicket } from './scope'
+import { readSessionLiveTicket } from './session-ticket'
 
 const workspace = '19df8afd-0f8c-4c6b-bc9c-20df0b046a72'
 const otherWorkspace = 'f143a678-070f-474b-803b-0bb119a88410'
@@ -54,4 +55,16 @@ test('gateway configuration uses the existing origin and refuses credential-bear
   assert.equal(liveGatewayConfig({ DEVICE_GATEWAY_URL: 'https://gateway.test' }), null)
   assert.equal(liveGatewayConfig({ DEVICE_GATEWAY_URL: 'https://user:password@gateway.test', DEVICE_GATEWAY_PUSH_SECRET: config.secret }), null)
   assert.equal(liveGatewayConfig({ DEVICE_GATEWAY_URL: 'file:///tmp/gateway', DEVICE_GATEWAY_PUSH_SECRET: config.secret }), null)
+})
+
+test('opaque capability tickets never outlive the persisted session deadline on either gateway', () => {
+  const channel = 'c'.repeat(64), now = 1_800_000_000_000, deadline = now + 35_000
+  const worker = liveChannelTicket(channel, config, now, 'actual-session', deadline)
+  assert.equal(worker.expiresAt, deadline)
+  assert.equal(deviceGatewayTicketValid(`live:${channel}`, worker.protocol, config.secret, deadline - 1), true)
+  assert.equal(deviceGatewayTicketValid(`live:${channel}`, worker.protocol, config.secret, deadline), false)
+  const builtin = liveChannelTicket(channel, { ...config, mode: 'builtin' }, now, 'actual-session', deadline)
+  assert.deepEqual(readSessionLiveTicket(channel, builtin.protocol, config.secret, now), {
+    protocol: builtin.protocol, expiresAt: deadline, sessionId: 'actual-session',
+  })
 })

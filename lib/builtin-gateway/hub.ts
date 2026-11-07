@@ -9,6 +9,7 @@ export type GatewaySocket = { kind: 'live' | 'device'; key: string; expiresAt: n
 export type GatewayPresence = { online: boolean; lastSeenAt: string | null }
 export type GatewayMessage =
   | { type: 'session_revoked'; sessionId: string }
+  | { type: 'live_revoked'; key: string }
   | { type: 'live'; key: string; events: LiveInvalidation[] }
   | { type: 'work'; key: string }
   | { type: 'claim'; key: string; connection: string; seen?: number }
@@ -41,8 +42,9 @@ export class GatewayHub {
   private pendingSnapshots = new Map<string, PendingSnapshot>()
   private presence: PresenceWatches
   private unsubscribe: () => void
+  private revokedLive = new Map<string, ReturnType<typeof setTimeout>>()
 
-  constructor(private bus: GatewayBus, private now = Date.now, secret = '', private authorizeSession?: (sessionId: string) => Promise<boolean>) {
+  constructor(private bus: GatewayBus, private now = Date.now, secret = '', private authorizeSession?: (sessionId: string, channel: string) => Promise<boolean>) {
     this.presence = new PresenceWatches(secret, bus, now, (keys, signal) => this.snapshots(keys, signal),
       (peer, reply) => this.send(peer, JSON.stringify(reply)), (channel, home) => {
         this.receive({ type: 'live', key: channel, events: [{ kind: 'device_list', id: home }, { kind: 'thread_list', id: home }] })
@@ -51,9 +53,10 @@ export class GatewayHub {
   }
 
   async authorize(socket: GatewaySocket): Promise<boolean> {
+    if (socket.kind === 'live' && this.revokedLive.has(socket.key)) return false
     if (socket.kind !== 'live' || !socket.sessionId) return true
     if (!this.authorizeSession || socket.expiresAt <= this.now()) return false
-    try { return await this.authorizeSession(socket.sessionId) }
+    try { return await this.authorizeSession(socket.sessionId, socket.key) && !this.revokedLive.has(socket.key) }
     catch { return false } // An unavailable fresh authority never keeps a live capability open.
   }
 
@@ -61,6 +64,7 @@ export class GatewayHub {
     const connection: Connection = { peer, socket, claimed: false, seen: this.now(), online: false, authorized: !socket.sessionId }
     this.connections.set(peer.id, connection)
     if (socket.kind === 'live') {
+      if (this.revokedLive.has(socket.key)) { this.remove(peer.id, 4001, 'live capability revoked'); return }
       if (socket.sessionId) {
         // Register before checking: a committed revoke during the await removes
         // this exact connection, and a late successful read cannot resurrect it.
@@ -207,6 +211,12 @@ export class GatewayHub {
     await this.bus.publish(message)
   }
 
+  async revokeLive(key: string) {
+    const message = { type: 'live_revoked', key } as const
+    this.receive(message)
+    await this.bus.publish(message)
+  }
+
   async work(key: string) {
     const message = { type: 'work', key } as const
     this.receive(message)
@@ -214,6 +224,16 @@ export class GatewayHub {
   }
 
   private receive(message: GatewayMessage, source?: string) {
+    if (message.type === 'live_revoked') {
+      clearTimeout(this.revokedLive.get(message.key))
+      const expiry = setTimeout(() => this.revokedLive.delete(message.key), 300_000)
+      expiry.unref?.()
+      this.revokedLive.set(message.key, expiry)
+      for (const [id, connection] of this.connections) {
+        if (connection.socket.kind === 'live' && connection.socket.key === message.key) this.remove(id, 4001, 'live capability revoked')
+      }
+      return
+    }
     if (message.type === 'session_revoked') {
       for (const [id, connection] of this.connections) {
         if (connection.socket.kind === 'live' && connection.socket.sessionId === message.sessionId) this.remove(id, 4001, 'session revoked')
@@ -284,6 +304,7 @@ export class GatewayHub {
       } else if (message.type === 'work') {
         if (socket.kind === 'device') this.send(peer, 'work')
       } else if (socket.kind === 'live') {
+        if (this.revokedLive.has(socket.key)) { this.remove(peer.id, 4001, 'live capability revoked'); continue }
         if (socket.expiresAt <= this.now()) { this.remove(peer.id, 4001, 'ticket expired'); continue }
         const events = socket.revisions ? message.events : withoutRevisions(message.events)
         for (const event of events) this.send(peer, JSON.stringify(event))
@@ -305,5 +326,9 @@ export class GatewayHub {
     for (const pending of this.pendingSnapshots.values()) pending.finish(new CodedError('BUILTIN_GATEWAY_PRESENCE_UNAVAILABLE'))
   }
 
-  stop() { this.unsubscribe(); this.disconnect() }
+  stop() {
+    this.unsubscribe(); this.disconnect()
+    for (const timer of this.revokedLive.values()) clearTimeout(timer)
+    this.revokedLive.clear()
+  }
 }

@@ -220,7 +220,8 @@
     "lint:runtime": "oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs",
     "test:cloud-services": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.test.ts lib/cloud-services/model.test.ts lib/cloud-services/model-billing.test.ts components/settings/cloud-settings.test.tsx",
     "test:cloud-services-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.db.test.ts lib/mobile-push-delivery.db.test.ts",
-    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts"
+    "test:enterprise-db": "node --experimental-test-module-mocks --test-force-exit --import ./scripts/server-test.mjs --import tsx --test lib/enterprise/http.db.test.ts lib/enterprise/governance.db.test.ts lib/enterprise/live-authority.db.test.ts lib/enterprise/audit-outbox.db.test.ts",
+    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts lib/enterprise/protocol.test.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.121",
@@ -233,6 +234,7 @@
     "@better-auth/core": "1.7.12",
     "@better-auth/expo": "1.7.12",
     "@better-auth/oauth-provider": "1.7.12",
+    "@better-auth/sso": "1.7.12",
     "@chat-adapter/slack": "4.43.0",
     "@chat-adapter/state-pg": "^4.43.0",
     "@chat-adapter/telegram": "^4.43.0",

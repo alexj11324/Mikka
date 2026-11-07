@@ -21,7 +21,11 @@ export async function acquireHostedQuota(workspaceId: string, database?: Pick<Po
     await client.query("set local lock_timeout='5s'; set local statement_timeout='5s'; set local idle_in_transaction_session_timeout='30s'")
     const { rows: [workspace] } = await client.query<{ kind: 'personal' | 'team' }>('select kind from mikka_workspaces where id=$1 for share', [workspaceId])
     if (!workspace) throw new GovernanceError('not_found')
-    const { rows: [grant] } = await client.query<PlanGrant>('select plan,source,"seatLimit","expiresAt" from mikka_workspace_entitlements where "workspaceId"=$1', [workspaceId])
+    const { rows: [link] } = await client.query<{ organizationId: string }>('select "organizationId" from mikka_organization_workspaces where "workspaceId"=$1', [workspaceId])
+    if (link) await client.query('select id from mikka_organizations where id=$1 for share', [link.organizationId])
+    const { rows: [grant] } = link
+      ? await client.query<PlanGrant>('select plan,source,"seatLimit","expiresAt" from mikka_organization_entitlements where "organizationId"=$1', [link.organizationId])
+      : await client.query<PlanGrant>('select plan,source,"seatLimit","expiresAt" from mikka_workspace_entitlements where "workspaceId"=$1', [workspaceId])
     return { limit: resolveEntitlements({ mode, kind: workspace.kind, grant }).hostedMaxInFlight, close }
   } catch (error) { await close(); throw error }
 }
