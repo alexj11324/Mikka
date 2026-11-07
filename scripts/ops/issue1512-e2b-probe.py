@@ -28,7 +28,8 @@ PHASES = {'entry', 'spawn', 'spawn_throw', 'spawn_error', 'catalogue_received',
           'parent_deadline_snapshot', 'parent_deadline_child', 'parent_exit',
           'call_begin', 'call_return', 'call_throw', 'module_load_begin', 'module_load_return',
           'module_load_throw', 'bundle_evaluation_begin', 'probe_branch_enter', 'hosted_probe_enter',
-          'binaries_resolved', 'fingerprint_ready', 'probe_scratch_ready', 'marker_unavailable'}
+          'binaries_resolved', 'fingerprint_ready', 'probe_scratch_ready', 'marker_unavailable',
+          'process_snapshot', 'vm_snapshot'}
 HARNESSES = {'claude_code', 'codex'}
 APIS = {'spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'execPromisified', 'execFilePromisified'}
 MODULES = {'worker_bundle', 'claude_sdk', 'pino'}
@@ -36,6 +37,17 @@ MARKERS = {'probe_branch_enter', 'hosted_probe_enter', 'binaries_resolved', 'fin
 SIGNALS = {'SIGTERM', 'SIGKILL', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'SIGBUS', 'other'}
 RESOURCES = {'PipeWrap', 'ProcessWrap', 'Timeout', 'TCPSocketWrap', 'TCPServerWrap',
              'FSWatcher', 'FSEventWrap', 'TTYWrap', 'other'}
+SAMPLES = {'after_5s', 'after_15s', 'cli_deadline'}
+STATES = {'R', 'S', 'D', 'Z', 'T', 't', 'X', 'I', 'other'}
+WAITS = {'zero', 'futex', 'epoll', 'pipe', 'child_wait', 'io', 'sleep', 'other'}
+PROCESS_NUMBERS = {'pid', 'ppid', 'depth', 'startTicks', 'utimeTicks', 'stimeTicks',
+                   'minFaults', 'majorFaults', 'rssPages', 'readBytes', 'writeBytes'}
+VM_NUMBERS = {'trackedProcesses', 'snapshotMs', 'cpuUserTicks', 'cpuNiceTicks', 'cpuSystemTicks',
+              'cpuIdleTicks', 'cpuIowaitTicks', 'cpuIrqTicks', 'cpuSoftirqTicks', 'cpuStealTicks',
+              'cpuPressureSomeUs', 'memoryPressureSomeUs', 'memoryPressureFullUs',
+              'ioPressureSomeUs', 'ioPressureFullUs', 'memAvailableKiB', 'cgroupMemoryBytes',
+              'cgroupUsageUs', 'cgroupUserUs', 'cgroupSystemUs', 'cgroupPeriods',
+              'cgroupThrottledPeriods', 'cgroupThrottledUs'}
 ERROR_TYPES = {'TimeoutException', 'CommandExitException', 'ConnectError', 'HTTPError',
                'NotFoundException', 'AuthenticationException', 'TemplateException',
                'RateLimitException', 'ValueError', 'RuntimeError', 'DiagnosticFailure'}
@@ -102,10 +114,11 @@ def stage(ledger, path, phase):
 
 
 def new_ledger(context):
-    return {'version': 4, 'diagnosticOnly': True, 'releaseAccepted': False, 'identity': context,
+    return {'version': 5, 'diagnosticOnly': True, 'releaseAccepted': False, 'identity': context,
             'candidateOrigin': dict(context),
             'budget': {'candidates': 1, 'cpuCount': 2, 'memoryMiB': 4096, 'probeSandboxes': 1, 'sandboxSeconds': 60,
-                       'commandSeconds': 45, 'internalProbeMilliseconds': 20000},
+                       'commandSeconds': 45, 'internalProbeMilliseconds': 20000,
+                       'resourceSnapshots': 3, 'maxSnapshotProcesses': 12},
             'candidate': {'kind': 'desktop', 'name': candidate_name(context), 'absenceConfirmed': False, 'buildStarted': False},
             'candidateChecks': [],
             'sandboxes': [], 'events': [], 'ignoredDiagnosticLines': 0,
@@ -119,7 +132,7 @@ def validate_ledger(ledger, context):
     if (set(ledger) - {'version', 'diagnosticOnly', 'releaseAccepted', 'identity', 'budget', 'candidate',
                       'candidateOrigin', 'candidateChecks', 'sandboxes', 'events', 'ignoredDiagnosticLines',
                       'probe', 'cleanup', 'cleanupHistory', 'phase'}
-            or ledger.get('version') != 4 or ledger.get('diagnosticOnly') is not True
+            or ledger.get('version') != 5 or ledger.get('diagnosticOnly') is not True
             or ledger.get('releaseAccepted') is not False or ledger.get('identity') != context
             or ledger.get('candidateOrigin') != context or not isinstance(candidate, dict)
             or set(candidate) - {'kind', 'name', 'absenceConfirmed', 'buildStarted', 'templateId', 'buildId'}
@@ -137,6 +150,23 @@ def validate_ledger(ledger, context):
 def closed_event(value):
     if not isinstance(value, dict) or value.get('version') != 1 or value.get('phase') not in PHASES:
         return None
+    if value['phase'] in {'process_snapshot', 'vm_snapshot'}:
+        process = value['phase'] == 'process_snapshot'
+        numeric = (PROCESS_NUMBERS if process else VM_NUMBERS) | {'version', 'elapsedMs'}
+        allowed = numeric | {'phase', 'sample'} | ({'harness', 'state', 'wait'} if process else set())
+        if set(value) - allowed or value.get('sample') not in SAMPLES:
+            return None
+        if any(type(item) is not int or not 0 <= item <= 2**53 - 1
+               for key, item in value.items() if key in numeric):
+            return None
+        if process and (value.get('harness') not in HARNESSES or value.get('state') not in STATES
+                        or value.get('wait') not in WAITS or value.get('depth') not in {0, 1}
+                        or not all(type(value.get(key)) is int and value[key] > 0 for key in ['pid', 'ppid'])
+                        or 'startTicks' not in value):
+            return None
+        if not process and (type(value.get('trackedProcesses')) is not int or not 0 <= value['trackedProcesses'] <= 12):
+            return None
+        return value
     numeric = {'elapsedMs', 'stdoutBytes', 'pid', 'catalogueCount', 'exitCode', 'spawned', 'catalogues', 'exited', 'closed'}
     boolean = {'catalogueSeen', 'exited', 'closed'}
     allowed = {'version', 'phase', 'harness', 'api', 'module', 'marker', 'signal', 'resources'} | numeric | boolean
@@ -165,15 +195,31 @@ def closed_event(value):
 class Collector:
     def __init__(self, ledger, output):
         self.ledger, self.output, self.buffer = ledger, output, ''
+        self.roots, self.process_samples, self.vm_samples = {}, {}, set()
+
+    def resource_allowed(self, value):
+        phase = value['phase']
+        if phase == 'spawn' and value.get('harness') in HARNESSES and type(value.get('pid')) is int:
+            self.roots.setdefault(value['harness'], value['pid'])
+        if phase == 'process_snapshot':
+            sample, pid = value['sample'], value['pid']
+            seen = self.process_samples.setdefault(sample, set())
+            root = self.roots.get(value['harness'])
+            if (len(seen) >= 12 or pid in seen or sample in self.vm_samples
+                    or (value['depth'] == 0 and pid != root) or (value['depth'] == 1 and value['ppid'] != root)):
+                return False
+            seen.add(pid)
+        if phase == 'vm_snapshot':
+            sample = value['sample']
+            if sample in self.vm_samples or value['trackedProcesses'] != len(self.process_samples.get(sample, set())):
+                return False
+            self.vm_samples.add(sample)
+        return True
 
     def __call__(self, chunk):
         if not isinstance(chunk, str):
             return
         self.buffer += chunk
-        if len(self.buffer) > 8192:
-            self.buffer = ''
-            self.ledger['ignoredDiagnosticLines'] += 1
-            return
         while '\n' in self.buffer:
             line, self.buffer = self.buffer.split('\n', 1)
             value = None
@@ -182,12 +228,15 @@ class Collector:
                     value = closed_event(json.loads(line[len(PREFIX):]))
                 except (ValueError, TypeError):
                     pass
-            if value is None or len(self.ledger['events']) >= 128:
+            if value is None or len(self.ledger['events']) >= 128 or not self.resource_allowed(value):
                 self.ledger['ignoredDiagnosticLines'] += 1
                 continue
             self.ledger['events'].append(value)
             save(self.output, self.ledger)
             print(PREFIX + json.dumps(value, separators=(',', ':')), flush=True)
+        if len(self.buffer) > 8192:
+            self.buffer = ''
+            self.ledger['ignoredDiagnosticLines'] += 1
 
 
 def inspect_candidate(builder, api_key, ledger, output, phase, allow_absent=False):

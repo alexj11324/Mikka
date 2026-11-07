@@ -1,4 +1,4 @@
-name: Issue 1512 standalone catalogue cold start validation
+name: Issue 1512 bounded CLI resource diagnosis
 
 on:
   push:

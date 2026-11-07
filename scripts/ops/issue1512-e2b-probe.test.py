@@ -6,6 +6,8 @@ import io
 import json
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -360,6 +362,146 @@ class Guards(unittest.TestCase):
             callback(probe.PREFIX + json.dumps({'version': 1, 'phase': 'parent_exit', 'elapsedMs': 7, 'exitCode': 0, 'spawned': 2, 'catalogues': 2, 'exited': 2, 'closed': 2}) + '\n')
             self.assertEqual(len(ledger['events']), 1)
             self.assertNotIn(PRIVATE, captured.getvalue() + json.dumps(ledger))
+
+    def test_resource_schema_accepts_only_closed_kernel_numbers_and_enums(self):
+        row = {'version': 1, 'phase': 'process_snapshot', 'sample': 'after_5s', 'elapsedMs': 5000,
+               'harness': 'codex', 'pid': 42, 'ppid': 7, 'depth': 0, 'startTicks': 100,
+               'state': 'S', 'wait': 'epoll', 'utimeTicks': 15, 'stimeTicks': 2, 'readBytes': 4096}
+        self.assertEqual(probe.closed_event(row), row)
+        for change in [{'comm': PRIVATE}, {'cmdline': PRIVATE}, {'path': PRIVATE}, {'wait': PRIVATE},
+                       {'state': PRIVATE}, {'sample': 'after_30s'}, {'depth': 2}, {'pid': 0},
+                       {'utimeTicks': -1}, {'readBytes': 2**53}, {'rssPages': True}]:
+            self.assertIsNone(probe.closed_event({**row, **change}))
+        vm = {'version': 1, 'phase': 'vm_snapshot', 'sample': 'cli_deadline', 'elapsedMs': 20000,
+              'trackedProcesses': 0, 'snapshotMs': 2, 'cpuPressureSomeUs': 1300, 'memAvailableKiB': 1024}
+        self.assertEqual(probe.closed_event(vm), vm)
+        self.assertIsNone(probe.closed_event({**vm, 'trackedProcesses': 13}))
+        self.assertIsNone(probe.closed_event({**vm, 'pressure': PRIVATE}))
+
+    def test_resource_collector_requires_owned_roots_and_only_one_descendant_level(self):
+        ledger = probe.new_ledger(probe.identity(ENV))
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            collect = probe.Collector(ledger, Path(directory) / 'receipt.json')
+            def send(row): collect(probe.PREFIX + json.dumps({'version': 1, 'elapsedMs': 1, **row}) + '\n')
+            row = {'phase': 'process_snapshot', 'sample': 'after_5s', 'harness': 'codex', 'pid': 42,
+                   'ppid': 7, 'depth': 0, 'state': 'R', 'wait': 'other', 'startTicks': 100}
+            send(row)  # No preceding owned spawn.
+            send({'phase': 'spawn', 'harness': 'codex', 'pid': 42})
+            send(row)
+            send({**row, 'pid': 43, 'ppid': 999, 'depth': 1})
+            send({**row, 'pid': 43, 'ppid': 42, 'depth': 1})
+            send({**row, 'pid': 44, 'ppid': 43, 'depth': 1})
+            send({**row, 'pid': 45, 'ppid': 42, 'harness': 'claude_code', 'depth': 1})
+            processes = [event for event in ledger['events'] if event['phase'] == 'process_snapshot']
+            self.assertEqual([event['pid'] for event in processes], [42, 43])
+
+    def test_resource_collector_caps_three_snapshots_and_twelve_processes_per_snapshot(self):
+        ledger = probe.new_ledger(probe.identity(ENV))
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            collect = probe.Collector(ledger, Path(directory) / 'receipt.json')
+            def send(row): collect(probe.PREFIX + json.dumps({'version': 1, 'elapsedMs': 1, **row}) + '\n')
+            send({'phase': 'spawn', 'harness': 'codex', 'pid': 42})
+            for sample in ['after_5s', 'after_15s', 'cli_deadline', 'after_30s']:
+                for pid in range(100, 120):
+                    row = {'phase': 'process_snapshot', 'sample': sample, 'harness': 'codex', 'pid': pid,
+                           'ppid': 42, 'depth': 1, 'state': 'D', 'wait': 'io', 'startTicks': 100}
+                    send(row); send(row)
+                vm = {'phase': 'vm_snapshot', 'sample': sample, 'trackedProcesses': 12, 'snapshotMs': 2}
+                send(vm); send(vm)
+            self.assertEqual(sum(event['phase'] == 'process_snapshot' for event in ledger['events']), 36)
+            self.assertEqual(sum(event['phase'] == 'vm_snapshot' for event in ledger['events']), 3)
+            self.assertEqual(ledger['budget']['resourceSnapshots'], 3)
+            self.assertEqual(ledger['budget']['maxSnapshotProcesses'], 12)
+
+    def test_actual_observer_with_fake_kernel_files_drops_names_pid_reuse_and_foreign_descendants(self):
+        hook = (HERE / 'issue1512-e2b-probe-hook.mjs').read_text()
+        reader = hook[hook.index('function readKernel('):hook.index('// Pure observer boundary')]
+        observer = hook[hook.index('function createResourceObserver('):hook.index('// End bounded kernel observer.')]
+        program = r'''
+import assert from 'node:assert/strict'
+let closed = 0, size = 3
+const openSync = () => 8, closeSync = () => closed++
+const readSync = (_fd, buffer, offset, length) => { assert.equal(offset, 0); assert.equal(length, 8193); buffer.write('123'); return size }
+assert.equal(readKernel('unused-fixture'), '123')
+size = 8193; assert.equal(readKernel('unused-fixture'), undefined); assert.equal(closed, 2)
+const files = new Map(), reads = [], events = []
+function stat(pid, ppid, start = 100, state = 'R') {
+  const fields = Array(50).fill('0'); fields[0] = state
+  for (const [index, value] of [[1, ppid], [7, 17], [9, 1], [11, 31], [12, 13], [19, start], [21, 22]]) fields[index] = String(value)
+  return `${pid} (private-comm ) must-not-escape) ${fields.join(' ')}`
+}
+for (const [pid, ppid] of [[11, 7], [12, 7], [21, 11], [22, 999], [29, 21]]) files.set(`/proc/${pid}/stat`, stat(pid, ppid))
+files.set('/proc/11/task/11/children', '21 22 29')
+files.set('/proc/21/io', 'read_bytes: 512\nwrite_bytes: 1024\n')
+files.set('/proc/21/wchan', 'futex_wait_queue')
+files.set('/proc/11/wchan', 'private-kernel-symbol')
+files.set('/proc/stat', 'cpu 1 2 3 4 5 6 7 8 0 0\n')
+for (const key of ['cpu', 'memory', 'io']) files.set(`/proc/pressure/${key}`, 'some avg10=0.00 avg60=0.00 avg300=0.00 total=45\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=19\n')
+files.set('/proc/meminfo', 'MemAvailable: 1234 kB\n')
+files.set('/sys/fs/cgroup/memory.current', '4096\n')
+files.set('/sys/fs/cgroup/cpu.stat', 'usage_usec 42\nuser_usec 30\nsystem_usec 12\nnr_periods 5\nnr_throttled 2\nthrottled_usec 90\n')
+const read = path => { reads.push(path); return files.get(path)?.replaceAll('\\n', '\n') }
+const resource = createResourceObserver(read, row => events.push(row), 7)
+resource.track(11, 'claude_code'); resource.track(12, 'codex'); resource.track(99, 'other')
+resource.sample('after_5s'); resource.sample('after_5s')
+assert.deepEqual(events.filter(row => row.phase === 'process_snapshot').map(row => row.pid), [11, 12, 21])
+assert.equal(events[0].utimeTicks, 31); assert.equal(events[0].stimeTicks, 13)
+assert.equal(events[0].minFaults, 17); assert.equal(events[0].majorFaults, 1); assert.equal(events[0].rssPages, 22)
+assert.equal(events[0].wait, 'other'); assert.equal(events[2].wait, 'futex'); assert.equal(events[2].readBytes, 512)
+assert.ok(!('readBytes' in events[1]))
+const vm = events.find(row => row.phase === 'vm_snapshot')
+assert.equal(vm.cpuIdleTicks, 4); assert.equal(vm.cpuPressureSomeUs, 45); assert.equal(vm.memoryPressureFullUs, 19)
+assert.equal(vm.memAvailableKiB, 1234); assert.equal(vm.cgroupMemoryBytes, 4096); assert.equal(vm.cgroupThrottledUs, 90)
+files.set('/proc/11/stat', stat(11, 7, 999))
+const before = events.length, beforeReads = reads.length
+resource.sample('after_15s')
+assert.deepEqual(events.slice(before).filter(row => row.phase === 'process_snapshot').map(row => row.pid), [12])
+assert.ok(!reads.slice(beforeReads).includes('/proc/11/io'))
+resource.sample('cli_deadline'); resource.sample('cli_deadline'); resource.sample('after_30s')
+assert.equal(events.filter(row => row.phase === 'vm_snapshot').length, 3)
+assert.ok(!JSON.stringify(events).includes('private-'))
+assert.ok(reads.every(path => /^\/proc\/(?:\d+\/(?:stat|io|wchan|task\/\d+\/children)|stat|meminfo|pressure\/(?:cpu|memory|io))$/.test(path) || /^\/sys\/fs\/cgroup\/(?:memory.current|cpu.stat)$/.test(path)))
+assert.ok(!reads.includes('/proc/21/task/21/children'))
+files.set('/proc/11/stat', stat(11, 7)); files.set('/proc/11/task/11/children', Array.from({ length: 20 }, (_, n) => n + 100).join(' '))
+for (let pid = 100; pid < 120; pid++) files.set(`/proc/${pid}/stat`, stat(pid, 11))
+const capped = [], cap = createResourceObserver(read, row => capped.push(row), 7)
+cap.track(11, 'claude_code'); cap.track(12, 'codex'); cap.sample('after_5s')
+assert.equal(capped.filter(row => row.phase === 'process_snapshot').length, 12)
+assert.equal(capped.at(-1).trackedProcesses, 12)
+const denied = createResourceObserver(() => { throw Error('denied') }, () => { throw Error('must not emit') }, 7)
+assert.doesNotThrow(() => { denied.track(11, 'codex'); denied.sample('after_5s') })
+console.log(JSON.stringify({ checks: 8, passed: true }))
+'''
+        node = shutil.which('node')
+        self.assertIsNotNone(node)
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run([node, '--input-type=module'], input=reader + observer + program,
+                                    capture_output=True, text=True, timeout=10,
+                                    env={'PATH': '/usr/bin:/bin', 'HOME': directory, 'NODE_OPTIONS': ''})
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(json.loads(result.stdout), {'checks': 8, 'passed': True})
+
+    def test_collector_keeps_complete_coalesced_lines_and_bounds_only_the_unfinished_tail(self):
+        ledger = probe.new_ledger(probe.identity(ENV))
+        rows = [{'version': 1, 'phase': 'spawn', 'harness': 'codex', 'pid': 42}]
+        for sample in ['after_5s', 'after_15s', 'cli_deadline']:
+            for pid in range(100, 112):
+                rows.append({'version': 1, 'phase': 'process_snapshot', 'sample': sample, 'elapsedMs': 20000,
+                             'harness': 'codex', 'pid': pid, 'ppid': 42, 'depth': 1, 'state': 'D', 'wait': 'io',
+                             **{key: 2**53 - 1 for key in ['startTicks', 'utimeTicks', 'stimeTicks', 'minFaults',
+                                                         'majorFaults', 'rssPages', 'readBytes', 'writeBytes']}})
+            rows.append({'version': 1, 'phase': 'vm_snapshot', 'sample': sample,
+                         'elapsedMs': 20000, 'trackedProcesses': 12, 'snapshotMs': 1})
+        lines = [probe.PREFIX + json.dumps(row) + '\n' for row in rows]
+        self.assertTrue(all(len(line) <= 4096 for line in lines))
+        chunk = ''.join(lines)
+        self.assertGreater(len(chunk), 8192)
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            collect = probe.Collector(ledger, Path(directory) / 'receipt.json')
+            collect(chunk + 'x' * 8193)
+            self.assertEqual(ledger['events'], rows)
+            self.assertEqual(ledger['ignoredDiagnosticLines'], 1)
+            self.assertEqual(collect.buffer, '')
 
     def test_workflow_is_branch_scoped_pinned_and_reads_only_the_existing_e2b_key(self):
         workflow = (HERE.parents[1] / '.github/workflows/issue1512-e2b-probe.yml').read_text()

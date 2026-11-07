@@ -1,7 +1,7 @@
 // Temporary anonymous catalogue boundaries, loaded with Node --import.
 // Transparent observation: no network/FS restriction or child-control change.
 import childProcess from 'node:child_process'
-import { realpathSync, writeSync } from 'node:fs'
+import { closeSync, openSync, readSync, realpathSync, writeSync } from 'node:fs'
 import { registerHooks, syncBuiltinESMExports } from 'node:module'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -22,6 +22,112 @@ function family(args) {
   if (JSON.stringify(args) === JSON.stringify(['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'])) return 'claude_code'
   return 'other'
 }
+// Fixed kernel accounting only. Never inspect argv, environments or user files.
+function readKernel(path) {
+  let fd
+  try {
+    fd = openSync(path, 'r')
+    const buffer = Buffer.alloc(8193), size = readSync(fd, buffer, 0, buffer.length, null)
+    return size <= 8192 ? buffer.subarray(0, size).toString('utf8') : undefined
+  } catch { return undefined }
+  finally { if (fd !== undefined) { try { closeSync(fd) } catch { /* Observation only. */ } } }
+}
+// Pure observer boundary, also exercised with fake kernel files offline.
+function createResourceObserver(read, emitResource, parentPid) {
+  const roots = new Map(), sampled = new Set()
+  const states = new Set(['R', 'S', 'D', 'Z', 'T', 't', 'X', 'I'])
+  const waits = { '0': 'zero', futex_wait: 'futex', futex_wait_queue: 'futex', futex_wait_queue_me: 'futex',
+    do_epoll_wait: 'epoll', ep_poll: 'epoll', pipe_read: 'pipe', do_wait: 'child_wait',
+    io_schedule: 'io', folio_wait_bit_common: 'io', wait_on_page_bit_common: 'io', hrtimer_nanosleep: 'sleep' }
+  const integer = value => typeof value === 'string' && /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : undefined
+  const put = (out, key, value) => { const n = integer(value); if (n !== undefined) out[key] = n }
+  function stat(pid) {
+    if (!Number.isSafeInteger(pid) || pid <= 0) return
+    const raw = read(`/proc/${pid}/stat`)
+    if (typeof raw !== 'string' || integer(raw.split(' ', 1)[0]) !== pid) return
+    const end = raw.lastIndexOf(') ')
+    if (end < 0) return
+    // Drop comm completely; offsets follow docs.kernel.org/filesystems/proc.html.
+    const fields = raw.slice(end + 2).trim().split(/\s+/)
+    if (fields.length < 22) return
+    const row = { pid, state: states.has(fields[0]) ? fields[0] : 'other' }
+    for (const [key, index] of Object.entries({ ppid: 1, minFaults: 7, majorFaults: 9,
+      utimeTicks: 11, stimeTicks: 12, startTicks: 19, rssPages: 21 })) put(row, key, fields[index])
+    return row.ppid > 0 && row.startTicks !== undefined ? row : undefined
+  }
+  const same = (a, b) => a && b && a.pid === b.pid && a.ppid === b.ppid && a.startTicks === b.startTicks
+  function processRow(identity, harness, depth) {
+    const before = stat(identity.pid)
+    if (!same(before, identity)) return
+    const io = read(`/proc/${identity.pid}/io`) ?? ''
+    const blocked = (read(`/proc/${identity.pid}/wchan`) ?? '').trim()
+    const after = stat(identity.pid)
+    if (!same(before, after)) return
+    const row = { ...after, harness, depth, wait: Object.hasOwn(waits, blocked) ? waits[blocked] : 'other' }
+    put(row, 'readBytes', /^read_bytes:\s*(\d+)\s*$/m.exec(io)?.[1])
+    put(row, 'writeBytes', /^write_bytes:\s*(\d+)\s*$/m.exec(io)?.[1])
+    return row
+  }
+  function system() {
+    const row = {}, cpu = /^cpu\s+([^\n]+)$/m.exec(read('/proc/stat') ?? '')?.[1].trim().split(/\s+/)
+    if (cpu) for (const [index, name] of ['cpuUserTicks', 'cpuNiceTicks', 'cpuSystemTicks', 'cpuIdleTicks',
+      'cpuIowaitTicks', 'cpuIrqTicks', 'cpuSoftirqTicks', 'cpuStealTicks'].entries()) put(row, name, cpu[index])
+    // PSI totals and cgroup cpu.stat times are microseconds. System CPU full
+    // pressure is undefined, so only its some counter is meaningful here.
+    for (const resource of ['cpu', 'memory', 'io']) {
+      const raw = read(`/proc/pressure/${resource}`) ?? ''
+      for (const kind of resource === 'cpu' ? ['some'] : ['some', 'full']) {
+        put(row, `${resource}Pressure${kind === 'some' ? 'Some' : 'Full'}Us`, new RegExp(`^${kind} [^\\n]* total=(\\d+)\\s*$`, 'm').exec(raw)?.[1])
+      }
+    }
+    put(row, 'memAvailableKiB', /^MemAvailable:\s*(\d+) kB\s*$/m.exec(read('/proc/meminfo') ?? '')?.[1])
+    put(row, 'cgroupMemoryBytes', (read('/sys/fs/cgroup/memory.current') ?? '').trim())
+    const cpuStat = read('/sys/fs/cgroup/cpu.stat') ?? ''
+    for (const [key, name] of Object.entries({ usage_usec: 'cgroupUsageUs', user_usec: 'cgroupUserUs', system_usec: 'cgroupSystemUs',
+      nr_periods: 'cgroupPeriods', nr_throttled: 'cgroupThrottledPeriods', throttled_usec: 'cgroupThrottledUs' })) {
+      put(row, name, new RegExp(`^${key} (\\d+)\\s*$`, 'm').exec(cpuStat)?.[1])
+    }
+    return row
+  }
+  return {
+    track(pid, harness) {
+      if (!['claude_code', 'codex'].includes(harness) || roots.has(harness)) return
+      try {
+        const identity = stat(pid)
+        if (identity?.ppid === parentPid) roots.set(harness, { pid, ppid: identity.ppid, startTicks: identity.startTicks })
+      } catch { /* Observation only. */ }
+    },
+    sample(sample) {
+      if (!['after_5s', 'after_15s', 'cli_deadline'].includes(sample) || sampled.has(sample) || sampled.size >= 3) return
+      sampled.add(sample)
+      const began = performance.now()
+      try {
+        const rows = [], live = []
+        for (const [harness, identity] of roots) {
+          const row = processRow(identity, harness, 0)
+          if (row) { rows.push(row); live.push([harness, identity]) }
+        }
+        for (const [harness, identity] of live) {
+          // Only direct descendants listed by this owned leader, then recheck ppid.
+          const ids = (read(`/proc/${identity.pid}/task/${identity.pid}/children`) ?? '').trim().split(/\s+/).slice(0, 12)
+          for (const value of ids) {
+            if (rows.length >= 12) break
+            const child = stat(integer(value))
+            if (!child || child.ppid !== identity.pid || rows.some(row => row.pid === child.pid)) continue
+            const row = processRow(child, harness, 1)
+            if (row && same(stat(identity.pid), identity)) rows.push(row)
+          }
+        }
+        const vm = system()
+        for (const row of rows) emitResource({ phase: 'process_snapshot', sample, ...row })
+        emitResource({ phase: 'vm_snapshot', sample, trackedProcesses: rows.length,
+          snapshotMs: Math.round(performance.now() - began), ...vm })
+      } catch { /* Missing/revoked kernel counters never change probe execution. */ }
+    },
+  }
+}
+// End bounded kernel observer.
+const resourceObserver = createResourceObserver(readKernel, emit, process.pid)
 function snapshot(record, phase) {
   emit({ harness: record.harness, api: record.api, phase, pid: record.pid,
     ...(record.harness !== 'other' ? { stdoutBytes: record.stdoutBytes, catalogueSeen: record.catalogueSeen, catalogueCount: record.catalogueCount } : {}),
@@ -33,6 +139,7 @@ function observeChild(child, harness, api) {
   const record = { harness, api, pid: Number.isSafeInteger(child.pid) ? child.pid : null, stdoutBytes: 0,
     catalogueSeen: false, catalogueCount: null, exited: false, closed: false, exitCode: null, signal: null }
   records.push(record)
+  resourceObserver.track(record.pid, harness)
   snapshot(record, 'spawn')
   let buffer = '', parseDisabled = false
   // Only the existing catalogue exchange already consumes stdout. Never drain
@@ -60,7 +167,10 @@ function observeChild(child, harness, api) {
     record.signal = signals.has(signal) ? signal : signal ? 'other' : null
     snapshot(record, 'exit')
   })
-  const timer = setTimeout(() => snapshot(record, 'deadline_snapshot'), 20000)
+  const timer = setTimeout(() => {
+    snapshot(record, 'deadline_snapshot')
+    if (harness !== 'other') resourceObserver.sample('cli_deadline')
+  }, 20000)
   timer.unref()
   child.once('close', () => { record.closed = true; clearTimeout(timer); buffer = ''; snapshot(record, 'close') })
 }
@@ -134,6 +244,7 @@ const parentTimers = [5000, 15000, 30000].map(ms => {
     }
     emit({ phase: 'parent_deadline_snapshot', resources })
     for (const record of records) snapshot(record, 'parent_deadline_child')
+    if (ms === 5000 || ms === 15000) resourceObserver.sample(ms === 5000 ? 'after_5s' : 'after_15s')
   }, ms)
   timer.unref()
   return timer
