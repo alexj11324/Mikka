@@ -179,7 +179,7 @@ export class DaemonTracer {
    */
   span<T>(name: string, attributes: Record<string, Value>, work: (span: SpanHandle) => Promise<T>, options: SpanOptions = {}): Promise<T> {
     const hash = attributes["mikka.run.id_hash"], harness = attributes["mikka.harness"]
-    if (name === "daemon.adapter.start" && typeof hash === "string" && /^[a-f0-9]{16}$/.test(hash)
+    if (name === "daemon.adapter.start" && options.onStartupTiming && typeof hash === "string" && /^[a-f0-9]{16}$/.test(hash)
       && HARNESSES.includes(harness as Harness)) {
       const scope: StartupScope = { runIdHash: hash, harness: harness as Harness, startedAt: Date.now(), started: performance.now(),
         phases: [], phaseCount: 0, truncated: false, closed: false }

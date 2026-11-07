@@ -27,6 +27,7 @@ import { authenticateDevice, ownedDeviceWithReport } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
+import { RUN_DECISION_CATALOGUE } from '@/lib/project-map/mcp-tool'
 import { issueForUser } from '@/lib/issue-access'
 import { failRunForDaemonUpgrade, failQueuedSubscriptionRuntime, latestCheckpoint } from '@/lib/run-leases'
 import { subscriptionPreflightSchema } from '@mikka/protocol/harness'
@@ -54,6 +55,7 @@ import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
 import { cloudStartupPhases, cloudStartupRunAttributes, cloudStartupSpan } from '@/lib/computer/startup-tracing'
+import { cloudStartupDiagnosticEnv } from '@/lib/computer/startup-diagnostics'
 
 import { daemonTooOld, daemonVersions } from '@/lib/daemon-release'
 
@@ -362,7 +364,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
           const { CUSTOM_MCP_TOOLKIT, runMcpAdvertised } = await import('@/lib/plugins/run-mcp')
           if (await runMcpAdvertised(caller.userId, run.id)) apps = [...apps.filter(app => app !== CUSTOM_MCP_TOOLKIT).slice(0, 63), CUSTOM_MCP_TOOLKIT]
         }
-        return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token, ...(tools.length ? { mailbox: true as const } : {}), ...(apps.length ? { apps } : {}) }
+        return { url: mcpResourceURL ?? new URL(withBasePath('/api/mcp'), request.url).toString(), token,
+          decisionCatalogue: RUN_DECISION_CATALOGUE,
+          mailboxCatalogue: { version: 1 as const, transport: 'mikka-stateless-2025-06-18' as const, tools },
+          ...(tools.length ? { mailbox: true as const } : {}), ...(apps.length ? { apps } : {}) }
       })
       .catch((error: unknown) => { console.error('Could not issue a run token', error instanceof Error ? error.message : error); return undefined })
   // A retry after a lost lease works on in the lost attempt's worktree and,
@@ -442,7 +447,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   const githubConnected = receivesRunCredentials ? Boolean(githubCredential)
     : repo.repoPath.startsWith('v2/github.com/') && await githubMachineConfigured(caller.userId)
   timings.next('response_fence')
-  const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => NextResponse.json({
+  const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => {
+    const assignedEnv = cloudStartupDiagnosticEnv(taskEnv, { deviceKind: device.kind, run: current,
+      repository: remoteRepositoryRef(repo.remoteUrl), harness, subscriptionBindingId: subscription?.id })
+    return NextResponse.json({
     ...publication,
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),
@@ -465,7 +473,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(subscriptionLease ? { subscriptionLease } : {}),
     ...(computer && assignmentPolicy.permissions.computer_use !== 'deny' ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),
-    ...(Object.keys(taskEnv).length ? { taskEnv } : {}),
+    ...(Object.keys(assignedEnv).length ? { taskEnv: assignedEnv } : {}),
     ...(taskSecretNames.length ? { taskSecretNames } : {}),
     ...threadContinuation,
     ...retry,
@@ -474,7 +482,8 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...benchmarkAssignment,
     policy: assignmentPolicy,
     ...(distribution ? {policySnapshotRequired:distribution.required,policySnapshot:issuePolicySnapshot(distribution,assignmentPolicy)} : {}),
-  }, { headers: { 'cache-control': 'private, no-store' } }))
+    }, { headers: { 'cache-control': 'private, no-store' } })
+  })
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
 }
 
