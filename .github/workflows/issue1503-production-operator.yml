@@ -1,7 +1,7 @@
 name: Issue 1503 same-child GitHub expiry maintenance
 on:
   push:
-    branches: [ops/issue-1503-child-expiry-20261107]
+    branches: [ops/issue-1503-child-expiry-0819-20261107]
     paths:
       - .github/workflows/issue1503-production-operator.yml
       - scripts/ops/issue1503/renew-github-expiry.mjs
@@ -11,7 +11,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: issue1503-child-expiry-20261107
+  group: issue1503-child-expiry-0819-20261107
   cancel-in-progress: false
 jobs:
   renew_github_expiry:
@@ -95,7 +95,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-child-expiry-20261107
+          name: issue1503-child-expiry-0819-20261107
           path: |
             issue1503-report/github-expiry-renewal.json
             issue1503-report/renewed-fixture-state.json
