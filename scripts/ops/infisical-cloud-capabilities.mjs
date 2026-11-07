@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/infisical-cloud-capabilities',
-  base: 'a9635b9c9fd441f8e390c37073d6f87bd20bd35b',
+  base: 'f59e2813242cbd98d615584dd4f4c96219dcc0ec',
   identity: '2cf9fa19-b9db-4c08-8ca0-b31859f2cbac', audience: 'mikka-infisical',
   project: '89850d6a-f020-4936-863e-df77380dfe40',
   connection: 'mikka-team-vercel-native-sync',

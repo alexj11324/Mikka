@@ -211,3 +211,5 @@ test('URL-shape diagnostics use only closed categories and do not permit untrust
   }
   assert.throws(() => githubOidcUrl(alternate), code('OIDC_URL'))
 })
+
+// Fresh rollout readback, 2026-11-07.

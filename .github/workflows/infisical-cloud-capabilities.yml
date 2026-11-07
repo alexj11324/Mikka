@@ -36,3 +36,5 @@ jobs:
         run: node scripts/ops/infisical-cloud-capabilities.mjs --preflight
       - name: Inspect six fixed metadata routes with the existing OIDC identity
         run: node scripts/ops/infisical-cloud-capabilities.mjs --inspect
+
+# Fresh rollout readback, 2026-11-07.
