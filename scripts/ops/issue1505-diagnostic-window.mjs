@@ -1,18 +1,24 @@
-// Temporary #1505 operations helper. No issue, Profile, model task or VM creation.
+// Temporary #1505 operations helper. Reuse exactly the original idle Bot; no Bot/task/VM creation.
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
-export const SOURCE = 'fb173dcbdc2f2f02ebb98be2edf80df975c58d7f'
-export const TREE = '4a5724298b2a1a2a3b5c9ad1d1c9185fa5e03a67'
-export const BRANCH = 'ops/1505-diagnostic-window-fb173d'
+export const SOURCE = '4c756faf5fb6e6fcf0bda4935c9f602b1ffc716a'
+export const TREE = 'ea88b8e12370875672a37cd8b4dc068d3df12d57'
+export const BRANCH = 'ops/1505-diagnostic-window-reuse-620a3647'
 export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
 export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
 export const KEY = 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW'
 export const ORIGIN = 'https://app.aspectlylabs.com'
-export const GO = 'root-reviewed-1505-diagnostic-window-fb173d'
+export const GO = 'root-reviewed-1505-diagnostic-window-reuse-620a3647'
+export const ORIGINAL = Object.freeze({
+  receiptSha256: '12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5',
+  helperCommit: '5cd039213a531476cde35500a2498bd3a5089556', helperTree: 'a841f19b0bab028bc386d6c768cce35496ca306b',
+  runId: '42366750743', attempt: '1', fixtureId: '620a3647-b039-4909-8562-e3ff867d7324',
+  botId: 'fdeea45f-8cb2-450a-96a4-d9a682f71482', botName: '测试1505 620a3647',
+})
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SHA = /^[0-9a-f]{64}$/
 const ID = /^[A-Za-z0-9_-]{1,200}$/
@@ -43,16 +49,34 @@ async function platform(path, { token, fetchImpl, method = 'GET', body, allow404
 const ownRow = row => row?.key === KEY && Array.isArray(row.target) && row.target.length === 1 && row.target[0] === 'production'
   && !row.gitBranch && !row.customEnvironmentIds?.length && ID.test(row.id ?? '')
 
-export async function prepareWindow({ env, helpers, fetchImpl = fetch, now = Date.now, save = async () => {} }) {
+export function readOriginalBot(bytes) {
+  check(hash(bytes) === ORIGINAL.receiptSha256, 'original_receipt_changed')
+  const report = JSON.parse(bytes.toString('utf8'))
+  check(report.version === 1 && report.issue === 1505 && report.status === 'prepared'
+    && report.workflowHead === ORIGINAL.helperCommit && report.workflowRunId === ORIGINAL.runId && report.attempt === ORIGINAL.attempt
+    && report.fixtureId === ORIGINAL.fixtureId && report.botId === ORIGINAL.botId && report.botName === ORIGINAL.botName
+    && report.projectId === PROJECT && report.teamId === TEAM && SHA.test(report.requesterHash) && SHA.test(report.workspaceHash)
+    && report.cleanup?.botStopped === true && report.cleanup.workspaceRestored === true && report.cleanup.signedOut === true
+    && Array.isArray(report.cleanup.errors) && report.cleanup.errors.length === 0
+    && report.modelsDispatched === 0 && report.virtualMachinesCreated === 0 && report.profilesCreated === 0, 'original_receipt_invalid')
+  return { botId: report.botId, botName: report.botName, fixtureId: report.fixtureId,
+    requesterHash: report.requesterHash, workspaceHash: report.workspaceHash, receiptSha256: ORIGINAL.receiptSha256 }
+}
+
+export async function prepareWindow({ env, helpers, reuse, fetchImpl = fetch, now = Date.now, save = async () => {} }) {
   const report = { version: 1, issue: 1505, sourceCommit: SOURCE, sourceTree: TREE, projectId: PROJECT, teamId: TEAM,
     workflowRunId: env.GITHUB_RUN_ID, attempt: env.GITHUB_RUN_ATTEMPT, workflowHead: env.GITHUB_SHA,
     helperBranch: BRANCH, fixtureId: randomUUID(), startedAt: new Date(now()).toISOString(), status: 'running',
     scope: 'dedicated_bot_repository_window', modelsDispatched: 0, virtualMachinesCreated: 0, profilesCreated: 0,
-    cleanup: { botStopped: false, workspaceRestored: false, signedOut: false, errors: [] }, window: null }
+    botCreationAttempted: false, botStopAttempted: false,
+    reusedFrom: { receiptSha256: ORIGINAL.receiptSha256, workflowRunId: ORIGINAL.runId, fixtureId: ORIGINAL.fixtureId },
+    cleanup: { botIdleVerified: false, workspaceRestored: false, signedOut: false, errors: [] }, window: null }
   const client = helpers.createSessionClient(ORIGIN, fetchImpl)
   let stage = 'configuration_preflight', loginAttempted = false, requesterId, workspaceId, originalWorkspaceId, accountReady = false
   const call = (path, options = {}) => platform(path, { token: env.VERCEL_TEAM_TOKEN, fetchImpl, ...options })
   try {
+    check(reuse?.botId === ORIGINAL.botId && reuse.botName === ORIGINAL.botName && reuse.fixtureId === ORIGINAL.fixtureId
+      && reuse.receiptSha256 === ORIGINAL.receiptSha256 && SHA.test(reuse.requesterHash) && SHA.test(reuse.workspaceHash), 'original_receipt_invalid')
     const { data: listed } = await call(`/v10/projects/${PROJECT}/env`)
     check(Array.isArray(listed.envs) && !listed.envs.some(row => row.key === KEY), 'existing_window_not_owned')
     report.windowKeyAbsentBefore = true
@@ -66,6 +90,7 @@ export async function prepareWindow({ env, helpers, fetchImpl = fetch, now = Dat
       check(session.user?.email?.toLowerCase() === email.toLowerCase() && typeof session.user?.id === 'string'
         && session.user.id.length > 0 && session.user.id.length <= 128, 'session_identity_mismatch')
       requesterId = session.user.id; report.requesterHash = hash(requesterId)
+      check(report.requesterHash === reuse.requesterHash, 'reused_bot_requester_changed')
       const version = await client.json('/api/version')
       check(/^[0-9a-f]{40}$/.test(version.build ?? ''), 'application_version_invalid')
       report.applicationAtPreparation = version.build
@@ -73,27 +98,26 @@ export async function prepareWindow({ env, helpers, fetchImpl = fetch, now = Dat
       const scope = await helpers.selectAcceptanceTeam(client, { ownerId: requesterId }, value => { originalWorkspaceId = value })
       workspaceId = scope.workspaceId
       check(UUID.test(workspaceId) && scope.adminId !== requesterId && scope.evidence?.teamAdminMembershipVerified === true, 'shared_team_not_verified')
-      report.workspaceHash = hash(workspaceId); report.normalSessionVerified = true; report.sharedTeamVerified = true
-      stage = 'normal_bot_creation'
-      report.botName = `测试1505 ${report.fixtureId.slice(0, 8)}`
-      report.botCreationAttempted = true
-      // Persist the exact recovery name before the potentially ambiguous POST.
-      // A missing response ID must never be interpreted as proof of no write.
+      report.workspaceHash = hash(workspaceId)
+      check(report.workspaceHash === reuse.workspaceHash, 'reused_bot_workspace_changed')
+      report.normalSessionVerified = true; report.sharedTeamVerified = true
+      stage = 'normal_bot_reuse'
+      // The normal GET independently requires both this session owner and its current workspace.
+      const bot = await client.json(`/api/bots/${reuse.botId}`)
+      check(bot.id === reuse.botId && bot.name === reuse.botName, 'reused_bot_identity_changed')
+      report.botId = bot.id; report.botName = bot.name; report.botRetention = 'reused_existing_no_delete_api'
+      report.botOwnedAndNamed = true
+      stage = 'normal_bot_idle_read'
+      // This registered read does not welcome/wake the chat; a failed/busy read never stops it.
+      const chat = await client.rpc('coordinator.pollCoordinatorChat', [bot.id])
+      check(chat?.botId === bot.id && chat.enabled === true && chat.working === false && chat.error === null
+        && chat.streamRunId === undefined && Array.isArray(chat.items) && chat.items.length === 0 && chat.cursor === 0
+        && chat.historyBefore === undefined && Array.isArray(chat.persistedStreamIds) && chat.persistedStreamIds.length === 0,
+        'reused_bot_not_confirmed_idle')
+      report.cleanup.botIdleVerified = true; report.botIdleObservedAt = new Date(now()).toISOString(); accountReady = true
       await save(report)
-      // Record the returned ID before the next GET so a failed validation cannot lose the created fixture.
-      const created = await client.rpc('bots.createBot', [{ name: report.botName,
-        color: 'gris', shape: 'cercle', model: null, repository: null }])
-      check(UUID.test(created.id ?? ''), 'bot_create_response_invalid')
-      report.botId = created.id; report.botRetention = 'retained_no_delete_api'
-      await save(report)
-      await helpers.acceptanceBot(client, report.botId, report.fixtureId)
-      report.botOwnedAndNamed = true; accountReady = true
     } catch (error) { report.error = { stage, ...closedError(error) } }
     finally {
-      if (report.botId) {
-        try { await client.rpc('coordinator.stopCoordinatorTurn', [report.botId]); report.cleanup.botStopped = true }
-        catch (error) { report.cleanup.errors.push({ stage: 'stop_created_bot', ...closedError(error) }) }
-      }
       if (originalWorkspaceId && requesterId) {
         try { await helpers.restoreAcceptanceWorkspace(client, requesterId, originalWorkspaceId); report.cleanup.workspaceRestored = true }
         catch (error) { report.cleanup.errors.push({ stage: 'restore_workspace', ...closedError(error) }) }
@@ -104,7 +128,7 @@ export async function prepareWindow({ env, helpers, fetchImpl = fetch, now = Dat
       }
       client.clear()
     }
-    check(accountReady && !report.error && report.cleanup.botStopped && report.cleanup.workspaceRestored
+    check(accountReady && !report.error && report.cleanup.botIdleVerified && report.cleanup.workspaceRestored
       && report.cleanup.signedOut && !report.cleanup.errors.length, 'normal_session_cleanup_incomplete')
     stage = 'window_creation'
     const expiresAt = new Date(now() + 120 * 60_000).toISOString()
@@ -177,12 +201,25 @@ async function main() {
     && process.env.GITHUB_REF === `refs/heads/${mode === 'remove' ? BRANCH + '-cleanup' : BRANCH}`, 'execution_not_reviewed')
   check(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() === SOURCE
     && execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim() === TREE, 'source_not_pinned')
-  check(['prepare', 'remove'].includes(mode) && typeof output === 'string' && output.length > 0, 'arguments_invalid')
+  const opsRoot = fileURLToPath(new URL('../../', import.meta.url))
+  check(execFileSync('git', ['-C', opsRoot, 'rev-list', '--parents', '-n', '1', 'HEAD'], { encoding: 'utf8' }).trim()
+    === `${process.env.GITHUB_SHA} ${ORIGINAL.helperCommit}`
+    && execFileSync('git', ['-C', opsRoot, 'rev-parse', `${ORIGINAL.helperCommit}^{tree}`], { encoding: 'utf8' }).trim() === ORIGINAL.helperTree,
+    'helper_parent_not_pinned')
+  check(JSON.stringify(execFileSync('git', ['-C', opsRoot, 'diff', '--name-only', ORIGINAL.helperCommit, 'HEAD'], { encoding: 'utf8' }).trim().split('\n').sort())
+    === JSON.stringify(['.github/workflows/issue1505-diagnostic-window.yml', 'scripts/ops/issue1505-diagnostic-window-original-42366750743.json',
+      'scripts/ops/issue1505-diagnostic-window.mjs']), 'helper_files_not_pinned')
+  const reuse = readOriginalBot(await readFile(new URL('./issue1505-diagnostic-window-original-42366750743.json', import.meta.url)))
+  check(['verify', 'prepare', 'remove'].includes(mode) && typeof output === 'string' && output.length > 0, 'arguments_invalid')
   const save = async data => { await mkdir(dirname(resolve(output)), { recursive: true }); await writeFile(output, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 }) }
   let report
-  if (mode === 'prepare') {
+  if (mode === 'verify') {
+    report = { status: 'verified', sourceCommit: SOURCE, sourceTree: TREE, originalReceiptSha256: ORIGINAL.receiptSha256,
+      botId: reuse.botId, modelCalls: 0, accountCalls: 0 }
+    await save(report)
+  } else if (mode === 'prepare') {
     const helpers = await import(pathToFileURL(resolve('scripts/acceptance/cloud-startup.mjs')).href)
-    report = await prepareWindow({ env: process.env, helpers, save })
+    report = await prepareWindow({ env: process.env, helpers, reuse, save })
     if (report.status !== 'prepared') process.exitCode = 1
   } else {
     check(typeof input === 'string', 'cleanup_record_missing')

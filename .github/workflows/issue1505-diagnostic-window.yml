@@ -1,10 +1,9 @@
-# Root-reviewed preparation only. It creates no model task, Profile or VM.
-# New run at attempt 1 after run 42356924285 was cancelled before any runner step.
-# Publish this normal fast-forward only after the coordinated account window and exact CI review.
+# Draft: reuse the exact original idle Bot; no Bot/task/Profile/model/VM creation.
+# Root must review and replace only PENDING_ROOT_REVIEW_REUSE before publishing.
 name: Issue 1505 prepare scoped diagnostic window
 on:
   push:
-    branches: [ops/1505-diagnostic-window-fb173d]
+    branches: [ops/1505-diagnostic-window-reuse-620a3647]
 permissions:
   contents: write
   id-token: write
@@ -25,18 +24,19 @@ jobs:
       run:
         working-directory: source
     env:
-      DIAGNOSTIC_WINDOW_GO: root-reviewed-1505-diagnostic-window-fb173d
+      DIAGNOSTIC_WINDOW_GO: root-reviewed-1505-diagnostic-window-reuse-620a3647
     steps:
       - name: Check out the exact temporary helper
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.sha }}
           path: ops
+          fetch-depth: 2
           persist-credentials: false
       - name: Check out the reviewed application source without credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: fb173dcbdc2f2f02ebb98be2edf80df975c58d7f
+          ref: 4c756faf5fb6e6fcf0bda4935c9f602b1ffc716a
           path: source
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -44,11 +44,12 @@ jobs:
           node-version: 24
       - name: Verify immutable source and explicit root review before credentials
         run: |
-          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-diagnostic-window-fb173d'
+          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-diagnostic-window-reuse-620a3647'
           test "$GITHUB_RUN_ATTEMPT" = '1'
-          test "$(git rev-parse HEAD)" = 'fb173dcbdc2f2f02ebb98be2edf80df975c58d7f'
-          test "$(git rev-parse HEAD^{tree})" = '4a5724298b2a1a2a3b5c9ad1d1c9185fa5e03a67'
-          node --check ../ops/scripts/ops/issue1505-diagnostic-window.mjs
+          test "$(git rev-parse HEAD)" = '4c756faf5fb6e6fcf0bda4935c9f602b1ffc716a'
+          test "$(git rev-parse HEAD^{tree})" = 'ea88b8e12370875672a37cd8b4dc068d3df12d57'
+          printf '%s  %s\n' '60ffebfd9b294d8bbdd7963265f4769dfb0d9ac315e55737c52554ba0d0b31c1' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
+          node ../ops/scripts/ops/issue1505-diagnostic-window.mjs verify "$RUNNER_TEMP/diagnostic-window-preflight.json"
       - name: Read the existing SMOKE email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -85,7 +86,7 @@ jobs:
           secret-name: VERCEL_TEAM_TOKEN
           recursive: false
           include-imports: false
-      - name: Prepare one idle Bot and one bounded diagnostic configuration
+      - name: Verify the exact existing idle Bot and prepare one fresh bounded window
         id: prepare
         run: node ../ops/scripts/ops/issue1505-diagnostic-window.mjs prepare "$RUNNER_TEMP/diagnostic-window.json"
       - name: Preserve the recovery record before any helper ref deletion
@@ -93,7 +94,10 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: issue-1505-diagnostic-window
-          path: ${{ runner.temp }}/diagnostic-window.json
+          path: |
+            ${{ runner.temp }}/diagnostic-window.json
+            ${{ runner.temp }}/diagnostic-window-preflight.json
+            ops/scripts/ops/issue1505-diagnostic-window-original-42366750743.json
           if-no-files-found: error
           retention-days: 14
       - name: Remove only this successfully completed immutable helper ref
@@ -105,14 +109,17 @@ jobs:
         run: |
           import json, os, urllib.request, urllib.error
           from pathlib import Path
-          repo, branch = 'alexj11324/Mikka', 'ops/1505-diagnostic-window-fb173d'
+          repo, branch = 'alexj11324/Mikka', 'ops/1505-diagnostic-window-reuse-620a3647'
           assert os.environ['GITHUB_REPOSITORY'] == repo and os.environ['GITHUB_REF'] == 'refs/heads/' + branch
           receipt = {'branch': branch, 'expectedSha': os.environ['GITHUB_SHA'], 'status': 'failed'}
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, hdrs, newurl): return None
+          opener = urllib.request.build_opener(NoRedirect)
           def call(path, method='GET'):
               request = urllib.request.Request('https://api.github.com/repos/' + repo + '/' + path, method=method,
                   headers={'Authorization':'Bearer ' + os.environ['GH_TOKEN'], 'Accept':'application/vnd.github+json'})
               try:
-                  with urllib.request.urlopen(request, timeout=20) as response:
+                  with opener.open(request, timeout=20) as response:
                       body = response.read(); return response.status, json.loads(body) if body else None
               except urllib.error.HTTPError as error:
                   return error.code, None
