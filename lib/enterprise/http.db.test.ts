@@ -1087,7 +1087,10 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       }, body: new URLSearchParams({ SAMLRequest: request.context, RelayState: `${appOrigin}/signed-out` }), redirect: 'manual' })
       assert.equal(idpLogout.status, 200)
       assert.equal(await remaining([first.session.id, child.session.id, descendant.session.id]), 0, 'native IdP logout revokes every derived bearer')
-      assert.equal((await readWorkspace(child.token)).status, 401)
+      assert.equal(await session(cookieFor(child.token)), null, 'the native session is gone after SLO')
+      const revoked = await readWorkspace(child.token)
+      assert.equal(revoked.status, 403, 'governance uses its existing access_denied response for a missing session')
+      assert.deepEqual(await revoked.json(), { error: { code: 'governance_denied', detail: 'access_denied' } })
 
       const rootSp = await login(), rootChild = await web.handoff(rootSp.token), rootSnapshot = await metadata(rootSp.session.id)
       const afterRootSp = await login()

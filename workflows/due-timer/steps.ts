@@ -1,3 +1,4 @@
+import { withRecoveryWorkflowAuthority } from '@/lib/enterprise/execution-authority'
 import { RetryableError } from 'workflow'
 import type { DueKind } from '@/lib/due-timer'
 import type { RecoveryTimerClaim, RecoveryTimerIdentity } from '@/lib/due-timer-owner'
@@ -6,7 +7,7 @@ export async function runDue(kind: DueKind) {
   'use step'
   try {
     const { dueJobs } = await import('@/lib/due-timer')
-    return await dueJobs[kind].run()
+    return await (kind === 'run-recovery' ? withRecoveryWorkflowAuthority(() => dueJobs[kind].run()) : dueJobs[kind].run())
   } catch {
     // error-cause: the Workflow event log would persist raw database text; each job's sweep is idempotent.
     throw new RetryableError('due_timer_unavailable', { retryAfter: '1m' })
