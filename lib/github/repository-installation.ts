@@ -3,6 +3,8 @@ import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { githubRepositoryInstallations } from '@/lib/db/schema'
 import { githubRepository } from './run-pull-request'
+import { readGitHubAppConfig } from './app-config'
+import { githubAppEnvironmentConfig } from './app-env'
 
 /** The Plugins → GitHub connection, else the GitHub sign-in account (Better Auth owns account). Durable provider subject only, never OAuth tokens. */
 export async function linkedGitHubAccountId(userId: string): Promise<string | null> {
@@ -35,8 +37,8 @@ async function githubJson(fetcher: typeof fetch, token: string, path: string) {
 export async function recordRepositoryInstallation(userId: string, remoteKey: string, credential: { token: string; githubAccountId: string; repositoryId?: number }, options: Options = {}): Promise<void> {
   try {
     const repo = githubRepository(remoteKey)
-    const env = options.env ?? process.env
-    const appId = Number(env.GITHUB_APP_ID)
+    const config = options.env ? githubAppEnvironmentConfig(options.env) : await readGitHubAppConfig()
+    const appId = Number(config.id)
     if (!isId(appId)) throw new Error('app_not_configured')
     const fetcher = options.fetcher ?? fetch
     const repositoryId = credential.repositoryId ?? (await githubJson(fetcher, credential.token, repo.path)).data.id

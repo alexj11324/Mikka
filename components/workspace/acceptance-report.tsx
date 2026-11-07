@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowRight, ChevronRight, CircleCheck, CircleX, ExternalLink, Play } from 'lucide-react'
 import { getArtifact } from '@/app/actions/artifacts'
 import { getThreadChanges } from '@/app/actions/agents'
@@ -11,12 +12,14 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
-import type { AcceptanceDetail, ResultRow } from '@/lib/factory/acceptance-view'
+import { resultRows, type AcceptanceDetail, type ResultRow } from '@/lib/factory/acceptance-view'
 import type { FactoryFlow } from '@/lib/factory/flow-client'
 import { pullNumberOf } from '@/lib/factory/artifact-review'
 import type { ArtifactMedia } from '@/lib/artifacts/types'
 import { cn } from '@/lib/utils'
-import { CountBadges } from './factory-flow'
+import { useArtifactReview } from './artifact-review'
+import type { FactoryTask } from './factory-acceptance-pane'
+import { CountBadges, isFlowV2 } from './factory-flow'
 import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha } from './short-sha'
 import { Counts, FileSection, useDiffWrap } from './thread-changes'
@@ -144,4 +147,35 @@ export function ReportBanner({ tone, icon, title, detail, children }: { tone: 'm
     </div>
     {children && <div className="flex shrink-0 items-center gap-2">{children}</div>}
   </div>
+}
+
+/**
+ * The PR report above the report's text in the Artifact window (P1, P3, P6, P7, P7b), read-only. It follows
+ * the task's state from the shared detail, flow and ledger reads, so it stays while a fix run or failed checks
+ * unbind the decision; a bound decision puts its own buttons into the banner through `onBannerSlot`.
+ */
+export function ArtifactReportLead({ task, artifactId, onBannerSlot, actions: header }: { task: FactoryTask; artifactId: string; onBannerSlot: (node: HTMLElement | null) => void; /** The window header's action area: a fix run names itself there (P3), with nothing to decide. */ actions?: HTMLElement | null }) {
+  const t = useTranslations('ArtifactReview')
+  const tAcceptance = useTranslations('FactoryAcceptance')
+  const format = useFormatter()
+  const { kind, detail, flow, ledger, merge, pullRequest } = useArtifactReview(task.id, { hasArtifact: true, runSucceeded: true })
+  // A v2 report draws its lead only while it is the task's report; an older task has no flow to say so.
+  if (!detail || (isFlowV2(detail) && flow?.acceptance?.artifactId !== artifactId)) return null
+  const checks = (Array.isArray(detail.checks) ? detail.checks : []).filter(check => !isFlowV2(detail) || check.runId !== null)
+  const results = resultRows(checks, detail.task?.candidateId ?? null)
+  const failed = results.filter(row => row.status === 'failed')
+  const rejected = ledger?.rejections?.at(-1)
+  const time = (iso: string) => format.dateTime(new Date(iso), { hour: '2-digit', minute: '2-digit' })
+  const actions = <span ref={onBannerSlot} className="flex items-center gap-2 empty:hidden" />
+  const github = pullRequest && <Button size="sm" variant="secondary" nativeButton={false} render={<a href={pullRequest.url} target="_blank" rel="noopener noreferrer" />}>{tAcceptance('openOnGitHub')}</Button>
+  const banner = kind === 'fixing' ? <ReportBanner tone="muted" icon={<Spinner />} title={rejected ? t('changesRequestedAt', { time: time(rejected.createdAt) }) : t('state.fixing')} detail={rejected?.note} />
+    : kind === 'refused' && merge?.refusal ? <ReportBanner tone="destructive" icon={<CircleX aria-hidden="true" />} title={t('mergeFailed', { reason: tAcceptance(`mergeRefusal.${merge.refusal}` as 'mergeRefusal.githubUnavailable') })}>{actions}</ReportBanner>
+    : kind === 'blocked' || failed.length ? <ReportBanner tone="destructive" icon={<CircleX aria-hidden="true" />} title={failed.length ? t('checksFailed', { names: failed.map(row => t(row.stage)).join(' · ') }) : t('state.blocked')} detail={detail.task?.reason || null}>
+      {github}{actions}
+    </ReportBanner> : undefined
+  // The changes are the candidate's work tree; during a fix run that is still the PR's last candidate.
+  return <>
+    {header && kind === 'fixing' && createPortal(<span role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground"><Spinner />{t('state.fixing')}</span>, header)}
+    <AcceptanceReport artifactId={artifactId} issueId={task.issueId} runId={task.candidateRunId ?? flow?.acceptance?.runId ?? null} detail={detail} flow={flow} results={results} banner={banner} />
+  </>
 }

@@ -8,10 +8,11 @@ import { oAuthProxy, oneTimeToken } from 'better-auth/plugins'
 import { pool } from '@/lib/db'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appOrigin, MCP_SCOPE, mcpResourceURL } from '@/lib/mcp/resource'
-import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
+import { authOAuthProxyOptions, authEffectiveTrustedOrigins, authSignInMethods } from '@/lib/auth-config'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { afterJob } from '@/lib/background'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
+import { githubSignInClient } from '@/lib/github/app-config'
 import { beforeSignup, localSignUpRateRules } from '@/lib/abuse/signup'
 import { newUserAvatar } from '@/lib/default-avatar'
 import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
@@ -21,10 +22,9 @@ import { readFreshSessionsInScope, SESSION_OPTIONS } from '@/lib/fresh-session'
 import { desktopSessionCacheAfter, withDesktopSessionCache } from '@/lib/desktop-rpc/session-cache'
 
 /** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
-export const MOBILE_APP_ORIGIN = 'mikka://'
+export { MOBILE_APP_ORIGIN } from '@/lib/auth-config'
 
-export const githubEnabled = Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET)
-export const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+export const { github: githubEnabled, google: googleEnabled } = authSignInMethods(process.env)
 export const authBaseURL = appOrigin
 const proxyOptions = authOAuthProxyOptions(process.env)
 export const oauthCallbackBaseURL = proxyOptions?.productionURL ?? authBaseURL
@@ -64,12 +64,11 @@ export const auth = betterAuth({
     },
   },
   socialProviders: {
-    ...(githubEnabled ? { github: {
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    github: async () => ({
+      ...await githubSignInClient(),
       getUserInfo: githubVerifiedProfile(),
       requireEmailVerification: true,
-    } } : {}),
+    }),
     ...(googleEnabled ? { google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
@@ -84,13 +83,7 @@ export const auth = betterAuth({
   emailAndPassword: email.emailAndPassword,
   emailVerification: email.emailVerification,
   rateLimit: { ...email.rateLimit, customRules: { ...email.rateLimit.customRules, ...localSignUpRateRules(process.env) }, storage: 'database' },
-  trustedOrigins: [
-    ...authTrustedOrigins(process.env),
-    ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
-    // The iOS app's deep link (apps/mobile app.json scheme); Expo Go uses exp:// while developing.
-    MOBILE_APP_ORIGIN,
-    ...(process.env.NODE_ENV === 'development' ? ['exp://'] : []),
-  ],
+  trustedOrigins: authEffectiveTrustedOrigins(process.env),
   // Makes the app an OAuth 2.1 server so agents (Claude Code, Codex…) can sign
   // in to the MCP server at /api/mcp as the person. Clients register
   // themselves (RFC 7591) and use PKCE; access tokens are opaque and hashed in
@@ -172,6 +165,11 @@ export const auth = betterAuth({
     } : {}),
   },
 })
+
+/** The provider Better Auth actually initialized, including the explicitly opted-in server App. */
+export async function githubSignInEnabled(): Promise<boolean> {
+  return (await auth.$context).socialProviders.some(provider => provider.id === 'github')
+}
 
 // Inside withFreshSession (money, permissions, credentials, deletion) a session read skips the cookie cache.
 readFreshSessionsInScope(auth.api, { cookieName: async () => (await auth.$context).authCookies.sessionData.name })

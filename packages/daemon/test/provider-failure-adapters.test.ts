@@ -1,11 +1,12 @@
 // Real adapter/CLI transports, synthetic provider protocol events; no network.
 import { chmodSync, readFileSync } from "node:fs"
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { join, resolve } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { ClaudeAdapter } from "../src/adapters/claude"
 import { CodexAdapter } from "../src/adapters/codex"
-import type { AgentEvent, ExitEvent } from "../src/adapters/types"
+import type { AgentEvent, AgentSession, ExitEvent } from "../src/adapters/types"
 import { NoSandbox } from "../src/agents/sandbox"
 import { ToolApprovalGate } from "../src/agents/tool-approval"
 import { buildChildEnv } from "../src/env"
@@ -14,7 +15,32 @@ import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(cleanupTempDirs)
 
-async function run(harness: "claude_code" | "codex", scenario: Record<string, unknown>) {
+it('waits for the real Claude process exit before emitting terminal safety evidence', async () => {
+  const binary = resolve(import.meta.dirname, 'fakes/fake-claude.mjs'), runId = 'native-terminal'
+  chmodSync(binary, 0o755)
+  let child: ChildProcessWithoutNullStreams | undefined, processEnded = false
+  let exited: Promise<void> | undefined, session: AgentSession | undefined
+  const adapter = new ClaudeAdapter({ stateDir: tempDir(), binary, spawnHosted(options) {
+    child = spawn(binary, options.args, { cwd: options.cwd, env: options.env, signal: options.signal, stdio: ['pipe', 'pipe', 'pipe'] })
+    exited = new Promise<void>(resolve => child!.once('exit', () => { processEnded = true; resolve() }))
+    return child
+  } })
+  try {
+    session = await adapter.start({ runId, cwd: await makeRepo(), prompt: 'ordinary turn',
+      toolApproval: new ToolApprovalGate(runId, { isLive: () => true }), env: buildChildEnv(), log: createLogger({ level: 'silent' }) })
+    let terminal = false
+    for await (const event of session.events()) {
+      if (event.type === 'exit') { terminal = true; expect(processEnded).toBe(true) }
+    }
+    expect(terminal).toBe(true)
+  } finally {
+    if (!processEnded) child?.kill('SIGKILL')
+    await exited
+    await session?.detach?.()
+  }
+})
+
+async function run(harness: "claude_code" | "codex", scenario: Record<string, unknown> | string) {
   const stateDir = tempDir(), runId = "provider-failure"
   const binary = resolve(import.meta.dirname, `fakes/fake-${harness === "claude_code" ? "claude" : "codex"}.mjs`)
   chmodSync(binary, 0o755)
@@ -22,7 +48,7 @@ async function run(harness: "claude_code" | "codex", scenario: Record<string, un
     ? new ClaudeAdapter({ stateDir, binary })
     : new CodexAdapter({ stateDir, binary, sandbox: new NoSandbox() })
   const session = await adapter.start({
-    runId, cwd: await makeRepo(), prompt: "PROVIDER_DIAGNOSTIC " + JSON.stringify(scenario),
+    runId, cwd: await makeRepo(), prompt: typeof scenario === "string" ? scenario : "PROVIDER_DIAGNOSTIC " + JSON.stringify(scenario),
     credential: { kind: "provider", protocol: harness === "claude_code" ? "anthropic" : "openai", baseUrl: "https://provider.example.test", key: "fixture-private-model-key" },
     toolApproval: new ToolApprovalGate(runId, { isLive: () => true }),
     env: buildChildEnv(), log: createLogger({ level: "silent" }),
@@ -102,6 +128,7 @@ it("preserves the outer JSON-RPC billing diagnostic when Codex rejects turn/star
   } })).rejects.toMatchObject({
     name: "ProviderFailureError",
     providerFailure: { kind: "balance", retryable: false, status: 429, code: "insufficient_quota" },
+    failureDetails: { category: "quota", status: 429, runId: "provider-failure" },
   })
 })
 
@@ -112,4 +139,27 @@ it("retains a native Codex usageLimitExceeded signal for quota continuation", as
   expect(exit).toMatchObject({ type: "exit", outcome: "failed", quota: { resetsAt: null } })
   expect(exit.providerFailure).toBeUndefined()
   expect(prompts).toBe(1)
+})
+
+describe.each(["claude_code", "codex"] as const)("%s structured failures", harness => {
+  it("retains genuine provider prose and classification while removing credentials and actual user input", async () => {
+    const { exit, prompts } = await run(harness, "FIXTURE_STRUCTURED_FAILURE explain my private research topic")
+    expect(exit).toMatchObject({ outcome: "failed", providerFailure: { kind: "balance", retryable: false }, failureDetails: { schemaVersion: 1, runId: "provider-failure", category: "quota", code: "run_quota_exceeded", status: 429 } })
+    expect(exit.failureDetails?.providerMessage).toContain("Your account has no remaining credit")
+    expect(JSON.stringify(exit.failureDetails)).not.toMatch(/fixture-private-model-key|private research topic/)
+    expect(exit.failureDetails?.appVersion).not.toBe("unknown")
+    expect(prompts).toBe(1)
+  })
+  it("omits provider prose that echoes actual user input or the credential", async () => {
+    const { exit } = await run(harness, "FIXTURE_STRUCTURED_FAILURE ECHO explain my private research topic")
+    expect(exit.failureDetails).toMatchObject({ category: "quota", status: 429 })
+    expect(exit.failureDetails?.providerMessage).toBeUndefined()
+    expect(JSON.stringify(exit.failureDetails)).not.toMatch(/fixture-private-model-key|private research topic/)
+  })
+  it("keeps a bare 403 as access denied without changing credential-disable policy", async () => {
+    const scenario = harness === "claude_code" ? { failure: { api_error_status: 403, result: 'API Error: 403 {"error":{"message":"Workspace access denied"}}' } } : { failure: { message: 'unexpected status 403: {"error":{"message":"Workspace access denied"}}', codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 403 } } } }
+    const { exit } = await run(harness, scenario)
+    expect(exit.failureDetails).toMatchObject({ category: "access_denied", code: "run_access_denied", status: 403 })
+    expect(exit.providerFailure).toBeUndefined()
+  })
 })

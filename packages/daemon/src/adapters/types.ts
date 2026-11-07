@@ -23,6 +23,7 @@ import type { SkillAssignmentReceipt } from '@mikka/protocol/skill'
 import type { Logger } from "../log"
 import type { RunMailbox } from '../run-mailbox'
 import type { QuotaSignal } from '../runs/quota-exhausted'
+import type { DaemonPreparationTiming } from '../tracing'
 
 /**
  * Terminal event of a session; the daemon turns it into the run's end state.
@@ -30,8 +31,12 @@ import type { QuotaSignal } from '../runs/quota-exhausted'
  * `stopReason` is `submitted` (the agent handed in its work explicitly).
  */
 export interface ExitEvent {
+  /** Host-captured failure; never accepted from a model handoff. */
+  failureDetails?: import("@mikka/protocol/run-failure").RunFailure
   type: "exit"
   outcome: "succeeded" | "failed" | "cancelled"
+  /** An adapter error may end its stream without proving the native process exited. */
+  sessionExited?: false
   /** Defaults: `turn_ended` for succeeded, `error` for failed. */
   stopReason?: StopReason
   error?: string
@@ -65,6 +70,8 @@ export interface AgentCapabilities {
 }
 
 export interface SessionOptions {
+  /** Parent run context for asynchronous SDK callbacks after adapter startup. */
+  traceContext?: import('@mikka/protocol/trace-context').RunTraceContext
   /** API key or custom provider for this run (agents/run-credential.ts), never written to disk. */
   credential?: RunCredential
   /** Trusted server-issued delivery binding, never model-selected. */
@@ -80,6 +87,8 @@ export interface SessionOptions {
   apps?: RunApps
   /** Trusted claimed run MCP; independent of optional app connections. */
   mcp?: import('../agents/run-apps').RunMcp
+  /** Acceptance-only host receiver, passed only to the Mikka MCP child. */
+  mcpHttpObservationUrl?: string
   /** Fixed container paths supplied by the hosted runner, never by the assignment. */
   githubRuntime?: { nodeBinary: string; ghBinary: string }
   /** Trusted, run-bound host gate. Never populated from model input. */
@@ -165,6 +174,15 @@ export interface AgentSession {
    * (daemon shutdown); release processes and handles, keep it resumable.
    */
   detach?(): Promise<void>
+}
+
+/** One run's already-starting native session, with no task input released. */
+export interface PreparedAgentStart {
+  readonly ready: Promise<void>
+  /** Present only after an opted-in early start settles; never rebased onto agent_start. */
+  readonly preparationTiming?: DaemonPreparationTiming
+  start(options: StartOptions): Promise<AgentSession>
+  cancel(): Promise<void>
 }
 
 export interface AgentAdapter {

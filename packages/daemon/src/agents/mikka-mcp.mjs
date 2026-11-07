@@ -19,22 +19,113 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { closeSync, fstatSync, openSync, readSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
 import { isAbsolute, join, resolve, sep } from "node:path"
+import { request as httpRequest } from 'node:http'
+
+// Acceptance-only, best-effort observation of the two business fetch paths
+// below. The receiver is the host's existing loopback OTLP server, not an
+// authorization/proxy endpoint. No business call awaits these reports. In
+// particular SIGTERM/SIGKILL keep their normal behavior; lost generations and
+// missing terminal events must remain unknown in the host's receipt.
+function observeMcpHttp(endpoint) {
+  const ignored = { headers: () => {}, body: () => {} }
+  const disabled = { begin: () => ignored, catalogue: () => {}, close: () => {} }
+  if (typeof endpoint !== 'string' || !/^http:\/\/127\.0\.0\.1:\d{1,5}\/v1\/mcp-http\/[a-f0-9]{32}$/.test(endpoint)) return disabled
+  try { if (new URL(endpoint).port === '' || Number(new URL(endpoint).port) > 65535) return disabled } catch { return disabled }
+  const child = randomUUID().replaceAll('-', '')
+  const queue = []
+  let sequence = 0, sent = 0, completed = 0, lost = 0, active = false, closed = false
+  const loss = () => { lost = Math.min(1_000_000, lost + 1) }
+  function pump() {
+    if (active || queue.length === 0) return
+    active = true
+    const body = JSON.stringify({ ...queue.shift(), lost })
+    let done = false, timer, request
+    const settled = ok => {
+      if (done) return
+      done = true; clearTimeout(timer)
+      if (!ok) loss()
+      active = false
+      queueMicrotask(pump)
+    }
+    try {
+      request = httpRequest(endpoint, { method: 'POST', agent: false,
+        headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } }, response => {
+        response.resume()
+        response.once('end', () => settled(response.statusCode === 200))
+        response.once('error', () => settled(false))
+        response.once('aborted', () => settled(false))
+      })
+      // An observation never keeps an otherwise exiting MCP child alive.
+      request.once('socket', socket => socket.unref())
+      request.once('error', () => settled(false))
+      timer = setTimeout(() => { request.destroy(); settled(false) }, 250)
+      timer.unref()
+      request.end(body)
+    } catch { request?.destroy(); settled(false) }
+  }
+  function emit(type, fields = {}) {
+    const event = { version: 3, child, type, sequence: ++sequence, at: Date.now(), ...fields }
+    // Up to three events per request, plus child start/catalogue/close. Overflow is a known loss;
+    // it cannot turn into a complete zero-request observation.
+    if (sequence > 387) { loss(); return }
+    queue.push(event); queueMicrotask(pump)
+  }
+  emit('child_start')
+  return {
+    catalogue(sha256) { emit('catalogue_ready', { source: 'claim', sha256 }) },
+    begin(operation) {
+      if (closed || !['decision_catalogue', 'decision_record'].includes(operation)) { loss(); return ignored }
+      const request = ++sent, started = performance.now()
+      emit('request_start', { request, operation })
+      let finished = false, bodyFinished = false
+      return {
+        headers(status) {
+          if (finished) return
+          finished = true; completed++
+          emit('request_end', { request, durationMs: Math.round((performance.now() - started) * 1000) / 1000,
+            status: status ?? null, outcome: status >= 200 && status < 300 ? 'ok' : 'error' })
+        },
+        body(outcome) {
+          if (!finished || bodyFinished) return
+          bodyFinished = true
+          emit('request_body_end', { request, durationMs: Math.round((performance.now() - started) * 1000) / 1000, outcome })
+        },
+      }
+    },
+    close() {
+      if (closed) return
+      closed = true; emit('child_close', { sent, completed })
+    },
+  }
+}
+const decisionObserver = observeMcpHttp(process.env.MIKKA_MCP_HTTP_OBSERVATION_URL)
 // Decisions travel directly to the bound Mikka worker endpoint. No decision,
 // conversation or credential is ever written to the handoff or worktree.
 const decisionMcpUrl = process.env.MIKKA_DECISION_MCP_URL
 const decisionMcpToken = process.env.MIKKA_DECISION_MCP_TOKEN
 const decisionMcpAvailable = Boolean(decisionMcpUrl && /^mkw_[A-Za-z0-9_-]{43}$/.test(decisionMcpToken ?? ''))
 let decisionRpcId = 0
-async function decisionRpc(method, params) {
+async function decisionRpc(operation, method, params) {
+  // The audited path contains business requests only. Keep this boundary at
+  // the physical send, so another method cannot silently inherit its label.
+  if (!(operation === 'decision_catalogue' && method === 'tools/list'
+    || operation === 'decision_record' && method === 'tools/call' && params?.name === 'record_decision')) throw new Error('decision_method_invalid')
   if (!decisionMcpAvailable) throw new Error('decision_unavailable')
   const id = ++decisionRpcId
-  const response = await fetch(decisionMcpUrl, {
-    method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20_000),
-    headers: { authorization: 'Bearer ' + decisionMcpToken, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18' },
-    body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-  })
+  const observed = decisionObserver.begin(operation)
+  let response
+  try {
+    response = await fetch(decisionMcpUrl, {
+      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20_000),
+      headers: { authorization: 'Bearer ' + decisionMcpToken, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18' },
+      body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+    })
+    observed.headers(response.status)
+  } catch (error) { observed.headers(); throw error }
   if (!response.ok) throw new Error('decision_http_' + response.status)
-  const text = await response.text()
+  let text
+  try { text = await response.text(); observed.body('read') }
+  catch (error) { observed.body('error'); throw error }
   if (text.length > 1_000_000) throw new Error('decision_response_size')
   const envelope = response.headers.get('content-type')?.includes('application/json')
     ? JSON.parse(text)
@@ -43,16 +134,44 @@ async function decisionRpc(method, params) {
   return envelope.result
 }
 let decisionToolPromise
+const preparedDecisionCatalogue = process.env.MIKKA_DECISION_MCP_CATALOGUE
+function readPreparedDecisionCatalogue(raw) {
+  if (Buffer.byteLength(raw) > 32_768) throw new Error('decision_catalogue_size')
+  const catalogue = JSON.parse(raw)
+  const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const exact = (value, keys) => object(value) && Object.keys(value).length === keys.length && Object.keys(value).every(key => keys.includes(key))
+  const tool = catalogue?.tool
+  if (!exact(catalogue, ['version', 'tool']) || catalogue.version !== 1
+    || !exact(tool, ['name', 'title', 'description', 'inputSchema', 'annotations']) || tool.name !== 'record_decision'
+    || typeof tool.title !== 'string' || !tool.title.length || tool.title.length > 200
+    || typeof tool.description !== 'string' || !tool.description.length || tool.description.length > 2000
+    || !object(tool.inputSchema) || tool.inputSchema.type !== 'object'
+    || !exact(tool.annotations, ['idempotentHint']) || tool.annotations.idempotentHint !== true)
+    throw new Error('decision_catalogue_invalid')
+  return tool
+}
 async function decisionTools() {
   if (!decisionMcpAvailable) return []
+  if (preparedDecisionCatalogue !== undefined) {
+    // Malformed supplied metadata never triggers a second remote lookup. Old
+    // servers omit the field and retain their original tools/list path below.
+    try {
+      if (!decisionToolPromise) {
+        const tool = readPreparedDecisionCatalogue(preparedDecisionCatalogue)
+        decisionObserver.catalogue(createHash('sha256').update(preparedDecisionCatalogue).digest('hex'))
+        decisionToolPromise = Promise.resolve([tool])
+      }
+      return await decisionToolPromise
+    } catch { return [] }
+  }
   // Use the server's canonical schema rather than a separately maintained copy.
-  decisionToolPromise ??= decisionRpc('tools/list', {}).then(result =>
+  decisionToolPromise ??= decisionRpc('decision_catalogue', 'tools/list', {}).then(result =>
     Array.isArray(result.tools) ? result.tools.filter(tool => tool.name === 'record_decision' && tool.inputSchema?.type === 'object') : [])
   try { return await decisionToolPromise } catch { decisionToolPromise = undefined; return [] }
 }
 async function recordDecision(args) {
   try {
-    const result = await decisionRpc('tools/call', { name: 'record_decision', arguments: args })
+    const result = await decisionRpc('decision_record', 'tools/call', { name: 'record_decision', arguments: args })
     if (!Array.isArray(result.content)) throw new Error('decision_response')
     return result
   } catch {
@@ -666,6 +785,7 @@ async function handle(message) {
   }
 }
 
+let inputClosed = false, activeMessages = 0
 createInterface({ input: process.stdin }).on("line", (line) => {
   if (!line.trim()) return
   let message
@@ -674,5 +794,12 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   } catch {
     return fail(null, -32700, "Parse error")
   }
-  void handle(message).catch(() => fail(message.id ?? null, -32603, "Mikka tool unavailable"))
+  activeMessages++
+  void handle(message).catch(() => fail(message.id ?? null, -32603, "Mikka tool unavailable")).finally(() => {
+    activeMessages--
+    if (inputClosed && activeMessages === 0) decisionObserver.close()
+  })
+}).once('close', () => {
+  inputClosed = true
+  if (activeMessages === 0) decisionObserver.close()
 })

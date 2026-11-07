@@ -5,6 +5,7 @@
  * it ended, how many input and output tokens it used and how many tools it was
  * offered. Logged for the platform route and for a person's subscription.
  */
+import type { SubscriptionCallTiming, SubscriptionStages } from '../packages/daemon/src/subscription-worker-timing'
 
 export type ModelRoute = 'hosted' | 'subscription'
 
@@ -27,14 +28,25 @@ export interface ModelCallTiming {
   inputTokens: number | null
   /** Input tokens read from the provider's prompt cache. */
   cacheReadTokens: number | null
-  /** Input tokens written to the cache (reported by Anthropic routes only). */
+  /** Input tokens written to the provider's cache when reported by the receipt. */
   cacheWriteTokens: number | null
+  /** Compatible-provider fields before the SDK normalizes an absent read count to zero. */
+  rawCache: { read: RawCacheCount; write: RawCacheCount; creation: RawCacheCount }
   outputTokens: number | null
   toolCalls: number
   finishReason: string | null
   /** The stream failed or was cancelled before it finished. */
   interrupted: boolean
+  /** Pre-layout tools/system hashes: a difference is a prefix-change candidate, not proof of a miss. Never the content. */
+  prefix?: PromptPrefix
+  /** Actual Codex layout result; absent for other routes, false for an unchanged prompt. */
+  codexLayoutApplied?: boolean
+  /** Numeric-only subscription IPC stages; Node offsets and Go durations have separate clocks. */
+  subscriptionStages?: SubscriptionStages
 }
+
+export type PromptPrefix = { tools: string; system: string[] }
+type RawCacheCount = { state: 'number'; tokens: number } | { state: 'missing' | 'null' | 'invalid'; tokens: null }
 
 export interface ModelCallStart {
   route: ModelRoute
@@ -47,30 +59,65 @@ export interface ModelCallStart {
   workflowRunId?: string | null
   stepId?: string | null
   attempt?: number | null
+  prefix?: PromptPrefix
+  codexLayoutApplied?: boolean
+  subscriptionTiming?: SubscriptionCallTiming
 }
 
 type Part = { type: string; usage?: unknown; finishReason?: unknown }
 
-const FIRST_TOKEN = new Set(['text-delta', 'reasoning-delta', 'tool-input-start', 'tool-call'])
+export const MODEL_FIRST_TOKEN = new Set(['text-delta', 'reasoning-delta', 'tool-input-start', 'tool-input-delta', 'tool-call'])
+
+/** Unknown is not zero. Provider token counts and costs must be finite and nonnegative. */
+export function modelMetric(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+}
 
 function total(value: unknown): number | null {
-  if (typeof value === 'number') return value
-  if (value && typeof value === 'object' && 'total' in value && typeof value.total === 'number') return value.total
+  if (typeof value === 'number') return modelMetric(value)
+  if (value && typeof value === 'object' && 'total' in value) return modelMetric(value.total)
   return null
 }
 
-function cache(usage: unknown, field: 'cacheRead' | 'cacheWrite'): number | null {
-  if (!usage || typeof usage !== 'object' || !('inputTokens' in usage)) return null
-  const input = usage.inputTokens
-  if (!input || typeof input !== 'object' || !(field in input)) return null
-  const value = (input as Record<string, unknown>)[field]
-  return typeof value === 'number' ? value : null
+/** AI SDK v7 public usage and v4 provider usage both include cache in the input total. */
+function normalizedModelTokenUsage(usage: unknown): Pick<ModelCallTiming, 'inputTokens' | 'outputTokens' | 'cacheReadTokens' | 'cacheWriteTokens'> {
+  const raw = usage && typeof usage === 'object' ? usage as Record<string, unknown> : {}
+  const input = raw.inputTokens && typeof raw.inputTokens === 'object' ? raw.inputTokens as Record<string, unknown> : {}
+  const details = raw.inputTokenDetails && typeof raw.inputTokenDetails === 'object' ? raw.inputTokenDetails as Record<string, unknown> : {}
+  return {
+    inputTokens: total(raw.inputTokens), outputTokens: total(raw.outputTokens),
+    cacheReadTokens: modelMetric(input.cacheRead) ?? modelMetric(details.cacheReadTokens),
+    cacheWriteTokens: modelMetric(input.cacheWrite) ?? modelMetric(details.cacheWriteTokens),
+  }
 }
 
-function reason(value: unknown): string | null {
-  if (typeof value === 'string') return value
-  if (value && typeof value === 'object' && 'unified' in value && typeof value.unified === 'string') return value.unified
-  return null
+/** Tracing may additionally use the provider's numeric cache-write receipt. */
+export function modelTokenUsage(usage: unknown): ReturnType<typeof normalizedModelTokenUsage> {
+  const normalized = normalizedModelTokenUsage(usage)
+  const details = own(own(usage, 'raw'), 'prompt_tokens_details')
+  return { ...normalized, cacheWriteTokens: normalized.cacheWriteTokens
+    ?? modelMetric(own(details, 'cache_write_tokens')) ?? modelMetric(own(details, 'cached_creation_tokens')) }
+}
+
+function own(value: unknown, key: string): unknown {
+  return value && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, key) ? (value as Record<string, unknown>)[key] : undefined
+}
+
+function rawCache(usage: unknown): ModelCallTiming['rawCache'] {
+  const details = own(own(usage, 'raw'), 'prompt_tokens_details')
+  const count = (key: 'cached_tokens' | 'cache_write_tokens' | 'cached_creation_tokens'): RawCacheCount => {
+    if (!details || typeof details !== 'object' || Array.isArray(details) || !Object.hasOwn(details, key)) return { state: 'missing', tokens: null }
+    const value = own(details, key)
+    if (value === null) return { state: 'null', tokens: null }
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return { state: 'number', tokens: value }
+    return { state: 'invalid', tokens: null }
+  }
+  return { read: count('cached_tokens'), write: count('cache_write_tokens'), creation: count('cached_creation_tokens') }
+}
+
+export function modelFinishReason(value: unknown): string | null {
+  const reason = typeof value === 'string' ? value : value && typeof value === 'object' && 'unified' in value ? value.unified : null
+  return typeof reason === 'string' && ['stop', 'length', 'content-filter', 'tool-calls', 'error', 'other', 'unknown'].includes(reason) ? reason : null
 }
 
 /** Passes the model's stream through unchanged and logs its timing once it ends. Never throws for logging. */
@@ -80,6 +127,7 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
   let usage: unknown
   let finishReason: string | null = null
   let toolCalls = 0
+  let failed = false
   let logged = false
   const emit = (interrupted: boolean) => {
     if (logged) return
@@ -93,11 +141,12 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
         firstTokenMs: firstToken === null ? null : firstToken - start.requestedAt,
         firstTextMs: firstText === null ? null : firstText - start.requestedAt,
         durationMs: at - start.requestedAt,
-        inputTokens: usage && typeof usage === 'object' && 'inputTokens' in usage ? total(usage.inputTokens) : null,
-        cacheReadTokens: cache(usage, 'cacheRead'),
-        cacheWriteTokens: cache(usage, 'cacheWrite'),
-        outputTokens: usage && typeof usage === 'object' && 'outputTokens' in usage ? total(usage.outputTokens) : null,
+        ...normalizedModelTokenUsage(usage),
+        rawCache: rawCache(usage),
         toolCalls, finishReason, interrupted,
+        ...(start.prefix ? { prefix: start.prefix } : {}),
+        ...(start.codexLayoutApplied === undefined ? {} : { codexLayoutApplied: start.codexLayoutApplied }),
+        ...(start.subscriptionTiming ? { subscriptionStages: start.subscriptionTiming.snapshot() } : {}),
       })
     } catch { /* timing never fails the call */ }
   }
@@ -106,12 +155,13 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
     async pull(controller) {
       let next: ReadableStreamReadResult<P>
       try { next = await reader.read() } catch (error) { emit(true); throw error }
-      if (next.done) { emit(false); controller.close(); return }
+      if (next.done) { emit(failed); controller.close(); return }
       const part = next.value
-      if (firstToken === null && FIRST_TOKEN.has(part.type)) firstToken = now()
-      if (firstText === null && part.type === 'text-delta') firstText = now()
+      if (firstToken === null && MODEL_FIRST_TOKEN.has(part.type)) firstToken = now()
+      if (firstText === null && part.type === 'text-delta') { firstText = now(); start.subscriptionTiming?.firstSdkText() }
       if (part.type === 'tool-call') toolCalls++
-      if (part.type === 'finish') { usage = part.usage; finishReason = reason(part.finishReason) }
+      if (part.type === 'error') failed = true
+      if (part.type === 'finish') { usage = part.usage; finishReason = modelFinishReason(part.finishReason); failed ||= finishReason === 'error' }
       controller.enqueue(part)
     },
     async cancel(cause) { emit(true); await reader.cancel(cause) },
@@ -126,4 +176,14 @@ export async function stepIdentity(): Promise<Pick<ModelCallStart, 'workflowRunI
     const step = getStepMetadata()
     return { workflowRunId: getWorkflowMetadata().workflowRunId, stepId: step.stepId, attempt: step.attempt }
   } catch { return {} }
+}
+
+const shortHash = async (value: unknown) => (await import('node:crypto')).createHash('sha256').update(JSON.stringify(value) ?? '').digest('hex').slice(0, 12)
+
+/** The cacheable prefix of a model call as short hashes: the tools as sent, then each system message's text. */
+export async function promptPrefix(prompt: readonly { role: string; content: unknown }[], tools: unknown): Promise<PromptPrefix> {
+  return {
+    tools: await shortHash(tools ?? null),
+    system: await Promise.all(prompt.filter(message => message.role === 'system').map(message => shortHash(message.content))),
+  }
 }

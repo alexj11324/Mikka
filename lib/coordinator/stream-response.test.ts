@@ -1,15 +1,23 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { mock, test } from 'node:test'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
+import { WorkflowAgent, type ModelCallStreamPart } from '@ai-sdk/workflow'
+import { MockLanguageModelV4 } from 'ai/test'
+import { registerSerializationClass } from 'workflow/internal/class-serialization'
 import { fingerprint } from '@/lib/credentials/fingerprint'
 import { QUIET_REPLY } from '@/lib/attention/handoff'
-import { coordinatorTextStream } from './stream-response'
+import { coordinatorTextStream, type CoordinatorStreamTiming } from './stream-response'
+import { ScopedCoordinatorWritable } from './scoped-stream'
 import { coordinatorStreamReply, type CoordinatorLiveReply } from '../coordinator-stream-client'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
 
 const start = (id = 'run:0', quietEligible = false): CoordinatorWorkflowStreamPart => ({ type: 'coordinator-turn-start', id, quietEligible })
-const delta = (text: string): CoordinatorWorkflowStreamPart => ({ type: 'text-delta', id: '0', text })
+const delta = (text: string): ModelCallStreamPart => ({ type: 'text-delta', id: '0', text })
 const committed = (id = 'run:0', through = 2, quiet = false): CoordinatorWorkflowStreamPart => ({ type: 'coordinator-turn-committed', id, through, quiet })
 const boundary = (type: 'start-step' | 'finish-step') => ({ type }) as unknown as CoordinatorWorkflowStreamPart
+const scopedStart = (id = 'run:0', quietEligible = false): CoordinatorWorkflowStreamPart => ({ type: 'coordinator-turn-start', id, quietEligible, modelStream: 'scoped-v1' })
+const scopedPart = (id: string, part: ModelCallStreamPart): CoordinatorWorkflowStreamPart => ({ type: 'coordinator-model-part', id, part })
 const body = (events: CoordinatorStreamEvent[]) => events.map(event => event.type === 'text' ? event.delta : '').join('')
 
 async function drain(stream: ReadableStream<CoordinatorStreamEvent>, events: CoordinatorStreamEvent[] = []) {
@@ -28,6 +36,21 @@ async function project(parts: CoordinatorWorkflowStreamPart[]) {
   return drain(output.pipeThrough(coordinatorTextStream('owner', [])))
 }
 
+test('invalid SDK calls and paired errors stay server-side while the corrected reply commits',async()=>{
+  const events=await project([start(),
+    {type:'tool-call',toolCallId:'bad',toolName:'none',input:{x:'private input'},dynamic:true,invalid:true,error:new Error('private error')} as CoordinatorWorkflowStreamPart,
+    {type:'tool-error',toolCallId:'bad',toolName:'none',input:{x:'private input'},dynamic:true,error:'AI_NoSuchToolError: private error'} as CoordinatorWorkflowStreamPart,
+    boundary('finish-step'),boundary('start-step'),
+    {type:'tool-call',toolCallId:'bad',toolName:'registered',input:{}} as CoordinatorWorkflowStreamPart,
+    {type:'tool-result',toolCallId:'bad',toolName:'registered',input:{},output:{ok:true}} as CoordinatorWorkflowStreamPart,
+    delta('Corrected reply'),committed(),
+  ])
+  assert.deepEqual(events.filter(event=>event.type==='tool').map(event=>[event.name,event.state]),[['registered','running'],['registered','done']])
+  assert.equal(body(events),'Corrected reply')
+  assert.equal(events.at(-1)?.type,'committed')
+  assert.doesNotMatch(JSON.stringify(events),/private|NoSuchTool|none/)
+})
+
 test('text arrives before the turn commits; model internals never leave the stream', async () => {
   const raw = new TransformStream<CoordinatorWorkflowStreamPart, CoordinatorWorkflowStreamPart>()
   const writer = raw.writable.getWriter()
@@ -45,6 +68,277 @@ test('text arrives before the turn commits; model internals never leave the stre
     { type: 'tool-input-delta', id: 't', delta: 'private tool input' }, delta('public'), committed()])
   assert.equal(body(events), 'public')
   assert.equal(JSON.stringify(events).includes('private'), false)
+})
+
+test('a scoped stop freezes the live reply at the same boundary as its stored stopped text', async () => {
+  const events = await project([start(), delta('Before stop.'),
+    { type: 'coordinator-turn-stopped', id: 'run:0' },
+    delta(' Late queued tail.'), { type: 'reset-step' }, delta('Late replacement'), committed()])
+  assert.equal(body(events), 'Before stop.')
+  assert.equal(events.some(event => event.type === 'reset'), false)
+  assert.equal(events.at(-1)?.type, 'committed')
+})
+
+test('scoped model parts and old control markers cannot change the next round', async () => {
+  const scoped = scopedPart
+  const events = await project([scopedStart('run:0'), scoped('run:0', delta('First.')),
+    { type: 'coordinator-turn-stopped', id: 'run:0' }, scoped('run:0', delta('Late first')), committed(),
+    scopedStart('run:1'), scoped('run:1', delta('Second')), scopedStart('run:0'),
+    { type: 'coordinator-turn-stopped', id: 'run:0' }, committed(),
+    scoped('run:0', { type: 'reset-step' }), scoped('run:0', delta('old tail')),
+    delta('unscoped tail'), scoped('run:1', delta(' reply.')), committed('run:1', 4)])
+  const texts = (id: string) => events.flatMap(event => event.type === 'text' && event.id === id ? [event.delta] : []).join('')
+  assert.equal(texts('run:0'), 'First.')
+  assert.equal(texts('run:1'), 'Second reply.')
+  assert.deepEqual(events.filter(event => event.type === 'committed').map(event => event.id), ['run:0', 'run:1'])
+})
+
+test('the real SDK and step serializer retain turn scope through a revived durable writable', { timeout: 10_000 }, async t => {
+  // Resolve the installed transitive core through workflow, as the SDK does. No transport is contacted.
+  const workflowRequire = createRequire(createRequire(import.meta.url).resolve('workflow'))
+  const coreRequire = createRequire(workflowRequire.resolve('@workflow/core'))
+  const { dehydrateStepArguments, hydrateStepArguments, getDeserializeStream } = await import(pathToFileURL(workflowRequire.resolve('@workflow/core/serialization')).href)
+  const { SPEC_VERSION_CURRENT } = await import(pathToFileURL(coreRequire.resolve('@workflow/world')).href)
+  registerSerializationClass('class//test//ScopedCoordinatorWritable', ScopedCoordinatorWritable)
+  const worldKey = Symbol.for('@workflow/world//cache')
+  const previousWorld = Reflect.get(globalThis, worldKey)
+  const fetch = mock.method(globalThis, 'fetch', async () => { throw new Error('offline_fixture_network_forbidden') })
+  t.after(() => { fetch.mock.restore(); if (previousWorld === undefined) Reflect.deleteProperty(globalThis, worldKey); else Reflect.set(globalThis, worldKey, previousWorld) })
+  const frames: Uint8Array[] = []
+  let closes = 0
+  const record = (runId: string, name: string, chunks: Uint8Array[]) => {
+    assert.equal(runId, 'wrun_fixture')
+    assert.equal(name, 'default')
+    frames.push(...chunks.map(chunk => chunk.slice()))
+  }
+  Reflect.set(globalThis, worldKey, { specVersion: SPEC_VERSION_CURRENT, streams: {
+    write: async (runId: string, name: string, chunk: Uint8Array) => record(runId, name, [chunk]),
+    writeMulti: async (runId: string, name: string, chunks: Uint8Array[]) => record(runId, name, chunks),
+    close: async () => { closes++ },
+  } })
+  const handle = new WritableStream<CoordinatorWorkflowStreamPart>({ write() { throw new Error('workflow_handle_must_be_revived') } })
+  Object.defineProperty(handle, Symbol.for('WORKFLOW_STREAM_NAME'), { value: 'default' })
+  const encoded = await dehydrateStepArguments([new ScopedCoordinatorWritable(handle, 'run:0')], 'wrun_fixture', undefined)
+  assert.ok(encoded instanceof Uint8Array)
+  const ops: Promise<unknown>[] = []
+  const [revived] = await hydrateStepArguments(encoded, 'wrun_fixture', undefined, ops) as [ScopedCoordinatorWritable]
+  assert.ok(revived instanceof ScopedCoordinatorWritable)
+  const controller = new AbortController()
+  let modelSignal: AbortSignal | undefined
+  const model = new MockLanguageModelV4({ doStream: async options => {
+    modelSignal = options.abortSignal
+    return { stream: new ReadableStream({ start(output) {
+      output.enqueue({ type: 'stream-start', warnings: [] })
+      output.enqueue({ type: 'text-start', id: 't' })
+      output.enqueue({ type: 'text-delta', id: 't', delta: 'First.' })
+      output.enqueue({ type: 'text-delta', id: 't', delta: 'Queued tail.' })
+      output.enqueue({ type: 'text-end', id: 't' })
+      output.enqueue({ type: 'finish', finishReason: { unified: 'stop', raw: 'stop' }, usage: {
+        inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+        outputTokens: { total: 2, text: 2, reasoning: 0 },
+      } })
+      output.close()
+    } }) }
+  } })
+  await new WorkflowAgent({ model }).stream({ messages: [{ role: 'user', content: 'synthetic fixture' }], writable: revived,
+    preventClose: true, maxRetries: 0, abortSignal: controller.signal })
+  await Promise.all(ops)
+  assert.equal(modelSignal, controller.signal)
+  assert.equal(revived.locked, false)
+  assert.equal(closes, 0, 'preventClose preserves the shared durable stream for control markers and later rounds')
+  assert.equal(fetch.mock.callCount(), 0)
+  const bytes = new ReadableStream<Uint8Array>({ start(output) { frames.forEach(frame => output.enqueue(frame)); output.close() } })
+  const sdkParts: CoordinatorWorkflowStreamPart[] = []
+  for await (const part of bytes.pipeThrough(getDeserializeStream({}, undefined))) sdkParts.push(part as CoordinatorWorkflowStreamPart)
+  assert.ok(sdkParts.length >= 4)
+  assert.ok(sdkParts.every(part => part.type === 'coordinator-model-part' && part.id === 'run:0'))
+  assert.ok(sdkParts.some(part => part.type === 'coordinator-model-part' && part.part.type === 'reset-step'))
+  assert.ok(sdkParts.some(part => part.type === 'coordinator-model-part' && (part.part.type as string) === 'finish'))
+  const first = sdkParts.findIndex(part => part.type === 'coordinator-model-part' && part.part.type === 'text-delta')
+  assert.ok(first >= 0)
+  // Another durable step can publish Stop and the next turn before the model writer's accepted tail drains.
+  const events = await project([scopedStart(), ...sdkParts.slice(0, first + 1),
+    { type: 'coordinator-turn-stopped', id: 'run:0' }, committed(), scopedStart('run:1'),
+    scopedPart('run:1', delta('Next.')), ...sdkParts.slice(first + 1), committed('run:1', 4)])
+  assert.equal(body(events), 'First.Next.')
+  assert.deepEqual(events.filter(event => event.type === 'committed').map(event => event.id), ['run:0', 'run:1'])
+})
+
+test('the scoped writer preserves real backpressure, lock, error, abort and close behavior', async () => {
+  const accepted: CoordinatorWorkflowStreamPart[] = []
+  const blocked = Promise.withResolvers<void>()
+  let closed = 0
+  const raw = new WritableStream<CoordinatorWorkflowStreamPart>({
+    async write(part) { accepted.push(part); await blocked.promise }, close() { closed++ },
+  })
+  const scoped = new ScopedCoordinatorWritable(raw, 'run:7')
+  const writer = scoped.getWriter()
+  assert.equal(scoped.locked, true)
+  assert.throws(() => scoped.getWriter(), TypeError)
+  let settled = false
+  const pending = writer.write(delta('safe')).then(() => { settled = true })
+  await Promise.resolve()
+  assert.equal(settled, false)
+  assert.equal(writer.desiredSize, 0)
+  blocked.resolve()
+  await pending
+  await writer.ready
+  assert.deepEqual(accepted, [scopedPart('run:7', delta('safe'))])
+  writer.releaseLock()
+  assert.equal(scoped.locked, false)
+  await scoped.close()
+  assert.equal(closed, 1)
+  const reason = new Error('synthetic write failure')
+  let aborted: unknown
+  const abortable = new ScopedCoordinatorWritable(new WritableStream({ abort(value) { aborted = value } }), 'run:8')
+  const abortWriter = abortable.getWriter()
+  const rejectedClosed = assert.rejects(abortWriter.closed, error => error === reason)
+  await abortWriter.abort(reason)
+  await rejectedClosed
+  assert.equal(aborted, reason)
+  abortWriter.releaseLock()
+  const failed = new ScopedCoordinatorWritable(new WritableStream({ write() { throw reason } }), 'run:9').getWriter()
+  const failedClosed = assert.rejects(failed.closed, error => error === reason)
+  await assert.rejects(failed.write(delta('safe')), error => error === reason)
+  await failedClosed
+  failed.releaseLock()
+})
+
+test('Stop does not depend on a cooperative SDK model stream to discard the late tail', async t => {
+  const controller = new AbortController()
+  const raw: CoordinatorWorkflowStreamPart[] = [scopedStart()]
+  const fetch = mock.method(globalThis, 'fetch', async () => { throw new Error('offline_fixture_network_forbidden') })
+  t.after(() => fetch.mock.restore())
+  const writable = new ScopedCoordinatorWritable(new WritableStream<CoordinatorWorkflowStreamPart>({ write(part) {
+    raw.push(part)
+    if (part.type === 'coordinator-model-part' && part.part.type === 'text-delta' && part.part.text === 'Before.') {
+      raw.push({ type: 'coordinator-turn-stopped', id: 'run:0' })
+      controller.abort()
+    }
+  } }), 'run:0')
+  let passedSignal: AbortSignal | undefined
+  const model = new MockLanguageModelV4({ doStream: async options => {
+    passedSignal = options.abortSignal
+    return { stream: new ReadableStream({ start(output) {
+      output.enqueue({ type: 'stream-start', warnings: [] })
+      output.enqueue({ type: 'text-start', id: 't' })
+      output.enqueue({ type: 'text-delta', id: 't', delta: 'Before.' })
+      output.enqueue({ type: 'text-delta', id: 't', delta: 'Accepted late.' })
+      output.enqueue({ type: 'text-end', id: 't' })
+      output.enqueue({ type: 'finish', finishReason: { unified: 'stop', raw: 'stop' }, usage: {
+        inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 2, text: 2, reasoning: 0 },
+      } })
+      output.close()
+    } }) }
+  } })
+  await new WorkflowAgent({ model }).stream({ messages: [{ role: 'user', content: 'synthetic fixture' }], writable,
+    preventClose: true, maxRetries: 0, abortSignal: controller.signal })
+  assert.equal(passedSignal, controller.signal)
+  assert.equal(passedSignal.aborted, true)
+  assert.ok(raw.some(part => part.type === 'coordinator-model-part' && part.part.type === 'text-delta' && part.part.text === 'Accepted late.'))
+  assert.equal(body(await project([...raw, committed()])), 'Before.')
+  const { stoppedStepText } = await import('./stop')
+  assert.equal(await stoppedStepText(new ReadableStream({ start(output) { raw.forEach(part => output.enqueue(part)); output.close() } }), 'run:0'), 'Before.')
+  assert.equal(fetch.mock.callCount(), 0)
+})
+
+test('scoped output preserves all 63 secret splits and Unicode secret checks before release', async () => {
+  const old = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
+  try {
+    const secret = '0123456789abcdef'.repeat(4)
+    const prefix = 'Safe intro. '
+    for (const value of [secret, '凭证🔒秘密字段不可输出🔑']) {
+      const fingerprints = [fingerprint('owner', value)]
+      for (let split = 1; split < value.length; split++) {
+        const events: CoordinatorStreamEvent[] = []
+        const raw = new ReadableStream<CoordinatorWorkflowStreamPart>({ start(output) {
+          for (const part of [scopedStart(), scopedPart('run:0', delta(prefix + value.slice(0, split))),
+            scopedPart('run:0', delta(value.slice(split))), committed()]) output.enqueue(part)
+          output.close()
+        } })
+        await assert.rejects(drain(raw.pipeThrough(coordinatorTextStream('owner', fingerprints)), events))
+        assert.equal(body(events), prefix.slice(0, Math.max(0, prefix.length + split - (value.length - 1))))
+        assert.equal(events.some(event => event.type === 'committed'), false)
+      }
+    }
+  } finally { if (old === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = old }
+})
+
+test('scoped retry resets and quiet turns keep the existing text guard and sentinel behavior', async () => {
+  const events = await project([scopedStart(), scopedPart('run:0', delta('旧的回答🔒')), scopedPart('run:0', { type: 'reset-step' }),
+    scopedPart('run:0', delta('新的回答🌍')), committed(), scopedStart('run:1', true),
+    scopedPart('run:1', delta(QUIET_REPLY.slice(0, 5))), scopedPart('run:1', delta(QUIET_REPLY.slice(5))), committed('run:1', 4, true)])
+  let replies: CoordinatorLiveReply[] = []
+  for (const event of events) if (event.type !== 'committed') replies = coordinatorStreamReply(replies, event)
+  assert.equal(replies[0].text, '新的回答🌍')
+  assert.equal(events.some(event => event.type === 'text' && event.id === 'run:1'), false)
+  assert.equal(events.some(event => event.type === 'reset' && event.text === ''), true)
+  assert.equal(JSON.stringify(events).includes(QUIET_REPLY), false)
+})
+
+test('projection timing separates holdback from quiet and records only local numeric observations', async () => {
+  const old = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
+  try {
+    const saved = fingerprint('owner', 'synthetic-guard-value-'.repeat(4))
+    for (const scenario of ['held', 'immediate', 'quiet'] as const) {
+      let time = 100
+      const samples: CoordinatorStreamTiming[] = []
+      const projection = coordinatorTextStream('owner', scenario === 'immediate' ? [] : [saved], { now: () => time, onTiming: sample => { samples.push(sample) } })
+      const events = drain(projection.readable)
+      const writer = projection.writable.getWriter()
+      await writer.write(scopedStart('run:0', scenario === 'quiet'))
+      time = 105
+      await writer.write(scopedPart('run:0', delta(scenario === 'quiet' ? QUIET_REPLY : '短回复🌍')))
+      time = 120
+      // Even a scoped SDK finish does not certify a successful persisted turn.
+      await writer.write(scopedPart('run:0', { type: 'finish' } as unknown as ModelCallStreamPart))
+      time = 140
+      await writer.write(committed('run:0', 2, scenario === 'quiet'))
+      await writer.close()
+      projection.reportTerminal(4)
+      const output = await events
+      assert.equal(samples.length, 1)
+      assert.deepEqual(samples[0], { streamId: 'run:0', fingerprintCount: scenario === 'immediate' ? 0 : 1,
+        maxHoldback: scenario === 'immediate' ? 0 : saved.length - 1, firstRawTextMs: 5,
+        firstEmittedTextMs: scenario === 'quiet' ? null : scenario === 'held' ? 40 : 5,
+        committedMs: 40, firstEmittedAtCommitted: scenario === 'held' ? 1 : 0,
+        firstBlockedByHoldback: scenario === 'held' ? 1 : 0, quietEligible: scenario === 'quiet' ? 1 : 0, stopped: 0, terminal: 0 })
+      assert.equal(body(output), scenario === 'quiet' ? '' : '短回复🌍')
+      assert.ok(Object.entries(samples[0]).every(([key, value]) => key === 'streamId' || value === null || typeof value === 'number'))
+      assert.equal(JSON.stringify(samples).includes(saved.digest), false)
+    }
+  } finally { if (old === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = old }
+})
+
+test('projection diagnostics finalize once for EOF, cancellation, supersession and guard errors', async () => {
+  const old = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
+  try {
+    const secret = 'synthetic-saved-value'
+    for (const terminal of [1, 2, 3, 4] as const) {
+      const samples: CoordinatorStreamTiming[] = []
+      const projection = coordinatorTextStream('owner', [fingerprint('owner', secret)], { now: () => 1, onTiming: sample => { samples.push(sample); throw new Error('synthetic diagnostic failure') } })
+      const reading = drain(projection.readable)
+      // Register the failure handler before writing the part rejected by the credential guard.
+      const observed = terminal === 2 ? assert.rejects(reading) : reading
+      const writer = projection.writable.getWriter()
+      await writer.write(scopedStart())
+      if (terminal === 2) await assert.rejects(writer.write(scopedPart('run:0', delta(secret))))
+      else {
+        if (terminal === 3) await writer.write(scopedStart('run:1'))
+        if (terminal === 4) projection.reportTerminal(4)
+        await writer.close()
+      }
+      await observed
+      projection.reportTerminal(4)
+      assert.equal(samples[0].terminal, terminal)
+      assert.equal(samples.filter(sample => sample.streamId === 'run:0').length, 1)
+      assert.equal(samples[0].firstEmittedTextMs, null)
+      assert.equal(samples[0].committedMs, null)
+    }
+  } finally { if (old === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = old }
 })
 
 test('tool-backed steps concatenate; a retried step replaces only its partial attempt', async () => {

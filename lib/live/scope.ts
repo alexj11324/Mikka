@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import { deviceGatewayTicket } from '../device-gateway-ticket'
+import { gatewayConfig, gatewayURL } from '../builtin-gateway/config'
+import { sessionLiveTicket } from './session-ticket'
 
 export type LiveScope = { ownerId: string; workspaceId: string }
 
@@ -9,18 +11,15 @@ export function liveChannelId(scope: LiveScope) {
 }
 
 export function liveGatewayConfig(env: Record<string, string | undefined>) {
-  if (!env.DEVICE_GATEWAY_URL || !env.DEVICE_GATEWAY_PUSH_SECRET) return null
-  try {
-    const url = new URL(env.DEVICE_GATEWAY_URL)
-    if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return null
-    return { url: url.origin, secret: env.DEVICE_GATEWAY_PUSH_SECRET }
-  } catch { return null }
+  const config = gatewayConfig(env)
+  return config ? { url: config.url, secret: config.secret, mode: config.mode } : null
 }
 
-export function liveTicket(scope: LiveScope, config: NonNullable<ReturnType<typeof liveGatewayConfig>>, now = Date.now()) {
+export function liveTicket(scope: LiveScope, config: { url: string; secret: string; mode?: 'builtin' | 'worker' }, now = Date.now(), sessionId?: string) {
   const channel = liveChannelId(scope)
-  const ticket = deviceGatewayTicket(`live:${channel}`, config.secret, now)
-  const url = new URL(`/v1/live/${channel}/socket`, config.url)
+  const url = gatewayURL(config, `/v1/live/${channel}/socket`)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  if (config.mode === 'builtin') return { url: url.href, ...sessionLiveTicket(channel, sessionId ?? '', config.secret, now) }
+  const ticket = deviceGatewayTicket(`live:${channel}`, config.secret, now)
   return { url: url.href, protocol: ticket.protocol, expiresAt: ticket.exp * 1000 }
 }

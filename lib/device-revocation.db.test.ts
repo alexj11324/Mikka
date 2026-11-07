@@ -17,6 +17,7 @@ import { Socket } from 'node:net'
 import { withDeviceRoute } from './device-route'
 import { pool as appPool } from './db'
 import { longPollIdleCheck } from './device-link'
+import { MIN_DAEMON_VERSION } from '@mikka/protocol/device'
 
 // Every byte the database sends to this process.
 const sockets = new Set<Socket>()
@@ -203,7 +204,9 @@ test('with push, revocation ends a waiting long poll on its NOTIFY, long before 
   })
   assert.equal(longPollIdleCheck.ms, 5_000)
   const poll = (f: Fixture, wait: number) => scope.run(() => commands(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/commands?wait=${wait}`, {
-    headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${f.token}` },
+    // Exercise an admitted waiting poll, not an obsolete client's cold npm
+    // upgrade lookup before LISTEN. Version-floor behavior has its own tests.
+    headers: { 'x-mikka-client-version': MIN_DAEMON_VERSION, authorization: `Bearer ${f.token}` },
   }), { params: Promise.resolve({ deviceId: f.device }) }))
 
   const pushed = await fixture()

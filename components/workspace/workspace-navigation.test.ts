@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { canonicalHref, closeThread, goTo, nextMark, openThread, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
+import { canonicalHref, closeThread, goTo, nextMark, openThread, queryMoved, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, tidyAddress, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
 import type { WorkspaceLocation } from './workspace-navigation'
 
 const BOT = '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f'
@@ -228,6 +228,22 @@ function fakeBrowser(path: string, state: unknown = { __NA: true }) {
   Object.assign(globalThis, { window: { location, history, dispatchEvent() { return true } } })
   return { history, path: () => entries[index].href }
 }
+
+test('canonicalizing an unchanged return address does not consume its pending popstate', () => {
+  const chat = `/?workspace=one&bot=${BOT}`
+  const browser = fakeBrowser(chat)
+  queryMoved()
+  browser.history.pushState(null, '', '/settings?workspace=one')
+  queryMoved()
+  browser.history.back()
+  tidyAddress(() => true)
+  assert.equal(queryMoved(), true, 'the returned bot still needs to be shown after the router renders its address')
+  assert.equal(queryMoved(), false, 'the same query is handled only once')
+  browser.history.replaceState(null, '', `${chat}#paragraph`)
+  assert.equal(queryMoved(), false, 'an anchor-only history move must not change the workspace selection')
+  goTo({ bot: null })
+  assert.equal(queryMoved(), false, 'a workspace-owned move is already shown by its caller')
+})
 
 // ← in an open thread is the thread model's close (decision 0301, R-82): openThread records where it came from; closeThread goes back there.
 test('closing a thread opened from here is back: no new entry, and back does not reopen it', () => {

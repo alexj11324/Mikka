@@ -45,6 +45,13 @@ export function pushSettingsHistory(href: string, workspaceId?: string, basePath
   requested.pathname = appPath(destinationRoute, locale, basePath)
   if (!isLocalSettingsNavigation(current, requested, workspaceId, basePath)) return false
 
+  // A section change is not a workspace change. Keep the URL's explicit scope,
+  // not a possibly stale resolved workspaceId, unless the destination sets one.
+  // Leave an implicit default implicit so ordinary navigation cannot invalidate
+  // the authenticated cache or clear the desktop bootstrap.
+  const workspace = current.searchParams.get('workspace')
+  if (!requested.searchParams.has('workspace') && workspace !== null) requested.searchParams.set('workspace', workspace)
+
   if (current.href !== requested.href) {
     window.history.pushState(null, '', `${requested.pathname}${requested.search}${requested.hash}`)
     document.querySelector('[data-slot="sidebar-inset"]')?.scrollTo({ top: 0 })
@@ -69,3 +76,9 @@ export function takeShellSearchRequest() {
 export function requestShellBrowser() {
   try { window.localStorage.setItem('mikka:browser', '1') } catch { /* storage unavailable */ }
 }
+
+let appHref: string | null = null
+/** The app page last shown outside Settings, for Settings' way back. Kept outside the
+ *  workspace component: a Settings link that names the workspace remounts it. */
+export function rememberAppHref(href: string) { appHref = href }
+export function appHrefBeforeSettings() { return appHref }

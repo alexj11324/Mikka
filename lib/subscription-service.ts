@@ -1,3 +1,6 @@
+import { captureRunFailure, type RunFailureContext } from '@mikka/protocol/run-failure'
+import { WorkflowRunFailureError } from './workflow-run-failure'
+import { APP_BUILD } from './app-build'
 import { workerSubscriptionMatches } from './agent-kit/worker'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { quotaSnapshotSchema, type QuotaSnapshot } from '@mikka/protocol'
@@ -76,11 +79,12 @@ export class SubscriptionService {
       await this.admitModel({ workspaceId: binding.workspaceId, ownerId: use.ownerId }, binding.modelId, binding.route, callSignal)
     }
     await admit()
-    const row = await this.repository.connection(use.ownerId, binding.connectionId)
-    const client = this.worker(this.repository.scope(row)).forUse(use)
     return resolveSubscriptionModel(use, binding.modelId, {
       access: () => this.access(use, signal),
-      model: async modelId => {
+      model: async (modelId, { connection }) => {
+        // This call's access check already read and verified the custody scope.
+        // Each later model/HTTP call still runs its own fresh authorization.
+        const client = this.worker({ ownerId: connection.ownerId, workspaceId: connection.workspaceId, connectionId: connection.id, provider: connection.provider === 'openai' ? 'codex' : 'claude' }).forUse(use)
         const provider = createOpenAICompatible({ name: 'mikka-subscription', baseURL: 'https://mikka.invalid/v1', apiKey: 'private-worker-placeholder',
           fetch: async (_url, init) => {
             if (typeof init?.body !== 'string') {
@@ -106,6 +110,7 @@ export class SubscriptionService {
         const model = provider(modelId)
         const doStream = model.doStream.bind(model)
         model.doStream = async options => {
+          const failureContext: RunFailureContext = { credential: 'subscription', provider: connection.provider === 'openai' ? 'codex' : 'claude_code', appVersion: APP_BUILD, requestBodyValues: { prompt: options.prompt, tools: options.tools, providerOptions: options.providerOptions, headers: options.headers } }
           try {
             const result = await doStream(options)
             const reader = result.stream.getReader()
@@ -116,19 +121,33 @@ export class SubscriptionService {
                   const { value, done } = await reader.read()
                   if (closed) return
                   if (done) { closed = true; reader.releaseLock(); controller.close(); return }
-                  if (value.type === 'error') await logGenerationFailure('stream_part', value.error)
-                  controller.enqueue(value.type === 'error' ? { type: 'error', error: subscriptionGenerationError(value.error) } : value)
+                  if (value.type === 'error') {
+                    const cancelled = requestedCancellation(value.error, options.abortSignal, signal)
+                    if (cancelled) {
+                      closed = true; controller.error(cancelled)
+                      try { await reader.cancel(cancelled) } finally { reader.releaseLock() }
+                      return
+                    }
+                    await logGenerationFailure('stream_part', value.error)
+                  }
+                  controller.enqueue(value.type === 'error' ? { type: 'error', error: subscriptionGenerationError(value.error, failureContext) } : value)
                 } catch (error) {
                   if (closed) return
+                  const cancelled = requestedCancellation(error, options.abortSignal, signal)
+                  if (cancelled) { closed = true; reader.releaseLock(); controller.error(cancelled); return }
                   await logGenerationFailure('stream', error)
                   closed = true; reader.releaseLock()
-                  controller.enqueue({ type: 'error', error: subscriptionGenerationError(error) }); controller.close()
+                  controller.enqueue({ type: 'error', error: subscriptionGenerationError(error, failureContext) }); controller.close()
                 }
               },
               async cancel(reason) { closed = true; await reader.cancel(reason); reader.releaseLock() }
             })
             return { ...result, stream }
-          } catch (error) { await logGenerationFailure('start', error); throw subscriptionGenerationError(error) }
+          } catch (error) {
+            const cancelled = requestedCancellation(error, options.abortSignal, signal)
+            if (cancelled) throw cancelled
+            await logGenerationFailure('start', error); throw subscriptionGenerationError(error, failureContext)
+          }
         }
         return model
       }
@@ -149,7 +168,7 @@ export class SubscriptionService {
     // The use belongs to the credential's owner: the run owner, or the member who shared it (分享给团队成员).
     return {ownerId:String(row.ownerId),workspaceId:row.workspaceId,consumerId:row.consumerId,bindingId:row.id,execution:'native',runId} as const
   }
-  async nativeContext(use: SubscriptionUse, signal?: AbortSignal) {
+  async nativeContext(use: SubscriptionUse, signal?: AbortSignal, requireModelCatalogue = false) {
     return measureSubscriptionNative('context', use.runId, async timing => {
       const binding=await timing.measure('binding', () => this.repository.binding(use.ownerId,use.bindingId))
       const selected = await timing.measure('selection', () => this.nativeRunSelection(use, binding.modelId))
@@ -159,6 +178,15 @@ export class SubscriptionService {
       const authorized=await timing.measure('access', () => this.check(use,signal,selected.modelId ?? null))
       await timing.measure('admit_after', () => this.admitModel(scope, selected.modelId ?? binding.modelId, binding.route, signal, false))
       const row=await timing.measure('connection', () => this.repository.connection(use.ownerId,binding.connectionId))
+      // Requested only by a daemon that could not resolve a full ID through its
+      // shortcut menu. The evidence belongs to this exact authorized binding and
+      // credential epoch; a different account's catalogue grants nothing.
+      if (requireModelCatalogue && (binding.route !== 'claude_code_cli' || row.state !== 'connected'
+        || row.paused || Number(row.epoch) !== authorized.binding.connectionRevision
+        || !row.modelCatalog || Number(row.modelCatalog.revision) !== Number(row.epoch)
+        || !Array.isArray(row.modelCatalog.models) || !row.modelCatalog.models.includes(binding.modelId))) {
+        throw new SubscriptionRefusal('binding_mismatch')
+      }
       const client=this.worker(this.repository.scope(row)).forUse(use)
       await timing.measure('prepare', () => client.call('prepare',{revision:authorized.binding.connectionRevision},signal))
       const info=await timing.measure('context', () => client.call<{accountId:string;plan?:string;expiresAt:string}>('nativeContext',{revision:authorized.binding.connectionRevision},signal))
@@ -168,7 +196,7 @@ export class SubscriptionService {
   /** Prepare a device's direct-provider credential once. nativeAuth performs
    * the custody refresh itself and returns the expiry with the access token;
    * separate prepare/context child processes would repeat that same work. */
-  async nativeLease(use: SubscriptionUse, signal?: AbortSignal) {
+  async nativeLease(use: SubscriptionUse, signal?: AbortSignal, includeModelCatalogue = false) {
     return measureSubscriptionNative('lease', use.runId, async timing => {
       const binding = await timing.measure('binding', () => this.repository.binding(use.ownerId, use.bindingId))
       const selected = await timing.measure('selection', () => this.nativeRunSelection(use, binding.modelId))
@@ -178,9 +206,20 @@ export class SubscriptionService {
       const authorized = await timing.measure('access', () => this.check(use, signal, model ?? null))
       await timing.measure('admit_after', () => this.admitModel(scope, model, binding.route, signal, false))
       const row = await timing.measure('connection', () => this.repository.connection(use.ownerId, binding.connectionId))
+      // This is evidence for the prepared model, not another authorization
+      // round trip. Reuse the exact connection/epoch already read for custody.
+      // Older strict lease clients retain their original response shape.
+      const catalogue = row.modelCatalog
+      const modelCatalogueVerified = includeModelCatalogue && binding.route === 'claude_code_cli'
+        && row.id === binding.connectionId && String(row.ownerId) === use.ownerId
+        && row.state === 'connected' && !row.paused
+        && Number(row.epoch) === authorized.binding.connectionRevision
+        && catalogue != null && Number(catalogue.revision) === Number(row.epoch)
+        && Array.isArray(catalogue.models) && catalogue.models.includes(model)
       const lease = await timing.measure('native_auth', () => this.worker(this.repository.scope(row)).forUse(use)
         .call<{ accessToken?: unknown; expiresAt?: unknown; accountId?: unknown; chatgptAccountId?: unknown; chatgptPlanType?: unknown }>('nativeAuth', { revision: authorized.binding.connectionRevision }, signal))
       return nativeLeaseSchema.parse({ route: binding.route, modelId: model, revision: authorized.binding.connectionRevision,
+        ...(modelCatalogueVerified ? { modelCatalogueVerified: true } : {}),
         accountId: binding.route === 'codex_cli' ? lease.chatgptAccountId : lease.accountId,
         ...(typeof lease.chatgptPlanType === 'string' ? { plan: lease.chatgptPlanType } : {}),
         accessToken: lease.accessToken, expiresAt: typeof lease.expiresAt === 'string' ? new Date(lease.expiresAt).toISOString() : lease.expiresAt })
@@ -291,19 +330,36 @@ export class SubscriptionService {
   }
 }
 
+/** The SDK recognizes a requested cancellation by AbortError, not an error
+ * part. Preserve that control flow through its HTTP wrapper; an ordinary
+ * provider error, unrequested cancellation, or deadline is still a failure. */
+function requestedCancellation(error: unknown, ...signals: (AbortSignal | undefined)[]): Error | undefined {
+  if (!signals.some(signal => signal?.aborted && !(signal.reason instanceof Error && signal.reason.name === 'TimeoutError'))) return
+  let cause = error
+  for (let depth = 0; depth < 4; depth++) {
+    if ((cause instanceof WorkerRefusal && cause.code === 'subscription_cancelled') || (cause instanceof Error && cause.name === 'AbortError')) {
+      return Object.assign(new Error('subscription_cancelled', { cause: error }), { name: 'AbortError' })
+    }
+    if (!(cause instanceof Error)) break
+    cause = cause.cause
+  }
+}
+
 /** Only fixed, typed refusal codes cross into persisted chat errors. SDK
  * wrappers may carry the original error in cause; raw provider text cannot. */
-export function subscriptionGenerationError(error: unknown): Error {
+export function subscriptionGenerationError(error: unknown, context: RunFailureContext = {}): Error {
+  const original = error
+  let code = 'subscription_generation_failed'
   for (let depth = 0; depth < 4; depth++) {
     if (error instanceof SubscriptionRefusal || error instanceof WorkerRefusal) {
-      if (GENERATION_FAILURES.has(error.code)) return new Error(error.code)
-      if (error.code === 'invalid_credential_bundle') return new Error('reconnect_required')
-      if (BACKEND_FAILURES.has(error.code)) return new Error('backend_unavailable')
+      if (GENERATION_FAILURES.has(error.code)) { code = error.code; break }
+      if (error.code === 'invalid_credential_bundle') { code = 'reconnect_required'; break }
+      if (BACKEND_FAILURES.has(error.code)) { code = 'backend_unavailable'; break }
     }
     if (!(error instanceof Error)) break
     error = error.cause
   }
-  return new Error('subscription_generation_failed')
+  return new WorkflowRunFailureError(captureRunFailure(original, { credential: 'subscription', ...context }), { cause: original }, code)
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { ExecutionIdentity } from '../execution-identity'
+import type { RunTraceContext } from '@mikka/protocol/trace-context'
 import type { AgentProfileSelection } from '../factory/agent-profile'
 import { workerDefinitionDigest } from './worker-digest'
 import { z } from 'zod'
@@ -21,6 +22,8 @@ export interface WorkerModelDispatch {
 }
 
 export interface WorkerDefinitionSnapshot {
+  /** Correlation only; excluded from the frozen execution/authority digest. */
+  traceContext?: RunTraceContext
   /** Trusted dispatch identity; absent on historical runs, never inferred retroactively. */
   executionIdentity?: ExecutionIdentity
   /** Copied only from the host's authorized parent execution; legacy workers gain nothing. */

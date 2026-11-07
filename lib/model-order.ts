@@ -4,13 +4,14 @@ import { cloudModelSupport, type CloudModelState } from './cloud-template-models
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { deviceOnlineStates } from './device-presence'
+import { deviceSchedulingView, type SchedulingNode } from './device-scheduling'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { ActionFailureError } from './action-error'
 import { apiKeyHarnesses } from './model-api-key-providers'
 import { hasStaleOfficialAllowance, shownSubscriptionAvailability, subscriptionAvailability } from './subscription-quota'
 import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
-  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, offerKey, onPreferredAgent, placeStage, planDispatch, whyNoDevice,
+  agentsByOffer, defaultOrderByAgent, deviceModel, dispatchOrder, entryKey, latestDefaultCandidates, offerKey, onPreferredAgent, placeStage, planDispatch, whyNoDevice,
   type CredentialState, type DeviceStage, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
@@ -39,6 +40,8 @@ export interface OrderRow extends OrderEntry {
 }
 
 export interface OrderView {
+  /** Actual dispatch rank and availability, from the same planner as new runs. */
+  dispatchOrder?: SchedulingNode[]
   location: RunLocation
   customized: boolean
   autoModelRouting: boolean
@@ -68,6 +71,9 @@ export interface OrderView {
    */
   deviceModels: Record<string, string[]>
 }
+
+/** The prompt's display facts; never a model admission or dispatch authority. */
+export type OrderContextView = Pick<OrderView, 'location' | 'preferredHarness' | 'entries' | 'candidates' | 'cloudReady' | 'cloudModels'>
 
 interface EntryRow { id: string; harness: OrderHarness; model: string; sourceKind: 'subscription' | 'api_key'; sourceId: string }
 const toEntry = (row: EntryRow): OrderEntry => ({
@@ -112,6 +118,39 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
   return [...new Map(ordered.map(item => [entryKey(item), item])).values()]
 }
 
+/** A custom fixed Profile already names one source/model/harness. Recheck that
+ * entry without enumerating unrelated accounts or choosing an alternative.
+ * Default/inherited selection still uses orderCandidates and its full ordering.
+ * This is a fresh candidate read, not a credential grant or cached admission. */
+export async function selectedOrderCandidates(query: Query, scope: OrderScope, entry: OrderEntry): ReturnType<typeof orderCandidates> {
+  if (!z.uuid().safeParse(sourceId(entry)).success) return []
+  if (entry.source.kind === 'api_key') {
+    const { usableApiKeys } = await import('./model-api-keys')
+    return (await usableApiKeys(query, scope.ownerId, scope.workspaceId, entry.source.keyId))
+      .filter(key => key.models.includes(entry.model) && apiKeyHarnesses(key).includes(entry.harness))
+      .map(key => ({ harness: entry.harness, model: entry.model, name: entry.model,
+        source: { kind: 'api_key' as const, keyId: key.id }, provider: key.provider, credentialOwnerId: key.ownerId }))
+  }
+  const { runMayUseCredentialSql } = await import('./personal-policy')
+  // Derive the payor only from the exact source and its current workspace share.
+  // The source owner's active membership is still checked before its catalogue.
+  const { rows: [source] } = await query.query<{ ownerId: string }>(`SELECT c."ownerId" FROM byos_connections c
+    WHERE c.id=$1 AND ${runMayUseCredentialSql('c."ownerId"', '$2', '$3')}`,
+  [entry.source.connectionId, scope.ownerId, scope.workspaceId])
+  if (!source) return []
+  if (source.ownerId !== scope.ownerId) {
+    const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
+    try { await authorizeSubscriptionWorkspace(source.ownerId, scope.workspaceId) } catch { return [] }
+  }
+  const { executionModelOptions } = await import('./execution-model-options')
+  return (await executionModelOptions(query, { ...scope, ownerId: source.ownerId }, true,
+    { connectionId: entry.source.connectionId, model: entry.model }))
+    .map(row => ({ harness: (row.provider === 'codex' ? 'codex' : 'claude_code') as OrderHarness,
+      model: String(row.modelId), name: String(row.modelId), source: { kind: 'subscription' as const, connectionId: String(row.connectionId) },
+      provider: String(row.provider), credentialOwnerId: String(row.ownerId) }))
+    .filter(candidate => entryKey(candidate) === entryKey(entry))
+}
+
 async function settingsRow(query: Query, scope: OrderScope) {
   const { rows: [row] } = await query.query<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean }>(
     'SELECT location,customized,"preferredHarness","autoModelRouting" FROM model_order_settings WHERE "ownerId"=$1 AND "workspaceId"=$2', [scope.ownerId, scope.workspaceId])
@@ -122,7 +161,7 @@ async function settingsRow(query: Query, scope: OrderScope) {
 export async function readOrder(query: Query, scope: OrderScope, candidates?: (OrderCandidate & { provider: string })[]): Promise<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness; autoModelRouting: boolean; entries: OrderEntry[] }> {
   const settings = await settingsRow(query, scope)
   if (!settings.customized) {
-    const available = candidates ?? await orderCandidates(query, scope)
+    const available = latestDefaultCandidates(candidates ?? await orderCandidates(query, scope))
     const defaults = defaultOrderByAgent(available, settings.preferredHarness)
     // Include lighter reported models from the default credentials without
     // silently adding a different paid key. Turning routing off restores each
@@ -260,30 +299,41 @@ export async function checkOrderQuota(query: Query, scope: OrderScope, connectio
  * The person's own local devices as dispatch sees them; 参与调度 is `enabled`.
  * A run not yet ended counts toward its device's load (pickDevice).
  */
-export async function poolDevices(query: Query, ownerId: string): Promise<PoolDevice[]> {
-  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
+export async function poolDevices(query: Query, ownerId: string): Promise<(PoolDevice & { lastSeenAt: number | null })[]> {
+  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number; subscriptionModels: Record<string, string[]> }>(
     `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d.harnesses,d."deviceType",d."createdAt",
-      (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns"
+      (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns",
+      COALESCE((SELECT jsonb_object_agg(c.id::text,c."modelCatalog"->'models') FROM byos_connections c
+        WHERE c."ownerId"=$1 AND c.provider='claude' AND c.state='connected' AND c.paused=false AND c."removedAt" IS NULL
+          AND c."modelCatalog"->>'revision'=c.epoch::text AND jsonb_typeof(c."modelCatalog"->'models')='array'), '{}'::jsonb) AS "subscriptionModels"
     FROM devices d WHERE d."ownerId"=$1 AND d.kind='local' AND d."removedAt" IS NULL ORDER BY d."lastSeenAt" DESC NULLS LAST,d.id`, [ownerId])
   const presence = await deviceOnlineStates(rows)
   return rows.map(row => ({
-    id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [],
+    id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [], subscriptionModels: row.subscriptionModels ?? {},
     server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(), lastSeenAt: row.lastSeenAt?.getTime() ?? null,
   }))
 }
 
-/** The page: credentials' candidates, the list with each entry's status, and 运行位置. */
-export async function orderView(query: Query, scope: OrderScope): Promise<OrderView> {
+/** The page: credentials' candidates, the list with each entry's status, and 运行位置.
+ * A display caller may share its own device read; execution/dispatch never consumes this projection. */
+export function orderView(query: Query, scope: OrderScope, readDevices?: () => Promise<PoolDevice[]>): Promise<OrderView>
+export function orderView(query: Query, scope: OrderScope, readDevices: (() => Promise<PoolDevice[]>) | undefined, projection: 'context'): Promise<OrderContextView>
+export async function orderView(query: Query, scope: OrderScope, readDevices: () => Promise<PoolDevice[]> = () => poolDevices(query, scope.ownerId), projection?: 'context'): Promise<OrderView | OrderContextView> {
   const candidates = await orderCandidates(query, scope)
   const order = await readOrder(query, scope, candidates)
   const states = await credentialStates(query, scope, order.entries, candidates, Date.now(), { probe: false, display: true })
-  const devices = await poolDevices(query, scope.ownerId)
+  const devices = await readDevices()
   const added = new Set(order.entries.map(entryKey))
   const agents = agentsByOffer(candidates)
-  const { usableApiKeys } = await import('./model-api-keys')
-  const { rows: connected } = await query.query<{ id: string }>(`SELECT id::text AS id FROM byos_connections WHERE "ownerId"=$1 AND state='connected'`, [scope.ownerId])
-  const subscriptions = new Set([...connected.map(row => row.id), ...candidates.flatMap(candidate => candidate.source.kind === 'subscription' ? [candidate.source.connectionId] : [])])
-  const credentials = subscriptions.size + (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).length
+  let credentials: number | undefined
+  // Only Settings consumes this count. Prompt facts already derive their
+  // credential kinds from the freshly authorized candidates above.
+  if (projection !== 'context') {
+    const { usableApiKeys } = await import('./model-api-keys')
+    const { rows: connected } = await query.query<{ id: string }>(`SELECT id::text AS id FROM byos_connections WHERE "ownerId"=$1 AND state='connected'`, [scope.ownerId])
+    const subscriptions = new Set([...connected.map(row => row.id), ...candidates.flatMap(candidate => candidate.source.kind === 'subscription' ? [candidate.source.connectionId] : [])])
+    credentials = subscriptions.size + (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).length
+  }
   // 会先用 and the ready devices follow dispatch: the 优先使用的 Agent's list first.
   const runnable = dispatchOrder(order.entries, order.preferredHarness)
   const ready = order.location === 'cloud' && await (await import('./rule-dispatch')).cloudReady(query, { ...scope, botId: null, harness: runnable[0]?.harness ?? 'claude_code' })
@@ -292,24 +342,11 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
   const cloudModels = Object.fromEntries(order.entries.map(entry => [entry.id, cloudModelSupport(entry)]))
   const plan = planDispatch({ entries: runnable, location: order.location, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] })
   const firstDevice = plan.kind === 'device' ? devices.find(device => device.id === plan.deviceId) : undefined
-  return {
+  const context: OrderContextView = {
     location: order.location,
-    customized: order.customized,
-    autoModelRouting: order.autoModelRouting,
     preferredHarness: order.preferredHarness,
-    credentials,
-    devices: devices.filter(device => device.enabled).length,
     cloudReady: ready,
     cloudModels,
-    places: {
-      cloud: order.location === 'cloud' ? ready ? 'ready' : 'noKey' : null,
-      devices: [...devices].sort((a, b) => Number(b.server) - Number(a.server)).map(device => ({ id: device.id, name: device.name, server: device.server,
-        stage: placeStage(device, runnable.filter(entry => credential(entry).usable), order.preferredHarness), lastSeenAt: device.lastSeenAt ?? null })),
-    },
-    first: plan.kind === 'cloud' ? { kind: 'cloud' } : firstDevice ? { kind: 'device', id: firstDevice.id, name: firstDevice.name, server: firstDevice.server } : null,
-    readyDeviceIds: devices.filter(device => planDispatch({ entries: runnable, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),
-    deviceModels: Object.fromEntries(devices.map(device => [device.id,
-      [...new Set(order.entries.filter(entry => deviceModel({ ...device, enabled: true, online: true }, entry)).map(entry => entry.model))]])),
     entries: order.entries.map(entry => {
       const state = states.get(entry.id)!
       // 云端 that runs takes every model; otherwise a server or a computer must.
@@ -318,6 +355,32 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
       return { ...entry, provider: state.provider, agents: agents.get(offerKey(entry)) ?? [entry.harness], block }
     }),
     candidates: candidates.map(candidate => ({ ...candidate, added: added.has(entryKey(candidate)) })),
+  }
+  if (projection === 'context') return context
+  return {
+    dispatchOrder: deviceSchedulingView({ location: order.location, entries: runnable, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] }),
+    location: order.location,
+    customized: order.customized,
+    autoModelRouting: order.autoModelRouting,
+    preferredHarness: order.preferredHarness,
+    credentials: credentials!,
+    devices: devices.filter(device => device.enabled).length,
+    cloudReady: ready,
+    cloudModels,
+    places: {
+      cloud: order.location === 'cloud' ? ready ? 'ready' : 'noKey' : null,
+      devices: [...devices].sort((a, b) => Number(b.server) - Number(a.server)).map(device => {
+        const lastSeenAt = device.lastSeenAt instanceof Date ? device.lastSeenAt.getTime() : typeof device.lastSeenAt === 'number' ? device.lastSeenAt : Date.parse(device.lastSeenAt ?? '')
+        return { id: device.id, name: device.name, server: device.server,
+          stage: placeStage(device, runnable.filter(entry => credential(entry).usable), order.preferredHarness), lastSeenAt: Number.isFinite(lastSeenAt) ? lastSeenAt : null }
+      }),
+    },
+    first: plan.kind === 'cloud' ? { kind: 'cloud' } : firstDevice ? { kind: 'device', id: firstDevice.id, name: firstDevice.name, server: firstDevice.server } : null,
+    readyDeviceIds: devices.filter(device => planDispatch({ entries: runnable, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),
+    deviceModels: Object.fromEntries(devices.map(device => [device.id,
+      [...new Set(order.entries.filter(entry => deviceModel({ ...device, enabled: true, online: true }, entry)).map(entry => entry.model))]])),
+    entries: context.entries,
+    candidates: context.candidates,
   }
 }
 

@@ -3,9 +3,13 @@ import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { mock, test } from 'node:test'
+import { RUN_DECISION_CATALOGUE } from './mcp-tool'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { createApiHandler } from '../../apps/api/src/application'
+import * as apiServer from '../../apps/api/compat/server'
 
 test('decision HTTP routes and worker MCP persist through real token authorization', { skip: !dbUrl }, async t => {
+  mock.module('next/server', { namedExports: apiServer })
   mock.module('@/lib/auth', { namedExports: {
     MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => null } },
   } })
@@ -18,6 +22,9 @@ test('decision HTTP routes and worker MCP persist through real token authorizati
   const route = await import('../../app/api/projects/[projectId]/decisions/route')
   const marking = await import('../../app/api/projects/[projectId]/decisions/from-message/route')
   const mcp = await import('../../app/api/mcp/route')
+  // Exercise the real API request scope used by MCP's retained tool callbacks.
+  const mcpApi = createApiHandler([{ path: '/mikka/api/mcp', template: '/api/mcp', source: 'app/api/mcp/route.ts',
+    methods: ['POST'], load: async () => mcp }])
   const owner = await seedUser(connection, 'decision-http-owner'), other = await seedUser(connection, 'decision-http-other')
   const workspace = await seedWorkspace(connection, owner, [{ userId: owner, role: 'admin' }])
   const foreign = await seedWorkspace(connection, other, [{ userId: other, role: 'admin' }])
@@ -46,7 +53,7 @@ test('decision HTTP routes and worker MCP persist through real token authorizati
         ...(incoming.method !== 'GET' ? { body: Buffer.concat(chunks).toString('utf8') } : {}),
       })
       const context = { params: Promise.resolve({ projectId }) }
-      const response = incoming.url?.includes('/api/mcp') ? await mcp.POST(request)
+      const response = incoming.url?.includes('/api/mcp') ? await mcpApi.fetch(request)
         : incoming.url?.includes('/from-message') ? await marking.POST(request, context)
           : incoming.method === 'GET' ? await route.GET(request, context) : await route.POST(request, context)
       outgoing.writeHead(response.status, Object.fromEntries(response.headers))
@@ -102,7 +109,7 @@ test('decision HTTP routes and worker MCP persist through real token authorizati
   await t.test('exported worker MCP lists and actually calls record_decision; revoked token fails', async () => {
     const listed = await rpc(runToken.token, 'tools/list', {})
     assert.equal(listed.response.status, 200)
-    assert.ok(listed.payload.result.tools.some((tool: { name: string }) => tool.name === 'record_decision'))
+    assert.deepEqual(listed.payload.result.tools.find((tool: { name: string }) => tool.name === 'record_decision'), RUN_DECISION_CATALOGUE.tool)
     const args = { ...input, projectId, issueId, idempotencyKey: 'mcp-real-write' }
     const called = await rpc(runToken.token, 'tools/call', { name: 'record_decision', arguments: args })
     assert.equal(called.response.status, 200)

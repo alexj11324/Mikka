@@ -60,6 +60,20 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     await store.verify(id, 'cus_fixture', `card_${id}`)
     return id
   }
+  await t.test('a paid-only store requires verification and positive balance without consuming a chat trial', async () => {
+    const paidOnly = new HostedUsageStore(pool, { metered: true, allowTrial: false }), fresh = randomUUID()
+    await assert.rejects(paidOnly.canUseMikkaPaid(fresh), /verification_required/)
+    await assert.rejects(paidOnly.reserve(fresh, 'fixture-paid-only', randomUUID()), /verification_required/)
+    assert.deepEqual([(await paidOnly.status(fresh)).state, (await paidOnly.status(fresh)).trialLeft], ['verification_required', null])
+    assert.equal((await pool.query('SELECT count(*)::int n FROM hosted_usage WHERE "workspaceId"=$1', [fresh])).rows[0].n, 0)
+    const funded = await verified(), call = randomUUID()
+    await paidOnly.canUseMikkaPaid(funded)
+    await paidOnly.reserve(funded, 'fixture-paid-only', call)
+    await paidOnly.settle(call, 1_000, 5, 5)
+    assert.equal((await paidOnly.balance(funded)).free, 999_000)
+    await pool.query('UPDATE hosted_allowances SET remaining=0 WHERE "workspaceId"=$1', [funded])
+    await assert.rejects(paidOnly.canUseMikkaPaid(funded), /free_allowance_used/)
+  })
   await t.test('no card: the first 20 messages are answered, paid by the platform, once per person; the 21st needs a card', async () => {
     const fresh = randomUUID()
     // Nothing sent yet (the welcome turn): admitted, 20 left.

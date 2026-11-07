@@ -93,7 +93,7 @@
   <rect x="470" y="96" width="130" height="48" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5"/>
   <text x="535" y="125" text-anchor="middle" font-size="15" fill="#e6edf3">Stripe</text>
   <rect x="400" y="210" width="200" height="60" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5"/>
-  <text x="500" y="235.5" text-anchor="middle" font-size="15" fill="#e6edf3">Next.js app on Vercel</text>
+  <text x="500" y="235.5" text-anchor="middle" font-size="15" fill="#e6edf3">Hono/Nitro · Vercel</text>
   <text x="500" y="254.5" text-anchor="middle" font-size="15" fill="#e6edf3">API, device API /v1</text>
   <rect x="400" y="490" width="200" height="60" fill="#0d1117" stroke="#e6edf3" stroke-width="2.5"/>
   <text x="500" y="515.5" text-anchor="middle" font-size="15" fill="#e6edf3">MCP server</text>

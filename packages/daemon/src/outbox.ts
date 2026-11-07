@@ -31,6 +31,8 @@ import { readJson, writeJsonAtomic } from "./fs-util"
 import { assertSafeId, isSafeId } from "./ids"
 import type { Logger } from "./log"
 import type { RunPatch, ServerLink } from "./server-link"
+import type { RunTraceContext } from "@mikka/protocol/trace-context"
+import { daemonTracer } from "./tracing"
 
 export type OutboxItem =
   | { kind: "chunk"; seq: number; chunk: RunChunk }
@@ -72,7 +74,9 @@ export class Outbox {
       item: OutboxItem,
       error: unknown
     ) => void = () => undefined,
-    private readonly retainResources = false
+    private readonly retainResources = false,
+    /** Existing journal metadata restores the run after a retry or process restart. */
+    private readonly traceContext: (runId: string) => RunTraceContext | undefined = () => undefined,
   ) {
     mkdirSync(dir, { recursive: true, mode: 0o700 })
   }
@@ -198,7 +202,9 @@ export class Outbox {
   /** Serialized per run so items always leave in append order. */
   flush(runId: string): Promise<void> {
     const previous = this.chains.get(runId) ?? Promise.resolve()
-    const next = previous.then(() => this.deliver(runId))
+    const active = daemonTracer.capture()
+    const carrier = active?.runId === runId ? active : this.traceContext(runId)
+    const next = previous.then(() => daemonTracer.withContext(carrier, () => this.deliver(runId)))
     this.chains.set(runId, next)
     return next
   }

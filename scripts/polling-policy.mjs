@@ -28,11 +28,12 @@ const local = (reason, hits) => ({ kind: 'local', reason, hits })
  * - tracking '#1212': a database poll still waiting to be replaced by push, through `replaceWith`.
  */
 export const pollingAllowlist = {
+  'lib/builtin-gateway/scheduler.ts': local('自托管 cron 调度器替代 Cloudflare cron，不是数据轮询；复用已有 due-timer 和 15 分钟 safety sweep', 1),
   // Web: SWR polling that reads our database.
   'components/workspace/issue-pull-request-link.tsx': db(web, 'a PR with no webhook of ours (linked by hand, or a repository without the app) is re-checked with GitHub every 5 min while visible; a run-delivered PR also re-reads on pull_request_status', 1),
   // Server: loops that re-query our database.
   'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
-  'lib/coordinator/group-turns.ts': db(server, 'untilStopped fallback timer only: 15 s while the worker LISTENs for the stop push, 1 s if LISTEN is unavailable', 1),
+  'lib/coordinator/group-turns.ts': db(server, 'untilStopped fallback only: 15 s for best-effort subscriptions or a failed reliable-push read, 1 s if LISTEN is unavailable', 1),
   'workflows/run-publication/workflow.ts': db(server, 'untilDone: publish and fail results retried with exponential backoff, 30 s doubling to a 10 min cap, until done (GitHub outage or another worker\'s lease; nothing to push)', 1),
   // Daemon: loops that call our server, which reads the database.
   'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down (always so for a cloud computer, whose server pushes), 1 s against a server older than run-control push; a watcher with timedFloorMs runs at most that often on timer ticks', 1),

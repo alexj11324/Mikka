@@ -8,6 +8,7 @@
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
 import { providerFailureSchema } from "./provider-failure"
+import { runFailureSchema } from "./run-failure"
 
 export const RUN_QUESTION_KINDS = [
   "context",
@@ -145,6 +146,16 @@ export type RunCriterion = z.infer<typeof runCriterion>
 export const criterionVerificationStatus = (criterion: RunCriterion): CriterionStatus =>
   criterion.status ?? (criterion.passed ? "passed" : "failed")
 
+/** Host-observed session exit and the final authenticated workspace upload. */
+export const runSafePoint = z.object({
+  observedAt: z.iso.datetime({ offset: true }),
+  session: z.literal('exited'),
+  checkpoint: z.enum(['ready', 'unavailable']),
+  checkpointTakenAt: z.iso.datetime({ offset: true }).optional(),
+}).strict().refine(value => value.checkpoint === 'ready'
+  ? value.checkpointTakenAt !== undefined && Date.parse(value.observedAt) >= Date.parse(value.checkpointTakenAt)
+  : value.checkpointTakenAt === undefined, { message: 'A ready final checkpoint requires its acknowledged snapshot time' })
+
 /**
  * The handoff report sent with every run completion. The agent fills what
  * it can through its submit / ask / blocker call (summary, open questions,
@@ -194,6 +205,8 @@ export const runReport = z.object({
   providerFailure: providerFailureSchema.optional(),
   /** Final upload for provider_failure or native quota_exhausted; unavailable requires the original worktree. */
   providerCheckpoint: z.enum(["ready", "unavailable"]).optional(),
+  /** Daemon-owned terminal evidence; unavailable never authorizes discarding the original workspace. */
+  safePoint: runSafePoint.optional(),
   /** Daemon-owned receipt for an exact, unchanged read-only candidate. */
   check: z.object({
     sha: z.string().regex(/^[a-f0-9]{40}$/),
@@ -247,6 +260,7 @@ export const RUN_COMPLETE_ROUTE = "/v1/runs/:runId/complete"
 export const runCompletion = z.object({
   stopReason: runStopReason,
   report: runReport,
+  failureDetails: runFailureSchema.optional(),
 })
 export type RunCompletion = z.infer<typeof runCompletion>
 
@@ -255,7 +269,7 @@ export type RunCompletion = z.infer<typeof runCompletion>
  * result decides whether it reaches review); other endings may omit it.
  */
 export const runCompleteRequest = z
-  .object({ stopReason: runStopReason, report: runReport.optional() })
+  .object({ stopReason: runStopReason, report: runReport.optional(), failureDetails: runFailureSchema.optional() })
   .refine((body) => body.stopReason !== "submitted" || body.report, {
     message: "A submitted run needs a report.",
     path: ["report"],

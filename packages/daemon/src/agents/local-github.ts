@@ -10,6 +10,7 @@ import { runRuntimeTimings } from '../run-runtime-timing'
 import { prepareMachineGitHub } from './machine-github'
 import { GITHUB_CREDENTIAL_SCRIPT } from './github-runtime'
 import { findOnPath } from '../path-search'
+import { localGitConfig } from './local-git-origin'
 
 export interface PreparedRunGitHub {
   /** No tokens: native gh reads its current hosts.yml on each invocation. */
@@ -26,6 +27,7 @@ export async function prepareLocalGitHub(assignment: RunAssignment, host: {
   path?: string
 }): Promise<PreparedRunGitHub | undefined> {
   if (!assignment.github) return undefined
+  const fixtureConfig = localGitConfig()
   const lease = async () => {
     if (host.signal.aborted || !host.link.githubLease) throw Error('github_credential_unavailable')
     return host.link.githubLease(assignment.deviceId, assignment.runId, host.signal)
@@ -57,8 +59,9 @@ export async function prepareLocalGitHub(assignment: RunAssignment, host: {
     return {
       env: { ...prepared.env, GH_CONFIG_DIR: directory, PATH: binary ? `${bin}${delimiter}${path}` : path,
         ...(!binary ? { GIT_CONFIG_VALUE_1: `!${helper} prepared-git ${quote(directory)}` } : {}),
-        GIT_CONFIG_COUNT: '4', GIT_CONFIG_KEY_2: 'commit.gpgSign', GIT_CONFIG_VALUE_2: 'false',
+        GIT_CONFIG_COUNT: String(4 + fixtureConfig.length), GIT_CONFIG_KEY_2: 'commit.gpgSign', GIT_CONFIG_VALUE_2: 'false',
         GIT_CONFIG_KEY_3: 'tag.gpgSign', GIT_CONFIG_VALUE_3: 'false',
+        ...Object.fromEntries(fixtureConfig.flatMap(([key, value], index) => [[`GIT_CONFIG_KEY_${4 + index}`, key], [`GIT_CONFIG_VALUE_${4 + index}`, value]])),
         GIT_AUTHOR_NAME: 'Mikka Agent', GIT_AUTHOR_EMAIL: 'agent@mikka.invalid',
         GIT_COMMITTER_NAME: 'Mikka Agent', GIT_COMMITTER_EMAIL: 'agent@mikka.invalid',
       },

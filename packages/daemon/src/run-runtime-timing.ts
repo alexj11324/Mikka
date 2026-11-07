@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks"
 import { HARNESSES, type Harness } from "@mikka/protocol/harness"
 import { runIdHash } from "./tracing"
 import type { OfficialCliTiming } from "./official-cli-timing"
+import type { McpHttpTiming } from './mcp-http-timing'
 
 type Phase = "preparing" | "executing" | "finishing"
 type Endpoint = "policy_snapshot" | "permission_check" | "permission_request" | "server_decision" | "computer_authority"
@@ -15,14 +16,17 @@ type RequestRecord = { sequence: number; endpoint: Endpoint; phase: Phase; metho
   startMs: number; endMs: number | null; ms: number | null; outcome: Outcome }
 type Count = { endpoint: Endpoint; phase: Phase; shared: boolean; started: number; completed: number; errors: number; ms: number }
 
-/** A receipt of actual Mikka HTTP sends, not sampled spans or inferred calls.
- * Provider CLI traffic goes directly to the provider and is not measured here.
+/** A receipt of actual host HttpServerLink/taskFetch sends, not sampled spans.
+ * Provider CLI traffic goes directly to the provider and is not measured here;
+ * the optional MCP receipt covers only the child generations actually observed.
  * The final receipt rides the run's existing finish chunk; no extra write. */
 export type RunRuntimeTiming = {
   version: 1
   runIdHash: string
   harness: Harness
   source: "http_server_link"
+  scope: 'daemon_http_server_link_and_task_fetch'
+  allFirstPartyHttpComplete: false
   window: "run_launch_to_agent_exit"
   startedAt: number
   endedAt: number
@@ -39,6 +43,7 @@ export type RunRuntimeTiming = {
   toolCallsCompleted: number
   toolCallsFailed: number
   officialCliTiming?: OfficialCliTiming
+  mcpHttpTiming?: McpHttpTiming
 }
 
 export const RUNTIME_REQUEST_LIMIT = 128
@@ -46,6 +51,13 @@ const TOOL_LIMIT = 256
 const METHODS = new Set(["GET", "POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIONS"])
 const ms = (value: number) => Math.max(0, Math.round(value * 1_000) / 1_000)
 const NOOP = () => {}
+
+/** One opt-in covers every added persisted diagnostic, including startup phases.
+ * The trusted candidate launcher may enable it; ordinary runs need an explicit
+ * assignment variable. Never inherit it from another run or the process env. */
+export function runDiagnosticsEnabled(taskEnv: Record<string, string> | undefined, hostOptIn?: boolean): boolean {
+  return hostOptIn === true || taskEnv?.CLOUD_STARTUP_TIMING === '1'
+}
 
 function classify(tail: string, body: unknown): Endpoint {
   const operation = body && typeof body === "object" ? body as { action?: unknown; operation?: unknown } : undefined
@@ -80,6 +92,7 @@ export class RunRuntimeObservation {
   private readonly completedTools = new Set<string>()
   private toolCallsFailed = 0
   private officialCliTiming?: OfficialCliTiming
+  private mcpHttpTiming?: McpHttpTiming
 
   constructor(readonly hash: string, readonly deviceHash: string, readonly harness: Harness,
     private readonly release: () => void, private readonly clock: () => number, private readonly wallClock: () => number) {
@@ -98,6 +111,10 @@ export class RunRuntimeObservation {
 
   attachOfficialCliTiming(timing: OfficialCliTiming) {
     if (!this.closed && timing.runIdHash === this.hash && timing.harness === this.harness) this.officialCliTiming = timing
+  }
+
+  attachMcpHttpTiming(timing: McpHttpTiming) {
+    if (!this.closed && timing.runIdHash === this.hash && timing.harness === this.harness) this.mcpHttpTiming = timing
   }
 
   accepted(kind: AgentAcceptedKind) {
@@ -147,12 +164,14 @@ export class RunRuntimeObservation {
     if (this.closed) return
     this.finishing()
     const receipt: RunRuntimeTiming = { version: 1, runIdHash: this.hash, harness: this.harness, source: "http_server_link",
+      scope: 'daemon_http_server_link_and_task_fetch', allFirstPartyHttpComplete: false,
       window: "run_launch_to_agent_exit", startedAt: this.startedAt, endedAt: this.wallClock(), ms: ms(this.clock() - this.started),
       executionStartMs: this.executionStartMs, executionEndMs: this.executionEndMs, complete: true,
       ...(this.agentAccepted ? { agentAccepted: { ...this.agentAccepted } } : {}),
       requests: this.requests.map(record => ({ ...record })), counts: [...this.counts.values()].map(count => ({ ...count })), truncated: this.truncated,
       providerOutputChunks: this.providerOutputChunks, toolCallsStarted: this.tools.size, toolCallsCompleted: this.completedTools.size, toolCallsFailed: this.toolCallsFailed,
-      ...(this.officialCliTiming ? { officialCliTiming: this.officialCliTiming } : {}) }
+      ...(this.officialCliTiming ? { officialCliTiming: this.officialCliTiming } : {}),
+      ...(this.mcpHttpTiming ? { mcpHttpTiming: this.mcpHttpTiming } : {}) }
     this.close()
     return receipt
   }
@@ -198,6 +217,11 @@ export class RunRuntimeTimings {
   attachOfficialCliTiming(runId: string, timing: OfficialCliTiming) {
     if (typeof runId !== "string" || !runId) return
     this.runs.get(runIdHash(runId))?.attachOfficialCliTiming(timing)
+  }
+
+  attachMcpHttpTiming(runId: string, timing: McpHttpTiming) {
+    if (typeof runId !== 'string' || !runId) return
+    this.runs.get(runIdHash(runId))?.attachMcpHttpTiming(timing)
   }
 
   agentAccepted(runId: string, kind: AgentAcceptedKind) {

@@ -1,5 +1,6 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
+import { serverDocumentKind, serverPageKind } from '@/lib/server-pages'
 
 export type Locale = 'zh-CN' | 'en'
 export type Href = string | { pathname?: string; query?: Record<string, string | number | boolean | readonly string[] | null | undefined>; hash?: string }
@@ -86,6 +87,9 @@ export function isOwnURL(url: URL) {
  * than becoming an in-memory SPA route. Keep the actual page set explicit. */
 export function isClientRoute(url: URL) {
   if (!isOwnURL(url)) return false
+  // A self-hosted auth document must return ordinary business navigation to
+  // the server entry. The official app and installed clients have no marker.
+  if (serverDocumentKind() && !serverPageKind(url)) return false
   const path = withoutLocale(url.pathname)
   return ['/', '/dashboard', '/devices', '/device', '/settings', '/settings/teams', '/settings/members', '/workspaces/new', '/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/verify-email', '/oauth/consent'].includes(path)
     || /^\/(?:invite|a|w)\/[^/]+$/.test(path)

@@ -1,6 +1,7 @@
 import { afterJob } from '@/lib/background'
 import { liveInvalidations, withoutRevisions, type LiveInvalidation } from './events'
 import { liveChannelId, liveGatewayConfig, type LiveScope } from './scope'
+import { gatewayConfig, gatewayURL } from '../builtin-gateway/config'
 
 /** The Worker deploys after the app (.github/workflows/device-gateway.yml). An
  * older Worker refuses a revision field, so this instance sends plain keys for a while. */
@@ -11,7 +12,14 @@ export function resetLiveRevisionFallback() { plainUntil = 0 }
 export async function sendLiveInvalidations(scope: LiveScope, events: LiveInvalidation[], env = process.env, send = fetch, now = Date.now) {
   const config = liveGatewayConfig(env)
   if (!config || !liveInvalidations(events, true)) return
-  const url = new URL(`/v1/live/${liveChannelId(scope)}/push`, config.url)
+  if (gatewayConfig(env)?.mode === 'builtin') {
+    try {
+      const { builtinGateway } = await import('../builtin-gateway/runtime')
+      await builtinGateway()?.hub.live(liveChannelId(scope), events)
+    } catch { console.warn('[live] builtin gateway invalidation unavailable') }
+    return
+  }
+  const url = gatewayURL(config, `/v1/live/${liveChannelId(scope)}/push`)
   const revised = events.some(event => event.rev !== undefined)
   let body = revised && now() < plainUntil ? withoutRevisions(events) : events
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -39,7 +47,12 @@ export async function sendLiveInvalidations(scope: LiveScope, events: LiveInvali
 export function scheduleLive(work: () => Promise<void>) {
   // after() may invoke this after the request scope has ended. Scope is
   // retained for fresh reads; permissions are still resolved by the work.
-  afterJob('after:live-notify', async () => { try { await work() } catch { console.warn('[live] committed invalidation failed') } }, { orRun: true, retainContext: true })
+  afterJob('after:live-notify', async () => {
+    try { await work() } catch (error) {
+      // By name and code only (decision 2026-11-05-0330): a message can carry database content.
+      console.warn('[live] committed invalidation failed', { name: (error as Error | undefined)?.name, code: (error as { code?: unknown } | undefined)?.code })
+    }
+  }, { orRun: true, retainContext: true })
 }
 
 export function notifyLive(scope: LiveScope, events: LiveInvalidation[]) {

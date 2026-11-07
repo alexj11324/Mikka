@@ -1,6 +1,6 @@
 import 'server-only'
 import { headers } from 'next/headers'
-import { auth, googleEnabled, githubEnabled } from '@/lib/auth'
+import { auth, googleEnabled, githubSignInEnabled } from '@/lib/auth'
 import { emailSignInEnabled } from '@/lib/email-sign-in'
 import { onboardingDone } from '@/lib/onboarding'
 import { byoE2BKeyEnabled, getE2BKeyStatus } from '@/lib/secrets/e2b'
@@ -10,11 +10,12 @@ import { ActionFailureError } from '@/lib/action-error'
 import { authorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 import { safeDesktopSession } from './session'
 import { desktopFeatures } from './features'
+import { getEdition } from '@/lib/edition'
 import type { DesktopBootstrap, DesktopConfig } from './wire'
 
 export async function desktopConfig(userId?: string): Promise<DesktopConfig> {
-  const [emailEnabled, features] = await Promise.all([emailSignInEnabled(), desktopFeatures(userId)])
-  return { googleEnabled, githubEnabled, emailEnabled, features, daemonPackageName: process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka' }
+  const [emailEnabled, features, githubEnabled] = await Promise.all([emailSignInEnabled(), desktopFeatures(userId), githubSignInEnabled()])
+  return { edition: getEdition(), googleEnabled, githubEnabled, emailEnabled, features, daemonPackageName: process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka' }
 }
 
 export async function desktopSession() {

@@ -1,3 +1,6 @@
+import { captureClaudeRunFailure } from "../adapters/claude"
+import { failureFrom, RunFailureError } from "@mikka/protocol/run-failure"
+import { DAEMON_VERSION } from "../paths"
 import { randomUUID } from "node:crypto"
 import { createSdkMcpServer, query, tool, type Options } from "@anthropic-ai/claude-agent-sdk"
 import { buildChildEnv } from "../env"
@@ -5,6 +8,7 @@ import { coordinatorDeadline, coordinatorSystemPrompt, CoordinatorToolHost, COOR
 
 export interface ClaudeCoordinatorHost {
   /** A private host-managed directory, not a coding worktree. */
+  runId?: string
   cwd: string
   tools: readonly CoordinatorTool[]
   /** Host environment is filtered by the same allowlist as coding workers. */
@@ -55,6 +59,7 @@ export function claudeCoordinatorOptions(input: CoordinatorInput, host: ClaudeCo
 /** Runs one native SDK loop; no second model or post-processing LLM. */
 export async function runClaudeCoordinator(input: CoordinatorInput, host: ClaudeCoordinatorHost): Promise<CoordinatorReply> {
   const deadline = coordinatorDeadline(input)
+  const capture = (error: unknown) => captureClaudeRunFailure(error, { runId: host.runId, appVersion: DAEMON_VERSION, provider: "claude", credential: "subscription", sensitiveText: [input.instructions, input.context] })
   let session: ReturnType<typeof query> | undefined
   try {
     deadline.controller.signal.throwIfAborted()
@@ -63,10 +68,13 @@ export async function runClaudeCoordinator(input: CoordinatorInput, host: Claude
     for await (const message of session) {
       deadline.controller.signal.throwIfAborted()
       if (message.type !== "result") continue
-      if (message.subtype !== "success" || message.is_error) throw new Error("coordinatorClaudeFailed")
+      if (message.subtype !== "success" || message.is_error) throw new RunFailureError(capture(message))
       return { text: validateCoordinatorReply(message.result), nativeSessionId: message.session_id, toolCalls: tools.toolCalls }
     }
     throw new Error("coordinatorClaudeNoResult")
+  } catch (error) {
+    if (deadline.controller.signal.aborted || failureFrom(error)) throw error
+    throw new RunFailureError(capture(error), { cause: error })
   } finally {
     session?.close()
     deadline.dispose()

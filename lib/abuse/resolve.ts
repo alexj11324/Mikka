@@ -12,5 +12,6 @@ export async function resolveDefaultHostedModel(
     modelId,
     undefined,
     scope.ownerId,
+    { operation: scope.botId ? 'bot' : 'coordinator' },
   )
 }

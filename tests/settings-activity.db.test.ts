@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { after, before, mock, test } from 'node:test'
 import type { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
@@ -32,10 +32,6 @@ before(async () => {
   const intl = await import('next-intl/server')
   mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en' } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser, name: sessionUser, email: `${sessionUser}@example.invalid` } } : null } } } })
-  // Saving seals with KMS; the fixture key never leaves this process and no AWS call is made.
-  const kmsModule = await import('../lib/credentials/kms')
-  const { randomBytes } = await import('node:crypto')
-  mock.module('@/lib/credentials/kms', { namedExports: { ...kmsModule, awsKms: () => ({ generate: async () => ({ plaintext: randomBytes(32), wrapped: 'synthetic-key' }), decrypt: async () => { throw new Error('settings never decrypt') } }) } })
   ;({ pool } = await import('../lib/db'))
   ;({ workspacePool } = await import('../lib/workspace-db'))
   actions = await import('../app/actions/settings-activity')
@@ -295,7 +291,16 @@ dbTest('device token links are recorded only for owned, present devices', async 
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM device_token_devices WHERE "tokenId"=$1', [tokenId])).rows[0].n, 0)
 })
 
-dbTest('saved logins: added and re-passworded from settings, owner only, never echoed', async () => {
+dbTest('saved logins: added and re-passworded from settings, owner only, never echoed', async t => {
+  // Exercise the real community KMS. Mocking awsKms does not replace the backend
+  // selected inside credentialKms; this process-only fixture never contacts AWS.
+  const previousEdition = process.env.MIKKA_EDITION, previousMasterKey = process.env.CREDENTIAL_MASTER_KEY
+  process.env.MIKKA_EDITION = 'community'
+  process.env.CREDENTIAL_MASTER_KEY = randomBytes(32).toString('base64')
+  t.after(() => {
+    if (previousEdition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = previousEdition
+    if (previousMasterKey === undefined) delete process.env.CREDENTIAL_MASTER_KEY; else process.env.CREDENTIAL_MASTER_KEY = previousMasterKey
+  })
   const { overrideDeploymentSwitch } = await import('../lib/deployment-switches')
   const password = randomUUID(), replacement = randomUUID()
   sessionUser = null
@@ -310,6 +315,12 @@ dbTest('saved logins: added and re-passworded from settings, owner only, never e
   if (saved.error) throw new Error(saved.error)
   assert.equal(saved.site, 'https://figma.com', 'a bare host is read as https and reduced to its origin')
   assert.ok(!JSON.stringify(saved).includes(password))
+  const sealed = (await pool.query('SELECT wrapped_dek,nonce,ciphertext FROM credential_secrets WHERE credential_id=$1', [saved.id])).rows[0]
+  assert.ok(sealed.wrapped_dek.startsWith('local:v1:'))
+  assert.ok(!JSON.stringify(sealed).includes(password))
+  const { localKms, open } = await import('../lib/credentials/kms')
+  const plaintext = await open(localKms('broker'), { userId: A, credentialId: saved.id, origin: saved.site }, { v: 1, wrappedDek: sealed.wrapped_dek, nonce: sealed.nonce, ciphertext: sealed.ciphertext })
+  try { assert.deepEqual(JSON.parse(plaintext.toString('utf8')), { username: 'alex@example.com', password }) } finally { plaintext.fill(0) }
   const listed = await actions.listSavedLogins()
   if (listed.error) throw new Error(listed.error)
   assert.ok(listed.logins.some(login => login.id === saved.id && login.site === 'https://figma.com' && login.account === 'alex@example.com'))

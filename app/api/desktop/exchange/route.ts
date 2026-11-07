@@ -3,7 +3,7 @@ import { and, eq, gt, isNotNull, isNull } from 'drizzle-orm'
 
 import { db } from '@/lib/db'
 import { desktopAuthRequests } from '@/lib/db/schema'
-import { desktopAuthCode, desktopAuthState, desktopAuthVerifier } from '@/lib/desktop-auth'
+import { desktopAuthCode, desktopAuthState, desktopAuthVerifier, desktopSameOriginRequest } from '@/lib/desktop-auth'
 import { sha256Hex, verifierMatches } from '@/lib/desktop-auth-server'
 import { withRequestLog } from '@/lib/request-log'
 import { auth } from '@/lib/auth'
@@ -20,8 +20,7 @@ const noStore = { 'Cache-Control': 'no-store' }
  * first attempt, right or wrong, so a code cannot be guessed against.
  */
 async function handlePOST(request: Request) {
-  const origin = request.headers.get('origin')
-  if (origin && origin !== new URL(request.url).origin) return new NextResponse(null, { status: 403 })
+  if (!desktopSameOriginRequest(request)) return new NextResponse(null, { status: 403 })
   let body: unknown
   try {
     body = await request.json()
@@ -35,11 +34,17 @@ async function handlePOST(request: Request) {
   if (!state || !code || !verifier || (value.client !== undefined && value.client !== 'bundled')) return NextResponse.json({ error: 'invalidRequest' }, { status: 400, headers: noStore })
 
   const now = new Date()
-  const [row] = await db.update(desktopAuthRequests).set({ usedAt: now })
+  // Lock the still-unused row before returning its old token. Consuming and
+  // clearing then commit together; concurrent attempts cannot both redeem it.
+  const pending = db.$with('pending_desktop_auth').as(db.select({
+    stateHash: desktopAuthRequests.stateHash, codeHash: desktopAuthRequests.codeHash,
+    challenge: desktopAuthRequests.codeChallenge, token: desktopAuthRequests.token,
+  }).from(desktopAuthRequests)
     .where(and(eq(desktopAuthRequests.stateHash, sha256Hex(state)), isNotNull(desktopAuthRequests.boundAt), isNull(desktopAuthRequests.usedAt), gt(desktopAuthRequests.expiresAt, now)))
-    .returning({ codeHash: desktopAuthRequests.codeHash, challenge: desktopAuthRequests.codeChallenge, token: desktopAuthRequests.token })
-  // RETURNING yields the row after the update, so clear the parked token next.
-  if (row) await db.update(desktopAuthRequests).set({ token: null }).where(eq(desktopAuthRequests.stateHash, sha256Hex(state)))
+    .for('update'))
+  const [row] = await db.with(pending).update(desktopAuthRequests).set({ usedAt: now, token: null })
+    .from(pending).where(eq(desktopAuthRequests.stateHash, pending.stateHash))
+    .returning({ codeHash: pending.codeHash, challenge: pending.challenge, token: pending.token })
   if (!row?.token || row.codeHash !== sha256Hex(code) || !verifierMatches(verifier, row.challenge)) {
     return NextResponse.json({ error: 'exchangeRejected' }, { status: 400, headers: noStore })
   }

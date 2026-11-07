@@ -3,12 +3,14 @@
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useSWRConfig } from 'swr'
 import { browserRuntime } from '@/lib/live/browser-runtime'
-import { type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
+import { type LiveRefresh, type LiveSubscriptionOptions, type LiveSubscription } from '@/lib/live/channel'
 import { LiveChannels } from '@/lib/live/channels'
+import { coversLiveRevisions } from '@/lib/live/revisions'
 import { TabShare, tabShareChannelName } from '@/lib/live/tab-share'
 import type { LiveKind } from '@/lib/live/events'
 import { registerLiveKeyConnection } from '@/lib/swr/live-focus'
-import { readCacheShareNamespace } from '@/lib/swr/persistent-cache'
+import { PersistentReadCache, readCacheShareNamespace } from '@/lib/swr/persistent-cache'
+import { readBoundary, readFresh } from '@/lib/swr/read-observer'
 
 const LiveContext = createContext<{ channels: LiveChannels; ownerId: string; workspaceId?: string; namespace: string | null; share?: (scope: string | null) => TabShare | null } | null>(null)
 
@@ -71,45 +73,59 @@ export function useLiveKeys(entities: readonly LiveEntity[], keys: readonly stri
   revisions.current = entities
   const revisionKey = JSON.stringify([options?.revisions ?? null, entities.map(entity => entity.revisions ?? null)])
   const minIntervalMs = options?.minIntervalMs ?? 0
-  const timing = useRef<LiveSubscriptionOptions>({ minIntervalMs, deadline: options?.deadline, revisions: options?.revisions })
-  timing.current = { minIntervalMs, deadline: options?.deadline, revisions: options?.revisions }
+  const timing = useRef<LiveSubscriptionOptions>({ minIntervalMs, deadline: options?.deadline, revisions: options?.revisions, presence: options?.presence })
+  timing.current = { minIntervalMs, deadline: options?.deadline, revisions: options?.revisions, presence: options?.presence }
   const optionsFor = (index: number): LiveSubscriptionOptions => ({ ...timing.current, revisions: { ...timing.current.revisions, ...revisions.current[index]?.revisions } })
   // Renders do not reanchor an expiry. A newer HTTP observation can arrange a
   // final check if the conservative timer fired before the server's deadline.
   const deadlineKey = options?.deadline?.at ?? null
   const deadlineObservation = options?.deadline?.observation
+  const presenceKey = JSON.stringify(options?.presence)
   const active = useRef<LiveSubscription[]>([])
+  const lifetime = useMemo(() => ({}), [channels, scope, references, serialized, cache, mutate, share, ownerId, namespace])
+  const currentLifetime = useRef(lifetime)
+  currentLifetime.current = lifetime
   useEffect(() => {
     if (!channels) return
+    let mounted = true
+    const current = () => mounted && currentLifetime.current === lifetime && document.visibilityState === 'visible'
+      && (!(cache instanceof PersistentReadCache) || cache.isEnabled)
     const subscriptions = (JSON.parse(references) as LiveEntity[]).map(({ kind, id, workspaceId: entityScope }, index) => {
       const channelScope = entityScope === undefined ? scope : entityScope
-      const refresh = (key: string) => {
+      const refresh: LiveRefresh = (key, requiredRevisions, reuseCompleted, after = readBoundary()) => {
+        if (!current()) return
         const authorized = () => ownerId && namespace && readCacheShareNamespace(cache, ownerId) === namespace
-        if (!share || !authorized()) return mutate(key)
+        const heldAtStart = { ...cache.get(key)?.data?.live?.revisions }
+        const accepts = (data: unknown) => coversLiveRevisions(data, requiredRevisions)
+          && coversLiveRevisions(data, heldAtStart)
+          && coversLiveRevisions(data, cache.get(key)?.data?.live?.revisions)
+        const read = () => readFresh(cache, key, after, () => mutate(key), accepts, current)
+        if (!share || !authorized()) return read()
         const tabs = share(channelScope)
-        if (!tabs) return mutate(key)
+        if (!tabs) return read()
         const previous = cache.get(key)?.data
         // Share normalized snapshots, never a delta against another tab's
         // cursor. A local write while waiting must not be overwritten either.
-        return tabs.run(key, () => mutate(key), data => {
-          if (!authorized()) return
-          return cache.get(key)?.data === previous ? mutate(key, data, { revalidate: false }) : mutate(key)
-        })
+        return readFresh(cache, key, after, () => tabs.run(key, read, data => {
+          if (!current() || !authorized()) return
+          return cache.get(key)?.data === previous ? mutate(key, data, { revalidate: false }) : read()
+        }, accepts, reuseCompleted), accepts, current)
       }
       return channels.subscribe(channelScope, kind, id, JSON.parse(serialized) as string[], refresh, optionsFor(index))
     })
     const connections = (JSON.parse(serialized) as string[]).map(key => registerLiveKeyConnection(cache, [key], () => channels.keyConnected(key)))
     active.current = subscriptions
     return () => {
+      mounted = false
       for (const stop of subscriptions) stop()
       for (const stop of connections) stop()
       if (active.current === subscriptions) active.current = []
     }
     // Timing options update the existing handles below. Only an actual scope,
     // entity, cache key or refresh owner change needs a new initial read.
-  }, [channels, scope, references, serialized, cache, mutate, share, ownerId, namespace])
+  }, [channels, scope, references, serialized, cache, mutate, share, ownerId, namespace, lifetime])
   useEffect(() => {
     active.current.forEach((subscription, index) => subscription.update(optionsFor(index)))
     // optionsFor reads the refs set above.
-  }, [minIntervalMs, deadlineKey, deadlineObservation, revisionKey])
+  }, [minIntervalMs, deadlineKey, deadlineObservation, revisionKey, presenceKey])
 }

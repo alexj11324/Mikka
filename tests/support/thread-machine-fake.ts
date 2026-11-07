@@ -24,7 +24,11 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
   factoryAutomaticRuntime.enqueue = async (database, actor, previousRunId, runId) => {
     await (await import('../../lib/factory/cloud-stage-handoff')).handoffFactoryCloudStage(database, actor, previousRunId, runId)
   }
-  factoryAutomaticRuntime.park = (database, actor, runId) => machines.parkThreadMachine(database, actor, runId, async () => {}, async () => null)
+  const park = (database: Pool, actor: { userId: string; workspaceId: string }, runId: string) => machines.parkThreadMachine(database, actor, runId, async () => {}, async () => null)
+  factoryAutomaticRuntime.park = async (database, actor, runId, nextRunId) => {
+    if (nextRunId && await machines.retainThreadMachineForHandoff(database, actor, runId, nextRunId)) return
+    await park(database, actor, runId)
+  }
   const real = { ...machines.threadMachineProvider }
   const credentials = new Map<string, string>()
   const sandbox = (sandboxId: string) => {
@@ -33,12 +37,17 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
       sandboxId,
       files: {
         read: async () => catalogue.sha,
-        write: async (path: string, body: string) => {
+        write: async (path: string | { path: string; data: string }[], body?: unknown) => {
           // The handoff alone cannot register a worker that has not started.
-          if (!/^\/run\/mikka-viewer\/thread-[a-f0-9-]+\.json$/.test(path)) return
-          const { deviceId, credential } = JSON.parse(body) as { deviceId: string; credential: string }
-          handoff = { deviceId, credential }
-          credentials.set(deviceId, credential)
+          const files = typeof path === 'string' ? [{ path, data: body }] : path
+          for (const file of files) {
+            // A locator sidecar or maintenance file is not a worker bootstrap.
+            if (!/^\/run\/mikka-viewer\/thread-[a-f0-9-]+\.json$/.test(file.path)) continue
+            if (typeof file.data !== 'string') throw new Error('Fixture bootstrap must be text')
+            const { deviceId, credential } = JSON.parse(file.data) as { deviceId: string; credential: string }
+            handoff = { deviceId, credential }
+            credentials.set(deviceId, credential)
+          }
         },
       },
       commands: { run: async (command: string) => {
@@ -61,6 +70,8 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
   })
   return {
     enqueueDurable: realEnqueue,
+    /** Runs the real pause transition; only the provider acknowledgement is synthetic. */
+    park: (actor: { userId: string; workspaceId: string }, runId: string) => park(pool, actor, runId),
     /** Provisions a queued cloud run's thread machine; returns its device and the worker's device token. */
     async start(actor: { userId: string; workspaceId: string }, runId: string) {
       await machines.ensureThreadMachine(pool, actor, runId)

@@ -6,7 +6,7 @@ import type { CredentialScope } from '../packages/daemon/src/subscription-worker
 import { runMayUseCredentialSql } from './personal-policy'
 import { quotaDisplayKey } from './subscription-quota'
 
-export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown; accountLabel?: string | null; paused?: boolean }
+export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown; accountLabel?: string | null; paused?: boolean; modelCatalog?: { revision: number | string; models: string[] } | null }
 export class SubscriptionRepository {
   constructor(readonly pool: Pick<Pool, 'query'> & Partial<Pick<Pool, 'connect'>>) {}
   /** Serialize allocation only: provider calls happen after this short transaction.
@@ -37,7 +37,7 @@ export class SubscriptionRepository {
     return id
   }
   async connection(ownerId: string, id: string): Promise<ConnectionRow> {
-    const { rows } = await this.pool.query<ConnectionRow>('select id,"ownerId","workspaceId",provider,state,epoch,quota,"accountLabel",paused from byos_connections where id=$1 and "ownerId"=$2', [id, ownerId])
+    const { rows } = await this.pool.query<ConnectionRow>('select id,"ownerId","workspaceId",provider,state,epoch,quota,"accountLabel",paused,"modelCatalog" from byos_connections where id=$1 and "ownerId"=$2', [id, ownerId])
     if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
     return rows[0]
   }
@@ -54,6 +54,25 @@ export class SubscriptionRepository {
     if (!row) throw new SubscriptionRefusal('binding_required')
     const { modelId, ...binding } = row
     return { ...subscriptionBindingSchema.parse({ ...binding, connectionRevision: Number(row.connectionRevision) }), modelId: String(modelId) }
+  }
+  /** One fresh database snapshot for a frozen model's binding and connection.
+   * Keep a missing connection distinct from a missing/mismatched binding. */
+  async bindingConnection(ownerId: string, id: string) {
+    const { rows } = await this.pool.query<{ connection: ConnectionRow | null; connectionRevision: string; modelId: string }>(`
+      select b.id,b."ownerId",b."workspaceId",b."consumerId",b."connectionId",b."connectionRevision",b.route,b."modelId",
+        case when c.id is null then null else json_build_object(
+          'id',c.id,'ownerId',c."ownerId",'workspaceId',c."workspaceId",'provider',c.provider,
+          'state',c.state,'epoch',c.epoch::text,'quota',c.quota,'accountLabel',c."accountLabel",'paused',c.paused
+        ) end as connection
+      from byos_bindings b left join byos_connections c on c.id=b."connectionId" and c."ownerId"=b."ownerId"
+      where b.id=$1 and b."ownerId"=$2`, [id, ownerId])
+    const row = rows[0]
+    if (!row) throw new SubscriptionRefusal('binding_required')
+    const { modelId, connection, ...binding } = row
+    return {
+      binding: { ...subscriptionBindingSchema.parse({ ...binding, connectionRevision: Number(row.connectionRevision) }), modelId: String(modelId) },
+      connection,
+    }
   }
   async saveQuota(row: ConnectionRow, quota: QuotaSnapshot) {
     const { rows: [saved] } = await this.pool.query<{ previous: unknown }>(`with old as (select quota from byos_connections where id=$1 and "ownerId"=$2)
@@ -102,7 +121,7 @@ export class SubscriptionRepository {
     const { rows } = await this.pool.query('select id from byos_bindings where "ownerId"=$1 and "consumerId"=$2 and route in (\'codex_cpa\',\'claude_cpa\') order by "createdAt" desc limit 1', [ownerId, consumerId])
     return rows[0]?.id ?? null
   }
-  async nativeBinding(ownerId: string, consumerId: string, harness: string, bindingId?: string, workspaceId?: string) {
+  async nativeBinding(ownerId: string, consumerId: string, harness: string, bindingId?: string, workspaceId?: string, options: { currentConnection?: true } = {}) {
     if (harness !== 'codex' && harness !== 'claude_code') return null
     const route = harness === 'codex' ? 'codex_cli' : 'claude_code_cli'
     // The task's Agent belongs to the caller. A binding may still belong to a different person
@@ -120,6 +139,19 @@ export class SubscriptionRepository {
         await authorizeSubscriptionWorkspace(row.ownerId, row.workspaceId)
       } catch { return null }
     }
-    return this.binding(row.ownerId, row.id)
+    if (!options.currentConnection) return this.binding(row.ownerId, row.id)
+    // Membership may have awaited a different database. Re-read this exact
+    // binding, its original scope and its current connection together after it;
+    // never fall through to an older binding if the selected one was revoked.
+    const { rows: [current] } = await this.pool.query(`SELECT b.id,b."ownerId",b."workspaceId",b."consumerId",b."connectionId",b."connectionRevision",b.route,b."modelId"
+      FROM byos_bindings b JOIN agents a ON a.id::text=b."consumerId" AND a."userId"=$1
+      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
+        AND c.state='connected' AND c.paused=false AND c.epoch=b."connectionRevision" AND c.provider=$7
+      WHERE b."consumerId"=$2 AND b.route=$3 AND b.id=$4 AND b."workspaceId"=$5 AND b."ownerId"=$6
+        AND ${runMayUseCredentialSql('b."ownerId"', '$1', 'b."workspaceId"')}`,
+    [ownerId, consumerId, route, row.id, row.workspaceId, row.ownerId, harness === 'codex' ? 'codex' : 'claude'])
+    if (!current) return null
+    const { modelId, ...binding } = current
+    return { ...subscriptionBindingSchema.parse({ ...binding, connectionRevision: Number(current.connectionRevision) }), modelId: String(modelId) }
   }
 }

@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { Window } from 'happy-dom'
 import { captureParityReadReceipts, parityBotReadKeys } from './parity-reads.mjs'
-import { observeReads } from './parity-page-ready.mjs'
+import { observeReads, pageReady } from './parity-page-ready.mjs'
+import { compareImages } from './parity-images.mjs'
 
 const ids = { coordinator: 'coordinator-bot', bot: 'bot', coordinatorUser: 'c1', coordinatorReply: 'c2', botUser: 'b1', botReply: 'b2' }
 const coordinator = { conversationId: 'coordinator', lastReadMessageId: 'c2', lastReadPosition: 2 }
@@ -117,4 +122,234 @@ test('only the exact successful Linear unavailable payload enables its existing 
   ]) {
     assert.deepEqual(await observedResponse({ path, status, json: async () => data }).finish(), { linearUnavailable: expected })
   }
+})
+
+const artifactFixture = { artifactTitle: 'Desktop review notes', htmlTitle: 'Desktop review preview' }
+const finalReply = 'The review is complete. Conversations, task details and artifacts are ready.'
+
+// Offline DOM locators: changes explicitly release visibility waits. No browser,
+// application request, sleep or screenshot is involved in this readiness check.
+function artifactPage(t, { reply = true, frameReady = true } = {}) {
+  const window = new Window()
+  const document = window.document
+  const pending = new Set()
+  const card = title => `<button data-slot="artifact-card"><span>${title}</span><span>Document · v1</span></button>`
+  document.body.innerHTML = `<div id="background">${finalReply}${card(artifactFixture.artifactTitle)}${card(artifactFixture.htmlTitle)}</div>
+    <div role="dialog"><main><h2>Desktop review</h2><iframe></iframe><div id="other-cards">${card(artifactFixture.artifactTitle)}${card(artifactFixture.htmlTitle)}</div></main>
+    <aside><p id="reply">${reply ? finalReply : ''}</p><div data-slot="thread-artifacts"></div></aside></div>`
+  const frame = document.querySelector('iframe').contentDocument
+  frame.body.innerHTML = frameReady ? '<h1>Desktop review</h1>' : ''
+  function locator(roots) {
+    const descendants = selector => roots().flatMap(root => [...root.querySelectorAll(selector)])
+    const matches = (node, value, exact) => exact ? node.textContent.trim() === value : node.textContent.includes(value)
+    const visible = () => roots().some(node => !node.closest?.('[hidden]'))
+    return {
+      locator: selector => locator(() => descendants(selector)),
+      frameLocator: selector => locator(() => descendants(selector).map(node => node.contentDocument)),
+      getByRole: (role, { name, exact = false } = {}) => locator(() => descendants(role === 'heading' ? 'h1,h2,h3,h4,h5,h6' : `[role="${role}"]`)
+        .filter(node => name === undefined || matches(node, name, exact))),
+      getByText: (value, { exact = false } = {}) => locator(() => descendants('*').filter(node => matches(node, value, exact)
+        && ![...node.children].some(child => matches(child, value, exact)))),
+      waitFor: async () => {
+        if (visible()) return
+        await new Promise((resolve, reject) => pending.add({ visible, resolve, reject }))
+      },
+    }
+  }
+  const update = change => {
+    change(document)
+    for (const wait of pending) if (wait.visible()) { pending.delete(wait); wait.resolve() }
+  }
+  const expire = () => {
+    for (const wait of pending) wait.reject(new Error('PARITY_FIXTURE_WAIT_TIMEOUT'))
+    pending.clear()
+  }
+  t.after(() => { expire(); window.close() })
+  const page = locator(() => [document])
+  return { update, expire, frame, addCard: (title, hidden = false) => update(() => {
+    const cards = document.querySelector('aside [data-slot="thread-artifacts"]')
+    cards.insertAdjacentHTML('beforeend', card(title))
+    cards.lastElementChild.hidden = hidden
+  }), start: name => {
+    const state = { completed: false }
+    const result = pageReady(page, name, artifactFixture, {}).then(() => { state.completed = true })
+    void result.catch(() => {})
+    return { state, result }
+  } }
+}
+
+const nextTurn = () => new Promise(resolve => setImmediate(resolve))
+
+for (const name of ['artifact-markdown', 'artifact-html']) {
+  test(`${name} waits for both visible thread cards, not background or partial matches`, { timeout: 1000 }, async t => {
+    const f = artifactPage(t)
+    const { state, result } = f.start(name)
+    await nextTurn()
+    assert.equal(state.completed, false, 'background and dialog-body cards cannot complete the thread')
+    f.addCard(artifactFixture.artifactTitle)
+    await nextTurn()
+    assert.equal(state.completed, false, 'one card is not the completed fixture')
+    f.addCard(`${artifactFixture.htmlTitle} incomplete`)
+    await nextTurn()
+    assert.equal(state.completed, false, 'a partial title match is not the fixture card')
+    f.update(document => document.querySelector('aside [data-slot="artifact-card"]:last-child').remove())
+    f.addCard(artifactFixture.htmlTitle, true)
+    await nextTurn()
+    assert.equal(state.completed, false, 'a hidden card cannot be captured')
+    f.update(document => { document.querySelector('aside [data-slot="artifact-card"]:last-child').hidden = false })
+    await result
+    assert.equal(state.completed, true)
+  })
+
+  test(`${name} requires the final reply in the dialog thread`, { timeout: 1000 }, async t => {
+    const f = artifactPage(t, { reply: false })
+    f.addCard(artifactFixture.artifactTitle)
+    f.addCard(artifactFixture.htmlTitle)
+    const { state, result } = f.start(name)
+    await nextTurn()
+    assert.equal(state.completed, false, 'a background reply does not complete the dialog thread')
+    f.update(document => document.querySelector('main').insertAdjacentHTML('beforeend', `<p>${finalReply}</p>`))
+    await nextTurn()
+    assert.equal(state.completed, false, 'the document is not the thread')
+    f.update(document => { document.querySelector('#reply').textContent = finalReply })
+    await result
+    assert.equal(state.completed, true)
+  })
+
+  test(`${name} fails when a required thread card never arrives`, { timeout: 1000 }, async t => {
+    const f = artifactPage(t)
+    f.addCard(artifactFixture.artifactTitle)
+    const { state, result } = f.start(name)
+    await nextTurn()
+    assert.equal(state.completed, false)
+    f.expire()
+    await assert.rejects(result, /PARITY_FIXTURE_WAIT_TIMEOUT/)
+  })
+}
+
+test('artifact HTML still requires the rendered iframe document', { timeout: 1000 }, async t => {
+  const f = artifactPage(t, { frameReady: false })
+  f.addCard(artifactFixture.artifactTitle)
+  f.addCard(artifactFixture.htmlTitle)
+  const { state, result } = f.start('artifact-html')
+  await nextTurn()
+  assert.equal(state.completed, false)
+  f.update(() => { f.frame.body.innerHTML = '<h1>Desktop review</h1>' })
+  await result
+  assert.equal(state.completed, true)
+})
+
+const taskFixture = { issueTitle: 'Review the desktop workspace' }
+const taskMessages = {
+  Workspace: { detail: { createdTask: 'Created the task' } },
+  IssueThreads: { open: 'Open thread {name}', conversation: 'Thread conversation' },
+}
+const taskDescription = 'Review conversations, task details, artifacts and workspace settings in the desktop app.'
+const threadReply = 'The review is complete. Conversations, task details and artifacts are ready.'
+
+// Deferred Locator boundaries exercise the real readiness helper without a
+// browser. The task and its nested thread have the same accessible region name;
+// only the outer region contains #task-title. Their independent reads can finish
+// in any order, without a skeleton for the activity or the task's thread list.
+function taskReadiness(pending) {
+  const waiting = Promise.withResolvers()
+  const wait = key => key === pending ? waiting.promise : Promise.resolve()
+  const text = (value, options) => {
+    assert.equal(options.exact, true)
+    const key = new Map([[taskDescription, 'description'], [taskMessages.Workspace.detail.createdTask, 'activity']]).get(value)
+    assert.ok(key, 'task text must be one of the existing positive readiness markers')
+    return { waitFor: () => wait(key) }
+  }
+  let narrowed = false
+  const task = {
+    _apiName: 'Locator',
+    filter({ has }) {
+      assert.equal(has.selector, '#task-title')
+      narrowed = true
+      return this
+    },
+    async _expect(expression, options) {
+      assert.equal(narrowed, true, 'the nested thread shares this accessible name; select the region containing the task title')
+      assert.equal(expression, 'to.have.attribute.value')
+      assert.equal(options.expressionArg, 'aria-busy')
+      assert.equal(options.expectedText[0].string, 'false')
+      await wait('verified')
+      return { matches: true }
+    },
+    locator(selector) {
+      assert.equal(selector, '#task-title:not([readonly])')
+      return { waitFor: () => wait('editable-title') }
+    },
+    getByText: text,
+    getByRole(role, options) {
+      if (role === 'button') {
+        assert.deepEqual(options, { name: 'Open thread Review the desktop workspace', exact: true, pressed: true })
+        return { waitFor: () => wait('thread-row') }
+      }
+      assert.equal(role, 'list')
+      assert.deepEqual(options, { name: 'Thread conversation', exact: true })
+      return { getByText(value, options) {
+        assert.equal(value, threadReply)
+        assert.deepEqual(options, { exact: true })
+        return { waitFor: () => wait('thread-reply') }
+      } }
+    },
+  }
+  const page = {
+    getByRole(role, options) {
+      assert.equal(role, 'region')
+      assert.deepEqual(options, { name: taskFixture.issueTitle, exact: true })
+      return task
+    },
+    locator: selector => ({ selector }),
+    getByText() { assert.fail('a reply or activity elsewhere on the page must not satisfy task readiness') },
+  }
+  return { page, release: waiting.resolve }
+}
+
+for (const pending of ['verified', 'editable-title', 'description', 'activity', 'thread-row', 'thread-reply']) {
+  test(`task-thread capture waits for ${pending} even when all its other reads are ready`, async t => {
+    const { page, release } = taskReadiness(pending)
+    t.after(release)
+    let completed = false
+    let failure
+    const ready = pageReady(page, 'task-thread', taskFixture, taskMessages).then(() => { completed = true }, error => { failure = error })
+    await new Promise(resolve => setImmediate(resolve))
+    assert.ifError(failure)
+    assert.equal(completed, false, 'mask collection must not begin while an independent read is unrendered')
+    release()
+    await ready
+    assert.ifError(failure)
+    assert.equal(completed, true)
+  })
+}
+
+const whitePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAD0lEQVQImWP4jwYYSBcAAHg8P8HaEZ1pAAAAAElFTkSuQmCC', 'base64')
+const blackPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWNgYGD4j4ZJFQAABloP8TIttywAAAAASUVORK5CYII=', 'base64')
+
+test('identical pixels with different mask geometry still fail and retain both geometries', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-parity-masks-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const before = { bytes: whitePng, masks: [{ kind: 'time', x: 0, y: 0, width: 1, height: 1 }] }
+  const after = { bytes: whitePng, masks: [{ kind: 'time', x: 1, y: 0, width: 1, height: 1 }] }
+  const report = await compareImages(before, after, join(directory, 'diff.png'))
+  assert.equal(report.changedPixels, 0)
+  assert.equal(report.maskGeometryMatches, false)
+  assert.equal(report.passed, false)
+  const retained = JSON.parse(JSON.stringify(report))
+  assert.deepEqual(retained.masks, before.masks)
+  assert.deepEqual(retained.afterMasks, after.masks)
+})
+
+test('matching masks preserve the unchanged strict pixel comparison', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-parity-pixels-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const original = { bytes: whitePng, masks: [] }
+  const same = await compareImages(original, original, join(directory, 'same.png'))
+  assert.equal(same.passed, true)
+  const changed = await compareImages(original, { bytes: blackPng, masks: [] }, join(directory, 'different.png'))
+  assert.equal(changed.maskGeometryMatches, true)
+  assert.equal(changed.changedRatio, 1)
+  assert.equal(changed.maximumRatio, 0.001)
+  assert.equal(changed.passed, false)
 })

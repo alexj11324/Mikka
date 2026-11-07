@@ -13,6 +13,7 @@ import { workspacePool } from '@/lib/workspace-db'
 import { coordinatorSessionScope } from '@/lib/live/coordinator-session'
 import { subscribeToCoordinatorReplies } from './reply-live'
 import { waitForReply } from './reply-wait'
+import { logReplyCompletion } from './reply-completion'
 import { coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -39,10 +40,11 @@ async function lastPosition(userId: string): Promise<number> {
  * to readCoordinatorMessages.
  */
 export async function sendToCoordinator(userId: string, text: string) {
+  const botId = await coordinatorChat(userId)
   const after = await lastPosition(userId)
-  await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, await coordinatorChat(userId), text))
+  await recordCoordinatorEvent(db, peerCoordinatorMessageEvent(userId, botId, text))
   await wakeCoordinator(userId)
-  return { queued: true, coordinatorRunning: coordinatorEnabled(), after }
+  return { queued: true, coordinatorRunning: await coordinatorEnabled(userId, botId), after }
 }
 
 /** One stored message as text: what was said, and which tools the Coordinator called. */
@@ -117,8 +119,10 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
     if (!final && !failed && !await hasAssistantAfter(userId, botId, after)) return { done: false }
     const messages = await messagesAfter(userId, botId, after, limit)
     const replied = messages.some(message => message.role === 'assistant')
-    return { done: true, value: { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: coordinatorEnabled() } }
-  }, { deadline, signal, subscribe: changed => subscribeToCoordinatorReplies(scope, botId, changed) })
+    return { done: true, value: { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: await coordinatorEnabled(userId, botId) } }
+  }, { deadline, signal, subscribe: (changed, abort) => subscribeToCoordinatorReplies(scope, botId, changed, abort),
+    onComplete: completion => logReplyCompletion(botId, completion),
+  })
 }
 
 export async function listIssues(userId: string, input: { status?: string }) {

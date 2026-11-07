@@ -4,11 +4,13 @@ import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setImmediate as nextTurn } from 'node:timers/promises'
 import { allowedApiPath, normalizedRendererPath, RENDERER_CSP, RENDERER_URL, rendererAssetPath, safeAppNext } from './bundled-policy'
 import { isTrustedFrame, navigationDecision, originOf, trustedIpcSender } from './security'
 import { bundledProtocol } from './bundled-protocol'
 import { SessionVault, type EncryptedStorage, type StoredSession } from './session-vault'
 import { BundledAuth } from './bundled-auth'
+import { notifyBundledSessionChange, type BundledSessionChange } from './bundled-session-change'
 import { BundledLive } from './bundled-live'
 import { startBundledLoopback } from './bundled-loopback'
 import { BundledViewer, validViewerGrant } from './bundled-viewer'
@@ -213,10 +215,25 @@ test('browser handoff creates/exchanges PKCE only in main and publishes only pub
   let complete!: () => void
   const finished = new Promise<void>(resolve => { complete = resolve })
   const code = randomBytes(32).toString('base64url')
+  let bootstrapReads = 0, otherNotifications = 0
+  const reads: Promise<Response>[] = []
+  const bootstrap = () => auth.request('/api/desktop/rpc', { method: 'POST', body: JSON.stringify({ version: 1, action: 'desktop.bootstrap', args: [] }) })
+  // An existing renderer reacts to sessionChanged by starting its ordinary
+  // authenticated read; loadURL mounts another document with its own read.
+  const main = { isDestroyed: () => false, getURL: () => RENDERER_URL, send: () => { reads.push(bootstrap()) } }
+  const other = { ...main, send: () => { otherNotifications++ } }
   const auth = new BundledAuth({ serverUrl: 'https://server.test/mikka', version: '0.1.2', vault,
-    openExternal: async url => { opened = new URL(url) }, changed: () => {}, returned: next => { assert.equal(next, '/en?issue=42'); complete() },
+    openExternal: async url => { opened = new URL(url) },
+    changed: (change?: BundledSessionChange) => notifyBundledSessionChange([main, other], main, RENDERER_URL, change),
+    returned: async next => { assert.equal(next, '/en?issue=42'); reads.push(bootstrap()); await Promise.all(reads); complete() },
     fetch: async (url, init) => {
       const body = JSON.parse(String(init?.body))
+      if (url.endsWith('/api/desktop/rpc')) {
+        assert.equal(new Headers(init?.headers).get('authorization'), `Bearer ${secret}`)
+        assert.equal(body.action, 'desktop.bootstrap')
+        bootstrapReads++
+        return Response.json({ version: 1, ok: true, result: identity })
+      }
       assert.equal(new Headers(init?.headers).get('authorization'), null)
       if (url.endsWith('/api/desktop/begin')) { registration = body; return new Response(null, { status: 204 }) }
       assert.ok(url.endsWith('/api/desktop/exchange'))
@@ -237,10 +254,64 @@ test('browser handoff creates/exchanges PKCE only in main and publishes only pub
   assert.equal(auth.session(), null)
   await fetch(`${registration.callback}?state=${registration.state}&code=${code}`)
   await finished
+  assert.equal(bootstrapReads, 1, 'PKCE navigation must not also bootstrap the old main document')
+  assert.equal(otherNotifications, 1, 'other trusted windows still discard their old session')
   assert.deepEqual(auth.session(), identity)
   assert.equal((await vault.load())?.token, secret)
   assert.equal((await vault.load())?.sessionCache, sessionCache)
   assert.equal(JSON.stringify(auth.session()).includes(secret), false)
+})
+
+test('pending PKCE skips only the navigating main window and ordinary changes still notify it', () => {
+  const notified: string[] = []
+  const target = (id: string, url = RENDERER_URL, destroyed = false) => ({
+    isDestroyed: () => destroyed, getURL: () => url, send: () => { notified.push(id) },
+  })
+  const main = target('main'), settings = target('settings', `${RENDERER_URL}/settings`)
+  const contents = [main, settings, target('destroyed', RENDERER_URL, true), target('untrusted', 'https://other.invalid/')]
+  notifyBundledSessionChange(contents, main, RENDERER_URL, { pendingReturn: true })
+  assert.deepEqual(notified, ['settings'])
+  notified.length = 0
+  notifyBundledSessionChange(contents, main, RENDERER_URL)
+  assert.deepEqual(notified, ['main', 'settings'])
+  notified.length = 0
+  notifyBundledSessionChange(contents, null, RENDERER_URL, { pendingReturn: true })
+  assert.deepEqual(notified, ['main', 'settings'], 'without a navigating main no trusted window is suppressed')
+})
+
+test('PKCE navigation failure restores notification only for its current authentication generation', { timeout: 5000 }, async t => {
+  for (const superseded of [false, true]) await t.test(superseded ? 'signed out during navigation' : 'current sign-in', async t => {
+    const vault = new SessionVault(await fixture(t), 'https://server.test/mikka', encryption())
+    let registration: { state: string; callback: string } | undefined
+    let returned!: () => void, restored!: () => void, rejectNavigation!: (error: Error) => void
+    const navigating = new Promise<void>(resolve => { returned = resolve })
+    const recovered = new Promise<void>(resolve => { restored = resolve })
+    const navigation = new Promise<void>((_resolve, reject) => { rejectNavigation = reject })
+    const changes: (BundledSessionChange | undefined)[] = []
+    const auth = new BundledAuth({ serverUrl: 'https://server.test/mikka', version: '0.1.2', vault,
+      openExternal: async () => {},
+      changed: change => { changes.push(change); if (!change) restored() },
+      returned: () => { returned(); return navigation },
+      fetch: async (url, init) => {
+        if (url.endsWith('/api/desktop/begin')) { registration = JSON.parse(String(init?.body)); return new Response(null, { status: 204 }) }
+        if (url.endsWith('/api/auth/sign-out')) return new Response(null, { status: 204 })
+        assert.ok(url.endsWith('/api/desktop/exchange'))
+        return Response.json({ ...identity, token: secret })
+      },
+    })
+    t.after(() => auth.dispose())
+    await auth.signIn({ provider: 'github', locale: 'en', next: '/' })
+    assert.ok(registration)
+    await fetch(`${registration.callback}?state=${registration.state}&code=${randomBytes(32).toString('base64url')}`)
+    await navigating
+    assert.deepEqual(changes, [{ pendingReturn: true }])
+    if (superseded) await auth.signOut()
+    rejectNavigation(new Error('fixture navigation failed'))
+    if (!superseded) await recovered
+    await nextTurn()
+    assert.deepEqual(changes, [{ pendingReturn: true }, undefined], superseded ? 'the stale failure cannot notify after the later sign-out' : 'failed navigation refreshes the retained document')
+    assert.deepEqual(auth.session(), superseded ? null : identity)
+  })
 })
 
 test('password session rotation is accepted only for its RPC and refreshes public session id privately', async t => {

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { seedCoordinator } from '../../tests/support/coordinator-bot'
+import { captureRunFailure } from '@mikka/protocol/run-failure'
 
 // Every bot chats on the Coordinator harness; botId keeps their chats apart.
 // Database regressions execute only in CI against ephemeral Postgres 17.
@@ -157,7 +158,10 @@ dbTest('personal provenance and STOP/pending survive actual inbox persistence an
     ]
     for (const seed of seeds) await recordCoordinatorEvent(db, seed)
     const taken = await store.takeInbox(userId, 'synthetic-provenance-holder', botId)
-    assert.deepEqual([taken.held, taken.added], [true, 3])
+    assert.deepEqual([taken.held, taken.added], [true, 1])
+    assert.deepEqual(promptMessages(null, (await store.loadConversation(userId, botId)).messages, trust).map(message => message.content), ['STOP publication'])
+    const runtime = await store.takeInbox(userId, 'synthetic-provenance-holder', botId)
+    assert.deepEqual([runtime.held, runtime.added], [true, 2])
     await store.editMemory(userId, () => ({ memory: '- synthetic private provenance note', result: null }), botId)
     const conversation = await store.loadConversation(userId, botId)
     assert.equal(conversation.memory, '- synthetic private provenance note')
@@ -212,21 +216,29 @@ dbTest('unclassified runtime data stays pending while direct user input and clas
       const id=randomUUID();runtimeIds.push(id)
       await db.insert(schema.coordinatorEvents).values({id,userId:owner,botId:coordinator,kind:'action_decided',dedupeKey:`judgment:${owner}:${i}`,issueId:null,runId:null,payload:{status:'pending',action:'synthetic'},createdAt:new Date('2026-10-28T00:00:00Z')})
     }
+    const backgroundId=randomUUID()
+    await db.insert(schema.coordinatorEvents).values({
+      id:backgroundId,userId:owner,botId:coordinator,kind:'issue_status_changed',tier:'background',
+      dedupeKey:`background:${owner}`,issueId:null,runId:null,payload:{title:'Synthetic issue',status:'review'},
+      createdAt:new Date('2026-10-27T22:00:00Z'),
+    })
     await recordCoordinatorEvent(db,userMessageEvent(owner,'Continue the existing authorized work',{ botId: coordinator }))
     const selected=await store.untriagedEvents(owner, coordinator)
     assert.ok(selected.some(event=>event.kind==='user_message'),'direct input is not starved behind the runtime batch')
     const direct=await store.takeInbox(owner, 'direct-holder', coordinator)
-    assert.equal(direct.added,1,'NULL runtime tiers are not implicitly consumed as results')
+    assert.equal(direct.added,1,'neither background nor unclassified runtime data may accompany the direct request')
     assert.equal(await store.releaseLease(owner, 'direct-holder', coordinator),false)
     const pending=await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId,owner),eq(schema.coordinatorEvents.id,runtimeIds[0])))
     assert.equal(pending[0].tier,null);assert.equal(pending[0].deliveredAt,null)
+    const [background]=await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id,backgroundId))
+    assert.equal(background.deliveredAt,null,'the earlier background notification remains queued')
     await store.setEventTier(runtimeIds[0],'result',{userId:owner+'-foreign',botId:coordinator})
     const [denied]=await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id,runtimeIds[0]))
     assert.equal(denied.tier,null,'a foreign scope cannot classify this event')
     // Explicit synthetic classification tests persistence, not model quality.
     await store.setEventTier(runtimeIds[0],'result',{userId:owner,botId:coordinator})
     const takes=await Promise.all(['holder-a','holder-b'].map(holder=>store.takeInbox(owner, holder, coordinator)))
-    assert.equal(takes.reduce((sum,take)=>sum+take.added,0),1,'concurrent leases cannot deliver a result twice')
+    assert.equal(takes.reduce((sum,take)=>sum+take.added,0),2,'one lease delivers the classified result and retained background exactly once')
     const winner=takes.findIndex(take=>take.held)
     assert.notEqual(winner,-1)
     const repeated=await store.takeInbox(owner, ['holder-a','holder-b'][winner], coordinator)
@@ -236,7 +248,7 @@ dbTest('unclassified runtime data stays pending while direct user input and clas
     assert.equal(delivered.tier,'result','delivered event classification is immutable to a stale update')
     assert.ok(delivered.deliveredAt)
     const messages=await db.select().from(schema.coordinatorMessages).where(eq(schema.coordinatorMessages.userId,owner))
-    assert.equal(messages.length,2)
+    assert.equal(messages.length,3)
     const remaining=await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId,owner),sql`${schema.coordinatorEvents.deliveredAt} is null`))
     assert.equal(remaining.length,51,'unjudged rows remain undelivered')
   })
@@ -470,12 +482,13 @@ dbTest('重试 re-runs a failed bot turn once, for the message already sent, in 
     const answered = await store.chatView(owner, 200, botId)
     assert.equal(answered.error, null, 'the chat-wide line clears once a turn ends cleanly')
     assert.deepEqual(answered.items.map(item => [item.from, item.text, item.failure ?? null]), [
-      ['person', 'Plan my week', { kind: 'hosted', code: 'verification_required' }],
+      ['person', 'Plan my week', { kind: 'hosted', code: 'verification_required', raw: 'verification_required', failureDetails: answered.items[0].failure?.failureDetails }],
       ['person', 'Then plan next week', null],
       ['coordinator', 'Here is the plan.', null],
     ])
+    assert.equal(answered.items[0].failure?.failureDetails?.runId, 'wrun_third-turn')
     const context = await store.loadConversation(owner, botId)
-    assert.ok(context.messages.every(({ message }) => !('mikkaFailure' in message)), 'the model never sees the mark')
+    assert.ok(context.messages.every(({ message }) => !('mikkaFailure' in message) && !('mikkaFailureDetails' in message)), 'the model never sees failure metadata')
   })
 })
 
@@ -857,5 +870,54 @@ dbTest('Factory completion delivery keeps historical handoffs and reads current 
     const plain = String((await store.loadConversation(owner, botId)).messages.at(-1)!.message.content)
     assert.ok(plain.includes('Plain task complete') && plain.includes('Verified GitHub pull request: https://github.com/example/plain/pull/1 (open)'))
     assert.ok(!plain.includes('Current host observation'), 'ordinary non-Factory notifications retain their own publication and result')
+  })
+})
+
+
+dbTest('structured failures survive a fresh chat read, retain the lease fence, and stay out of model/list projections', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { eq, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  ])
+  const owner = `test-run-failure-${randomUUID()}`, holder = 'wrun_structured_failure'
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  let botId = '', version = '', storedFailure: unknown
+  t.after(async () => { await scope.close() })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values (${owner},'Failure fixture',${`${owner}@example.invalid`},false,now(),now())`)
+    botId = (await seedCoordinator(owner)).botId
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'A private synthetic request for the bot.', { botId }))
+    await store.takeInbox(owner, holder, botId)
+    const failureDetails = captureRunFailure({ statusCode: 400, responseBody: JSON.stringify({ error: { type: 'invalid_request_error', message: 'The provider does not support this request format.' } }) }, { provider: 'codex', credential: 'subscription', runId: holder, appVersion: 'a'.repeat(40) })
+    await store.failTurn(owner, holder, 'subscription_generation_failed', botId, undefined, failureDetails)
+    const chat = await store.chatView(owner, 200, botId)
+    assert.equal(chat.failureDetails?.category, 'invalid_request')
+    assert.equal(chat.failureDetails?.providerMessage, 'The provider does not support this request format.')
+    assert.equal(chat.failureDetails?.runId, holder)
+    assert.deepEqual(chat.items[0].failure?.failureDetails, chat.failureDetails)
+    storedFailure = chat.failureDetails
+    version = (await store.chatVersion(owner, 200, botId)).version
+    await store.failTurn(owner, holder, 'late_overwrite', botId, undefined, captureRunFailure({ statusCode: 429 }))
+    assert.deepEqual((await store.chatView(owner, 200, botId)).failureDetails, storedFailure, 'the first release consumed this lease')
+  })
+  await scope.close()
+  const reloaded = createRequestDatabaseScope(databaseUrl!)
+  t.after(async () => { await reloaded.close() })
+  await reloaded.run(async () => {
+    const chat = await store.chatView(owner, 200, botId)
+    assert.deepEqual(chat.failureDetails, storedFailure, 'a new request/database scope reads the persisted record')
+    const context = await store.loadConversation(owner, botId)
+    assert.ok(context.messages.every(row => !('mikkaFailureDetails' in row.message)))
+    assert.doesNotMatch(JSON.stringify(await store.botChats(owner)), /providerMessage|The provider does not support/)
+    assert.equal((await store.chatView('another-owner', 200, botId)).failureDetails, undefined)
+    const altered = { ...chat.failureDetails!, occurredAt: new Date(Date.parse(chat.failureDetails!.occurredAt) + 1000).toISOString() }
+    await db.update(schema.coordinatorSessions).set({ lastFailure: altered }).where(eq(schema.coordinatorSessions.botId, botId))
+    assert.notEqual((await store.chatVersion(owner, 200, botId)).version, version, 'details alone change the existing snapshot hash')
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Try a fresh request.', { botId }))
+    await store.takeInbox(owner, 'wrun_recovered_failure', botId)
+    await store.appendMessages(owner, 'wrun_recovered_failure', [{ role: 'assistant', content: 'Recovered.', mikkaFailureDetails: altered } as unknown as import('ai').ModelMessage], null, botId)
+    const recovered = await store.chatView(owner, 200, botId)
+    assert.equal(recovered.failureDetails, undefined, 'a successful response clears current failure details')
+    assert.equal(recovered.items.at(-1)?.failure, undefined, 'model output cannot forge a host failure')
+    assert.deepEqual(recovered.items[0].failure?.failureDetails, storedFailure, 'historical failed message retains its own record')
   })
 })

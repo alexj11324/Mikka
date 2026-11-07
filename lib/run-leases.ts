@@ -8,7 +8,7 @@ import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/reposi
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
 import { afterJob } from '@/lib/background'
-import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos, devices, issues } from '@/lib/db/schema'
@@ -25,6 +25,7 @@ import { deviceOnlineStates } from '@/lib/device-presence'
 import { ownE2BKeySql } from './secrets/e2b-owner-sql'
 import { readmitLostLocalRun, type AdmittedTakeover, type CloudRecoverySource } from './run-repository-retry'
 import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
+import { serverRunFailure } from './run-failure-details'
 import { subscriptionPreflightSchema } from '@mikka/protocol/harness'
 import type { RunReport } from '@mikka/protocol/run'
 import messages from '@/messages/zh-CN.json'
@@ -45,7 +46,7 @@ export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners:
     .where(or(
       and(inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now)),
       and(eq(agentRuns.status, 'queued'), isNotNull(agentRuns.retryOf),
-        or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)))),
+        or(isNull(devices.lastSeenAt), gt(devices.lastSeenAt, now), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS)))),
     ))
     .orderBy(agentRuns.userId).limit(100)
   let failed = 0
@@ -108,10 +109,12 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(
       eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'), isNotNull(agentRuns.retryOf),
-      or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS))),
+      or(isNull(devices.lastSeenAt), gt(devices.lastSeenAt, now), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS))),
     ))
     .limit(20)
-  const presence = await deviceOnlineStates(stranded.flatMap(({ run, lastSeenAt }) => run.deviceId ? [{ id: run.deviceId, lastSeenAt }] : []), now.getTime())
+  // Lease decisions retain the sweep snapshot, but presence is observed after
+  // the query: a heartbeat committed while it waited is not a future heartbeat.
+  const presence = await deviceOnlineStates(stranded.flatMap(({ run, lastSeenAt }) => run.deviceId ? [{ id: run.deviceId, lastSeenAt }] : []))
   for (const { run } of stranded) {
     if (run.stopRequestedAt) {
       const ended = await endRun(run.id, ['queued'], { status: 'stopped', error: null }, now)
@@ -120,7 +123,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
     }
     if (run.deviceId && presence.get(run.deviceId)) continue
     // Nothing waits on an offline device (设备离线时 is gone): another device takes it, else the person gets the card.
-    const target = await takeoverTarget(run, now)
+    const target = await takeoverTarget(run)
     if (target && run.agentDefinition?.repositoryAdmission) {
       await recoverAdmittedRun(run, target, now, true)
       continue
@@ -142,7 +145,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
  * 参与调度 on. The target clones the same remote. Admitted local tasks
  * use the target Agent and retain original provenance through retryOf.
  */
-async function takeoverTarget(run: { id: string; userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null; agentDefinition?: Run['agentDefinition'] }, now: Date): Promise<(TakeoverCandidate & { deviceRepoId: string; agentId: string }) | null> {
+async function takeoverTarget(run: { id: string; userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null; agentDefinition?: Run['agentDefinition'] }): Promise<(TakeoverCandidate & { deviceRepoId: string; agentId: string }) | null> {
   if (!run.deviceRepoId) return null
   const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl, repoPath: deviceRepos.repoPath }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   const [agent] = await db.select({ harness: agents.harness }).from(agents).where(eq(agents.id, run.agentId)).limit(1)
@@ -161,7 +164,7 @@ async function takeoverTarget(run: { id: string; userId: string; agentId: string
     .where(and(eq(devices.ownerId, run.userId), eq(devices.enabled, true), eq(devices.kind, 'local'), isNull(devices.removedAt), sql`${devices.protocolVersion} >= ${DAEMON_PROTOCOL_VERSION}`))
     .orderBy(desc(devices.lastSeenAt))
   // Only devices with 参与调度 on (enabled, decision 2026-11-02-1400); servers first.
-  const presence = await deviceOnlineStates(available.map(device => ({ id: device.deviceId, lastSeenAt: device.lastSeenAt })), now.getTime())
+  const presence = await deviceOnlineStates(available.map(device => ({ id: device.deviceId, lastSeenAt: device.lastSeenAt })))
   let candidates = available.filter(device => presence.get(device.deviceId)).sort((a, b) => Number(b.deviceType === 'server') - Number(a.deviceType === 'server'))
   const harness = run.agentDefinition?.harness ?? agent.harness
   // A fresh local admission needs B's real registered Agent; the old Agent
@@ -241,7 +244,7 @@ async function reclaimLostRun(run: Run, now: Date) {
     left join thread_machines m on m."runId"=b."runId" and m."ownerId"=b."ownerId" and m."workspaceId"=b."workspaceId"
     where b."runId"=${run.id} and b."ownerId"=${run.userId}`)).rows[0] as CloudRecoverySource | undefined
   const cloud = bound ? null : await cloudTarget(run)
-  const target = cloud ? null : await takeoverTarget(run, now)
+  const target = cloud ? null : await takeoverTarget(run)
   if (!bound && !cloud && !target) {
     const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status: 'failed', error: DEVICE_STAYED_OFFLINE }, now, true, await noMachineCard())
     if (ended) await announceEnd({ ...run, status: 'failed' })
@@ -261,7 +264,7 @@ async function reclaimLostRun(run: Run, now: Date) {
   }
   const retried = await db.transaction(async tx => {
     const [ended] = await tx.update(agentRuns)
-      .set({ status: 'failed', stopReason: 'device_lost', error: `The machine went offline; ${where} as attempt ${outcome.attempt} of ${MAX_RUN_ATTEMPTS}.`, finishedAt: now, updatedAt: now })
+      .set({ status: 'failed', stopReason: 'device_lost', failureDetails: serverRunFailure(run.id, now), error: `The machine went offline; ${where} as attempt ${outcome.attempt} of ${MAX_RUN_ATTEMPTS}.`, finishedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now), isNull(agentRuns.stopRequestedAt)))
       .returning({ id: agentRuns.id })
     if (!ended) return false
@@ -433,7 +436,7 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
             AND previous.status IN ('succeeded','failed','stopped','cancelled'))`)
     if (retained.rowCount) return null
     const [ended] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, resumeStatus: null,
-      stopReason: 'device_lost', error: run.error ?? DEVICE_STAYED_OFFLINE, finishedAt: now, updatedAt: now })
+      stopReason: 'device_lost', failureDetails: serverRunFailure(runId, now), error: run.error ?? DEVICE_STAYED_OFFLINE, finishedAt: now, updatedAt: now })
       .where(eq(agentRuns.id, runId)).returning()
     const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
     await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
@@ -462,7 +465,7 @@ async function noMachineCard() {
 async function endRun(runId: string, from: readonly Run['status'][], end: { status: 'failed' | 'stopped'; error: string | null }, now: Date, expiredLease = false, noMachine?: unknown): Promise<boolean> {
   return db.transaction(async tx => {
     const [ended] = await tx.update(agentRuns)
-      .set({ status: end.status, pauseReason: null, resumeStatus: null, stopReason: 'device_lost', error: end.error, finishedAt: now, updatedAt: now })
+      .set({ status: end.status, pauseReason: null, resumeStatus: null, stopReason: 'device_lost', failureDetails: end.status === 'failed' ? serverRunFailure(runId, now) : null, error: end.error, finishedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), inArray(agentRuns.status, [...from]),
         end.status === 'failed' ? isNull(agentRuns.stopRequestedAt) : undefined,
         expiredLease ? lt(agentRuns.leaseExpiresAt, now) : undefined))
@@ -482,7 +485,7 @@ async function endRun(runId: string, from: readonly Run['status'][], end: { stat
 export async function failRunForDaemonUpgrade(runId: string, deviceId: string, userId: string, now = new Date()): Promise<boolean> {
   const ended = await db.transaction(async tx => {
     const [run] = await tx.update(agentRuns)
-      .set({ status: 'failed', pauseReason: null, resumeStatus: null, stopReason: 'error', error: DAEMON_UPGRADE_REQUIRED, finishedAt: now, updatedAt: now })
+      .set({ status: 'failed', pauseReason: null, resumeStatus: null, stopReason: 'error', failureDetails: serverRunFailure(runId, now), error: DAEMON_UPGRADE_REQUIRED, finishedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
       .returning()
     if (!run) return null
@@ -510,7 +513,7 @@ export async function failQueuedSubscriptionRuntime(runId: string, deviceId: str
     const summary = messages.RunErrors.subscription_local_runtime_unavailable[detail ?? 'default']
     const report: RunReport = { summary, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null }
     const [run] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, resumeStatus: null, stopReason: 'error', error: error.message,
-      report, finishedAt: now, updatedAt: now })
+      report, failureDetails: serverRunFailure(runId, now, error), finishedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'),
         isNull(agentRuns.startedAt), isNull(agentRuns.sessionId), isNull(agentRuns.stopRequestedAt), or(isNull(agentRuns.leaseExpiresAt), lt(agentRuns.leaseExpiresAt, now)),
         sql`EXISTS (SELECT 1 FROM agents a WHERE a.id=${agentRuns.agentId} AND a."userId"=${userId}

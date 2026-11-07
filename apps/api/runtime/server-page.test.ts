@@ -1,0 +1,62 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { serverPageResponse, servesCommunityUI } from './server-page'
+import { serverDocumentKind, serverPageKind } from '../../../lib/server-pages'
+
+const html = '<!doctype html><html lang="zh-CN"><body><div id="root"></div><script src="/mikka/assets/app.js"></script></body></html>'
+const request = (path: string, init?: RequestInit) => new Request(`https://self.example${path}`, init)
+const view = { kind: 'mikka-server', address: 'https://self.example/mikka' }
+const info = async (input: Request) => new Response(input.method === 'HEAD' ? null : JSON.stringify(view), {
+  headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+})
+
+test('community defaults to server data, explicit 1 restores the compiled UI, cloud keeps its app', async () => {
+  for (const [env, legacy] of [[{}, false], [{ MIKKA_COMMUNITY_UI: '0' }, false], [{ MIKKA_COMMUNITY_UI: 'true' }, false],
+    [{ MIKKA_COMMUNITY_UI: '1' }, true], [{ MIKKA_EDITION: 'cloud' }, true], [{ MIKKA_EDITION: 'cloud', MIKKA_COMMUNITY_UI: '0' }, true]] as const) {
+    assert.equal(servesCommunityUI(env), legacy)
+    for (const path of ['/mikka', '/mikka/en', '/mikka/settings', '/mikka/en/settings/members']) {
+      const response = await serverPageResponse(request(path), html, info, env)
+      assert.equal(response.status, 200)
+      assert.match(response.headers.get('cache-control')!, /no-store/)
+      const body = await response.text()
+      if (legacy) { assert.match(body, /<html\b/); assert.doesNotMatch(body, /data-mikka-server-page/) }
+      else assert.deepEqual(JSON.parse(body), view)
+    }
+  }
+})
+
+test('authentication documents keep their flows and server marker in both locales', async () => {
+  for (const locale of ['', '/en']) for (const path of ['/sign-in?web=1&web_state=opaque', '/sign-up', '/device?user_code=TEST',
+    '/forgot-password', '/reset-password?token=opaque', '/verify-email?token=opaque', '/oauth/consent', '/workspaces/new', `/invite/${'a'.repeat(64)}`]) {
+    const response = await serverPageResponse(request(`/mikka${locale}${path}`), html, async () => { throw new Error('AUTH_MUST_RETAIN_EXISTING_FORM') }, {})
+    assert.equal(response.status, 200)
+    assert.match(await response.text(), /data-mikka-server-page="authentication"/)
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer')
+  }
+})
+
+test('GitHub linking stays on its existing narrow surface before and after URL cleanup', async () => {
+  for (const query of ['section=plugins&app=github', `section=plugins&app=github&intent=ghi_${'a'.repeat(43)}`,
+    'section=plugins&app=github&github=link-failed&reason=account']) {
+    const response = await serverPageResponse(request(`/mikka/?${query}`), html, info, {})
+    assert.equal(response.status, 308)
+    const canonical = new URL(response.headers.get('location')!)
+    const document = await serverPageResponse(new Request(canonical), html, info, {})
+    assert.match(await document.text(), /data-mikka-server-page="github"/)
+    assert.equal(serverPageKind(canonical), 'github')
+  }
+  for (const query of ['section=plugins&app=gmail', 'section=plugins&app=github&intent=invalid',
+    'section=plugins&app=github&app=github', 'section=plugins&app=github&next=https://evil.test']) {
+    assert.equal(serverPageKind(new URL(`https://self.example/mikka?${query}`)), null)
+  }
+})
+
+test('server pages preserve HEAD, refuse writes and never absorb machine endpoints', async () => {
+  const head = await serverPageResponse(request('/mikka', { method: 'HEAD' }), html, info, {})
+  assert.equal(head.status, 200); assert.equal(await head.text(), '')
+  assert.equal((await serverPageResponse(request('/mikka', { method: 'POST', body: '{}' }), html, info, {})).status, 405)
+  for (const path of ['/mikka/api/version', '/mikka/v1/live/socket', '/.well-known/workflow/v1/flow', '/mikka/%61pi/desktop/discovery']) {
+    assert.equal((await serverPageResponse(request(path), html, info, {})).status, 404)
+  }
+  assert.equal(serverDocumentKind(), null, 'no document marker means no renderer restriction')
+})

@@ -1,3 +1,4 @@
+import { captureRunFailure } from "@mikka/protocol/run-failure"
 import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
@@ -47,7 +48,7 @@ import { CursorAdapter } from "./adapters/cursor"
 import { MockAdapter } from "./adapters/mock"
 import type { AgentAdapter } from "./adapters/types"
 import { publishRun, snapshotTree } from "./agents/publish"
-import { agentPublishedReceipt, githubReceiptEnvironment, withRunGitCredentials } from './agents/github-runtime'
+import { agentPublishedReceipt, githubReceiptEnvironment } from './agents/github-runtime'
 import { prepareLocalGitHub } from './agents/local-github'
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
@@ -70,6 +71,7 @@ import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprin
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
 import { reusableHostedModels, type HostedModelProbe } from "./cloud-model-probe"
+import { prefetchHostedCliFiles, type HostedCliPrefetch } from "./hosted-cli-prefetch"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { preflightLocalSubscription } from "./subscription-preflight"
@@ -78,6 +80,7 @@ import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
 import { Outbox } from "./outbox"
+import type { RunTraceContext } from '@mikka/protocol/trace-context'
 import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
 import { daemonTracer, runIdHash } from "./tracing"
@@ -95,7 +98,8 @@ import { DeviceGatewayClosedError, openDeviceGateway, runDeviceGateway } from ".
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
-import { EmptyRepositoryError, RepositoryCache } from "./repositories"
+import { RepositoryCache } from "./repositories"
+import { prepareRunRepository } from './run-repository'
 import { daemonTestMode, normalizeRepository } from "@mikka/protocol/repository"
 import type { RunAssignment } from "./server-link"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
@@ -151,8 +155,12 @@ export interface DaemonOptions {
   modelProbe?: boolean
   /** Anonymous official-CLI probes held in memory by the trusted preloader. */
   preloadedModels?: HostedModelProbe
+  /** One-use control-plane locator; the existing registered claim still authorizes it. */
+  initialRunId?: string
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
+  /** Trusted acceptance launcher only; opt in to persisted run/CLI diagnostics. */
+  collectCliTiming?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
   e2bContainerRuntime?: boolean
   /** Trusted infrastructure supplies its already-listening review broker. */
@@ -212,9 +220,15 @@ const HARNESS_RESCAN_MS = 5 * 60_000
 /** How often the CLIs are asked again for their models; 重新检测 asks at once. */
 const MODEL_PROBE_MS = 6 * 60 * 60_000
 
-/** Whose model credential a cloud run uses: the subscription binding's owner, or for an API-key run the run owner the server assigned the computer to. */
-function credentialOwner(assignment: RunAssignment): string | undefined {
-  return assignment.subscriptionBinding?.ownerId ?? (assignment.modelCredential ? assignment.computer?.ownerId : undefined)
+/** The authenticated claim grants a computer to this run on this device.
+ * A shared subscription can have a different payer. Existing signed policy
+ * envelopes also bind the execution owner; their signature and freshness are
+ * verified by verifyRunPolicy before worktree setup or agent work. Older
+ * servers keep their authenticated claim contract without an envelope. */
+function cloudComputerGrantMatches(assignment: RunAssignment | undefined, runId: string, deviceId: string | undefined): boolean {
+  if (!assignment?.computer || !deviceId || assignment.runId !== runId || assignment.deviceId !== deviceId) return false
+  const snapshot = assignment.policySnapshot?.payload
+  return !snapshot || (snapshot.runId === runId && snapshot.deviceId === deviceId && snapshot.ownerId === assignment.computer.ownerId)
 }
 
 export class Daemon {
@@ -223,6 +237,7 @@ export class Daemon {
   private releaseLock: (() => Promise<void>) | null = null
   private rpc: RpcServer | null = null
   private outbox!: Outbox
+  private registrationTraceContext?: RunTraceContext
   private journal!: RunJournal
   private captureUploader!: CaptureUploader
   private worktrees!: WorktreeManager
@@ -284,12 +299,16 @@ export class Daemon {
   private ended = new Set<string>()
   /** The server pass in flight; the next one starts after it. */
   private syncing: Promise<void> = Promise.resolve()
+  private initialRunHint?: string
+  /** An early claim must retain the first sync's complete repository settings. */
+  private initialRepositorySync?: { runId: string; ready: Promise<void> }
   /** Cuts the poll loop's pause short (the device just registered). */
   private wakeCommands: (() => void) | null = null
 
   constructor(private readonly options: DaemonOptions) {
     this.paths = daemonPaths(options.dataDir)
     this.log = options.log ?? createLogger({ dir: this.paths.logs })
+    this.initialRunHint = options.initialRunId
     // A cloud computer runs the daemon built with this deployment, whose server
     // pushes every run-control write (notifyRunControl). Off the gateway (no
     // ticket yet, a refused ticket, a dropped socket) its runs use the 20 s
@@ -336,7 +355,8 @@ export class Daemon {
       this.log,
       undefined,
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error),
-      this.options.retainResources
+      this.options.retainResources,
+      runId => this.journal.get(runId)?.assignment.traceContext,
     )
     this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
     this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
@@ -385,7 +405,7 @@ export class Daemon {
       const liveComputer = (runId: string, display: string | undefined) => {
         const entry = this.journal.get(runId)
         const computer = entry?.assignment.computer
-        if (this.stopped || !this.registered || !computer || computer.display !== display || !entry || computer.ownerId !== credentialOwner(entry.assignment) || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
+        if (this.stopped || !this.registered || !computer || computer.display !== display || !cloudComputerGrantMatches(entry?.assignment, runId, this.device.deviceId) || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
         return computer
       }
       const executeOrdinary = async (current: typeof driver, call: import('./computer/driver.mjs').ComputerCall, display: string | undefined, runId: string, assertLive: () => void) => {
@@ -396,13 +416,13 @@ export class Daemon {
         needsPerson: this.computerNeedsPerson(),
         permitted: runId => {
           const entry = this.journal.get(runId)
-          return Boolean(!this.stopped && this.registered && entry?.assignment.computer && this.supervisor?.computerRunAllowed(runId))
+          return Boolean(!this.stopped && this.registered && cloudComputerGrantMatches(entry?.assignment, runId, this.device.deviceId) && this.supervisor?.computerRunAllowed(runId))
         },
         execute: createHostedComputerExecutor({ liveComputer, executeOrdinary, authority: this.options.credentialExecutorAuthority }),
         // The server picks the desktop from the run's binding; the call names none.
         capture: async (runId, call, signal) => {
           const entry = this.journal.get(runId)
-          if (!entry?.assignment.computer || !this.supervisor.computerRunAllowed(runId) || !this.options.link.screenCapture) throw new Error('Cloud computer run unavailable')
+          if (this.stopped || !this.registered || !cloudComputerGrantMatches(entry?.assignment, runId, this.device.deviceId) || !this.supervisor.computerRunAllowed(runId) || !this.options.link.screenCapture) throw new Error('Cloud computer run unavailable')
           try {
             return await this.options.link.screenCapture(runId, call, signal)
           } catch (error) {
@@ -423,6 +443,7 @@ export class Daemon {
           link: this.options.link,
           journal: this.journal,
           binaries: this.options.harnessBinaries,
+          collectCliTiming: this.options.collectCliTiming,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
           computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
           // The cloud machine's own probe decides which subscription models a run may use here.
@@ -439,6 +460,12 @@ export class Daemon {
       // A frozen template can be weeks old. The binaries were checked above;
       // the natural refresh period starts when this machine accepts its owner.
       this.lastModelProbe = Date.now()
+    }
+    // Only the activated cloud entry point warms software pages. It does not
+    // delay registration/claim or replace the real CLI/model/identity checks.
+    if (hosted && this.options.e2bContainerRuntime && !this.stopped) {
+      this.cliPrefetch ??= prefetchHostedCliFiles(hosted.binaries,
+        preloadedModels ? this.options.preloadedModels?.manifest?.kind : undefined)
     }
     await this.cloudComputerBroker?.listen()
     if (this.stopped) throw new Error("daemon stopped during startup")
@@ -476,6 +503,7 @@ export class Daemon {
         : this.realAdapters()),
     ]))
     this.supervisor = new RunSupervisor({
+      collectCliTiming: this.options.collectCliTiming,
       journal: this.journal,
       adapterStateDir: this.paths.adapterState,
       downloadChatFile: this.options.link.downloadChatFile?.bind(this.options.link),
@@ -485,6 +513,7 @@ export class Daemon {
       adapters,
       startSubscription: hosted?.start ?? this.localSubscriptions()?.start,
       startCredential: hosted?.start,
+      prepareSubscription: hosted?.prepare,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       prepareRunGitHub: hosted ? undefined : (assignment, signal, onCredential) => prepareLocalGitHub(assignment, {
@@ -526,23 +555,8 @@ export class Daemon {
           }
         : undefined,
       repository: assignment => this.repository(assignment),
-      prepareRepository: async (assignment, signal, githubEnvironment) => {
-        const remoteUrl = assignment.remoteUrl
-        if (!remoteUrl) return
-        await withRunGitCredentials(assignment, runPaths(this.paths.adapterState, assignment.runId).privateDir, async (env, github) => {
-          try {
-            await this.repositories.prepare(remoteUrl, signal, env)
-          } catch (error) {
-            if (!(error instanceof EmptyRepositoryError)) throw error
-            // An empty remote: a run that may push gives it a first commit
-            // with no files on its base branch, then works like on any other.
-            if (!pushDecision(runPolicy(assignment.policy)).push) return this.repositories.localEmptyBase(remoteUrl)
-            const branch = assignment.baseBranch && assignment.baseBranch !== 'HEAD' ? assignment.baseBranch : (await github.defaultBranch()) ?? 'main'
-            await this.repositories.seedEmpty(remoteUrl, branch, signal, env)
-            await this.repositories.prepare(remoteUrl, signal, env)
-          }
-        }, githubEnvironment)
-      },
+      prepareRepository: (assignment, signal, githubEnvironment, policyReady) => prepareRunRepository(this.repositories,
+        runPaths(this.paths.adapterState, assignment.runId).privateDir, assignment, signal, githubEnvironment, policyReady),
       baseRef: assignment => assignment.remoteUrl
         ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)
         : Promise.resolve(assignment.baseBranch ?? 'HEAD'),
@@ -616,7 +630,7 @@ export class Daemon {
     // never pin a run here that no adapter would take. (A detected CLI
     // without an adapter yet is left out; the schema has no "unsupported".)
     const detected = hosted
-      ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
+      ? hosted.harnesses.map((harness) => ({ harness, installed: true, version: null, subscriptionBroker: true as const, ...(harness === 'claude_code' ? { subscriptionModelCatalogue: true as const } : {}), ...(this.cloudComputerBroker ? { computerBroker: true as const } : {}) }))
       : (this.options.harnesses ?? detectHarnesses(this.harnessStore()))
     if (this.stopped) throw new Error("daemon stopped during startup")
     // A callback alone is insufficient: the host must own the enforcement
@@ -1052,11 +1066,12 @@ export class Daemon {
     const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness),
       toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info) }
     delete report.subscriptionBroker
+    delete report.subscriptionModelCatalogue
     delete report.subscriptionPreflight
     if (!this.localSubscriptionCapable(info) || (info.harness !== "codex" && info.harness !== "claude_code")) return report
     const result = await preflightLocalSubscription(info.harness, { store: this.harnessStore(), scratchDir: this.paths.dataDir,
       binary: this.options.harnessBinaries?.[info.harness] })
-    if (result.ready) return { ...report, version: result.version, subscriptionBroker: true }
+    if (result.ready) return { ...report, version: result.version, subscriptionBroker: true, ...(report.harness === 'claude_code' ? { subscriptionModelCatalogue: true as const } : {}) }
     logCodedError(result.error, { harness: info.harness }, this.log)
     return { ...report, subscriptionPreflight: result.error.detail }
   }
@@ -1081,6 +1096,7 @@ export class Daemon {
 
   /** The hosted runner's CLIs on a cloud machine (subscription-hosted-runner.ts), which its model probe asks. */
   private hostedBinaries: Partial<Record<"codex" | "claude_code", string>> | undefined
+  private cliPrefetch: HostedCliPrefetch | undefined
 
   private modelProbeOn() {
     // A cloud machine probes its own CLIs too (Alex, 2026-11-03): its runs start only on a model they reported.
@@ -1310,7 +1326,7 @@ export class Daemon {
 
   private async register(credential: string) {
     const { workspaceId, deviceId: knownDeviceId } = this.device
-    const { deviceId, tracing } = await this.options.link.registerDevice(
+    const { deviceId, tracing } = await daemonTracer.span("daemon.registration", {}, async () => this.options.link.registerDevice(
       credential,
       {
         name: hostname(),
@@ -1328,7 +1344,7 @@ export class Daemon {
           : {}),
       },
       knownDeviceId
-    )
+    ), { traceContext: this.registrationTraceContext })
     // A late registration must not restore the session replaced over RPC.
     if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) throw new Error('Device session changed during registration')
     if (deviceId !== this.device.deviceId) {
@@ -1369,6 +1385,17 @@ export class Daemon {
       this.server = "unregistered"
       return
     }
+    const initialRunId = this.initialRunHint
+    let resolveRepositories: (() => void) | undefined, rejectRepositories: ((error: unknown) => void) | undefined
+    const repositoriesReady = initialRunId ? new Promise<void>((resolve, reject) => {
+      resolveRepositories = resolve; rejectRepositories = reject
+    }) : undefined
+    if (initialRunId && repositoriesReady) {
+      this.initialRepositorySync = { runId: initialRunId, ready: repositoriesReady }
+      // A failed sync may settle before the claim response. The claim still
+      // observes this same rejection before any repository or CLI effects.
+      void repositoriesReady.catch(() => undefined)
+    }
     try {
       // Once per start: refreshes version and harnesses, and keeps the id
       // (and the runs pinned to it) across restarts and re-logins.
@@ -1376,7 +1403,12 @@ export class Daemon {
         await this.register(credential)
       }
       const deviceId = this.device.deviceId as string
-      // Heartbeat first: lease renewal must not wait on anything else.
+      if (initialRunId) {
+        this.initialRunHint = undefined
+        this.claimQueued([initialRunId])
+      }
+      // Lease renewal still precedes repository/discovery work; the hinted
+      // claim above runs concurrently without delaying this heartbeat.
       const quotas = this.quota?.snapshot().quotas
       const receiptsVersion = this.deviceReceiptsVersion
       const heartbeat = {
@@ -1451,6 +1483,7 @@ export class Daemon {
       const checkpointRun = link.checkpointRun?.bind(link)
       if (checkpointRun) await this.supervisor.saveCheckpoints(checkpointRun)
       this.saveDevice({ repos: await link.listRepos(deviceId) })
+      resolveRepositories?.()
       this.server = "online"
       await this.outbox.flushAll()
       // Resume only reservations already made while a run was live. Do not
@@ -1472,6 +1505,7 @@ export class Daemon {
       await this.pruneWorktrees()
       await this.sweepEmptyRuns()
     } catch (error) {
+      rejectRepositories?.(error)
       if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) return
       this.server = "offline"
       if (error instanceof SessionRejectedError) {
@@ -1479,6 +1513,11 @@ export class Daemon {
       } else if (!(error instanceof ServerUnreachableError)) {
         this.log.error({ err: error }, "server sync failed")
       }
+    } finally {
+      // Early exits (including uninstall) cannot release a claim with missing
+      // setup/copyFiles. Already-resolved/rejected promises remain unchanged.
+      rejectRepositories?.(new ServerUnreachableError("Initial repository sync unavailable"))
+      if (this.initialRepositorySync?.ready === repositoriesReady) this.initialRepositorySync = undefined
     }
   }
 
@@ -1536,12 +1575,14 @@ export class Daemon {
     if (!isSafeId(runId)) return this.refuseRun(runId)
     const existing = this.journal.get(runId)
     if (existing) return this.supervisor.summary(existing)
+    const repositoriesReady = this.initialRepositorySync?.runId === runId ? this.initialRepositorySync.ready : undefined
     const assignment = await daemonTracer.span("daemon.run.lease", { "mikka.run.id_hash": runIdHash(runId) }, async span => {
       const claimed = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal)
       span.set("mikka.harness", claimed.harness)
       return claimed
     }, { root: true })
     if (assignment.runId !== runId) return this.refuseRun(runId)
+    if (repositoriesReady) await repositoriesReady
     // A hosted workspace can be registered after this daemon starts. Resolve
     // that server-owned registration before the synchronous repository check.
     if (this.usesHostedWorkspace(assignment) && !this.device.repos?.some(repo => repo.repoId === assignment.repoId))
@@ -1568,11 +1609,12 @@ export class Daemon {
       }
       if (!matches) {
         const message = "Repository origin does not match the approved repository"
-        await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message) })
-        throw new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+        const error = new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+        await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message), failureDetails: captureRunFailure(error, { runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment.prompt] }) })
+        throw error
       }
     }
-    if (assignment.computer && (!this.cloudComputerBroker || assignment.computer.ownerId !== credentialOwner(assignment))) throw new Error('Cloud computer runtime unavailable')
+    if (assignment.computer && (!this.cloudComputerBroker || !cloudComputerGrantMatches(assignment, runId, deviceId))) throw new Error('Cloud computer runtime unavailable')
     // A response may arrive after shutdown began, including while repository
     // validation awaited I/O. Its server lease can expire; never launch it.
     if (this.stopped) throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
@@ -1598,6 +1640,7 @@ export class Daemon {
         .completeRun(runId, {
           stopReason: "error",
           report: baseReport(error.message),
+          failureDetails: captureRunFailure(error, { runId, appVersion: DAEMON_VERSION }),
         })
         .catch((err: unknown) =>
           this.log.warn({ run_id: runId, err }, "could not report refused run")
@@ -1733,7 +1776,7 @@ export class Daemon {
       "device.setCredential": (raw) => {
         this.reviewAbort?.abort()
         this.reviewAbort = null
-        const { credential, workspaceId } =
+        const { credential, workspaceId, traceContext } =
           daemonRpc["device.setCredential"].params.parse(raw)
         // The device id is kept, in every workspace (ADR ORV-284):
         // registering with it in another workspace joins this same device
@@ -1744,7 +1787,8 @@ export class Daemon {
         })
         this.revokeLocalComputerGrants()
         this.registered = false
-        void this.syncWithServer()
+        this.registrationTraceContext = traceContext
+        void daemonTracer.withContext(traceContext, () => this.syncWithServer())
         return { ok: true as const }
       },
       "device.clearCredential": () => {
@@ -1869,6 +1913,7 @@ export class Daemon {
 
   private async stopInternal() {
     this.stopped = true
+    this.cliPrefetch?.abort()
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
     await this.maintenance
@@ -1892,6 +1937,9 @@ export class Daemon {
     }
     await this.outbox?.close()
     await daemonTracer.shutdown()
+    // Cancellation of a real task is never held behind this optional read.
+    // Still drain its descriptor before releasing this daemon's lifecycle.
+    await this.cliPrefetch?.done
     const release = this.releaseLock
     this.releaseLock = null
     await release?.().catch((err: unknown) => {

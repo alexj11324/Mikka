@@ -1,3 +1,4 @@
+import { captureRunFailure } from '@mikka/protocol/run-failure'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { coordinatorChatState } from './chat-state'
@@ -66,4 +67,41 @@ test('once the turn holding the lease has stored its reply, the chat is no longe
   assert.equal(coordinatorChatState(turn, [{ ...event, tier: 'background' }], now, { role: 'assistant', streamId: 'wrun_turn:0' }).working, false)
   // A finished reply keeps the turn's warning, as a released lease does.
   assert.deepEqual(coordinatorChatState({ ...turn, lastError: 'length' }, [], now, { role: 'assistant', streamId: 'wrun_turn:0' }), { working: false, error: 'length' })
+})
+
+test('a wake code carries the turn failure stored while that message waited, never an older one', () => {
+  const sent = new Date(now.getTime() - 600_000)
+  const waited = { ...event, wakeAttempts: MAX_WAKE_ATTEMPTS, wakeLeaseUntil: null, wakeLastError: 'wake_exhausted', createdAt: sent }
+  const failed = { leaseHolder: null, leaseUntil: null, lastError: 'subscription_generation_failed (provider_request_rejected)', lastErrorAt: new Date(sent.getTime() + 60_000) }
+  assert.deepEqual(coordinatorChatState(failed, [waited], now), { working: false, error: 'wake_exhausted', cause: 'subscription_generation_failed (provider_request_rejected)' })
+  // A failure recorded before the message arrived belongs to an earlier message.
+  assert.deepEqual(coordinatorChatState({ ...failed, lastErrorAt: new Date(sent.getTime() - 1) }, [waited], now), { working: false, error: 'wake_exhausted' })
+  assert.deepEqual(coordinatorChatState({ ...failed, lastErrorAt: null }, [waited], now), { working: false, error: 'wake_exhausted' })
+})
+
+test('a failure followed by a newer stored reply is not the chat state any more', () => {
+  const sent = new Date(now.getTime() - 600_000)
+  // An untriaged runtime row (tier null, not the person's) no turn takes, its wakes used up.
+  const stale = { kind: 'run_finished', tier: null, wakeAttempts: MAX_WAKE_ATTEMPTS, wakeLeaseUntil: null, wakeLastError: 'wake_exhausted', createdAt: sent }
+  const before = coordinatorChatState(undefined, [stale], now, { role: 'user', createdAt: new Date(sent.getTime() - 1) })
+  assert.deepEqual(before, { working: false, error: 'wake_exhausted' }, 'failed first: the line shows')
+  const answered = { role: 'assistant', streamId: 'wrun_later:0', createdAt: new Date(sent.getTime() + 60_000) }
+  assert.deepEqual(coordinatorChatState(undefined, [stale], now, answered), { working: false, error: null }, 'then a reply: no stale line')
+  // A reply stored before the row arrived does not hide it.
+  assert.deepEqual(coordinatorChatState(undefined, [stale], now, { ...answered, createdAt: new Date(sent.getTime() - 60_000) }), { working: false, error: 'wake_exhausted' })
+  // A newer failing row still shows after an older reply.
+  const fresh = { ...stale, kind: 'user_message', tier: 'attention', createdAt: new Date(sent.getTime() + 120_000) }
+  assert.equal(coordinatorChatState(undefined, [stale, fresh], now, answered).error, 'wake_exhausted')
+})
+
+test('a structured failure belongs only to its failed input and remains hidden while a new turn is working', () => {
+  const failure = captureRunFailure({ statusCode: 429, error: { code: 'insufficient_quota', message: 'The account has no remaining quota.' } }, { runId: 'wrun_failed' })
+  const sent = new Date(now.getTime() - 60_000)
+  const session = { leaseUntil: null, lastError: 'subscription_generation_failed', lastErrorAt: new Date(now.getTime() - 30_000), lastFailure: failure }
+  const waiting = { ...event, wakeAttempts: MAX_WAKE_ATTEMPTS, createdAt: sent }
+  assert.deepEqual(coordinatorChatState(session, [waiting], now).failureDetails, failure)
+  assert.equal(coordinatorChatState({ ...session, lastErrorAt: new Date(sent.getTime() - 1) }, [waiting], now).failureDetails, undefined)
+  assert.equal(coordinatorChatState(session, [event], now).failureDetails, undefined)
+  assert.equal(coordinatorChatState({ ...session, leaseHolder: 'wrun_new', leaseUntil: future }, [], now).failureDetails, undefined)
+  assert.equal(coordinatorChatState({ ...session, lastError: null }, [], now).failureDetails, undefined)
 })

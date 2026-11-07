@@ -2,6 +2,8 @@
 import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
 import { randomUUID } from "node:crypto"
+import { currentSubscriptionTiming, withSubscriptionWorkerTiming } from './subscription-worker-timing'
+import { captureRunFailure, type RunFailure } from "@mikka/protocol/run-failure"
 
 export interface CredentialScope {
   ownerId: string
@@ -40,7 +42,18 @@ export interface WorkerMetadata { id: string; provider: string; state: string; r
 export interface NativeLease { accessToken: string; accountId?: string; chatgptAccountId?: string; chatgptPlanType?: string; expiresAt?: string }
 
 export class WorkerRefusal extends Error {
-  constructor(readonly code: string = "subscription_worker_unavailable") { super(code); this.name = "WorkerRefusal" }
+  constructor(readonly code: string = "subscription_worker_unavailable", readonly failureDetails?: RunFailure) { super(code); this.name = "WorkerRefusal" }
+}
+function providerDiagnostic(value: unknown, provider: string): { provider: string; status?: number; error: { type: string; message?: string } } | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return
+  const v = value as Record<string, unknown>
+  if (v.provider !== provider || Object.keys(v).some(key => !['provider', 'status', 'error'].includes(key))) return
+  if (v.status !== undefined && (typeof v.status !== 'number' || !Number.isInteger(v.status) || v.status < 400 || v.status > 599)) return
+  if (!v.error || typeof v.error !== 'object' || Array.isArray(v.error)) return
+  const e = v.error as Record<string, unknown>
+  if (Object.keys(e).some(key => !['type', 'message'].includes(key)) || typeof e.type !== 'string' || !/^[a-z_]{1,64}$/.test(e.type)) return
+  if (e.message !== undefined && (typeof e.message !== 'string' || !e.message.length || e.message.length > 512)) return
+  return { provider, ...(typeof v.status === 'number' ? { status: v.status } : {}), error: { type: e.type, ...(typeof e.message === 'string' ? { message: e.message } : {}) } }
 }
 const STORE_FAILURE = /^(secret_store_failure (GET|POST|DELETE) (no_token|network|http_\d{3})|subscription_upstream_failure (claude|codex) (transport|response|event|incomplete|convert) \d{1,3} [a-z_]{1,40})$/
 const REQUEST_BYTES = '(0|[1-9]\\d{0,9})'
@@ -59,6 +72,7 @@ export class SubscriptionWorkerClient {
   private start(request: Record<string, unknown>, signal?: AbortSignal, chunk?: (value: string) => void, head?: (value: { contentType: string }) => void, binary?: (value: Uint8Array) => void) {
     if (signal?.aborted) throw new WorkerRefusal("subscription_cancelled")
     const id = randomUUID()
+    const timing = currentSubscriptionTiming()?.startWorker(request.method)
     const child = spawn(this.launch.binary, this.launch.args ?? [], {
       // No ambient platform keys or native account state in a worker child.
       env: { PATH: process.env.PATH, LANG: "C.UTF-8", NODE_ENV: "production", ...this.launch.env },
@@ -89,6 +103,7 @@ export class SubscriptionWorkerClient {
       const finish = (error?: Error, value?: unknown) => {
         if (settled) return
         settled = true
+        timing?.settle(error instanceof WorkerRefusal && error.code === 'subscription_cancelled' ? 'cancelled' : error ? 'error' : 'result')
         clearTimeout(timer)
         signal?.removeEventListener("abort", abort)
         stop()
@@ -108,9 +123,14 @@ export class SubscriptionWorkerClient {
             if (value.toString('base64') !== frame.binaryChunk) throw new WorkerRefusal()
             binary(value)
           }
-          else if (typeof frame.chunk === "string" && chunk) chunk(frame.chunk)
-          else if (frame.error) finish(new WorkerRefusal(safeCode(frame.error)))
-          else if (Object.hasOwn(frame, "result")) finish(undefined, frame.result)
+          else if (typeof frame.chunk === "string" && chunk) { timing?.chunk(); chunk(frame.chunk) }
+          else if (frame.error) {
+            timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing'))
+            const diagnostic = providerDiagnostic(frame.providerFailure, this.config.scope.provider)
+            const failure = diagnostic ? captureRunFailure({ ...diagnostic, requestBodyValues: request.payload }, { runId: this.config.use?.runId, provider: this.config.scope.provider, credential: 'subscription' }) : undefined
+            finish(new WorkerRefusal(safeCode(frame.error), failure))
+          }
+          else if (Object.hasOwn(frame, "result")) { timing?.terminal(frame.timing, Object.hasOwn(frame, 'timing')); finish(undefined, frame.result) }
           else finish(new WorkerRefusal())
         } catch { finish(new WorkerRefusal()) }
       })
@@ -123,11 +143,18 @@ export class SubscriptionWorkerClient {
       // Execution children receive the access-store identity only. Refresh and
       // OAuth stay in custody children, with no token material in their results.
       void (async () => {
-        const identity = this.resolveIdentity ? await this.resolveIdentity(executionOnly, signal, this.config.use, request.revision) : {}
+        const identityDone = timing?.beginIdentity()
+        let identity: { workloadToken?: string; accessToken?: string; accessSnapshot?: WorkerConfiguration['accessSnapshot'] }
+        try {
+          identity = this.resolveIdentity ? await withSubscriptionWorkerTiming(timing, () => this.resolveIdentity!(executionOnly, signal, this.config.use, request.revision)) : {}
+          timing?.identityMode(!this.resolveIdentity ? 'static' : Object.hasOwn(identity, 'accessSnapshot') ? 'parent_snapshot' : Object.hasOwn(identity, 'accessToken') ? 'access_token' : Object.hasOwn(identity, 'workloadToken') ? 'custody_token' : 'unobserved')
+        } finally { identityDone?.() }
         if (settled) return
         const resolved = { ...this.config, ...identity }
         const config = executionOnly ? { ...resolved, executionOnly: true, path: '', workloadToken: '', enrollmentAttemptPath: '', enrollmentClaimPath: '', enrollmentGrantPath: '', enableCodexOAuth: false, enableClaudeOAuth: false } : resolved
-        child.stdin.write(`${JSON.stringify(config)}\n${JSON.stringify({ ...request, id })}\n`)
+        const frames = `${JSON.stringify(config)}\n${JSON.stringify({ ...request, id })}\n`
+        timing?.configWrite()
+        child.stdin.write(frames)
       })().catch(() => finish(new WorkerRefusal()))
     })
     return { result, stop: abort, pause: () => child.stdout.pause(), resume: () => child.stdout.resume() }
@@ -167,6 +194,7 @@ export class SubscriptionWorkerClient {
     catch (error) { await body.cancel().catch(() => undefined); throw error }
   }
   stream(revision: number, model: string, payload: unknown, signal?: AbortSignal): ReadableStream<Uint8Array> {
+    currentSubscriptionTiming()?.streamEntry()
     const encoder = new TextEncoder()
     const abort = new AbortController()
     const forwardAbort = () => abort.abort(signal?.reason)

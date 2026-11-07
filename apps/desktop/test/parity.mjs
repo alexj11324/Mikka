@@ -45,7 +45,7 @@ const report = {
   timeZone: 'UTC',
   captureClock: createCaptureClock(started, process.env.MIKKA_DESKTOP_CAPTURE_TIME),
   nativeViewports: [],
-  themes: ['light', 'dark'], masksAllowed: ['avatars', 'timestamps'], startedAt: new Date(started).toISOString(), screens: [],
+  themes: ['light', 'dark'], masksAllowed: ['avatars', 'timestamps'], excludedDesktopOnly: ['data-desktop-only: server row, Settings › 服务器'], startedAt: new Date(started).toISOString(), screens: [],
 }
 await mkdir(output, { recursive: true })
 let scope
@@ -368,7 +368,10 @@ function screens(fixture) {
       await target.page.getByRole('dialog', { name: messages.Shell.searchLabel, exact: true }).getByRole('option', { name: messages.Shell.newTask, exact: true }).click()
       await target.page.getByRole('dialog', { name: messages.Shell.newTaskDialog.title, exact: true }).waitFor()
     } },
-    ...Object.entries(messages.Settings.sections).filter(([id]) => id !== 'developer').map(([id, section]) => ({
+    // This parity environment is the cloud edition (desktop.yml). The Mikka
+    // cloud connection page exists only for community server administrators;
+    // its real component states are captured by self-hosting-ui.yml instead.
+    ...Object.entries(messages.Settings.sections).filter(([id]) => id !== 'developer' && id !== 'cloud').map(([id, section]) => ({
       name: `settings-${id}`,
       open: async target => {
         if (id === 'audit') {

@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict'
+import { execFile, spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test, { mock } from 'node:test'
+import { promisify } from 'node:util'
+import { CLOUD_PRELOADER_WAKE_COMMAND, CLOUD_PRELOADER_WAKE_RECEIPT } from '../computer/worker-command'
 import { logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } from './thread-worker-logs'
 
 const mask = (text: string) => text.replaceAll('sekret', '[secret:TOKEN]')
@@ -108,8 +115,12 @@ test('runtime refresh failures name their actual phase without logging provider 
         warnings.push(args)
       })
       let released = false
-      const query = async (sql: string) => {
+      const query = async (sql: string, values: unknown[] = []) => {
         queries.push(sql)
+        if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
+          assert.deepEqual(values, [run.id, actor.userId])
+          return { rows: [{ issueId: run.issueId }], rowCount: 1 }
+        }
         if (sql.startsWith('SELECT t.* FROM factory_tasks')) return { rows: [], rowCount: 0 }
         if (sql.startsWith('SELECT r.*')) return { rows: [{ ...run }], rowCount: 1 }
         if (sql.startsWith('SELECT * FROM thread_machines')) return { rows: [{ ...machine }], rowCount: 1 }
@@ -182,8 +193,12 @@ test('question wake failures identify the rejecting boundary without exposing pr
         if (scenario === 'diagnostic_sink') throw new Error('PRIVATE-CREDENTIAL sink')
         warnings.push(args)
       })
-      const query = async (sql: string) => {
+      const query = async (sql: string, values: unknown[] = []) => {
         queries.push(sql)
+        if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
+          assert.deepEqual(values, [run.id, actor.userId])
+          return { rows: [{ issueId: run.issueId }], rowCount: 1 }
+        }
         if (sql.startsWith('SELECT r.*')) return { rows: phase === 'admission' ? [] : [{ ...run,
           ...(phase === 'execution_identity' ? { agentDefinition: { executionIdentity: {} } } : {}),
         }], rowCount: phase === 'admission' ? 0 : 1 }
@@ -249,4 +264,172 @@ test('runtime guard diagnostics keep their closed phase and never emit a provide
   assert.deepEqual(JSON.parse(lines[1]), { event: 'thread_runtime_refresh_failed', runId: 'run-guard', phase: 'rollback',
     errorClass: 'RuntimeRefreshError', errorCode: 'unknown', exitCode: 1 })
   assert.doesNotMatch(lines.join('\n'), /PRIVATE.CREDENTIAL/)
+})
+
+// Exercise the real provisioning orchestration. The SQL/provider boundaries
+// are synthetic here; thread-machine-task.db.test.ts retains real PG coverage.
+async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'publish_failed' | 'revoked' | 'old_registration' | 'lease_lost') {
+  const { ensureThreadMachine } = await import('./thread-machines')
+  const id = (n: number) => `41700000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const actor = { userId: 'bootstrap-fixture-owner', workspaceId: id(2) }
+  const run = { id: id(1), userId: actor.userId, issueId: id(3), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
+    status: 'queued', stopRequestedAt: null, repoPath: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git', runHarness: 'codex' }
+  const machine = { runId: run.id, ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: run.issueId,
+    botId: run.runtimeBotId, state: 'starting', snapshotId: 'codex', operationId: id(7), sandboxId: null }
+  const queries: string[] = [], commands: { command: string; options: Record<string, unknown> }[] = []
+  const uploads: { path: string; data: string }[][] = []
+  const fault = new Error('synthetic publication failure')
+  const wall = Date.now(), floor = new Date(wall)
+  let clockAdvance = 0, tokenHash = '', credentialDeviceId = '', authenticated = false, finished = false, released = false
+  const result = (rows: unknown[]) => ({ rows, rowCount: rows.length })
+  const query = async (sql: string, values: unknown[] = []) => {
+    queries.push(sql)
+    if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') return result([{ issueId: run.issueId }])
+    if (sql.startsWith('SELECT r.*') || sql.startsWith('SELECT * FROM agent_runs') || sql.startsWith('SELECT status,"stopRequestedAt"')) return result([{ ...run }])
+    if (sql.startsWith('SELECT * FROM thread_machines')) return result([{ ...machine }])
+    if (sql.startsWith('SELECT 1 FROM thread_machines')) return result(scenario === 'lease_lost' ? [] : [{}])
+    if (sql === 'SELECT clock_timestamp() AS now') return result([{ now: floor }])
+    if (sql.startsWith('INSERT INTO device_tokens')) {
+      tokenHash = values[3] as string; credentialDeviceId = values[4] as string
+      assert.equal(values[1], actor.userId); assert.equal(values[5], actor.workspaceId)
+      return result([])
+    }
+    if (sql.startsWith('SELECT 1 FROM devices d JOIN device_tokens')) {
+      assert.deepEqual(values, [credentialDeviceId, actor.userId, floor, tokenHash])
+      assert.match(sql, /t\."revokedAt" IS NULL AND t\."lastUsedAt">=\$3/)
+      if (!authenticated) clockAdvance = 31_000
+      return result(authenticated ? [{}] : [])
+    }
+    if (sql.startsWith("UPDATE thread_machines SET state='running'")) {
+      finished = true
+      return result([{ ...machine, epoch: 1, lifecycle: { phase: 'created' }, computeSeconds: 0 }])
+    }
+    if (sql.startsWith('UPDATE thread_machines')) return result([{ runId: run.id }])
+    if (/^(BEGIN|COMMIT|ROLLBACK|SELECT pg_advisory_xact_lock|INSERT INTO (devices|device_repos)|UPDATE (device_tokens|agent_runs|factory_attempts))/.test(sql)) return result([])
+    assert.fail(`Unexpected bootstrap-fixture SQL: ${sql}`)
+  }
+  const pool = { query, connect: async () => ({ query, release: () => { released = true } }) } as never
+  const box = { sandboxId: 'bootstrap-fixture-vm', files: {
+    read: async () => 'a'.repeat(40),
+    write: async (files: { path: string; data: string }[], options: unknown) => {
+      assert.deepEqual(options, { user: 'root', useOctetStream: false })
+      assert.equal(queries.at(-1), 'SELECT clock_timestamp() AS now')
+      assert.ok(queries.includes('COMMIT'))
+      uploads.push(files)
+    },
+  }, commands: { run: async (command: string, options: Record<string, unknown>) => {
+    commands.push({ command, options })
+    if (command.startsWith('tail -n 200 ')) return { stdout: '', stderr: '', exitCode: 0 }
+    if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
+      assert.equal(options.user, 'root'); assert.notEqual(options.background, true)
+      assert.ok(command.indexOf('mv /home/user/.mikka/initial-run.next') < command.indexOf('mv /home/user/.mikka/bootstrap.next'))
+      if (scenario === 'publish_failed') throw fault
+      authenticated = scenario === 'preloaded'
+      return { stdout: scenario === 'fallback' ? '' : 'mikka-preloaded-worker-woken\n', stderr: '', exitCode: 0 }
+    }
+    assert.match(command, /node dist\/cloud\/cloud-worker\.js/)
+    assert.equal(options.user, 'user'); assert.equal(options.background, true)
+    if (scenario === 'fallback') authenticated = true
+    return { stdout: '', stderr: '', exitCode: 0 }
+  } } }
+  const provider = { create: async () => box,
+    connect: async () => assert.fail('a fresh fixture does not resume another VM'), kill: async () => assert.fail('no provider kill belongs to this helper'),
+  } as unknown as Parameters<typeof ensureThreadMachine>[3]
+  const saved = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA }
+  process.env.MIKKA_CLOUD_WORKER_URL = 'https://fixture.invalid/mikka'; process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40)
+  const clock = mock.method(Date, 'now', () => wall + clockAdvance)
+  const warning = mock.method(console, 'warn', () => {})
+  const info = mock.method(console, 'info', () => {})
+  let error: unknown
+  try { await ensureThreadMachine(pool, actor, run.id, provider) } catch (caught) { error = caught }
+  finally {
+    clock.mock.restore(); warning.mock.restore(); info.mock.restore()
+    if (saved.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = saved.url
+    if (saved.sha === undefined) delete process.env.MIKKA_CLOUD_WORKER_SHA; else process.env.MIKKA_CLOUD_WORKER_SHA = saved.sha
+  }
+  return { queries, commands, uploads, error, fault, finished, released }
+}
+
+test('bootstrap publication wakes the preloader without another remote start command', async () => {
+  const f = await bootstrapFixture('preloaded')
+  assert.ifError(f.error)
+  assert.equal(f.uploads.length, 1)
+  assert.equal(f.commands.length, 1, 'one atomic publish/wake command replaces publish then redundant start')
+  assert.match(f.commands[0].command, /runuser -u user -- sh -c/)
+  assert.ok(f.finished); assert.ok(f.released)
+  assert.equal(f.queries.filter(sql => sql.startsWith('SELECT 1 FROM devices d JOIN device_tokens')).length, 1, 'a wake receipt does not replace credential registration')
+  const bootstrap = JSON.parse(f.uploads[0][0].data)
+  assert.ok(!JSON.stringify(f.commands).includes(bootstrap.credential), 'credentials stay in the file upload, never command text or options')
+})
+
+test('an unavailable preloader retains the existing user background fallback and registration proof', async () => {
+  const fast = await bootstrapFixture('preloaded'), fallback = await bootstrapFixture('fallback')
+  assert.ifError(fallback.error)
+  assert.equal(fallback.uploads.length, 1); assert.equal(fallback.commands.length, 2)
+  assert.deepEqual(fallback.queries, fast.queries, 'the fast path adds no SQL or authorization work')
+  assert.ok(fallback.finished); assert.ok(fallback.released)
+})
+
+test('failed publication or a lost credential lease never starts a worker', async () => {
+  for (const scenario of ['publish_failed', 'lease_lost'] as const) {
+    const f = await bootstrapFixture(scenario)
+    if (scenario === 'publish_failed') assert.equal(f.error, f.fault)
+    else assert.match(String(f.error), /Thread provisioning cancelled/)
+    assert.equal(f.commands.filter(row => row.options.background === true).length, 0)
+    assert.equal(f.uploads.length, scenario === 'publish_failed' ? 1 : 0)
+    assert.equal(f.finished, false); assert.ok(f.released)
+    assert.ok(f.queries.includes('ROLLBACK'))
+  }
+})
+
+test('a successful wake cannot stand in for a live new credential registration', async () => {
+  for (const scenario of ['revoked', 'old_registration'] as const) {
+    const f = await bootstrapFixture(scenario)
+    assert.match(String(f.error), /Thread worker did not register/)
+    assert.equal(f.finished, false); assert.ok(f.released)
+    assert.equal(f.commands.filter(row => row.options.background === true).length, 0)
+    assert.ok(f.queries.includes('ROLLBACK'))
+  }
+})
+
+test('the preloader wake command signals only a live wait-bootstrap process and reports failed signals as fallback', { skip: process.platform !== 'linux', timeout: 10000 }, async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-bootstrap-wake-'))
+  const pidFile = join(directory, 'preloaded.pid')
+  const command = CLOUD_PRELOADER_WAKE_COMMAND.replaceAll('/home/user/.mikka/preloaded.pid', pidFile)
+  const execute = promisify(execFile)
+  const launch = async (preloader: boolean) => {
+    const child = spawn(process.execPath, ['-e', `let wakes=0; process.on('SIGUSR1',()=>{wakes++;process.send('woken')}); process.on('message',()=>process.send(wakes)); process.send('ready')`,
+      ...(preloader ? ['--', '--wait-bootstrap'] : [])], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] })
+    assert.deepEqual(await once(child, 'message'), ['ready', undefined])
+    return child
+  }
+  const stop = async (child: ReturnType<typeof spawn>) => {
+    if (child.exitCode !== null || child.signalCode !== null) return
+    const ended = once(child, 'exit'); child.kill('SIGTERM'); await ended
+  }
+  try {
+    const absent = await execute('sh', ['-c', command])
+    assert.equal(absent.stdout, ''); assert.equal(absent.stderr, '')
+    const child = await launch(true)
+    try {
+      await writeFile(pidFile, `${child.pid}\n`)
+      const woken = once(child, 'message')
+      assert.equal((await execute('sh', ['-c', command])).stdout.trim(), CLOUD_PRELOADER_WAKE_RECEIPT)
+      assert.deepEqual(await woken, ['woken', undefined])
+      // Deterministically reproduce the exit-between-check-and-signal branch;
+      // the real /proc and kill -0 checks still run against the live process.
+      const failedSignal = 'kill() { if test "$1" = "-USR1"; then return 1; else command kill "$@"; fi; }; '
+      assert.equal((await execute('sh', ['-c', failedSignal + command])).stdout, '')
+      const count = once(child, 'message'); child.send?.('count')
+      assert.deepEqual(await count, [1, undefined])
+    } finally { await stop(child) }
+    assert.equal((await execute('sh', ['-c', command])).stdout, '', 'an exited PID is not a wake acknowledgement')
+    const unrelated = await launch(false)
+    try {
+      await writeFile(pidFile, `${unrelated.pid}\n`)
+      assert.equal((await execute('sh', ['-c', command])).stdout, '')
+      const count = once(unrelated, 'message'); unrelated.send?.('count')
+      assert.deepEqual(await count, [0, undefined], 'another live process receives no signal')
+    } finally { await stop(unrelated) }
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })

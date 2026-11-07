@@ -6,7 +6,9 @@ import type { LoopbackAuthServer } from './loopback'
 import { publicSession, responseSessionCache, SESSION_CACHE_HEADER, storedSession, type SessionVault, type StoredSession } from './session-vault'
 import { accountChoice, responseWorkspace, rpcEnvelope } from './bundled-accounts'
 import { openBundledWebPage } from './bundled-web'
+import { canonicalServerUrl } from './server-discovery'
 import { markStartup } from '../startup'
+import type { BundledSessionChange } from './bundled-session-change'
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 
@@ -18,14 +20,54 @@ export class BundledAuth {
   private restoration: Promise<void> | undefined
   private listener: LoopbackAuthServer | null = null
   private timeout: ReturnType<typeof setTimeout> | null = null
-  private readonly base: URL
+  /** The built-in server: accounts without their own `server` belong to it. */
+  private readonly home: string
+  /** Where the next sign-in goes, and every request while nobody is signed in. */
+  private target: string
   constructor(private readonly options: {
     serverUrl: string; version: string; fetch: Fetcher; vault: SessionVault
-    openExternal(url: string): Promise<void>; changed(): void; returned(next: string): void
+    openExternal(url: string): Promise<void>; changed(change?: BundledSessionChange): void; returned(next: string): void | Promise<void>
     scopeChanged?(): void
     /** A new app link for the browser's callback page to open (app-link.ts). */
     appLink?(): string
-  }) { this.base = remoteBase(options.serverUrl) }
+    /** The sign-in page's server at launch (server-directory.ts); the built-in one otherwise. */
+    target?: string
+    /** The sign-in target followed a newly selected account. */
+    targetChanged?(url: string): void
+    /** A server's public label for the account switcher. */
+    describe?(url: string): { url: string; cloud: boolean; name: string | null }
+  }) {
+    this.home = canonicalServerUrl(options.serverUrl)
+    this.target = options.target ? canonicalServerUrl(options.target) : this.home
+  }
+
+  /** An account's own server; exact canonical spelling, compared as a string. */
+  serverOf(account: StoredSession): string { return account.server ?? this.home }
+  /** The server the window talks to: the current account's, or the sign-in target. */
+  serverUrl(): string { return this.current ? this.serverOf(this.current) : this.target }
+  targetUrl(): string { return this.target }
+  /** Signed-in account count per server, for Settings and the switcher. */
+  serverAccounts(): Map<string, number> {
+    const counts = new Map<string, number>()
+    for (const account of this.saved.values()) counts.set(this.serverOf(account), (counts.get(this.serverOf(account)) ?? 0) + 1)
+    return counts
+  }
+  /** Points the next sign-in at another server. A sign-in already open in the
+   * browser is abandoned, so its code can never land on the new server. */
+  async setTarget(url: string): Promise<void> {
+    await this.whenRestored()
+    const next = canonicalServerUrl(url)
+    if (next === this.target) return
+    this.cancel(); this.generation++
+    this.target = next
+    if (!this.current) this.options.changed()
+  }
+  private follow(account: StoredSession): void {
+    const server = this.serverOf(account)
+    if (server === this.target) return
+    this.target = server
+    this.options.targetChanged?.(server)
+  }
 
   restore(): Promise<void> {
     // The local window can load while the OS keychain reads. Every credential
@@ -34,6 +76,7 @@ export class BundledAuth {
       this.saved.clear()
       for (const account of stored?.accounts ?? []) this.saved.set(account.identity.user.id, account)
       this.current = stored?.activeUserId ? this.saved.get(stored.activeUserId) ?? null : null
+      if (this.current) this.follow(this.current)
     })
   }
   whenRestored(): Promise<void> { return this.restoration ?? Promise.resolve() }
@@ -71,6 +114,7 @@ export class BundledAuth {
       if (inheritedCache && latest?.token === account.token) account = { ...account, sessionCache: latest.sessionCache }
       this.saved.set(account.identity.user.id, account)
       this.current = account
+      this.follow(account)
       // Preserve concurrent revocations and cache updates of other accounts.
       const current = this.snapshot()
       if (JSON.stringify(current) !== written) await this.options.vault.saveAccounts(current)
@@ -90,7 +134,7 @@ export class BundledAuth {
   }
   session(): BundledSession | null { return this.current ? structuredClone(this.current.identity) : null }
   /** Main-only authorization scope; neither token nor workspace selector crosses IPC. */
-  scope(): string | null { return this.current ? JSON.stringify([this.current.identity.user.id, this.current.identity.session.id, this.current.workspace ?? null]) : null }
+  scope(): string | null { return this.current ? JSON.stringify([this.serverOf(this.current), this.current.identity.user.id, this.current.identity.session.id, this.current.workspace ?? null]) : null }
   private cancel(): void {
     this.listener?.close(); this.listener = null
     if (this.timeout) clearTimeout(this.timeout)
@@ -98,14 +142,16 @@ export class BundledAuth {
   }
   dispose(): void { this.generation++; this.cancel() }
 
-  /** Main-only primitive; a stored account chooses authentication, never an IPC token. */
+  /** Main-only primitive; a stored account chooses authentication, never an IPC token.
+   * Its token goes only to its own server; without an account, to the sign-in target. */
   private async fetchAs(path: string, init: RequestInit, account: StoredSession | null): Promise<Response> {
     if (!path.startsWith('/api/') || path.includes('\\') || path.includes('#') || /%(?:2f|5c|2e|25)/i.test(path.split('?')[0]!)) throw new Error('Invalid backend path')
-    const target = new URL(`${this.base.pathname.replace(/\/$/, '')}${path}`, this.base.origin)
-    if (target.origin !== this.base.origin) throw new Error('Invalid backend origin')
+    const base = remoteBase(account ? this.serverOf(account) : this.target)
+    const target = new URL(`${base.pathname.replace(/\/$/, '')}${path}`, base.origin)
+    if (target.origin !== base.origin) throw new Error('Invalid backend origin')
     const headers = new Headers(init.headers)
     headers.delete('cookie'); headers.delete('authorization'); headers.delete('proxy-authorization'); headers.delete(SESSION_CACHE_HEADER)
-    headers.set('origin', this.base.origin)
+    headers.set('origin', base.origin)
     headers.set('x-mikka-client', 'desktop')
     headers.set('x-mikka-client-version', this.options.version)
     headers.set('x-mikka-desktop-protocol', '1')
@@ -225,19 +271,32 @@ export class BundledAuth {
       } catch { return null }
     }))
     if (current.token !== this.current?.token) return Response.json({ error: 'desktop_session_changed' }, { status: 409 })
-    return Response.json({ ...(body as Record<string, unknown>), accounts: [own, ...results.filter(item => item !== null)] }, { status: response.status, headers: { 'cache-control': 'no-store' } })
+    const accounts = [own, ...results.filter(item => item !== null)]
+    // Each account names its server only when the accounts span more than one.
+    const serverFor = (id: string) => this.serverOf(this.saved.get(id) ?? current)
+    const labelled = new Set(accounts.map(choice => serverFor(choice.id))).size > 1
+      ? accounts.map(choice => ({ ...choice, server: this.describe(serverFor(choice.id)) }))
+      : accounts
+    return Response.json({ ...(body as Record<string, unknown>), accounts: labelled }, { status: response.status, headers: { 'cache-control': 'no-store' } })
   }
 
-  private async accept(value: unknown, generation: number, sessionCache?: string): Promise<void> {
+  describe(url: string): { url: string; cloud: boolean; name: string | null } {
+    return this.options.describe?.(url) ?? { url, cloud: url === this.home, name: null }
+  }
+
+  private async accept(value: unknown, generation: number, sessionCache?: string, change?: BundledSessionChange): Promise<void> {
     const input = value as { token?: unknown }
     const identity = publicSession(value)
-    const parsed = storedSession({ token: input?.token, identity, sessionCache })
+    const parsed = storedSession({ token: input?.token, identity, sessionCache, ...(this.target !== this.home ? { server: this.target } : {}) })
     if (!parsed || generation !== this.generation) throw new Error('Sign-in expired / 登录已过期')
+    // One user id names one account; the same id from another server is refused, never merged.
+    const prior = this.saved.get(parsed.identity.user.id)
+    if (prior && this.serverOf(prior) !== this.serverOf(parsed)) throw new Error('desktop_account_conflict')
     // Same-account reauthentication replaces only that account; add-account
     // retains the other encrypted sessions, bounded like the web switcher.
     if (!this.saved.has(parsed.identity.user.id) && this.saved.size >= 5) throw new Error('desktop_account_limit_reached')
     if (!await this.commitAccount(parsed, generation)) return
-    this.options.changed()
+    this.options.changed(change)
   }
 
   async signIn(input: unknown): Promise<void> {
@@ -261,8 +320,10 @@ export class BundledAuth {
           body: JSON.stringify({ state, code, verifier, client: 'bundled' }), signal: AbortSignal.timeout(30_000),
         }, false)
         if (!response.ok) throw new Error('Sign-in exchange failed')
-        await this.accept(await response.json(), generation, responseSessionCache(response.headers))
-        if (generation === this.generation) this.options.returned(next)
+        await this.accept(await response.json(), generation, responseSessionCache(response.headers), { pendingReturn: true })
+        // Navigation replaces the main document. Await a failure so the current
+        // generation alone can fall back to its ordinary session notification.
+        if (generation === this.generation) await this.options.returned(next)
       })().catch(() => { if (generation === this.generation) this.options.changed() })
     }, this.options.appLink?.())
     if (generation !== this.generation) { listener.close(); return }
@@ -275,8 +336,9 @@ export class BundledAuth {
         body: JSON.stringify({ state, callback: listener.callback, challenge }), signal: AbortSignal.timeout(15_000),
       }, false)
       if (!response.ok || generation !== this.generation) throw new Error('Sign-in registration failed / 登录登记失败')
-      const route = `${this.base.pathname.replace(/\/$/, '')}${value.locale === 'en' ? '/en' : ''}/${value.mode === 'sign-up' ? 'sign-up' : 'sign-in'}`
-      const url = new URL(route, this.base.origin)
+      const base = remoteBase(this.target)
+      const route = `${base.pathname.replace(/\/$/, '')}${value.locale === 'en' ? '/en' : ''}/${value.mode === 'sign-up' ? 'sign-up' : 'sign-in'}`
+      const url = new URL(route, base.origin)
       url.search = new URLSearchParams({ desktop: '1', desktop_state: state, desktop_next: next, desktop_callback: listener.callback }).toString()
       if (value.provider) url.searchParams.set('continue', value.provider)
       if (value.addAccount) url.searchParams.set('addAccount', '1')
@@ -300,10 +362,11 @@ export class BundledAuth {
     if (!response.ok) return { code: typeof body.code === 'string' && /^[A-Z0-9_]{1,100}$/.test(body.code) ? body.code : 'INVALID_EMAIL_OR_PASSWORD', status: response.status }
     if (typeof body.token !== 'string' || generation !== this.generation) return { code: 'INVALID_EMAIL_OR_PASSWORD', status: 401 }
     const initialCache = responseSessionCache(response.headers)
-    const identityHeaders = new Headers({ authorization: `Bearer ${body.token}`, origin: this.base.origin, 'x-mikka-client': 'desktop', 'x-mikka-client-version': this.options.version, 'x-mikka-desktop-protocol': '1' })
+    const base = remoteBase(this.target)
+    const identityHeaders = new Headers({ authorization: `Bearer ${body.token}`, origin: base.origin, 'x-mikka-client': 'desktop', 'x-mikka-client-version': this.options.version, 'x-mikka-desktop-protocol': '1' })
     if (initialCache) identityHeaders.set(SESSION_CACHE_HEADER, initialCache)
     // Use the newly returned token only in main, before exposing public identity.
-    const identityResponse = await this.options.fetch(new URL(`${this.base.pathname.replace(/\/$/, '')}/api/auth/get-session`, this.base.origin).href, {
+    const identityResponse = await this.options.fetch(new URL(`${base.pathname.replace(/\/$/, '')}/api/auth/get-session`, base.origin).href, {
       headers: identityHeaders,
       redirect: 'error', cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(15_000),
     })
@@ -336,7 +399,27 @@ export class BundledAuth {
     if (provider !== 'google' && provider !== 'github') throw new Error('Invalid account provider')
     if (!this.current) throw new Error('Sign in first / 请先登录')
     // Linking requires the browser's explicit authenticated account confirmation.
-    const url = new URL(`${this.base.pathname.replace(/\/$/, '')}/?settings=account`, this.base.origin)
-    if (!await openBundledWebPage(url.href, { serverUrl: this.options.serverUrl, auth: this, openExternal: this.options.openExternal })) throw new Error('Invalid account link target')
+    const base = remoteBase(this.serverOf(this.current))
+    const url = new URL(`${base.pathname.replace(/\/$/, '')}/?settings=account`, base.origin)
+    if (!await openBundledWebPage(url.href, { serverUrl: base.href, auth: this, openExternal: this.options.openExternal })) throw new Error('Invalid account link target')
+  }
+
+  /** Disconnect: signs out every account on one server. The window moves to an
+   * account on another server, or to the sign-in page. */
+  async signOutServer(url: string): Promise<void> {
+    await this.whenRestored()
+    const server = canonicalServerUrl(url)
+    const leaving = [...this.saved.values()].filter(account => this.serverOf(account) === server)
+    this.generation++; this.cancel()
+    const revocation = Promise.all(leaving.map(account => this.fetchAs('/api/auth/sign-out', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(10_000) }, account).catch(() => null)))
+    for (const account of leaving) this.saved.delete(account.identity.user.id)
+    if (this.current && this.serverOf(this.current) === server) {
+      this.current = this.saved.values().next().value ?? null
+      if (this.current) this.follow(this.current)
+    }
+    if (!this.current && this.target === server) { this.target = this.home; this.options.targetChanged?.(this.home) }
+    await this.persist()
+    this.options.changed()
+    await revocation
   }
 }

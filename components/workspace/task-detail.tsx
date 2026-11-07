@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import { getDeletedIssue, listIssueConnections, setIssueDeleted } from '@/app/actions/issue-operations'
 import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { CacheReadError } from '@/lib/cache-read-error'
-import { waitForCacheHydration } from '@/lib/swr/persistent-cache'
+import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import { issueKeys } from '@/lib/swr/keys'
 import { ListReadScopeError } from '@/lib/live/list-read'
 import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
@@ -92,7 +92,21 @@ export function TaskDetail({ id, ...props }: DetailProps & { id: string }) {
     void waitForCacheHydration(cache).then(() => active ? mutate() : undefined).catch(() => {})
     return () => { active = false }
   }, [cache, id, mutate, props.user.id])
-  if (error) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
+  const unavailable = error instanceof CacheReadError || error instanceof ListReadScopeError || !!readAccessFailure(error)
+  // A refusal retires this mount's authorization; a later transport failure
+  // cannot make its old cached document writable again.
+  useEffect(() => {
+    if (unavailable) { setLoadedId(null); props.onDirty(false) }
+  }, [unavailable, props.onDirty])
+  const backgroundFailed = Boolean(error && data && loadedId === id && !unavailable)
+  const readFailedMessage = t('readFailed'), retryLabel = t('reload')
+  useEffect(() => {
+    const notice = `issue-detail-read-${id}`
+    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: event => { event.preventDefault(); void mutate() } } })
+    else toast.dismiss(notice)
+    return () => { toast.dismiss(notice) }
+  }, [backgroundFailed, id, mutate, readFailedMessage, retryLabel])
+  if (error && !backgroundFailed) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
   if (!data) return <div role="status" aria-label={t('reading')} className="mx-auto flex w-full max-w-170 flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
   // Show a local snapshot immediately, but do not seed a writable Y.Doc from
   // it before the normal read rechecks access and the current body fingerprint.
@@ -339,7 +353,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
           <div className="flex min-w-0 flex-col gap-7">
             <FieldGroup><Field><FieldLabel htmlFor="task-title" className="sr-only">{t('titleLabel')}</FieldLabel><Textarea id="task-title" readOnly={preview} aria-label={t('titleLabel')} rows={1} placeholder={t('titleLabel')} value={title} onChange={event => changed({ title: event.target.value })} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; setEditSequence(value => value + 1) }} onBlur={() => { if (title.trim() && title !== saved.title) void save() }} maxLength={200} className="field-sizing-content min-h-10 w-full resize-none rounded-sm border-none bg-transparent px-0 py-0 text-2xl font-semibold tracking-tight shadow-none md:text-2xl outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring dark:bg-transparent" onKeyDown={event => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }} /></Field></FieldGroup>
             {documentTools && <div><Button size="sm" variant="ghost" onClick={() => setDocumentTools(false)}><ArrowLeft data-icon="inline-start" />{t('backToSimple')}</Button></div>}
-    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || preview ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted content={content} disabled={readOnly || preview} layout={documentTools ? 'document' : 'issue'} activity={activity} afterDescription={preview ? null : <><FactoryAcceptance issueId={saved.id} onOpen={showAcceptance} onOpenThread={showThread} /><IssueRelations liveWorkspaceId={syncState.workspaceId ?? null} viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} /><IssueThreads issueId={saved.id} openId={openThread} onOpen={showThread} /></>} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || preview ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
+    <SectionBoundary onClose={onClose}>{syncState.ready || readOnly || preview ? <>{readOnly && <Alert><AlertDescription>{t('invalidContentReadOnly')}</AlertDescription></Alert>}<IssueEditor persisted issueId={preview ? undefined : saved.id} content={content} disabled={readOnly || preview} layout={documentTools ? 'document' : 'issue'} activity={activity} afterDescription={preview ? null : <><FactoryAcceptance issueId={saved.id} onOpen={showAcceptance} onOpenThread={showThread} /><IssueRelations liveWorkspaceId={syncState.workspaceId ?? null} viewerId={user.id} mode="subissues" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} /><IssueThreads issueId={saved.id} openId={openThread} onOpen={showThread} /></>} sharedDoc={sync?.doc} author={user.name || user.email} authorId={user.id} replacement={replacement} onReplacementApplied={replacementApplied} syncLabel={readOnly || preview ? '' : syncState.error ? t('syncFailedLabel') : t('syncedLabel')} onChange={descriptionChanged} /></> : <div className="flex flex-col items-start gap-4"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" />{syncState.error && <Button variant="outline" size="sm" onClick={() => { void retrySync().catch(() => {}) }}>{t('retrySync')}</Button>}</div>}</SectionBoundary>
           </div>
           {syncState.error && <FieldError className="text-xs">{t('syncRetryNotice')}</FieldError>}
         </div>

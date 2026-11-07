@@ -2,11 +2,9 @@
 
 import { useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { updateDisplayName } from '@/app/actions/account'
 import { Input } from '@/components/ui/input'
-import { useActionError } from '@/lib/use-action-error'
+import { useSaveDisplayName } from '@/hooks/settings/use-account'
 
 /**
  * The name the person is shown by. Saves when the field is left or on Enter, like the
@@ -15,8 +13,7 @@ import { useActionError } from '@/lib/use-action-error'
  */
 export function ProfileName({ name }: { name: string }) {
   const t = useTranslations('Settings.profile')
-  const actionError = useActionError()
-  const router = useRouter()
+  const saveDisplayName = useSaveDisplayName()
   const [value, setValue] = useState(name)
   const [saved, setSaved] = useState(name)
   const [saving, setSaving] = useState(false)
@@ -30,13 +27,12 @@ export function ProfileName({ name }: { name: string }) {
     inFlight.current = true
     setSaving(true)
     try {
-      const result = await updateDisplayName(next)
-      if (result.error) { toast.error(actionError(result.error)); return }
+      const error = await saveDisplayName(next)
+      if (error) { toast.error(error); return }
       setSaved(next)
       setValue(next)
       toast.success(t('saved'))
-      router.refresh()
-    } catch { toast.error(actionError()) } finally {
+    } finally {
       inFlight.current = false
       setSaving(false)
     }

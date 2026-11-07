@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { errorAlertFixtures, fixtureDigest, syntheticErrorQuery, verifySyntheticResult } from './posthog-alert-acceptance.mjs'
 import { ALERTS, DASHBOARD, INSIGHTS, MANAGED_TAG, alertChanges, insightChanges, posthogApi, sync } from './posthog-observability.mjs'
 
 /** An in-memory PostHog with the API surface the script uses. */
@@ -118,4 +122,68 @@ test('the API key is required and never appears in errors', async () => {
   const key = 'phx_secretvalue123456'
   const api = posthogApi({ key, fetchImpl: async () => new Response(JSON.stringify({ detail: key }), { status: 403 }) })
   await assert.rejects(api.alerts(), error => !error.message.includes(key) && /403/.test(error.message))
+})
+
+// The engine result is an explicit recorded validation, not a CI network query.
+// Any SQL or fixture edit invalidates it until the exact synthetic SELECT is rerun.
+const readEngineReceipt = () => JSON.parse(readFileSync(new URL('./posthog/error-spike-engine-receipt.json', import.meta.url), 'utf8'))
+
+test('the exact error-alert SQL and fixtures retain their verified real HogQL result', () => {
+  const receipt = readEngineReceipt()
+  const cases = errorAlertFixtures()
+  const source = INSIGHTS.find(item => item.key === 'alert-error-spike').query.source.query
+  assert.equal(receipt.schema_version, 1)
+  assert.equal(receipt.kind, 'synthetic_hogql_readonly')
+  assert.equal(receipt.project_id, 670821)
+  assert.equal(receipt.production_acceptance, false)
+  assert.equal(receipt.ci_executes_remote_query, false)
+  assert.equal(receipt.sql_sha256, fixtureDigest(source))
+  assert.equal(receipt.fixtures_sha256, fixtureDigest(JSON.stringify(cases)))
+  assert.equal(receipt.acceptance_script_sha256, fixtureDigest(readFileSync(new URL('./posthog-alert-acceptance.mjs', import.meta.url))))
+  assert.equal(receipt.baseline_sha256, fixtureDigest(receipt.baseline_sql))
+  const metricTail = sql => sql.slice(sql.indexOf('    service_start AS ('))
+  assert.equal(metricTail(source), metricTail(receipt.baseline_sql), 'preserve the owner array coverage and baseline computation')
+  const query = syntheticErrorQuery(source, cases, receipt.baseline_sql)
+  assert.equal(receipt.synthetic_query_sha256, fixtureDigest(query))
+  assert.equal(receipt.result_sha256, fixtureDigest(receipt.result))
+  assert.equal(query.includes('posthog.'), false, 'synthetic validation must not read production tables')
+  const verified = verifySyntheticResult(receipt.result, cases)
+  assert.deepEqual(verified.summary, receipt.summary)
+  // These are the two demonstrated old defects, not merely a different query hash.
+  for (const name of ['successful non-root wake and cron entries handle only their own exact hook attempts',
+    'another successful entry in the same trace never handles a failed child entry']) {
+    const fixture = cases.find(item => item.name === name)
+    assert.equal(verified.rows.find(row => row.id === fixture.id).baselinePassed, 0)
+  }
+  assert.equal(verified.rows.find(row => row.id === cases.at(-1).id).baselinePassed, 1, 'legacy linked root behavior stays supported')
+  const duplicate = cases.find(item => item.name === 'duplicate physical span rows do not become different excluded identities')
+  const duplicateResult = verified.rows.find(row => row.id === duplicate.id)
+  assert.equal(duplicateResult.distinct, 3)
+  assert.equal(duplicateResult.raw, 4)
+})
+
+test('the recorded engine response rejects truncation, extra columns and altered identities', () => {
+  const { result } = readEngineReceipt()
+  assert.throws(() => verifySyntheticResult(result.split('\n').slice(0, -1).join('\n')), /ALERT_ENGINE_/)
+  const lines = result.split('\n')
+  const detail = lines.findIndex(line => line.startsWith('case-'))
+  const extraColumn = [...lines]
+  extraColumn[detail] += '|unexpected'
+  assert.throws(() => verifySyntheticResult(extraColumn.join('\n')), /ALERT_ENGINE_RESULT_COLUMNS/)
+  const changedIdentity = [...lines]
+  const fields = changedIdentity[detail].split('|')
+  fields[1] = 'ids:unexpected/http'
+  changedIdentity[detail] = fields.join('|')
+  assert.throws(() => verifySyntheticResult(changedIdentity.join('\n')), /ALERT_ENGINE_IDENTITY_MISMATCH/)
+})
+
+test('the error insight description fits the official targeted update schema', () => {
+  assert.ok(INSIGHTS.find(item => item.key === 'alert-error-spike').description.length <= 400)
+})
+
+test('the official query-only acceptance entry emits the exact verified packet without contacting PostHog', () => {
+  const query = execFileSync(process.execPath, [fileURLToPath(new URL('./posthog-alert-acceptance.mjs', import.meta.url)), '--query-only'], {
+    encoding: 'utf8', timeout: 5000, maxBuffer: 1048576,
+  })
+  assert.equal(fixtureDigest(query), readEngineReceipt().synthetic_query_sha256)
 })

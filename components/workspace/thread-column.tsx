@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import { findThreadIssue } from '@/app/actions/agents'
 import { Skeleton } from '@/components/ui/skeleton'
+import { InlineLoadError } from '@/components/load-error'
+import { readAccessFailure } from '@/lib/swr/persistent-cache'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { PANEL_WIDTH } from '@/components/nav/context-panel'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
@@ -27,15 +30,30 @@ const TASK_WIDE = '(min-width: 1024px)'
  */
 export function ThreadColumn({ runId, issueId: known, overList = false, name }: { runId: string; issueId?: string | null; /** Opened from 全部线程: ← goes back to that list, ✕ closes both. */ overList?: boolean; /** Its row's name in the thread list, so the header reads the same. */ name?: string }) {
   const t = useTranslations('IssueThreads')
-  const { data: looked, isLoading } = useSWR(known ? null : ['thread-issue', runId], () => findThreadIssue(runId))
+  const { data: looked, error, isLoading, mutate } = useSWR(known ? null : ['thread-issue', runId], () => findThreadIssue(runId))
+  const [rejectedRun, setRejectedRun] = useState<string | null>(null)
+  const refused = !!readAccessFailure(error) || error?.code === 'runNotFound' || error?.code === 'desktop_session_changed'
+  useEffect(() => {
+    if (refused) setRejectedRun(runId)
+    else if (!error) setRejectedRun(null)
+  }, [refused, error, runId])
   // A thread with no task opens too, on its own conversation; it just has no task to link to.
-  const thread = known ? { issueId: known } : looked
+  const thread = known ? { issueId: known } : refused || (error && rejectedRun === runId) ? undefined : looked
+  const backgroundFailed = Boolean(error && thread)
+  const readFailedMessage = t('loadFailed'), retryLabel = t('retry')
+  useEffect(() => {
+    const notice = `thread-issue-read-${runId}`
+    if (backgroundFailed) toast.error(readFailedMessage, { id: notice, duration: Infinity, action: { label: retryLabel, onClick: event => { event.preventDefault(); void mutate() } } })
+    else toast.dismiss(notice)
+    return () => { toast.dismiss(notice) }
+  }, [backgroundFailed, runId, mutate, readFailedMessage, retryLabel])
   // A thread the viewer may not read is not a place: show what is there instead.
   useEffect(() => { if (!known && !isLoading && looked === null) navigate({ thread: null }, 'replace') }, [known, isLoading, looked])
   const issueId = thread?.issueId ?? null
   return <RightColumn slot="thread-column">
     {thread
       ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} name={name} onBack={closeThread} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null }) : undefined} />
+      : error ? <div className="p-4"><InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} /></div>
       : <div role="status" aria-label={t('loading')} className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>}
   </RightColumn>
 }

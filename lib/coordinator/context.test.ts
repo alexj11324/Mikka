@@ -4,6 +4,7 @@ import type { ModelMessage } from 'ai'
 import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
 import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 import { runCompletionObservations } from './run-completion-observation'
+import { restoreChatToolMetadata } from './chat-tool-metadata'
 
 test('watchdog blocker exposes the actual host facts and never invents a successful handoff', () => {
   const prompt = eventPrompt({ kind: 'run_report', issueId: 'issue', runId: null, payload: {
@@ -18,6 +19,15 @@ test('watchdog blocker exposes the actual host facts and never invents a success
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
 }
+
+test('a legacy cached invalid tool activity requires a fresh bounded projection',()=>{
+  const items=[{position:2,from:'coordinator',activity:{tools:[{call:'bad',name:'none',state:'error' as const}]}}]
+  const rows=[
+    {position:2,parts:[{type:'tool-call' as const,ordinal:1,toolCallId:'bad',toolName:'none'}]},
+    {position:3,parts:[{type:'tool-result' as const,ordinal:1,toolCallId:'bad',status:'error' as const,mikkaInvalidToolCall:true as const}]},
+  ]
+  assert.equal(restoreChatToolMetadata(items,rows,3,3),undefined)
+})
 
 function exchange(text: string): ModelMessage[] {
   return [
@@ -419,6 +429,24 @@ test('execution-identity discovery is hidden in the footer without removing disp
   ])
   const prompt = promptMessages(null, rows)
   assert.deepEqual(prompt.slice(1, 3), discovery, 'discovery calls and results still reach the model')
+})
+
+test('legacy SDK invalid calls pair by id without hiding valid calls with a reused name or id',()=>{
+  const rows:ModelMessage[]=[
+    {role:'assistant',content:[{type:'tool-call',toolCallId:'reused',toolName:'registered',input:{}}]},
+    {role:'tool',content:[{type:'tool-result',toolCallId:'reused',toolName:'registered',output:{type:'json',value:{ok:true}}}]},
+    {role:'assistant',content:[{type:'tool-call',toolCallId:'bad',toolName:'registered',input:{}}]},
+    {role:'tool',content:[{type:'tool-result',toolCallId:'bad',toolName:'registered',output:{type:'error-text',value:'AI_InvalidToolInputError: synthetic invalid schema'}}]},
+    {role:'assistant',content:[{type:'tool-call',toolCallId:'reused',toolName:'none',input:{x:'private'}}]},
+    {role:'tool',content:[{type:'tool-result',toolCallId:'reused',toolName:'none',output:{type:'error-text',value:'AI_NoSuchToolError: Model tried to call unavailable tool none. private'}}]},
+    {role:'assistant',content:'Corrected welcome'},
+  ]
+  const items=chatItems(rows.map((message,index)=>({message,position:index+1,createdAt:new Date(0)})))
+  assert.deepEqual(items.flatMap(item=>item.tools),['registered'])
+  assert.deepEqual(items.flatMap(item=>item.activity?.tools??[]).map(tool=>[tool.call,tool.name,tool.state]),[['reused','registered','done']])
+  assert.equal(items.at(-1)?.text,'Corrected welcome')
+  assert.doesNotMatch(JSON.stringify(items),/private|NoSuchTool|InvalidToolInput|none/)
+  assert.match(JSON.stringify(rows),/NoSuchToolError/,'raw model evidence is retained')
 })
 
 test('a person\'s message counts the photos sent with it, without carrying them in the chat', () => {

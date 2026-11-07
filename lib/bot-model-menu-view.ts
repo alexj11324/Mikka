@@ -24,6 +24,8 @@ export interface BotModelMenuOption {
   modelId: string
   /** `claude`, `codex`, `mikka` for the hosted model, or an API key's provider (`anthropic`, `deepseek`, `custom`…). */
   provider: string
+  /** A community default uses cloud credits or the administrator's own provider. */
+  hostedSource?: 'cloud' | 'self-hosted'
 }
 
 export interface BotModelMenuGroup {
@@ -40,6 +42,7 @@ export interface BotModelMenuGroup {
   points?: number
   /** Mikka 默认 with no points yet: the free messages left before a card is needed. */
   trialLeft?: number
+  hostedSource?: 'cloud' | 'self-hosted'
   options: BotModelMenuOption[]
 }
 
@@ -88,6 +91,6 @@ export function isCurrent(menu: Pick<BotModelMenu, 'current'>, option: BotModelM
  * 2240): the first in the menu's order, its first model. Null with none.
  */
 export function ownSubscriptionOption(menu: Pick<BotModelMenu, 'groups'>): { option: string; provider: string; plan: string | null } | null {
-  const group = menu.groups.find(item => item.kind === 'subscription' && item.options.length > 0)
+  const group = menu.groups.find(item => item.kind === 'subscription' && item.owner === undefined && item.options.length > 0)
   return group ? { option: group.options[0].id, provider: group.provider ?? group.options[0].provider, plan: group.plan ?? null } : null
 }

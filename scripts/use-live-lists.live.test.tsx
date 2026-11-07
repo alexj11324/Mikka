@@ -6,13 +6,16 @@ import type { State } from 'swr'
 import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import { liveKeyConnection } from '../lib/swr/live-focus'
+import { PersistentReadCache } from '../lib/swr/persistent-cache'
+import { CacheReadError } from '../lib/cache-read-error'
+import type { PresenceProof } from '../lib/live/presence'
 
 const home = '10000000-0000-4000-8000-000000000001'
 const team = '20000000-0000-4000-8000-000000000001'
 const otherTeam = '20000000-0000-4000-8000-000000000002'
 const otherHome = '10000000-0000-4000-8000-000000000002'
 type Kind = 'issues' | 'threads' | 'tasks' | 'bots' | 'groups' | 'roster'
-type Read = { items: { id: string; title: string }[]; live: { ownerId: string; workspaceId: string | null; selectedWorkspaceId?: string; deadline?: { at: string; afterMs: number }; revisions?: Record<string, number> }; version?: string; positions?: { id: string; version: string }[]; delta?: true; presenceFallback?: boolean }
+type Read = { items: { id: string; title: string }[]; live: { ownerId: string; workspaceId: string | null; selectedWorkspaceId?: string; deadline?: { at: string; afterMs: number }; revisions?: Record<string, number>; presence?: PresenceProof | null }; version?: string; positions?: { id: string; version: string }[]; delta?: true; presenceFallback?: boolean }
 const replies = new Map<Kind, () => Promise<Read>>()
 let reads: Kind[]
 let cursors: { kind: Kind; known?: string; positions?: unknown }[]
@@ -31,12 +34,17 @@ const browser = new Window({ url: 'https://mikka.example/mikka/en' })
 const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket
 let createRoot: typeof import('react-dom/client')['createRoot']
 let SWRConfig: typeof import('swr')['SWRConfig']
+let useSWR: typeof import('swr')['default']
 let unstableSerialize: typeof import('swr')['unstable_serialize']
 let LiveProvider: typeof import('../hooks/use-live-key')['LiveProvider']
+let useLiveKeys: typeof import('../hooks/use-live-key')['useLiveKeys']
+let staleOnFocus: typeof import('../components/swr-defaults')['staleOnFocus']
 let hooks: typeof import('../hooks/use-live-lists')
 let useListExpiry: typeof import('../hooks/use-list-expiry')['useListExpiry']
 let root: Root, container: HTMLDivElement, cache: Map<string, State>, tickets: string[]
 let refresh: Partial<Record<Kind, () => Promise<unknown>>>
+let replaceObserved: (value: Read) => Promise<unknown>
+let automaticReadiness = true
 const sockets: FakeSocket[] = []
 
 /** Real React, SWR and LiveChannels; only authenticated read and WS boundaries
@@ -48,6 +56,7 @@ class FakeSocket {
   onerror: (() => void) | null = null
   onmessage: ((event: { data: string }) => void) | null = null
   readonly url: string
+  readonly sent: { type: string; id: string; token?: string }[] = []
   // The channel asks the Worker for revisions; the fixture addresses the socket by its channel path.
   constructor(url: string) {
     assert.equal(new URL(url).searchParams.get('revisions'), '1')
@@ -56,10 +65,10 @@ class FakeSocket {
     queueMicrotask(() => {
       if (this.readyState !== 0) return
       this.readyState = 1; this.onopen?.()
-      this.message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS })
+      if (automaticReadiness) this.message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS })
     })
   }
-  send(value: string) { if (value === 'ping') this.onmessage?.({ data: 'pong' }) }
+  send(value: string) { if (value === 'ping') this.onmessage?.({ data: 'pong' }); else this.sent.push(JSON.parse(value)) }
   close() { this.readyState = 3; this.onclose?.() }
   message(value: unknown) { if (this.readyState === 1) this.onmessage?.({ data: JSON.stringify(value) }) }
 }
@@ -80,13 +89,14 @@ before(async () => {
   Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, WebSocket: FakeSocket })
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ SWRConfig, unstable_serialize: unstableSerialize } = await import('swr'))
-  ;({ LiveProvider } = await import('../hooks/use-live-key'))
+  ;({ SWRConfig, default: useSWR, unstable_serialize: unstableSerialize } = await import('swr'))
+  ;({ LiveProvider, useLiveKeys } = await import('../hooks/use-live-key'))
+  ;({ staleOnFocus } = await import('../components/swr-defaults'))
   hooks = await import('../hooks/use-live-lists')
   ;({ useListExpiry } = await import('../hooks/use-list-expiry'))
 })
 beforeEach(() => {
-  reads = []; cursors = []; scopeError = null; tickets = []; sockets.length = 0; refresh = {}; cache = new Map(); replies.clear()
+  reads = []; cursors = []; scopeError = null; automaticReadiness = true; tickets = []; sockets.length = 0; refresh = {}; cache = new Map(); replies.clear()
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   for (const kind of ['issues', 'threads', 'tasks', 'bots', 'groups', 'roster'] as const) replies.set(kind, async () => snapshot(kind))
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
@@ -125,7 +135,439 @@ async function render(kinds: Kind[], workspace = team, owner = 'owner') {
 }
 async function settled() { await wait(); await wait() }
 function emit(scope: string, kind: string) { for (const socket of sockets) if (socket.url.endsWith(scope)) socket.message({ kind, id: scope }) }
-const deferred = <T,>() => { let resolve!: (value: T) => void; return { promise: new Promise<T>(done => { resolve = done }), resolve: (value: T) => resolve(value) } }
+const deferred = <T,>() => { let resolve!: (value: T) => void, reject!: (error: unknown) => void; return { promise: new Promise<T>((done, fail) => { resolve = done; reject = fail }), resolve: (value: T) => resolve(value), reject: (error: unknown) => reject(error) } }
+
+type ReadCompare = (a: Read | undefined, b: Read | undefined) => boolean
+function ObservedReader({ enabled, scopes, owner, compare }: { enabled: boolean; scopes: string[]; owner: string; compare?: ReadCompare }) {
+  const key = ['observed-live-reader', owner]
+  const result = useSWR<Read>(enabled ? key : null, () => read('issues'), { revalidateOnFocus: false, revalidateOnReconnect: false, ...(compare ? { compare } : {}) })
+  replaceObserved = value => result.mutate(value, { revalidate: false })
+  const serialized = unstableSerialize(key)
+  useLiveKeys(scopes.map(scope => ({ kind: 'issue_list', id: scope, workspaceId: scope,
+    revisions: { [serialized]: result.data?.live.revisions?.[`issue_list:${scope}`] } })), [serialized])
+  return <Items kind="issues" value={result} />
+}
+function ChannelAnchor() {
+  useLiveKeys([{ kind: 'bot_list', id: team, workspaceId: team }], ['observed-live-anchor'])
+  return null
+}
+async function renderObserved(enabled: boolean, scopes = [team], owner = 'owner', compare?: ReadCompare, onSuccess?: () => void, anchor = false) {
+  await act(async () => root.render(<SWRConfig key={owner} value={{ provider: () => cache, use: [staleOnFocus], dedupingInterval: 0, shouldRetryOnError: false, ...(onSuccess ? { onSuccess } : {}) }}>
+    <LiveProvider ownerId={owner} workspaceId={team}>{anchor && <ChannelAnchor />}<ObservedReader enabled={enabled} scopes={scopes} owner={owner} compare={compare} /></LiveProvider>
+  </SWRConfig>))
+}
+
+test('a committed SWR read after connection readiness covers the pending live flush', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false)
+  await renderObserved(true)
+  assert.equal(count('issues'), 1)
+  assert.ok(view('issues')?.includes('revision-5'), 'the real SWR cache has already committed the read')
+  await settled()
+  assert.equal(count('issues'), 1, 'finishing before the existing flush does not require the same read again')
+  await act(async () => emit(team, 'issue_list')); await settled()
+  assert.equal(count('issues'), 2, 'a later unversioned event cannot reuse the earlier commit')
+})
+
+test('a late live subscription shares the committed read from its continuously ready connection', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  assert.equal(count('issues'), 1)
+  assert.ok(view('issues')?.includes('revision-5'))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(sockets.length, 1, 'the unrelated existing subscriber keeps this exact connection alive')
+  assert.equal(count('issues'), 1, 'subscribing itself is not a data change after the already committed read')
+})
+
+for (const revision of [undefined, 6]) test(`a ${revision ? 'higher-revision' : 'new unversioned'} push while unsubscribed invalidates the committed read before a late subscription`, async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await act(async () => sockets[0].message({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['issue_list'] }))
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  await act(async () => {
+    sockets[0].message({ kind: 'issue_list', id: team, ...(revision ? { rev: revision } : {}) })
+  })
+  replies.set('issues', async () => issueAt(6))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(count('issues'), 2)
+  assert.ok(view('issues')?.includes('revision-6'))
+})
+
+for (const ready of [false, true]) test(`a late subscription cannot reuse a read from ${ready ? 'before' : 'without'} the capability acknowledgement`, async () => {
+  automaticReadiness = false
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  if (ready) await act(async () => sockets[0].message({ type: 'live_ready', version: 1, kinds: LIVE_KINDS }))
+  replies.set('issues', async () => issueAt(6))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(count('issues'), 2)
+  assert.ok(view('issues')?.includes('revision-6'))
+})
+
+test('a committed read from an earlier connection generation cannot cover a late subscription', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  for (const visibility of ['hidden', 'visible']) await act(async () => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: visibility })
+    document.dispatchEvent(new browser.Event('visibilitychange') as unknown as Event)
+  })
+  assert.equal(sockets.length, 2)
+  replies.set('issues', async () => issueAt(6))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(count('issues'), 2)
+  assert.ok(view('issues')?.includes('revision-6'))
+})
+
+test('a replaced committed cache object cannot satisfy the pending live flush', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false); await renderObserved(true)
+  await act(async () => { await replaceObserved(issueAt(9)) })
+  replies.set('issues', async () => issueAt(10))
+  await settled()
+  assert.equal(count('issues'), 2, 'a different cache object needs one ordinary read, without a proof retry loop')
+  assert.ok(view('issues')?.includes('revision-10'))
+})
+
+test('a newer failed SWR read cannot resurrect an earlier committed provenance', async () => {
+  replies.set('issues', async () => issueAt(5))
+  await renderObserved(false, [], 'owner', undefined, undefined, true)
+  await renderObserved(true, [], 'owner', undefined, undefined, true)
+  const error = new Error('fixture latest read failed')
+  replies.set('issues', async () => { throw error })
+  await act(async () => { await refresh.issues!() })
+  assert.equal(cache.get(unstableSerialize(['observed-live-reader', 'owner']))?.error, error)
+  replies.set('issues', async () => issueAt(6))
+  await renderObserved(true, [team], 'owner', undefined, undefined, true); await settled()
+  assert.equal(count('issues'), 3)
+  assert.ok(view('issues')?.includes('revision-6'))
+})
+
+test('live catch-ups share an ordinary SWR read that starts after both scoped connections open', async () => {
+  const held = deferred<Read>(), next = deferred<Read>()
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false, [team, home])
+    assert.equal(sockets.filter(socket => socket.readyState === 1).length, 2)
+    await renderObserved(true, [team, home])
+    assert.equal(count('issues'), 1)
+    await wait()
+    assert.equal(count('issues'), 1, 'both catch-up obligations are covered by the same later in-flight read')
+    await act(async () => held.resolve(snapshot('issues'))); await wait()
+    assert.ok(view('issues')?.includes('owner:issues'))
+    replies.set('issues', () => next.promise)
+    await act(async () => { emit(team, 'issue_list'); emit(home, 'issue_list') }); await wait()
+    assert.equal(count('issues'), 2, 'a later unversioned event needs a new read; completed results are not reused')
+    await act(async () => next.resolve(issueAt(6))); await wait()
+    assert.ok(view('issues')?.includes('revision-6'))
+  } finally { await act(async () => { held.resolve(snapshot('issues')); next.resolve(issueAt(6)) }) }
+})
+
+test('a SWR read that starts before the live connection opens cannot consume its catch-up', async () => {
+  const held = deferred<Read>()
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(true); await wait()
+    assert.equal(count('issues'), 2, 'the connection gap still needs a later authoritative read')
+    await act(async () => held.resolve(snapshot('issues'))); await wait()
+    assert.ok(view('issues')?.includes('owner:issues'))
+  } finally { await act(async () => held.resolve(snapshot('issues'))) }
+})
+
+function issueAt(revision: number): Read {
+  const value = snapshot('issues')
+  return { ...value, items: [{ id: 'issues', title: `revision-${revision}` }], live: { ...value.live, revisions: { [`issue_list:${team}`]: revision, [`issue_list:${home}`]: revision } } }
+}
+
+for (const revision of [undefined, 6]) test(`a ${revision ? 'higher-revision' : 'new unversioned'} push during a shared SWR read still gets its trailing read`, async () => {
+  const held = deferred<Read>()
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false); await renderObserved(true); await wait()
+    assert.equal(count('issues'), 1)
+    await act(async () => {
+      sockets[0].message({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['issue_list'] })
+      sockets[0].message({ kind: 'issue_list', id: team, ...(revision ? { rev: revision } : {}) })
+    })
+    await wait(); assert.equal(count('issues'), 1, 'the notification remains pending behind the active read')
+    replies.set('issues', async () => issueAt(6))
+    await act(async () => held.resolve(issueAt(5))); await settled()
+    assert.equal(count('issues'), 2)
+    assert.ok(view('issues')?.includes('revision-6'))
+  } finally { await act(async () => held.resolve(issueAt(5))) }
+})
+
+test('a later-started SWR read must still prove every required revision before covering a live push', async () => {
+  const held = deferred<Read>()
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false)
+    await act(async () => {
+      sockets[0].message({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['issue_list'] })
+      sockets[0].message({ kind: 'issue_list', id: team, rev: 6 })
+    })
+    await renderObserved(true); await wait()
+    assert.equal(count('issues'), 1)
+    replies.set('issues', async () => issueAt(6))
+    await act(async () => held.resolve(issueAt(5))); await settled()
+    assert.equal(count('issues'), 2, 'a successful HTTP read without the required revision cannot satisfy the push')
+    assert.ok(view('issues')?.includes('revision-6'))
+  } finally { await act(async () => held.resolve(issueAt(5))) }
+})
+
+test('a SWR response discarded by an optimistic mutation cannot consume the live catch-up', async () => {
+  const held = deferred<Read>()
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false); await renderObserved(true); await wait()
+    await act(async () => { await replaceObserved({ ...issueAt(5), items: [{ id: 'issues', title: 'optimistic-local-value' }] }) })
+    replies.set('issues', async () => issueAt(6))
+    await act(async () => held.resolve(issueAt(5))); await settled()
+    assert.equal(count('issues'), 2, 'SWR ignored the HTTP result; the obligation still requires a committed read')
+    assert.ok(view('issues')?.includes('revision-6'))
+  } finally { await act(async () => held.resolve(issueAt(5))) }
+})
+
+test('a custom comparator retaining an older cache value cannot certify an unversioned live catch-up', async () => {
+  const held = deferred<Read>(), first = issueAt(6)
+  const compare: ReadCompare = (left, right) => Object.is(left, right) || left !== undefined && right === first
+  cache.set(unstableSerialize(['observed-live-reader', 'owner']), { data: issueAt(5) })
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false, [team], 'owner', compare)
+    await renderObserved(true, [team], 'owner', compare); await wait()
+    assert.equal(count('issues'), 1)
+    replies.set('issues', async () => issueAt(6))
+    await act(async () => held.resolve(first)); await settled()
+    assert.equal(count('issues'), 2, 'onSuccess and custom compare alone do not prove that the fresh result entered the cache')
+    assert.ok(view('issues')?.includes('revision-6'))
+  } finally { await act(async () => held.resolve(first)) }
+})
+
+test('a shared read cannot replace the revision held when the live obligation began with a lower revision', async () => {
+  const held = deferred<Read>()
+  cache.set(unstableSerialize(['observed-live-reader', 'owner']), { data: issueAt(9) })
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false); await renderObserved(true); await wait()
+    assert.equal(count('issues'), 1)
+    replies.set('issues', async () => issueAt(10))
+    await act(async () => held.resolve(issueAt(5))); await settled()
+    assert.equal(count('issues'), 2, 'post-commit revision 5 cannot erase the earlier revision 9 requirement')
+    assert.ok(view('issues')?.includes('revision-10'))
+  } finally { await act(async () => held.resolve(issueAt(5))) }
+})
+
+test('a completed read cannot erase the higher revision still held by the active live subscription', async () => {
+  replies.set('issues', async () => issueAt(9))
+  await renderObserved(false); await renderObserved(true); await settled()
+  assert.equal(count('issues'), 1)
+  await act(async () => emit(team, 'issue_list'))
+  replies.set('issues', async () => issueAt(5))
+  await act(async () => { await refresh.issues!() })
+  assert.equal(count('issues'), 2)
+  assert.ok(view('issues')?.includes('revision-5'), 'the actual SWR commit precedes the pending live flush')
+  replies.set('issues', async () => issueAt(10))
+  await settled()
+  assert.equal(count('issues'), 3, 'the subscription still requires revision 9 after cache commit 5')
+  assert.ok(view('issues')?.includes('revision-10'))
+})
+
+test('an original onSuccess exception remains a SWR error without a shared-read retry', async () => {
+  const held = deferred<Read>(), error = new Error('fixture success callback failed')
+  let callbacks = 0
+  const onSuccess = () => { callbacks++; throw error }
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false, [team], 'owner', undefined, onSuccess)
+    await renderObserved(true, [team], 'owner', undefined, onSuccess); await wait()
+    await act(async () => held.resolve(issueAt(6))); await settled()
+    assert.equal(count('issues'), 1, 'the observer must not retry an original SWR callback failure')
+    assert.equal(callbacks, 1)
+    assert.equal(cache.get(unstableSerialize(['observed-live-reader', 'owner']))?.error, error)
+  } finally { await act(async () => held.resolve(issueAt(6))) }
+})
+
+test('a discarded shared read cannot start another request after the page becomes hidden', async () => {
+  const held = deferred<Read>()
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false); await renderObserved(true); await wait()
+    await act(async () => {
+      await replaceObserved(issueAt(5))
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+      document.dispatchEvent(new browser.Event('visibilitychange') as unknown as Event)
+    })
+    replies.set('issues', async () => issueAt(6))
+    await act(async () => held.resolve(issueAt(5))); await settled()
+    assert.equal(count('issues'), 1, 'the retired visible interval cannot initiate a new HTTP read')
+    await act(async () => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+      document.dispatchEvent(new browser.Event('visibilitychange') as unknown as Event)
+    }); await settled()
+    assert.equal(count('issues'), 2, 'the existing visibility catch-up still performs the necessary fresh read')
+    assert.ok(view('issues')?.includes('revision-6'))
+  } finally { await act(async () => held.resolve(issueAt(5))) }
+})
+
+test('a newer SWR read replaces a shared observation without applying or re-reading the discarded result', async () => {
+  const first = deferred<Read>(), second = deferred<Read>()
+  replies.set('issues', () => first.promise)
+  let replacement: Promise<unknown> | undefined
+  try {
+    await renderObserved(false); await renderObserved(true); await wait()
+    replies.set('issues', () => second.promise)
+    await act(async () => { replacement = refresh.issues!() })
+    assert.equal(count('issues'), 2)
+    await act(async () => first.resolve(issueAt(5))); await wait()
+    assert.equal(view('issues'), 'loading', 'SWR discards the superseded result')
+    assert.equal(count('issues'), 2, 'the newer in-flight read itself covers the obligation')
+    await act(async () => { second.resolve(issueAt(6)); await replacement }); await wait()
+    assert.ok(view('issues')?.includes('revision-6'))
+    assert.equal(count('issues'), 2)
+  } finally { await act(async () => { first.resolve(issueAt(5)); second.resolve(issueAt(6)); await replacement }) }
+})
+
+test('an old cache error cannot be attributed to a superseded read or consume the replacement revision requirement', async () => {
+  const first = deferred<Read>(), second = deferred<Read>()
+  cache.set(unstableSerialize(['observed-live-reader', 'owner']), { data: issueAt(9), error: new Error('earlier read failed') })
+  replies.set('issues', () => first.promise)
+  let replacement: Promise<unknown> | undefined
+  try {
+    await renderObserved(false); await renderObserved(true); await wait()
+    replies.set('issues', () => second.promise)
+    await act(async () => { replacement = refresh.issues!() })
+    await act(async () => first.resolve(issueAt(5))); await wait()
+    assert.equal(count('issues'), 2)
+    replies.set('issues', async () => issueAt(10))
+    await act(async () => { second.resolve(issueAt(5)); await replacement }); await settled()
+    assert.equal(count('issues'), 3, 'the replacement must still cover revision 9; an unrelated old error is not its outcome')
+    assert.ok(view('issues')?.includes('revision-10'))
+  } finally { await act(async () => { first.resolve(issueAt(5)); second.resolve(issueAt(5)); await replacement }) }
+})
+
+test('a shared permission failure keeps SWR error handling and does not start another request', async () => {
+  const held = deferred<Read>(), error = new CacheReadError('workspaceAccessDenied')
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false); await renderObserved(true); await wait()
+    assert.equal(count('issues'), 1)
+    await act(async () => held.reject(error)); await settled()
+    assert.equal(count('issues'), 1)
+    assert.equal(view('issues'), 'unavailable')
+    assert.equal(cache.get(unstableSerialize(['observed-live-reader', 'owner']))?.error, error)
+  } finally { await act(async () => held.resolve(snapshot('issues'))) }
+})
+
+test('retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope', async () => {
+  const held = deferred<Read>(), oldCache = cache
+  replies.set('issues', () => held.promise)
+  try {
+    await renderObserved(false); await renderObserved(true); await wait()
+    // Force the old SWR result to be discarded before its provider departs.
+    await act(async () => { await replaceObserved(issueAt(5)) })
+    cache = new Map()
+    replies.set('issues', async () => snapshot('issues', 'next-owner', otherHome))
+    await renderObserved(true, [otherTeam], 'next-owner'); await settled()
+    const before = count('issues')
+    await act(async () => held.resolve(snapshot('issues'))); await settled()
+    assert.equal(count('issues'), before, 'the retired obligation cannot initiate a new request')
+    assert.ok(view('issues')?.includes('next-owner:issues'))
+    assert.equal(cache.has(unstableSerialize(['observed-live-reader', 'owner'])), false)
+    assert.equal(cache.get(unstableSerialize(['observed-live-reader', 'next-owner']))?.data.live.ownerId, 'next-owner')
+    assert.notEqual(cache, oldCache)
+  } finally { await act(async () => held.resolve(snapshot('issues'))) }
+})
+
+for (const ownedHome of [home, team]) test(`resolving the issue home ${ownedHome === team ? 'equal to' : 'different from'} the selected workspace preserves its live subscription`, async () => {
+  const held = deferred<Read>()
+  const value = snapshot('issues', 'owner', ownedHome)
+  replies.set('issues', () => held.promise)
+  try {
+    await render(['issues']); await settled()
+    const selected = sockets.find(socket => socket.url.endsWith(team))!
+    assert.ok(selected)
+    assert.equal(selected.readyState, 1)
+    const before = count('issues')
+    replies.set('issues', async () => value)
+    await act(async () => held.resolve(value)); await settled()
+    assert.equal(selected.readyState, 1, 'discovering the home must not close the selected workspace channel')
+    assert.deepEqual(tickets, ownedHome === team ? [team] : [team, home])
+    assert.equal(count('issues'), before + Number(ownedHome !== team), 'only a newly discovered distinct home needs its initial catch-up')
+    assert.ok(view('issues')?.includes('owner:issues'))
+  } finally { held.resolve(value) }
+})
+
+test('an unresolved issue home retains disconnected fallback even when its selected workspace channel is healthy', async () => {
+  replies.set('issues', async () => snapshot('issues', 'owner', null))
+  await render(['issues']); await settled()
+  assert.deepEqual(tickets, [team], 'an unresolved home must never guess another ticket scope')
+  assert.equal(sockets[0].readyState, 1)
+  assert.equal(liveKeyConnection(cache, unstableSerialize(['issues', 'owner', team])), false, 'selected-workspace coverage alone cannot suppress the unresolved owner-wide fallback')
+  assert.ok(view('issues')?.includes('owner:issues'))
+})
+
+test('real thread hooks require a current presence acknowledgement, update its proof and unregister on exit', async () => {
+  let presence: PresenceProof = { token: `initial.${'a'.repeat(64)}`, expiresAt: Date.now() + 300_000 }
+  replies.set('threads', async () => { const value = snapshot('threads'); return { ...value, presenceFallback: true, live: { ...value.live, presence } } })
+  await render(['threads', 'bots']); await settled()
+  const key = unstableSerialize(['threads', 'owner']), socket = sockets.find(value => value.url.endsWith(home))!
+  assert.equal(liveKeyConnection(cache, key), false)
+  const before = { reads: count('threads'), tickets: tickets.length, sockets: sockets.length }
+  await act(async () => socket.message({ type: 'presence_ready', version: 1 }))
+  assert.equal(socket.sent.length, 1)
+  assert.equal(liveKeyConnection(cache, key), false, 'support does not acknowledge this subscription')
+  const previous = socket.sent[0].id
+  await act(async () => socket.message({ type: 'presence_ack', id: previous, expiresAt: presence.expiresAt }))
+  assert.equal(liveKeyConnection(cache, key), true)
+  presence = { token: `updated.${'b'.repeat(64)}`, expiresAt: Date.now() + 300_000 }
+  await act(async () => { await refresh.threads!() })
+  assert.deepEqual(socket.sent.map(value => value.type), ['presence_watch', 'presence_unwatch', 'presence_watch'])
+  assert.equal(liveKeyConnection(cache, key), false)
+  await act(async () => socket.message({ type: 'presence_ack', id: previous, expiresAt: presence.expiresAt }))
+  assert.equal(liveKeyConnection(cache, key), false, 'the prior proof cannot acknowledge the current read')
+  await act(async () => socket.message({ type: 'presence_ack', id: socket.sent.at(-1)!.id, expiresAt: presence.expiresAt }))
+  assert.equal(liveKeyConnection(cache, key), true)
+  assert.equal(count('threads'), before.reads + 1, 'only the explicit read ran; watch control does not read')
+  assert.equal(tickets.length, before.tickets); assert.equal(sockets.length, before.sockets)
+  await render(['bots']); await wait()
+  assert.equal(socket.sent.at(-1)!.type, 'presence_unwatch')
+  assert.equal(socket.readyState, 1, 'the other list still owns this home socket')
+})
+
+test('an older server presence fallback flag remains uncovered on a healthy new live transport', async () => {
+  replies.set('threads', async () => ({ ...snapshot('threads'), presenceFallback: true }))
+  await render(['threads']); await settled()
+  const socket = sockets.find(value => value.url.endsWith(home))!, key = unstableSerialize(['threads', 'owner'])
+  await act(async () => socket.message({ type: 'presence_ready', version: 1 }))
+  assert.equal(liveKeyConnection(cache, key), false)
+  assert.deepEqual(socket.sent, [])
+})
+
+test('three acknowledged presence tabs still share one authorized read for the same device-state push', { timeout: 10_000 }, async () => {
+  const scoped = [0, 1, 2].map(() => new PersistentReadCache({ userId: 'owner', workspaceId: team, build: 'presence-fixture', role: 'member' }))
+  await Promise.all(scoped.map(value => value.hydrate(async () => undefined)))
+  const presence = { token: `shared.${'c'.repeat(64)}`, expiresAt: Date.now() + 300_000 }
+  replies.set('threads', async () => { const value = snapshot('threads'); return { ...value, presenceFallback: true, live: { ...value.live, presence } } })
+  await act(async () => root.render(<>{scoped.map((provider, index) => <SWRConfig key={index} value={{ provider: () => provider, dedupingInterval: 0 }}>
+    <LiveProvider ownerId="owner" workspaceId={team}><Threads owner="owner" /></LiveProvider>
+  </SWRConfig>)}</>))
+  await settled(); await wait(2_100)
+  await act(async () => {
+    for (const socket of sockets) {
+      socket.message({ type: 'presence_ready', version: 1 })
+      socket.message({ type: 'presence_ack', id: socket.sent.at(-1)!.id, expiresAt: presence.expiresAt })
+    }
+  })
+  const before = count('threads'), key = unstableSerialize(['threads', 'owner'])
+  assert.ok(scoped.every(provider => liveKeyConnection(provider, key) === true))
+  await act(async () => emit(home, 'thread_list')); await settled()
+  assert.equal(count('threads'), before + 1)
+  assert.ok(scoped.every(provider => liveKeyConnection(provider, key) === true))
+  assert.ok(sockets.every(socket => socket.sent.length === 1), 'the shared unchanged proof does not re-register')
+})
 
 for (const kind of ['issues', 'threads'] as const) test(`a restored ${kind} snapshot sends its existing row proofs and removes rows absent from the authorized delta`, async () => {
   const kept = '30000000-0000-4000-8000-000000000001', removed = '30000000-0000-4000-8000-000000000002'
@@ -203,6 +645,42 @@ test('real list hooks update held revisions after an asynchronous read without l
   assert.equal(tickets.length, before.tickets)
   assert.equal(sockets.length, before.sockets)
   assert.equal(liveKeyConnection(cache, issueKey), true)
+})
+
+test('real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes', { timeout: 15_000 }, async () => {
+  const scoped = [0, 1, 2].map(() => new PersistentReadCache({ userId: 'owner', workspaceId: team, build: 'fixture', role: 'member' }))
+  await Promise.all(scoped.map(value => value.hydrate(async () => undefined)))
+  const snapshotAt = (revision: number): Read => {
+    const value = snapshot('bots')
+    return { ...value, items: [{ id: 'bots', title: `revision-${revision}` }], live: { ...value.live, revisions: { [`bot_chat_list:${home}`]: revision } } }
+  }
+  replies.set('bots', async () => snapshotAt(5))
+  await act(async () => root.render(<>{scoped.map((provider, index) => <SWRConfig key={index} value={{ provider: () => provider, dedupingInterval: 0 }}>
+    <LiveProvider ownerId="owner" workspaceId={team}><div data-tab={index}><Bots owner="owner" /></div></LiveProvider>
+  </SWRConfig>)}</>))
+  await settled(); await wait(2_100)
+  assert.equal(sockets.length, 3)
+  for (const socket of sockets) socket.message({ type: 'live_ready', version: 2, kinds: LIVE_KINDS, revisions: ['bot_chat_list'] })
+  const held = deferred<Read>()
+  const before = count('bots')
+  replies.set('bots', () => held.promise)
+  try {
+    await act(async () => sockets[0].message({ kind: 'bot_chat_list', id: home })); await wait()
+    assert.equal(count('bots'), before + 1, 'the first tab is reading a snapshot captured before revision 6')
+    replies.set('bots', async () => snapshotAt(6))
+    await act(async () => { for (const socket of sockets) socket.message({ kind: 'bot_chat_list', id: home, rev: 6 }) }); await wait()
+    assert.equal(count('bots'), before + 1, 'the other tabs join the outstanding claim')
+    await act(async () => held.resolve(snapshotAt(5))); await settled(); await wait(2_100)
+    for (const index of [0, 1, 2]) assert.ok(container.querySelector(`[data-tab="${index}"]`)?.textContent?.includes('revision-6'), 'the newer push must reach every tab without another push or reconnect')
+    assert.equal(count('bots'), before + 2, 'old read + one fresh read, including the paced leader trailing read')
+
+    await wait(2_100)
+    replies.set('bots', async () => snapshotAt(7))
+    const fresh = count('bots')
+    await act(async () => { for (const socket of sockets) socket.message({ kind: 'bot_chat_list', id: home, rev: 7 }) }); await settled()
+    assert.equal(count('bots'), fresh + 1, 'matching pushes still coalesce across real providers')
+    for (const index of [0, 1, 2]) assert.ok(container.querySelector(`[data-tab="${index}"]`)?.textContent?.includes('revision-7'))
+  } finally { held.resolve(snapshotAt(5)) }
 })
 
 test('healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list', { timeout: 80_000 }, async () => {

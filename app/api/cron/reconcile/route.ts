@@ -12,7 +12,7 @@ const headers = { 'cache-control': 'no-store' }
 /**
  * The single safety-net sweep (#1371), called every 15 minutes by the minute
  * Worker. Coordinator wakes, schedules, run recovery, account deletion and
- * audit retention start from their writes and their durable timers; this recovers only work already due that none of
+ * audit retention and push receipts start from their writes and their durable timers; this recovers only work already due that none of
  * them picked up (a start lost between COMMIT and its wake, a timer that
  * failed). Worst case, such work runs 15 minutes after its due time. An idle
  * call costs two statements: one on the main database, one on the workspace
@@ -47,6 +47,7 @@ async function handleGET(request: Request) {
       counts.recoveryCounts = await (await import('@/lib/run-recovery')).recoverRuns(work => afterJob('cron:reconcile/group-turns', work))
       await armDueTimer('run-recovery')
     }
+    if (due.pushReceipts) counts.pushReceiptCounts = await (await import('@/lib/mobile-push-delivery')).recoverPhonePushReceipts()
     return Response.json(counts, { headers })
   }
   catch { return Response.json({ error: 'reconcileFailed' }, { status: 502, headers }) }

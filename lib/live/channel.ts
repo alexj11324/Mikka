@@ -1,10 +1,14 @@
 import { liveInvalidation, liveReadiness, LIVE_ID, LIVE_REVISION_PARAM, type LiveKind } from './events'
+import { liveRevisionKey, type LiveRevisions } from './revisions'
+import { LIVE_PRESENCE_PARAM, PRESENCE_MAX_TOKEN_BYTES, PRESENCE_MAX_WATCHES_PER_SOCKET, presenceReply, type PresenceCommand, type PresenceProof } from './presence'
+import { readBoundary } from '../swr/read-observer'
 
 export const LIVE_FALLBACK_MS = 60_000
 const HEARTBEAT_MS = 30_000
 type Timer = unknown
 export type LiveTicket = { url: string; protocol: string; expiresAt: number }
 export type LiveSocket = Pick<WebSocket, 'onopen' | 'onmessage' | 'onclose' | 'onerror' | 'readyState' | 'send' | 'close'>
+export type LiveObservation = { event: 'socket' | 'received' | 'skipped' | 'read'; state?: 'connecting' | 'open' | 'ready' | 'closed'; reason?: 'hidden' | 'revision_held' | 'unsubscribed' | 'covered' | 'invalid'; kind?: LiveKind; id?: string; rev?: number; key?: string }
 export interface LiveRuntime {
   ticket(signal: AbortSignal): Promise<LiveTicket | null>
   socket(ticket: LiveTicket): LiveSocket
@@ -15,6 +19,8 @@ export interface LiveRuntime {
   monotonicNow?(): number
   later(callback: () => void, milliseconds: number): Timer
   cancel(timer: Timer): void
+  /** Optional metadata-only observer. It must never change transport behavior. */
+  observe?(observation: LiveObservation): void
 }
 export type LiveSubscriptionOptions = {
   /** Minimum spacing for changes, never for reconnect/visibility catch-up. */ minIntervalMs?: number
@@ -23,11 +29,16 @@ export type LiveSubscriptionOptions = {
   /** Per SWR key: this entity's revision its current data was read at (read
    * before the data, lib/live/revisions.ts). A push at or below it skips that
    * key's read; a missing or unknown revision always reads. */ revisions?: Readonly<Record<string, number | null | undefined>> | null
+  /** A device-dependent read keeps fallback until this exact watch is acknowledged.
+   * Null means required but unavailable; absent means no presence dependency. */ presence?: PresenceProof | null
 }
 export type LiveSubscription = (() => void) & { update(options: LiveSubscriptionOptions): void }
-type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: (key: string) => unknown; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string; revisions: Map<string, number> }
-/** `waits: null` reads unconditionally; otherwise the read is skipped once every listed revision is held. */
-type PendingRead = { refresh: Subscription['refresh']; at: number; waits: { subscription: Subscription; key: string; rev: number }[] | null }
+/** Shared reads cover every known revision; only fully versioned pushes may reuse a completed result. */
+export type LiveRefresh = (key: string, requiredRevisions?: Readonly<LiveRevisions>, reuseCompleted?: boolean, after?: number) => unknown
+type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: LiveRefresh; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; deadlineObservation: number | null; timer: string; revisions: Map<string, number>; presence: PresenceProof | null | undefined }
+type PresenceWatch = { id: string; proof: PresenceProof; coveredUntil: number | null; unavailable: boolean }
+/** An unversioned event always reads, while retaining any known revisions merged into that read. */
+type PendingRead = { at: number; after: number; unconditional: boolean; waits: { subscription: Subscription; key: string; rev: number }[] }
 const heldRevisions = (value: LiveSubscriptionOptions['revisions']) => new Map(Object.entries(value ?? {})
   .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isSafeInteger(entry[1]) && entry[1] > 0))
 
@@ -39,8 +50,14 @@ export class LiveChannel {
   private unwatch: (() => void) | null = null
   private generation = 0
   private connected = false
+  /** Continuous coverage starts at this generation's capability acknowledgement.
+   * Every valid push advances it, including keys not yet subscribed here. */
+  private coverageAfter: number | null = null
   private capabilities = new Set<LiveKind>()
   private revisionKinds = new Set<LiveKind>()
+  private presenceSupported = false
+  private presenceWatches = new Map<string, PresenceWatch>()
+  private nextPresence = 0
   /** Reads a push did not need because the key's data already held its revision. */
   skippedReads = 0
   private retryMs = 1_000
@@ -54,10 +71,14 @@ export class LiveChannel {
 
   constructor(private runtime: LiveRuntime) {}
 
+  private observe(observation: LiveObservation) {
+    try { this.runtime.observe?.(observation) } catch { /* analytics never changes a read */ }
+  }
+
   keyConnected(key: string): boolean | undefined {
     const subscriptions = [...this.subscriptions].filter(subscription => subscription.keys.includes(key))
     if (!subscriptions.length) return undefined
-    return this.connected && subscriptions.every(subscription => this.capabilities.has(subscription.kind))
+    return this.connected && subscriptions.every(subscription => this.supported(subscription))
   }
 
   subscribe(kind: LiveKind, id: string, keys: readonly string[], refresh: Subscription['refresh'], options: LiveSubscriptionOptions = {}): LiveSubscription {
@@ -66,18 +87,21 @@ export class LiveChannel {
       deadlineAt: options.deadline && Number.isFinite(options.deadline.afterMs) ? this.localNow() + Math.max(0, options.deadline.afterMs) : null,
       deadlineKey: options.deadline?.at ?? null,
       deadlineObservation: Number.isFinite(options.deadline?.observation) ? options.deadline!.observation! : null,
-      timer: `deadline:${++this.nextDeadline}`, revisions: heldRevisions(options.revisions) }
+      timer: `deadline:${++this.nextDeadline}`, revisions: heldRevisions(options.revisions), presence: options.presence }
     this.subscriptions.add(subscription)
     if (this.subscriptions.size === 1) {
       this.unwatch = this.runtime.watchVisibility(() => this.visibilityChanged())
       if (this.runtime.visible()) { this.fallback(); void this.connect() }
     }
-    if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true)
+    if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true, false, undefined,
+      this.supported(subscription) ? this.coverageAfter ?? undefined : undefined)
+    this.syncPresence()
     this.fallback()
     this.scheduleDeadline(subscription)
     const stop = () => {
       this.subscriptions.delete(subscription)
       this.clear(subscription.timer)
+      this.syncPresence()
       if (this.allSupported()) this.clear('fallback')
       if (!this.subscriptions.size) this.dispose()
       else for (const key of keys) {
@@ -88,6 +112,9 @@ export class LiveChannel {
     return Object.assign(stop, { update: (next: LiveSubscriptionOptions) => {
       if (!this.subscriptions.has(subscription)) return
       subscription.minIntervalMs = Math.max(0, next.minIntervalMs ?? 0)
+      subscription.presence = next.presence
+      this.syncPresence()
+      if (this.allSupported()) this.clear('fallback'); else this.fallback()
       // A revision only moves forward: an older response cannot reopen a covered push.
       for (const [key, rev] of heldRevisions(next.revisions)) if (rev > (subscription.revisions.get(key) ?? 0)) subscription.revisions.set(key, rev)
       const key = next.deadline?.at ?? null
@@ -131,13 +158,18 @@ export class LiveChannel {
 
   private closeSocket() {
     this.connected = false
+    this.coverageAfter = null
     this.capabilities.clear(); this.revisionKinds.clear()
+    this.presenceSupported = false
+    for (const watch of this.presenceWatches.values()) this.clear(`presence:${watch.id}`)
+    this.presenceWatches.clear()
     this.controller?.abort()
     this.controller = null
     this.clear('heartbeat'); this.clear('renew')
     const socket = this.socket
     this.socket = null
     if (socket) {
+      this.observe({ event: 'socket', state: 'closed' })
       socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null
       try { socket.close() } catch { /* the connection may already be closed */ }
     }
@@ -174,19 +206,19 @@ export class LiveChannel {
     })
   }
 
-  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number) {
-    if (!this.runtime.visible()) return
+  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number, after = readBoundary()) {
+    if (!this.runtime.visible()) { this.observe({ event: 'skipped', reason: 'hidden', kind, id, rev }); return }
     for (const subscription of this.subscriptions) {
       if (kind && (subscription.kind !== kind || subscription.id !== id)) continue
-      if (unsupportedOnly && this.connected && this.capabilities.has(subscription.kind)) continue
+      if (unsupportedOnly && this.connected && this.supported(subscription)) continue
       for (const key of subscription.keys) {
         // A duplicate push, or the echo of this tab's own write, is already shown.
-        if (rev !== undefined && (subscription.revisions.get(key) ?? 0) >= rev) { this.skippedReads++; continue }
+        if (rev !== undefined && (subscription.revisions.get(key) ?? 0) >= rev) { this.skippedReads++; this.observe({ event: 'skipped', reason: 'revision_held', kind: subscription.kind, id: subscription.id, rev, key }); continue }
         const at = kind && !immediate ? Math.max(this.localNow(), (this.lastRead.get(key) ?? -Infinity) + subscription.minIntervalMs) : this.localNow()
         const previous = this.pending.get(key)
-        const wait = rev === undefined ? null : [{ subscription, key, rev }]
-        const waits = !wait || (previous && !previous.waits) ? null : [...previous?.waits ?? [], ...wait]
-        this.pending.set(key, { refresh: subscription.refresh, at: Math.min(at, previous?.at ?? Infinity), waits })
+        const waits = [...previous?.waits ?? [], ...rev === undefined ? [] : [{ subscription, key, rev }]]
+        this.pending.set(key, { at: Math.min(at, previous?.at ?? Infinity), after: Math.max(after, previous?.after ?? after),
+          unconditional: rev === undefined || previous?.unconditional === true, waits })
       }
     }
     this.scheduleFlush()
@@ -194,7 +226,7 @@ export class LiveChannel {
 
   /** Every push behind this read is covered by data that arrived meanwhile. */
   private covered(read: PendingRead) {
-    return read.waits !== null && read.waits.every(({ subscription, key, rev }) => (subscription.revisions.get(key) ?? 0) >= rev)
+    return !read.unconditional && read.waits.every(({ subscription, key, rev }) => (subscription.revisions.get(key) ?? 0) >= rev)
   }
 
   private scheduleFlush() {
@@ -209,30 +241,115 @@ export class LiveChannel {
 
   private flush() {
     if (!this.runtime.visible()) return
-    const activeKeys = new Set([...this.subscriptions].flatMap(value => [...value.keys]))
     for (const [key, read] of this.pending) {
-      const { refresh, at } = read
-      if (!activeKeys.has(key)) { this.pending.delete(key); continue }
-      if (this.covered(read)) { this.pending.delete(key); this.skippedReads++; continue }
+      const { at } = read
+      // A key can outlive one of its consumers (e.g. the native badge and its
+      // Board). Never let a departed consumer's refresh discard the obligation.
+      const entity = [...this.subscriptions].find(subscription => subscription.keys.includes(key))
+      if (!entity) { this.pending.delete(key); this.observe({ event: 'skipped', reason: 'unsubscribed', key }); continue }
+      if (this.covered(read)) { this.pending.delete(key); this.skippedReads++; this.observe({ event: 'skipped', reason: 'covered', key }); continue }
       if (this.inFlight.has(key) || at > this.localNow()) continue
       this.pending.delete(key)
       this.lastRead.set(key, this.localNow())
       const request = Symbol()
       this.inFlight.set(key, request)
+      this.observe({ event: 'read', key, kind: entity.kind, id: entity.id })
       const settled = () => {
         if (this.inFlight.get(key) !== request) return
         this.inFlight.delete(key)
         // A notification during a read is still dirty: deliver one trailing read.
         this.scheduleFlush()
       }
-      try { Promise.resolve(refresh(key)).catch(() => {}).finally(settled) }
+      // A completed SWR read can precede this flush. Preserve every active
+      // consumer's higher revision even if that read replaced the cache first.
+      const held = [...this.subscriptions].flatMap(subscription => {
+        const rev = subscription.revisions.get(key)
+        return subscription.keys.includes(key) && rev !== undefined ? [{ subscription, rev }] : []
+      })
+      const requirements = [...read.waits, ...held]
+      const required = requirements.length ? requirements.reduce<LiveRevisions>((revisions, { subscription, rev }) => {
+        const ref = liveRevisionKey(subscription.kind, subscription.id.toLowerCase())
+        revisions[ref] = Math.max(revisions[ref] ?? 0, rev)
+        return revisions
+      }, {}) : undefined
+      try { Promise.resolve(entity.refresh(key, required, !read.unconditional, read.after)).catch(() => {}).finally(settled) }
       catch { settled() } // SWR owns read errors.
     }
     this.scheduleFlush()
   }
 
   private allSupported() {
-    return this.connected && [...this.subscriptions].every(subscription => this.capabilities.has(subscription.kind))
+    return this.connected && [...this.subscriptions].every(subscription => this.supported(subscription))
+  }
+
+  private supported(subscription: Subscription) {
+    if (!this.capabilities.has(subscription.kind)) return false
+    if (subscription.presence === undefined) return true
+    const watch = subscription.presence && this.presenceWatches.get(subscription.presence.token)
+    return this.presenceSupported && !!watch && !watch.unavailable && watch.coveredUntil !== null && watch.coveredUntil > this.localNow()
+  }
+
+  private sendPresence(command: PresenceCommand) {
+    if (!this.socket || !this.connected) return false
+    try { this.socket.send(JSON.stringify(command)); return true }
+    catch { this.disconnected(this.generation); return false }
+  }
+
+  /** The real mounted subscriptions own these watches. Equal proofs share one
+   * registration; changing data does not force a read or a ticket renewal. */
+  private syncPresence() {
+    if (!this.connected || !this.presenceSupported || !this.runtime.visible()) return
+    const wanted = new Map<string, PresenceProof>()
+    for (const { presence } of this.subscriptions) {
+      if (!presence || typeof presence.token !== 'string' || presence.token.length > PRESENCE_MAX_TOKEN_BYTES
+        || !/^[A-Za-z0-9_-]+\.[a-f0-9]{64}$/.test(presence.token) || !Number.isSafeInteger(presence.expiresAt) || presence.expiresAt <= this.runtime.now()) continue
+      wanted.set(presence.token, presence)
+    }
+    for (const [token, watch] of this.presenceWatches) if (!wanted.has(token)) {
+      this.presenceWatches.delete(token)
+      this.clear(`presence:${watch.id}`)
+      if (!this.sendPresence({ type: 'presence_unwatch', id: watch.id })) return
+    }
+    for (const [token, proof] of wanted) {
+      if (this.presenceWatches.has(token) || this.presenceWatches.size >= PRESENCE_MAX_WATCHES_PER_SOCKET) continue
+      const watch: PresenceWatch = { id: `p${++this.nextPresence}`, proof, coveredUntil: null, unavailable: false }
+      this.presenceWatches.set(token, watch)
+      // Expiry only marks this watch uncovered. The existing fallback and
+      // ticket lifecycle own future reads; no new renewal/read timer is added.
+      this.expirePresence(watch, proof.expiresAt)
+      if (!this.sendPresence({ type: 'presence_watch', id: watch.id, token })) return
+    }
+  }
+
+  private expirePresence(watch: PresenceWatch, expiresAt: number) {
+    this.later(`presence:${watch.id}`, Math.max(0, expiresAt - this.runtime.now()), () => {
+      if (this.presenceWatches.get(watch.proof.token) !== watch) return
+      watch.coveredUntil = null; watch.unavailable = true
+      this.sendPresence({ type: 'presence_unwatch', id: watch.id })
+      this.fallback()
+    })
+  }
+
+  private receivePresence(value: unknown) {
+    const reply = presenceReply(value)
+    if (!reply) return false
+    if (reply.type === 'presence_ready') {
+      this.presenceSupported = true
+      this.syncPresence()
+    } else {
+      const watch = [...this.presenceWatches.values()].find(item => item.id === reply.id)
+      if (!this.presenceSupported || !watch) return true
+      if (reply.type === 'presence_unavailable') {
+        watch.coveredUntil = null; watch.unavailable = true
+        this.clear(`presence:${watch.id}`)
+      } else if (!watch.unavailable && reply.expiresAt > this.runtime.now() && reply.expiresAt <= watch.proof.expiresAt) {
+        watch.coveredUntil = this.localNow() + reply.expiresAt - this.runtime.now()
+        this.coverageAfter = readBoundary()
+        this.expirePresence(watch, reply.expiresAt)
+      }
+    }
+    if (this.allSupported()) this.clear('fallback'); else this.fallback()
+    return true
   }
 
   private fallback() {
@@ -265,6 +382,7 @@ export class LiveChannel {
     this.clear('retry')
     const generation = ++this.generation
     const controller = this.controller = new AbortController()
+    this.observe({ event: 'socket', state: 'connecting' })
     try {
       const ticket = await this.runtime.ticket(controller.signal)
       if (generation !== this.generation || !this.runtime.visible()) return
@@ -272,10 +390,12 @@ export class LiveChannel {
       // Ask for revisions. An older Worker ignores the parameter and answers version 1.
       const url = new URL(ticket.url)
       url.searchParams.set(LIVE_REVISION_PARAM, '1')
+      url.searchParams.set(LIVE_PRESENCE_PARAM, '1')
       const socket = this.socket = this.runtime.socket({ ...ticket, url: url.href })
       socket.onopen = () => {
         if (generation !== this.generation) return
         this.connected = true; this.retryMs = 1_000; this.pong = true
+        this.observe({ event: 'socket', state: 'open' })
         // An open socket/pong is not evidence that this Worker supports a new kind.
         this.fallback()
         this.invalidate() // Covers changes committed while the connection was opening.
@@ -288,8 +408,11 @@ export class LiveChannel {
         if (typeof message.data !== 'string' || message.data.length > 2_048) return
         try {
           const parsed: unknown = JSON.parse(message.data)
+          if (this.receivePresence(parsed)) return
           const readiness = liveReadiness(parsed)
           if (readiness) {
+            this.observe({ event: 'socket', state: 'ready' })
+            this.coverageAfter = readBoundary()
             this.capabilities = new Set(readiness.kinds)
             this.revisionKinds = new Set(readiness.revisions)
             if (this.allSupported()) this.clear('fallback'); else this.fallback()
@@ -297,7 +420,11 @@ export class LiveChannel {
           }
           if (message.data.length > 256) return
           const value = liveInvalidation(parsed, this.revisionKinds.size > 0)
-          if (value) this.invalidate(value.kind, value.id, false, false, value.rev !== undefined && this.revisionKinds.has(value.kind) ? value.rev : undefined)
+          if (value) {
+            this.observe({ event: 'received', kind: value.kind, id: value.id, rev: value.rev })
+            const after = this.coverageAfter = readBoundary()
+            this.invalidate(value.kind, value.id, false, false, value.rev !== undefined && this.revisionKinds.has(value.kind) ? value.rev : undefined, after)
+          } else this.observe({ event: 'skipped', reason: 'invalid' })
         } catch { /* malformed keys/capabilities cannot trigger reads or disable fallback */ }
       }
       socket.onclose = socket.onerror = () => this.disconnected(generation)

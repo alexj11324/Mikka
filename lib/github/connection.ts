@@ -8,6 +8,8 @@ import { githubConnections } from '@/lib/db/schema'
 import { auth } from '@/lib/auth'
 import { resolveAppOrigin } from '@/lib/auth-config'
 import { withBasePath } from '@/lib/base-path'
+import { readGitHubAppConfig } from './app-config'
+import { GitHubAccessError } from './user-access-error'
 
 // Plugins → GitHub connects a GitHub account for repository access without
 // touching the Better Auth login identity. It reuses the GitHub App's callback
@@ -32,14 +34,22 @@ function callbackURL() {
   return new URL(GITHUB_CALLBACK_PATH, base).toString()
 }
 
-export function githubConnectConfigured() {
-  return Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET && callbackBase())
+export async function githubConnectConfigured() {
+  const config = await readGitHubAppConfig()
+  return Boolean(config.clientId && config.clientSecret && callbackBase())
 }
 
-export function startGitHubConnect(userId: string) {
+async function connectionClient() {
+  const config = await readGitHubAppConfig()
+  if (!config.clientId || !config.clientSecret) throw new GitHubAccessError('githubNotConfigured', 503)
+  return { clientId: config.clientId, clientSecret: config.clientSecret }
+}
+
+export async function startGitHubConnect(userId: string) {
+  const { clientId } = await connectionClient()
   const state = `ghc_${randomBytes(32).toString('base64url')}`
   const url = new URL('https://github.com/login/oauth/authorize')
-  url.search = new URLSearchParams({ client_id: process.env.GITHUB_CLIENT_ID!, redirect_uri: callbackURL(), state, allow_signup: 'false' }).toString()
+  url.search = new URLSearchParams({ client_id: clientId, redirect_uri: callbackURL(), state, allow_signup: 'false' }).toString()
   return {
     url: url.toString(),
     cookie: { name: GITHUB_CONNECT_COOKIE, value: `${state}.${userId}`, options: { httpOnly: true, sameSite: 'lax' as const, secure: callbackURL().startsWith('https:'), path: GITHUB_CALLBACK_PATH, maxAge: STATE_TTL_SECONDS } },
@@ -51,9 +61,10 @@ export function startGitHubConnect(userId: string) {
  * own state, and PKCE with S256, which GitHub supports for GitHub App user
  * authorization ("strongly recommended", plain is not supported).
  */
-export function githubAuthorizeURL(state: string, codeChallenge: string) {
+export async function githubAuthorizeURL(state: string, codeChallenge: string) {
+  const { clientId } = await connectionClient()
   const url = new URL('https://github.com/login/oauth/authorize')
-  url.search = new URLSearchParams({ client_id: process.env.GITHUB_CLIENT_ID!, redirect_uri: callbackURL(), state, allow_signup: 'false', code_challenge: codeChallenge, code_challenge_method: 'S256' }).toString()
+  url.search = new URLSearchParams({ client_id: clientId, redirect_uri: callbackURL(), state, allow_signup: 'false', code_challenge: codeChallenge, code_challenge_method: 'S256' }).toString()
   return url.toString()
 }
 
@@ -68,10 +79,11 @@ export function githubConnectUser(state: string | null, cookie: string | undefin
 }
 
 async function postToken(params: Record<string, string>): Promise<TokenResponse> {
+  const { clientId, clientSecret } = await connectionClient()
   const response = await fetch('https://github.com/login/oauth/access_token', {
     method: 'POST', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(10_000),
     headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'Mikka' },
-    body: new URLSearchParams({ client_id: process.env.GITHUB_CLIENT_ID!, client_secret: process.env.GITHUB_CLIENT_SECRET!, ...params }),
+    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, ...params }),
   })
   const body = await response.json().catch(() => null) as Partial<TokenResponse> | null
   if (!response.ok || typeof body?.access_token !== 'string' || !body.access_token) throw new Error('GitHub token exchange failed')

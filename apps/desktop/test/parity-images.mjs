@@ -6,6 +6,9 @@ import { writeFile } from 'node:fs/promises'
 const require = createRequire(import.meta.url)
 const sharp = createRequire(require.resolve('next/package.json'))('sharp')
 const DYNAMIC = ['[data-slot="bot-avatar"]', '[data-slot="avatar"]', 'time']
+/** Parts only the bundled app has (the server row and Settings › 服务器, #1557).
+ * The hosted renderer cannot show them, so both captures leave them out. */
+export const DESKTOP_ONLY = '[data-desktop-only]'
 
 /** Only documented changing avatars and timestamps are masked. Keep their
  * rectangles as evidence and require the geometry to match between builds. */
@@ -29,7 +32,7 @@ export async function screenshot(page, path, { identities = [] } = {}) {
     if (!box.width || !box.height || box.right <= 0 || box.bottom <= 0 || box.left >= innerWidth || box.top >= innerHeight || getComputedStyle(element).visibility === 'hidden') return []
     return [{ kind: 'identity', x: box.x, y: box.y, width: box.width, height: box.height }]
   })))
-  const bytes = await page.screenshot({ path, animations: 'disabled', caret: 'hide', mask: [...DYNAMIC.map(selector => page.locator(`${selector}:visible`)), ...identityMasks], maskColor: '#808080', scale: 'css' })
+  const bytes = await page.screenshot({ path, animations: 'disabled', caret: 'hide', mask: [...DYNAMIC.map(selector => page.locator(`${selector}:visible`)), ...identityMasks], maskColor: '#808080', scale: 'css', style: `${DESKTOP_ONLY} { display: none !important; }` })
   return { bytes, masks }
 }
 
@@ -62,7 +65,7 @@ export async function compareImages(before, after, differencePath, { maximumRati
   await sharp(diff, { raw: { width: a.info.width, height: a.info.height, channels: 4 } }).png().toFile(differencePath)
   const geometryMatches = JSON.stringify(before.masks.filter(mask => mask.kind !== 'identity')) === JSON.stringify(after.masks.filter(mask => mask.kind !== 'identity'))
   const comparedPixels = pixels - excludedIdentityPixels
-  return { width: a.info.width, height: a.info.height, changedPixels: changed, totalPixels: pixels, comparedPixels, excludedIdentityPixels, changedRatio: changed / comparedPixels, maximumRatio, masks: before.masks, maskGeometryMatches: geometryMatches, passed: geometryMatches && changed / comparedPixels <= maximumRatio }
+  return { width: a.info.width, height: a.info.height, changedPixels: changed, totalPixels: pixels, comparedPixels, excludedIdentityPixels, changedRatio: changed / comparedPixels, maximumRatio, masks: before.masks, afterMasks: after.masks, maskGeometryMatches: geometryMatches, passed: geometryMatches && changed / comparedPixels <= maximumRatio }
 }
 
 export async function writeImageReport(path, report) {

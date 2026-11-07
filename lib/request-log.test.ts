@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { channel } from 'node:diagnostics_channel'
 import { hashUserId, noteLogOutcome, noteLogUser, requestIdFor, withRequestLog } from './request-log'
 
 function capture() {
@@ -77,4 +78,52 @@ test('outcomes allow only fixed values and stay isolated between concurrent requ
   assert.deepEqual(Object.fromEntries(completed.map(entry => [entry.route, entry.outcome])), { '/api/empty': 'empty', '/api/work': 'work', '/api/invalid': undefined })
   assert.ok(!lines.some(item => item.line.includes('SECRET')))
   assert.ok(lines.filter(item => JSON.parse(item.line).msg === 'api_request_started').every(item => !('outcome' in JSON.parse(item.line))))
+})
+
+test('request attribution publishes an internal invocation ID before auth and caches each authenticated identity', async () => {
+  const metadata = channel('mikka.request.metadata')
+  const updates: Array<Record<string, unknown>> = []
+  const observe = (value: unknown) => { updates.push({ ...(value as Record<string, unknown>) }) }
+  const originalSalt = process.env.LOG_HASH_SALT
+  metadata.subscribe(observe)
+  const { lines, sink } = capture()
+  try {
+    process.env.LOG_HASH_SALT = 'fixture-first'
+    const firstHash = hashUserId('private-user-a')
+    await withRequestLog('/api/demo', () => {
+      assert.equal(updates.length, 1)
+      assert.match(String(updates[0].requestId), /^[0-9a-f-]{36}$/)
+      assert.deepEqual(Object.keys(updates[0]), ['requestId'])
+      noteLogUser('private-user-a')
+      process.env.LOG_HASH_SALT = 'fixture-changed'
+      noteLogUser('private-user-a')
+      noteLogUser(null)
+      return new Response('ok')
+    }, sink)(new Request('https://x.test/api/demo?private=PRIVATE_QUERY', {
+      headers: { 'x-vercel-id': 'external-edge-id', authorization: 'Bearer PRIVATE_TOKEN' },
+    }))
+    const first = JSON.parse(lines[1].line)
+    assert.equal(first.invocationId, updates[0].requestId)
+    assert.notEqual(first.invocationId, first.requestId)
+    assert.equal(first.userIdHash, firstHash)
+    assert.deepEqual(updates[1], { requestId: first.invocationId, userIdHash: firstHash })
+    assert.equal(updates.length, 2)
+
+    await withRequestLog('/api/demo', () => {
+      noteLogUser('private-user-a')
+      noteLogUser('private-user-b')
+      noteLogUser('private-user-b')
+      return new Response('ok')
+    }, sink)(new Request('https://x.test/api/demo', { headers: { 'x-vercel-id': 'external-edge-id' } }))
+    const second = JSON.parse(lines[3].line)
+    assert.notEqual(second.invocationId, first.invocationId)
+    assert.equal(second.userIdHash, hashUserId('private-user-b'))
+    assert.equal(updates.length, 5)
+    assert.equal(updates[4].userIdHash, second.userIdHash)
+    assert.doesNotMatch(JSON.stringify({ updates, lines }), /private-user-|PRIVATE_QUERY|PRIVATE_TOKEN/)
+  } finally {
+    metadata.unsubscribe(observe)
+    if (originalSalt === undefined) delete process.env.LOG_HASH_SALT
+    else process.env.LOG_HASH_SALT = originalSalt
+  }
 })

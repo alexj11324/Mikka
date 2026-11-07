@@ -29,6 +29,19 @@ Each bot also has a cloud desktop you can watch, take over and hand back.
 Track progress, respond when needed and review results in one place, on the web,
 in the macOS desktop app or in the iOS app.
 
+## Run your own server
+
+Deploy the [self-hosted Docker server](docs/self-hosting.md), then connect the
+official app to its address. The image provides the API, realtime updates,
+daemon gateway, scheduler, migrations and your own model credentials. Its
+default web entry exposes server information and keeps the authentication
+pages needed by the official clients.
+
+The full community workspace UI remains in the public source and still builds,
+but is frozen and disabled by default. Set `MIKKA_COMMUNITY_UI=1` and recreate
+the app container to enable that compatibility UI. The official UI is maintained
+separately; paid UI libraries are not distributed in this repository or image.
+
 ## How Mikka works
 
 - **Bots coordinate. Agents execute.**
@@ -243,11 +256,12 @@ Each run uses its own git worktree, so parallel threads stay isolated.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web, desktop and iOS apps, Telegram, Slack, notification sources and MCP clients reach the Next.js app on Vercel, which keeps state in Postgres and takes payments through Stripe. A minute Worker and app events wake the Coordinator, which dispatches runs to the daemon on your Mac, Linux machine or SSH host and wakes each bot's Mikka Cloud computer. Agents report back through MCP. Factory stages fed by monitoring sit on top of the Coordinator, and approved writes go back to connected apps. Linear sync, switched off, is dashed.">
+  <img src="docs/assets/architecture-light.svg" alt="Mikka architecture: the web, desktop and iOS apps, Telegram, Slack, notification sources and MCP clients reach the Hono/Nitro API on Vercel, which keeps state in Postgres and takes payments through Stripe. A minute Worker and app events wake the Coordinator, which dispatches runs to the daemon on your Mac, Linux machine or SSH host and wakes each bot's Mikka Cloud computer. Agents report back through MCP. Factory stages fed by monitoring sit on top of the Coordinator, and approved writes go back to connected apps. Linear sync, switched off, is dashed.">
 </picture>
 
 The web app, the desktop and iOS apps, Telegram, Slack and MCP clients all reach
-the same Next.js application on Vercel. Events such as a finished run, a worker
+the same Hono/Nitro API on Vercel. The web and desktop share the Vite-built React
+UI. Events such as a finished run, a worker
 question or a rated notification go to the Coordinator, a durable workflow
 that triages each event and decides the next step. Every bot runs on the same
 workflow, each with its own chat, memory and inbox.
@@ -289,7 +303,7 @@ The dashed box and lines are Linear sync, which is switched off.
 
 | Layer | Stack |
 | --- | --- |
-| App | Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, ReUI, OpenUI for bot replies |
+| App | Vite, Hono/Nitro, React 19, Tailwind CSS 4, shadcn/ui, ReUI, OpenUI for bot replies |
 | Desktop | Electron with electron-updater in [`apps/desktop`](apps/desktop) (macOS, Apple Silicon) |
 | Mobile | Expo and Expo Router (React Native) with native tabs in [`apps/mobile`](apps/mobile) |
 | Bots | Vercel AI SDK; the hosted default model on ZeroCat, with Vercel AI Gateway as fallback; every bot, including the Coordinator, is a durable loop on [Vercel Workflow](workflows/coordinator) |
@@ -304,14 +318,18 @@ The dashed box and lines are Linear sync, which is switched off.
 | Subscriptions | A Go worker in [`packages/subscription-worker`](packages/subscription-worker), with secrets in Infisical |
 | Agents | The Mikka daemon runs Claude Code, Codex or Cursor through a CLI adapter for each thread |
 
+Current build, start and rollback steps: [shared runtime operations](docs/operations/web-runtime.md).
+
 ## Repository layout
 
 ```text
-app/                 # Next.js routes, server actions and API (MCP, webhooks, cron, daemon /v1)
+app/                 # Shared pages, action sources and API handlers (MCP, webhooks, cron, daemon /v1)
 components/          # React UI
 lib/                 # Domain logic: coordinator, issues, billing, factory, computer, MCP, auth
 workflows/           # Durable workflows (Coordinator, Slack, sub-agents, thread machines, run publication)
 agents/              # Built-in bot definitions
+apps/frontend/       # Shared Vite renderer for web and desktop
+apps/api/            # Hono/Nitro runtime and server compatibility adapters
 apps/desktop/        # macOS desktop app (Electron)
 apps/mobile/         # iOS app (Expo)
 packages/daemon/     # Local daemon and Agent CLI adapters
@@ -378,10 +396,10 @@ what they cover.
 
 | Test | Needs | Why not in CI |
 | --- | --- | --- |
-| `pnpm test:factory-http` (`tests/factory-{query,question,monitor-cycle}-http.test.ts`) | A production build (`next build`), `eval "$(bash scripts/dev/bootstrap-local.sh)"` (which exports `BETTER_AUTH_SECRET` from a random local file). The runner points its server's `BETTER_AUTH_URL` at its own origin. In local test-account mode the runner creates the probes' own non-superuser database roles (`factory192`, `factoryquestions192`, `factorycycle192`) on the loopback `*_e2e` database | CI runs no production build ([decision](docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md), rule 3) |
-| `pnpm test:test-accounts-http` (`tests/test-account-pool.http.test.mjs`) | A production build and a disposable test environment registered with `scripts/test-accounts/bootstrap.mjs` | Same: no production build in CI |
+| `pnpm test:factory-http` (`tests/factory-{query,question,monitor-cycle}-http.test.ts`) | A production build (`pnpm build`), `eval "$(bash scripts/dev/bootstrap-local.sh)"` (which exports `BETTER_AUTH_SECRET` from a random local file). The runner points its server's `BETTER_AUTH_URL` at its own origin. In local test-account mode the runner creates the probes' own non-superuser database roles (`factory192`, `factoryquestions192`, `factorycycle192`) on the loopback `*_e2e` database | Run explicitly against a prepared isolated build; CI runtime build and browser checks run separately |
+| `pnpm test:test-accounts-http` (`tests/test-account-pool.http.test.mjs`) | A production build and a disposable test environment registered with `scripts/test-accounts/bootstrap.mjs` | Same prepared isolated-build requirement |
 | `pnpm test:local-loop` and its `:mailbox`, `:cloud`, `:worker-mailbox` variants | `dev:local`, a real daemon, a model API key; the cloud item needs an E2B template | Needs real credentials, and it refuses to run under a CI identity |
-| `tests/byos-handoff-browser.test.mjs` | Chromium at `/usr/bin/chromium` | It drives a browser; CI runs no browser tests ([decision](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md)) |
+| `tests/byos-handoff-browser.test.mjs` | Chromium at `/usr/bin/chromium` | Standalone Linux browser and loopback handoff check, outside `pnpm test:byos`; HTTPS destinations are intercepted locally. CI runs separate Analytics and desktop browser checks. |
 | `packages/daemon/test/codex-contract.node-test.mts` | The official Codex CLI, passed as `CODEX_CONTRACT_BIN`; without it the test skips | CI does not download the Codex binary |
 
 Start with these documents:
@@ -404,6 +422,22 @@ Start with these documents:
 Mikka is in early access. Email
 [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com) for an invite, then
 follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
+
+## Acknowledgements
+
+<p>
+  <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
+      <img src="docs/assets/openai-mark-light.svg" alt="OpenAI logo" width="32" height="32">
+    </picture>
+  <strong>OpenAI · Codex for Open Source</strong>
+</p>
+
+Mikka is proudly developed with support from the [Codex for Open Source](https://openai.com/form/codex-for-oss/) program.
+
+A heartfelt thank-you to OpenAI and the Codex team for providing Mikka's maintainer with six months of ChatGPT Pro access. This support gives us more room to explore ambitious ideas, improve engineering and user experience, and give back to the open-source community.
+
+Mikka is an independent open-source project and is not affiliated with or endorsed by OpenAI. The OpenAI name and logo are trademarks of OpenAI.
 
 ## License
 

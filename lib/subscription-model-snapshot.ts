@@ -105,11 +105,11 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
     cancelled(signal)
     const { assertSubscriptionModelTransport } = await import('./model-admission/runtime')
     await assertSubscriptionModelTransport({ workspaceId: frozen.workspaceId, ownerId: scope.ownerId }, frozen.modelId, frozen.route, signal, false)
-    const binding = await service.repository.binding(frozen.ownerId, frozen.bindingId)
+    const { binding, connection } = await service.repository.bindingConnection(frozen.ownerId, frozen.bindingId)
     for (const [key, expected] of Object.entries({ id: frozen.bindingId, ownerId: frozen.ownerId, consumerId: frozen.consumerId, workspaceId: frozen.workspaceId, connectionId: frozen.connectionId, connectionRevision: frozen.connectionRevision, modelId: frozen.modelId, route: frozen.route })) {
       if (binding[key as keyof typeof binding] !== expected) throw refuse()
     }
-    const connection = await service.repository.connection(frozen.ownerId, frozen.connectionId)
+    if (!connection) throw new SubscriptionRefusal('account_unavailable')
     if (connection.ownerId !== frozen.ownerId || Number(connection.epoch) !== frozen.connectionRevision || connection.state !== 'connected') throw refuse()
     cancelled(signal)
   }
@@ -118,12 +118,13 @@ export async function resolveFrozenHostedModel(scope: HostedModelScope, runtime:
     defaultModel: () => { throw refuse() }, subscriptionService: () => service, workspace: dependencies.workspace,
   })
   await verify()
-  if (typeof model === 'string') throw refuse()
-  return new Proxy(model, { get(target, property) {
+  if (typeof model === 'string' || model.specificationVersion !== 'v4') throw refuse()
+  const { observedModel } = await import('./tracing/ai')
+  return observedModel(new Proxy(model, { get(target, property) {
     const member = Reflect.get(target, property, target)
     if ((property === 'doStream' || property === 'doGenerate') && typeof member === 'function') {
       return async (...args: unknown[]) => { await verify(); return Reflect.apply(member, target, args) }
     }
     return member
-  } })
+  } }), { modelId: frozen.modelId, userId: scope.ownerId, route: 'subscription', provider: frozen.route === 'claude_cpa' ? 'anthropic' : 'openai', operation: frozen.coordinator ? 'coordinator' : 'bot' })
 }

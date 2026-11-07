@@ -13,7 +13,7 @@ import { chatFailure, failureMessageKey, type ChatFailure } from '@/lib/chat-fai
 export function failureLine(error: string | null | undefined, locale: 'zh-CN' | 'en' = 'zh-CN'): string | null {
   if (!error) return null
   const failure = chatFailure({ working: false, error })
-  return failure && failure.kind !== 'failed' ? lineFor(failure, locale) : null
+  return failure && (failure.kind !== 'failed' || failure.cloudCode) ? lineFor(failure, locale) : null
 }
 
 const BRANDED = new Set(['free_allowance_used', 'points_exhausted', 'platform_paused'])
@@ -21,7 +21,7 @@ const BRANDED = new Set(['free_allowance_used', 'points_exhausted', 'platform_pa
 function lineFor(failure: ChatFailure, locale: 'zh-CN' | 'en'): string {
   const messages = locale === 'en' ? englishMessages : chineseMessages
   const message = failureMessageKey(failure)
-  const scope: Record<string, unknown> = message.namespace === 'Billing.refusal' ? messages.Billing.refusal : messages.Coordinator
+  const scope: Record<string, unknown> = message.namespace === 'RunErrors' ? messages.RunErrors : message.namespace === 'Billing.refusal' ? messages.Billing.refusal : messages.Coordinator
   const text = message.key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], scope)
   if (typeof text !== 'string') throw new Error(`missing message ${message.namespace}.${message.key}`)
   return message.namespace === 'Billing.refusal' && BRANDED.has(message.key) ? messages.Billing.refusal.branded.replace('{reason}', text) : text

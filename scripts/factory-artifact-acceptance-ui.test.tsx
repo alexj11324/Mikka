@@ -53,7 +53,7 @@ mock.module(new URL('../components/workspace/thread-changes.tsx', import.meta.ur
   ThreadChangesPane: () => null, ThreadChangesView: () => null, ChangesTabLabel: () => null, Counts: () => null, FileSection: () => null,
   useDiffWrap: () => ['nowrap', () => {}],
 } })
-mock.module(new URL('../app/actions/artifacts.ts', import.meta.url).href, { namedExports: { getArtifact: async () => undefined, getArtifactText: async () => undefined } })
+mock.module(new URL('../app/actions/artifacts.ts', import.meta.url).href, { namedExports: { getArtifact: async () => undefined, getArtifactText: async () => undefined, listRunArtifacts: async () => [] } })
 mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { listBots: async () => [] } })
 mock.module(new URL('../components/artifacts/artifact-share.tsx', import.meta.url).href, { namedExports: { ArtifactShare: () => null } })
 mock.module(new URL('../components/coordinator/coordinator-chat.tsx', import.meta.url).href, { namedExports: { CoordinatorChat: () => null } })

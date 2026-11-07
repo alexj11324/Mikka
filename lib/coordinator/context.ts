@@ -13,6 +13,7 @@ import { chatFailure, type ChatFailure } from '@/lib/chat-failure'
 import { eventLine, type EventLine } from './event-line'
 import { projectedToolResult, toolCallMetadata, toolResultMetadata, type ProjectedToolMetadata } from './tool-metadata'
 import { quotePreview, toolQuote } from './tool-quote'
+import { invalidToolParts } from './invalid-tool-call'
 
 export { QUOTE_KEYS, QUOTE_PREVIEW_CHARS, QUOTE_SPACE, quoteText, quotePreview, toolQuoteText, toolQuote } from './tool-quote'
 
@@ -282,19 +283,16 @@ export function instructionsWithMemory(instructions: string, memory: string): st
   return `${instructions}\n\n## What the person asked you to remember\n${memory}`
 }
 
-/**
- * The system prompt with its cacheable prefix first: the rules and the GitHub lines (the authorized repository
- * list), which stay the same from turn to turn, then the memory and what changes each turn. `stable` is where the
- * prefix ends (lib/prompt-cache.ts), so a turn with the same rules and repositories reuses the cached prefix.
- */
 /** The cached context after the rules: the GitHub lines, then the allowed models list; empty parts are left out. */
 export function cachedContextLines(...parts: string[]): string {
   return parts.filter(Boolean).join('\n')
 }
 
-export function promptWithCachedContext(rules: string, github: string, memory: string, tail: string): { instructions: string; stable: number } {
+/** Keep a rules breakpoint before the repository/model context: a repository push or a newly used repository
+ * can change that context between turns, while the rules and tool definitions remain reusable. */
+export function promptWithCachedContext(rules: string, github: string, memory: string, tail: string): { instructions: string; stable: number; stableRules: number } {
   const prefix = github ? `${rules}\n${github}` : rules
-  return { stable: prefix.length, instructions: instructionsWithMemory(prefix, memory) + tail }
+  return { stableRules: rules.length, stable: prefix.length, instructions: instructionsWithMemory(prefix, memory) + tail }
 }
 
 /**
@@ -417,6 +415,7 @@ function takeArtifacts(text: string): { ids: string[]; text: string } {
  */
 export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pending?: true })[]): ChatItem[] {
   const items: ChatItem[] = []
+  const invalidParts = invalidToolParts(rows.map(row => row.message))
   let briefingBoundary = false
   // Artifacts handed over since the last reply, waiting for one to sit under.
   const waiting = { ids: [] as string[], position: 0, createdAt: new Date(0) }
@@ -441,7 +440,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       // the Bot's side says why, with 重试, until a reply follows (the welcome request had no other trace in the chat).
       if (raw.startsWith(COORDINATOR_WELCOME_MARK)) {
         const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
-        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason }) : null
+        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason, failureDetails: (message as { mikkaFailureDetails?: unknown }).mikkaFailureDetails }) : null
         if (failure) {
           flush()
           items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: '', tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], welcome: true, failure })
@@ -479,14 +478,14 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         const images = typeof message.content === 'string' ? 0 : message.content.filter(part => part.type === 'file' && part.mediaType.startsWith('image/')).length
         // The turn that answered this message failed (store.failTurn): the reason stays under it.
         const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
-        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason }) : null
+        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason, failureDetails: (message as { mikkaFailureDetails?: unknown }).mikkaFailureDetails }) : null
         items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
       }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
-      const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
-      const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName)
+      const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) && !invalidParts.has(part) ? [part.toolName] : [])
+      const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) && !invalidParts.has(part)
         ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...toolCallMetadata(part.toolName, part.input, part as ProjectedToolMetadata), ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)),
           ...withQuote(part.input === undefined ? quotePreview((part as { quotePreview?: unknown }).quotePreview) : toolQuote(part.input)) }] : [])
       // Any reasoning means it thought; only readable text (not encrypted or empty) can be opened.
@@ -522,6 +521,7 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const last = items.at(-1)
       if (last?.from !== 'coordinator') continue
       for (const part of message.content) {
+        if (invalidParts.has(part)) continue
         const runId = dispatchedRun(part)
         if (runId && !last.threads.includes(runId)) last.threads.push(runId)
         const step = part.type === 'tool-result' ? last.activity?.tools.find(tool => tool.call === part.toolCallId) : undefined

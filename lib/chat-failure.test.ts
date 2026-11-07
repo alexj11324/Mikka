@@ -1,3 +1,5 @@
+import { captureRunFailure } from '@mikka/protocol/run-failure'
+import { CloudServiceError } from './cloud-services/errors'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { chatFailure, failureMessageKey } from './chat-failure'
@@ -6,6 +8,14 @@ import { failureLine } from '../apps/mobile/lib/chat-failure'
 
 const person = { from: 'person' }, reply = { from: 'coordinator' }, event = { from: 'event' }
 const balance = 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: Insufficient Balance (request_id: 11111111-1111-4111-8111-111111111111)'
+
+test('exhausted tool recovery has a stable friendly failure and retry',()=>{
+  const failure=chatFailure({working:false,error:'model_tool_unavailable'})!
+  assert.deepEqual(failure,{kind:'failed',reason:'tools',raw:'model_tool_unavailable'})
+  assert.deepEqual(failureMessageKey(failure),{namespace:'Coordinator',key:'replyToolUnavailable'})
+  assert.deepEqual(failureLine(failure),{text:'回复未完成，请重试',retry:true,recovery:null})
+  assert.equal(chatFailure({working:true,error:'model_tool_unavailable'}),null)
+})
 
 test('the observed model streaming balance refusal has safe copy and a model recovery without retry', () => {
   const failure = chatFailure({ working: false, error: balance })!
@@ -34,16 +44,16 @@ test('generic, quoted and tool errors never become a balance state from credit o
   ]) {
     assert.equal(chatBalanceRefusal(error), false, error)
     const failure = chatFailure({ working: false, error })!
-    assert.deepEqual(failure, { kind: 'failed' }, error)
+    assert.deepEqual(failure, chatBalanceRefusal(error) ? { kind: 'failed', reason: 'balance' } : { kind: 'failed', raw: error }, error)
     assert.equal(failureLine(failure).retry, true, error)
   }
 })
 
 test('a failed reply is named by what the person can do, never the raw error', () => {
-  assert.deepEqual(chatFailure({ working: false, error: 'Step "step//./workflows/coordinator/agent-kit-steps//botRuntime" failed after 3 retries: binding_required' }), { kind: 'subscription', notice: 'selectionChanged' })
-  assert.deepEqual(chatFailure({ working: false, error: 'Error: points_exhausted' }), { kind: 'hosted', code: 'points_exhausted' })
-  assert.deepEqual(chatFailure({ working: false, error: 'wake_exhausted' }), { kind: 'wake', code: 'wake_exhausted' })
-  assert.deepEqual(chatFailure({ working: false, error: 'model timed out' }), { kind: 'failed' })
+  assert.deepEqual(chatFailure({ working: false, error: 'Step "step//./workflows/coordinator/agent-kit-steps//botRuntime" failed after 3 retries: binding_required' }), { kind: 'subscription', notice: 'selectionChanged', raw: 'binding_required' })
+  assert.deepEqual(chatFailure({ working: false, error: 'Error: points_exhausted' }), { kind: 'hosted', code: 'points_exhausted', raw: 'points_exhausted' })
+  assert.deepEqual(chatFailure({ working: false, error: 'wake_exhausted' }), { kind: 'wake', code: 'wake_exhausted', raw: 'wake_exhausted' })
+  assert.deepEqual(chatFailure({ working: false, error: 'model timed out' }), { kind: 'failed', raw: 'model timed out' })
 })
 
 test('nothing while a turn works; a turn that ended with no reply and nothing recorded is a failure', () => {
@@ -60,4 +70,39 @@ test('every actionable server subscription error remains readable in the mobile 
     assert.equal(failure?.kind, 'subscription', code)
     assert.ok(failure && failureLine(failure).text, code)
   }
+})
+
+test('详情 carries the stored codes as recorded: the line code, then the turn failure behind a wake code (decision 2026-11-05-0330)', () => {
+  // A subscription turn the provider rejected: the line reads the subscription copy, 详情 the code with its detail.
+  assert.deepEqual(chatFailure({ working: false, error: 'subscription_generation_failed (provider_request_rejected)' }),
+    { kind: 'subscription', notice: 'retry', raw: 'subscription_generation_failed (provider_request_rejected)' })
+  // Retries ran out: the line is 回复重试已停止, 详情 also names the last real failure.
+  assert.deepEqual(chatFailure({ working: false, error: 'wake_exhausted', cause: 'subscription_generation_failed (provider_request_rejected)' }),
+    { kind: 'wake', code: 'wake_exhausted', raw: 'wake_exhausted\nsubscription_generation_failed (provider_request_rejected)' })
+  // An unknown code has no words of its own: the generic line, the code as it is under 详情.
+  assert.deepEqual(chatFailure({ working: false, error: 'some_new_failure_code' }), { kind: 'failed', raw: 'some_new_failure_code' })
+  // The same text twice is listed once; nothing while working.
+  assert.equal(chatFailure({ working: false, error: 'wake_failed', cause: 'wake_failed' })?.raw, 'wake_failed')
+  assert.equal(chatFailure({ working: true, error: 'wake_exhausted', cause: 'x' }), null)
+})
+
+test('structured details accompany existing failure discriminators and malformed legacy payloads stay absent', () => {
+  const failureDetails = captureRunFailure({ statusCode: 400, error: { type: 'invalid_request_error', message: 'Unsupported request format.' } }, { runId: 'wrun_details', provider: 'codex' })
+  const failure = chatFailure({ working: false, error: 'wake_exhausted', cause: 'subscription_generation_failed', failureDetails })
+  assert.equal(failure?.kind, 'wake')
+  assert.deepEqual(failure?.failureDetails, failureDetails)
+  assert.equal(chatFailure({ working: true, error: 'wake_exhausted', failureDetails }), null)
+  assert.equal(chatFailure({ working: false, error: null, failureDetails }), null, 'cached details cannot revive a cleared failure')
+  assert.deepEqual(chatFailure({ working: false, error: 'some_new_failure_code', failureDetails: { providerMessage: 'untrusted' } }), { kind: 'failed', raw: 'some_new_failure_code' })
+})
+
+test('optional cloud recovery and main structured failure details survive the combined chat contract', () => {
+  const failureDetails = captureRunFailure(new CloudServiceError('cloud_quota_exhausted'), { runId: 'wrun_cloud_quota' })
+  const failure = chatFailure({ working: false, error: 'cloud_quota_exhausted', failureDetails })
+  assert.equal(failure?.kind, 'failed')
+  assert.equal(failure?.kind === 'failed' && failure.cloudCode, 'cloud_quota_exhausted')
+  assert.deepEqual(failure?.failureDetails, failureDetails)
+  assert.deepEqual(failureMessageKey(failure!), { namespace: 'RunErrors', key: 'cloud_quota_exhausted.default' })
+  assert.equal(failureLine(failure!).recovery, 'cloudBilling')
+  assert.equal(chatFailure({ working: true, error: 'cloud_quota_exhausted', failureDetails }), null)
 })

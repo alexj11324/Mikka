@@ -1,5 +1,5 @@
 import 'server-only'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { bots, mobilePushTokens } from '@/lib/db/schema'
 import { readPreferences } from '@/lib/preferences'
@@ -9,8 +9,10 @@ import { chatMuted } from '@/lib/chat-preferences'
 import { openUIText, parseOpenUI } from '@/lib/openui-lang'
 import type { ActionLocale } from '@/lib/suggestions/action-title'
 import { personLocale } from '@/lib/suggestions/action-title-server'
+import { appOrigin } from '@/lib/mcp/resource'
+import { BASE_PATH } from '@/lib/base-path'
 
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
+import { deliverPhonePush } from '@/lib/mobile-push-delivery'
 const BODY_MAX = 180
 const MESSAGES = {
   'zh-CN': () => import('@/messages/zh-CN.json'),
@@ -64,20 +66,9 @@ export async function pushReply(userId: string, botId: string, text: string | nu
     // The app opens the Coordinator's chat by its own route (botId null), under its usual name.
     const coordinator = !bot || bot.coordinator
     const body = text === null ? await codePushBody(await personLocale(userId)) : pushBody(text)
-    const response = await fetch(EXPO_PUSH_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json', accept: 'application/json',
-        ...(process.env.EXPO_ACCESS_TOKEN ? { authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}),
-      },
-      body: JSON.stringify(tokens.map(({ token }) => ({ to: token, title: coordinator ? 'Coordinator' : bot.name, body, sound: 'default', data: { botId: coordinator ? null : botId } }))),
-      signal: AbortSignal.timeout(10_000),
-    })
-    if (!response.ok) throw new Error(`Expo push returned ${response.status}`)
-    const result = await response.json() as { data?: { status: string; details?: { error?: string } }[] }
-    const gone = (result.data ?? []).flatMap((ticket, index) => ticket.status === 'error' && ticket.details?.error === 'DeviceNotRegistered' ? [tokens[index].token] : [])
-    if (gone.length) await db.delete(mobilePushTokens).where(inArray(mobilePushTokens.token, gone))
+    await deliverPhonePush(userId, { to: tokens.map(({ token }) => token), title: coordinator ? 'Coordinator' : bot.name, body,
+      data: { botId: coordinator ? null : botId, serverUrl: `${appOrigin}${BASE_PATH}`, userId }, collapseId: botId }, await personLocale(userId))
   } catch (error) {
-    console.error('Phone push failed', error instanceof Error ? error.message : error)
+    console.error('phone_push_failed', { code: error instanceof Error && 'code' in error && typeof error.code === 'string' && /^cloud_[a-z_]+$/.test(error.code) ? error.code : 'push_unavailable' })
   }
 }

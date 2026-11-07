@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import useSWRInfinite, { unstable_serialize as infiniteKey } from 'swr/infinite'
 import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
@@ -25,6 +25,7 @@ import { authorRuns, chronological, fetchGroupMessages, mergeGroupPoll, newestGr
 import { toast } from 'sonner'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useActionError } from '@/lib/use-action-error'
+import { readAccessFailure } from '@/lib/swr/persistent-cache'
 
 /** A message the person sent that the server has not stored yet; a failed one waits for 重试. */
 type Pending = { key: string; body: string; failed: boolean; sentId?: string }
@@ -58,7 +59,9 @@ export function GroupChatView({ group, userId, people }: {
   const { data: members = [] } = useGroupMembers(group.id)
   const member = (type: 'user' | 'agent' | 'bot', id: string) => members.find(item => item.memberType === type && item.id === id)
   const [draft, setDraft] = useViewState(`group:${group.id}:draft`, '')
-  const [pending, setPending] = useState<Pending[]>([])
+  // Navigation keeps unsent text and the same in-flight promise's result; it never resends.
+  const [pending, setPending] = useViewState<Pending[]>(`group:${group.id}:pending`, [])
+  const [accessRejected, setAccessRejected] = useState(false)
   const shown = useRef<{ id: string; page: GroupMessagePage } | null>(null)
   const { data: pages, error, size, setSize, isValidating, mutate } = useSWRInfinite<GroupMessagePage>(
     pageKey(group.id),
@@ -78,11 +81,33 @@ export function GroupChatView({ group, userId, people }: {
   // Only the pages hold the group's revision (its newest page); the members always read.
   const pagesKey = infiniteKey(pageKey(group.id))
   useLiveKey('group_chat', group.id, [pagesKey, unstable_serialize(groupMembersKey(group.id))], group.workspaceId, { minIntervalMs: GROUP_MERGE_MS, revisions: { [pagesKey]: pages?.[0]?.revision } })
-  const messages = pages ? chronological(pages) : []
+  const messages = useMemo(() => pages ? chronological(pages) : [], [pages])
+  const receivedIds = useMemo(() => new Set(messages.map(message => message.id)), [messages])
+  useEffect(() => {
+    if (!pending.some(item => item.sentId && receivedIds.has(item.sentId))) return
+    setPending(current => current.filter(item => !item.sentId || !receivedIds.has(item.sentId)))
+  }, [pending, receivedIds, setPending])
   const reactions = useMessageReactions(messages.map(message => message.id))
   const older = pages?.at(-1)?.nextBefore ?? null
   const loadingOlder = isValidating && !!pages && size > pages.length
   const code = error instanceof GroupMessagesRequestError ? error.code : error ? 'unavailable' : null
+  const refused = !!readAccessFailure(error)
+  // A transport failure cannot restore access after a refusal. A successful
+  // deduplicated read clears SWR's error even if its original view unmounted.
+  useEffect(() => {
+    if (refused) setAccessRejected(true)
+    else if (!error) setAccessRejected(false)
+  }, [refused, error])
+  const backgroundFailed = !!pages && code === 'unavailable' && !refused && !accessRejected
+  const blockingCode = backgroundFailed ? null : code
+  // A failed background read leaves the transcript and composer in place.
+  // Keep its retry outside document flow so reading history does not jump.
+  useEffect(() => {
+    const id = `group-read-error:${userId}:${group.id}`
+    if (backgroundFailed) toast.error(t('loadError'), { id, duration: Infinity, action: { label: t('retry'), onClick: event => { event.preventDefault(); void mutate() } } })
+    else toast.dismiss(id)
+    return () => { toast.dismiss(id) }
+  }, [backgroundFailed, userId, group.id, t, mutate])
   const deliver = async (item: Pending) => {
     setPending(list => list.map(entry => entry.key === item.key ? { ...entry, failed: false } : entry))
     let sentId: string
@@ -129,8 +154,8 @@ export function GroupChatView({ group, userId, people }: {
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
     <div ref={scroller} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
-        {code === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
-          : code ? <div role="alert" className="flex items-center gap-3 py-6 text-sm"><span>{code === 'unauthorized' ? t('authRequired') : t('loadError')}</span>{code !== 'unauthorized' && <Button variant="outline" size="sm" onClick={() => { void mutate() }}>{t('retry')}</Button>}</div>
+        {blockingCode === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
+          : blockingCode ? <div role="alert" className="flex items-center gap-3 py-6 text-sm"><span>{blockingCode === 'unauthorized' ? t('authRequired') : t('loadError')}</span>{blockingCode !== 'unauthorized' && <Button variant="outline" size="sm" onClick={() => { void mutate() }}>{t('retry')}</Button>}</div>
             : !pages ? <div aria-busy="true" className="flex flex-col gap-3 py-4"><Skeleton className="h-9 w-2/3" /><Skeleton className="ml-auto h-9 w-1/2" /><Skeleton className="h-9 w-3/5" /></div>
               : messages.length === 0 && !unsent.length ? <p className="py-6 text-sm text-muted-foreground">{t('empty')}</p>
                 : <>
@@ -167,7 +192,7 @@ export function GroupChatView({ group, userId, people }: {
       </div>
     </div>
     <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-      <ChatComposer ref={null} value={draft} onChange={setDraft} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!code} attachmentScope={{ kind: 'group', id: group.id }}
+      <ChatComposer ref={null} value={draft} onChange={setDraft} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!blockingCode} attachmentScope={{ kind: 'group', id: group.id }}
         sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />
     </div>
   </section>

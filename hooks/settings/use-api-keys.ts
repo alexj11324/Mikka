@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { harnessName } from '@/components/labels/entity-labels'
 import useSWR, { useSWRConfig } from 'swr'
 import { createApiKey, deleteApiKey, refetchApiKeyModels, updateApiKeyAfterQuota, updateApiKeyShare, type getApiKeys } from '@/app/actions/model-api-keys'
 import { settingsRead } from '@/lib/settings-read'
 import { settingsKeys } from '@/lib/swr/keys'
 import { useActionError } from '@/lib/use-action-error'
-import type { ApiKeyProtocol, ApiKeyProvider, ApiKeyView } from '@/lib/model-api-key-providers'
+import { apiKeyProtocols, protocolHarness, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView } from '@/lib/model-api-key-providers'
 
 export type ApiKey = ApiKeyView & { shared: boolean }
 
@@ -83,4 +85,21 @@ export function useApiKeys(workspaceId: string) {
   }
 
   return { data, loadError, pending, failed, share, refetch, remove, add, setAfterQuota }
+}
+
+/**
+ * How a key is named and what it serves: its provider or custom name, and
+ * 「Anthropic、OpenAI 协议 · 可用 Claude Code、Codex」 (Harness draft, Alex
+ * 2026-11-02), or that an OpenAI-protocol provider without the Responses API
+ * serves bot chats only (Codex runs on it).
+ */
+export function useApiKeyLabels() {
+  const t = useTranslations('Settings.apiKeys')
+  const protocolAgents = (protocols: readonly ApiKeyProtocol[]) =>
+    t('protocolAgents', { protocols: protocols.map(item => t(`protocolName.${item}`)).join('、'), agents: protocols.map(item => harnessName(protocolHarness(item))).join('、') })
+  const title = (key: Pick<ApiKeyView, 'provider' | 'name'>) => key.provider === 'custom' ? key.name ?? t('provider.custom') : t(`provider.${key.provider}`)
+  const agents = (key: Pick<ApiKeyView, 'provider' | 'protocol' | 'responsesApi'>) => key.protocol === 'openai' && !key.responsesApi && key.provider === 'custom'
+    ? t('noResponsesApi', { protocol: t('protocolName.openai') })
+    : protocolAgents(apiKeyProtocols(key))
+  return { title, agents, protocolAgents }
 }

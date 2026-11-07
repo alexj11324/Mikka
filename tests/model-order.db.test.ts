@@ -76,6 +76,90 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     return { id, agents }
   }
 
+  await t.test('a display caller can supply its invocation-local devices without a second device read', async () => {
+    const scope = await person('order-display-projection')
+    await device(scope.ownerId, [])
+    const devices = await order.poolDevices(pool, scope.ownerId)
+    const ordinary = await order.orderView(pool, scope)
+    let suppliedReads = 0
+    const projected = await order.orderView(pool, scope, async () => { suppliedReads++; return devices })
+    assert.equal(suppliedReads, 1)
+    assert.deepEqual(projected, ordinary)
+    assert.equal(projected.devices, 1)
+    assert.equal((await order.orderView(pool, scope, async () => [])).devices, 0, 'the supplied display snapshot is the one consumed')
+  })
+
+  for (const allowed of [false, true]) await t.test(`prompt order facts omit only unused count queries when member sharing is ${allowed}`, async t => {
+    const scope = await person('order-context-count')
+    await subscribe(scope, 'claude', ['claude-haiku-5-5'])
+    await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'count-fixture' }] })) as unknown as typeof fetch })
+    await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
+    await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,$2)', [scope.workspaceId, allowed])
+    type Statement = { sql: string; values: unknown[] }
+    const tracked = (statements: Statement[]) => ({ query: (sql: string, values: unknown[] = []) => {
+      statements.push({ sql, values: structuredClone(values) })
+      return pool.query(sql, values)
+    } }) as Pick<typeof pool, 'query'>
+    const fullStatements: Statement[] = [], contextStatements: Statement[] = []
+    const full = await order.orderView(tracked(fullStatements), scope, async () => [])
+    const context = await order.orderView(tracked(contextStatements), scope, async () => [], 'context')
+    const { location, preferredHarness, entries, candidates, cloudReady, cloudModels } = full
+    assert.deepEqual(context, { location, preferredHarness, entries, candidates, cloudReady, cloudModels })
+    assert.equal(full.credentials, 2, 'the page still counts the subscription and key with sharing either allowed or denied')
+    assert.equal(Object.hasOwn(context, 'credentials'), false)
+    const countStart = fullStatements.findIndex(row => row.sql.startsWith('SELECT id::text AS id FROM byos_connections WHERE'))
+    const saved = allowed ? 4 : 3
+    assert.ok(countStart >= 0)
+    assert.equal(fullStatements.length - contextStatements.length, saved)
+    assert.deepEqual(contextStatements, [...fullStatements.slice(0, countStart), ...fullStatements.slice(countStart + saved)], 'every remaining SQL statement and scoped argument is unchanged')
+    t.diagnostic(JSON.stringify({ kind: 'order_projection_pg_query_budget', allowed, full: fullStatements.length, context: contextStatements.length, saved }))
+  })
+
+  await t.test('prompt order facts freshly enforce shared-owner membership, grants, policy and binding epochs', async () => {
+    const scope = await person('order-context-borrower')
+    const lender = await person('order-context-lender')
+    const unrelated = await person('order-context-unrelated')
+    const connection = await subscribe(lender, 'claude', ['claude-haiku-5-5'])
+    await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
+    await order.changeOrder(pool, unrelated, { kind: 'location', location: 'local' })
+    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [scope.workspaceId, lender.ownerId, `${lender.ownerId}@example.invalid`])
+    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [lender.ownerId, scope.workspaceId])
+    const offered = async (checked = scope) => (await order.orderView(pool, checked, async () => [], 'context')).candidates.some(row => row.source.kind === 'subscription' && row.source.connectionId === connection)
+    assert.equal(await offered(), true)
+    assert.equal(await offered(unrelated), false, 'a different owner and workspace cannot inherit these facts')
+    for (const revoke of ['share', 'policy', 'member', 'pause', 'epoch'] as const) {
+      if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [lender.ownerId, scope.workspaceId])
+      else if (revoke === 'policy') await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)', [scope.workspaceId])
+      else if (revoke === 'member') await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [scope.workspaceId, lender.ownerId])
+      else if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [connection])
+      else await pool.query('UPDATE byos_connections SET epoch=2 WHERE id=$1', [connection])
+      assert.equal(await offered(), false, `${revoke}: no prior projection bypasses a fresh refusal`)
+      if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [lender.ownerId, scope.workspaceId])
+      else if (revoke === 'policy') await pool.query('DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1', [scope.workspaceId])
+      else if (revoke === 'member') await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [scope.workspaceId, lender.ownerId])
+      else if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [connection])
+      else await pool.query('UPDATE byos_connections SET epoch=1 WHERE id=$1', [connection])
+      assert.equal(await offered(), true, `${revoke}: a subsequent invocation is fresh rather than a cached refusal`)
+    }
+  })
+
+  await t.test('local Claude uses the exact account catalogue only with a capable daemon and current epoch', async () => {
+    const scope = await person('order-account-catalogue')
+    const own = await subscribe(scope, 'claude', ['claude-sonnet-5-5', 'claude-sonnet-5'])
+    const other = await person('order-other-catalogue')
+    const foreign = await subscribe(other, 'claude', ['claude-sonnet-5'])
+    const local = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, models: ['sonnet'], subscriptionModelCatalogue: true }])
+    const { deviceSupport } = await import('../lib/model-order-plan')
+    const entry = { id: 'historical', harness: 'claude_code' as const, model: 'claude-sonnet-5', source: { kind: 'subscription' as const, connectionId: own } }
+    let report = (await order.poolDevices(pool, scope.ownerId)).find(row => row.id === local.id)!
+    assert.equal(deviceSupport(report, entry), 'ready')
+    assert.equal(deviceSupport(report, { ...entry, source: { kind: 'subscription', connectionId: foreign } }), 'modelNotReported')
+    assert.equal(deviceSupport({ ...report, harnesses: report.harnesses.map(info => ({ ...info, subscriptionModelCatalogue: undefined })) }, entry), 'needsUpdate')
+    await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [own])
+    report = (await order.poolDevices(pool, scope.ownerId)).find(row => row.id === local.id)!
+    assert.equal(deviceSupport(report, entry), 'modelNotReported', 'stale catalogue evidence grants nothing')
+  })
+
   await t.test('a new binding can dispatch before Settings is opened: probe null/stale quota once, and keep paid keys out after a failed check', async () => {
     const scope = await person('order-first-dispatch')
     const ctx = { ...scope, botId: null }
@@ -367,7 +451,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await device(scope.ownerId, [{ harness: 'codex', installed: true }], true, { name: 'Linux box' })
     assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'notInstalled', device: 'Linux box', count: 1 } })
     const old = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, subscriptionBroker: false }], true, { name: 'Old Mac' })
-    assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'needsUpdate', device: 'Old Mac', count: 1 } })
+    assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'needsUpdate', device: 'Old Mac', count: 1, modelEvidence: 'unknown' } })
     const card = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([card.kind === 'none' && card.reason, card.kind === 'none' && card.card.description], ['noDevice', 'Old Mac 的 Mikka 需要更新'])
     // Claude Code reporting other models, and one from before the model probe: neither runs it.

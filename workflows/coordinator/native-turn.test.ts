@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { fakeWorkflowRuntime } from '../../tests/support/fake-workflow'
+import { failureFrom } from '@mikka/protocol/run-failure'
 
 // The native turn's wait on a virtual Workflow clock: it re-reads when the
 // device writes (the route resumes its hook), not every second (#1212).
@@ -44,7 +45,7 @@ test('a lost wake is covered by the 15 s re-read; an idle 3-minute turn reads 13
   polls.length = 0
   const idle = run().then(() => assert.fail('an idle turn cannot succeed'), (error: Error) => error)
   await fake.advance(200_000)
-  assert.match((await idle).message, /nativeCoordinatorTimedOut/)
+  assert.equal(failureFrom(await idle)?.category, 'timeout')
   assert.equal(polls.length, 13)
 })
 

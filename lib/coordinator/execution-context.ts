@@ -1,4 +1,5 @@
 import messages from '@/messages/en.json'
+import type { PoolDevice } from '../model-order-plan'
 
 /**
  * What the Bot knows each turn about where the person's work can run, so it
@@ -37,47 +38,52 @@ const WHY: Record<'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'subscri
 
 const scopeFor = async (userId: string, botId: string) => ({ ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, botId) })
 
-const source: ExecutionContextSource = {
-  workspace: async (userId, botId) => {
-    const { workspaceId } = await scopeFor(userId, botId)
-    const { workspacePool } = await import('@/lib/workspace-db')
-    const row = (await workspacePool.query<{ name: string; kind: 'personal' | 'team' }>('SELECT name,kind FROM mikka_workspaces WHERE id=$1', [workspaceId])).rows[0]
-    return row ? { name: row.name, kind: row.kind } : null
-  },
-  devices: async userId => {
-    const [{ pool }, { poolDevices }] = await Promise.all([import('@/lib/db'), import('@/lib/model-order')])
-    return (await poolDevices(pool, userId)).map(device => ({ name: device.name, online: device.online, enabled: device.enabled, agents: device.harnesses.filter(item => item.installed).map(item => agentName(item.harness)) }))
-  },
-  order: async (userId, botId) => {
-    const [{ pool }, { dispatchOrder, orderView, poolDevices }] = await Promise.all([import('@/lib/db'), import('@/lib/model-order')])
-    const [view, devices] = await Promise.all([orderView(pool, await scopeFor(userId, botId)), poolDevices(pool, userId)])
-    const credentials = new Map(view.candidates.map(candidate => [`${candidate.source.kind}:${candidate.provider}`, { kind: candidate.source.kind, provider: candidate.provider }]))
-    // Where each model can run: the person's own E2B cloud when it takes runs, and each server or computer whose daemon
-    // reported it (lib/model-order-plan.ts deviceSupport). Online and 参与调度 change from turn to turn, so they are left to the tail.
-    const { deviceSupport } = await import('@/lib/model-order-plan')
-    const label = (device: (typeof devices)[number]) => `${device.name} (${device.server ? 'server' : 'computer'})`
-    const support = (entry: (typeof view.entries)[number]) => devices.map(device => ({ device, stage: deviceSupport(device, entry) }))
-    const places = (entry: (typeof view.entries)[number]) => [...(view.cloudReady && view.cloudModels[entry.id] === 'ready' ? ['cloud'] : []), ...support(entry).filter(item => item.stage === 'ready').map(item => label(item.device)).sort()]
-    const unsupported = (entry: (typeof view.entries)[number]) => support(entry).filter(item => item.stage !== 'ready').map(item => {
-      const detail = item.stage === 'subscriptionRuntimeUnavailable' ? item.device.harnesses.find(info => info.harness === entry.harness)?.subscriptionPreflight : undefined
-      return `${label(item.device)}: ${detail ? messages.RunErrors.subscription_local_runtime_unavailable[detail] : WHY[item.stage]}`
-    }).sort()
-    return {
-      location: view.location,
-      // In the order a new thread tries them: the 优先使用的 Agent's list, then the other's (decision 2026-11-05-0400).
-      entries: dispatchOrder(view.entries, view.preferredHarness).map(entry => ({ harness: entry.harness, agent: agentName(entry.harness), model: entry.model, source: entry.source.kind, provider: entry.provider, places: places(entry), unsupported: unsupported(entry), block: entry.block?.reason ?? null })),
-      credentials: [...credentials.values()],
-    }
-  },
-  e2b: async userId => {
-    const [{ pool }, { ownE2BKeySql }] = await Promise.all([import('@/lib/db'), import('@/lib/secrets/e2b-owner-sql')])
-    return (await pool.query(`SELECT 1 WHERE ${ownE2BKeySql('$1::text')}`, [userId])).rowCount !== 0
-  },
-  hosted: async (userId, botId) => {
-    const { workspaceId } = await scopeFor(userId, botId)
-    const { hostedUsage } = await import('@/lib/abuse/runtime')
-    return (await hostedUsage.status(workspaceId)).state
-  },
+/** One display read owns these promises; neither an earlier turn nor a model/dispatch check can reuse them. */
+function defaultSource(userId: string, botId: string): ExecutionContextSource {
+  let scope: ReturnType<typeof scopeFor> | undefined
+  let devices: Promise<PoolDevice[]> | undefined
+  const readScope = () => scope ??= scopeFor(userId, botId)
+  const readDevices = () => devices ??= Promise.all([import('@/lib/db'), import('@/lib/model-order')])
+    .then(([{ pool }, { poolDevices }]) => poolDevices(pool, userId))
+  return {
+    workspace: async () => {
+      const { workspaceId } = await readScope()
+      const { workspacePool } = await import('@/lib/workspace-db')
+      const row = (await workspacePool.query<{ name: string; kind: 'personal' | 'team' }>('SELECT name,kind FROM mikka_workspaces WHERE id=$1', [workspaceId])).rows[0]
+      return row ? { name: row.name, kind: row.kind } : null
+    },
+    devices: async () => (await readDevices()).map(device => ({ name: device.name, online: device.online, enabled: device.enabled, agents: device.harnesses.filter(item => item.installed).map(item => agentName(item.harness)) })),
+    order: async () => {
+      const [{ pool }, { dispatchOrder, orderView }] = await Promise.all([import('@/lib/db'), import('@/lib/model-order')])
+      const [view, devices] = await Promise.all([orderView(pool, await readScope(), readDevices, 'context'), readDevices()])
+      const credentials = new Map(view.candidates.map(candidate => [`${candidate.source.kind}:${candidate.provider}`, { kind: candidate.source.kind, provider: candidate.provider }]))
+      // Where each model can run: the person's own E2B cloud when it takes runs, and each server or computer whose daemon
+      // reported it (lib/model-order-plan.ts deviceSupport). Online and 参与调度 change from turn to turn, so they are left to the tail.
+      const { deviceSupport } = await import('@/lib/model-order-plan')
+      const label = (device: (typeof devices)[number]) => `${device.name} (${device.server ? 'server' : 'computer'})`
+      const support = (entry: (typeof view.entries)[number]) => devices.map(device => ({ device, stage: deviceSupport(device, entry) }))
+      const places = (entry: (typeof view.entries)[number]) => [...(view.cloudReady && view.cloudModels[entry.id] === 'ready' ? ['cloud'] : []), ...support(entry).filter(item => item.stage === 'ready').map(item => label(item.device)).sort()]
+      const unsupported = (entry: (typeof view.entries)[number]) => support(entry).filter(item => item.stage !== 'ready').map(item => {
+        const detail = item.stage === 'subscriptionRuntimeUnavailable' ? item.device.harnesses.find(info => info.harness === entry.harness)?.subscriptionPreflight : undefined
+        return `${label(item.device)}: ${detail ? messages.RunErrors.subscription_local_runtime_unavailable[detail] : WHY[item.stage]}`
+      }).sort()
+      return {
+        location: view.location,
+        // In the order a new thread tries them: the 优先使用的 Agent's list, then the other's (decision 2026-11-05-0400).
+        entries: dispatchOrder(view.entries, view.preferredHarness).map(entry => ({ harness: entry.harness, agent: agentName(entry.harness), model: entry.model, source: entry.source.kind, provider: entry.provider, places: places(entry), unsupported: unsupported(entry), block: entry.block?.reason ?? null })),
+        credentials: [...credentials.values()],
+      }
+    },
+    e2b: async () => {
+      const [{ pool }, { ownE2BKeySql }] = await Promise.all([import('@/lib/db'), import('@/lib/secrets/e2b-owner-sql')])
+      return (await pool.query(`SELECT 1 WHERE ${ownE2BKeySql('$1::text')}`, [userId])).rowCount !== 0
+    },
+    hosted: async () => {
+      const { workspaceId } = await readScope()
+      const { hostedUsage } = await import('@/lib/abuse/runtime')
+      return (await hostedUsage.status(workspaceId)).state
+    },
+  }
 }
 
 /** A slow source never holds up the turn: past this its part is left out. */
@@ -91,13 +97,14 @@ async function read<T>(work: () => Promise<T>, timeoutMs: number): Promise<T | n
   ]).finally(() => clearTimeout(timer))
 }
 
-export async function readExecutionFacts(userId: string, botId: string, from: ExecutionContextSource = source, timeoutMs = PART_TIMEOUT_MS): Promise<ExecutionFacts> {
+export async function readExecutionFacts(userId: string, botId: string, from?: ExecutionContextSource, timeoutMs = PART_TIMEOUT_MS): Promise<ExecutionFacts> {
+  const source = from ?? defaultSource(userId, botId)
   const [workspace, devices, order, e2b, hosted] = await Promise.all([
-    read(() => from.workspace(userId, botId), timeoutMs),
-    read(() => from.devices(userId, botId), timeoutMs),
-    read(() => from.order(userId, botId), timeoutMs),
-    read(() => from.e2b(userId, botId), timeoutMs),
-    read(() => from.hosted(userId, botId), timeoutMs),
+    read(() => source.workspace(userId, botId), timeoutMs),
+    read(() => source.devices(userId, botId), timeoutMs),
+    read(() => source.order(userId, botId), timeoutMs),
+    read(() => source.e2b(userId, botId), timeoutMs),
+    read(() => source.hosted(userId, botId), timeoutMs),
   ])
   return { workspace, devices, order, e2b, hosted }
 }
@@ -145,12 +152,12 @@ export function executionContextText(facts: ExecutionFacts): string {
   return lines.join('\n')
 }
 
-export async function executionContext(userId: string, botId: string, from: ExecutionContextSource = source, timeoutMs = PART_TIMEOUT_MS): Promise<string> {
+export async function executionContext(userId: string, botId: string, from?: ExecutionContextSource, timeoutMs = PART_TIMEOUT_MS): Promise<string> {
   return executionContextText(await readExecutionFacts(userId, botId, from, timeoutMs))
 }
 
 /** The turn's execution facts split for the prompt cache: the allowed models list (cached prefix) and the rest (per turn). */
-export async function executionContextParts(userId: string, botId: string, from: ExecutionContextSource = source, timeoutMs = PART_TIMEOUT_MS): Promise<{ models: string; live: string }> {
+export async function executionContextParts(userId: string, botId: string, from?: ExecutionContextSource, timeoutMs = PART_TIMEOUT_MS): Promise<{ models: string; live: string }> {
   const facts = await readExecutionFacts(userId, botId, from, timeoutMs)
   return { models: modelListText(facts), live: executionContextText(facts) }
 }

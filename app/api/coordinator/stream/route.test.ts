@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
+import { createHash } from 'node:crypto'
 import { drizzle } from 'drizzle-orm/pg-proxy'
 import { fingerprint, type SecretFingerprint } from '@/lib/credentials/fingerprint'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
@@ -30,7 +31,7 @@ const db = drizzle(async (sql, params) => {
 const getSession = mock.fn(async (_options: unknown) => session)
 const loadFingerprints = mock.fn(async (_userId: string) => fingerprints)
 const start = (id = 'turn:0'): CoordinatorWorkflowStreamPart => ({ type: 'coordinator-turn-start', id, quietEligible: false })
-const delta = (text: string): CoordinatorWorkflowStreamPart => ({ type: 'text-delta', id: '0', text })
+const delta = (text: string): Extract<CoordinatorWorkflowStreamPart, { type: 'text-delta' }> => ({ type: 'text-delta', id: '0', text })
 const committed = (): CoordinatorWorkflowStreamPart => ({ type: 'coordinator-turn-committed', id: 'turn:0', through: 3, quiet: false })
 const partsStream = (parts: CoordinatorWorkflowStreamPart[]) => new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) {
   for (const part of parts) controller.enqueue(part)
@@ -39,13 +40,14 @@ const partsStream = (parts: CoordinatorWorkflowStreamPart[]) => new ReadableStre
 let source: () => ReadableStream<CoordinatorWorkflowStreamPart>
 const readStream = mock.fn(() => source())
 const getRun = mock.fn((_runId: string) => ({ getReadable: readStream }))
+const logInfo = mock.method(console, 'info', () => {})
 let GET: typeof import('./route')['GET']
 before(async () => {
   mock.module(new URL('../../../../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession } } } })
   mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { db } })
   mock.module(new URL('../../../../lib/credentials/chat-guard.ts', import.meta.url).href, { namedExports: { credentialChatFingerprints: loadFingerprints } })
   mock.module(new URL('../../../../lib/request-log.ts', import.meta.url).href, { namedExports: {
-    noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler,
+    noteLogRpcAction: () => {}, noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler,
   } })
   mock.module('workflow/api', { namedExports: { getRun } })
   mock.module(new URL('../../../../lib/coordinator/coordinator-bot.ts', import.meta.url).href, { namedExports: {
@@ -65,6 +67,7 @@ beforeEach(() => {
   ]
   fingerprints = []; queries.length = 0
   getSession.mock.resetCalls(); loadFingerprints.mock.resetCalls(); getRun.mock.resetCalls(); readStream.mock.resetCalls()
+  logInfo.mock.resetCalls()
   source = () => partsStream([start(), delta('visible reply'), committed()])
 })
 const call = (params: Record<string, string> = {}, headers: Record<string, string> = {}) => GET(new Request(`https://mikka.example/mikka/api/coordinator/stream?${new URLSearchParams(params)}`, { headers }))
@@ -83,6 +86,51 @@ test('reconnect sends only events after the acknowledged cursor and resets for a
   assert.equal(reset.headers.get('x-mikka-stream-reset'), '1')
   assert.deepEqual((await events(reset)).map(event => event.type), ['start', 'text', 'committed'])
   assert.equal((await call({ after: '-1' })).status, 400)
+})
+
+test('a cursor from the earlier unscoped projection replays instead of skipping new chunk boundaries', async () => {
+  const oldKey = createHash('sha256').update(JSON.stringify(['wrun_owner', fingerprints])).digest('hex')
+  const response = await call({ after: '2' }, { 'x-mikka-stream-key': oldKey })
+  assert.equal(response.headers.get('x-mikka-stream-reset'), '1')
+  assert.deepEqual((await events(response)).map(event => event.type), ['start', 'text', 'committed'])
+  assert.equal(loadFingerprints.mock.callCount(), 1)
+  assert.equal(queries.length, 1)
+})
+
+test('HTTP projection diagnostics use the already loaded fingerprints and never log their values or reply text', async () => {
+  const old = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
+  try {
+    const secret = 'synthetic-fingerprint-source-'.repeat(4)
+    fingerprints = [fingerprint('owner', secret)]
+    source = () => partsStream([{ type: 'coordinator-turn-start', id: 'turn:0', quietEligible: false, modelStream: 'scoped-v1' },
+      { type: 'coordinator-model-part', id: 'turn:0', part: delta('synthetic short reply') },
+      { type: 'coordinator-turn-stopped', id: 'turn:0' },
+      { type: 'coordinator-model-part', id: 'turn:0', part: delta('must stay hidden') }, committed()])
+    const result = await events(await call())
+    assert.equal(result.filter(event => event.type === 'text').map(event => event.delta).join(''), 'synthetic short reply')
+    assert.equal(loadFingerprints.mock.callCount(), 1)
+    assert.equal(queries.length, 1)
+    assert.equal(logInfo.mock.callCount(), 1)
+    const serialized = logInfo.mock.calls[0].arguments[0] as string
+    const sample = JSON.parse(serialized)
+    assert.deepEqual(Object.keys(sample).sort(), ['msg', 'streamId', 'fingerprintCount', 'maxHoldback', 'firstRawTextMs', 'firstEmittedTextMs',
+      'committedMs', 'firstEmittedAtCommitted', 'firstBlockedByHoldback', 'quietEligible', 'stopped', 'terminal'].sort())
+    assert.equal(sample.msg, 'coordinator_stream_projection_timing')
+    assert.equal(sample.streamId, 'turn:0')
+    for (const [key, value] of Object.entries(sample)) {
+      if (key !== 'msg' && key !== 'streamId') assert.ok(value === null || typeof value === 'number' && Number.isFinite(value))
+    }
+    assert.equal(sample.fingerprintCount, 1)
+    assert.equal(sample.maxHoldback, secret.length - 1)
+    assert.equal(sample.firstBlockedByHoldback, 1)
+    assert.equal(sample.firstEmittedAtCommitted, 1)
+    assert.equal(sample.stopped, 1)
+    assert.equal(sample.terminal, 0)
+    for (const forbidden of [secret, fingerprints[0].digest, process.env.BETTER_AUTH_SECRET, 'synthetic short reply', 'must stay hidden']) {
+      assert.equal(serialized.includes(forbidden), false)
+    }
+  } finally { if (old === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = old }
 })
 
 test('authentication and malformed bot IDs fail before any chat or stream lookup', async () => {

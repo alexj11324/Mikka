@@ -11,6 +11,8 @@ import os
 import re
 import shutil
 import stat
+import sys
+import time
 from pathlib import Path
 
 ROOTS = ('/',)
@@ -101,6 +103,73 @@ def finalize_cli(manifest, kind, added_paths, relocate_from=None, relocate_to=No
     return validate_cli_manifest({**manifest, 'added': added}, kind)
 
 
+def file_sha256(handle):
+    digest = hashlib.sha256()
+    for block in iter(lambda: handle.read(1024 * 1024), b''):
+        digest.update(block)
+    return digest.hexdigest()
+
+
+def file_identity(info):
+    # Reading may change atime. Content, permissions and ownership changes
+    # change mtime/ctime; a replacement also changes the device/inode pair.
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def verify_cli(manifest_path, kind):
+    """Read the existing release receipt and verify every selected CLI's bytes.
+
+    This deliberately never calls finalize_cli: finalization establishes an
+    added binary's digest, whereas a release check must compare that digest.
+    All reads stay inside the caller's catalogue command deadline.
+    """
+    began = time.perf_counter()
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    try:
+        canonical_manifest = manifest_path.resolve(strict=True)
+        if not canonical_manifest.is_relative_to(PRIVATE):
+            raise ValueError('official_cli_manifest_untrusted')
+        # The worker directory is an intentional version-selection symlink;
+        # the root-owned 0444 receipt itself must be a bounded regular file.
+        with os.fdopen(os.open(manifest_path, flags), 'rb') as handle:
+            before = os.fstat(handle.fileno())
+            if (not stat.S_ISREG(before.st_mode) or before.st_uid != 0
+                    or stat.S_IMODE(before.st_mode) != 0o444 or before.st_size > 8192):
+                raise ValueError('official_cli_manifest_untrusted')
+            raw = handle.read(8193)
+            if len(raw) > 8192:
+                raise ValueError('official_cli_manifest_untrusted')
+            manifest = validate_cli_manifest(json.loads(raw), kind)
+            checked = []
+            for harness in CLI_NAMES:
+                selected = manifest['original'][harness] or manifest['added'].get(harness)
+                if selected is None:
+                    continue
+                started = time.perf_counter()
+                path = Path(selected['path'])
+                if path.resolve(strict=True) != path:
+                    raise ValueError('runtime_cli_changed')
+                with os.fdopen(os.open(path, flags), 'rb') as binary:
+                    initial = os.fstat(binary.fileno())
+                    if not stat.S_ISREG(initial.st_mode) or not os.access(path, os.X_OK):
+                        raise ValueError('runtime_cli_unavailable')
+                    digest = file_sha256(binary)
+                    if (digest != selected['sha256']
+                            or file_identity(os.fstat(binary.fileno())) != file_identity(initial)
+                            or path.resolve(strict=True) != path
+                            or file_identity(path.lstat()) != file_identity(initial)):
+                        raise ValueError('runtime_cli_changed')
+                checked.append({'harness': harness, 'bytes': initial.st_size,
+                                'elapsedMs': round((time.perf_counter() - started) * 1000), 'matched': True})
+            if (manifest_path.resolve(strict=True) != canonical_manifest
+                    or file_identity(os.fstat(handle.fileno())) != file_identity(before)
+                    or file_identity(manifest_path.lstat()) != file_identity(before)):
+                raise ValueError('official_cli_manifest_changed')
+    except OSError as error:
+        raise ValueError('runtime_cli_unavailable') from error
+    return {'kind': kind, 'files': checked, 'elapsedMs': round((time.perf_counter() - began) * 1000)}
+
+
 def finalization_policy(kind):
     raw = FINALIZATION_POLICY.read_bytes()
     policy = json.loads(raw)
@@ -150,11 +219,9 @@ def entry(path):
     if stat.S_ISLNK(info.st_mode):
         row.update(kind='link', target=os.readlink(path))
     elif stat.S_ISREG(info.st_mode):
-        digest = hashlib.sha256()
         with path.open('rb') as handle:
-            for block in iter(lambda: handle.read(1024 * 1024), b''):
-                digest.update(block)
-        row.update(kind='file', sha256=digest.hexdigest())
+            digest = file_sha256(handle)
+        row.update(kind='file', sha256=digest)
     elif stat.S_ISDIR(info.st_mode):
         row.update(kind='directory')
     else:
@@ -215,10 +282,15 @@ def verify(manifest, e2b_finalization=None):
     if manifest.get('version') != 1 or not manifest.get('entries'):
         raise ValueError('official_manifest_invalid')
     before = manifest['entries']
-    try:
-        after = [entry(Path(row['path'])) for row in before]
-    except (FileNotFoundError, NotADirectoryError) as error:
-        raise RuntimeError('official_files_removed') from error
+    after = []
+    for row in before:
+        try:
+            after.append(entry(Path(row['path'])))
+        except (FileNotFoundError, NotADirectoryError) as error:
+            # Identify the protected entry, not arbitrary exception text or a
+            # symlink target outside the original manifest. Refusal is unchanged.
+            detail = json.dumps({'path': row['path']}, separators=(',', ':'))
+            raise RuntimeError('official_files_removed ' + detail) from error
     changed = [{'path': original['path'], 'kind': original['kind'], 'before': {key: original.get(key) for key in set(original) | set(current) if original.get(key) != current.get(key)},
                 'after': {key: current.get(key) for key in set(original) | set(current) if original.get(key) != current.get(key)}}
                for original, current in zip(before, after) if original != current]
@@ -256,7 +328,7 @@ def verify(manifest, e2b_finalization=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['capture', 'verify', 'cli-capture', 'cli-finalize', 'cli-check'])
+    parser.add_argument('action', choices=['capture', 'verify', 'cli-capture', 'cli-finalize', 'cli-check', 'cli-verify'])
     parser.add_argument('manifest', type=Path)
     parser.add_argument('--receipt', type=Path)
     parser.add_argument('--e2b-finalization', choices=['claude', 'codex', 'desktop'])
@@ -267,6 +339,13 @@ def main():
     parser.add_argument('--relocate-from', type=Path)
     parser.add_argument('--relocate-to', type=Path)
     args = parser.parse_args()
+    if args.action == 'cli-verify':
+        if args.receipt:
+            parser.error('cli_verify_is_read_only')
+        result = verify_cli(args.manifest, args.kind)
+        # Keep the following catalogue command's stdout an array only.
+        print('mikka-cli-verification ' + json.dumps(result, separators=(',', ':')), file=sys.stderr, flush=True)
+        return
     if args.action == 'capture':
         # Refuse to replace a prior baseline, including a dangling symlink.
         with args.manifest.open('x') as handle:

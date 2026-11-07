@@ -1,3 +1,4 @@
+import { readCompactRunFailure, type CompactRunFailure } from './run-failure-view'
 import { runIsActive, runSummaryText } from './issue-run-conversation'
 import type { RunChain } from './run-chain'
 
@@ -7,6 +8,7 @@ import type { RunChain } from './run-chain'
  * agent, output or messages, and cannot open or join it.
  */
 export interface IssueThread {
+  failureDetails?: CompactRunFailure | null
   id: string
   status: string
   /** How the run came out once it ended (R-52); null while running or not judged yet. */
@@ -45,6 +47,7 @@ export interface IssueThread {
 }
 
 export interface IssueThreadAttempt {
+  failureDetails?: CompactRunFailure | null
   runId: string
   /** 1-based; the root run is attempt 1. */
   attempt: number
@@ -60,11 +63,11 @@ export type ThreadQuestion = 'waiting' | 'resuming' | null
 /** Attach the run's resolved chain; without one the thread is a one-attempt chain. */
 export function withRunChain(thread: IssueThread, chain: RunChain | null | undefined): IssueThread {
   if (!chain) return thread
-  const attempts = chain.attempts.map(attempt => ({ runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
+  const attempts = chain.attempts.map(attempt => ({ ...(attempt.failureDetails ? { failureDetails: readCompactRunFailure(attempt.failureDetails) } : {}), runId: attempt.runId, attempt: attempt.attempt, status: attempt.status, outcome: attempt.outcome ?? null,
     stopping: runIsActive(attempt.status) && !!attempt.stopRequestedAt, createdAt: attempt.createdAt, finishedAt: attempt.finishedAt }))
   const latest = attempts.find(attempt => attempt.runId === chain.latestRunId)
   return {
-    ...thread, rootRunId: chain.rootRunId, latestRunId: chain.latestRunId, attempts,
+    ...thread, rootRunId: chain.rootRunId, latestRunId: chain.latestRunId, attempts, failureDetails: readCompactRunFailure(latest?.failureDetails),
     continuation: latest && latest.runId !== thread.id ? { id: latest.runId, status: latest.status, outcome: latest.outcome ?? null, stopping: latest.stopping } : null,
   }
 }
@@ -119,7 +122,7 @@ export const ISSUE_THREAD_LIMIT = 20
 
 export interface IssueThreadRow {
   id: string; issueId: string | null; userId: string; status: string; prompt: string
-  report: unknown; error: string | null; createdAt: Date; finishedAt: Date | null
+  report: unknown; error: string | null; failureDetails?: unknown; createdAt: Date; finishedAt: Date | null
   agentName: string; harness: string; ownerName?: string | null
   stopRequestedAt?: Date | null
   outcome?: string | null
@@ -166,6 +169,7 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id))
     .slice(0, ISSUE_THREAD_LIMIT)
     .map(row => ({
+      failureDetails: readCompactRunFailure(row.failureDetails),
       id: row.id, status: row.status, outcome: row.outcome ?? null, createdAt: row.createdAt, finishedAt: row.finishedAt, ownedByCurrentUser: row.userId === viewerId,
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,

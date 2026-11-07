@@ -1,5 +1,7 @@
 import type { ChatFailure } from './types'
 import { subscriptionRecovery, type SubscriptionRefusalNotice } from '../../../lib/subscription-refusal'
+import messages from '../../../messages/zh-CN.json'
+import type { CloudErrorCode } from '../../../lib/cloud-services/errors'
 
 const SUBSCRIPTION_LINES = {
   unavailable: '所选订阅不可用', reconnect: '订阅需要重新连接', quotaUsed: '订阅额度已用完', retry: '订阅暂时不可用',
@@ -8,7 +10,12 @@ const SUBSCRIPTION_LINES = {
   modelNotReported: '云电脑没报告能跑这个模型',
 } satisfies Record<SubscriptionRefusalNotice, string>
 
-interface FailureLine { text: string; retry: boolean; recovery: 'models' | 'model' | 'billing' | null }
+interface FailureLine { text: string; retry: boolean; recovery: 'models' | 'model' | 'billing' | 'cloudBilling' | null }
+const CLOUD_RECOVERY = {
+  cloud_not_connected: 'model', cloud_scope_missing: 'model', cloud_server_revoked: 'model',
+  cloud_invalid_request: 'model', cloud_access_denied: 'model', cloud_quota_exhausted: 'cloudBilling',
+  cloud_rate_limited: 'retry', cloud_unavailable: 'retry',
+} satisfies Record<CloudErrorCode, 'model' | 'cloudBilling' | 'retry'>
 
 /**
  * A failed reply's line on the phone, in the web chat's words
@@ -17,6 +24,11 @@ interface FailureLine { text: string; retry: boolean; recovery: 'models' | 'mode
  * is still retrying offers no 重试. Unknown newer codes stay readable.
  */
 export function failureLine(failure: ChatFailure): FailureLine {
+  if (failure.kind === 'failed' && failure.cloudCode && Object.hasOwn(CLOUD_RECOVERY, failure.cloudCode)) {
+    const recovery = CLOUD_RECOVERY[failure.cloudCode], retry = recovery === 'retry'
+    return { text: messages.RunErrors[failure.cloudCode].default, retry,
+      recovery: recovery === 'retry' ? null : recovery }
+  }
   switch (failure.kind) {
     case 'subscription': {
       if (!Object.hasOwn(SUBSCRIPTION_LINES, failure.notice)) return { text: SUBSCRIPTION_LINES.retry, retry: true, recovery: null }
@@ -34,6 +46,7 @@ export function failureLine(failure: ChatFailure): FailureLine {
     }
     case 'failed': return failure.reason === 'balance'
       ? { text: 'API 余额不足', retry: false, recovery: 'model' }
+      : failure.reason === 'tools' ? { text: '回复未完成，请重试', retry: true, recovery: null }
       : { text: '回复失败', retry: true, recovery: null }
   }
 }
