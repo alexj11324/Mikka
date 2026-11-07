@@ -1,11 +1,11 @@
 # Fresh diagnostic window after exact removal of the preceding window.
 # Reuse only the same independently verified idle Bot. No task/Profile/model/VM creation.
-# Normal child of 9f9ad0d4; original Bot receipt identity remains 5cd03921.
+# Normal child of 302ea829; exact prior prepared receipt is embedded and hash-bound.
 # Prepared before merge; create this helper ref only after latest CI and actual writers permit release.
-name: Issue 1505 prepare scoped diagnostic window
+name: Issue 1505 renew exact owned diagnostic window
 on:
   push:
-    branches: [ops/1505-diagnostic-window-e33e3a91]
+    branches: [ops/1505-renew-window-e33-2308]
 permissions:
   contents: write
   id-token: write
@@ -18,15 +18,11 @@ jobs:
     if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    concurrency:
-      group: e2b-official-runtime-release
-      cancel-in-progress: false
-      queue: max
     defaults:
       run:
         working-directory: source
     env:
-      DIAGNOSTIC_WINDOW_GO: root-reviewed-1505-diagnostic-window-e33e3a91
+      DIAGNOSTIC_WINDOW_GO: root-reviewed-1505-renew-window-e33-2308
     steps:
       - name: Check out the exact temporary helper
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -46,11 +42,11 @@ jobs:
           node-version: 24
       - name: Verify immutable source and explicit root review before credentials
         run: |
-          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-diagnostic-window-e33e3a91'
+          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-renew-window-e33-2308'
           test "$GITHUB_RUN_ATTEMPT" = '1'
           test "$(git rev-parse HEAD)" = 'e33e3a91d4011efbe768b11b428a5d152ede744a'
           test "$(git rev-parse HEAD^{tree})" = 'b2e36d3351654fceec59fe138a55de31cb155df9'
-          printf '%s  %s\n' 'b47cf757a7ad3f9169992e0b8c4e857cbd3ff88579e1d0aefbb5a4324a9dc83b' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
+          printf '%s  %s\n' '266bed08ab45c16f6b7e88c33d7254835e9ba9e51296099be976f3168cb5396c' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
           node ../ops/scripts/ops/issue1505-diagnostic-window.mjs verify "$RUNNER_TEMP/diagnostic-window-preflight.json"
       - name: Read the existing SMOKE email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -88,9 +84,9 @@ jobs:
           secret-name: VERCEL_TEAM_TOKEN
           recursive: false
           include-imports: false
-      - name: Verify the exact existing idle Bot and prepare one fresh bounded window
+      - name: Remove the exact owned window, then verify the same idle Bot and prepare once
         id: prepare
-        run: node ../ops/scripts/ops/issue1505-diagnostic-window.mjs prepare "$RUNNER_TEMP/diagnostic-window.json"
+        run: node ../ops/scripts/ops/issue1505-diagnostic-window.mjs renew "$RUNNER_TEMP/diagnostic-window.json" "$RUNNER_TEMP/diagnostic-window-rotation.json"
       - name: Preserve the recovery record before any helper ref deletion
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -99,6 +95,8 @@ jobs:
           path: |
             ${{ runner.temp }}/diagnostic-window.json
             ${{ runner.temp }}/diagnostic-window-preflight.json
+            ${{ runner.temp }}/diagnostic-window-rotation.json
+            ${{ runner.temp }}/diagnostic-window-previous.json
             ops/scripts/ops/issue1505-diagnostic-window-original-42366750743.json
           if-no-files-found: error
           retention-days: 14
@@ -111,7 +109,7 @@ jobs:
         run: |
           import json, os, urllib.request, urllib.error
           from pathlib import Path
-          repo, branch = 'alexj11324/Mikka', 'ops/1505-diagnostic-window-e33e3a91'
+          repo, branch = 'alexj11324/Mikka', 'ops/1505-renew-window-e33-2308'
           assert os.environ['GITHUB_REPOSITORY'] == repo and os.environ['GITHUB_REF'] == 'refs/heads/' + branch
           receipt = {'branch': branch, 'expectedSha': os.environ['GITHUB_SHA'], 'status': 'failed'}
           class NoRedirect(urllib.request.HTTPRedirectHandler):

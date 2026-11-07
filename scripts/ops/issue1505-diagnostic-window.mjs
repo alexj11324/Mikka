@@ -7,20 +7,23 @@ import { execFileSync } from 'node:child_process'
 
 export const SOURCE = 'e33e3a91d4011efbe768b11b428a5d152ede744a'
 export const TREE = 'b2e36d3351654fceec59fe138a55de31cb155df9'
-export const BRANCH = 'ops/1505-diagnostic-window-e33e3a91'
-export const HELPER_PARENT = '9f9ad0d4e0424df488a5a2ac981fbdafbcffcc1f'
-export const HELPER_PARENT_TREE = '9b54db78ea828a61e97f3990011d54d2aad06bb3'
+export const BRANCH = 'ops/1505-renew-window-e33-2308'
+export const HELPER_PARENT = '302ea8293966e10dc5490fe129e813526540052f'
+export const HELPER_PARENT_TREE = 'ef05bc376d24129a4a9838fcb7bb1d6ce7feb067'
 export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
 export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
 export const KEY = 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW'
 export const ORIGIN = 'https://app.aspectlylabs.com'
-export const GO = 'root-reviewed-1505-diagnostic-window-e33e3a91'
+export const GO = 'root-reviewed-1505-renew-window-e33-2308'
 export const ORIGINAL = Object.freeze({
   receiptSha256: '12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5',
   helperCommit: '5cd039213a531476cde35500a2498bd3a5089556', helperTree: 'a841f19b0bab028bc386d6c768cce35496ca306b',
   runId: '42366750743', attempt: '1', fixtureId: '620a3647-b039-4909-8562-e3ff867d7324',
   botId: 'fdeea45f-8cb2-450a-96a4-d9a682f71482', botName: '测试1505 620a3647',
 })
+export const PREVIOUS_RECEIPT_SHA256 = '8b4682055612cda2f2e3cdf7264ea503f17d9abd74bb9212d02061ff55d18a99'
+const PREVIOUS_RECEIPT_BASE64 = 'ewogICJ2ZXJzaW9uIjogMSwKICAiaXNzdWUiOiAxNTA1LAogICJzb3VyY2VDb21taXQiOiAiZTMzZTNhOTFkNDAxMWVmYmU3NjhiMTFiNDI4YTVkMTUyZWRlNzQ0YSIsCiAgInNvdXJjZVRyZWUiOiAiYjJlMzZkMzM1MTY1NGZjZWVjNTlmZTEzOGE1NWRlMzFjYjE1NWRmOSIsCiAgInByb2plY3RJZCI6ICJwcmpfVmROejNQMEZtdVJiWktlSTQwaGJDcXdSME5WSCIsCiAgInRlYW1JZCI6ICJ0ZWFtX0M3bHd4VlZ2blVpY0ZsaTYxMTJtdnhwdiIsCiAgIndvcmtmbG93UnVuSWQiOiAiNDI0MjE5NDU2NTMiLAogICJhdHRlbXB0IjogIjEiLAogICJ3b3JrZmxvd0hlYWQiOiAiMzAyZWE4MjkzOTY2ZTEwZGM1NDkwZmUxMjllODEzNTI2NTQwMDUyZiIsCiAgImhlbHBlckJyYW5jaCI6ICJvcHMvMTUwNS1kaWFnbm9zdGljLXdpbmRvdy1lMzNlM2E5MSIsCiAgImZpeHR1cmVJZCI6ICIzMmFjZTdjOC1kZjVkLTRkY2UtYjhkNi1hYTkwOTYyY2I0N2QiLAogICJzdGFydGVkQXQiOiAiMjAyNi0xMS0wN1QyMjo0Nzo1OS45MDNaIiwKICAic3RhdHVzIjogInByZXBhcmVkIiwKICAic2NvcGUiOiAiZGVkaWNhdGVkX2JvdF9yZXBvc2l0b3J5X3dpbmRvdyIsCiAgIm1vZGVsc0Rpc3BhdGNoZWQiOiAwLAogICJ2aXJ0dWFsTWFjaGluZXNDcmVhdGVkIjogMCwKICAicHJvZmlsZXNDcmVhdGVkIjogMCwKICAiYm90Q3JlYXRpb25BdHRlbXB0ZWQiOiBmYWxzZSwKICAiYm90U3RvcEF0dGVtcHRlZCI6IGZhbHNlLAogICJyZXVzZWRGcm9tIjogewogICAgInJlY2VpcHRTaGEyNTYiOiAiMTJmNmYzNzU4YzM4MmRkNTVjOTA1NWIzYWIzMmY5ZDc4NWM2MjA1OTRjNjZhZDRkNDlhMjAzMGIzY2NkYThkNSIsCiAgICAid29ya2Zsb3dSdW5JZCI6ICI0MjM2Njc1MDc0MyIsCiAgICAiZml4dHVyZUlkIjogIjYyMGEzNjQ3LWIwMzktNDkwOS04NTYyLWUzZmY4NjdkNzMyNCIKICB9LAogICJjbGVhbnVwIjogewogICAgImJvdElkbGVWZXJpZmllZCI6IHRydWUsCiAgICAid29ya3NwYWNlUmVzdG9yZWQiOiB0cnVlLAogICAgInNpZ25lZE91dCI6IHRydWUsCiAgICAiZXJyb3JzIjogW10KICB9LAogICJ3aW5kb3ciOiB7CiAgICAia2V5IjogIk1JS0tBX0NMT1VEX0RJQUdOT1NUSUNfV0lORE9XIiwKICAgICJ2YWx1ZVNoYTI1NiI6ICIzY2Q5MTMwZmJhMDhhMWFiOGRjZjhmNWEzNTFlZjA1ZGUxYTk4NTE2NjU2ODk4ZWZjNWUwMWM4MDI2YzBkY2UyIiwKICAgICJleHBpcmVzQXQiOiAiMjAyNi0xMS0wOFQwMDo0ODowMi45OThaIiwKICAgICJkdXJhdGlvbk1pbnV0ZXMiOiAxMjAsCiAgICAid3JpdGVBdHRlbXB0ZWQiOiB0cnVlLAogICAgImNyZWF0aW9uQWNrbm93bGVkZ2VkIjogdHJ1ZSwKICAgICJyZWFkYmFja1ZlcmlmaWVkIjogdHJ1ZSwKICAgICJyZXF1aXJlc1N1YnNlcXVlbnRXZWJCdWlsZCI6IHRydWUsCiAgICAiYWN0aXZlRGVwbG95bWVudFJldm9rZWQiOiBmYWxzZSwKICAgICJpZCI6ICJUcFRLdWoyTldMYTNiZ2oxIgogIH0sCiAgIndpbmRvd0tleUFic2VudEJlZm9yZSI6IHRydWUsCiAgInJlcXVlc3Rlckhhc2giOiAiYjgyM2JhMWM1NzI5NzY4YjFkYTVjMzYxNWFiYTkxYWMzOTcyM2JkNGM1NGU5ZjM4MmIzZWQxMzY4ZDU4ZWM2ZSIsCiAgImFwcGxpY2F0aW9uQXRQcmVwYXJhdGlvbiI6ICI5ZWE3YjJjZDYxZGViNzI0ZjIwMzMwOTA2Zjg2ZGY2ZGYyY2Q5ODI4IiwKICAid29ya3NwYWNlSGFzaCI6ICJhMzgzMDdmNzU2MjBkZTRiZmUzYjM3NGVkMmQ1MTAwNDFkYTgwN2FmMDk0YzU3MWVhZmIwMzE4Y2UyMWYzNTM1IiwKICAibm9ybWFsU2Vzc2lvblZlcmlmaWVkIjogdHJ1ZSwKICAic2hhcmVkVGVhbVZlcmlmaWVkIjogdHJ1ZSwKICAiYm90SWQiOiAiZmRlZWE0NWYtOGNiMi00NTBhLTk2YTQtZDlhNjgyZjcxNDgyIiwKICAiYm90TmFtZSI6ICLmtYvor5UxNTA1IDYyMGEzNjQ3IiwKICAiYm90UmV0ZW50aW9uIjogInJldXNlZF9leGlzdGluZ19ub19kZWxldGVfYXBpIiwKICAiYm90T3duZWRBbmROYW1lZCI6IHRydWUsCiAgImJvdElkbGVIaXN0b3J5IjogewogICAgIml0ZW1zIjogMTgsCiAgICAiY3Vyc29yIjogNDQsCiAgICAicGVyc2lzdGVkU3RyZWFtcyI6IDEyLAogICAgInBlbmRpbmdJdGVtcyI6IDAKICB9LAogICJib3RJZGxlT2JzZXJ2ZWRBdCI6ICIyMDI2LTExLTA3VDIyOjQ4OjAyLjMzMloiLAogICJmaW5pc2hlZEF0IjogIjIwMjYtMTEtMDdUMjI6NDg6MDMuOTIyWiIKfQo='
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SHA = /^[0-9a-f]{64}$/
 const ID = /^[A-Za-z0-9_-]{1,200}$/
@@ -207,6 +210,73 @@ export async function removeOwnedWindow(report, { token, fetchImpl = fetch, now 
     expirationDeadlinePassedAtObservation: now() >= Date.parse(report.window.expiresAt), observedAt: new Date(now()).toISOString() }
 }
 
+
+/** The preceding owned receipt is immutable public recovery metadata, never a credential. */
+export function readPreviousWindow(bytes = Buffer.from(PREVIOUS_RECEIPT_BASE64, 'base64')) {
+  check(hash(bytes) === PREVIOUS_RECEIPT_SHA256, 'previous_receipt_changed')
+  const report = JSON.parse(bytes.toString('utf8'))
+  check(report.version === 1 && report.issue === 1505 && report.status === 'prepared'
+    && report.sourceCommit === SOURCE && report.sourceTree === TREE
+    && report.workflowHead === HELPER_PARENT && report.workflowRunId === '42421945653' && report.attempt === '1'
+    && report.projectId === PROJECT && report.teamId === TEAM
+    && report.botId === ORIGINAL.botId && report.botName === ORIGINAL.botName
+    && report.requesterHash === 'b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e'
+    && report.workspaceHash === 'a38307f75620de4bfe3b374ed2d510041da807af094c571eafb0318ce21f3535'
+    && report.window?.key === KEY && report.window.id === 'TpTKuj2NWLa3bgj1'
+    && report.window.valueSha256 === '3cd9130fba08a1ab8dcf8f5a351ef05de1a98516656898efc5e01c8026c0dce2'
+    && report.window.expiresAt === '2026-11-08T00:48:02.998Z' && report.window.durationMinutes === 120
+    && report.window.readbackVerified === true && report.window.creationAcknowledged === true
+    && report.cleanup?.botIdleVerified === true && report.cleanup.workspaceRestored === true && report.cleanup.signedOut === true
+    && Array.isArray(report.cleanup.errors) && report.cleanup.errors.length === 0
+    && report.botCreationAttempted === false && report.botStopAttempted === false
+    && report.modelsDispatched === 0 && report.virtualMachinesCreated === 0 && report.profilesCreated === 0,
+    'previous_receipt_invalid')
+  return report
+}
+
+/** Main supplies only the pinned preceding receipt. No request retry or uncertain-write recovery is automatic. */
+export async function renewWindow({ previous, env, helpers, reuse, fetchImpl = fetch, now = Date.now,
+  save = async () => {}, saveRotation = async () => {} }) {
+  const report = { version: 1, issue: 1505, sourceCommit: SOURCE, sourceTree: TREE,
+    workflowRunId: env.GITHUB_RUN_ID, attempt: env.GITHUB_RUN_ATTEMPT, workflowHead: env.GITHUB_SHA,
+    helperBranch: BRANCH, operation: 'replace_owned_diagnostic_window', status: 'running',
+    previousReceiptSha256: PREVIOUS_RECEIPT_SHA256, previousWorkflowRunId: previous.workflowRunId,
+    previousWindow: { id: previous.window.id, valueSha256: previous.window.valueSha256, expiresAt: previous.window.expiresAt },
+    startedAt: new Date(now()).toISOString(), removal: null, newWindow: null,
+    modelsDispatched: 0, virtualMachinesCreated: 0, profilesCreated: 0, activeDeploymentRevoked: false }
+  let stage = 'persist_previous_ownership'
+  const persist = async () => {
+    try { await saveRotation(report) }
+    catch (cause) { throw Object.assign(new Error('recovery_artifact_write_failed', { cause }), { windowCode: 'recovery_artifact_write_failed' }) }
+  }
+  try {
+    await persist()
+    stage = 'remove_previous_window'
+    report.removal = await removeOwnedWindow(previous, { token: env.VERCEL_TEAM_TOKEN, fetchImpl, now })
+    stage = 'persist_previous_removal'
+    await persist()
+    stage = 'prepare_fresh_window'
+    const prepared = await prepareWindow({ env, helpers, reuse, fetchImpl, now, save })
+    report.newWindow = prepared.window
+    report.newFixtureId = prepared.fixtureId
+    check(prepared.status === 'prepared', 'fresh_window_not_prepared')
+    report.status = 'renewed'
+  } catch (error) {
+    report.status = 'failed'; report.error = { stage, ...closedError(error) }
+    report.recovery = { preserveHelperRef: true, repeatPreparationAutomatically: false,
+      previousWindowMayRemain: report.removal?.projectEnvironmentRemoved !== true,
+      newWindowWriteMayExist: report.newWindow?.writeAttempted === true }
+  } finally {
+    report.finishedAt = new Date(now()).toISOString()
+    try { await persist() }
+    catch { report.status = 'failed'; report.error ??= { stage: 'save_rotation', code: 'recovery_artifact_write_failed' }
+      report.recovery = { preserveHelperRef: true, repeatPreparationAutomatically: false,
+        previousWindowMayRemain: report.removal?.projectEnvironmentRemoved !== true,
+        newWindowWriteMayExist: report.newWindow?.writeAttempted === true } }
+  }
+  return report
+}
+
 async function main() {
   const [mode, output, input] = process.argv.slice(2)
   check(process.env.DIAGNOSTIC_WINDOW_GO === GO && process.env.GITHUB_REPOSITORY === 'alexj11324/Mikka'
@@ -222,17 +292,23 @@ async function main() {
   check(JSON.stringify(execFileSync('git', ['-C', opsRoot, 'diff', '--name-only', HELPER_PARENT, 'HEAD'], { encoding: 'utf8' }).trim().split('\n').sort())
     === JSON.stringify(['.github/workflows/issue1505-diagnostic-window.yml', 'scripts/ops/issue1505-diagnostic-window.mjs']), 'helper_files_not_pinned')
   const reuse = readOriginalBot(await readFile(new URL('./issue1505-diagnostic-window-original-42366750743.json', import.meta.url)))
-  check(['verify', 'prepare', 'remove'].includes(mode) && typeof output === 'string' && output.length > 0, 'arguments_invalid')
+  const previous = readPreviousWindow()
+  check(previous.requesterHash === reuse.requesterHash && previous.workspaceHash === reuse.workspaceHash, 'previous_owner_changed')
+  check(['verify', 'renew', 'remove'].includes(mode) && typeof output === 'string' && output.length > 0, 'arguments_invalid')
   const save = async data => { await mkdir(dirname(resolve(output)), { recursive: true }); await writeFile(output, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 }) }
+  await mkdir(dirname(resolve(output)), { recursive: true })
+  await writeFile(resolve(dirname(output), 'diagnostic-window-previous.json'), Buffer.from(PREVIOUS_RECEIPT_BASE64, 'base64'), { mode: 0o600 })
   let report
   if (mode === 'verify') {
     report = { status: 'verified', sourceCommit: SOURCE, sourceTree: TREE, originalReceiptSha256: ORIGINAL.receiptSha256,
-      botId: reuse.botId, modelCalls: 0, accountCalls: 0 }
+      botId: reuse.botId, previousReceiptSha256: PREVIOUS_RECEIPT_SHA256, previousWindowId: previous.window.id, modelCalls: 0, accountCalls: 0 }
     await save(report)
-  } else if (mode === 'prepare') {
+  } else if (mode === 'renew') {
+    check(typeof input === 'string' && input.length > 0 && resolve(input) !== resolve(output), 'rotation_record_missing')
+    const saveRotation = async data => { await mkdir(dirname(resolve(input)), { recursive: true }); await writeFile(input, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 }) }
     const helpers = await import(pathToFileURL(resolve('scripts/acceptance/cloud-startup.mjs')).href)
-    report = await prepareWindow({ env: process.env, helpers, reuse, save })
-    if (report.status !== 'prepared') process.exitCode = 1
+    report = await renewWindow({ previous, env: process.env, helpers, reuse, save, saveRotation })
+    if (report.status !== 'renewed') process.exitCode = 1
   } else {
     check(typeof input === 'string', 'cleanup_record_missing')
     report = await removeOwnedWindow(JSON.parse(await readFile(input, 'utf8')), { token: process.env.VERCEL_TEAM_TOKEN })
