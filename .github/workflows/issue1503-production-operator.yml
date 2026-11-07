@@ -59,7 +59,7 @@ jobs:
         run: node --import tsx scripts/ops/issue1503/delivery.mjs
         env:
           NODE_ENV: production
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: f811448d805e7baa7b032fd6ae62d991f59966c8
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 1edbeca687119eb0ef71f209ac3d411fbc85b888
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: claude_code
           MIKKA_1503_CODEX_QUESTION: '0'
@@ -77,7 +77,7 @@ jobs:
         run: node --import tsx scripts/ops/issue1503/delivery.mjs
         env:
           NODE_ENV: production
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: f811448d805e7baa7b032fd6ae62d991f59966c8
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 1edbeca687119eb0ef71f209ac3d411fbc85b888
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: codex
           MIKKA_1503_CODEX_QUESTION: '1'
