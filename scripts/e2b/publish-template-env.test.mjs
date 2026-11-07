@@ -14,6 +14,13 @@ const POLICY_SHA = createHash('sha256').update(readFileSync(new URL('./e2b-final
 const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
   kind, policySha256: POLICY_SHA, before: PROOF, after: PROOF, originalBefore: PROOF, originalAfter: PROOF, providerChanges: [],
 } })
+const ROOT_CA = '/usr/local/share/ca-certificates/e2b-ca.crt'
+// Desktop is official-only artifact 13538924302; Claude is the d63 fresh-scan
+// failure (42326876749 / 128264238545), not by itself a production gate pass.
+const ROOT_CA_ROTATIONS = {
+  desktop: ['7177f680c9c87f91ff9ab72a4409511cc4781d7c3dc549f302bfa17bd973b6b9', '88a5a279fec06a155bf9de1dd28abc93aae0f17db5f9febe69d5e25b15f8ff4d'],
+  claude: ['fd1175201e861f159f0d6ae42523b0f5d754ade8a36d105e8b7110b180101862', '21899698fbaa1da5314e42bc049b146f16cddb2e7540822b2a15f009f8342996'],
+}
 const mcpTiming = (runId, harness) => ({ version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children',
   generationCoverage: 'unverified', allFirstPartyHttpComplete: false, remoteMcpServerCount: 0, childPathAuditVersion: 1,
   runIdHash: createHash('sha256').update(runId).digest('hex').slice(0, 16), harness, startedAt: 1010, endedAt: 1900,
@@ -55,6 +62,61 @@ test('conservation requires both strict installation and exact provider-only fin
     const invalid = structuredClone(proof); mutate(invalid)
     assert.throws(() => assertConservation(invalid, 'claude'), /runtime_release_conservation_invalid/)
   }
+})
+
+for (const [kind, [beforeSha, afterSha]] of Object.entries(ROOT_CA_ROTATIONS)) {
+  test(`${kind} exact root CA rotation permits only finalization with an unchanged installation proof`, () => {
+    for (const modeChanged of [false, true]) {
+      const proof = conservation(kind)
+      proof.finalization.originalAfter = { ...PROOF, sha256: 'e'.repeat(64) }
+      proof.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file',
+        before: { sha256: beforeSha, ...(modeChanged ? { mode: 420 } : {}) },
+        after: { sha256: afterSha, ...(modeChanged ? { mode: 511 } : {}) } }]
+      assert.doesNotThrow(() => assertConservation(proof, kind))
+      const invalid = structuredClone(proof)
+      invalid.after = proof.finalization.originalAfter
+      assert.throws(() => assertConservation(invalid, kind), /runtime_release_conservation_invalid/)
+    }
+  })
+}
+
+test('exact root CA publication rules preserve metadata and reject other certificate or CLI paths', () => {
+  const [beforeSha, afterSha] = ROOT_CA_ROTATIONS.desktop
+  const forbidden = [
+    { before: { uid: 0 }, after: { uid: 1000 } },
+    { before: { gid: 0 }, after: { gid: 1000 } },
+    { before: { mode: 420 }, after: { mode: 438 } },
+    { before: { kind: 'file', sha256: beforeSha, target: null }, after: { kind: 'link', sha256: null, target: '/opt/mikka/replaced.crt' } },
+    { before: { kind: 'file', sha256: beforeSha, target: null }, after: { kind: 'link', sha256: null, target: ROOT_CA } },
+    { before: { kind: 'file', sha256: beforeSha }, after: { kind: 'directory', sha256: null } },
+  ]
+  for (const kind of ['claude', 'desktop', 'codex']) {
+    for (const fields of forbidden) {
+      const proof = conservation(kind)
+      proof.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', ...fields }]
+      assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+    }
+    for (const path of ['/usr/local/share/ca-certificates/unobserved.crt', '/usr/local/share/ca-certificates/e2b-ca.crt.backup',
+      '/etc/ssl/certs/unobserved.crt', '/usr/local/bin/claude', '/usr/local/bin/codex']) {
+      const proof = conservation(kind)
+      proof.finalization.providerChanges = [{ path, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }]
+      assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+    }
+    for (const side of ['before', 'after']) {
+      for (const value of [null, '', 'f'.repeat(63), 'g'.repeat(64), 'A'.repeat(64), 123]) {
+        const proof = conservation(kind)
+        const change = { path: ROOT_CA, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }
+        change[side].sha256 = value
+        proof.finalization.providerChanges = [change]
+        assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+      }
+    }
+  }
+  const codex = conservation('codex')
+  codex.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }]
+  assert.doesNotThrow(() => assertConservation(codex, 'codex'))
+  codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }
+  assert.throws(() => assertConservation(codex, 'codex'), /runtime_release_conservation_invalid/)
 })
 
 test('certificate conversion proof fixes the original bytes and exact link target', () => {
