@@ -67,7 +67,7 @@ class Publish(unittest.TestCase):
                 bt.assert_new_template('mikka-new-claude', 'fixture-key')
 
     def test_model_probe_requires_each_declared_harness_and_kills_only_its_sandbox(self):
-        calls = []
+        calls, created = [], []
         class Probe:
             def __init__(self, reports):
                 self.commands = self
@@ -77,13 +77,47 @@ class Publish(unittest.TestCase):
                 return SimpleNamespace(exit_code=0, stdout=json.dumps(self.reports))
             def kill(self): calls.append('killed')
         reports = [{'harness': 'codex', 'installed': True, 'version': None, 'models': ['fixture-model']}]
-        factory = lambda *args, **kwargs: Probe(reports)
+        def factory(*args, **kwargs):
+            created.append((args, kwargs))
+            return Probe(reports)
         self.assertEqual(bt.probe_models('tpl1', 'codex', 'fixture-key', factory), reports)
-        self.assertIn('--probe-models', calls[0][0])
+        self.assertTrue(calls[0][0].endswith('/opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js'))
+        self.assertNotIn('cloud-worker.js', calls[0][0])
+        self.assertEqual(calls[0][1], {'user': 'user', 'timeout': 45})
+        self.assertEqual(created[0][0], ('tpl1',))
+        self.assertEqual(created[0][1]['timeout'], 60)
         self.assertEqual(calls[-1], 'killed')
         with self.assertRaisesRegex(RuntimeError, 'model_probe_missing claude_code'):
             bt.probe_models('tpl1', 'desktop', 'fixture-key', factory)
         self.assertEqual(calls[-1], 'killed')
+
+    def test_official_instance_validation_uses_the_same_standalone_probe(self):
+        module_spec = importlib.util.spec_from_file_location('validate_official', Path(__file__).with_name('validate-official-instances.py'))
+        validator = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(validator)
+        calls, killed = [], []
+        class Probe:
+            def __init__(self, kind):
+                self.kind, self.sandbox_id, self.commands = kind, 'fixture-instance', self
+            def run(self, command, **options):
+                calls.append((command, options))
+                harnesses = ['claude_code', 'codex'] if self.kind == 'desktop' else ['claude_code' if self.kind == 'claude' else 'codex']
+                data = [{'harness': harness, 'installed': True, 'models': ['fixture-model']} for harness in harnesses]
+                return SimpleNamespace(exit_code=0, stdout=json.dumps(data if 'node dist/cloud/' in command else {'entries': 1, 'sha256': 'f' * 64}))
+            def kill(self): killed.append(self.kind)
+        sdk = SimpleNamespace(Sandbox=SimpleNamespace(create=lambda kind, **_: Probe(kind)))
+        with patch.dict('sys.modules', {'e2b': sdk}), patch.dict(validator.os.environ, {'E2B_API_KEY': 'fixture-key'}), \
+                patch.object(validator.digest, 'commit', return_value='a' * 40), \
+                patch.object(validator.digest, 'worker_hash', return_value='b' * 40), \
+                patch.object(validator.subprocess, 'check_output', return_value='# fixture bootstrap'):
+            validator.validate()
+        probes = [(command, options) for command, options in calls if 'node dist/cloud/' in command]
+        self.assertEqual(len(probes), 3)
+        for command, options in probes:
+            self.assertTrue(command.endswith('node dist/cloud/cloud-model-probe.js'))
+            self.assertNotIn('cloud-worker.js', command)
+            self.assertEqual(options, {'user': 'user', 'timeout': 100})
+        self.assertEqual(killed, ['desktop', 'claude', 'codex'])
 
     def test_capability_manifest_matches_template_kinds_and_task_environment(self):
         manifest = json.loads((bt.ROOT / 'scripts/e2b/template-capabilities.json').read_text())

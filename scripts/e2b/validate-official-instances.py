@@ -49,7 +49,7 @@ def validate(source_ref='HEAD'):
             after = json.loads(sandbox.commands.run(MANIFEST, user='root', timeout=100).stdout)
             if before != after:
                 raise RuntimeError(f'official_files_changed {kind}')
-            probe = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; cd /opt/mikka/worker/packages/daemon; node dist/cloud/cloud-worker.js --probe-models', user='user', timeout=100)
+            probe = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; cd /opt/mikka/worker/packages/daemon; node dist/cloud/cloud-model-probe.js', user='user', timeout=100)
             models = json.loads(probe.stdout)
             for harness in (['claude_code', 'codex'] if kind == 'desktop' else ['claude_code' if kind == 'claude' else 'codex']):
                 if not any(row.get('harness') == harness and row.get('installed') is True and (row.get('models') or row.get('modelSlots')) for row in models):

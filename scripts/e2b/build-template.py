@@ -426,7 +426,7 @@ def probe_models(template_id, kind, api_key, sandbox_factory=None):
     required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
     sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60, metadata=release_metadata())
     try:
-        result = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --probe-models', user='user', timeout=45)
+        result = sandbox.commands.run('export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH; /opt/mikka/runtime/node/bin/node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-model-probe.js', user='user', timeout=45)
         if result.exit_code != 0:
             raise RuntimeError('model_probe_failed')
         reports = json.loads(result.stdout)
