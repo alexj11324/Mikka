@@ -31,9 +31,17 @@ briefing in the morning and see what is waiting on me.
 
 ## Where it lives
 
-The app is the system tab bar with four tabs, 对话 · 线程 · 建议 · 设置, and a
+The app is the system tab bar with four tabs, **Bot · 任务 · 建议 · 设置**, and a
 search tab at its trailing end
-([decision](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md)). Each tab is
+([decision](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md); tab names and
+the 任务 tab since [2026-11-07](decisions/2026-11-07-2045-tasks-only-threads-inside.md)).
+Lists show tasks only; a thread opens from its task's 活动, pushed over the task.
+The Bot tab's large title sits in the top bar's own row with a **+** on the right
+(新建 Bot, 新建群聊); there is no workspace menu, and workspaces switch only in
+设置 › 工作区. The 任务 tab groups its tasks 待处理 · 进行中 · 待办 · 已完成, with
+a raised hand for 待处理 and no coloured dots; its + creates a task. The
+paragraphs below on the 对话 bar's workspace menu and on the 线程 tab and its
+segment are replaced by this. Each tab is
 its own Stack with a large title. A chat and a thread open over the tabs, so the
 tab bar hides there. 新建 Bot and 新建群聊 open as form sheets. 线程 and 建议 show
 their counts as the system's tab badges.
