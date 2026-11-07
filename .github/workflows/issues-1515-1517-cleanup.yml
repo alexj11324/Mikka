@@ -5,6 +5,7 @@ on:
     paths:
       - scripts/ops/issues-1515-1517-cleanup.ts
       - scripts/ops/issues-1515-1517-runtime-cleanup.py
+      - scripts/ops/issues-1515-1517-production-env.mjs
       - .github/workflows/issues-1515-1517-cleanup.yml
 permissions:
   contents: read
@@ -73,6 +74,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
+      - name: Verify scoped production environment extraction without credentials
+        run: node scripts/ops/issues-1515-1517-production-env.mjs --self-test
       - run: pnpm install --frozen-lockfile
       - name: Read required production configuration MIKKA_DATABASE_URL
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -86,7 +89,7 @@ jobs:
           secret-name: MIKKA_DATABASE_URL
           recursive: false
           include-imports: false
-      - name: Read required production configuration DATABASE_URL
+      - name: Read the existing Vercel production environment credential
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -94,10 +97,12 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /vercel
-          secret-name: DATABASE_URL
+          secret-path: /platform
+          secret-name: VERCEL_DEPLOY_TOKEN
           recursive: false
           include-imports: false
+      - name: Read only the workspace database from the production environment
+        run: node scripts/ops/issues-1515-1517-production-env.mjs
       - name: Read required production configuration DEVICE_GATEWAY_URL
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
