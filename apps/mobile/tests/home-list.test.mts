@@ -39,6 +39,13 @@ test('home: pins in their order, the Coordinator first among unplaced; sections;
   assert.equal(homeList(chats, { searching: true, collapsed: new Set() }).pinned.length, 0)
 })
 
+// 2026-11-07: the page's large title is Bot, so bots that open the list have no second 「Bot」 header.
+test('home: the bots that open the list carry no Bot header', async () => {
+  const { homeList } = await import('../features/home/model/home-list.ts')
+  const { items } = homeList([chat('b'), chat('g', { kind: 'group' })], { searching: false, collapsed: new Set() })
+  assert.deepEqual(items.map(i => i.kind === 'section' ? `[${i.title}]` : i.chat.key), ['b', '[群聊]', 'g'])
+})
+
 test('the avatar mark: waiting outranks unread, a hand-marked chat shows a dot', async () => {
   const { badgeOf } = await import('../features/home/model/home-list.ts')
   assert.deepEqual(badgeOf(chat('x', { waiting: 1, unread: 5 })), { kind: 'waiting' })

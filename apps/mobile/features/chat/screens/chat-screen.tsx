@@ -30,7 +30,8 @@ import { apiCache } from '@/lib/api-cache'
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runName, type BotPage, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
 import { ChatHeader } from '@/features/chat/components/chat-header'
-import { menuThreads } from '@/features/chat/model/chat-header-menu'
+import { menuTasks } from '@/features/chat/model/chat-header-menu'
+import { useTasks } from '@/features/tasks/components/task-list'
 import { ChatSelectableText } from '@/features/chat/components/chat-selectable-text'
 import { ChatSelectionBar } from '@/features/chat/components/chat-selection-bar'
 import { ChatQueueCard } from '@/features/chat/components/chat-queue-card'
@@ -73,6 +74,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const [composerHeight, setComposerHeight] = useState(90)
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
   const home = useHome().data?.live?.workspaceId
+  const homeBots = useHome().data?.bots
   // The web's chat key (components/coordinator/coordinator-chat.tsx) on the person's home channel; a turn's lease
   // running out has no write, so the server names it as a deadline.
   // A push reads only what is new since the last read, and merges it into what is shown (#1408).
@@ -85,7 +87,9 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const serviceRefresh = useRefresh(reload)
   // The person's proposals: the web's key (components/coordinator/pending-actions.tsx), on the same home channel.
   // The title menu's threads: read when the chat opens, again when a thread list changes; never while idle.
-  const botPage = useLiveApi<BotPage>(`/api/mobile/bots/${self}`, () => ({ refs: [listRef('thread_list', home)] }))
+  // The title menu's tasks: the ones this bot dispatched (the Coordinator's are its bot row's).
+  const tasks = useTasks()
+  const ownBotId = self === 'coordinator' ? homeBots?.find(item => item.coordinator)?.id : self
   const pending = useLiveApi<PendingAction[]>('/api/pending-actions', items => ({
     refs: [listRef('pending_actions', home)], deadline: pendingActionsDeadline(items),
   }))
@@ -165,9 +169,11 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   // iOS asks once; the moment is the first message the Coordinator sent on its own, not app launch.
   useEffect(() => { if (proactive && push === 'undetermined') void askForPush() }, [proactive, push])
 
+  // A cited task or a task's thread opens the task (2026-11-07: a thread opens only inside its task).
   const open = (source: CitationSource) => {
-    if (source.kind === 'run') router.push(`/thread/${source.id}`)
-    else router.push('/tasks')
+    if (source.kind === 'issue') router.push(`/task/${source.id}`)
+    else if (source.issue) router.push(`/task/${source.issue.id}`)
+    else router.push(`/thread/${source.id}`)
   }
 
   const deliver = (item: Outgoing): Promise<boolean> => {
@@ -283,7 +289,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
         {item.threads.map(id => {
           const run = sources[id]
           return run?.kind === 'run'
-            ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
+            ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => open(run)} /></TimedRow>
             : null
         })}
       </Arrival>
@@ -292,9 +298,9 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
 
   return (
     <View style={styles.screen}>
-      {/* Back is the system's (and its edge swipe); the bot's name opens its menu: its threads and its page. */}
-      <ChatHeader name={name} threads={botPage.data ? menuThreads(botPage.data) : null} onThread={id => router.push(`/thread/${id}`)}
-        onAllThreads={() => router.push(`/bots/${self}/threads`)} onInfo={() => router.push(`/bots/${self}/info`)} />
+      {/* Back is the system's (and its edge swipe); the bot's name opens its menu: its tasks and its page. */}
+      <ChatHeader name={name} tasks={tasks.data ? menuTasks(tasks.data.tasks, ownBotId) : null} onTask={id => router.push(`/task/${id}`)}
+        onAllTasks={() => router.push(`/bots/${self}/tasks`)} onInfo={() => router.push(`/bots/${self}/info`)} />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <GestureDetector gesture={timeReveal}>
       <View style={{ flex: 1, overflow: 'hidden' }}

@@ -19,7 +19,7 @@ type BarItem = BarButton | BarMenu | BarView
 const list = (items?: BarItem | BarItem[]) => items === undefined ? [] : Array.isArray(items) ? items : [items]
 
 const ios = Platform.OS === 'ios'
-const TAB_ROOTS = new Set(['/', '/threads', '/suggestions', '/settings', '/search'])
+const TAB_ROOTS = new Set(['/', '/tasks', '/suggestions', '/settings', '/search'])
 
 // A plain function, not a component: the toolbar keeps only children whose type is Stack.Toolbar.Button or
 // Stack.Toolbar.Menu itself, and silently drops anything wrapped in another component.

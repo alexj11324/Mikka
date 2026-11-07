@@ -59,9 +59,12 @@ export function homeList<C extends ListChat>(chats: readonly C[], options: { sea
   const items = SECTIONS.flatMap((id): HomeItem<C>[] => {
     const list = rest.filter(chat => sectionOf(chat) === id)
     if (!list.length) return []
+    const rows = list.map((chat): HomeItem<C> => ({ kind: 'chat', chat, section: id }))
+    // The page's large title is Bot, so the bots that open the list carry no second 「Bot」 header (2026-11-07).
+    if (id === 'bots' && !rest.some(chat => sectionOf(chat) === 'working')) return rows
     const collapsed = options.collapsed.has(id)
     const header: HomeItem<C> = { kind: 'section', id, title: SECTION_TITLES[id], count: list.length, collapsed, unread: list.reduce((sum, chat) => sum + unreadOf(chat), 0) }
-    return [header, ...(collapsed ? [] : list.map((chat): HomeItem<C> => ({ kind: 'chat', chat, section: id })))]
+    return [header, ...(collapsed ? [] : rows)]
   })
   return { pinned, items, hidden }
 }

@@ -174,7 +174,35 @@ export interface Suggestions { groups: { source: Source; items: Suggestion[] }[]
 export type TaskBlockReason = 'question' | 'quota' | 'run' | 'failed' | 'dependency' | 'flagged'
 export interface Task { id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string
   /** Absent from a server older than 受阻. */
-  blocked?: { reason: TaskBlockReason; blocker: string | null } | null }
+  blocked?: { reason: TaskBlockReason; blocker: string | null } | null
+  /** Its list group from its current thread (R-52, 2026-11-07); absent from an older server (features/tasks/model/task-groups.ts). */
+  group?: TaskGroup
+  /** The bot that dispatched it. */
+  bot?: TaskBot | null
+  /** A scheduled task's next run. */
+  schedule?: TaskSchedule | null
+  createdAt?: string }
+
+/** 待处理 · 进行中 · 待办 · 已完成 (decisions/2026-11-07-2045-tasks-only-threads-inside.md). */
+export type TaskGroup = 'pending' | 'running' | 'todo' | 'done'
+export interface TaskBot { id: string; name: string; color?: string; shape?: string }
+export interface TaskSchedule { label: string; nextAt: string | null }
+
+/** One entry of a task's 活动, newest first. */
+export type TaskActivity =
+  | { kind: 'attempt'; runId: string; n: number; group: ThreadGroup; harness: string; createdAt: string; failed: boolean }
+  | { kind: 'replaced'; runId: string; createdAt: string }
+  | { kind: 'created'; by: string | null; createdAt: string }
+
+/** GET /api/mobile/tasks/:id: the task's detail and its 活动. */
+export interface TaskDetail {
+  task: Task & {
+    description: string | null
+    agent: { harness: string; model: string | null } | null
+    place: { kind: MachineKind; name: string } | null
+  }
+  activity: TaskActivity[]
+}
 
 export interface Preferences {
   proactive: boolean
