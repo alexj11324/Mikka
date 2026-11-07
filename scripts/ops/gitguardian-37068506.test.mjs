@@ -335,3 +335,34 @@ test('only the exact previously observed extra occurrence can disclose a validat
 })
 
 // Fresh rollout readback, 2026-11-07.
+
+// Regression: changed provider scope must stop before reopening any incident.
+test('mixed-incident restore rejects changed scope before any write', async () => {
+  const { restoreCordy, ROUTES: paths } = await import('./gitguardian-37068506.mjs')
+  const requests = []
+  await assert.rejects(() => restoreCordy({ report: {}, request: async (route, method = 'GET') => {
+    requests.push([route, method])
+    if (route === paths.token) return { data: { workspace_id: 837165, status: 'active', revoked_at: null, scopes: ['incidents:read', 'incidents:write'] } }
+    return { data: { id: 123, occurrences_count: 4 } }
+  } }))
+  assert.equal(requests.some(([, method]) => method === 'POST'), false)
+})
+
+test('restore only reopens the verified four-occurrence mixed incident and checks final state', async () => {
+  const { restoreCordy } = await import('./gitguardian-37068506.mjs')
+  const rows = occurrences()
+  rows.forEach((row, i) => { row.id = [310917417,310917415,310917416][i] })
+  rows.push({ id:296439688,incident_id:TARGET.incident,sha:'3367c154e0ebb5acde0cc22cca1a034c708a947f',filepath:'scripts/local-env.sh',change_type:'addition',source:{id:30134018,type:'github',full_name:'alexj11324/Cordy',url:'https://github.com/alexj11324/Cordy',external_id:1341050282},matches:[{post_line_start:7,post_line_end:7}] })
+  let opened = false
+  const writes = []
+  const result = report()
+  await restoreCordy({ report: result, request: async (path, method = 'GET') => {
+    if (method === 'POST') { writes.push(path); assert.equal(path, ROUTES.reopen); opened = true }
+    if (path === ROUTES.token) return { data:token() }
+    if (path === ROUTES.inspectionOccurrences) return { data:rows,headers:new Headers() }
+    return { data:{...incident(opened?'TRIGGERED':'IGNORED'),occurrences_count:4} }
+  } })
+  assert.deepEqual(writes,[ROUTES.reopen])
+  assert.equal(result.result,'mixed_incident_open')
+  assert.equal(result.writeAttempts,1)
+})

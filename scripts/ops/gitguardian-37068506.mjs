@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/gitguardian-37068506',
-  base: '1f44582f24cbc4076b34ca4f8c895b17549ad0db',
+  base: '2933023be45a9e0f9f2ed69d83beb7ab4b97e1cd',
   workspace: 837165, incident: 37068506,
   source: '518b9d32eb9315656173ae7a074c920546fdcb70',
   file: 'docker-compose.yml', blob: '80bf3b1e101f3f8fc34ae95640f2f3017a708ce8',
@@ -19,7 +19,7 @@ export const ROUTES = Object.freeze({
   token: '/v1/api_tokens/self', incident: `${INCIDENT}?with_occurrences=0`,
   occurrences: `/v1/occurrences/secrets?incident_id=${TARGET.incident}&per_page=4`,
   inspectionOccurrences: `/v1/occurrences/secrets?incident_id=${TARGET.incident}&per_page=5`,
-  ignore: `${INCIDENT}/ignore`,
+  ignore: `${INCIDENT}/ignore`, reopen: `${INCIDENT}/reopen`,
 })
 const OWNED = ['.github/workflows/gitguardian-37068506.yml', 'scripts/ops/gitguardian-37068506.mjs', 'scripts/ops/gitguardian-37068506.test.mjs']
 class GuardError extends Error { constructor(code) { super(code); this.code = code } }
@@ -183,13 +183,13 @@ export function guardianClient(token, fetcher = fetch, record = () => {}) {
   requireThat(typeof token === 'string' && token.length > 0, 'TOKEN_MISSING')
   return async function request(route, method = 'GET') {
     requireThat((method === 'GET' && [ROUTES.token, ROUTES.incident, ROUTES.occurrences, ROUTES.inspectionOccurrences].includes(route))
-      || (method === 'POST' && route === ROUTES.ignore), 'API_ROUTE')
+      || (method === 'POST' && [ROUTES.ignore, ROUTES.reopen].includes(route)), 'API_ROUTE')
     let response
     try {
       response = await fetcher(`${API}${route}`, {
         method, redirect: 'error', signal: AbortSignal.timeout(15000),
         headers: { authorization: `Token ${token}`, accept: 'application/json', 'content-type': 'application/json', 'x-privacy-mode': 'true' },
-        ...(method === 'POST' ? { body: JSON.stringify({ ignore_reason: 'false_positive' }) } : {}),
+        ...(method === 'POST' && route === ROUTES.ignore ? { body: JSON.stringify({ ignore_reason: 'false_positive' }) } : {}),
       })
     } catch { throw new GuardError('API_TRANSPORT') }
     record({ operation: Object.entries(ROUTES).find(([, path]) => path === route)[0], status: response.status })
@@ -221,18 +221,45 @@ export async function dispose({ request, report }) {
   report.result = 'verified'
 }
 
+export async function restoreCordy({ request, report }) {
+  validateToken((await request(ROUTES.token)).data)
+  const before = inspectIncident((await request(ROUTES.incident)).data)
+  requireThat(before.idMatches && before.actualCount === 4 && before.urlExactMatches
+    && before.detectorExactMatches, 'RESTORE_INCIDENT_SCOPE')
+  const reply = await request(ROUTES.inspectionOccurrences)
+  const occurrences = inspectOccurrences(reply.data, reply.headers)
+  const rows = occurrences.rows
+  const mikka = rows.filter(row => row.repoNumericMatches && row.repoNameMatches)
+  requireThat(rows.length === 4 && mikka.length === 3
+    && mikka.every(row => [310917415, 310917416, 310917417].includes(row.id)
+      && row.incidentMatches && row.sha === TARGET.source && row.filePath === TARGET.file
+      && row.matches.length === 1 && TARGET.lines.includes(row.matches[0].postLineStart))
+    && rows.some(row => row.id === 296439688 && row.extraSource?.repositoryFullName === 'alexj11324/Cordy'), 'RESTORE_OCCURRENCE_SCOPE')
+  report.before = before
+  // Reopen the mixed incident; never ignore Cordy to make the Mikka check green.
+  if (before.status === 'IGNORED') {
+    report.writeAttempts = 1
+    await request(ROUTES.reopen, 'POST')
+  }
+  const after = inspectIncident((await request(ROUTES.incident)).data)
+  requireThat(after.idMatches && after.actualCount === 4 && after.urlExactMatches
+    && ['TRIGGERED', 'ASSIGNED'].includes(after.status), 'RESTORE_READBACK')
+  report.after = after
+  report.result = 'mixed_incident_open'
+}
+
 async function main() {
   const report = { incident: TARGET.incident, workspace: TARGET.workspace, result: 'blocked', writeAttempts: 0, requests: [],
     secretContentRequested: false, scannerConfigurationChanged: false, checkRunEditedOrSkipped: false }
   try {
     // This diagnostic revision deliberately has no CLI disposition entry point.
-    requireThat(process.argv.length === 3 && ['--preflight', '--inspect'].includes(process.argv[2]), 'MODE')
+    requireThat(process.argv.length === 3 && ['--preflight', '--inspect', '--restore-cordy'].includes(process.argv[2]), 'MODE')
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
     report.execution = validateExecution({ env: process.env, event, head: git('rev-parse', 'HEAD'),
       parent: git('rev-parse', 'HEAD^'), changed: git('diff', '--name-only', 'HEAD^', 'HEAD').split('\n').filter(Boolean) })
     report.source = validateSource(execFileSync('git', ['show', `${TARGET.source}:${TARGET.file}`], { stdio: ['ignore', 'pipe', 'pipe'] }))
     if (process.argv[2] === '--preflight') report.result = 'source_verified'
-    else await inspect({ request: guardianClient(process.env.GITGUARDIAN_API_TOKEN, fetch, row => report.requests.push(row)), report })
+    else await (process.argv[2] === '--restore-cordy' ? restoreCordy : inspect)({ request: guardianClient(process.env.GITGUARDIAN_API_TOKEN, fetch, row => report.requests.push(row)), report })
   } catch (error) {
     report.error = error instanceof GuardError ? error.code : 'DISPOSITION_FAILED'
     process.exitCode = 1
