@@ -873,7 +873,6 @@
     "setup": "Set up repository and agent",
     "offlineSince": "Offline · {time}",
     "noAgent": "No agent found",
-    "sandboxBlocked": "{agents} found, sandbox unavailable",
     "sandboxMissing": "This device could not install {packages}. Install them with the system package manager and it recovers on its own.",
     "sandboxRefused": "This machine does not let regular users create a sandbox. An administrator needs to enable user namespaces.",
     "sandboxUserns": "Ubuntu stops regular users from creating the sandbox here (AppArmor's user namespace restriction). Lift it on this device and the agents come back on their own.",
@@ -945,9 +944,12 @@
       "cancelled": "Cancelled",
       "manual": "Connect manually"
     },
-    "runsModels": "Runs {models}",
-    "runsCount": "{count, plural, one {Runs # preferred model} other {Runs # preferred models}}",
-    "runsNone": "Runs no preferred model",
+    "computers": "Computers",
+    "noRuns": "{reason} · gets no runs",
+    "noSubscriptionRuns": "{reason} · gets no subscription runs",
+    "notScheduling": "Not taking part",
+    "needsUpdate": "Mikka needs an update",
+    "sandboxUnavailable": "Sandbox unavailable",
     "offlineNoRuns": "Offline · gets no runs",
     "local": {
       "adding": "Adding this computer",
