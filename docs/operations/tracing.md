@@ -337,6 +337,16 @@ in that browser cookie jar, and the PKCE handoff retains that session. Keeping
 native authentication last preserves its ordinary session for the subsequent
 bundled and hosted lifecycle checks without an extra login or relaxed expiry.
 
+A validated PKCE confirmation page in the system browser reads only
+`desktop.session` and the public login configuration. It does not initialize
+workspace authorization, onboarding or owner-evaluated features that the
+confirmation card cannot use. This applies only to the exact Web sign-in
+route with a valid handoff and no OAuth or Composio continuation. The installed
+renderer still requests its full bootstrap. Leaving the confirmation page
+requires a fresh workspace bootstrap, even when the workspace selector stays
+empty; identity-only data cannot mount workspace readers. Both the existing
+owner/session fence and the current bootstrap phase reject obsolete responses.
+
 Startup counts come from the first pair of the unchanged five-pair lifecycle:
 bundled Electron versus the preserved hosted Web renderer in the same compiled
 Electron shell, with retained authenticated state and the same warm backend.

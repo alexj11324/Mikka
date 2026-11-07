@@ -18,19 +18,22 @@ import { DeviceAuthorization } from '@/components/device-authorization'
 import NotFound from '@/app/[locale]/not-found'
 import { safeAuthReturn } from '@/lib/auth-return'
 import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
-import { readBootstrap, type DesktopBootstrap } from './bootstrap'
+import { readAuthentication, readBootstrap, type AuthenticationBootstrap, type BootstrapScope, type DesktopBootstrap } from './bootstrap'
 import { Link } from './i18n-navigation'
 import { localeOf, navigate, REFRESH_EVENT, useLocation, withoutLocale } from './location'
 import { getTransportState, setTransportState, subscribeTransport } from './transport-state'
 import { Offline } from './offline'
 import { setClientConfiguration } from './client-configuration'
-import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, PlatformExtras, requireUpdate } from 'mikka:platform'
+import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, bootstrapScope, PlatformExtras, requireUpdate } from 'mikka:platform'
 import { loadWorkspace, preloadWorkspace } from './workspace-loader'
 import { InstalledWorkspace } from './installed-workspace'
 
 const Workspace = lazy(loadWorkspace)
 const SharedArtifactRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.SharedArtifactRoute })))
 const WorkspaceLinkRoute = lazy(() => import('./deep-link-routes').then(module => ({ default: module.WorkspaceLinkRoute })))
+type ApplicationBootstrap =
+  | { scope: 'authentication'; value: AuthenticationBootstrap }
+  | { scope: 'workspace'; workspace: string | null; value: DesktopBootstrap }
 
 /** Runtime-specific composition only. The application surfaces below are the
  * exact same components, data hooks and lazy chunks as the web application. */
@@ -44,21 +47,23 @@ export function App() {
 }
 
 function SessionApplication() {
-  const [bootstrap, setBootstrap] = useState<DesktopBootstrap | null>(null)
+  const [bootstrap, setBootstrap] = useState<ApplicationBootstrap | null>(null)
   const [failed, setFailed] = useState(false)
   const [pending, setPending] = useState(true)
-  const requestedWorkspace = useLocation().searchParams.get('workspace')
-  const workspace = useRef(requestedWorkspace)
-  workspace.current = requestedWorkspace
-  const lastRequestedWorkspace = useRef(requestedWorkspace)
+  const location = useLocation()
+  const requestedScope = bootstrapScope(location)
+  const requestedWorkspace = requestedScope === 'workspace' ? location.searchParams.get('workspace') : null
+  const requested = useRef({ scope: requestedScope, workspace: requestedWorkspace })
+  requested.current = { scope: requestedScope, workspace: requestedWorkspace }
+  const lastRequested = useRef(requested.current)
   const generation = useRef(0)
-  const inFlight = useRef<{ workspace: string | null; promise: Promise<void> } | null>(null)
+  const inFlight = useRef<{ scope: BootstrapScope; workspace: string | null; promise: Promise<void> } | null>(null)
   const state = useSyncExternalStore(subscribeTransport, getTransportState, getTransportState)
   const reload = useCallback((changedOwner = false) => {
-    const requested = workspace.current
-    if (inFlight.current?.workspace === requested && !changedOwner) return inFlight.current.promise
-    const changedScope = changedOwner || requested !== lastRequestedWorkspace.current
-    lastRequestedWorkspace.current = requested
+    const request = requested.current
+    if (inFlight.current?.scope === request.scope && inFlight.current.workspace === request.workspace && !changedOwner) return inFlight.current.promise
+    const changedScope = changedOwner || request.scope !== lastRequested.current.scope || request.workspace !== lastRequested.current.workspace
+    lastRequested.current = request
     if (changedScope) setBootstrap(null)
     if (changedOwner) { setClientConfiguration(null); setSession(null) }
     const current = ++generation.current
@@ -68,12 +73,15 @@ function SessionApplication() {
     const promise = Promise.resolve().then(async () => {
       if (changedScope) await clearPersistentReadCaches()
       if (current !== generation.current) return
-      const value = await readBootstrap(requested)
+      const isCurrent = () => current === generation.current
+      const value: ApplicationBootstrap = request.scope === 'authentication'
+        ? { scope: 'authentication', value: await readAuthentication(isCurrent) }
+        : { scope: 'workspace', workspace: request.workspace, value: await readBootstrap(request.workspace, isCurrent) }
       if (current !== generation.current) return
-      if (!value.user) await clearPersistentReadCaches()
+      if (!value.value.user) await clearPersistentReadCaches()
       if (current !== generation.current) return
-      setClientConfiguration(value)
-      setSession(value.user && value.session ? { user: value.user, session: value.session } : null)
+      setClientConfiguration(value.scope === 'workspace' ? value.value : null)
+      setSession(value.value.user && value.value.session ? { user: value.value.user, session: value.value.session } : null)
       setBootstrap(value)
       setFailed(false)
       setTransportState('ready')
@@ -82,7 +90,7 @@ function SessionApplication() {
     }).finally(() => {
       if (current === generation.current) { setPending(false); inFlight.current = null }
     })
-    inFlight.current = { workspace: requested, promise }
+    inFlight.current = { ...request, promise }
     return promise
   }, [])
   useEffect(() => {
@@ -106,25 +114,29 @@ function SessionApplication() {
     }
   }, [reload])
   useEffect(() => {
-    // Only workspace navigation needs a fresh server authorization. Bot, task,
-    // panel and settings navigation keep the same hydrated shared provider.
-    if (requestedWorkspace !== lastRequestedWorkspace.current) void reload()
-  }, [requestedWorkspace, reload])
+    // Leaving a PKCE identity page needs full workspace authorization even
+    // when both routes have the same selector. Ordinary application navigation
+    // keeps its existing hydrated provider.
+    if (requestedScope !== lastRequested.current.scope || requestedWorkspace !== lastRequested.current.workspace) void reload()
+  }, [requestedScope, requestedWorkspace, reload])
   useEffect(() => {
     // A confirmed expiry discards every owner-scoped cache together. Network
     // failures retain the visible conversation and its unsent local draft.
-    if (state === 'unauthenticated' && bootstrap?.user) {
+    if (state === 'unauthenticated' && bootstrap?.value.user) {
       generation.current++
       inFlight.current = null
       setClientConfiguration(null)
       setSession(null)
-      setBootstrap(current => current ? { ...current, user: null, session: null, cacheWorkspace: null, onboarding: undefined } : null)
+      setBootstrap(current => !current ? null : current.scope === 'workspace'
+        ? { ...current, value: { ...current.value, user: null, session: null, cacheWorkspace: null, onboarding: undefined } }
+        : { ...current, value: { ...current.value, user: null, session: null } })
       void clearPersistentReadCaches()
     }
-  }, [state, bootstrap?.user])
+  }, [state, bootstrap?.value.user])
   if (state === 'update-required') return <UpdateRequired />
-  if (!bootstrap) return failed ? <Offline pending={pending} retry={() => void reload()} /> : <WorkspaceLoading />
-  return <><ConnectionStatus offline={state === 'offline' || failed} retry={() => void reload()} /><AccountCache key={bootstrap.user?.id ?? 'signed-out'}><Routes bootstrap={bootstrap} /></AccountCache></>
+  if (!bootstrap || bootstrap.scope !== requestedScope || (bootstrap.scope === 'workspace' && bootstrap.workspace !== requestedWorkspace))
+    return failed ? <Offline pending={pending} retry={() => void reload()} /> : <WorkspaceLoading />
+  return <><ConnectionStatus offline={state === 'offline' || failed} retry={() => void reload()} /><AccountCache key={bootstrap.value.user?.id ?? 'signed-out'}><Routes bootstrap={bootstrap} /></AccountCache></>
 }
 
 function AccountCache({ children }: { children: ReactNode }) {
@@ -132,12 +144,12 @@ function AccountCache({ children }: { children: ReactNode }) {
   return <SWRConfig value={config}>{children}</SWRConfig>
 }
 
-function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
+function Routes({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
   const location = useLocation()
   const path = withoutLocale(location.pathname)
   const query = location.searchParams
   const locale = localeOf(location.pathname)
-  const user = bootstrap.user
+  const user = bootstrap.value.user
   const authentication = path === '/sign-in' || path === '/sign-up'
   const invitation = /^\/invite\/([^/]+)$/.exec(path)
   const sharedArtifact = /^\/a\/([^/]+)$/.exec(path)
@@ -158,14 +170,15 @@ function Routes({ bootstrap }: { bootstrap: DesktopBootstrap }) {
   if (browserRoute || (platform === 'desktop' && path === '/sign-up')) return <BrowserRoute signUp={path === '/sign-up'} account={user?.email ?? null} />
   if (sharedArtifact) return <Suspense fallback={<WorkspaceLoading />}><SharedArtifactRoute key={sharedArtifact[1]} token={sharedArtifact[1]} /></Suspense>
   if (invitation) return <main className="flex min-h-dvh items-center justify-center bg-muted/30 p-5"><InvitationCard token={/^[a-f0-9]{64}$/.test(invitation[1]) ? invitation[1] : ''} email={user?.email ?? null} /></main>
-  if (authentication || !user) return <AuthForm key={path} mode={path === '/sign-up' ? 'sign-up' : 'sign-in'} addAccount={query.get('addAccount') === '1'} next={query.get('next') ?? undefined} googleEnabled={bootstrap.googleEnabled} githubEnabled={bootstrap.githubEnabled} emailEnabled={bootstrap.emailEnabled} oauthFailed={query.get('oauth') === 'failed' || query.has('error')} signedInAs={user ? { name: user.name, email: user.email, image: user.image } : null} />
+  if (authentication || !user) return <AuthForm key={path} mode={path === '/sign-up' ? 'sign-up' : 'sign-in'} addAccount={query.get('addAccount') === '1'} next={query.get('next') ?? undefined} googleEnabled={bootstrap.value.googleEnabled} githubEnabled={bootstrap.value.githubEnabled} emailEnabled={bootstrap.value.emailEnabled} oauthFailed={query.get('oauth') === 'failed' || query.has('error')} signedInAs={user ? { name: user.name, email: user.email, image: user.image } : null} />
+  if (bootstrap.scope !== 'workspace') return <WorkspaceLoading />
   if (workspaceLink) return <Suspense fallback={<WorkspaceLoading />}><WorkspaceLinkRoute key={workspaceLink[1]} slug={workspaceLink[1]} /></Suspense>
   if (path === '/device') return <DeviceAuthorization account={user.email} initialCode={query.get('user_code') ?? ''} />
   if (path === '/workspaces/new') return <NewWorkspace email={user.email} />
   if (path === '/devices') return <WorkspaceLoading />
   if (path !== '/' && path !== '/dashboard' && !['/settings', '/settings/teams', '/settings/members'].includes(path)) return <NotFound />
-  if (platform === 'desktop') return <InstalledWorkspace user={user} bootstrap={bootstrap} />
-  return <Suspense fallback={<WorkspaceLoading />}><Workspace user={user} bootstrap={bootstrap} /></Suspense>
+  if (platform === 'desktop') return <InstalledWorkspace user={user} bootstrap={bootstrap.value} />
+  return <Suspense fallback={<WorkspaceLoading />}><Workspace user={user} bootstrap={bootstrap.value} /></Suspense>
 }
 
 function NewWorkspace({ email }: { email: string }) {

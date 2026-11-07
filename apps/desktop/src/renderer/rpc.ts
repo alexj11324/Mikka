@@ -14,13 +14,13 @@ export class DesktopTransportError extends Error {
 
 /** The renderer has no auth headers. Electron's scheme handler supplies them in
  * main, so even a compromised page cannot read or export its session credential. */
-export function callAction<T = unknown>(action: string, args: unknown[]): Promise<T> {
-  return callRemoteAction(action, args, { endpoint: '/api/desktop/rpc', credentials: 'omit', header: 'x-mikka-desktop-protocol' })
+export function callAction<T = unknown>(action: string, args: unknown[], isCurrent?: () => boolean): Promise<T> {
+  return callRemoteAction(action, args, { endpoint: '/api/desktop/rpc', credentials: 'omit', header: 'x-mikka-desktop-protocol', isCurrent })
 }
 
 export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: () => boolean }): Promise<T> {
-  // Web supplies its existing SDK owner generation. Native identity fencing
-  // remains in main; it does not supply or depend on this optional callback.
+  // Web supplies its existing SDK owner generation; bootstrap also fences
+  // retired page phases. Native identity authorization remains in main.
   const assertCurrent = (cause?: unknown) => {
     if (transport.isCurrent?.() === false) throw new DesktopTransportError('desktop_session_changed', { status: 409, cause })
   }
