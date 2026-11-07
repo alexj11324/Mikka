@@ -116,6 +116,8 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	if token == "" {
 		return nil, ErrCredential
 	}
+	conversionDone := timingSpan(ctx, timingConversion)
+	defer conversionDone()
 	var original map[string]any
 	if json.Unmarshal(request.Payload, &original) != nil {
 		requestFailure(e.Provider, "input", "json_invalid", len(request.Payload), modelRequestMaxBytes)
@@ -205,7 +207,11 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	}
 	client.Timeout = 270 * time.Second
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	conversionDone()
+	httpStarted := time.Now()
+	headersDone := timingSpan(ctx, timingHTTPHeaders)
 	response, err := client.Do(req)
+	headersDone()
 	if err != nil {
 		upstreamFailure(e.Provider, "transport", 0, "network")
 		return nil, ErrProvider
@@ -260,7 +266,11 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 				emit(ex.StreamChunk{Err: ErrProvider})
 				return
 			}
+			timingOnceSince(ctx, timingHTTPFirstEvent, httpStarted)
 			kind, _ := event["type"].(string)
+			if providerTextEvent(e.Provider, kind, event) {
+				timingOnceSince(ctx, timingHTTPFirstTextEvent, httpStarted)
+			}
 			if kind == "error" || kind == "response.failed" || event["error"] != nil {
 				kind := upstreamErrorType(raw)
 				upstreamFailure(e.Provider, "event", 200, kind)
@@ -279,6 +289,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 					emit(ex.StreamChunk{Err: ErrProvider})
 					return
 				}
+				timingOnceSince(ctx, timingFirstConvertedChunk, httpStarted)
 				if !emit(ex.StreamChunk{Payload: append(append([]byte("data: "), piece...), []byte("\n\n")...)}) {
 					return
 				}
@@ -295,6 +306,20 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		emit(ex.StreamChunk{Payload: []byte("data: [DONE]\n\n")})
 	}()
 	return &ex.StreamResult{Chunks: chunks}, nil
+}
+
+// Inspect only the already-parsed closed event shapes; never retain the text.
+func providerTextEvent(provider, kind string, event map[string]any) bool {
+	if provider == "claude" && kind == "content_block_delta" {
+		delta, _ := event["delta"].(map[string]any)
+		text, _ := delta["text"].(string)
+		return delta["type"] == "text_delta" && text != ""
+	}
+	if provider == "codex" && kind == "response.output_text.delta" {
+		text, _ := event["delta"].(string)
+		return text != ""
+	}
+	return false
 }
 
 // Keep the OAuth subscription's required protocol prefix separate from the

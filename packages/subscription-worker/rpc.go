@@ -49,6 +49,7 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 		decoder := json.NewDecoder(bytes.NewReader(frame))
 		decoder.DisallowUnknownFields()
 		var result any
+		var timing *timingRecorder
 		var err error
 		invalid := decoder.Decode(&request) != nil || decoder.Decode(new(any)) != io.EOF || request.ID == "" || len(request.ID) > 64
 		// Raising the model frame budget must not expand execute, nativeStream,
@@ -65,9 +66,10 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 				timeout = 270 * time.Second
 			}
 			callCtx, cancel := context.WithTimeout(ctx, timeout)
+			callCtx, timing = withRequestTiming(callCtx)
 			if w.ExecutionOnly && request.Method != "executeStream" && request.Method != "execute" && request.Method != "quota" && request.Method != "nativeContext" && request.Method != "nativeStream" {
 				cancel()
-				_ = encoder.Encode(map[string]any{"id": request.ID, "error": string(ErrUnsupported)})
+				_ = encodeTimingMessage(encoder, map[string]any{"id": request.ID, "error": string(ErrUnsupported)}, timing)
 				continue
 			}
 			switch request.Method {
@@ -148,7 +150,7 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 		} else {
 			message["result"] = result
 		}
-		if encoder.Encode(message) != nil {
+		if encodeTimingMessage(encoder, message, timing) != nil {
 			return ErrUnavailable
 		}
 	}

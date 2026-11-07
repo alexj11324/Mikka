@@ -10,7 +10,10 @@ import (
 // Streams one explicitly selected credential. Closing IPC cancels the provider
 // context. No account pool, replay/retry or billing fallback exists here.
 func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload []byte, emit func([]byte) error) error {
-	if err := w.authorizeRuntime(ctx, epoch, "model", model); err != nil {
+	authorizeDone := timingSpan(ctx, timingAuthorize)
+	err := w.authorizeRuntime(ctx, epoch, "model", model)
+	authorizeDone()
+	if err != nil {
 		return err
 	}
 	if w.Executor == nil || w.Executor.Identifier() != w.Scope.Provider {
@@ -31,7 +34,9 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 	execCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	execCtx = withCodexSession(execCtx, w.Scope, w.Use, r.Epoch)
+	executorDone := timingSpan(ctx, timingExecutorOpen)
 	result, err := w.Executor.ExecuteStream(execCtx, a, exec.Request{Model: model, Payload: payload, Format: translator.FormatOpenAI}, exec.Options{Stream: true, SourceFormat: translator.FormatOpenAI, ResponseFormat: translator.FormatOpenAI})
+	executorDone()
 	if err != nil {
 		return executionFailure(err)
 	}
@@ -41,6 +46,7 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	firstChunk := true
 	for {
 		select {
 		case <-ticker.C:
@@ -60,10 +66,23 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 				requestFailure(w.Scope.Provider, "stream", "chunk_too_large", len(chunk.Payload), 65536)
 				return ErrProvider
 			}
-			if err = w.activeRuntime(ctx, r.Epoch, model); err != nil {
+			var firstGuardDone func()
+			if firstChunk {
+				firstGuardDone = timingSpan(ctx, timingFirstChunkGuard)
+			}
+			err = w.activeRuntime(ctx, r.Epoch, model)
+			if firstGuardDone != nil {
+				firstGuardDone()
+			}
+			if err != nil {
 				return err
 			}
-			if err = emit(chunk.Payload); err != nil {
+			err = emit(chunk.Payload)
+			if firstChunk {
+				recordFirstEmit(ctx)
+				firstChunk = false
+			}
+			if err != nil {
 				return ErrUnavailable
 			}
 		}

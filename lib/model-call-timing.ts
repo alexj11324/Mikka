@@ -5,6 +5,7 @@
  * it ended, how many input and output tokens it used and how many tools it was
  * offered. Logged for the platform route and for a person's subscription.
  */
+import type { SubscriptionCallTiming, SubscriptionStages } from '../packages/daemon/src/subscription-worker-timing'
 
 export type ModelRoute = 'hosted' | 'subscription'
 
@@ -40,6 +41,8 @@ export interface ModelCallTiming {
   prefix?: PromptPrefix
   /** Actual Codex layout result; absent for other routes, false for an unchanged prompt. */
   codexLayoutApplied?: boolean
+  /** Numeric-only subscription IPC stages; Node offsets and Go durations have separate clocks. */
+  subscriptionStages?: SubscriptionStages
 }
 
 export type PromptPrefix = { tools: string; system: string[] }
@@ -58,6 +61,7 @@ export interface ModelCallStart {
   attempt?: number | null
   prefix?: PromptPrefix
   codexLayoutApplied?: boolean
+  subscriptionTiming?: SubscriptionCallTiming
 }
 
 type Part = { type: string; usage?: unknown; finishReason?: unknown }
@@ -129,6 +133,7 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
         toolCalls, finishReason, interrupted,
         ...(start.prefix ? { prefix: start.prefix } : {}),
         ...(start.codexLayoutApplied === undefined ? {} : { codexLayoutApplied: start.codexLayoutApplied }),
+        ...(start.subscriptionTiming ? { subscriptionStages: start.subscriptionTiming.snapshot() } : {}),
       })
     } catch { /* timing never fails the call */ }
   }
@@ -140,7 +145,7 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
       if (next.done) { emit(failed); controller.close(); return }
       const part = next.value
       if (firstToken === null && FIRST_TOKEN.has(part.type)) firstToken = now()
-      if (firstText === null && part.type === 'text-delta') firstText = now()
+      if (firstText === null && part.type === 'text-delta') { firstText = now(); start.subscriptionTiming?.firstSdkText() }
       if (part.type === 'tool-call') toolCalls++
       if (part.type === 'error') failed = true
       if (part.type === 'finish') { usage = part.usage; finishReason = reason(part.finishReason) }
