@@ -8,6 +8,7 @@ import { nodeRuntimePackages, routeFunctionRules, workflowNodeExternals } from '
 import { publicAssetConfiguration } from './public-assets.mjs'
 import { nodeRequestAuthority, vercelRequestAuthority } from './request-authority-module.mjs'
 import { builtinServices } from './builtin-services-module.mjs'
+import { workflowDevelopmentAliases } from './workflow-development-aliases.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const revision = process.env.MIKKA_BUILD_REVISION || process.env.VERCEL_GIT_COMMIT_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
@@ -20,7 +21,7 @@ export default defineConfig({
   serverDir: false,
   builder: 'rolldown',
   buildDir: `${root}/node_modules/.cache/mikka-api`,
-  modules: [workflowNodeExternals, 'workflow/nitro', vercelRequestAuthority, nodeRequestAuthority, builtinServices],
+  modules: [workflowNodeExternals, 'workflow/nitro', workflowDevelopmentAliases, vercelRequestAuthority, nodeRequestAuthority, builtinServices],
   plugins: [`${root}/apps/api/plugins/security-headers.ts`, `${root}/apps/api/plugins/workflow-world.ts`],
   routes: { '/**': `${root}/apps/api/runtime/entry.ts` },
   ...assets,

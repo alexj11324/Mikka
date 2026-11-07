@@ -63,18 +63,20 @@ jobs:
           "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$GITHUB_SHA" --json > "$RUNNER_TEMP/candidates.json"
           node --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'
           import { readFileSync, appendFileSync } from 'node:fs'
-          import { assertReportIdentity, cleanupIdentity, reportDigest, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
-          const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
-          const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: report.workerSha,
-            runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
-          assertReportIdentity(report, expected)
-          for (const kind of ['desktop', 'claude', 'codex']) {
-            const row = report.templates[kind], proof = row.conservation
-            if (row.baseTemplate !== kind || row.preinstalled !== true || !row.buildId || !Array.isArray(row.models)
-              || !proof?.before?.entries || JSON.stringify(proof.before) !== JSON.stringify(proof.after)) throw Error('Candidate preservation gate failed')
-            console.log(`${kind}: ${proof.before.entries} preserved entries, manifest ${proof.before.sha256}`)
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models-sha256=${templateModelsDigest(report)}\ncandidate-sha256=${reportDigest(bytes)}\ncandidate-identities=${cleanupIdentity(report, expected)}\n`)
+          import { assertReportIdentity, cleanupIdentity, reportDigest, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
+          reportStep(() => {
+            const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
+            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: report.workerSha,
+              runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
+            assertReportIdentity(report, expected)
+            for (const kind of ['desktop', 'claude', 'codex']) {
+              const row = report.templates[kind], proof = row.conservation
+              if (row.baseTemplate !== kind || row.preinstalled !== true || !row.buildId || !Array.isArray(row.models)
+                || !proof?.before?.entries || JSON.stringify(proof.before) !== JSON.stringify(proof.after)) throw Error('runtime_report_preservation_invalid')
+              console.log(`${kind}: ${proof.before.entries} preserved entries, manifest ${proof.before.sha256}`)
+            }
+            appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models-sha256=${templateModelsDigest(report)}\ncandidate-sha256=${reportDigest(bytes)}\ncandidate-identities=${cleanupIdentity(report, expected)}\n`)
+          })
           JS
       - name: Preserve the complete private candidate report
         id: candidates
@@ -98,7 +100,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: e2b-candidate-build-cleanup
+          name: e2b-candidate-build-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/build-cleanup.json
           if-no-files-found: warn
           retention-days: 7

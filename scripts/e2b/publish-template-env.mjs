@@ -229,10 +229,16 @@ export function publicationInputFromFile(file, { sha256, modelsSha256, sourceSha
 if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--current')) {
   console.log(await currentWorkerSha({ token: process.env.VERCEL_TEAM_TOKEN }))
 } else if (import.meta.url === `file://${process.argv[1]}`) {
-  const templates = { desktop: process.env.DESKTOP_TEMPLATE_ID, claude: process.env.CLAUDE_TEMPLATE_ID, codex: process.env.CODEX_TEMPLATE_ID }
-  const input = publicationInputFromFile(process.argv[2], { templates, sourceSha: process.env.SOURCE_SHA,
-    sourceCommit: process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT, sha256: process.env.RUNTIME_REPORT_SHA256,
-    modelsSha256: process.env.TEMPLATE_MODELS_SHA256, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT })
-  const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, githubToken: process.env.GITHUB_TOKEN, ...input })
-  console.log(JSON.stringify({ event: 'official_runtime_env_verified', ...result }))
+  try {
+    const templates = { desktop: process.env.DESKTOP_TEMPLATE_ID, claude: process.env.CLAUDE_TEMPLATE_ID, codex: process.env.CODEX_TEMPLATE_ID }
+    const input = publicationInputFromFile(process.argv[2], { templates, sourceSha: process.env.SOURCE_SHA,
+      sourceCommit: process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT, sha256: process.env.RUNTIME_REPORT_SHA256,
+      modelsSha256: process.env.TEMPLATE_MODELS_SHA256, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT })
+    const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, githubToken: process.env.GITHUB_TOKEN, ...input })
+    console.log(JSON.stringify({ event: 'official_runtime_env_verified', ...result }))
+  } catch (error) {
+    // Keep parser causes for callers, never print receipt excerpts from them.
+    console.error(error.message)
+    process.exitCode = 1
+  }
 }

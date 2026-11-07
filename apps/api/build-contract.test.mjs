@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -15,6 +16,12 @@ import { inspectRoute } from './scripts/generate-routes.mjs'
 // rules. Source-shape assertions alone missed its multiple-wildcard failure.
 const nitroRequire = createRequire(import.meta.resolve('nitro/package.json'))
 const { addRoute, createRouter, findRoute, routeToRegExp } = await import(pathToFileURL(nitroRequire.resolve('rou3')).href)
+
+test('shared tracing loads in a native Node worker without a TypeScript resolver', () => {
+  execFileSync(process.execPath, ['--input-type=module', '-e',
+    'import { safeErrorAttributes } from "@mikka/protocol/tracing"; if (safeErrorAttributes(new Error("private"))["error.type"] !== "Error") process.exit(1)'],
+  { cwd: new URL('../../', import.meta.url), env: { ...process.env, NODE_OPTIONS: '' }, stdio: 'pipe' })
+})
 
 test('declaration inventory includes named reexports/destructuring and preserves explicit duration', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mikka-route-source-'))

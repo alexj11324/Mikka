@@ -35,6 +35,7 @@ export class HostedWorkflowModel implements Model {
         this.modelId,
         undefined,
         this.ownerId,
+        { operation: this.botId ? 'bot' : 'coordinator' },
       )
     ).doGenerate(options)
   }
@@ -48,6 +49,7 @@ export class HostedWorkflowModel implements Model {
       this.modelId,
       undefined,
       this.ownerId,
+      { operation: this.botId ? 'bot' : 'coordinator' },
     )
     const { stepIdentity, timedModelStream } = await import('../model-call-timing')
     const requestedAt = Date.now()

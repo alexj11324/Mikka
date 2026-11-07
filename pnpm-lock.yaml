@@ -97,9 +97,15 @@ importers:
       '@opentelemetry/api':
         specifier: 1.10.0
         version: 1.10.0
+      '@opentelemetry/api-logs':
+        specifier: 0.223.0
+        version: 0.223.0
       '@opentelemetry/core':
         specifier: 2.12.0
         version: 2.12.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/exporter-logs-otlp-proto':
+        specifier: 0.223.0
+        version: 0.223.0(@opentelemetry/api@1.10.0)
       '@opentelemetry/exporter-trace-otlp-proto':
         specifier: 0.223.0
         version: 0.223.0(@opentelemetry/api@1.10.0)
@@ -112,6 +118,9 @@ importers:
       '@opentelemetry/resources':
         specifier: 2.12.0
         version: 2.12.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-logs':
+        specifier: 0.223.0
+        version: 0.223.0(@opentelemetry/api@1.10.0)
       '@opentelemetry/sdk-trace-base':
         specifier: 2.12.0
         version: 2.12.0(@opentelemetry/api@1.10.0)
@@ -684,15 +693,24 @@ importers:
       '@opentelemetry/api':
         specifier: 1.9.0
         version: 1.9.0
+      '@opentelemetry/api-logs':
+        specifier: 0.223.0
+        version: 0.223.0
       '@opentelemetry/core':
         specifier: 2.12.0
         version: 2.12.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/exporter-logs-otlp-proto':
+        specifier: 0.223.0
+        version: 0.223.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-trace-otlp-proto':
         specifier: 0.223.0
         version: 0.223.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources':
         specifier: 2.12.0
         version: 2.12.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-logs':
+        specifier: 0.223.0
+        version: 0.223.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base':
         specifier: 2.12.0
         version: 2.12.0(@opentelemetry/api@1.9.0)
@@ -705,6 +723,9 @@ importers:
       pino:
         specifier: 10.4.0
         version: 10.4.0
+      posthog-node:
+        specifier: 5.55.2
+        version: 5.55.2(rxjs@7.8.2)
       proper-lockfile:
         specifier: 4.1.2
         version: 4.1.2
@@ -2916,6 +2937,12 @@ packages:
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
+
+  '@opentelemetry/exporter-logs-otlp-proto@0.223.0':
+    resolution: {integrity: sha512-wt33CkhmLfFDSRXNOABWQzVfks1PQvsRNIHqiY5Y5Hi6SiVF7iJYDTqpaUhbwcmyJYcB0LzBNvsic8GyufMxAA==}
+    engines: {node: ^18.19.0 || >=20.6.0}
+    peerDependencies:
+      '@opentelemetry/api': ^1.3.0
 
   '@opentelemetry/exporter-trace-otlp-proto@0.223.0':
     resolution: {integrity: sha512-hCFhPuROokNpwLibKmeMRuBNjPtbL+Ja5y/e/KBl5p3QcaH7xBjkj8roIGgKwCNJ4WChRLBzfoaNM3QksogfWw==}
@@ -14432,6 +14459,20 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/semantic-conventions': 1.43.0
+
+  '@opentelemetry/exporter-logs-otlp-proto@0.223.0(@opentelemetry/api@1.10.0)':
+    dependencies:
+      '@opentelemetry/api': 1.10.0
+      '@opentelemetry/otlp-exporter-base': 0.223.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/otlp-transformer': 0.223.0(@opentelemetry/api@1.10.0)
+      '@opentelemetry/sdk-logs': 0.223.0(@opentelemetry/api@1.10.0)
+
+  '@opentelemetry/exporter-logs-otlp-proto@0.223.0(@opentelemetry/api@1.9.0)':
+    dependencies:
+      '@opentelemetry/api': 1.9.0
+      '@opentelemetry/otlp-exporter-base': 0.223.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/otlp-transformer': 0.223.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-logs': 0.223.0(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/exporter-trace-otlp-proto@0.223.0(@opentelemetry/api@1.10.0)':
     dependencies:

@@ -22,6 +22,7 @@ import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
 import { daemonTracer, runIdHash } from "../tracing"
+import { ClaudeGenerationMetrics } from './generation-metrics'
 import { prepareClaudeSession, ClaudeProjectSettingsNotClaimable, type ClaudePrewarmBinding, type ClaudePreparation } from './claude-prewarm'
 import { runRuntimeTimings } from '../run-runtime-timing'
 import type { Readable, Writable } from "node:stream"
@@ -639,8 +640,11 @@ export class ClaudeAdapter implements AgentAdapter {
         return nativeToken
       },
     } : {}
+    const traceContext = options.traceContext ?? daemonTracer.capture()
+    const generations = new ClaudeGenerationMetrics(metrics => daemonTracer.generation(metrics, traceContext))
     const sdkOptions = (context: Pick<RunContext, "worktree" | "tmpDir" | "tempEnv" | "mcpServer">, append: string): Options => ({
         ...refreshOptions,
+        includePartialMessages: daemonTracer.enabled,
         cwd: context.worktree,
         // The official CLI echoes the exact stdin user frame after reading
         // it. Its UUID distinguishes this task from init and resumed history.
@@ -808,6 +812,7 @@ export class ClaudeAdapter implements AgentAdapter {
     void (async () => {
       try {
         for await (const message of session) {
+          generations.observe(message)
           if (
             options.requireSessionResume &&
             "session_id" in message &&
@@ -871,6 +876,7 @@ export class ClaudeAdapter implements AgentAdapter {
         }
         if (!ending) diedEarly(stderrTail())
       } catch (error) {
+        generations.fail()
         if (!ending) diedEarly(errorMessage(error), claudeProviderException(error))
       } finally {
         clearTimeout(authTimer)

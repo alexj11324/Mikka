@@ -28,7 +28,7 @@ export interface ModelCallTiming {
   inputTokens: number | null
   /** Input tokens read from the provider's prompt cache. */
   cacheReadTokens: number | null
-  /** Input tokens written to the cache (reported by Anthropic routes only). */
+  /** Input tokens written to the provider's cache when reported by the receipt. */
   cacheWriteTokens: number | null
   /** Compatible-provider fields before the SDK normalizes an absent read count to zero. */
   rawCache: { read: RawCacheCount; write: RawCacheCount; creation: RawCacheCount }
@@ -66,20 +66,37 @@ export interface ModelCallStart {
 
 type Part = { type: string; usage?: unknown; finishReason?: unknown }
 
-const FIRST_TOKEN = new Set(['text-delta', 'reasoning-delta', 'tool-input-start', 'tool-call'])
+export const MODEL_FIRST_TOKEN = new Set(['text-delta', 'reasoning-delta', 'tool-input-start', 'tool-input-delta', 'tool-call'])
+
+/** Unknown is not zero. Provider token counts and costs must be finite and nonnegative. */
+export function modelMetric(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+}
 
 function total(value: unknown): number | null {
-  if (typeof value === 'number') return value
-  if (value && typeof value === 'object' && 'total' in value && typeof value.total === 'number') return value.total
+  if (typeof value === 'number') return modelMetric(value)
+  if (value && typeof value === 'object' && 'total' in value) return modelMetric(value.total)
   return null
 }
 
-function cache(usage: unknown, field: 'cacheRead' | 'cacheWrite'): number | null {
-  if (!usage || typeof usage !== 'object' || !('inputTokens' in usage)) return null
-  const input = usage.inputTokens
-  if (!input || typeof input !== 'object' || !(field in input)) return null
-  const value = (input as Record<string, unknown>)[field]
-  return typeof value === 'number' ? value : null
+/** AI SDK v7 public usage and v4 provider usage both include cache in the input total. */
+function normalizedModelTokenUsage(usage: unknown): Pick<ModelCallTiming, 'inputTokens' | 'outputTokens' | 'cacheReadTokens' | 'cacheWriteTokens'> {
+  const raw = usage && typeof usage === 'object' ? usage as Record<string, unknown> : {}
+  const input = raw.inputTokens && typeof raw.inputTokens === 'object' ? raw.inputTokens as Record<string, unknown> : {}
+  const details = raw.inputTokenDetails && typeof raw.inputTokenDetails === 'object' ? raw.inputTokenDetails as Record<string, unknown> : {}
+  return {
+    inputTokens: total(raw.inputTokens), outputTokens: total(raw.outputTokens),
+    cacheReadTokens: modelMetric(input.cacheRead) ?? modelMetric(details.cacheReadTokens),
+    cacheWriteTokens: modelMetric(input.cacheWrite) ?? modelMetric(details.cacheWriteTokens),
+  }
+}
+
+/** Tracing may additionally use the provider's numeric cache-write receipt. */
+export function modelTokenUsage(usage: unknown): ReturnType<typeof normalizedModelTokenUsage> {
+  const normalized = normalizedModelTokenUsage(usage)
+  const details = own(own(usage, 'raw'), 'prompt_tokens_details')
+  return { ...normalized, cacheWriteTokens: normalized.cacheWriteTokens
+    ?? modelMetric(own(details, 'cache_write_tokens')) ?? modelMetric(own(details, 'cached_creation_tokens')) }
 }
 
 function own(value: unknown, key: string): unknown {
@@ -98,10 +115,9 @@ function rawCache(usage: unknown): ModelCallTiming['rawCache'] {
   return { read: count('cached_tokens'), write: count('cache_write_tokens'), creation: count('cached_creation_tokens') }
 }
 
-function reason(value: unknown): string | null {
-  if (typeof value === 'string') return value
-  if (value && typeof value === 'object' && 'unified' in value && typeof value.unified === 'string') return value.unified
-  return null
+export function modelFinishReason(value: unknown): string | null {
+  const reason = typeof value === 'string' ? value : value && typeof value === 'object' && 'unified' in value ? value.unified : null
+  return typeof reason === 'string' && ['stop', 'length', 'content-filter', 'tool-calls', 'error', 'other', 'unknown'].includes(reason) ? reason : null
 }
 
 /** Passes the model's stream through unchanged and logs its timing once it ends. Never throws for logging. */
@@ -125,11 +141,8 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
         firstTokenMs: firstToken === null ? null : firstToken - start.requestedAt,
         firstTextMs: firstText === null ? null : firstText - start.requestedAt,
         durationMs: at - start.requestedAt,
-        inputTokens: usage && typeof usage === 'object' && 'inputTokens' in usage ? total(usage.inputTokens) : null,
-        cacheReadTokens: cache(usage, 'cacheRead'),
-        cacheWriteTokens: cache(usage, 'cacheWrite'),
+        ...normalizedModelTokenUsage(usage),
         rawCache: rawCache(usage),
-        outputTokens: usage && typeof usage === 'object' && 'outputTokens' in usage ? total(usage.outputTokens) : null,
         toolCalls, finishReason, interrupted,
         ...(start.prefix ? { prefix: start.prefix } : {}),
         ...(start.codexLayoutApplied === undefined ? {} : { codexLayoutApplied: start.codexLayoutApplied }),
@@ -144,11 +157,11 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
       try { next = await reader.read() } catch (error) { emit(true); throw error }
       if (next.done) { emit(failed); controller.close(); return }
       const part = next.value
-      if (firstToken === null && FIRST_TOKEN.has(part.type)) firstToken = now()
+      if (firstToken === null && MODEL_FIRST_TOKEN.has(part.type)) firstToken = now()
       if (firstText === null && part.type === 'text-delta') { firstText = now(); start.subscriptionTiming?.firstSdkText() }
       if (part.type === 'tool-call') toolCalls++
       if (part.type === 'error') failed = true
-      if (part.type === 'finish') { usage = part.usage; finishReason = reason(part.finishReason) }
+      if (part.type === 'finish') { usage = part.usage; finishReason = modelFinishReason(part.finishReason); failed ||= finishReason === 'error' }
       controller.enqueue(part)
     },
     async cancel(cause) { emit(true); await reader.cancel(cause) },

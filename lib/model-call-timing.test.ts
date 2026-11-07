@@ -88,6 +88,18 @@ test('each tool call is timed by name, failures included, and its result is unch
   assert.deepEqual(timings, [{ tool: 'dispatch_run', ms: 2_500, failed: false }, { tool: 'broken', ms: 400, failed: true }])
 })
 
+test('provider error parts mark timing interrupted and malformed counts or finish text are not logged', async () => {
+  const lines: ModelCallTiming[] = []
+  await drain(timedModelStream({ stream: streamOf([
+    { type: 'error', error: new Error('private upstream response') },
+    { type: 'finish', usage: { inputTokens: { total: NaN, cacheRead: -1, cacheWrite: Infinity }, outputTokens: -2 }, finishReason: { unified: 'private upstream response' } },
+  ]) }, { route: 'hosted', model: 'm', tools: 0, startedAt: 0, requestedAt: 0 }, () => 5, line => lines.push(line)).stream)
+  assert.equal(lines.length, 1)
+  assert.equal(lines[0].interrupted, true)
+  assert.deepEqual([lines[0].inputTokens, lines[0].cacheReadTokens, lines[0].cacheWriteTokens, lines[0].outputTokens, lines[0].finishReason], [null, null, null, null, null])
+  assert.doesNotMatch(JSON.stringify(lines), /private upstream/)
+})
+
 test('the cacheable prefix is logged as short hashes of the tools and each system message, never their text', async () => {
   const { promptPrefix } = await import('./model-call-timing')
   const tools = [{ type: 'function', name: 'create_issue', description: 'secret tool text', inputSchema: {} }]

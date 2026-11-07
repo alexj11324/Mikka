@@ -1,5 +1,7 @@
 import { runChanged } from '../live/panels'
 import { cloudStartupSpan, cloudStartupPhases, cloudStartupRunAttributes } from '@/lib/computer/startup-tracing'
+import { captureTraceContext, withRunSpan } from '@/lib/tracing/context'
+import { daemonTraceSettings } from '@/lib/tracing/config'
 import 'server-only'
 import { runListChanged } from '../live/lists'
 import { rebindExecutionDevice, revalidateExecutionIdentity } from '../execution-identity'
@@ -607,6 +609,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
       WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+    return await withRunSpan('cloud.thread.provision', { ...cloudStartupRunAttributes(runId), 'mikka.run_id': runId }, async () => {
     if (!refreshRuntime) {
       refreshPhase = timings.next('execution_identity')
       await revalidateExecutionIdentity(client, run)
@@ -987,7 +990,9 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     refreshPhase = timings.next('publish_bootstrap')
     const handoffStartedAt = (await pool.query('SELECT clock_timestamp() AS now')).rows[0].now as Date
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
-    const bootstrap = JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) })
+    const bootstrap = JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(),
+      traceContext: captureTraceContext({ runId }), tracing: daemonTraceSettings(),
+      ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) })
     // Keep the strict bootstrap schema readable by old workers during rollout
     // and rollback. This optional locator binds to the same one-use bytes; it
     // carries no assignment or usable credential. String multipart is one RPC.
@@ -1025,6 +1030,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     await runChanged(pool, runId)
     logThreadLifecycle(finished.rows[0], { phase: finished.rows[0].lifecycle.phase, reason: finished.rows[0].lifecycle.phase, provider: 'running', deadline: Date.now(), computeSeconds: finished.rows[0].computeSeconds })
     return { runId, state: 'running' }
+    }, run.agentDefinition?.traceContext)
   } catch (error) {
     // Capture the rejecting branch before cleanup and the start wrapper hide
     // it. Admission can fail before the exact-question flag is available.

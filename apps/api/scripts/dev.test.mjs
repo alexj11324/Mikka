@@ -1,14 +1,9 @@
 import assert from 'node:assert/strict'
-import { execFile } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { tmpdir } from 'node:os'
-import { promisify } from 'node:util'
+import { Agent } from 'node:http'
 import test from 'node:test'
 import { getEventListeners } from 'node:events'
-import { build } from 'esbuild'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
-import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, tracingEntry } from './dev.mjs'
+import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady } from './dev.mjs'
 
 const request = (path, options) => new Request(`http://localhost:3000${path}`, options)
 const html = '<!doctype html><html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
@@ -32,8 +27,9 @@ test('development keeps one explicit browser origin and accepts existing port/ho
   for (const args of [['--port', '0'], ['-p', '65536'], ['-p', '1x'], ['--host', 'https://example.invalid'], ['--port'], ['--webpack']]) assert.throws(() => developmentOptions(args, {}))
 })
 
-test('only machine paths proxy, retaining the browser Host and exact encoded path', () => {
-  const proxy = apiProxyOptions('http://127.0.0.1:42311/')['^/']
+test('only machine paths proxy, retaining the browser Host and exact encoded path', t => {
+  const agent = new Agent({ keepAlive: true }); t.after(() => agent.destroy())
+  const proxy = apiProxyOptions('http://127.0.0.1:42311/', agent)['^/']
   assert.equal(proxy.changeOrigin, false)
   assert.equal(proxy.target, 'http://127.0.0.1:42311')
   for (const url of ['/mikka/api/auth/callback/github?code=opaque', '/mikka/%61pi/missing', '/mikka/api%2fmissing', '/mikka/w/review', '/.well-known/workflow/v1/flow']) {
@@ -44,6 +40,7 @@ test('only machine paths proxy, retaining the browser Host and exact encoded pat
   }
   for (const url of ['/mikka/en/settings', '/mikka/@vite/client', '/mikka/src/index.tsx', '/mikka/@react-refresh']) assert.equal(proxy.bypass({ url }), url)
   for (const target of ['https://127.0.0.1:444', 'http://example.invalid', 'http://user:password@127.0.0.1', 'http://127.0.0.1/base', 'http://127.0.0.1?target=other']) assert.throws(() => apiProxyOptions(target), /API_DEV_PROXY_TARGET_INVALID/)
+  assert.throws(() => apiProxyOptions('http://127.0.0.1:42311/'), /API_DEV_PROXY_AGENT_INVALID/)
 })
 
 test('development applies real locale, document cookie and private-link policies before HTML transformation', async () => {
@@ -91,20 +88,6 @@ test('HEAD does not transform a document; unknown APIs/assets and writes never g
   assert.equal(write.status, 405)
   assert.equal(write.headers.get('allow'), 'GET, HEAD')
 })
-
-test('the bundled worker entry executes tracing before loading its dynamic runtime graph', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'mikka-dev-tracing-'))
-  try {
-    const runtime = join(directory, 'runtime.mjs')
-    await writeFile(runtime, 'if (globalThis.__tracingBeforeRuntime !== true) throw new Error("TRACING_TOO_LATE"); console.log("tracing-first"); export default {fetch(){return new Response("ok")}}\n')
-    const entry = await tracingEntry({ directory, originalEntry: runtime, tracing: 'globalThis.__tracingBeforeRuntime = true;\n' })
-    const output = join(directory, 'compiled.mjs')
-    await build({ entryPoints: [entry], outfile: output, bundle: true, platform: 'node', format: 'esm', target: 'node24', logLevel: 'silent' })
-    const { stdout } = await promisify(execFile)(process.execPath, [output], { timeout: 10_000 })
-    assert.equal(stdout.trim(), 'tracing-first')
-  } finally { await rm(directory, { recursive: true, force: true }) }
-})
-
 
 function workerMessages() {
   const listeners = new Set()

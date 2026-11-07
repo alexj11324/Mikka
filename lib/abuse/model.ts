@@ -10,6 +10,7 @@ import { checkAbuseAlerts } from './alerts'
 import { canUseMikkaPaid, hostedUsage } from './runtime'
 import { withSharedCredits } from '@/lib/credit-shares'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
+import { observedModel, recordAiRoute, recordAiUsage, type AiMetadata } from '@/lib/tracing/ai'
 import { createZeroCatModel, gatewayCredential, pauseZeroCat, recordModelRoute, zeroCatConfig, zeroCatCost, zeroCatErrorStatus, zeroCatFailureReason, zeroCatPaused, ZEROCAT_FIRST_TOKEN_TIMEOUT_MS, type ZeroCatFallbackReason } from './zerocat'
 import {
   gatewayCost,
@@ -64,11 +65,13 @@ export async function hostedModel(
   modelId: string,
   provider?: Model,
   ownerId?: string,
+  metadata: AiMetadata = {},
 ): Promise<Model> {
   if (isZeroCatModel(modelId) && selfHostedDefaultModelConfig()) {
     if (provider) throw new ModelAdmissionError('modelRouteDenied')
     const billing = hostedBillingScope.getStore()
-    return selfHostedDefaultModel({ workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) })
+    const scope = { workspaceId, ownerId: ownerId ?? (billing?.workspaceId === workspaceId ? billing.ownerId : undefined) }
+    return observedModel(selfHostedDefaultModel(scope), { ...metadata, userId: scope.ownerId, route: 'self_hosted' })
   }
   await withSharedCredits(workspaceId, canUseMikkaPaid)
   const zeroCat = isZeroCatModel(modelId)
@@ -135,19 +138,20 @@ export async function hostedModel(
     pauseZeroCat()
     return zeroCatFailureReason(error, firstTokenTimedOut)
   }
-  let attemptMs: number | undefined
-  const route = (served: 'zerocat' | 'gateway', reason?: ZeroCatFallbackReason, error?: unknown, metadata?: unknown) => {
+  const route = (served: 'zerocat' | 'gateway', reason?: ZeroCatFallbackReason, error?: unknown, metadata?: unknown, attemptMs?: number) => {
+    recordAiRoute({ route: served, fallbackReason: reason, zeroCatMs: attemptMs })
     if (zeroCat) recordModelRoute({ model: modelId, route: served, reason, error, attemptMs, status: zeroCatErrorStatus(error), credential: served === 'gateway' ? gatewayCredential(metadata) : undefined })
   }
   /** Why ZeroCat is skipped before trying it, or undefined to try it. */
   const skipZeroCat = () => unavailable ?? (zeroCatPaused() ? 'paused' as const : undefined)
-  return new Proxy(model, {
+  return observedModel(new Proxy(model, {
     get(target, key) {
       if (key === 'doGenerate')
         return async (args: CallArgs) => {
           const id = randomUUID()
           await reserve(id, args)
           let requestStarted = false
+          let attemptMs: number | undefined
           try {
             if (hostedUsage.metered !== false) await checkAbuseAlerts()
             let reason = skipZeroCat(), failure: unknown
@@ -164,6 +168,7 @@ export async function hostedModel(
               } else reason = 'route_denied'
             }
             const served = result ? 'zerocat' : 'gateway'
+            recordAiRoute({ route: served, fallbackReason: reason, zeroCatMs: attemptMs })
             if (!result) {
               const admission = await admitGateway(args.abortSignal)
               const selected = await executionModel(admission)
@@ -172,8 +177,10 @@ export async function hostedModel(
               requestStarted = true
               result = await selected.doGenerate(prepared)
             }
-            route(served, reason, failure, result.providerMetadata)
+            route(served, reason, failure, result.providerMetadata, attemptMs)
             const cost = served === 'zerocat' ? zeroCatCost(result.usage) : gatewayCost(result.providerMetadata)
+            recordAiUsage(result.usage)
+            recordAiRoute({ totalCostUsd: cost === null ? null : cost / 1_000_000 })
             await hostedUsage.settle(
               id,
               cost,
@@ -195,6 +202,7 @@ export async function hostedModel(
           const id = randomUUID()
           await reserve(id, args)
           let requestStarted = false
+          let attemptMs: number | undefined
           try {
             if (hostedUsage.metered !== false) await checkAbuseAlerts()
             let reason = skipZeroCat(), failure: unknown
@@ -230,6 +238,7 @@ export async function hostedModel(
               } else reason = 'route_denied'
             }
             const served = opened ? 'zerocat' : 'gateway'
+            recordAiRoute({ route: served, fallbackReason: reason, zeroCatMs: attemptMs })
             if (!opened) {
               const admission = await admitGateway(args.abortSignal)
               const selected = await executionModel(admission)
@@ -254,7 +263,7 @@ export async function hostedModel(
               if (settlement.status === 'rejected') throw settlement.reason
               if (upstream.status === 'rejected') throw upstream.reason
             }
-            if (served === 'zerocat') { route('zerocat'); routed = true }
+            if (served === 'zerocat') { route('zerocat', undefined, undefined, undefined, attemptMs); routed = true }
             return {
               ...result,
               stream: new ReadableStream({
@@ -262,7 +271,7 @@ export async function hostedModel(
                   try {
                     const { value: chunk, done } = buffered.length ? { value: buffered.shift()!, done: false } : await reader.read()
                     if (done) {
-                      if (!routed) { route(served, reason, failure); routed = true }
+                      if (!routed) { route(served, reason, failure, undefined, attemptMs); routed = true }
                       if (!finished && !consumerCancelled) await hostedUsage.settle(id, null, 0, 0, generationId)
                       if (!consumerCancelled) controller.close()
                       return
@@ -277,8 +286,10 @@ export async function hostedModel(
                       }
                     }
                     if (chunk.type === 'finish') {
-                      if (!routed) { route(served, reason, failure, chunk.providerMetadata); routed = true }
+                      if (!routed) { route(served, reason, failure, chunk.providerMetadata, attemptMs); routed = true }
                       const cost = served === 'zerocat' ? zeroCatCost(chunk.usage) : gatewayCost(chunk.providerMetadata)
+                      recordAiUsage(chunk.usage)
+                      recordAiRoute({ totalCostUsd: cost === null ? null : cost / 1_000_000 })
                       await hostedUsage.settle(
                         id,
                         cost,
@@ -312,7 +323,7 @@ export async function hostedModel(
       const value = Reflect.get(target, key, target)
       return typeof value === 'function' ? value.bind(target) : value
     },
-  })
+  }), { ...metadata, modelId, userId: scope.ownerId, route: zeroCat && primary ? 'zerocat' : 'gateway' })
 }
 
 function withoutGatewayOptions(options: CallArgs['providerOptions']) {

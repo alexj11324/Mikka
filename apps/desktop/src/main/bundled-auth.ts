@@ -8,6 +8,7 @@ import { accountChoice, responseWorkspace, rpcEnvelope } from './bundled-account
 import { openBundledWebPage } from './bundled-web'
 import { canonicalServerUrl } from './server-discovery'
 import { markStartup } from '../startup'
+import type { BundledSessionChange } from './bundled-session-change'
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>
 
@@ -25,7 +26,7 @@ export class BundledAuth {
   private target: string
   constructor(private readonly options: {
     serverUrl: string; version: string; fetch: Fetcher; vault: SessionVault
-    openExternal(url: string): Promise<void>; changed(): void; returned(next: string): void
+    openExternal(url: string): Promise<void>; changed(change?: BundledSessionChange): void; returned(next: string): void | Promise<void>
     scopeChanged?(): void
     /** A new app link for the browser's callback page to open (app-link.ts). */
     appLink?(): string
@@ -283,7 +284,7 @@ export class BundledAuth {
     return this.options.describe?.(url) ?? { url, cloud: url === this.home, name: null }
   }
 
-  private async accept(value: unknown, generation: number, sessionCache?: string): Promise<void> {
+  private async accept(value: unknown, generation: number, sessionCache?: string, change?: BundledSessionChange): Promise<void> {
     const input = value as { token?: unknown }
     const identity = publicSession(value)
     const parsed = storedSession({ token: input?.token, identity, sessionCache, ...(this.target !== this.home ? { server: this.target } : {}) })
@@ -295,7 +296,7 @@ export class BundledAuth {
     // retains the other encrypted sessions, bounded like the web switcher.
     if (!this.saved.has(parsed.identity.user.id) && this.saved.size >= 5) throw new Error('desktop_account_limit_reached')
     if (!await this.commitAccount(parsed, generation)) return
-    this.options.changed()
+    this.options.changed(change)
   }
 
   async signIn(input: unknown): Promise<void> {
@@ -319,8 +320,10 @@ export class BundledAuth {
           body: JSON.stringify({ state, code, verifier, client: 'bundled' }), signal: AbortSignal.timeout(30_000),
         }, false)
         if (!response.ok) throw new Error('Sign-in exchange failed')
-        await this.accept(await response.json(), generation, responseSessionCache(response.headers))
-        if (generation === this.generation) this.options.returned(next)
+        await this.accept(await response.json(), generation, responseSessionCache(response.headers), { pendingReturn: true })
+        // Navigation replaces the main document. Await a failure so the current
+        // generation alone can fall back to its ordinary session notification.
+        if (generation === this.generation) await this.options.returned(next)
       })().catch(() => { if (generation === this.generation) this.options.changed() })
     }, this.options.appLink?.())
     if (generation !== this.generation) { listener.close(); return }

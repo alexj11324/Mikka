@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { assertArtifactReference, cleanupIdentity, CLEANUP_IDENTITY_MAX_BYTES, readRuntimeReport,
+import { assertArtifactReference, assertCandidatePreserved, cleanupIdentity, CLEANUP_IDENTITY_MAX_BYTES, readRuntimeReport,
   reportDigest, templateModels, templateModelsDigest } from './runtime-report.mjs'
 
 const expected = { sourceCommit: 'a'.repeat(40), workerSha: 'b'.repeat(40), runId: '123456', runAttempt: '2' }
@@ -66,6 +66,33 @@ test('a partial rerun cannot reuse a previous attempt or another run as subscrip
     assert.throws(() => readRuntimeReport(f.path, { ...f.expected, ...patch }), /expected_identity_invalid/)
 })
 
+test('report identities require the concrete build and preinstalled runtime', t => {
+  for (const change of [{ buildId: '' }, { buildId: undefined }, { buildId: 'foreign/build' },
+    { buildId: 'a'.repeat(129) }, { preinstalled: false }, { preinstalled: undefined }]) {
+    const report = fixture(); Object.assign(report.templates.codex, change)
+    const f = withReport(t, report)
+    assert.throws(() => readRuntimeReport(f.path, f.expected), /runtime_report_candidate_invalid/)
+  }
+})
+
+test('accepted and published reports preserve every original candidate field', () => {
+  const candidate = fixture(), accepted = { ...structuredClone(candidate), subscriptionAcceptance: { fixture: true } }
+  assert.equal(assertCandidatePreserved(accepted, candidate), accepted)
+  const release = structuredClone(accepted)
+  for (const row of Object.values(release.templates)) Object.assign(row, { public: true, buildStatus: 'ready' })
+  assert.equal(assertCandidatePreserved(release, candidate, { published: true }), release)
+  assert.throws(() => assertCandidatePreserved(release, candidate), /candidate_changed/)
+  assert.throws(() => assertCandidatePreserved(accepted, candidate, { published: true }), /candidate_changed/)
+  for (const change of [row => { row.buildId = 'different-build' }, row => { row.templateId = 'different-template' },
+    row => { row.name += '-different' }, row => { row.models[0].models.push('unmeasured') },
+    row => { row.conservation.preserved.pop() }, row => { row.extra = true }]) {
+    for (const published of [false, true]) {
+      const invalid = structuredClone(published ? release : accepted); change(invalid.templates.codex)
+      assert.throws(() => assertCandidatePreserved(invalid, candidate, { published }), /candidate_changed/)
+    }
+  }
+})
+
 test('only short cleanup identities cross the failure boundary, independent of every preservation proof byte', t => {
   const f = withReport(t), text = cleanupIdentity(f.report, expected), receipt = JSON.parse(text)
   assert.ok(Buffer.byteLength(text) < CLEANUP_IDENTITY_MAX_BYTES)
@@ -109,9 +136,11 @@ function workflowNodeScript(file, argument) {
 
 test('the actual workflow producer and pre-publication scripts keep large proofs out of every job output', t => {
   const f = withReport(t), output = join(f.dir, 'outputs')
+  const candidateDirectory = join(f.dir, 'e2b-candidates'), candidatePath = join(candidateDirectory, 'candidates.json')
+  mkdirSync(candidateDirectory); writeFileSync(candidatePath, f.bytes)
   const env = { PATH: process.env.PATH, GITHUB_SHA: expected.sourceCommit, SOURCE_SHA: expected.workerSha,
     GITHUB_RUN_ID: expected.runId, GITHUB_RUN_ATTEMPT: expected.runAttempt, GITHUB_OUTPUT: output,
-    TEMPLATE_MODELS_SHA256: templateModelsDigest(f.report) }
+    RUNNER_TEMP: f.dir, CANDIDATE_SHA256: f.expected.sha256, TEMPLATE_MODELS_SHA256: templateModelsDigest(f.report) }
   const run = (workflow, argument, extra = {}) => spawnSync(process.execPath, ['--input-type=module', '-', f.path], {
     input: workflowNodeScript(workflow, argument), encoding: 'utf8', env: { ...env, ...extra },
     cwd: fileURLToPath(new URL('../../', import.meta.url)),
@@ -129,14 +158,40 @@ test('the actual workflow producer and pre-publication scripts keep large proofs
   assert.equal(accepted.status, 0, accepted.stderr)
   assert.notEqual(run('e2b-official-runtime.yml', 'accepted.json', { GITHUB_RUN_ATTEMPT: '3' }).status, 0)
   assert.notEqual(run('e2b-official-runtime.yml', 'accepted.json', { TEMPLATE_MODELS_SHA256: 'd'.repeat(64) }).status, 0)
+  const changedBuild = structuredClone(f.report); changedBuild.templates.codex.buildId = 'other-build'
+  writeFileSync(f.path, JSON.stringify(changedBuild))
+  assert.notEqual(run('e2b-official-runtime.yml', 'accepted.json').status, 0, 'a changed build is refused before publish-verified')
+  const publicReport = structuredClone(f.report)
+  for (const row of Object.values(publicReport.templates)) Object.assign(row, { public: true, buildStatus: 'ready' })
+  const publicBytes = Buffer.from(JSON.stringify(publicReport) + '\n')
+  writeFileSync(f.path, publicBytes)
   writeFileSync(output, '')
   const release = run('e2b-official-runtime.yml', 'release.json')
   assert.equal(release.status, 0, release.stderr)
   const releaseLines = readFileSync(output, 'utf8').trim().split('\n')
   assert.equal(releaseLines.length, 2)
-  assert.equal(releaseLines[0], `release-sha256=${f.expected.sha256}`)
+  assert.equal(releaseLines[0], `release-sha256=${reportDigest(publicBytes)}`)
   assert.ok(releaseLines.every(line => Buffer.byteLength(line) < CLEANUP_IDENTITY_MAX_BYTES))
-  assert.deepEqual(readFileSync(f.path), f.bytes)
+  assert.deepEqual(readFileSync(candidatePath), f.bytes)
+  assert.deepEqual(readFileSync(f.path), publicBytes)
+  publicReport.templates.codex.conservation.preserved.pop()
+  writeFileSync(f.path, JSON.stringify(publicReport))
+  assert.notEqual(run('e2b-official-runtime.yml', 'release.json').status, 0, 'a changed preservation report cannot become a release artifact')
+})
+
+test('actual producer, accepted and release scripts never print malformed report content', t => {
+  const f = withReport(t), bytes = Buffer.from('{"CANARY_REPORT_CONTENT":invalid}')
+  writeFileSync(f.path, bytes)
+  for (const [workflow, argument] of [['e2b-template.yml', 'candidates.json'],
+    ['e2b-official-runtime.yml', 'accepted.json'], ['e2b-official-runtime.yml', 'release.json']]) {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-', f.path], {
+      input: workflowNodeScript(workflow, argument), encoding: 'utf8',
+      env: { PATH: process.env.PATH, RUNNER_TEMP: f.dir }, cwd: fileURLToPath(new URL('../../', import.meta.url)),
+    })
+    assert.equal(result.status, 1, argument)
+    assert.deepEqual(JSON.parse(result.stderr), { event: 'runtime_report_refused', code: 'runtime_report_failed' })
+    assert.doesNotMatch(result.stdout + result.stderr, /CANARY|candidates\.json/)
+  }
 })
 
 test('malformed report text keeps its error cause but never reaches CLI diagnostics', t => {

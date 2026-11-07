@@ -5,7 +5,7 @@ import { tokenWorkspace } from '../lib/tokens/principal'
 let user: { id: string; [tokenWorkspace]?: string } | null = { id: 'owner' }
 const reads: unknown[][] = [], filtered: unknown[][] = []
 const json = (data: unknown, status = 200) => Response.json(data, { status })
-mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_: string, handler: unknown) => handler, noteLogUser: () => {} } })
+mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_: string, handler: unknown) => handler, noteLogUser: () => {} } })
 mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExports: { mobileUser: async () => user, json, unauthorized: () => json({ error: 'authRequired' }, 401) } })
 mock.module(new URL('../lib/mobile-threads.ts', import.meta.url).href, { namedExports: { mobileThreads: async (...args: unknown[]) => { reads.push(args); return { threads: [{ id: 'inside' }, { id: 'outside' }], devices: [], live: { ownerId: 'owner', workspaceId: null } } } } })
 mock.module(new URL('../lib/tokens/scope.ts', import.meta.url).href, { namedExports: { runsOutsideToken: async (...args: unknown[]) => { filtered.push(args); return new Set(['outside']) } } })

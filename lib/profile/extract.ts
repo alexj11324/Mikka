@@ -6,7 +6,7 @@ import { selfHostedDefaultModelConfig } from '@/lib/default-model-config'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import { extractionPrompt, factInput, parseFacts } from './facts'
-import { captureGeneration } from '@/lib/posthog-server'
+import { withAiMetadata } from '@/lib/tracing/ai'
 import { profileEnabled } from './flags'
 import { profileEntitled } from './entitlement'
 import { claimExtractionCall, memoryEnabled, recordExtractionTokens, recordFacts, usageDay } from './store'
@@ -40,11 +40,9 @@ export async function extractFacts(notification: ExternalNotification, suggestio
     const day = usageDay(new Date())
     if (!await claimExtractionCall(notification.userId, day)) return 0
     const { instructions, prompt } = extractionPrompt(notification)
-    const started = Date.now()
-    const { text, usage } = await generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(FACT_TIMEOUT_MS) })
+    const { text, usage } = await withAiMetadata({ operation: 'profile_extraction' }, () => generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(FACT_TIMEOUT_MS) }))
     const inputTokens = usage.inputTokens ?? 0
     const outputTokens = usage.outputTokens ?? 0
-    captureGeneration(notification.userId, { model: FACT_MODEL, inputTokens, outputTokens, latencyMs: Date.now() - started, span: 'profile_extraction' })
     await recordExtractionTokens(notification.userId, day, inputTokens, outputTokens)
     const facts = parseFacts(text).map(fact => factInput(fact, notification, suggestionId))
     return facts.length ? await recordFacts(notification.userId, facts) : 0

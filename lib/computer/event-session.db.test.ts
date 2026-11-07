@@ -31,7 +31,7 @@ test('computer events authorize real sessions and read bounded owner/workspace p
     mocks.push(mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: database } }))
     mocks.push(mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: database } }))
     mocks.push(mock.module(new URL('../request-log.ts', import.meta.url).href, {
-      namedExports: { withRequestLog: (_name: string, route: (request: Request) => Promise<Response>) => route },
+      namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, route: (request: Request) => Promise<Response>) => route },
     }))
     const { GET } = await import('../../app/api/computer/events/route')
 

@@ -454,6 +454,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({
     ...publication,
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
+    ...(run.agentDefinition?.traceContext ? { traceContext: { ...run.agentDefinition.traceContext, runId } } : {}),
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),
     ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: current.prompt,
     kind: current.kind, leaseExpiresAt, policyRevision: cliPolicy.revision,

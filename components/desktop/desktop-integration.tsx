@@ -6,7 +6,7 @@ import { useRouter } from '@/i18n/navigation'
 import useSWR from 'swr'
 
 import { listDevices } from '@/app/actions/agents'
-import { localSetupAction } from '@/lib/local-device-setup'
+import { localSetupAction, localSetupNeedsOwnership } from '@/lib/local-device-setup'
 import type { getPreferences } from '@/app/actions/preferences'
 import { settingsRead } from '@/lib/settings-read'
 import { chooseDesktopNotifications } from '@/app/actions/desktop-notifications'
@@ -92,9 +92,11 @@ export function DesktopIntegration({ userId }: { userId: string }) {
     const bridge = window.mikka
     if (!bridge?.ssh?.autoLocal) return
     let live = true
-    void Promise.all([bridge.device.status(), listDevices()])
-      .then(([local, devices]) => {
-        const action = localSetupAction(local, devices.map(device => device.id))
+    void bridge.device.status()
+      .then(async local => {
+        if (!live) return
+        const ids = localSetupNeedsOwnership(local) ? (await listDevices()).map(device => device.id) : []
+        const action = localSetupAction(local, ids)
         if (live && action !== 'none') return bridge.ssh?.autoLocal?.(action)
       })
       .catch(() => {})

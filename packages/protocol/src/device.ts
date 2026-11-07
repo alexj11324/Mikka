@@ -24,6 +24,7 @@ import { quotaSnapshotSchema } from "./quota"
 import { runStopReason, runBenchmarkContext } from "./run"
 import { MAX_SKILLS_PER_RUN, runSkillSchema } from "./skill"
 import { skillAssignmentReceiptSchema } from './skill-artifact'
+import { sanitizeTraceContext } from './trace-context'
 import { nativeLeaseSchema } from './subscription'
 import { mailboxCatalogueSchema } from './mailbox'
 
@@ -383,6 +384,8 @@ export type RunKind = (typeof RUN_KINDS)[number]
 /** `POST /v1/devices/:deviceId/runs/:runId/claim`: what the daemon gets. */
 export const runAssignmentSchema = z.object({
   runId: id,
+  /** Optional telemetry, never authorization. A malformed carrier cannot prevent a run. */
+  traceContext: z.unknown().transform(sanitizeTraceContext).optional(),
   issueId: id,
   deviceId: id,
   repoId: id,

@@ -1,9 +1,9 @@
 import 'server-only'
-// oxlint-disable-next-line no-restricted-imports -- an analytics flush, no database work to label
-import { after } from 'next/server'
 import { PostHog } from 'posthog-node'
 import { gatedFeatureEnabled, productionFlagDefault } from '@/lib/feature-flags'
 import { posthogConfig } from '@/lib/posthog-config'
+import { registerTelemetryFlush } from '@/lib/tracing/flush'
+import { safeErrorAttributes } from '@mikka/protocol/tracing'
 
 // PostHog on the server, for per-person flags and LLM usage. It uses the same
 // project as the browser (NEXT_PUBLIC_POSTHOG_KEY) and the same distinct id,
@@ -20,17 +20,22 @@ const CACHE_MAX = 5_000
 /** The part of the PostHog client this module uses, so tests can pass a fake. */
 export interface ServerPostHog {
   getFeatureFlag(key: string, distinctId: string, options?: { sendFeatureFlagEvents?: boolean }): Promise<boolean | string | undefined>
-  capture(message: { distinctId: string; event: string; properties?: Record<string, unknown> }): void
+  capture(message: { distinctId: string; event: string; properties?: Record<string, unknown>; timestamp?: Date }): void
   flush(): Promise<void>
 }
 
 let client: ServerPostHog | null | undefined
 
-function serverPostHog(): ServerPostHog | null {
+export function serverPostHog(): ServerPostHog | null {
   if (client !== undefined) return client
   client = posthogConfig.token
-    ? new PostHog(posthogConfig.token, { host: posthogConfig.apiHost, secretKey: process.env.POSTHOG_SECRET_KEY || undefined, featureFlagsPollingInterval: FLAG_CACHE_MS, flushAt: 20, flushInterval: 10_000 })
+    ? new PostHog(posthogConfig.token, { host: posthogConfig.apiHost, secretKey: process.env.POSTHOG_SECRET_KEY || undefined, featureFlagsPollingInterval: FLAG_CACHE_MS,
+      flushAt: 20, maxQueueSize: 512, flushInterval: 10_000, requestTimeout: 5_000, fetchRetryCount: 0, disableGeoip: true })
     : null
+  if (client) {
+    const initialized = client
+    registerTelemetryFlush(() => initialized.flush())
+  }
   return client
 }
 
@@ -56,7 +61,7 @@ export async function serverFlagEnabled(key: string, userId: string, { posthog =
       ])
       enabled = gatedFeatureEnabled(value)
     } catch (error) {
-      console.error('PostHog flag check failed', error instanceof Error ? error.message : error)
+      console.error('PostHog flag check failed', safeErrorAttributes(error))
     } finally {
       clearTimeout(timer)
     }
@@ -69,27 +74,4 @@ export async function serverFlagEnabled(key: string, userId: string, { posthog =
 /** Forgets cached flag values; for tests. */
 export function clearFlagCache() {
   flagCache.clear()
-}
-
-export interface Generation { model: string; inputTokens: number; outputTokens: number; latencyMs: number; span: string }
-
-/**
- * Records one model call as a PostHog LLM analytics event, so cost per person
- * shows in PostHog. Only the model, token counts and timing: never the prompt
- * or the answer. Best effort: queued and flushed after the response; never
- * waits on PostHog and never throws.
- */
-export function captureGeneration(userId: string, generation: Generation, { posthog = serverPostHog() }: { posthog?: ServerPostHog | null } = {}) {
-  if (!posthog) return
-  try {
-    posthog.capture({ distinctId: userId, event: '$ai_generation', properties: {
-      $ai_model: generation.model, $ai_provider: 'vercel-ai-gateway', $ai_span_name: generation.span,
-      $ai_input_tokens: generation.inputTokens, $ai_output_tokens: generation.outputTokens, $ai_latency: generation.latencyMs / 1000,
-      app: 'mikka',
-    } })
-    const flush = () => posthog.flush().catch(() => {})
-    try { after(flush) } catch { void flush() }
-  } catch (error) {
-    console.error('PostHog capture failed', error instanceof Error ? error.message : error)
-  }
 }

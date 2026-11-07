@@ -1,5 +1,5 @@
 import { constants } from 'node:fs'
-import { lstat, mkdir, open, readdir, readFile } from 'node:fs/promises'
+import { lstat, mkdir, open, readdir, readFile, rename, unlink } from 'node:fs/promises'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { resolve, join } from 'node:path'
 import { performance } from 'node:perf_hooks'
@@ -35,6 +35,19 @@ async function readPrivate(path) {
     if (!stat.isFile() || (stat.mode & 0o077) || stat.size > 65536 || (process.getuid && stat.uid !== process.getuid())) fail('PRIVATE_FILE_UNSAFE')
     return JSON.parse(await handle.readFile('utf8'))
   } finally { await handle.close() }
+}
+
+async function replacePrivate(path, value) {
+  // Validate the existing retained file; write a new 0600 inode beside it and
+  // rename atomically so a normal browser consumer never sees partial JSON.
+  await readPrivate(path)
+  const temporary = `${path}.${randomUUID()}.tmp`
+  try {
+    await writePrivate(temporary, value)
+    await rename(temporary, path)
+  } finally {
+    await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error })
+  }
 }
 
 function scopedURL(environment, path) {
@@ -300,6 +313,7 @@ export async function acquireTestAccounts({ database, environment, runId, worker
           if (tokens.length) await writePrivate(auditFile, { values: tokens }, { append: true })
           await pool.recordResource(lease, { type: 'session', id: session.session.id, ownerId: userId })
           await assertActive()
+          await replacePrivate(storageStatePath, { cookies: [...cookies.values()], origins: [] })
         } catch (error) {
           tainted = true
           throw safeError(error)
