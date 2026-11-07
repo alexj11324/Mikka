@@ -61,7 +61,7 @@ import { PluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
 import { backToTaskOrigin, dropQueryKeys, goTo, NAVIGATE_EVENT, openedFromList, openThread, queryMoved, readLocation, sameLocation, sectionFor, taskOrigin, tidyAddress, toggleAllThreads, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
-import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest } from '@/lib/settings-navigation'
+import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest, appHrefBeforeSettings, rememberAppHref } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
 import { fetchSettingsData } from '@/lib/settings-data'
@@ -160,9 +160,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // server actions ahead of a settings save (Next runs a page's actions one at a time).
   const settingsShown = settingsOpen || pathname.startsWith('/settings')
   // The app page last shown outside Settings, for Settings' way back (backFromSettings).
-  const appHref = useRef<string | null>(null)
   const appQuery = params.toString()
-  useEffect(() => { if (!settingsShown) appHref.current = `${pathname}${appQuery ? `?${appQuery}` : ''}` }, [settingsShown, pathname, appQuery])
+  useEffect(() => { if (!settingsShown) rememberAppHref(`${pathname}${appQuery ? `?${appQuery}` : ''}`) }, [settingsShown, pathname, appQuery])
   const inSettings = useRef(settingsShown)
   inSettings.current = settingsShown
   const whileSettings = { isPaused: () => inSettings.current }
@@ -543,13 +542,15 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     if (pathname.startsWith('/settings') && !pushSettingsHistory('/')) { router.push('/'); return }
     openRail(destination)
   }
-  // ← in a Settings frame returns to the app page shown before Settings opened. The workspace stays
-  // mounted under Settings (#1603), so its own state is intact; only the address goes back.
+  // ← in a Settings frame returns to the app page shown before Settings opened, or home.
   const backFromSettings = () => {
-    const href = appHref.current
+    const href = appHrefBeforeSettings()
     if (!href) { leaveSettings('chats'); return }
     closeSettings()
-    if (pathname.startsWith('/settings') && !pushSettingsHistory(href)) router.push(href)
+    if (!pathname.startsWith('/settings')) return
+    // A workspace remounted under Settings shows the address it is given, as for any in-app move.
+    if (pushSettingsHistory(href)) window.dispatchEvent(new Event(NAVIGATE_EVENT))
+    else router.push(href)
   }
   const searchFromBar = () => {
     if (boardBusy) return
