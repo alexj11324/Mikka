@@ -84,7 +84,7 @@ export const INSIGHTS = [
     description: 'UTC today bytes / elapsed hours through reported bucket ×24×month days vs 500GB. ≥3h; same UTC day; healthy snapshot≤60m/provider≤180m. Assumes complete provider day cumulative. Daily pace equivalent, not billing-period forecast; monthly 50% retained.',
     query: hogql(sql('alert-daily-pace'), { display: 'ActionsTable' }) },
   { key: 'alert-error-spike', shortId: 'STBizeTe', name: '[1324] Mikka 错误码小时突增', tags: ['mikka', 'issue-1324', 'observability', 'source-alerts'],
-    description: 'Service+code weighted error spans > max(3×7d hourly median,50). Weight=1/sample_rate; legacy missing=0.1. Warmup 24 observed full hours; zero-fill only observed service hours. No current telemetry→NULL. Spans≠failed requests.',
+    description: 'Weighted error spans > max(3×7d hourly median,50). Excludes handled Workflow hook 404, duplicate 409 and terminal 410 chains with successful entries. Weight=1/sample_rate (legacy 0.1). Warmup 24 observed full hours; zero-fill only observed service hours. No current telemetry→NULL. Spans≠failed requests.',
     query: hogql(sql('alert-error-spike'), { display: 'ActionsTable' }) },
 ]
 
