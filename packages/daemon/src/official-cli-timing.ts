@@ -1,9 +1,10 @@
-import { randomBytes } from "node:crypto"
+import { createHash, randomBytes } from "node:crypto"
 import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import { runIdHash } from "./tracing"
 import { runRuntimeTimings } from "./run-runtime-timing"
 import { McpHttpTimingCollector, MCP_HTTP_BODY_LIMIT } from './mcp-http-timing'
+import type { RunMcp } from './agents/run-apps'
 
 type Harness = "claude_code" | "codex"
 type EventName = "claude_code.api_request" | "claude_code.api_error" | "claude_code.tool_result"
@@ -130,11 +131,12 @@ export class OfficialCliTimingCollector {
  * is per child process; no official CLI file or config file is modified.
  * Sources: code.claude.com/docs/en/monitoring-usage and
  * openai/codex/codex-rs/otel/{src/config.rs,src/provider.rs,README.md}. */
-export async function startCliTimingCollector({ runId, harness, remoteMcpServerCount }: {
-  runId: string; harness: Harness; model?: string; remoteMcpServerCount: number
+export async function startCliTimingCollector({ runId, harness, remoteMcpServerCount, decisionCatalogue }: {
+  runId: string; harness: Harness; model?: string; remoteMcpServerCount: number; decisionCatalogue?: RunMcp['decisionCatalogue']
 }) {
   const collector = new OfficialCliTimingCollector(runId, harness)
-  const mcpCollector = new McpHttpTimingCollector(runId, harness, remoteMcpServerCount)
+  const expectedCatalogueSha256 = decisionCatalogue ? createHash('sha256').update(JSON.stringify(decisionCatalogue)).digest('hex') : null
+  const mcpCollector = new McpHttpTimingCollector(runId, harness, remoteMcpServerCount, Date.now, expectedCatalogueSha256)
   const path = `/v1/logs/${randomBytes(16).toString("hex")}`
   const mcpPath = `/v1/mcp-http/${randomBytes(16).toString('hex')}`
   const server = createServer({ maxHeaderSize: 8192 }, (request, response) => {
