@@ -3,7 +3,7 @@ import { readFile, appendFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
-export const TARGET = { base: '9a6239665652a5dbedc26eeddd68139dfadf185a', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+export const TARGET = { base: 'ac7b93ddfb8f17f38ca9fd1deed39e525b2d5438', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
 const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
@@ -64,8 +64,10 @@ export async function prepare({env=process.env,fetcher=fetch,report}) {
  // Provider-owned metadata only: locate the existing Neon connection on the public project.
  const publicEnv=await ver('/v10/projects/'+TARGET.publicApp+'/env?teamId='+TARGET.team+'&decrypt=false');demand(Array.isArray(publicEnv.envs),'PUBLIC_METADATA_SCHEMA')
  report.neonVariables=publicEnv.envs.filter(x=>['DATABASE_URL','DATABASE_URL_UNPOOLED'].includes(x.key)&&x.target?.includes('production')&&!x.gitBranch).map(x=>({name:x.key,configurationId:x.configurationId??null,contentHint:x.contentHint??null,system:!!x.system}))
- const installations=await ver('/v1/integrations/configurations?teamId='+TARGET.team)
+ report.privateVariableNames=(await ver('/v10/projects/'+TARGET.app+'/env?teamId='+TARGET.team+'&decrypt=false')).envs.filter(x=>x.target?.includes('production')).map(x=>x.key)
+ const installations=await ver('/v1/integrations/configurations?view=account&teamId='+TARGET.team)
  report.integrationMetadata=(installations.configurations??installations.installations??[]).map(x=>({id:x.id,slug:x.slug??x.integration?.slug,projectIds:x.projects,resources:(x.resources??[]).map(r=>({id:r.id,name:r.name}))}))
+ const cfg=report.neonVariables[0]?.configurationId;if(cfg){const resources=await ver('/v1/integrations/installations/'+cfg+'/resources?teamId='+TARGET.team);report.neonResources=(resources.resources??resources.items??[]).map(r=>({id:r.id,externalResourceId:r.externalResourceId,name:r.name,productId:r.productId}))}
 }
 async function main(){const report={phase:'prepare-private-cloud',result:'blocked',requests:[],applicationSecretValuesRequested:false,credentialsWrittenToGitHub:false,newIdentityCreated:false};try{
  const git=(...a)=>execFileSync('git',a,{encoding:'utf8'}).trim();const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));assertExecution(process.env,event,git('rev-parse','HEAD'),git('rev-parse','HEAD^'),git('diff','--name-only','HEAD^','HEAD').split('\n'))

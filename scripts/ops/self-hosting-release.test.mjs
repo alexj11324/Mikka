@@ -11,3 +11,5 @@ test('untrusted execution cannot start a release',()=>{assert.throws(()=>assertE
 // API refusals are classified without printing raw errors or request bodies.
 
 // Only the exact closed PR316 Preview sync can be reused; production syncs are not retargeted.
+
+// Installation inventory uses the documented account view.
