@@ -17,7 +17,7 @@ jobs:
       github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
-      !startsWith(github.event.head_commit.message, 'ops: prepare private cloud production') && !startsWith(github.event.head_commit.message, 'ops: inspect private cloud production')
+      !startsWith(github.event.head_commit.message, 'ops: prepare private cloud production') && !startsWith(github.event.head_commit.message, 'ops: inspect private cloud production') && !startsWith(github.event.head_commit.message, 'ops: stage community acceptance')
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     permissions:
@@ -39,6 +39,24 @@ jobs:
         run: node scripts/ops/infisical-cloud-capabilities.mjs --inspect
 
 # Fresh rollout readback, 2026-11-07.
+
+  stage-community-acceptance:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && startsWith(github.event.head_commit.message, 'ops: stage community acceptance')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - run: node --test scripts/ops/self-hosting-release.test.mjs scripts/ops/self-hosting-subscription-acceptance.test.mjs
+      - run: node scripts/ops/self-hosting-release.mjs --preflight
 
   prepare-private-production:
     if: >-
@@ -75,7 +93,7 @@ jobs:
 
   private-production-readiness:
     if: >-
-      github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && startsWith(github.event.head_commit.message, 'ops: inspect private cloud production')
+      github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && startsWith(github.event.head_commit.message, 'ops: inspect private cloud production') && !endsWith(github.event.head_commit.message, 'subscriptions')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -139,3 +157,83 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           MIKKA_METERING_ONLY: ${{ endsWith(github.event.head_commit.message, 'metering') && '1' || '0' }}
+          MIKKA_CLOUD_ACCEPTANCE_PUBLIC: ${{ endsWith(github.event.head_commit.message, 'public') && '1' || '0' }}
+
+  community-subscriptions:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
+      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production') && endsWith(github.event.head_commit.message, 'subscriptions')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: web-deploy-production
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # Replaced by the exact released #1591 merge SHA before dispatch.
+      MIKKA_COMMUNITY_REVISION: PENDING_PUBLIC_CLOUD_RELEASE
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Check the source and access-only fixture boundary before authentication
+        run: |
+          node --test scripts/ops/self-hosting-release.test.mjs scripts/ops/self-hosting-subscription-acceptance.test.mjs
+          node scripts/ops/self-hosting-release.mjs --preflight
+      - name: Prepare the exact released source and immutable public image before credentials
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          if (!/^[a-f0-9]{40}$/.test(process.env.MIKKA_COMMUNITY_REVISION)) throw Error('COMMUNITY_SOURCE_PIN_REQUIRED')
+          JS
+          git fetch --depth=1 origin "$MIKKA_COMMUNITY_REVISION"
+          git worktree add --detach "$RUNNER_TEMP/mikka-community-source" "$MIKKA_COMMUNITY_REVISION"
+          pnpm --dir "$RUNNER_TEMP/mikka-community-source" install --frozen-lockfile
+          docker pull "ghcr.io/alexj11324/mikka:$MIKKA_COMMUNITY_REVISION"
+          curl --fail --silent --show-error --location --max-time 60 https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 -o "$RUNNER_TEMP/mikka-cloudflared"
+          node --input-type=module <<'JS'
+          import { readFileSync, chmodSync } from 'node:fs'
+          import { createHash } from 'node:crypto'
+          const file = process.env.RUNNER_TEMP + '/mikka-cloudflared'
+          if (createHash('sha256').update(readFileSync(file)).digest('hex') !== '1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872') throw Error('TUNNEL_DIGEST')
+          chmodSync(file, 0o700)
+          JS
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Complete the two independent official subscription threads on the community installation
+        timeout-minutes: 18
+        run: node scripts/ops/self-hosting-subscription-acceptance.mjs
+      - name: Independently reclaim only this run's access folder and machines
+        if: always()
+        run: node scripts/ops/self-hosting-subscription-acceptance.mjs --cleanup
+      - name: Retain only the closed acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: community-subscriptions-${{ github.run_id }}
+          path: .artifacts/self-hosting/community-subscriptions.json
+          if-no-files-found: warn
+          retention-days: 14

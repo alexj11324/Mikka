@@ -1,5 +1,7 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
+// The separate community driver proves full native threads; this receiver
+// remains a protocol/webhook proof and never claims community task completion.
 import { spawn, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
 
