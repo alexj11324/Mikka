@@ -3,7 +3,7 @@ import { ActionFailureError } from "./action-error";
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
-import { othersMayUse, pooledOwners } from "./personal-policy";
+import { othersMayUse, pooledOwners, runMayUseCredentialSql } from "./personal-policy";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
 import { subscriptionRouteReady } from "./subscription-routes";
 import { executionBinding, executionModelOptions } from "./execution-model-options";
@@ -41,28 +41,72 @@ export class ExecutionSettings {
   }
 
   /**
-   * For a bot whose owner has no subscription here: other members' subscriptions
-   * shared with 分享给团队成员 (Alex, 「B」), Claude first, then by the oldest
-   * share. Only ever offered to the resolver, never listed to the bot's owner.
+   * Other members' subscriptions shared with 分享给团队成员 (Alex, 「B」),
+   * Claude first, then by the oldest share. They can be chosen explicitly and
+   * default only after own subscriptions; the menu exposes public model identities and member names.
    */
   async pooledBindings(scope: ExecutionSettingsScope) {
     const rows = [];
-    for (const ownerId of await pooledOwners(this.pool, scope.ownerId, scope.workspaceId))
+    for (const ownerId of await this.sharedOwners(scope))
       rows.push(...(await chatReady(await this.bindingsOf(ownerId, scope.workspaceId))));
     return [...rows.filter((row) => row.provider === "claude"), ...rows.filter((row) => row.provider !== "claude")];
+  }
+  /** Sharing never grants membership to either participant. */
+  private async sharedOwners(scope: ExecutionSettingsScope) {
+    const owners = await pooledOwners(this.pool, scope.ownerId, scope.workspaceId);
+    if (!owners.length) return [];
+    const { authorizeSubscriptionWorkspace } = await import("./subscription-runtime");
+    await authorizeSubscriptionWorkspace(scope.ownerId, scope.workspaceId);
+    const active: string[] = [];
+    for (const ownerId of owners) {
+      try { await authorizeSubscriptionWorkspace(ownerId, scope.workspaceId); }
+      catch (error) {
+        if (error && typeof error === "object" && "code" in error && error.code === "workspaceAccessDenied") continue;
+        throw error;
+      }
+      active.push(ownerId);
+    }
+    return active;
+  }
+  private async sharedBinding(scope: ExecutionSettingsScope, bindingId: string) {
+    for (const ownerId of await this.sharedOwners(scope)) {
+      const [binding] = await chatReady(await this.bindingsOf(ownerId, scope.workspaceId, bindingId));
+      if (binding) return binding;
+    }
+    return undefined;
+  }
+  /** A saved per-bot copy is independent of which copy currently wins catalogue deduplication. */
+  async sharedChatBinding(scope: ExecutionSettingsScope, botId: string, bindingId: string) {
+    const binding = await this.sharedBinding(scope, bindingId);
+    if (!binding || binding.workspaceId !== scope.workspaceId || binding.consumerId !== botId) return undefined;
+    const bot = await this.pool.query('SELECT 1 FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "archivedAt" IS NULL',
+      [botId, scope.ownerId, scope.workspaceId]);
+    return bot.rowCount ? binding : undefined;
   }
   /** Clone another member's binding for this bot only, while they allow it here; never a credential. */
   async bindingForOthersBot(scope: ExecutionSettingsScope, botId: string, subscriptionOwnerId: string, bindingId: string) {
     if (subscriptionOwnerId === scope.ownerId || !(await othersMayUse(this.pool, subscriptionOwnerId, scope.workspaceId)))
       throw new ActionFailureError("executionModelUnknown");
+    const { authorizeSubscriptionWorkspace } = await import("./subscription-runtime");
+    await authorizeSubscriptionWorkspace(scope.ownerId, scope.workspaceId);
+    await authorizeSubscriptionWorkspace(subscriptionOwnerId, scope.workspaceId);
+    const [source] = await this.bindingsOf(subscriptionOwnerId, scope.workspaceId, bindingId);
+    if (!source) throw new ActionFailureError("executionModelUnknown");
+    if (source.workspaceId === scope.workspaceId && source.consumerId === botId) {
+      const bot = await this.pool.query('SELECT 1 FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "archivedAt" IS NULL',
+        [botId, scope.ownerId, scope.workspaceId]);
+      if (!bot.rowCount) throw new ActionFailureError("executionModelUnknown");
+      return source.bindingId as string;
+    }
     const hash = createHash("sha256").update(JSON.stringify([subscriptionOwnerId, scope.workspaceId, botId, bindingId])).digest("hex");
     const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
     const result = await this.pool.query(
       `INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
       SELECT $1,b."ownerId",$4::text,$2::text,b."connectionId",b."connectionRevision",b.route,b."modelId" FROM byos_bindings b
-      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false
+      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.epoch=b."connectionRevision" AND c.state='connected' AND c.paused=false AND c."removedAt" IS NULL
       JOIN bots bot ON bot.id=$2::uuid AND bot."ownerId"=$3 AND bot."workspaceId"=$4::uuid AND bot."archivedAt" IS NULL
       WHERE b.id=$5 AND b."ownerId"=$6 AND b.route IN ('codex_cpa','claude_cpa','openai_siwc')
+        AND ${runMayUseCredentialSql('b."ownerId"', '$3', '$4')}
       ON CONFLICT (id) DO UPDATE SET id=EXCLUDED.id RETURNING id`,
       [id, botId, scope.ownerId, scope.workspaceId, bindingId, subscriptionOwnerId],
     );
@@ -165,7 +209,7 @@ export class ExecutionSettings {
       if (
         !(
           await this.pool.query(
-            'SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3',
+            'SELECT id FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "archivedAt" IS NULL',
             [botId, scope.ownerId, scope.workspaceId],
           )
         ).rowCount
@@ -189,8 +233,12 @@ export class ExecutionSettings {
     const choice = (await this.connectedBindings(scope, bindingId)).find(
       (row) => row.bindingId === bindingId,
     );
-    if (!choice) throw new ActionFailureError("executionModelUnknown");
-    bindingId = await this.bindingForBot(scope, botId, bindingId);
+    if (choice) bindingId = await this.bindingForBot(scope, botId, bindingId);
+    else {
+      const shared = botId ? await this.sharedBinding(scope, bindingId) : undefined;
+      if (!shared || !botId) throw new ActionFailureError("executionModelUnknown");
+      bindingId = await this.bindingForOthersBot(scope, botId, shared.ownerId, bindingId);
+    }
     await this.pool.query(
       'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
       [scope.ownerId, scope.workspaceId, key, bindingId],

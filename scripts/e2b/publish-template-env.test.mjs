@@ -14,6 +14,8 @@ const MODELS = { desktop: [report('claude_code'), report('codex')], claude: [rep
 const TEMPLATES = { desktop: 'tpl-desktop', claude: 'tpl-claude', codex: 'tpl-codex' }
 const PROOF = { entries: 100, sha256: 'd'.repeat(64) }
 const POLICY_SHA = createHash('sha256').update(readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))).digest('hex')
+const SHARED = { verified: true, access: 'workspace_share', requesterHash: '1'.repeat(16), payerHash: '2'.repeat(16), workspaceHash: '3'.repeat(64),
+  connectionHash: '4'.repeat(16), bindingHash: '5'.repeat(16), connectionRevision: '2', profileVersion: 1, profileDigest: '6'.repeat(64) }
 const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
   kind, policySha256: POLICY_SHA, before: PROOF, after: PROOF, originalBefore: PROOF, originalAfter: PROOF, providerChanges: [],
 } })
@@ -31,7 +33,10 @@ const mcpTiming = (runId, harness) => ({ version: 1, source: 'mikka_mcp_physical
   rejectedEvents: 0, truncated: false,
   children: [{ child: 1, startedAt: 1020, closedAt: null, lastSequence: 3, sent: 1, completed: 1, lost: 0 }],
   requests: [{ child: 1, sequence: 1, operation: 'decision_catalogue', startedAt: 1040, endedAt: 1050, durationMs: 10, status: 200, outcome: 'ok' }] })
-const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
+const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { account: 'shared_smoke', workspaceRestored: true,
+  requesterHash: SHARED.requesterHash, payerHash: SHARED.payerHash,
+  team: { teamWorkspaceConfirmed: true, teamAdminMembershipVerified: true, teamWorkspaceHash: SHARED.workspaceHash } },
+  templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
   templateId, buildId: `build-${kind}`, baseTemplate: kind, preinstalled: true, public: true, buildStatus: 'ready',
   conservation: conservation(kind), models: MODELS[kind],
 }])), subscriptionAcceptance: Object.fromEntries([['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']].map(([kind, harness, model]) => [kind, {
@@ -44,6 +49,7 @@ const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, templates: Object.fromE
   runtimeAuthorization: { source: 'http_server_link', scope: 'daemon_http_server_link_and_task_fetch', complete: true, truncated: false, extraRemoteCalls: 0,
     hostAuthorizationComplete: true, basis: 'host_authorization_census_and_closed_mcp_business_paths', allFirstPartyHttpComplete: false,
     mcpHttpTiming: mcpTiming(`run-${kind}`, harness), observedProviderEvents: 1, officialDelivery: 'best_effort_not_a_complete_call_count' },
+  sharedScope: { ...SHARED },
 }])) }
 const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, sourceCommit: COMMIT, models: MODELS }).map(row => [row.key, row.value]))
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
@@ -55,7 +61,9 @@ test('publication reads complete file evidence and retains independently bound m
   t.after(() => rmSync(dir, { recursive: true, force: true }))
   const path = join(dir, 'release.json'), evidence = structuredClone(EVIDENCE)
   for (const [kind, row] of Object.entries(evidence.templates)) row.name = `mikka-${COMMIT.slice(0, 12)}-123-2-${kind}`
+  evidence.templates.claude.conservation.providerManifest = Array.from({ length: 5000 }, (_, index) => ({ path: `official/file-${index}`, sha256: 'd'.repeat(64) }))
   const bytes = Buffer.from(JSON.stringify(evidence) + '\n')
+  assert.ok(bytes.length > 310446, 'the combined shared/native proof retains the complete report beyond the failing env payload')
   writeFileSync(path, bytes)
   const expected = { sha256: reportDigest(bytes), modelsSha256: templateModelsDigest(evidence), templates: TEMPLATES,
     sourceSha: SHA, sourceCommit: COMMIT, runId: '123', runAttempt: '2' }
@@ -70,7 +78,7 @@ test('publication reads complete file evidence and retains independently bound m
   delete evidence.subscriptionAcceptance.claude
   const invalid = Buffer.from(JSON.stringify(evidence))
   writeFileSync(path, invalid)
-  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /subscription_missing/)
+  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /runtime_release_shared_scope_invalid claude/)
 })
 
 test('conservation requires both strict installation and exact provider-only finalization changes', () => {
@@ -392,6 +400,11 @@ test('GitHub-only build timeline waits for source upload before the single runti
 
 test('publication requires both real subscriptions on these exact candidates before any network request', async () => {
   for (const mutate of [
+    evidence => { delete evidence.acceptanceScope },
+    evidence => { evidence.acceptanceScope.account = 'owner_login' },
+    evidence => { evidence.acceptanceScope.workspaceRestored = false },
+    evidence => { evidence.subscriptionAcceptance.claude.sharedScope.payerHash = SHARED.requesterHash },
+    evidence => { evidence.subscriptionAcceptance.codex.sharedScope.access = 'owner' },
     value => { delete value.subscriptionAcceptance.codex },
     value => { value.subscriptionAcceptance.claude.credentialRoute = 'api_key' },
     value => { value.subscriptionAcceptance.codex.model = 'other-model' },

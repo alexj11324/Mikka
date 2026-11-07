@@ -6,7 +6,9 @@ export const GROUP_TURN_STOP_CHANNEL = 'mikka_group_turn_stop'
 export const COORDINATOR_LEASE_CHANNEL = 'mikka_coordinator_lease'
 /** A device may have work: payload is the device id, or `token:<id>` for a revoked credential. */
 export const DEVICE_WORK_CHANNEL = 'mikka_device_work'
-type Channel = typeof GROUP_TURN_STOP_CHANNEL | typeof COORDINATOR_LEASE_CHANNEL | typeof DEVICE_WORK_CHANNEL
+/** App reply/scope and workspace membership triggers; ids only, delivered at commit. */
+export const MCP_REPLY_CHANNEL = 'mikka_mcp_reply'
+type Channel = typeof GROUP_TURN_STOP_CHANNEL | typeof COORDINATOR_LEASE_CHANNEL | typeof DEVICE_WORK_CHANNEL | typeof MCP_REPLY_CHANNEL
 
 /** Sent with the writer's transaction: PostgreSQL delivers it only on COMMIT.
  * NOTIFY works through the Neon pooler; only LISTEN needs a direct session. */
@@ -77,7 +79,7 @@ export type SharedSubscription = {
   /** Forget what was heard, right before a fresh read. */
   reset(): void
   /** Resolves on a notification for one of the keys (or one heard since reset), after `ms`, or on abort. */
-  next(ms: number, signal?: AbortSignal): Promise<void>
+  next(ms: number, signal?: AbortSignal): Promise<'notified' | 'timeout' | 'aborted'>
   /** True once the shared session dropped: the caller falls back to its timer. */
   readonly lost: boolean
   close(): void
@@ -98,7 +100,11 @@ function openSharedSession(database: { options: PoolConfig }, channel: Channel, 
     await sessions?.end().catch(() => {})
   }
   const ready = (async () => {
-    sessions = new Pool({ ...directPoolOptions(database.options), max: 1, connectionTimeoutMillis: 5_000, application_name: 'mikka-listen' })
+    sessions = new Pool({ ...directPoolOptions(database.options), max: 1, connectionTimeoutMillis: 5_000, application_name: 'mikka-listen',
+      // Kernel probes, not SQL/application heartbeat. This improves detection
+      // of a dead peer; it is not a delivery deadline or an authorization check.
+      ...(channel === MCP_REPLY_CHANNEL ? { keepAlive: true, keepAliveInitialDelayMillis: 5_000, query_timeout: 5_000 } : {}),
+    })
     sessions.on('error', () => {})
     client = await sessions.connect()
     client.on('error', () => { drop(); void close() })
@@ -120,7 +126,8 @@ function openSharedSession(database: { options: PoolConfig }, channel: Channel, 
  * shared by every concurrent waiter (a long poll per idle device must not hold
  * a database connection each). Null when LISTEN is unavailable.
  */
-export async function subscribeShared(database: { options: PoolConfig }, channel: Channel, keys: readonly string[]): Promise<SharedSubscription | null> {
+export async function subscribeShared(database: { options: PoolConfig }, channel: Channel, keys: readonly string[], signal?: AbortSignal): Promise<SharedSubscription | null> {
+  if (signal?.aborted) return null
   const id = `${channel}:${String(database.options?.connectionString ?? database.options?.host ?? '')}:${String(database.options?.database ?? '')}`
   let session = sharedSessions.get(id)
   if (!session) { session = openSharedSession(database, channel, id); sharedSessions.set(id, session) }
@@ -140,17 +147,27 @@ export async function subscribeShared(database: { options: PoolConfig }, channel
     current.idle = setTimeout(() => { if (!current.subscribers.size) void current.close() }, SHARED_IDLE_MS)
     current.idle.unref?.()
   }
-  if (!await session.ready) { leave(); return null }
+  let cancel = () => {}
+  const cancelled = new Promise<false>(resolve => {
+    cancel = () => { leave(); resolve(false) }
+    signal?.addEventListener('abort', cancel, { once: true })
+  })
+  let ready: boolean
+  try { ready = await Promise.race([session.ready, cancelled]) }
+  finally { signal?.removeEventListener('abort', cancel) }
+  if (!ready || signal?.aborted) { leave(); return null }
   return {
     reset() { heard = false },
     get lost() { return lost },
     next(ms, signal) {
-      return new Promise<void>(resolve => {
-        if (heard || signal?.aborted) { resolve(); return }
-        const done = () => { clearTimeout(timer); signal?.removeEventListener('abort', done); wake = undefined; resolve() }
-        const timer = setTimeout(done, Math.max(0, ms))
-        wake = done
-        signal?.addEventListener('abort', done, { once: true })
+      return new Promise(resolve => {
+        if (signal?.aborted) { resolve('aborted'); return }
+        if (heard) { resolve('notified'); return }
+        const done = (reason: 'notified' | 'timeout' | 'aborted') => { clearTimeout(timer); signal?.removeEventListener('abort', abort); wake = undefined; resolve(reason) }
+        const abort = () => done('aborted')
+        const timer = setTimeout(() => done('timeout'), Math.max(0, ms))
+        wake = () => done('notified')
+        signal?.addEventListener('abort', abort, { once: true })
       })
     },
     close: leave,

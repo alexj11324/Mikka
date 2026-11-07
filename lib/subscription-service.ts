@@ -76,11 +76,12 @@ export class SubscriptionService {
       await this.admitModel({ workspaceId: binding.workspaceId, ownerId: use.ownerId }, binding.modelId, binding.route, callSignal)
     }
     await admit()
-    const row = await this.repository.connection(use.ownerId, binding.connectionId)
-    const client = this.worker(this.repository.scope(row)).forUse(use)
     return resolveSubscriptionModel(use, binding.modelId, {
       access: () => this.access(use, signal),
-      model: async modelId => {
+      model: async (modelId, { connection }) => {
+        // This call's access check already read and verified the custody scope.
+        // Each later model/HTTP call still runs its own fresh authorization.
+        const client = this.worker({ ownerId: connection.ownerId, workspaceId: connection.workspaceId, connectionId: connection.id, provider: connection.provider === 'openai' ? 'codex' : 'claude' }).forUse(use)
         const provider = createOpenAICompatible({ name: 'mikka-subscription', baseURL: 'https://mikka.invalid/v1', apiKey: 'private-worker-placeholder',
           fetch: async (_url, init) => {
             if (typeof init?.body !== 'string') {
@@ -116,10 +117,20 @@ export class SubscriptionService {
                   const { value, done } = await reader.read()
                   if (closed) return
                   if (done) { closed = true; reader.releaseLock(); controller.close(); return }
-                  if (value.type === 'error') await logGenerationFailure('stream_part', value.error)
+                  if (value.type === 'error') {
+                    const cancelled = requestedCancellation(value.error, options.abortSignal, signal)
+                    if (cancelled) {
+                      closed = true; controller.error(cancelled)
+                      try { await reader.cancel(cancelled) } finally { reader.releaseLock() }
+                      return
+                    }
+                    await logGenerationFailure('stream_part', value.error)
+                  }
                   controller.enqueue(value.type === 'error' ? { type: 'error', error: subscriptionGenerationError(value.error) } : value)
                 } catch (error) {
                   if (closed) return
+                  const cancelled = requestedCancellation(error, options.abortSignal, signal)
+                  if (cancelled) { closed = true; reader.releaseLock(); controller.error(cancelled); return }
                   await logGenerationFailure('stream', error)
                   closed = true; reader.releaseLock()
                   controller.enqueue({ type: 'error', error: subscriptionGenerationError(error) }); controller.close()
@@ -128,7 +139,11 @@ export class SubscriptionService {
               async cancel(reason) { closed = true; await reader.cancel(reason); reader.releaseLock() }
             })
             return { ...result, stream }
-          } catch (error) { await logGenerationFailure('start', error); throw subscriptionGenerationError(error) }
+          } catch (error) {
+            const cancelled = requestedCancellation(error, options.abortSignal, signal)
+            if (cancelled) throw cancelled
+            await logGenerationFailure('start', error); throw subscriptionGenerationError(error)
+          }
         }
         return model
       }
@@ -309,6 +324,21 @@ export class SubscriptionService {
       catch { results.push({ pending: null, failed: true }) }
     }
     return { expired: expired.expired, processed: results.length, results }
+  }
+}
+
+/** The SDK recognizes a requested cancellation by AbortError, not an error
+ * part. Preserve that control flow through its HTTP wrapper; an ordinary
+ * provider error, unrequested cancellation, or deadline is still a failure. */
+function requestedCancellation(error: unknown, ...signals: (AbortSignal | undefined)[]): Error | undefined {
+  if (!signals.some(signal => signal?.aborted && !(signal.reason instanceof Error && signal.reason.name === 'TimeoutError'))) return
+  let cause = error
+  for (let depth = 0; depth < 4; depth++) {
+    if ((cause instanceof WorkerRefusal && cause.code === 'subscription_cancelled') || (cause instanceof Error && cause.name === 'AbortError')) {
+      return Object.assign(new Error('subscription_cancelled', { cause: error }), { name: 'AbortError' })
+    }
+    if (!(cause instanceof Error)) break
+    cause = cause.cause
   }
 }
 

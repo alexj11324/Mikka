@@ -10,7 +10,7 @@ import { heldListPositions, mergeList, type ListPosition } from '@/lib/list-poll
 import { waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { chatKeys, taskRunKeys, threadKeys } from '@/lib/swr/keys'
-import { botListKey, groupListKey, issueListKey, ListReadScopeError, listReadDeadline, liveListReadOptions, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE, type ListLiveRead } from '@/lib/live/list-read'
+import { botListKey, groupListKey, issueListKey, ListReadScopeError, listReadDeadline, listReadPresence, liveListReadOptions, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE, type ListLiveRead } from '@/lib/live/list-read'
 import { fetchScopedGroups, GroupMessagesRequestError } from '@/lib/group-messages'
 import { heldRevision } from '@/lib/live/revisions'
 import { useLiveKey, useLiveKeys } from './use-live-key'
@@ -76,11 +76,7 @@ export function useLiveThreadList(ownerId: string, paused = false) {
   const unavailable = result.error instanceof ListReadScopeError || result.error instanceof CacheReadError
   const home = unavailable ? null : ownerListWorkspace(result.data, ownerId)
   const keys = [unstable_serialize(key)]
-  useLiveKey('thread_list', unavailable ? null : home ?? UNRESOLVED_LIST_SCOPE, keys, home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId), revisions: { [keys[0]]: heldRevision(result.data, 'thread_list', home) }, shareAcrossTabs: true })
-  // Presence is not a durable run write. Until the independent Device DO watch
-  // can prove its expiry notification, keep its shared 60s fallback alongside
-  // the real home channel. A null scope never creates another socket/ticket.
-  useLiveKey('thread_list', result.data?.presenceFallback && home ? UNRESOLVED_LIST_SCOPE : null, keys, null, { minIntervalMs: LIST_MERGE_MS, shareAcrossTabs: true })
+  useLiveKey('thread_list', unavailable ? null : home ?? UNRESOLVED_LIST_SCOPE, keys, home, { minIntervalMs: LIST_MERGE_MS, deadline: listReadDeadline(result.data, ownerId), revisions: { [keys[0]]: heldRevision(result.data, 'thread_list', home) }, presence: listReadPresence(result.data), shareAcrossTabs: true })
   return { ...result, data: unavailable ? undefined : result.data }
 }
 

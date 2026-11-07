@@ -1,23 +1,23 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { usePathname, useRouter } from '@/i18n/navigation'
 import { useSWRConfig } from 'swr'
 import { endSession } from '@/lib/auth-client'
-import { AppFrame, SignOutBoundary, WindowBar } from '@/components/app-shell'
-import { IconRail, type RailDestination } from '@/components/nav/icon-rail'
+import { SignOutBoundary } from '@/components/app-shell'
+import { SettingsFrame } from '@ui-slot/settings-frame'
+import type { RailDestination } from '@/components/nav/icon-rail'
 import { SettingsView } from './settings-view'
 import { resolveSettingsSection } from '@/lib/settings-sections'
 import { TeamDirectory } from '@/components/teams/team-directory'
 import { MembersSettings } from '@/components/workspace/members-settings'
 import { pushSettingsHistory, requestShellBrowser, requestShellSearch } from '@/lib/settings-navigation'
-import { SearchPill } from '@/components/nav/global-search'
-import { BrowserToggle } from '@/components/browser/browser-toggle'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 
-type RailMenu = { user: { name: string; email: string; image?: string | null }; onSettings: (href?: string) => void; onSignOut: () => void; signingOut: boolean }
+/** The app frame around settings. Its look is a UI slot (docs/ui-overlay.md). */
+export { SettingsFrame }
 
 /** Where a rail item lands when it is chosen from Settings. */
 export function railHref(destination: RailDestination) {
@@ -31,20 +31,24 @@ export function railHref(destination: RailDestination) {
  * The window bar is the app's own (R-35): the ⌘K pill and the 浏览器 globe
  * stay, and each leaves Settings for the app with search or the browser open.
  */
-export function SettingsFrame({ onRail, onSearch, onBrowser, children, ...menu }: RailMenu & { onRail: (destination: RailDestination) => void; onSearch: () => void; onBrowser: () => void; children: ReactNode }) {
-  return <AppFrame settings bar={<WindowBar center={<SearchPill onSearch={onSearch} />} trailing={<BrowserToggle open={false} onToggle={onBrowser} />} />} rail={<IconRail active={null} onNavigate={onRail} {...menu} />}>{children}</AppFrame>
+
+/** Routed settings content also lives inside the workspace's persistent frame. */
+export function SettingsRouteContent({ user, defaultWorkspaceId, googleEnabled = false, onRail, onSignOut, signingOut, accountError }: { user: { id: string; name: string; email: string; image?: string | null }; defaultWorkspaceId?: string; googleEnabled?: boolean } & Pick<Parameters<typeof SettingsView>[0], 'onRail' | 'onSignOut' | 'signingOut' | 'accountError'>) {
+  const pathname = usePathname()
+  const params = useSearchParams()
+  const workspaceId = params.get('workspace') ?? defaultWorkspaceId
+  const section = resolveSettingsSection(pathname, params.get('section'))
+  return <SettingsView user={user} userKey={user.id} googleEnabled={googleEnabled} activeSection={section} workspaceId={workspaceId} selectedTeamId={params.get('team') ?? undefined} onRail={onRail} onSignOut={onSignOut} signingOut={signingOut} accountError={accountError}>{section === 'teams' && <TeamDirectory key={workspaceId ?? 'default'} workspaceId={workspaceId} />}{section === 'members' && <MembersSettings key={`${workspaceId ?? 'default'}-${params.get('invite') ?? ''}`} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} embedded />}</SettingsView>
 }
 
 export function SettingsShell({ user, defaultWorkspaceId, googleEnabled = false, onRail: onRailOverride, onSearch: onSearchOverride, onBrowser: onBrowserOverride }: { user: { id: string; name: string; email: string; image?: string | null }; defaultWorkspaceId?: string; googleEnabled?: boolean; onRail?: (destination: RailDestination) => void; onSearch?: () => void; onBrowser?: () => void }) {
   const i18nText = useTranslations();
-  const pathname = usePathname()
   const params = useSearchParams()
   const router = useRouter()
   const { mutate } = useSWRConfig()
   const [signingOut, setSigningOut] = useState(false)
   const [error, setError] = useState('')
   const workspaceId = params.get('workspace') ?? defaultWorkspaceId
-  const section = resolveSettingsSection(pathname, params.get('section'))
   async function signOut() {
     if (signingOut) return
     setSigningOut(true); setError('')
@@ -61,6 +65,6 @@ export function SettingsShell({ user, defaultWorkspaceId, googleEnabled = false,
   const onSearch = onSearchOverride ?? (() => { requestShellSearch(); go('/') })
   const onBrowser = onBrowserOverride ?? (() => { requestShellBrowser(); go('/') })
   return <SignOutBoundary pending={signingOut}><SettingsFrame user={user} onRail={onRail} onSearch={onSearch} onBrowser={onBrowser} onSettings={href => go(href ?? '/settings')} onSignOut={() => void signOut()} signingOut={signingOut}>
-    <SettingsView user={user} userKey={user.id} googleEnabled={googleEnabled} activeSection={section} workspaceId={workspaceId} selectedTeamId={params.get('team') ?? undefined} onRail={onRail} onSignOut={() => void signOut()} signingOut={signingOut} accountError={error}>{section === 'teams' && <TeamDirectory key={workspaceId ?? 'default'} workspaceId={workspaceId} />}{section === 'members' && <MembersSettings key={`${workspaceId ?? 'default'}-${params.get('invite') ?? ''}`} workspaceId={workspaceId} inviteInitially={params.get('invite') === '1'} embedded />}</SettingsView>
+    <SettingsRouteContent user={user} defaultWorkspaceId={defaultWorkspaceId} googleEnabled={googleEnabled} onRail={onRail} onSignOut={() => void signOut()} signingOut={signingOut} accountError={error} />
   </SettingsFrame></SignOutBoundary>
 }

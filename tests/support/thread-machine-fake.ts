@@ -24,7 +24,11 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
   factoryAutomaticRuntime.enqueue = async (database, actor, previousRunId, runId) => {
     await (await import('../../lib/factory/cloud-stage-handoff')).handoffFactoryCloudStage(database, actor, previousRunId, runId)
   }
-  factoryAutomaticRuntime.park = (database, actor, runId) => machines.parkThreadMachine(database, actor, runId, async () => {}, async () => null)
+  const park = (database: Pool, actor: { userId: string; workspaceId: string }, runId: string) => machines.parkThreadMachine(database, actor, runId, async () => {}, async () => null)
+  factoryAutomaticRuntime.park = async (database, actor, runId, nextRunId) => {
+    if (nextRunId && await machines.retainThreadMachineForHandoff(database, actor, runId, nextRunId)) return
+    await park(database, actor, runId)
+  }
   const real = { ...machines.threadMachineProvider }
   const credentials = new Map<string, string>()
   const sandbox = (sandboxId: string) => {
@@ -66,6 +70,8 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
   })
   return {
     enqueueDurable: realEnqueue,
+    /** Runs the real pause transition; only the provider acknowledgement is synthetic. */
+    park: (actor: { userId: string; workspaceId: string }, runId: string) => park(pool, actor, runId),
     /** Provisions a queued cloud run's thread machine; returns its device and the worker's device token. */
     async start(actor: { userId: string; workspaceId: string }, runId: string) {
       await machines.ensureThreadMachine(pool, actor, runId)

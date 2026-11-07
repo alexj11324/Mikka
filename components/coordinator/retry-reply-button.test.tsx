@@ -11,7 +11,7 @@ let reply: unknown = { queued: true }
 let calls = 0
 let currentBuild = true
 let buildCheck = async () => currentBuild
-let submissions = 0, removedNotes = 0
+let submissions = 0, removedNotes = 0, scrollRequests = 0
 const submitted: { text: string; context: { retryOf?: number } | undefined }[] = []
 let chatItems: import('@/lib/coordinator/context').ChatItem[] = []
 let chatError: string | null = null
@@ -23,6 +23,7 @@ let menu: unknown = undefined
 let refusalCode: string | null = null
 let visibility: 'visible' | 'hidden' = 'visible'
 let versionReads = 0
+let pageRefreshRequired = false
 let pathname = '/mikka/en', search = ''
 let serverVersion: { build: string } = { build: 'fixture-current' }
 const notices: unknown[] = []
@@ -47,7 +48,12 @@ mock.module(new URL('../../lib/use-action-error.ts', import.meta.url).href, { na
 mock.module(new URL('../../lib/billing/verification-client.ts', import.meta.url).href, { namedExports: { hostedRefusal: () => refusalCode } })
 mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExports: {
   checkPageBuildBeforeAction: () => buildCheck(),
-  markPageNeedsRefresh: () => {}, pageNeedsRefresh: () => false, APP_BUILD: 'fixture-current', STALE_BUILD_EVENT: 'mikka:stale-build',
+  markPageNeedsRefresh: () => { pageRefreshRequired = true }, pageNeedsRefresh: () => pageRefreshRequired, APP_BUILD: 'fixture-current', STALE_BUILD_EVENT: 'mikka:stale-build',
+  subscribePageRefresh: (target: Pick<Window, 'addEventListener' | 'removeEventListener'>, offer: () => void) => {
+    target.addEventListener('mikka:stale-build', offer)
+    if (pageRefreshRequired) offer()
+    return () => { target.removeEventListener('mikka:stale-build', offer) }
+  },
   isStaleBuild: (page: string, server: string) => Boolean(page && server && page !== server),
   desktopBelowMinimum: () => false,
   readAppVersion: async () => { versionReads++; return serverVersion },
@@ -64,7 +70,7 @@ mock.module(new URL('./chat-composer.tsx', import.meta.url).href, { namedExports
 } } })
 mock.module(new URL('../ui/message-scroller.tsx', import.meta.url).href, { namedExports: Object.fromEntries([
   ...['MessageScroller', 'MessageScrollerContent', 'MessageScrollerItem', 'MessageScrollerProvider', 'MessageScrollerViewport'].map(name => [name, plain]),
-  ['MessageScrollerButton', nothing], ['useMessageScroller', () => ({ scrollToEnd: nothing })],
+  ['MessageScrollerButton', nothing], ['useMessageScroller', () => ({ scrollToEnd: () => { scrollRequests++ } })],
 ]) })
 mock.module(new URL('../workspace/agent-interaction.tsx', import.meta.url).href, { namedExports: { AgentInteractionContext: createContext({}) } })
 mock.module(new URL('../workspace/agent-theme.tsx', import.meta.url).href, { namedExports: { AgentThemeProvider: plain } })
@@ -109,7 +115,7 @@ before(async () => {
   ;({ VersionGuard } = await import('../version-guard'))
   Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })
 })
-beforeEach(() => { chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; scrollRequests = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
@@ -144,6 +150,35 @@ test('a generic current reply failure retains its explicit retry action', async 
   await act(async () => notice.querySelector<HTMLButtonElement>('button')!.click())
   assert.equal(calls, 1)
   assert.deepEqual(modelPicks, [])
+})
+
+test('background chat catch-up preserves the reading position and an in-progress draft', async () => {
+  const message = (position: number): import('@/lib/coordinator/context').ChatItem => ({ id: `fixture-person-${position}`, position, from: 'person', text: `message ${position}`, tools: [], threads: [], artifacts: [], createdAt: '2026-11-06T20:00:00Z' })
+  chatItems = [message(1)]
+  const renderChat = () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />)
+  await act(async () => renderChat())
+  await act(async () => composer.onChange('keep reading and editing'))
+  const editor = container.querySelector('textarea')!
+  editor.focus()
+  editor.setSelectionRange(5, 12)
+  assert.equal(scrollRequests, 0)
+  // A live push or reconnect can reveal messages sent from another window.
+  chatItems = [...chatItems, message(3), message(5)]
+  await act(async () => renderChat())
+  assert.equal(scrollRequests, 0, 'background data must not request a jump to the end')
+  assert.equal(composer.value, 'keep reading and editing')
+  assert.equal(document.activeElement, editor, 'background data keeps the focused composer mounted')
+  assert.deepEqual([editor.selectionStart, editor.selectionEnd], [5, 12])
+})
+
+test('an accepted send in this composer scrolls once; unrelated reads do not scroll again', async () => {
+  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => composer.onChange('a deliberate local send'))
+  await act(async () => composer.onSubmit())
+  assert.equal(submissions, 1)
+  assert.equal(scrollRequests, 1)
+  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  assert.equal(scrollRequests, 1)
 })
 
 test('existing window drafts migrate once and survive a chat remount in the scoped store', async () => {
@@ -227,6 +262,12 @@ test('a stale send does not clear an artifact quote', async () => {
   assert.equal(submissions, 0)
   assert.equal(cleared, 0)
   assert.equal(composer.value, 'keep the quote attached')
+})
+
+test('required refresh raised before VersionGuard mounts still shows a prompt without document reload', async () => {
+  pageRefreshRequired = true
+  await act(async () => root.render(<VersionGuard />))
+  assert.match(document.body.textContent ?? '', /Common.appUpdated/)
 })
 
 test('switching only the Bot search parameter checks the page version and requires a refresh', async () => {

@@ -8,7 +8,7 @@ import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { pollDevices, removeDevice, renameDevice, sendDeviceCommand, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import { useLiveKey } from '@/hooks/use-live-key'
-import { listReadDeadline, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
+import { listReadDeadline, listReadPresence, observeListRead, ownerListWorkspace, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 import { HarnessLabel } from '@/components/labels/entity-labels'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -258,13 +258,11 @@ export function DevicesSettings(_props: { workspaceId?: string }) {
   const key = 'devices-settings'
   const { data, error, mutate } = useSWR(key, () => observeListRead(pollDevices))
   const devices = data?.devices ?? []
-  // No timer (#1212): a device change pushes `device_list` on the owner's home channel; a heartbeat
-  // device's lapse is a deadline. Gateway presence has no write, so while a device is online through
-  // it the list keeps the shared 60 s fallback (a null scope never opens another socket).
+  // The same home socket watches gateway presence; only an acknowledged watch
+  // replaces fallback. Old Workers, unavailable proofs and disconnects keep it.
   const owner = data?.live.ownerId
   const home = owner ? ownerListWorkspace(data, owner) : null
-  useLiveKey('device_list', home ?? UNRESOLVED_LIST_SCOPE, [key], home, { minIntervalMs: 2_000, deadline: owner ? listReadDeadline(data, owner) : undefined })
-  useLiveKey('device_list', data?.presenceFallback && home ? UNRESOLVED_LIST_SCOPE : null, [key], null, { minIntervalMs: 2_000 })
+  useLiveKey('device_list', home ?? UNRESOLVED_LIST_SCOPE, [key], home, { minIntervalMs: 2_000, deadline: owner ? listReadDeadline(data, owner) : undefined, presence: listReadPresence(data), shareAcrossTabs: true })
   const [adding, setAdding] = useState(false)
   const [desktopSsh, setDesktopSsh] = useState(false)
   const [thisDevice, setThisDevice] = useState<string | null>(null)

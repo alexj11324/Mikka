@@ -258,6 +258,22 @@ pnpm desktop:dev
 
 Mikka 目前处于早期体验阶段。请发送邮件至 [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com) 申请邀请，然后参照 [快速入门](https://aspectlylabs.com/mikka/docs/quickstart) 开始使用。
 
+## 致谢
+
+<p>
+  <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
+      <img src="docs/assets/openai-mark-light.svg" alt="OpenAI 标志" width="32" height="32">
+    </picture>
+  <strong>OpenAI · Codex for Open Source</strong>
+</p>
+
+Mikka 的开发得到了 [Codex for Open Source](https://openai.com/form/codex-for-oss/) 计划的支持。
+
+衷心感谢 OpenAI 和 Codex 团队为 Mikka 的维护者提供六个月的 ChatGPT Pro 使用资格。这份支持让我们有更多空间探索有挑战性的想法、改进工程质量和用户体验，并回馈开源社区。
+
+Mikka 是独立开源项目，与 OpenAI 不存在隶属关系，也未获得 OpenAI 官方背书。OpenAI 名称及标志均为 OpenAI 的商标。
+
 ## 许可证
 
 Mikka 的版权归 Aspectly Labs 所有（© 2026），采用 [AGPL-3.0-only](LICENSE) 协议开源。第三方组件遵循各自的许可证，详见 [`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md)。

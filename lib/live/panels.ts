@@ -4,6 +4,7 @@ import { LIVE_ID, type LiveInvalidation } from './events'
 import { liveGatewayConfig, type LiveScope } from './scope'
 import { batchStreamInvalidation } from './stream-batch'
 import { wakeTokens, wakeWorkflowAfterCommit } from '../workflow-wake'
+import { armDueTimerAfterCommit } from '../due-timer'
 
 type Database = Pick<PoolClient, 'query'>
 type Source = { id: string; userId: string; issueId: string | null; botId: string | null; scope: string | null; workspaceId: string | null }
@@ -140,12 +141,16 @@ async function changed(executor: object, kind: 'issue_document' | 'run' | 'threa
     : publish()))
 }
 
-export const documentChanged = (executor: object, issueId: string) => changed(executor, 'issue_document', issueId)
+export const documentChanged = (executor: object, issueId: string) => {
+  armDueTimerAfterCommit(executor, 'run-recovery')
+  return changed(executor, 'issue_document', issueId)
+}
 /** A semantic run write also wakes the already mounted immediate parent of a new continuation,
  * and its issue's thread list for every member who can see the issue. */
 export const runChanged = (executor: object, runId: string) => {
   // A cloud run's thread-machine lifecycle waits on this instead of re-reading every 30 s (#1212).
   wakeWorkflowAfterCommit(executor, wakeTokens.threadMachine(runId))
+  armDueTimerAfterCommit(executor, 'run-recovery')
   return changed(executor, 'run', runId)
 }
 /** Stream chunks use a separate key so one final state change need not wait for the text cadence. */

@@ -14,6 +14,8 @@ async function accept(preloadedModels?: HostedModelProbe) {
   // Only the desktop template carries a desktop and its driver; a task machine
   // (E2B's claude or codex template) has neither.
   const computer = existsSync('/opt/mikka/computer/cua-driver') ? ['--e2b-computer'] : []
+  // Diagnostics are opt-in per assignment. A trusted operator can authorize a
+  // bounded Bot/repository window through the existing claim response.
   const code = await runCli(['daemon', '--data-dir', dataDir, '--server', config.server, '--hosted-subscriptions', '--e2b-container-runtime', ...computer], undefined, { protectionBypass: config.protectionBypass, preloadedModels, initialRunId: config.initialRunId })
   if (code !== null && code !== 0) throw new Error('Cloud worker failed')
 }

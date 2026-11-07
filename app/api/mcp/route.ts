@@ -18,7 +18,8 @@ import * as worker from '@/lib/mcp/worker'
 import * as artifacts from '@/lib/mcp/artifacts'
 import { ARTIFACT_KINDS } from '@/lib/db/schema'
 import { ARTIFACT_TITLE_MAX } from '@/lib/artifacts/limits'
-import { recordDecisionSchema, ProjectMapError } from '@/lib/project-map/contracts'
+import { ProjectMapError } from '@/lib/project-map/contracts'
+import { RECORD_DECISION_TOOL } from '@/lib/project-map/mcp-tool'
 
 export const dynamic = 'force-dynamic'
 // Leaves room for read_coordinator_messages to wait for a reply.
@@ -287,12 +288,7 @@ function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return creat
   }
 
   // Only a Mikka-issued run token grants this capability; the generic OAuth handler has no live decision writer.
-  server.registerTool('record_decision', {
-    title: 'Record a project decision',
-    description: 'Record a meaningful choice, change of direction, stopped route, merge or human confirmation in this Mikka task. Explain alternatives, reasons and original Mikka evidence. Keep a stable idempotencyKey for exact retries. This stores the decision only in Mikka, never in the code repository.',
-    inputSchema: recordDecisionSchema,
-    annotations: { idempotentHint: true },
-  }, async (input, ctx) => {
+  server.registerTool('record_decision', RECORD_DECISION_TOOL, async (input, ctx) => {
     const auth = ctx.http?.authInfo
     const run = worker.workerRun(auth)
     try {

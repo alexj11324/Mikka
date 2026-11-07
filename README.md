@@ -410,6 +410,22 @@ Mikka is in early access. Email
 [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com) for an invite, then
 follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart).
 
+## Acknowledgements
+
+<p>
+  <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
+      <img src="docs/assets/openai-mark-light.svg" alt="OpenAI logo" width="32" height="32">
+    </picture>
+  <strong>OpenAI · Codex for Open Source</strong>
+</p>
+
+Mikka is proudly developed with support from the [Codex for Open Source](https://openai.com/form/codex-for-oss/) program.
+
+A heartfelt thank-you to OpenAI and the Codex team for providing Mikka's maintainer with six months of ChatGPT Pro access. This support gives us more room to explore ambitious ideas, improve engineering and user experience, and give back to the open-source community.
+
+Mikka is an independent open-source project and is not affiliated with or endorsed by OpenAI. The OpenAI name and logo are trademarks of OpenAI.
+
 ## License
 
 Mikka is copyright © 2026 Aspectly Labs and licensed under

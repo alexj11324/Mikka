@@ -5,12 +5,13 @@ import { once } from 'node:events'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
+import { readHomeScopeProof } from './home-scope-proof'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
-test('a real revoked Better Auth session cannot renew a live ticket through its still-valid cache cookie', { skip: !url, timeout: 120_000 }, async () => {
+test('real tickets project only the active owned personal home and recheck a revoked Better Auth session', { skip: !url, timeout: 120_000 }, async () => {
   const database = new Pool({ connectionString: url, max: 4 })
   let handle!: (request: Request) => Promise<Response>
   const server = createServer(async (request, response) => {
@@ -27,6 +28,7 @@ test('a real revoked Better Auth session cannot renew a live ticket through its 
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`
   const workspaceId = randomUUID()
+  const foreignOwner = `live-ticket-foreign-${randomUUID()}`
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   let userId: string | undefined
   const mocks: { restore(): void }[] = []
@@ -56,7 +58,23 @@ test('a real revoked Better Auth session cannot renew a live ticket through its 
     const ticket = () => fetch(`${origin}/mikka/api/live/ticket?workspace=${workspaceId}`, { headers })
     const issued = await ticket()
     assert.equal(issued.status, 200)
-    assert.equal(typeof (await issued.json()).protocol, 'string')
+    const team = await issued.json()
+    assert.equal(typeof team.protocol, 'string')
+    assert.equal(team.homeScope, undefined, 'team membership alone cannot attest the personal home')
+    await database.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Foreign fixture',$2,true,now(),now())`, [foreignOwner, `${foreignOwner}@example.invalid`])
+    await database.query(`UPDATE mikka_workspaces SET kind='personal',"userId"=$2 WHERE id=$1`, [workspaceId, foreignOwner])
+    const foreign = await (await ticket()).json()
+    assert.equal(typeof foreign.protocol, 'string', 'the original active membership still grants its ordinary channel')
+    assert.equal(foreign.homeScope, undefined, 'membership in another owner\'s personal workspace is not the reader\'s home')
+    await database.query(`UPDATE mikka_workspaces SET "userId"=$2 WHERE id=$1`, [workspaceId, userId])
+    const home = await (await ticket()).json()
+    assert.equal(home.homeScope.expiresAt, home.expiresAt)
+    assert.deepEqual(readHomeScopeProof(home.homeScope.token, userId!, process.env.DEVICE_GATEWAY_PUSH_SECRET), {
+      ownerId: userId, workspaceId, expiresAt: home.expiresAt,
+    }, 'the real membership statement projects the actual owned personal workspace')
+    await database.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspaceId, userId])
+    assert.equal((await ticket()).status, 403, 'the existing active-member gate remains fresh')
+    await database.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspaceId, userId])
     await database.query('DELETE FROM session WHERE "userId"=$1', [userId])
     const cached = await fetch(`${origin}/mikka/api/auth/get-session`, { headers })
     assert.equal((await cached.json()).user.id, userId, 'the ordinary 5-minute cache still sees the revoked session')
@@ -66,6 +84,7 @@ test('a real revoked Better Auth session cannot renew a live ticket through its 
     assert.equal(body.error, 'authRequired')
     assert.equal(body.protocol, undefined)
     assert.equal(body.url, undefined)
+    assert.equal(body.homeScope, undefined)
   } finally {
     for (const item of mocks) item.restore()
     if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
@@ -74,6 +93,7 @@ test('a real revoked Better Auth session cannot renew a live ticket through its 
     await database.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspaceId])
     await database.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspaceId])
     if (userId) await database.query('DELETE FROM "user" WHERE id=$1', [userId])
+    await database.query('DELETE FROM "user" WHERE id=$1', [foreignOwner])
     await database.end()
   }
 })

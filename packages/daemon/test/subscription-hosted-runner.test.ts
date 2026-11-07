@@ -45,6 +45,45 @@ const collect = async (session: Awaited<ReturnType<Awaited<ReturnType<typeof cre
   const events = []; for await (const event of session.events()) events.push(event); return events
 }
 
+it('prepares the hosted Claude with its initial claim lease before checkout, then uses the final normal HOME and cwd with zero credential RPC', async () => {
+  const f = await fixture(), cwd = join(f.root, 'future-checkout')
+  const options = { ...f.options, cwd, prompt: 'PROBE_MACHINE' }
+  const prepared = f.runner.prepare(f.assignment, options, new AbortController().signal)
+  try {
+    await prepared.ready
+    expect(existsSync(cwd)).toBe(false)
+    expect(JSON.parse(readFileSync(join(f.config, 'fixture-process.json'), 'utf8')).prompts).toBe(0)
+    mkdirSync(cwd); execFileSync('git', ['init', '-q'], { cwd })
+    expect((await collect(await prepared.start(options))).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+    expect(JSON.parse(readFileSync(join(f.config, 'fixture-machine.json'), 'utf8'))).toEqual({ home: f.home,
+      cwd: realpathSync(cwd), value: 'ordinary-machine-environment', git: realpathSync(join(cwd, '.git')) })
+    expect(f.never).not.toHaveBeenCalled()
+  } finally { await prepared.cancel() }
+})
+
+it('cancels an actually parked hosted Claude before any final options exist', async () => {
+  const f = await fixture(), abort = new AbortController()
+  const prepared = f.runner.prepare(f.assignment, { ...f.options, cwd: join(f.root, 'missing-checkout') }, abort.signal)
+  await prepared.ready
+  const receipt = JSON.parse(readFileSync(join(f.config, 'fixture-process.json'), 'utf8'))
+  abort.abort(); await prepared.cancel()
+  expect(receipt.prompts).toBe(0)
+  expect(() => process.kill(receipt.pid, 0)).toThrow()
+  await expect(prepared.start(f.options)).rejects.toThrow('closed')
+  expect(f.never).not.toHaveBeenCalled()
+})
+
+it('retains the hosted account-source refusal after a successful prewarm claim with no prompt or fallback', async () => {
+  const f = await fixture(); f.assignment.subscriptionLease!.accessToken = 'fixture-paid'
+  const prepared = f.runner.prepare(f.assignment, f.options, new AbortController().signal)
+  try {
+    await prepared.ready
+    await expect(prepared.start(f.options)).rejects.toThrow()
+    expect(JSON.parse(readFileSync(join(f.config, 'fixture-process.json'), 'utf8')).prompts).toBe(0)
+    expect(f.never).not.toHaveBeenCalled()
+  } finally { await prepared.cancel() }
+})
+
 for (const harness of ['codex', 'claude_code'] as const) {
   it.each(['default', 'acceptance_host', 'repository'] as const)(`${harness} collects CLI timing only for an explicit diagnostic opt-in (%s)`, async source => {
     const f = await fixture(harness, source === 'acceptance_host' ? true : undefined)
@@ -58,7 +97,10 @@ for (const harness of ['codex', 'claude_code'] as const) {
         env: { ...f.options.env, FIXTURE_MACHINE_AUTH: '1' } })
       expect((await collect(session)).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
       const receipt = observation.finish()!
-      if (source === 'default') expect(receipt.officialCliTiming).toBeUndefined()
+      if (source === 'default') {
+        expect(receipt.officialCliTiming).toBeUndefined()
+        expect(receipt.mcpHttpTiming).toBeUndefined()
+      }
       else expect(receipt.officialCliTiming).toMatchObject({ harness, source: 'official_cli_otlp',
         collection: 'best_effort', flush: 'not_confirmed', cliExitObserved: true, events: [] })
       expect(f.assignment).toEqual(before)
@@ -66,6 +108,21 @@ for (const harness of ['codex', 'claude_code'] as const) {
     } finally { observation.close() }
   })
 }
+
+it.each([true, false])('Codex clears inherited compression only with timing enabled (%s)', async enabled => {
+  const f = await fixture('codex', enabled)
+  const options = { ...f.options, env: { ...f.options.env, FIXTURE_TIMING_ENV: '1',
+    OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: 'none' } }
+  f.assignment.taskEnv = { ...f.assignment.taskEnv, OTEL_EXPORTER_OTLP_COMPRESSION: 'gzip' }
+  const assignmentBefore = structuredClone(f.assignment), envBefore = { ...options.env }
+  expect((await collect(await f.runner.start(f.assignment, options))).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+  expect(JSON.parse(readFileSync(join(f.config, 'fixture-timing-env.json'), 'utf8'))).toEqual({
+    logsCompression: enabled ? null : 'none', genericCompression: enabled ? null : 'gzip', exporterConfigured: enabled,
+  })
+  expect(f.assignment).toEqual(assignmentBefore)
+  expect(options.env).toEqual(envBefore)
+  expect(f.never).not.toHaveBeenCalled()
+})
 
 it.each(['codex', 'claude_code'] as const)('%s consumes claim credentials and uses ordinary HOME/env/Git without any Mikka auth or proxy request', async harness => {
   const f = await fixture(harness)

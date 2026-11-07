@@ -81,6 +81,7 @@ import type {
   AgentReport,
   AgentSession,
   StartOptions,
+  PreparedAgentStart,
   ExitEvent,
 } from "../adapters/types"
 import { runStageChunk, runStateChunk, type RunChunk, type RunStage } from "../chunks"
@@ -108,11 +109,13 @@ import type { ToolApprovalGate } from "../agents/tool-approval"
 import type { PreparedRunGitHub } from '../agents/local-github'
 import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
 import { daemonTracer, runIdHash, type DaemonStartupTiming, type SpanHandle } from '../tracing'
-import { runRuntimeTimings, type RunRuntimeObservation, type RunRuntimeTiming } from '../run-runtime-timing'
+import { runDiagnosticsEnabled, runRuntimeTimings, type RunRuntimeObservation, type RunRuntimeTiming } from '../run-runtime-timing'
 
 export interface SupervisorDeps {
+  /** Trusted candidate launcher opt-in, shared with the official CLI collector. */
+  collectCliTiming?: boolean
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
-  /** Existing authenticated checkpoint route, before a provider completion releases the lease. */
+  /** Existing authenticated checkpoint route, before terminal completion releases the lease. */
   saveCheckpoint?(runId: string, checkpoint: RunCheckpoint): Promise<void>
   journal: RunJournal
   /** Same adapter state root used by RunContext; never supplied by the model. */
@@ -122,10 +125,12 @@ export interface SupervisorDeps {
   adapters: ReadonlyMap<Harness, AgentAdapter>
   /** Hosted subscription runs never fall back to local CLI authentication. */
   startSubscription?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
+  /** Hosted fresh Claude only: no task frame before start consumes final options. */
+  prepareSubscription?(assignment: RunAssignment, options: StartOptions, signal: AbortSignal): PreparedAgentStart
   /** The task VM prepares its actual API key and starts the official CLI directly. */
   startCredential?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
-  /** Authenticated policy validation before repository/setup effects, including resume. */
+  /** Fresh policy validation before worktree/setup/agent effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
   /** Once per local run, retained through verification and publication. */
@@ -133,7 +138,9 @@ export interface SupervisorDeps {
   bootstrap?(worktree:string,repo:DeviceRepo):Promise<string>
   /** Resolve only daemon-owned cache paths (or a trusted hosted workspace). */
   repository: (assignment: RunAssignment) => DeviceRepo
-  prepareRepository: (assignment: RunAssignment, signal: AbortSignal, githubEnvironment?: Record<string, string>) => Promise<void>
+  /** A fresh hosted claim may overlap remote reads with policyReady. Any
+   * empty-repository creation/push must await that same authorization. */
+  prepareRepository: (assignment: RunAssignment, signal: AbortSignal, githubEnvironment?: Record<string, string>, policyReady?: Promise<unknown>) => Promise<void>
   baseRef: (assignment: RunAssignment) => Promise<string>
   log: Logger
   /** Uploads what the run's agent queued with `submit_capture` (`captures.ts`). */
@@ -212,9 +219,18 @@ interface ActiveRun {
   mailboxPreparing?: Promise<RunMailbox | undefined>
   mailboxAbort?: AbortController
   mailboxClosing?: Promise<void>
+  /** Only a fresh hosted claim's read-only clone/fetch overlaps entry policy. */
+  repositoryPreparing?: { abort: AbortController; done: Promise<void>; allowEffects(): void; refuseEffects(reason: unknown): void }
+  sessionPreparing?: Promise<PreparedAgentStart>
+  prewarmAbort?: AbortController
+  preparedClosing?: Promise<void>
   session: AgentSession | null
-  /** The CLI has exited; its cancellation grace cannot cover host publication. */
+  /** Event consumption ended; cancellation grace cannot cover host publication. */
   sessionEnded?: boolean
+  /** An actual adapter exit, never an exhausted stream or forced detachment. */
+  sessionExited?: boolean
+  /** Constructed by this supervisor after finishing work and the final upload. */
+  safePoint?: HandoffReport['safePoint']
   cancelRequested: boolean
   /** Set when the watchdog or the lease stopped the run. */
   forcedStop?: StopReason
@@ -323,7 +339,7 @@ export class RunSupervisor {
     for (const [runId, run] of this.active) {
       const entry = this.deps.journal.get(runId)
       if (!entry?.worktree || !entry.baseCommit || run.checkpointing) continue
-      if (run.forcedStop || run.cancelRequested) continue
+      if (run.sessionEnded || run.forcedStop || run.cancelRequested) continue
       const since = run.lastCheckpointAt ?? run.lastProgressAt
       if (!run.checkpointDue && now - since < CHECKPOINT_EVERY_MS) continue
       await this.saveCheckpoint(runId, run, save, now)
@@ -365,11 +381,24 @@ export class RunSupervisor {
     finally { if (run.checkpointing === pending) run.checkpointing = undefined }
   }
 
-  private async saveProviderCheckpoint(runId: string, run: ActiveRun): Promise<"ready" | "unavailable"> {
+  private async saveTerminalCheckpoint(runId: string, run: ActiveRun, finishingComplete = false): Promise<Pick<NonNullable<HandoffReport['safePoint']>, 'checkpoint' | 'checkpointTakenAt'>> {
     // Even an older uploaded snapshot cannot stand in for this final tree.
     // The server may continue an unavailable one only in its original worktree.
-    return this.deps.saveCheckpoint && await this.saveCheckpoint(runId, run, this.deps.saveCheckpoint, Date.now(), true)
-      ? "ready" : "unavailable"
+    run.safePoint = undefined
+    let checkpointTakenAt: string | undefined
+    const save = this.deps.saveCheckpoint
+    const ready = save && await this.saveCheckpoint(runId, run, async (id, checkpoint) => {
+      await save(id, checkpoint)
+      checkpointTakenAt = checkpoint.takenAt
+    }, Date.now(), true)
+    const checkpoint = ready && checkpointTakenAt
+      ? { checkpoint: 'ready' as const, checkpointTakenAt }
+      : { checkpoint: 'unavailable' as const }
+    // The synthetic cancelled/error exits used to detach a stuck adapter
+    // cannot establish that the native process stopped writing its workspace.
+    if (finishingComplete && run.sessionExited && !this.stopping)
+      run.safePoint = { session: 'exited', observedAt: new Date().toISOString(), ...checkpoint }
+    return checkpoint
   }
 
   /** Lease and watchdog pass; the daemon calls it on every tick. */
@@ -408,9 +437,23 @@ export class RunSupervisor {
     return run.mailboxClosing
   }
 
+  private closePrepared(run: ActiveRun): Promise<void> {
+    if (!run.sessionPreparing) return Promise.resolve()
+    if (!run.preparedClosing) run.preparedClosing = run.sessionPreparing.then(value => value.cancel(), () => undefined)
+    run.prewarmAbort?.abort()
+    // Preparation may still be joining the mailbox. Abort that dependency
+    // before draining it; the mailbox finalizer still owns its close result.
+    run.mailboxAbort?.abort()
+    return run.preparedClosing
+  }
+
   /** Asks the session to stop; detaches it if it does not within the grace. */
   private requestCancel(runId: string, run: ActiveRun): Promise<void> {
     run.cancelRequested = true
+    // Read-ahead Git has its own lifetime and stops immediately, without
+    // borrowing the native session's cancellation grace.
+    run.repositoryPreparing?.abort.abort()
+    run.prewarmAbort?.abort()
     run.toolApproval?.revoke()
     // Fence new calls and abort outstanding transport immediately; do not
     // leave a mailbox usable during the CLI's cancellation grace period.
@@ -572,7 +615,7 @@ export class RunSupervisor {
     }
     if (assignment.leaseExpiresAt)
       this.leases.set(assignment.runId, Date.parse(assignment.leaseExpiresAt))
-    this.launch(assignment.runId, repo)
+    this.launch(assignment.runId, repo, true)
     return this.get(assignment.runId)
   }
 
@@ -922,9 +965,10 @@ export class RunSupervisor {
       entry.assignment.preserveQuestionWorktree = true
     const readOnlyTask = entry && (isReadOnlyTask(entry.assignment) || entry.assignment.factoryCheck?.reportOnly === true || entry.assignment.factoryExecuteKind === 'deliverable')
     // Never copy trusted evidence from an adapter/model report.
-    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
+    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, safePoint: _safePoint, ...content } = report
     report = {
       ...content,
+      ...(active?.safePoint ? { safePoint: active.safePoint } : {}),
       ...(entry?.baseCommit && /^[a-f0-9]{40}$/.test(entry.baseCommit)
         ? { sourceCommit: entry.baseCommit } : {}),
       ...(entry?.assignment.factoryExecuteKind === 'deliverable' && entry.deliverableCommit ? { deliverableCommit: entry.deliverableCommit } : {}),
@@ -996,18 +1040,24 @@ export class RunSupervisor {
    * shows which stage it reached. The stage's own result or error passes
    * through unchanged.
    */
-  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>): Promise<T> {
+  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>, reportAfter?: Promise<unknown>): Promise<T> {
     const started = performance.now()
     const attributes = { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": this.deps.journal.get(runId)?.assignment.harness }
     let startupTiming: DaemonStartupTiming | undefined
     try {
       const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(),
-        { onStartupTiming: timing => { startupTiming = timing } })
+        this.active.get(runId)?.runtimeTiming ? { onStartupTiming: timing => { startupTiming = timing } } : undefined)
+      const elapsed = performance.now() - started
+      // Repository reads can finish before policy. Preserve their actual
+      // duration, but produce no speculative stage/user message before it.
+      if (reportAfter) await reportAfter
       if (stage === "agent_start") this.active.get(runId)?.runtimeTiming?.executing()
-      this.emit(runId, runStageChunk(stage, performance.now() - started, true, startupTiming))
+      this.emit(runId, runStageChunk(stage, elapsed, true, startupTiming))
       return value
     } catch (error) {
-      this.emit(runId, runStageChunk(stage, performance.now() - started, false, startupTiming))
+      const elapsed = performance.now() - started
+      if (reportAfter) await reportAfter
+      this.emit(runId, runStageChunk(stage, elapsed, false, startupTiming))
       throw error
     }
   }
@@ -1046,12 +1096,12 @@ export class RunSupervisor {
   }
 
   /** Waits for the run's capture uploads, but never longer than a minute. */
-  private async flushCaptures(runId: string): Promise<void> {
-    if (!this.deps.captures) return
+  private async flushCaptures(runId: string): Promise<boolean> {
+    if (!this.deps.captures) return true
     let timer: NodeJS.Timeout | undefined
-    await Promise.race([
-      this.deps.captures.flush(runId),
-      new Promise<void>((resolve) => { timer = setTimeout(resolve, 60_000) }),
+    return Promise.race([
+      this.deps.captures.flush(runId).then(() => true),
+      new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), 60_000) }),
     ]).finally(() => clearTimeout(timer))
   }
 
@@ -1287,7 +1337,7 @@ export class RunSupervisor {
     return data
   }
 
-  private launch(runId: string, repo: DeviceRepo) {
+  private launch(runId: string, repo: DeviceRepo, initialClaim = false) {
     const run: ActiveRun = {
       repoPath: repo.path,
       session: null,
@@ -1299,24 +1349,30 @@ export class RunSupervisor {
     this.active.set(runId, run)
     const assignment = this.deps.journal.get(runId)?.assignment
     const harness = assignment?.harness
-    if (assignment) run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
+    if (assignment && runDiagnosticsEnabled(assignment.taskEnv, this.deps.collectCliTiming))
+      run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
     run.done = daemonTracer.span("daemon.run", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
       run.span = span
-      return this.drive(runId, repo, run)
+      return this.drive(runId, repo, run, initialClaim)
     }, { root: true })
       .catch(async (error: unknown) => {
+        run.repositoryPreparing?.refuseEffects(error)
+        run.repositoryPreparing?.abort.abort()
+        // Start both drains before joining: a native preparation can still
+        // be waiting on its mailbox while the Git child is being reaped.
+        await Promise.all([run.repositoryPreparing?.done.catch(() => undefined), this.closePrepared(run)])
         run.runtimeTiming?.finishing()
         const message = error instanceof Error ? error.message : String(error)
         this.deps.log.error({ run_id: runId, err: this.logError(runId, error) }, "run failed")
         if (this.stopping) return
         try {
           const providerFailure = run.cancelRequested ? undefined : startupProviderFailure(error)
-          const providerCheckpoint = providerFailure ? await this.saveProviderCheckpoint(runId, run) : undefined
+          const checkpoint = await this.saveTerminalCheckpoint(runId, run)
           if (this.stopping) return
           this.finish(runId,
             run.cancelRequested ? run.forcedStop ?? "cancelled" : providerFailure ? "provider_failure" : error instanceof CheckpointRecoveryError ? 'blocked' : "error",
             run.cancelRequested ? undefined : message,
-            { ...baseReport(run.cancelRequested ? undefined : message), ...(providerFailure ? { providerFailure, providerCheckpoint } : {}) },
+            { ...baseReport(run.cancelRequested ? undefined : message), ...(providerFailure ? { providerFailure, providerCheckpoint: checkpoint.checkpoint } : {}) },
           )
         } catch (finishError) {
           this.deps.log.error(
@@ -1326,6 +1382,8 @@ export class RunSupervisor {
         }
       })
       .finally(async () => {
+        run.repositoryPreparing?.abort.abort()
+        await Promise.all([run.repositoryPreparing?.done.catch(() => undefined), this.closePrepared(run)])
         run.toolApproval?.revoke()
         try { await this.closeMailbox(run) }
         catch { this.deps.log.warn('Run mailbox shutdown failed') }
@@ -1337,7 +1395,7 @@ export class RunSupervisor {
       })
   }
 
-  private async drive(runId: string, repo: DeviceRepo, run: ActiveRun) {
+  private async drive(runId: string, repo: DeviceRepo, run: ActiveRun, initialClaim: boolean) {
     const log = this.deps.log.child({ run_id: runId }, { serializers: {
       err: error => this.logError(runId, error),
       stderr: value => typeof value === 'string' ? this.maskers.get(runId)?.text(value) ?? value : value,
@@ -1345,7 +1403,30 @@ export class RunSupervisor {
     let entry = this.deps.journal.get(runId) as JournalEntry
     const { assignment } = entry
     if ((assignment.policySnapshotRequired || assignment.policySnapshot) && !this.deps.verifyRunPolicy) throw new Error('Run policy verification unavailable')
-    await this.deps.verifyRunPolicy?.(assignment, AbortSignal.any([this.stopController.signal, run.abort.signal]))
+    // Claim already authorized this exact remote and, where needed, handed
+    // over its GitHub credential. Only a new hosted task can read ahead: local
+    // credential preparation, old claim helpers and every resume stay serial.
+    const readAhead = initialClaim && this.deps.verifyRunPolicy && assignment.remoteUrl && !this.deps.prepareRunGitHub
+      && !assignment.continuesRunId && !assignment.resumeSessionId && !assignment.resumeFrom
+      && (!assignment.github || Boolean(assignment.github.token))
+    const readAbort = readAhead ? new AbortController() : undefined
+    const preparationSignal = AbortSignal.any([this.stopController.signal, run.abort.signal, ...(readAbort ? [readAbort.signal] : [])])
+    const policyReady = Promise.resolve().then(async () => {
+      await this.deps.verifyRunPolicy?.(assignment, preparationSignal)
+      preparationSignal.throwIfAborted()
+    })
+    if (readAbort) {
+      let allowEffects!: () => void, refuseEffects!: (reason: unknown) => void
+      const entryReady = new Promise<void>((resolve, reject) => { allowEffects = resolve; refuseEffects = reject })
+      const authorized = Promise.all([policyReady, entryReady])
+      void authorized.catch(() => undefined)
+      const done = this.stage(runId, 'repository', () => this.deps.prepareRepository(assignment, preparationSignal, undefined, authorized), authorized)
+      run.repositoryPreparing = { abort: readAbort, done, allowEffects, refuseEffects }
+      // Preserve the original rejection for the join without an unhandled
+      // rejection while the independent policy transport is still pending.
+      void done.catch(() => undefined)
+    }
+    await policyReady
     verifySkillAssignment(assignment)
     if (assignment.skillReceipt && (this.leases.get(runId)??0)<=Date.now())
       throw new Error('Receipted Skill assignment requires a current server lease')
@@ -1377,12 +1458,29 @@ export class RunSupervisor {
       this.setState(runId, "preparing")
       entry = this.deps.journal.get(runId) as JournalEntry
     }
+    // Preserve the original entry order, including Skill/session checks and
+    // the preparing state, before any repository write or stored stage.
+    run.repositoryPreparing?.allowEffects()
 
-    const preparationSignal = AbortSignal.any([this.stopController.signal, run.abort.signal])
     const checkMailbox = () => {
       const lease = this.leases.get(runId)
       const current = this.deps.journal.get(runId)
       assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
+    }
+    const prepareGate = async (worktree?: string) => {
+      if (run.toolApproval) return run.toolApproval
+      const toolApproval = this.deps.prepareRunToolApproval && await daemonTracer.span("daemon.tool_approval", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": assignment.harness },
+        () => this.deps.prepareRunToolApproval!(assignment, preparationSignal, checkMailbox, worktree))
+      run.toolApproval = toolApproval
+      // Register before an adapter can attach its cancellation callback. Keep
+      // a known local lease revocation before SIGTERM/SDK close races an exit.
+      toolApproval?.onRevoke(() => {
+        if (!this.stopping && this.active.get(runId) === run && !run.forcedStop
+          && this.leases.has(runId) && toolApproval.revokeReason === 'device_lost') {
+          this.forceStop(runId, run, 'device_lost')
+        }
+      })
+      return toolApproval
     }
     if (assignment.mcp?.mailbox === true && this.deps.prepareRunMailbox) {
       const abort = run.mailboxAbort = new AbortController()
@@ -1398,11 +1496,75 @@ export class RunSupervisor {
     }
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
+    const baseOptions = {
+      // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
+      github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
+        ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
+      githubEnvironment: run.github?.env,
+      onCredential: (name: string, value: string) => this.addCredential(runId, name, value),
+      apps: runApps(assignment.mcp),
+      mcp: runMcp(assignment.mcp),
+      runId,
+      requireSessionResume: assignment.requireSessionResume,
+      kind: assignment.kind,
+      factoryCheck: assignment.factoryCheck,
+      verifyCommand: assignment.verifyCommand,
+      env: buildChildEnv({
+        adapterAllow: adapter.envAllow,
+        runId,
+      }),
+      log,
+      networkAllow: repo.networkAllow,
+      policy: assignment.policy,
+      policyHash: assignment.policySnapshot?.payload.policyHash,
+      skills: assignment.skills,
+      skillReceipt: assignment.skillReceipt,
+      onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
+        const current = this.deps.journal.get(runId)
+        if (!current?.runtime || isTerminalRunState(current.state) || current.sessionId !== sessionId ||
+          current.skillMount?.sessionId !== sessionId || current.skillMount.receiptId !== assignment.skillReceipt?.id) return
+        if (current.runtime.observedModel === observedModel && (!current.execution || current.execution.observedModel === observedModel)) return
+        this.deps.journal.update(runId, { runtime: { ...current.runtime, observedModel },
+          ...(current.execution ? { execution: { ...current.execution, observedModel } } : {}),
+        })
+      } : undefined,
+      fixture: assignment.fixture,
+      model: assignment.model,
+      effort: assignment.effort,
+      // In memory only: the adapter hands it to the run's CLI environment.
+      credential: assignment.modelCredential,
+    }
+    const prewarm = this.deps.prepareSubscription && assignment.harness === 'claude_code'
+      && assignment.subscriptionBinding && assignment.subscriptionLease && !assignment.modelCredential
+      && !entry.sessionId && !entry.worktree && !assignment.continuesRunId && !assignment.resumeSessionId
+      && !assignment.requireSessionResume && !assignment.resumeFrom
+      && (!assignment.github || Boolean(assignment.github.token))
+      && (assignment.mcp?.mailbox !== true || assignment.mcp.mailboxCatalogue !== undefined)
+    if (prewarm) {
+      const abort = run.prewarmAbort = new AbortController()
+      const signal = AbortSignal.any([preparationSignal, abort.signal])
+      run.sessionPreparing = Promise.resolve().then(async () => {
+        const mailbox = await run.mailboxPreparing
+        signal.throwIfAborted(); checkMailbox()
+        const toolApproval = await prepareGate()
+        signal.throwIfAborted(); checkMailbox()
+        if (!toolApproval) throw Error('Run tool approval unavailable')
+        const guarded = mailbox && { tools: mailbox.tools, close: () => mailbox.close(), request: async (body: unknown, signal?: AbortSignal) => {
+          if (!await toolApproval.checkLive()) throw Error('Run tool approval unavailable')
+          return mailbox.request(body, signal)
+        } }
+        return this.deps.prepareSubscription!(assignment, { ...baseOptions, cwd: this.deps.worktrees.pathFor(runId),
+          mailbox: guarded, toolApproval, prompt: assignment.prompt }, signal)
+      })
+      void run.sessionPreparing.catch(() => undefined)
+    }
     if (this.stopping || run.cancelRequested) {
+      run.repositoryPreparing?.abort.abort()
+      await run.repositoryPreparing?.done.catch(() => undefined)
       if (!this.stopping) this.finish(runId, run.forcedStop ?? 'cancelled')
       return
     }
-    await this.stage(runId, "repository", () => this.deps.prepareRepository(assignment, preparationSignal, run.github?.env))
+    await (run.repositoryPreparing?.done ?? this.stage(runId, "repository", () => this.deps.prepareRepository(assignment, preparationSignal, run.github?.env)))
     if (this.stopping || run.cancelRequested) {
       if (!this.stopping) this.finish(runId, run.forcedStop ?? "cancelled")
       return
@@ -1474,6 +1636,7 @@ export class RunSupervisor {
         throw new Error("Check assignment is missing its read-only policy")
       await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
     }
+    const preparedSession = await run.sessionPreparing
     let mailbox = await (run.mailboxPreparing ?? this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox))
     run.mailbox = mailbox
     // A STOP/lease transition may win the handshake's final Promise handoff.
@@ -1481,17 +1644,7 @@ export class RunSupervisor {
     if (this.stopping) return
     if (run.cancelRequested) { this.finish(runId, run.forcedStop ?? 'cancelled'); return }
     if (mailbox) checkMailbox()
-    const toolApproval = this.deps.prepareRunToolApproval && await daemonTracer.span("daemon.tool_approval", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": assignment.harness },
-      () => this.deps.prepareRunToolApproval!(assignment, run.abort.signal, checkMailbox, worktree))
-    run.toolApproval = toolApproval
-    // Register before an adapter can attach its cancellation callback. Keep
-    // a known local lease revocation before SIGTERM/SDK close races an exit.
-    toolApproval?.onRevoke(() => {
-      if (!this.stopping && this.active.get(runId) === run && !run.forcedStop
-        && this.leases.has(runId) && toolApproval.revokeReason === 'device_lost') {
-        this.forceStop(runId, run, 'device_lost')
-      }
-    })
+    const toolApproval = await prepareGate(worktree)
     if (mailbox && toolApproval) {
       const original = mailbox
       mailbox = { tools: original.tools, close: () => original.close(), request: async (body, signal) => {
@@ -1516,48 +1669,9 @@ export class RunSupervisor {
       prompt = await materializeChatFiles(prompt, directory, download)
       if (followUp) followUp = await materializeChatFiles(followUp, directory, download)
     }
-    const options = {
-      // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
-      github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
-        ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
-      githubEnvironment: run.github?.env,
-      onCredential: (name: string, value: string) => this.addCredential(runId, name, value),
-      apps: runApps(assignment.mcp),
-      mcp: runMcp(assignment.mcp),
-      toolApproval,
-      runId,
-      requireSessionResume: assignment.requireSessionResume,
-      kind: assignment.kind,
-      factoryCheck: assignment.factoryCheck,
-      verifyCommand: assignment.verifyCommand,
-      cwd: worktree,
-      env: buildChildEnv({
-        adapterAllow: adapter.envAllow,
-        runId,
-      }),
-      log,
-      networkAllow: repo.networkAllow,
-      gitWritePaths: await worktreeGitWritePaths(repo.path, worktree, runId),
-      policy: assignment.policy,
-      policyHash: assignment.policySnapshot?.payload.policyHash,
-      skills: assignment.skills,
-      skillReceipt: assignment.skillReceipt,
-      onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {
-        const current = this.deps.journal.get(runId)
-        if (!current?.runtime || isTerminalRunState(current.state) || current.sessionId !== sessionId ||
-          current.skillMount?.sessionId !== sessionId || current.skillMount.receiptId !== assignment.skillReceipt?.id) return
-        if (current.runtime.observedModel === observedModel && (!current.execution || current.execution.observedModel === observedModel)) return
-        this.deps.journal.update(runId, { runtime: { ...current.runtime, observedModel },
-          ...(current.execution ? { execution: { ...current.execution, observedModel } } : {}),
-        })
-      } : undefined,
-      fixture: assignment.fixture,
-      model: assignment.model,
-      effort: assignment.effort,
-      mailbox,
-      // In memory only: the adapter hands it to the run's CLI environment.
-      credential: assignment.modelCredential,
-    }
+    const options = { ...baseOptions, cwd: worktree, toolApproval, mailbox,
+      gitWritePaths: await worktreeGitWritePaths(repo.path, worktree, runId) }
+
     const resuming =
       entry.sessionId !== null && adapter.capabilities.supportsResume
     // A follow-up run goes on with the earlier run's conversation, sending
@@ -1604,7 +1718,9 @@ export class RunSupervisor {
     let session: AgentSession
     if (assignment.subscriptionBinding && assignment.modelCredential) throw new Error("A run has one model credential")
     try {
-      session = await this.stage(runId, "agent_start", async () => assignment.modelCredential && this.deps.startCredential
+      session = await this.stage(runId, "agent_start", async () => preparedSession
+      ? await preparedSession.start({ ...options, prompt })
+      : assignment.modelCredential && this.deps.startCredential
       ? await this.deps.startCredential(assignment,{...options,prompt})
       : assignment.subscriptionBinding
       ? this.deps.startSubscription
@@ -1733,6 +1849,7 @@ export class RunSupervisor {
           continue
         }
         run.sessionEnded = true
+        run.sessionExited = next !== ABORTED && !next.done && event.sessionExited !== false
         clearTimeout(run.cancelTimer)
         if (run.cancelRequested) run.abort.abort()
         const finishingSignal = AbortSignal.any([this.stopController.signal, run.abort.signal])
@@ -1795,9 +1912,10 @@ export class RunSupervisor {
           stopReason = stopReasonOf(event, run, assignment)
         }
         // Captures go up before the run reports its end; a stopping daemon does not wait for them.
-        if (!this.stopping) await this.flushCaptures(runId)
+        const capturesSaved = !this.stopping && await this.flushCaptures(runId)
         stopReason = stopReasonOf(event, run, assignment)
-        if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: await this.saveProviderCheckpoint(runId, run) }
+        const checkpoint = await this.saveTerminalCheckpoint(runId, run, capturesSaved)
+        if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: checkpoint.checkpoint }
         if (this.stopping) return
         this.finish(runId, stopReason, error ?? verifyError, report)
         log.info(

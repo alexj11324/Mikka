@@ -1,13 +1,17 @@
 'use client'
 
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef, useSyncExternalStore, type Dispatch, type ReactNode, type SetStateAction } from 'react'
+import { CLEAR_VIEW_STATE_EVENT, VIEW_STATE_PREFIX } from '../chat-drafts'
 
 /** Browsing state lives for this window's session, separate from saved product settings. */
 function createViewStore(scope: string | null) {
   const values = new Map<string, unknown>()
   const listeners = new Set<() => void>()
-  const storageKey = (key: string) => `mikka:view:v1:${scope}:${key}`
+  let active = true
+  const storageKey = (key: string) => `${VIEW_STATE_PREFIX}v1:${scope}:${key}`
   return {
+    activate() { active = true },
+    retire() { active = false },
     get<T,>(key: string, fallback: T): T {
       if (!values.has(key) && scope && typeof window !== 'undefined') {
         try {
@@ -18,6 +22,7 @@ function createViewStore(scope: string | null) {
       return values.has(key) ? values.get(key) as T : fallback
     },
     set<T,>(key: string, value: T) {
+      if (!active) return
       values.set(key, value)
       if (scope) {
         try { window.sessionStorage.setItem(storageKey(key), JSON.stringify(value)) } catch { /* storage unavailable */ }
@@ -32,6 +37,13 @@ const ViewStateContext = createContext<ReturnType<typeof createViewStore> | null
 
 export function ViewStateProvider({ scope, children }: { scope: string; children: ReactNode }) {
   const store = useMemo(() => createViewStore(scope), [scope])
+  // Page navigation may finish a pending draft update, but a discarded account
+  // or workspace must never repopulate storage after its security boundary clears it.
+  useLayoutEffect(() => {
+    store.activate()
+    window.addEventListener(CLEAR_VIEW_STATE_EVENT, store.retire)
+    return () => { window.removeEventListener(CLEAR_VIEW_STATE_EVENT, store.retire); store.retire() }
+  }, [store])
   return <ViewStateContext.Provider value={store}>{children}</ViewStateContext.Provider>
 }
 

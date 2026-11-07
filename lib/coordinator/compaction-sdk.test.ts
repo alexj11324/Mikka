@@ -37,7 +37,15 @@ test('actual SDK partial-error or unterminated streams cannot become successful 
      controller.close()
     }})}
    }})
-   const service={repository:{binding:async()=>({id:selection.bindingId,...selection}),connection:async()=>({id:selection.connectionId,ownerId:scope.ownerId,workspaceId:scope.workspaceId,epoch:1,state:'connected'})},model:async()=>model} as unknown as SubscriptionService
+   const binding={id:selection.bindingId,...selection}
+   const connection={id:selection.connectionId,ownerId:scope.ownerId,workspaceId:scope.workspaceId,epoch:1,state:'connected'}
+   const service={repository:{
+    binding:async()=>binding,connection:async()=>connection,
+    bindingConnection:async(ownerId:string,bindingId:string)=>{
+     assert.equal(ownerId,scope.ownerId);assert.equal(bindingId,selection.bindingId)
+     return {binding,connection}
+    },
+   },model:async()=>model} as unknown as SubscriptionService
    const operation=()=>compactWithFrozenModel(scope,{harness:'ai_sdk',model:selection.modelId,modelSelection:selection},[{role:'user',content:'Synthetic retained pending context'}],{service:()=>service,workspace:async()=>{}})
    if(outcome==='stop')assert.equal(await operation(),'Synthetic partial summary')
    else await assert.rejects(operation)

@@ -85,9 +85,16 @@ async function fixture(options: { cloneFailure?: boolean; pausedMethod?: string;
     baseRef: () => repositories.baseRef(remote, 'main'),
     prepareRepository: async (_claimed, signal) => {
       repositoryEntered.resolve(signal)
-      await repositoryRelease.promise
-      await repositories.prepare(remote, signal)
-      repositoryDone.resolve()
+      const aborted = deferred()
+      const onAbort = () => aborted.resolve()
+      signal.addEventListener('abort', onAbort, { once: true })
+      try {
+        if (signal.aborted) onAbort()
+        await Promise.race([repositoryRelease.promise, aborted.promise])
+        signal.throwIfAborted()
+        await repositories.prepare(remote, signal)
+        repositoryDone.resolve()
+      } finally { signal.removeEventListener('abort', onAbort) }
     }, prepareRunMailbox,
   }
   const supervisor = new RunSupervisor(deps)
@@ -123,18 +130,31 @@ it.each(['repository', 'mailbox'] as const)('overlaps the enabled mailbox with c
   expect(f.close).toHaveBeenCalledOnce()
 })
 
-it('does not start mailbox or repository work before the initial policy check succeeds', async () => {
+it('aborts and drains the read-ahead repository without starting mailbox or CLI when initial policy refuses', async () => {
   const f = await fixture(), entered = deferred(), release = deferred()
   f.deps.verifyRunPolicy = async () => { entered.resolve(); await release.promise; throw Error('Policy rejected') }
   f.supervisor.start(f.assignment)
-  await entered.promise
-  expect(f.prepareRunMailbox).not.toHaveBeenCalled()
-  expect(f.methods).toEqual([])
-  release.resolve()
-  await f.supervisor.idle()
-  expect(f.prepareRunMailbox).not.toHaveBeenCalled()
-  expect(f.start).not.toHaveBeenCalled()
-  expect(f.supervisor.get(f.assignment.runId).error).toBe('Policy rejected')
+  try {
+    await entered.promise
+    const repositorySignal = await f.repositoryEntered.promise
+    expect(repositorySignal.aborted).toBe(false)
+    expect(f.prepareRunMailbox).not.toHaveBeenCalled()
+    expect(f.methods).toEqual([])
+    expect(f.records).toEqual([])
+    release.resolve()
+    // Keep the fake clone's normal release blocked. Only the real abort
+    // signal can settle its promise and allow the supervisor to drain it.
+    await f.supervisor.idle()
+    expect(repositorySignal.aborted).toBe(true)
+    expect(f.prepareRunMailbox).not.toHaveBeenCalled()
+    expect(f.methods).toEqual([])
+    expect(f.start).not.toHaveBeenCalled()
+    expect(f.supervisor.activeRunIds()).toEqual([])
+    expect(f.supervisor.get(f.assignment.runId).error).toBe('Policy rejected')
+  } finally {
+    release.resolve(); f.repositoryRelease.resolve()
+    await f.supervisor.idle()
+  }
 })
 
 it.each(['digest', 'team-authorization'] as const)('keeps the initial Skill %s check before mailbox and clone', async mode => {
