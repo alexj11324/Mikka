@@ -141,7 +141,7 @@ mobile trust. This flag reports sign-in readiness, not push-relay availability.
 
 ## Models, computers, and GitHub
 
-In **Settings → Models and subscriptions**, connect your own Claude or ChatGPT subscription, or add your own provider API key. The community edition does not reserve Mikka credits, require a payment card, or stop after the hosted free-message allowance. It hides the Billing settings section. The normal user/workspace permissions and model access rules still apply.
+In **Settings → Models and subscriptions**, add your own provider API key, or connect your own Claude or ChatGPT subscription after configuring the subscription backend below. The community edition does not reserve Mikka credits, require a payment card, or stop after the hosted free-message allowance. It hides the Billing settings section. The normal user/workspace permissions and model access rules still apply.
 
 To supply the server's default OpenAI-compatible model, set `MIKKA_DEFAULT_MODEL_BASE_URL`, `MIKKA_DEFAULT_MODEL_API_KEY`, and `MIKKA_DEFAULT_MODEL_ID`. Use the provider's API base, including its version path where required. Provider charges go to your account. Without a configured default model, choose one of your own available models.
 
@@ -150,6 +150,30 @@ Connect your own computer or server using the commands shown in Mikka's **Device
 For an E2B cloud computer, save your own E2B key in your account. This does not buy Mikka-hosted compute and does not charge Mikka credits.
 
 GitHub repository access uses your deployment's GitHub App. Manual configuration uses `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET` as required by the integration. The installation link is derived from the configured slug. It never sends a community user to the official Mikka App by default. The current OAuth configuration also enables GitHub sign-in; keep its callback registered on your own origin.
+
+### Subscription backend prerequisites
+
+Subscription connections use your own Infisical project or self-hosted Infisical instance to hold provider OAuth grants. PostgreSQL stores their metadata and references. A Mikka account or connection to Mikka cloud services is not required. The `CREDENTIAL_MASTER_KEY` used by the password vault does not configure subscription storage, and an existing Claude Code or Codex login on a machine is not imported into the server.
+
+The Linux x64 Docker build includes the pinned `mikka-subscription-worker` and `mikka-subscription-enrollment` binaries. It sets their paths through `MIKKA_BYOS_WORKER_BINARY` and `MIKKA_BYOS_ENROLLMENT_BINARY`; keep those image defaults. A non-Docker build must run `MIKKA_BUILD_BYOS_WORKER=1 node scripts/build-subscription-worker.mjs` before `pnpm build:app` with the same variable set, so packaging rejects missing binaries. The build verifies the existing Go compiler checksum and CPA source commit and does not use provider or Infisical credentials.
+
+Configure these server-only variables with values from **your own** Infisical installation. The standard two-identity configuration is:
+
+| Variable | Required value |
+| --- | --- |
+| `MIKKA_BYOS_INFISICAL_ORIGIN` | The HTTPS origin of your Infisical service, without a path, query or fragment. |
+| `MIKKA_BYOS_INFISICAL_PROJECT` | Your Infisical project ID. |
+| `MIKKA_BYOS_INFISICAL_ENVIRONMENT` | Your environment slug. |
+| `MIKKA_BYOS_INFISICAL_PATH` | The dedicated path holding provider grants and OAuth state, for example `/mikka/subscription-grants`. |
+| `MIKKA_BYOS_ACCESS_INFISICAL_PATH` | A different path for access-only projections, for example `/mikka/subscription-access`. |
+| `MIKKA_BYOS_CUSTODY_CLIENT_ID` / `MIKKA_BYOS_CUSTODY_CLIENT_SECRET` | Your Universal Auth custody identity, with read/create/delete permission on both paths. |
+| `MIKKA_BYOS_ACCESS_CLIENT_ID` / `MIKKA_BYOS_ACCESS_CLIENT_SECRET` | A different Universal Auth identity, with read-only permission on the access path and no access to the grant path. |
+
+The access path uses the same project unless `MIKKA_BYOS_ACCESS_INFISICAL_PROJECT` is set. The supported static-token alternative uses `MIKKA_BYOS_INFISICAL_TOKEN` for custody and a different `MIKKA_BYOS_ACCESS_INFISICAL_TOKEN` for access-only reads, with the same permissions. Do not mix in Mikka's project, identities, paths or provider grants. Supply these values as runtime secrets; the [environment template](../.env.example) lists the standard configuration.
+
+After configuring this backend, each user connects their existing subscription through the normal provider OAuth flow in **Settings → Models and subscriptions**. Community defaults enable BYOS and both OAuth routes; an explicit administrator override can disable them. The owner, workspace permissions, model availability and quota are checked before use. Missing backend configuration is reported as unavailable and does not fall back to Mikka's credentials. The separate operator enrollment receiver has additional configuration; it is not required for the signed-in Settings connection flow. See the [subscription worker documentation](../packages/subscription-worker/README.md) for that custody boundary and recovery behavior.
+
+The image acceptance check executes both packaged binaries and verifies their build digests, the worker's pinned CPA version, and rejection of an empty configuration. It makes no provider requests. A real Claude Code subscription task and a real Codex subscription task remain separate acceptance checks after OAuth authorization; the local synthetic model fixture does not establish either.
 
 ## Edition and hosted deployment
 

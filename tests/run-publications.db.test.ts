@@ -422,7 +422,7 @@ test('run result publication commits one owner-scoped result through retries and
       const { sendOwnedRunMessage, stopOwnedRun } = await import('../lib/run-control')
       const { db } = await import('../lib/db')
       const { coordinatorEnabled } = await import('../lib/coordinator/wake')
-      assert.equal(coordinatorEnabled(), false, 'this DB suite cannot invoke a real model')
+      assert.equal(await coordinatorEnabled(), false, 'this DB suite cannot invoke a real model')
       assert.equal(process.env.GITHUB_APP_ID, undefined, 'no GitHub App check is needed to admit')
       const f = await fixture({ prefix: 'ADMI' })
       // This fixture supplies historical publication/legacy-alias evidence.
