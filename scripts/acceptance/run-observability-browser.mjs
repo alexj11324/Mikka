@@ -179,7 +179,7 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
       // Cancel pending locator actions before waiting on authentication cleanup.
       // The context retains its cookie jar/API client after this page closes.
       await stopPage()
-      if (allocating.size) await attempt('pendingResourcesSettled', () => Promise.allSettled([...allocating]))
+      if (allocating.size) await attempt('pendingResourcesSettled', () => Promise.allSettled(allocating))
       else report.cleanup.pendingResourcesSettled = true
       await stopPage()
       if (report.signInAttempted && owned.context) {
