@@ -59,3 +59,43 @@ jobs:
             }
           } catch { console.log(JSON.stringify({available:false,code:'OFFICIAL_APP_METADATA_UNAVAILABLE'})); process.exitCode=1; }
           JS
+  private-production-metadata:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/feat/self-hosting-config-readback-1560'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Read the existing Vercel team token through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Read only fixed private project production variable metadata
+        run: |
+          node --input-type=module <<'JS'
+          try {
+            const project = 'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc';
+            const team = 'team_C7lwxVVvnUicFli6112mvxpv';
+            const get = async path => {
+              const r = await fetch('https://api.vercel.com'+path, {headers:{authorization:'Bearer '+process.env.VERCEL_TEAM_TOKEN},redirect:'error',signal:AbortSignal.timeout(15000)});
+              if (!r.ok) { console.log(JSON.stringify({operation:'private_project_metadata',status:r.status,available:false})); throw Error('READ_FAILED'); }
+              return r.json();
+            };
+            const p = await get('/v9/projects/'+project+'?teamId='+team);
+            if (p.id !== project || p.name !== 'mikka-cloud' || p.accountId !== team) throw Error('TARGET_MISMATCH');
+            const inventory = await get('/v10/projects/'+project+'/env?teamId='+team+'&decrypt=false');
+            if (!Array.isArray(inventory.envs) || inventory.envs.length>2000 || inventory.pagination?.next) throw Error('INCOMPLETE_METADATA');
+            const names = ['MIKKA_EDITION','MIKKA_CLOUD_URL','MIKKA_BASE_PATH','BETTER_AUTH_URL','BETTER_AUTH_SECRET','MIKKA_DATABASE_URL','DATABASE_URL','DATABASE_URL_UNPOOLED','MIKKA_CLOUD_DATA_KEY','GITHUB_APP_ID','GITHUB_APP_SLUG','GITHUB_APP_PRIVATE_KEY','GITHUB_WEBHOOK_SECRET','GITHUB_CLIENT_ID','GITHUB_CLIENT_SECRET'];
+            const rows = inventory.envs.filter(row => Array.isArray(row.target) && row.target.includes('production') && !row.gitBranch);
+            console.log(JSON.stringify({readAt:new Date().toISOString(),projectMatches:true,teamMatches:true,gitRepoMatches:p.link?.org==='alexj11324'&&p.link?.repo==='mikka-cloud',productionVariableCount:rows.length,variables:Object.fromEntries(names.map(name=>[name,{present:rows.some(row=>row.key===name),count:rows.filter(row=>row.key===name).length,integrationOwned:rows.some(row=>row.key===name&&!!row.configurationId)}])),secretValuesRequested:false,configurationWrites:0}));
+          } catch { console.log(JSON.stringify({code:'PRIVATE_METADATA_UNAVAILABLE',secretValuesRequested:false,configurationWrites:0})); process.exitCode=1; }
+          JS
