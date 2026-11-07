@@ -5,6 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { changeEnabledModels, readEnabledModels, hostedModelEnabled } from './enabled-models'
 import { executionModelOptions, executionBinding } from './execution-model-options'
+import { setBotApiKeyChoice, usableApiKeys } from './model-api-keys'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !url) throw new Error('Enabled models require isolated PostgreSQL')
@@ -56,6 +57,16 @@ test('migration, toggles, source ownership, fresh keys, dispatch filters and row
     const result = (await readEnabledModels(pool, scope)).sources.find(item => item.id === key)!
     assert.deepEqual(result.models.find(item => item.id === 'new'), { id: 'new', enabled: false, fresh: false })
     assert.deepEqual(result.models.find(item => item.id === 'newer'), { id: 'newer', enabled: false, fresh: true })
+    await pool.query(`ALTER TABLE model_api_keys ADD COLUMN provider text DEFAULT 'deepseek', ADD COLUMN name text,
+      ADD COLUMN "baseUrl" text, ADD COLUMN protocol text DEFAULT 'anthropic', ADD COLUMN last4 text DEFAULT 'test',
+      ADD COLUMN "responsesApi" boolean DEFAULT true;
+      CREATE TABLE workspace_personal_policies ("workspaceId" text,subscriptions boolean)`)
+    await pool.query('INSERT INTO workspace_personal_policies VALUES ($1,false)', [workspaceId])
+    assert.deepEqual((await usableApiKeys(pool, scope.ownerId, workspaceId))[0].models, ['old'])
+    await changeEnabledModels(pool, scope, key, { kind: 'all', enabled: false })
+    assert.deepEqual((await usableApiKeys(pool, scope.ownerId, workspaceId))[0].models, [])
+    await assert.rejects(setBotApiKeyChoice(pool, scope, null, key, 'old'), /executionModelUnknown/,
+      'an entirely disabled catalogue must not be mistaken for an unrestricted custom key')
     await changeEnabledModels(pool, scope, 'hosted', { kind: 'all', enabled: false })
     assert.equal(await hostedModelEnabled(pool, scope.ownerId), false)
     assert.equal(await hostedModelEnabled(pool, 'other'), true)
