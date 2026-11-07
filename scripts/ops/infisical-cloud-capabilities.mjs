@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/infisical-cloud-capabilities',
-  base: 'f3ef8f4a5f96909e84a719ab3cd4cf2515d57602',
+  base: '891c98c74fe6cfc97ca430197985900bb4bd4efc',
   identity: '2cf9fa19-b9db-4c08-8ca0-b31859f2cbac', audience: 'mikka-infisical',
   project: '89850d6a-f020-4936-863e-df77380dfe40',
   connection: 'mikka-team-vercel-native-sync',
@@ -59,6 +59,33 @@ export function githubOidcUrl(value) {
     && /\/idtoken$/i.test(url.pathname), 'OIDC_URL')
   url.searchParams.set('audience', TARGET.audience)
   return url.href
+}
+
+export function oidcUrlShape(value) {
+  let url = null
+  try { if (typeof value === 'string' && value.length > 0) url = new URL(value) } catch { /* No raw URL or error output. */ }
+  const host = url?.hostname ?? ''
+  const under = suffix => host === suffix || host.endsWith(`.${suffix}`)
+  const pathClasses = ['idtoken', 'id-token', 'oidctoken', 'oidc-token', 'oidc', 'token']
+  const path = url?.pathname ?? ''
+  const pathClass = pathClasses.find(part => new RegExp(`/${part}/?$`, 'i').test(path)) ?? 'OTHER'
+  return {
+    present: typeof value === 'string' && value.length > 0,
+    parseable: url !== null,
+    scheme: url?.protocol === 'https:' ? 'https' : url?.protocol === 'http:' ? 'http' : 'OTHER',
+    hostActionsGithubusercontent: under('actions.githubusercontent.com'),
+    hostGithubusercontent: under('githubusercontent.com'),
+    hostGithubCom: under('github.com'),
+    hostGithubAppCom: under('githubapp.com'),
+    hostAzureCom: under('azure.com'),
+    hostVisualStudioCom: under('visualstudio.com'),
+    hostLoopback: ['localhost', '127.0.0.1', '[::1]'].includes(host),
+    pathClass,
+    pathTrailingSlash: path.endsWith('/'),
+    portPresent: url !== null && url.port !== '',
+    userinfoPresent: url !== null && (url.username !== '' || url.password !== ''),
+    fragmentPresent: url !== null && url.hash !== '',
+  }
 }
 
 async function exchange(fetcher, operation, url, options, requests) {
@@ -199,14 +226,14 @@ async function main() {
     result: 'blocked', requests: [], applicationSecretsRequested: false, providerCredentialsRequested: false,
     configurationWrites: 0, identityOrTrustChanges: false }
   try {
-    requireThat(process.argv.length === 3 && ['--preflight', '--inspect'].includes(process.argv[2]), 'MODE')
+    // This diagnostic revision cannot authenticate or call the metadata API from the CLI.
+    requireThat(process.argv.length === 3 && ['--preflight', '--url-shape'].includes(process.argv[2]), 'MODE')
     report.execution = validateExecution({ env: process.env, event: JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8')),
       head: git('rev-parse', 'HEAD'), parent: git('rev-parse', 'HEAD^'), changed: git('diff', '--name-only', 'HEAD^', 'HEAD').split('\n').filter(Boolean) })
     if (process.argv[2] === '--preflight') report.result = 'source_verified'
     else {
-      const accessToken = await login(process.env, report.requests)
-      report.results = await inspect(metadataClient(accessToken, report.requests))
-      report.result = 'inspected'
+      report.urlShape = oidcUrlShape(process.env.ACTIONS_ID_TOKEN_REQUEST_URL)
+      report.result = 'url_shape_inspected'
     }
   } catch (error) { report.error = error instanceof GuardError ? error.code : 'INSPECTION_FAILED'; process.exitCode = 1 }
   const safe = JSON.stringify(report)

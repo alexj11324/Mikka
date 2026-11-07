@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import test from 'node:test'
-import { TARGET, GET_ROUTES, validateExecution, githubOidcUrl, login, metadataClient, permissionEvidence,
+import { TARGET, GET_ROUTES, validateExecution, githubOidcUrl, oidcUrlShape, login, metadataClient, permissionEvidence,
   projectMetadata, inspect } from './infisical-cloud-capabilities.mjs'
 
 const code = expected => error => error.code === expected && error.message === expected
@@ -171,4 +171,37 @@ test('no CLI mode can perform a configuration write', () => {
   assert.equal(receipt.error, 'MODE')
   assert.equal(receipt.configurationWrites, 0)
   assert.deepEqual(receipt.requests, [])
+})
+
+test('URL-shape diagnostics use only closed categories and do not change the original URL guard', () => {
+  const valid = oidcUrlShape('https://pipelines.actions.githubusercontent.com/fixed/idtoken?api-version=2.0')
+  assert.equal(valid.scheme, 'https')
+  assert.equal(valid.hostActionsGithubusercontent, true)
+  assert.equal(valid.pathClass, 'idtoken')
+  assert.equal(valid.userinfoPresent, false)
+  const alternate = 'https://user:synthetic@worker.githubapp.com:8443/opaque/oidc-token/?opaque=untrusted-provider-text#opaque'
+  const shape = oidcUrlShape(alternate)
+  assert.equal(shape.hostGithubAppCom, true)
+  assert.equal(shape.hostActionsGithubusercontent, false)
+  assert.equal(shape.pathClass, 'oidc-token')
+  assert.equal(shape.pathTrailingSlash, true)
+  assert.equal(shape.portPresent, true)
+  assert.equal(shape.userinfoPresent, true)
+  assert.equal(shape.fragmentPresent, true)
+  for (const value of [undefined, 'untrusted-provider-text', alternate,
+    'http://127.0.0.1/untrusted-provider-text?opaque=untrusted-provider-text',
+    'https://untrusted-provider-text.invalid/untrusted-provider-text', 'data:text/plain,untrusted-provider-text']) {
+    const result = oidcUrlShape(value)
+    assert.ok(Object.values(result).every(item => typeof item === 'boolean' ||
+      ['https', 'http', 'OTHER', 'idtoken', 'id-token', 'oidctoken', 'oidc-token', 'oidc', 'token'].includes(item)))
+    assert.equal(JSON.stringify(result).includes('untrusted-provider-text'), false)
+    assert.equal(JSON.stringify(result).includes('synthetic'), false)
+  }
+  assert.throws(() => githubOidcUrl(alternate), code('OIDC_URL'))
+  const child = spawnSync(process.execPath, [new URL('./infisical-cloud-capabilities.mjs', import.meta.url).pathname, '--inspect'], {
+    encoding: 'utf8', env: { PATH: process.env.PATH },
+  })
+  assert.equal(child.status, 1)
+  assert.equal(JSON.parse(child.stdout.trim()).error, 'MODE')
+  assert.deepEqual(JSON.parse(child.stdout.trim()).requests, [])
 })
