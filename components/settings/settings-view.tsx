@@ -1,20 +1,17 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useTheme } from 'next-themes'
 import { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
-import { Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SettingsContentFrame } from '@ui-slot/settings-content'
 import { ApiAndSubscriptions } from '@ui-slot/settings-models'
 import { SecurityAndSignIn } from '@ui-slot/settings-security'
+import { PreferencesSettings } from '@ui-slot/settings-preferences'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { ReplayOnboarding, WorkspaceSettings } from '@/components/settings/workspace-settings'
+import { WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { MembersPanel } from '@/components/settings/members-panel'
-import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 import { PluginsView } from '@/components/plugins/plugins-view'
 import { TeamPermissionsSettings } from '@/components/settings/team-permissions-settings'
 import { PaymentDesignationSettings } from '@/components/settings/payment-designation-settings'
@@ -23,7 +20,6 @@ import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { SecretsPage } from '@/components/settings/secrets-page'
 import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
-import { LocaleSetting } from '@/components/settings/locale-setting'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
 import { SecretsSettings } from '@/components/settings/secrets-settings'
@@ -31,7 +27,6 @@ import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
 import { ArchivedBotsSettings } from '@/components/settings/archived-bots-settings'
-import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { settingsHref, TEAM_ONLY_SECTIONS, type SettingsSectionId } from '@/lib/settings-sections'
 import { useRouter } from '@/i18n/navigation'
@@ -118,7 +113,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'privacy': return <PrivacySettings />
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} workspace={workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} /> : waiting} />
-    case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /><ReplayOnboarding /></>
+    case 'preferences': return <PreferencesSettings />
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} workspaceId={!preview ? workspaceId : undefined} workspaceName={workspaceName} />
@@ -136,19 +131,3 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
 }
 
 
-function AppearanceSection() {
-  const t = useTranslations('Settings.appearance')
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
-  return <SettingsSection id="appearance-heading" title={t('title')}>
-    <SettingRow title={t('theme')}>
-      <ToggleGroup aria-label={t('themeLabel')} variant="segment" spacing={0.5} disabled={!mounted} value={mounted && theme ? [theme] : []} onValueChange={values => { if (values[0]) setTheme(values[0]) }}>
-        <ToggleGroupItem value="light" aria-label={t('light')}><Sun />{t('light')}</ToggleGroupItem>
-        <ToggleGroupItem value="dark" aria-label={t('dark')}><Moon />{t('dark')}</ToggleGroupItem>
-        <ToggleGroupItem value="system" aria-label={t('systemLabel')}><Monitor />{t('system')}</ToggleGroupItem>
-      </ToggleGroup>
-    </SettingRow>
-    <SettingRow title={t('language')}><LocaleSetting /></SettingRow>
-  </SettingsSection>
-}
