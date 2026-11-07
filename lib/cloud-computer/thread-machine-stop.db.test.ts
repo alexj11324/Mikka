@@ -183,6 +183,9 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
       assert.deepEqual(await state(runId), provision);
       assert.deepEqual(calls, []);
+      await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), /Task runtime is busy/);
+      assert.deepEqual(await state(runId), provision, 'a queued wake cannot end another bootstrap lease');
+      assert.deepEqual(calls, []);
     });
 
     await t.test("a recorded native claim is preserved even with queued status and no reported SID", async () => {
@@ -194,6 +197,9 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       const before = await state(runId), { calls, provider } = fake();
       assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
       assert.deepEqual(await state(runId), before);
+      assert.deepEqual(calls, []);
+      await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), /Task runtime is busy/);
+      assert.deepEqual(await state(runId), before, 'a recorded native claim also fences a queued wake');
       assert.deepEqual(calls, []);
     });
 
@@ -224,6 +230,9 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       const before = await state(runId), { calls, provider } = fake();
       assert.equal(await acknowledgeQueuedThreadStop(pool, actor, runId, provider), false);
       assert.deepEqual(await state(runId), before);
+      assert.deepEqual(calls, []);
+      await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), /Task runtime is busy/);
+      assert.deepEqual(await state(runId), before, 'a queued wake shares the explicit Stop native-history fence');
       assert.deepEqual(calls, []);
     });
 

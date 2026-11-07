@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { candidateReceipt, validateTemplateSubscriptions, validateSubscriptionFiles } from './validate-template-subscriptions.mjs'
+import { observeChunks } from '../acceptance/cloud-startup.mjs'
 import { createHash } from 'node:crypto'
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -100,7 +101,7 @@ test('a release receipt names the actual candidate, revision, model and register
   }
 })
 
-function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false } = {}) {
+function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false, proofOverride = {} } = {}) {
   const events = [], devices = []
   const fetchImpl = async (input, init) => {
     const url = new URL(input), path = url.pathname
@@ -144,7 +145,9 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false }
       files: { read: async () => WORKER, write: async () => {} },
       commands: { run: async (_, options) => {
         if (options.background) {
-          options.onStdout(`mikka-template-device ${JSON.stringify({ ...proof, harness })}\n`)
+          options.onStdout(`mikka-template-device ${JSON.stringify({ ...proof, harness,
+            binary: harness === 'codex' ? '/usr/local/lib/node_modules/@openai/codex/bin/codex.js' : '/usr/local/bin/claude',
+            ...proofOverride })}\n`)
           return { wait: () => new Promise(() => {}) }
         }
         return { exitCode: 0 }
@@ -209,14 +212,116 @@ test('a real receipt rejection persists its run hash and reason without provider
     const raw = await readFile(diagnostics, 'utf8'), value = JSON.parse(raw)
     assert.equal(value.status, 'failed')
     assert.equal(value.code, 'template_gate_subscription_or_cleanup_failed')
-    assert.deepEqual(value.candidates[0], { kind: 'claude', stage: 'receipt', code: 'template_gate_official_agent_acceptance_missing',
+    const { candidateProof, ...failed } = value.candidates[0]
+    assert.deepEqual(failed, { kind: 'claude', stage: 'receipt', code: 'template_gate_official_agent_acceptance_missing',
       runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16),
-      sampleStatus: 'execution_proved_awaiting_server_timing', sampleError: 'startup_failed', cleanupErrors: [] })
+      sampleStatus: 'execution_proved_awaiting_server_timing', sampleError: 'startup_failed', cleanupErrors: [],
+      failure: { phase: 'unknown', code: 'startup_failed' },
+      observation: { lastStatus: 'unavailable', agentStart: false, providerChunk: false,
+        agentStartStage: null, cliInit: null,
+        replyVerified: true, replyVerifiedAfterTool: true, successfulTool: true, runtimeTimingStatus: 'unavailable', expectedAgentAck: false,
+        runtimeEvidence: { status: 'unavailable', reason: 'official_agent_acceptance_missing' } } })
     assert.equal(value.candidates[1].code, 'passed')
-    for (const forbidden of [secret, RUN, DEVICE, 'session=fixture', 'fixture-one-use', 'providerText', 'cause']) assert.ok(!raw.includes(forbidden))
+    assert.equal(candidateProof.deviceId, DEVICE)
+    assert.equal(candidateProof.binary, '/usr/local/bin/claude')
+    for (const forbidden of [secret, 'session=fixture', 'fixture-one-use', 'providerText', 'cause']) assert.ok(!raw.includes(forbidden))
+    for (const id of [RUN, DEVICE]) assert.ok(!JSON.stringify(failed).includes(id))
     await assert.rejects(stat(output), { code: 'ENOENT' })
     assert.equal((await stat(diagnostics)).mode & 0o777, 0o600)
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('preflight failures preserve their phase and closed error details without producing an accepted file', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'template-gate-preflight-')), secret = 'private_response_and_model_text'
+  const failures = [
+    { phase: 'profile_create', code: 'startup_http_error', httpStatus: 403 },
+    { phase: 'profile_validation', code: 'startup_http_error', httpStatus: 400 },
+    { phase: 'coordinator_stream', code: 'startup_http_error', httpStatus: 599 },
+    { phase: 'profile_selection', code: 'startup_api_refused' },
+    { phase: 'coordinator_submit', code: 'startup_rpc_refused' },
+    { phase: 'issue_create', code: 'startup_action_refused' },
+    { phase: 'coordinator_stream', code: 'startup_coordinator_stream_invalid' },
+    { phase: 'coordinator_stream', code: 'startup_dispatch_refused' },
+    { phase: 'coordinator_stream', code: 'startup_aborted' },
+    { phase: 'coordinator_stream', code: 'startup_timeout' },
+    { phase: 'thread_lookup', code: 'startup_dispatch_run_missing' },
+  ]
+  try {
+    const input = join(root, 'candidate.json')
+    await writeFile(input, JSON.stringify(report))
+    for (const [index, failure] of failures.entries()) {
+      const fixture = candidateFixture(async options => options.harness === 'claude_code' ? accepted(options.harness) : {
+        mode: 'candidate', status: 'failed', cleanup: { errors: [] }, samples: [{
+          harness: options.harness, status: 'failed', error: failure.code,
+          failure: { ...failure, message: secret, body: secret, cause: { token: secret } },
+          providerText: secret, cleanup: { status: 'passed', errors: [] },
+        }],
+      })
+      const output = join(root, `accepted-${index}.json`), diagnostics = join(root, `diagnostics-${index}.json`)
+      await assert.rejects(validateSubscriptionFiles(input, output, diagnostics, fixture.options), /template_gate_subscription_or_cleanup_failed/)
+      const raw = await readFile(diagnostics, 'utf8'), value = JSON.parse(raw)
+      const failed = value.candidates.find(row => row.kind === 'codex')
+      assert.equal(value.status, 'failed')
+      assert.equal(value.code, 'template_gate_subscription_or_cleanup_failed')
+      assert.equal(failed.stage, 'receipt')
+      assert.equal(failed.code, 'template_gate_execution_failed')
+      assert.deepEqual(failed.failure, failure)
+      assert.equal(failed.sampleError, failure.code)
+      assert.equal(failed.runIdHash, null)
+      assert.equal(failed.candidateProof.harness, 'codex')
+      assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+      assert.equal(value.candidates.find(row => row.kind === 'claude').passedReceipt.status, 'passed')
+      for (const forbidden of [secret, 'providerText', 'cause', 'message', 'body']) assert.ok(!raw.includes(forbidden))
+      assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
+      await assert.rejects(stat(output), { code: 'ENOENT' })
+    }
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('a failure before a sample exists preserves the startup phase without inventing sample evidence', async () => {
+  const diagnostics = [], failure = { phase: 'build_pin', code: 'startup_build_mismatch' }
+  const fixture = candidateFixture(async options => options.harness === 'claude_code' ? accepted(options.harness) : {
+    mode: 'candidate', status: 'failed', error: failure.code, failure, samples: [], cleanup: { errors: [] },
+  })
+  await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }),
+    /template_gate_subscription_or_cleanup_failed/)
+  const failed = diagnostics.find(row => row.kind === 'codex')
+  assert.deepEqual(failed.failure, failure)
+  assert.equal(failed.sampleStatus, 'unavailable')
+  assert.equal(failed.sampleError, null)
+  assert.equal(failed.runIdHash, null)
+  assert.ok(!Object.hasOwn(failed, 'observation'))
+  assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+})
+
+test('startup failure projection drops unknown content and only admits numeric HTTP error statuses', async () => {
+  const secret = 'private_unknown_code_phase_or_http_body'
+  const cases = [
+    [{ phase: secret, code: `startup_${secret}`, httpStatus: 500 }, { phase: 'unknown', code: 'startup_failed' }],
+    [{ phase: secret, code: 'startup_api_refused', httpStatus: 500 }, { phase: 'unknown', code: 'startup_api_refused' }],
+    ...['403', secret, 399, 600, 500.5, null].map(httpStatus => [
+      { phase: 'profile_create', code: 'startup_http_error', httpStatus }, { phase: 'profile_create', code: 'startup_http_error' },
+    ]),
+    [undefined, { phase: 'unknown', code: 'startup_http_error', httpStatus: 503 }],
+  ]
+  for (const [failure, expected] of cases) {
+    const diagnostics = []
+    const fixture = candidateFixture(async options => options.harness === 'claude_code' ? accepted(options.harness) : {
+      mode: 'candidate', status: 'failed', cleanup: { errors: [] }, samples: [{
+        harness: options.harness, status: 'failed', error: failure?.code ?? 'startup_http_503',
+        failure: failure && { ...failure, message: secret, response: { body: secret }, cause: { token: secret } },
+        cleanup: { status: 'passed', errors: [] },
+      }],
+    })
+    await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }),
+      /template_gate_subscription_or_cleanup_failed/)
+    const failed = diagnostics.find(row => row.kind === 'codex')
+    assert.deepEqual(failed.failure, expected)
+    assert.equal(failed.sampleError, expected.code)
+    assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+    const raw = JSON.stringify(diagnostics)
+    for (const forbidden of [secret, 'response', 'message', 'cause', 'token']) assert.ok(!raw.includes(forbidden))
+  }
 })
 
 test('failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code', async () => {
@@ -232,8 +337,13 @@ test('failure diagnostics retain only fixed cleanup outcomes and unknown excepti
     return value
   }, secret)
   await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }), /template_gate_subscription_or_cleanup_failed/)
-  assert.deepEqual(diagnostics[0], { kind: 'claude', stage: 'acceptance', code: 'template_gate_failed',
-    runIdHash: null, sampleStatus: 'unavailable', sampleError: null, cleanupErrors: ['device_remove_failed', 'sandbox_kill_failed'], registeredDeviceId: DEVICE })
+  const { candidateProof, ...failed } = diagnostics[0]
+  assert.deepEqual(failed, { kind: 'claude', stage: 'acceptance', code: 'template_gate_failed',
+    runIdHash: null, sampleStatus: 'unavailable', sampleError: null, cleanupErrors: ['device_remove_failed', 'sandbox_kill_failed'],
+    cleanupFailures: [{ step: 'device_remove', code: 'startup_request_failed' }, { step: 'sandbox_kill', code: 'failed' }],
+    cleanupFailuresTruncated: false, registeredDeviceId: DEVICE })
+  assert.equal(candidateProof.harness, 'claude_code')
+  assert.equal(candidateProof.binarySha256, 'c'.repeat(64))
   assert.equal(diagnostics[1].code, 'template_gate_execution_failed')
   assert.equal(diagnostics[1].sampleError, 'startup_execution_timeout')
   assert.deepEqual(diagnostics[1].cleanupErrors, ['device_remove_failed', 'sandbox_kill_failed', 'acceptance_cleanup_failed', 'terminal_timeout'])
@@ -261,5 +371,225 @@ test('retained cleanup identities must belong to this case and contain at most f
     await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }))
     assert.ok(diagnostics.every(row => !Object.hasOwn(row, 'retainedFixture')))
     assert.ok(!JSON.stringify(diagnostics).includes('raw-private-token'))
+  }
+})
+
+test('a terminal-before-proof failure identifies only its owned case and the missing evidence', async () => {
+  const diagnostics = [], issueId = '10000000-0000-4000-8000-000000000003'
+  const fixture = candidateFixture(async options => {
+    const value = accepted(options.harness)
+    if (options.harness === 'codex') Object.assign(value.samples[0], {
+      issueId, placement: { kind: 'device', deviceId: DEVICE }, lastStatus: 'failed',
+      status: 'failed', error: 'startup_ended_before_execution_proof',
+      agentStart: { observedAt: '2026-11-07T04:26:00Z' }, firstProviderChunk: { type: 'text-delta' },
+      replyVerified: false, replyVerifiedAfterTool: false, toolCalls: [{ outcome: 'error' }],
+      runtimeTimingStatus: 'complete',
+    })
+    return value
+  })
+  await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }),
+    /template_gate_subscription_or_cleanup_failed/)
+  const failed = diagnostics.find(row => row.kind === 'codex')
+  assert.deepEqual(failed.fixture, { issueId, runId: RUN })
+  assert.deepEqual(failed.observation, {
+    lastStatus: 'failed', agentStart: true, providerChunk: true, replyVerified: false,
+    agentStartStage: null, cliInit: null,
+    replyVerifiedAfterTool: false, successfulTool: false, runtimeTimingStatus: 'complete', expectedAgentAck: true,
+    runtimeEvidence: { status: 'passed', reason: null },
+  })
+})
+
+test('cleanup failures retain bounded step families and HTTP status without arbitrary causes', async () => {
+  const diagnostics = [], secret = 'private_token_or_provider_reply'
+  const fixture = candidateFixture(async options => {
+    const value = accepted(options.harness)
+    value.samples[0].cleanup = { status: 'failed', errors: [
+      { step: 'factoryCancelled', code: 'startup_http_409', message: secret },
+      { step: `runStopped_${RUN}`, code: 'startup_cleanup_scope_mismatch' },
+      { step: secret, code: `startup_${secret}` },
+    ] }
+    value.cleanup.errors = [{ step: 'profile_archive', code: 'startup_http_500', cause: secret },
+      { step: 'workspace_restore', code: 'startup_workspace_restore_failed' }]
+    return value
+  }, secret)
+  const fetchImpl = fixture.options.fetchImpl
+  fixture.options.fetchImpl = (input, init) => new URL(input).pathname.endsWith('/api/rpc')
+    && JSON.parse(init.body).action === 'agents.removeDevice'
+    ? Response.json({ error: secret }, { status: 409 }) : fetchImpl(input, init)
+  await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }))
+  assert.deepEqual(diagnostics[1].cleanupFailures, [
+    { step: 'factory_cancel', code: 'http_error', httpStatus: 409 },
+    { step: 'run_stop', code: 'startup_cleanup_scope_mismatch' },
+    { step: 'unknown', code: 'failed' },
+    { step: 'profile_archive', code: 'http_error', httpStatus: 500 },
+    { step: 'workspace_restore', code: 'startup_workspace_restore_failed' },
+    { step: 'device_remove', code: 'http_error', httpStatus: 409 },
+    { step: 'sandbox_kill', code: 'failed' },
+  ])
+  assert.equal(diagnostics[1].cleanupFailuresTruncated, false)
+  assert.ok(!JSON.stringify(diagnostics).includes(secret))
+})
+
+test('a failed pair preserves the genuine passing receipt without creating publishable evidence', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'template-gate-partial-proof-')), secret = 'private_provider_reply'
+  try {
+    const fixture = candidateFixture(async options => {
+      const value = accepted(options.harness)
+      value.samples[0].providerText = secret
+      value.samples[0].credentials = { token: secret }
+      if (options.harness === 'codex') {
+        value.samples[0].status = 'failed'
+        value.samples[0].error = 'startup_ended_before_execution_proof'
+      }
+      return value
+    })
+    const input = join(root, 'candidate.json'), output = join(root, 'accepted.json'), diagnostics = join(root, 'diagnostics.json')
+    await writeFile(input, JSON.stringify(report))
+    await assert.rejects(validateSubscriptionFiles(input, output, diagnostics, fixture.options), /template_gate_subscription_or_cleanup_failed/)
+    const raw = await readFile(diagnostics, 'utf8'), value = JSON.parse(raw)
+    assert.equal(value.status, 'failed')
+    assert.equal(value.candidates.length, 2)
+    const passing = value.candidates.find(row => row.kind === 'claude').passedReceipt
+    assert.equal(passing.status, 'passed')
+    assert.equal(passing.sourceCommit, COMMIT)
+    assert.equal(passing.workerSha, WORKER)
+    assert.equal(passing.templateId, 'candidate-claude')
+    assert.equal(passing.officialBinarySha256, 'c'.repeat(64))
+    assert.equal(passing.officialCliVersion, '0.163.0')
+    assert.equal(passing.model, 'claude-haiku-5-5')
+    assert.equal(passing.agentAcceptance.kind, 'claude_user_ack')
+    assert.equal(passing.runtimeAuthorization.extraRemoteCalls, 0)
+    assert.equal(passing.runtimeAuthorization.allFirstPartyHttpComplete, false)
+    assert.equal(passing.replyVerifiedAfterTool, true)
+    assert.ok(!Object.hasOwn(value.candidates.find(row => row.kind === 'codex'), 'passedReceipt'))
+    assert.ok(!raw.includes(secret))
+    assert.ok(!raw.includes('credentials'))
+    await assert.rejects(stat(output), { code: 'ENOENT' })
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('failure projection bounds cleanup rows and refuses foreign or malformed fixture identities', async () => {
+  const secret = 'private_message_must_not_become_a_field', issueId = '10000000-0000-4000-8000-000000000003'
+  for (const mutate of [
+    sample => { sample.sourceCommit = 'f'.repeat(40) },
+    sample => { sample.placement.deviceId = RUN },
+    sample => { sample.harness = 'foreign' },
+    sample => { sample.issueId = secret },
+    sample => { sample.runId = secret },
+  ]) {
+    const diagnostics = []
+    const fixture = candidateFixture(async options => {
+      const value = accepted(options.harness), sample = value.samples[0]
+      Object.assign(sample, { issueId, placement: { kind: 'device', deviceId: DEVICE }, status: 'failed',
+        lastStatus: secret, runtimeTimingStatus: secret, error: `startup_${secret}`,
+        stages: [{ stage: 'agent_start', ok: secret, ms: secret }],
+        daemonStartupTiming: { version: 1, runIdHash: sample.runtimeTiming.runIdHash, harness: options.harness, truncated: false,
+          phases: [{ name: 'daemon.adapter.cli_init', outcome: secret, ms: secret }] },
+        cleanup: { status: 'failed', errors: Array.from({ length: 100 }, () => ({ step: secret, code: secret })) } })
+      value.passedReceipt = { token: secret }
+      mutate(sample)
+      return value
+    })
+    await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }))
+    for (const row of diagnostics) {
+      assert.ok(!Object.hasOwn(row, 'fixture'))
+      assert.ok(!Object.hasOwn(row, 'passedReceipt'))
+      assert.equal(row.cleanupFailures.length, 8)
+      assert.equal(row.cleanupFailuresTruncated, true)
+      assert.equal(row.observation.lastStatus, 'unavailable')
+      assert.equal(row.observation.runtimeTimingStatus, 'unavailable')
+      assert.equal(row.observation.agentStartStage, null)
+      assert.equal(row.observation.cliInit, null)
+    }
+    assert.ok(!JSON.stringify(diagnostics).includes(secret))
+  }
+})
+
+test('the observed Codex adapter-start failure retains false agent_start and error cli_init', async () => {
+  const diagnostics = []
+  const fixture = candidateFixture(async options => {
+    const value = accepted(options.harness)
+    if (options.harness !== 'codex') return value
+    const sample = value.samples[0], runIdHash = createHash('sha256').update(RUN).digest('hex').slice(0, 16)
+    const finish = sample.runtimeTiming
+    delete finish.agentAccepted
+    Object.assign(finish, { executionStartMs: null, executionEndMs: null, providerOutputChunks: 0,
+      toolCallsStarted: 0, toolCallsCompleted: 0, toolCallsFailed: 0 })
+    finish.officialCliTiming.events = []
+    Object.assign(finish.mcpHttpTiming, { observedChildren: 0, observedComplete: false, children: [], requests: [] })
+    delete sample.runtimeTiming
+    Object.assign(sample, { runIdHash, status: 'failed', error: 'startup_ended_before_execution_proof',
+      replyVerified: false, replyVerifiedAfterTool: false, toolCalls: [] })
+    const stage = data => ({ chunk: { type: 'data-run-stage', data } })
+    assert.equal(observeChunks(sample, { thread: { id: RUN, status: 'failed' }, chunks: [
+      stage({ stage: 'repository', ok: true, ms: 4609 }), stage({ stage: 'worktree', ok: true, ms: 69 }),
+      stage({ stage: 'agent_start', ok: false, ms: 459, startupTiming: {
+        version: 1, runIdHash, harness: 'codex', startedAt: 1794025606249, endedAt: 1794025606708,
+        ms: 459.145, outcome: 'error', truncated: false, phases: [
+          { name: 'daemon.adapter.model_report', startMs: 2.115, endMs: 2.392, ms: 0.277, outcome: 'ok' },
+          { name: 'daemon.adapter.cli_init', startMs: 14.859, endMs: 455.88, ms: 441.021, outcome: 'error' },
+        ],
+      } }),
+      { chunk: { type: 'finish', messageMetadata: { mikkaRuntimeTiming: finish } } },
+      { chunk: { type: 'data-run-state', data: { state: 'failed', stopReason: 'error',
+        error: 'subscription_hosted_runtime_unavailable (adapter_start_failed)' } } },
+    ] }, 1794025608000), false)
+    return value
+  })
+  await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }))
+  const failed = diagnostics.find(row => row.kind === 'codex')
+  assert.deepEqual(failed.observation.agentStartStage, { ok: false, ms: 459 })
+  assert.deepEqual(failed.observation.cliInit, { outcome: 'error', ms: 441.021 })
+  assert.equal(failed.observation.agentStart, false)
+  assert.equal(failed.observation.providerChunk, false)
+  assert.equal(failed.observation.expectedAgentAck, false)
+  assert.equal(failed.observation.runtimeTimingStatus, 'complete')
+  assert.deepEqual(failed.observation.runtimeEvidence, { status: 'unavailable', reason: 'runtime_receipt_incomplete' })
+  assert.equal(failed.sampleError, 'startup_ended_before_execution_proof')
+})
+
+test('failed execution retains only bound registration binary metadata without a passing receipt', async () => {
+  const diagnostics = [], secret = 'private_registration_field'
+  const fixture = candidateFixture(async options => {
+    const value = accepted(options.harness)
+    if (options.harness === 'codex') {
+      value.samples[0].status = 'failed'
+      value.samples[0].error = 'startup_ended_before_execution_proof'
+    }
+    return value
+  }, undefined, { proofOverride: { privateField: secret } })
+  await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }))
+  const failed = diagnostics.find(row => row.kind === 'codex')
+  assert.deepEqual(failed.candidateProof, { sourceCommit: COMMIT, workerSha: WORKER, templateId: 'candidate-codex',
+    harness: 'codex', deviceId: DEVICE, binary: '/usr/local/lib/node_modules/@openai/codex/bin/codex.js',
+    binarySha256: 'c'.repeat(64), version: '0.163.0' })
+  assert.equal(failed.code, 'template_gate_execution_failed')
+  assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+  assert.ok(!JSON.stringify(diagnostics).includes(secret))
+})
+
+test('registration diagnostics reject unbounded or non-original binary metadata without leaking it', async () => {
+  const secret = 'private_registration_value'
+  for (const proofOverride of [
+    { binary: `https://example.invalid/${secret}` },
+    { binary: `/usr/local/bin/../${secret}` },
+    { binary: '/opt/mikka/runtime/harness-bin/codex' },
+    { binary: `/usr/local/bin/codex\n${secret}` },
+    { binary: '/usr/local/bin/' + 'x'.repeat(1024) },
+    { version: secret },
+  ]) {
+    const diagnostics = []
+    const fixture = candidateFixture(async options => {
+      const value = accepted(options.harness)
+      if (options.harness === 'codex') {
+        value.samples[0].status = 'failed'
+        value.samples[0].error = 'startup_ended_before_execution_proof'
+      }
+      return value
+    }, undefined, { proofOverride })
+    await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }))
+    assert.ok(diagnostics.every(row => !Object.hasOwn(row, 'candidateProof')))
+    if (proofOverride.version) assert.ok(diagnostics.every(row => !Object.hasOwn(row, 'passedReceipt')))
+    assert.ok(!JSON.stringify(diagnostics).includes(secret))
   }
 })

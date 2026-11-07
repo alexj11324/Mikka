@@ -4,8 +4,10 @@
 // (GET /api/mobile/home `live.workspaceId`), `open` the workspace the app has open.
 import { UNRESOLVED_LIVE_ID, type LiveRef } from './live-client'
 import type { BotPage, ComputerStatus, ThreadDetail, Threads } from './types'
+import { apiCache } from './api-cache'
+import type { PresenceProof } from '../../../lib/live/presence'
 
-type Spec = { refs: LiveRef[]; minIntervalMs?: number; deadline?: { at: string; afterMs: number } | null }
+type Spec = { refs: LiveRef[]; minIntervalMs?: number; deadline?: { at: string; afterMs: number } | null; presence?: PresenceProof | null }
 const LIST_MERGE_MS = 2_000
 
 /** A list's key is its channel's own workspace id; with no channel known it reads once a minute and asks for no ticket. */
@@ -16,12 +18,17 @@ export const minuteRef = (kind: LiveRef['kind']): LiveRef => ({ kind, id: UNRESO
 
 /**
  * 线程: the threads (thread_list) and the machines (device_list). A machine coming online
- * writes (its heartbeat route pushes device_list); going offline writes nothing, so while one
- * shows online the web's shared presence fallback stays: one read a minute (presenceFallback).
+ * writes (its heartbeat route pushes device_list); the gateway acknowledges the
+ * actual device watch before its minute fallback stops. Old servers retain that
+ * fallback while any device is online. Keep the refs stable as metadata arrives.
  */
-export function threadsLive(data: Threads | null, home: string | null | undefined): Spec {
-  const presence = !data || data.devices.some(device => device.online)
-  return { minIntervalMs: LIST_MERGE_MS, refs: [listRef('thread_list', home), listRef('device_list', home), ...(presence ? [minuteRef('device_list')] : [])] }
+export function threadsLive(data: Threads | null, home: string | null | undefined, ownerId = apiCache.account()): Spec {
+  if (data?.live?.presence !== undefined) {
+    const presence = data.live.ownerId === ownerId && data.live.workspaceId === home ? data.live.presence : null
+    return { minIntervalMs: LIST_MERGE_MS, refs: [listRef('thread_list', home), listRef('device_list', home)], presence }
+  }
+  const presence = !data || data.devices.some(device => device.online) ? null : undefined
+  return { minIntervalMs: LIST_MERGE_MS, refs: [listRef('thread_list', home), listRef('device_list', home)], presence }
 }
 
 /**

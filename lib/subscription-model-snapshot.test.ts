@@ -17,10 +17,15 @@ function fixture() {
   const binding = { id:id(3),ownerId:'alice',consumerId:id(1),workspaceId:id(2),connectionId:id(4),connectionRevision:7,modelId:'fixture-model',route:'claude_cpa' as const }
   const connection = { id:id(4),ownerId:'alice',workspaceId:id(2),epoch:'7',state:'connected' }
   let calls = 0
+  const reads = { binding: 0, connection: 0, pair: 0 }
   const model = new MockLanguageModelV4({ doGenerate:async () => { calls++; throw new Error('synthetic model invoked') } })
-  const service = { repository:{ binding:async (_owner:string,key:string) => { assert.equal(key,id(3));return { ...binding } },connection:async () => ({ ...connection }) },model:async () => model } as unknown as SubscriptionService
+  const service = { repository:{
+    binding:async (_owner:string,key:string) => { reads.binding++; assert.equal(key,id(3));return { ...binding } },
+    connection:async () => { reads.connection++; return { ...connection } },
+    bindingConnection:async (_owner:string,key:string) => { reads.pair++; assert.equal(key,id(3));return { binding:{ ...binding },connection:{ ...connection } } },
+  },model:async () => model } as unknown as SubscriptionService
   const deps = { service:() => service,workspace:async () => {} }
-  return { binding,connection,deps,calls:() => calls }
+  return { binding,connection,deps,reads,calls:() => calls }
 }
 test('an unverified managed subscription transport fails before model construction without default fallback',async()=>{
   const f=fixture()
@@ -81,4 +86,38 @@ test('Coordinator freezes an owned connected binding with distinct replay identi
   assert.notEqual(typeof await resolveFrozenHostedModel(coordinatorScope,frozen,f.deps),'string')
   await assert.rejects(resolveFrozenHostedModel(scope,frozen,f.deps))
   await assert.rejects(resolveFrozenHostedModel({...coordinatorScope,workspaceId:id(99)},frozen,f.deps))
+})
+
+test('one fresh binding/connection projection is read at every existing frozen verification boundary', async () => {
+  const f=fixture()
+  const frozen=await freezeHostedModelSelection(scope,{harness:'ai_sdk',model:'default'},{type:'subscription',bindingId:id(3)},f.deps)
+  Object.assign(f.reads,{binding:0,connection:0,pair:0})
+  const model=await resolveFrozenHostedModel(scope,frozen,f.deps)
+  assert.deepEqual(f.reads,{binding:1,connection:0,pair:2},'before and after resolution each get a fresh pair; ordinary model resolution retains its binding guard')
+  await assert.rejects(async () => (model as MockLanguageModelV4).doGenerate({prompt:[]}),/synthetic model invoked/)
+  assert.equal(f.reads.pair,3,'the real call boundary is a third fresh read, never the resolution snapshot')
+  f.connection.epoch='8'
+  await assert.rejects(async () => (model as MockLanguageModelV4).doGenerate({prompt:[]}),{code:'binding_mismatch'})
+  assert.equal(f.reads.pair,4)
+  assert.equal(f.calls(),1,'a later revoked call never invokes the model')
+})
+
+test('a binding mismatch retains precedence over a missing joined connection', async () => {
+  const f=fixture()
+  const frozen=await freezeHostedModelSelection(scope,{harness:'ai_sdk',model:'default'},{type:'subscription',bindingId:id(3)},f.deps)
+  f.deps.service().repository.bindingConnection=async () => ({binding:{...f.binding,modelId:'changed'},connection:null})
+  await assert.rejects(resolveFrozenHostedModel(scope,frozen,f.deps),{code:'binding_mismatch'})
+  f.deps.service().repository.bindingConnection=async () => ({binding:{...f.binding},connection:null})
+  await assert.rejects(resolveFrozenHostedModel(scope,frozen,f.deps),{code:'account_unavailable'})
+  assert.equal(f.calls(),0)
+})
+
+test('revocation during asynchronous model resolution is caught by the fresh post-resolution projection', async () => {
+  const f=fixture()
+  const frozen=await freezeHostedModelSelection(scope,{harness:'ai_sdk',model:'default'},{type:'subscription',bindingId:id(3)},f.deps)
+  const service=f.deps.service(), construct=service.model.bind(service)
+  service.model=async (...args) => { const model=await construct(...args);f.connection.state='disconnected';return model }
+  await assert.rejects(resolveFrozenHostedModel(scope,frozen,f.deps),{code:'binding_mismatch'})
+  assert.equal(f.reads.pair,2)
+  assert.equal(f.calls(),0)
 })

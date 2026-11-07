@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
-import { alignServerTimings, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace } from './cloud-startup.mjs'
+import { alignServerTimings, cleanupCase, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
+  startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from './cloud-startup.mjs'
 import { readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
 
@@ -61,6 +62,8 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           chunk: { type: 'finish', messageMetadata: { mikkaRuntimeTiming: (() => { const value = runtimeTiming(sample)
             if (extraAuth) { value.requests[0].endpoint = 'permission_check'; value.counts[0].endpoint = 'permission_check' }; return value })() } } }] : [])] : [stage('repository', 1000)],
       live: { runs: [{ id: sample.runId, workspaceId: workspace }] } }
+    detail.thread.latestRunId = sample.runId
+    detail.thread.attempts = [{ runId: sample.runId, status: detail.thread.status }]
     io.onDetail?.(sample, detail)
     return detail
   }
@@ -217,6 +220,126 @@ test('sampler IDs satisfy the installed 10% sampler, while invalid live configur
   for (const args of [['--runs', '2'], ['--origin', 'http://remote.example'], ['--mode', 'acceptance'],
     ['--device-id', deviceId, '--agent-id', agentId], ['--max-startup-ms', '0']]) assert.throws(() => options(args), /startup_/)
   assert.throws(() => createSessionClient('https://user:password@example.com'), /startup_origin_invalid/)
+})
+
+test('startup failure projection is closed, preserves only bounded HTTP status, and unwraps native abort classes', () => {
+  assert.equal(Object.isFrozen(STARTUP_FAILURE_CODES), true)
+  assert.equal(Object.isFrozen(STARTUP_FAILURE_PHASES), true)
+  assert.deepEqual(startupFailure(new Error('startup_http_503'), 'coordinator_stream'), { phase: 'coordinator_stream', code: 'startup_http_error', httpStatus: 503 })
+  assert.deepEqual(startupFailure(new Error('startup_http_700'), 'PRIVATE_PHASE'), { phase: 'unknown', code: 'startup_failed' })
+  assert.deepEqual(startupFailure(new Error('startup_private_credential'), 'profile_selection'), { phase: 'profile_selection', code: 'startup_failed' })
+  for (const [name, code] of [['AbortError', 'startup_aborted'], ['TimeoutError', 'startup_timeout']]) {
+    const wrapped = new Error('startup_request_failed', { cause: new DOMException('PRIVATE_URL?token=PRIVATE_TOKEN', name) })
+    const failure = startupFailure(wrapped, 'coordinator_submit')
+    assert.deepEqual(failure, { phase: 'coordinator_submit', code })
+    assert.doesNotMatch(JSON.stringify(failure), /PRIVATE|token|cause|message/)
+  }
+  const cyclic = new Error('PRIVATE_ERROR'); cyclic.cause = cyclic
+  assert.deepEqual(startupFailure(cyclic, 'unknown'), { phase: 'unknown', code: 'startup_failed' })
+})
+
+const oneCodexCandidate = () => parseOptions(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
+  '--device-id', deviceId, '--agent-id', agentId, '--timeout-ms', '1000'], {})
+
+test('a native stream reader abort or timeout before run binding retains its actual phase and still cleans the owned issue', async () => {
+  for (const [name, code] of [['AbortError', 'startup_aborted'], ['TimeoutError', 'startup_timeout']]) {
+    const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+    io.fetchImpl = (url, init) => url.pathname.endsWith('/api/coordinator/stream')
+      ? new Response(new ReadableStream({ start(controller) { controller.error(new DOMException('PRIVATE_READER_URL?key=PRIVATE_KEY', name)) } }), {
+        headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': 'wrun_FAULT' },
+      }) : original(url, init)
+    const report = await runCloudStartup(oneCodexCandidate(), { env, ...io }), sample = report.samples[0]
+    assert.equal(report.status, 'failed')
+    assert.equal(sample.runId, undefined); assert.equal(sample.runIdHash, undefined)
+    assert.equal(sample.error, code)
+    assert.deepEqual(sample.failure, { phase: 'coordinator_stream', code })
+    assert.equal(sample.cleanup.status, 'passed')
+    assert.ok(io.samples[0].cancelled && io.samples[0].deleted)
+    assert.doesNotMatch(JSON.stringify(report), /PRIVATE_READER|PRIVATE_KEY|PRIVATE_COOKIE|PRIVATE_PASSWORD/)
+  }
+})
+
+test('a fetch timeout wrapped by the session client preserves the coordinator-submit phase without retrying dispatch', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+  let submitted = 0
+  io.fetchImpl = (url, init) => {
+    if (url.pathname.endsWith('/api/rpc') && JSON.parse(init.body).action === 'coordinator.sendCoordinatorMessage') {
+      submitted++; throw new DOMException('PRIVATE_AUTH_URL?token=PRIVATE_TOKEN', 'TimeoutError')
+    }
+    return original(url, init)
+  }
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
+  assert.deepEqual(report.samples[0].failure, { phase: 'coordinator_submit', code: 'startup_timeout' })
+  assert.equal(submitted, 1)
+  assert.equal(report.samples[0].cleanup.status, 'passed')
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_AUTH_URL|PRIVATE_TOKEN/)
+})
+
+test('fixed pre-execution entry phases distinguish HTTP, API, RPC and action refusal without copying response bodies', async () => {
+  const cases = [
+    { action: 'model-order.getModelOrder', phase: 'profile_selection', status: 503, code: 'startup_http_error' },
+    { path: '/api/factory/agent-profiles', phase: 'profile_create', status: 429, code: 'startup_http_error' },
+    { action: 'execution-settings.getBotModelMenu', phase: 'chat_model_selection', body: { error: 'PRIVATE_API_REFUSAL' }, code: 'startup_api_refused' },
+    { action: 'execution-settings.getBotModelMenu', phase: 'chat_model_selection', body: { version: 1, ok: false }, code: 'startup_rpc_refused' },
+    { action: 'execution-settings.getBotModelMenu', phase: 'chat_model_selection', body: { version: 1, ok: true, result: { error: 'PRIVATE_ACTION_REFUSAL' } }, code: 'startup_action_refused' },
+    { action: 'issues.saveIssue', phase: 'issue_create', status: 403, code: 'startup_http_error' },
+    { action: 'coordinator.sendCoordinatorMessage', phase: 'coordinator_submit', status: 409, code: 'startup_http_error' },
+    { action: 'agents.pollIssueThreads', phase: 'thread_lookup', status: 502, code: 'startup_http_error' },
+  ]
+  for (const item of cases) {
+    const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+    let injected = false
+    io.fetchImpl = (url, init) => {
+      const path = url.pathname.replace('/mikka', ''), action = path === '/api/rpc' ? JSON.parse(init.body).action : null
+      if (!injected && (item.action ? action === item.action : path === item.path)) {
+        injected = true
+        return item.status ? new Response('PRIVATE_HTML_BODY?key=PRIVATE_KEY', { status: item.status }) : Response.json(item.body)
+      }
+      return original(url, init)
+    }
+    const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
+    assert.equal(report.status, 'failed', item.phase)
+    const failure = report.samples[0]?.failure ?? report.failure
+    assert.deepEqual(failure, { phase: item.phase, code: item.code, ...(item.status ? { httpStatus: item.status } : {}) })
+    assert.doesNotMatch(JSON.stringify(report), /PRIVATE_HTML|PRIVATE_API_REFUSAL|PRIVATE_ACTION_REFUSAL|PRIVATE_KEY/)
+  }
+})
+
+test('stream refusal, missing workflow identity and completed stream without dispatch retain distinct closed codes', async () => {
+  const cases = [
+    { response: () => new Response('PRIVATE_BODY', { status: 503 }), failure: { code: 'startup_http_error', httpStatus: 503 } },
+    { response: () => new Response('PRIVATE_BODY', { headers: { 'content-type': 'text/plain' } }), failure: { code: 'startup_coordinator_stream_unavailable' } },
+    { response: () => new Response('', { headers: { 'content-type': 'application/x-ndjson' } }), failure: { code: 'startup_workflow_run_missing' } },
+    { response: () => new Response('', { headers: { 'content-type': 'application/x-ndjson', 'x-mikka-stream-run': 'wrun_NOEVENT' } }), failure: { code: 'startup_dispatch_not_observed' } },
+  ]
+  for (const item of cases) {
+    const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+    io.fetchImpl = (url, init) => url.pathname.endsWith('/api/coordinator/stream') ? item.response() : original(url, init)
+    const report = await runCloudStartup(oneCodexCandidate(), { env, ...io }), sample = report.samples[0]
+    assert.equal(sample.status, 'failed')
+    assert.deepEqual(sample.failure, { phase: 'coordinator_stream', ...item.failure })
+    assert.equal(sample.error, item.failure.code)
+    assert.equal(sample.cleanup.status, 'passed')
+    assert.doesNotMatch(JSON.stringify(report), /PRIVATE_BODY/)
+  }
+})
+
+test('profile validation and pre-sample build pin keep their own stage instead of fabricating a run failure', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+  io.fetchImpl = async (url, init) => {
+    const response = await original(url, init)
+    if (!url.pathname.endsWith('/api/factory/agent-profiles')) return response
+    const value = await response.json(); value.profile.digest = 'PRIVATE_INVALID_PROFILE'
+    return Response.json(value)
+  }
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
+  assert.deepEqual(report.samples[0].failure, { phase: 'profile_validation', code: 'startup_profile_source_mismatch' })
+  assert.equal(io.samples.length, 0)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_INVALID_PROFILE/)
+  const pinned = await runCloudStartup({ ...oneCodexCandidate(), expectedBuild: 'EXPECTED_DIFFERENT_BUILD' }, { env, ...fixture({ candidate: true }) })
+  assert.equal(pinned.samples.length, 0)
+  assert.deepEqual(pinned.failure, { phase: 'build_pin', code: 'startup_build_mismatch' })
+  assert.equal(pinned.error, 'startup_build_mismatch')
 })
 
 test('claim/running state and daemon stages do not prove provider execution; split marker only counts after agent_start', () => {
@@ -480,6 +603,38 @@ test('trusted candidate timing still refuses missing official CLI or MCP observa
   }
 })
 
+test('member production acceptance observes the cloud host without reading or writing workspace secrets', async () => {
+  for (const harness of ['claude_code', 'codex']) for (const timingSecret of [false, true]) {
+    const io = fixture({ runtime: true, timingSecret })
+    const report = await runCloudStartup(options(['--mode', 'acceptance', '--runs', '3', '--harness', harness,
+      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40)]), { env, ...io })
+    assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
+    assert.deepEqual(report.officialTiming, { enabled: true, source: 'trusted_host', scope: 'cloud_task', variableCreated: false, cleaned: true })
+    assert.equal(report.samples.length, 3)
+    assert.ok(report.samples.every(sample => sample.requireOfficialTiming && sample.requireRuntimeReceipt
+      && sample.runtimeEvidence?.status === 'passed' && sample.cleanup.status === 'passed'))
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
+test('trusted cloud timing refuses missing CLI/MCP observations and extra remote authorization', async () => {
+  for (const field of ['officialCliTiming', 'mcpHttpTiming', 'extraAuth']) {
+    const io = fixture({ runtime: true, extraAuth: field === 'extraAuth' })
+    io.onDetail = (_sample, detail) => {
+      for (const item of detail.chunks) if (item.chunk?.messageMetadata?.mikkaRuntimeTiming && field !== 'extraAuth')
+        delete item.chunk.messageMetadata.mikkaRuntimeTiming[field]
+    }
+    const report = await runCloudStartup(options(['--mode', 'acceptance', '--runs', '3', '--harness', 'codex',
+      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40)]), { env, ...io })
+    assert.equal(report.status, 'failed')
+    assert.equal(report.samples.length, 3)
+    assert.ok(report.samples.every(sample => sample.error === 'startup_runtime_evidence_failed' && sample.cleanup.status === 'passed'))
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+  }
+})
+
 test('trusted candidate timing cannot claim a host without a pinned device and agent', async () => {
   const io = fixture({ candidate: true, runtime: true })
   const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
@@ -580,6 +735,112 @@ test('candidate cleanup deadline retains its fixture when the daemon never confi
   assert.ok(io.sockets.every(socket => socket.closed))
   assert.equal(io.calls.filter(call => call.path === '/api/auth/sign-out').length, 1)
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_/)
+})
+
+function continuationCleanupFixture() {
+  const root = id(810), child = id(811), issueId = id(812), calls = [], sockets = []
+  const record = { runId: root, issueId, title: '测试 1505 queued continuation', status: 'failed', error: 'startup_ended_before_execution_proof' }
+  let childStatus = 'queued', stopped
+  const stopRequested = new Promise(resolve => { stopped = resolve })
+  const client = {
+    async json(path) {
+      if (path === `/api/factory/tasks?issueId=${issueId}`) return { issueId, tasks: [] }
+      assert.equal(path, `/api/live/ticket?workspace=${workspace}`)
+      return { url: 'wss://live.example/socket', protocol: 'PRIVATE_LIVE_TICKET', expiresAt: epoch + 300000 }
+    },
+    async rpc(action, args) {
+      calls.push({ action, args })
+      if (action === 'agents.getIssueThread') {
+        assert.deepEqual(args, [issueId, root])
+        return { thread: { id: root, status: 'failed', latestRunId: child,
+          attempts: [{ runId: root, status: 'failed' }, { runId: child, status: childStatus }],
+          continuation: { id: child, status: childStatus } },
+        live: { runs: [{ id: root, workspaceId: workspace }, { id: child, workspaceId: workspace }] } }
+      }
+      if (action === 'agents.stopRun') {
+        assert.deepEqual(args, [root]); stopped()
+        return { stoppedRunIds: [child] }
+      }
+      if (action === 'issues.getIssue') return { issue: { id: issueId, title: record.title, revision: 2 } }
+      assert.equal(action, 'issue-operations.setIssueDeleted')
+      assert.deepEqual(args, [{ id: issueId, revision: 2 }])
+      return { deleted: true }
+    },
+  }
+  const io = { client, record, calls, sockets, stopRequested, now: () => epoch,
+    push(kind, runId) { for (const socket of sockets) if (!socket.closed) socket.onmessage?.({ data: JSON.stringify({ kind, id: runId }) }) },
+    finishChild() { childStatus = 'cancelled'; io.push('run', child) },
+    WebSocketImpl: class {
+      constructor() {
+        this.readyState = 1; sockets.push(this)
+        queueMicrotask(() => { this.onopen?.(); this.onmessage?.({ data: JSON.stringify({ type: 'live_ready', kinds: ['run', 'thread'] }) }) })
+      }
+      send(message) { assert.equal(message, 'ping') }
+      close() { this.closed = true; this.readyState = 3 }
+    },
+  }
+  return { ...io, root, child }
+}
+
+test('candidate cleanup stops a queued continuation after its original run failed and waits for the child push', async () => {
+  const io = continuationCleanupFixture()
+  let settled = false
+  const pending = cleanupCase(io.client, io.record, 'device', { ...io, timeoutMs: 1000 }).then(() => { settled = true })
+  await Promise.race([io.stopRequested, pending])
+  await new Promise(setImmediate)
+  assert.equal(io.calls.filter(call => call.action === 'agents.stopRun').length, 1, 'the terminal parent still addresses its live child through the normal stop API')
+  assert.equal(settled, false, 'a queued child is not terminal merely because its parent failed')
+  assert.equal(io.calls.some(call => call.action === 'issue-operations.setIssueDeleted'), false)
+  const reads = io.calls.filter(call => call.action === 'agents.getIssueThread').length
+  io.push('run', id(999))
+  await new Promise(setImmediate)
+  assert.equal(io.calls.filter(call => call.action === 'agents.getIssueThread').length, reads, 'unrelated run pushes do not read this fixture')
+  io.finishChild()
+  await pending
+  assert.equal(io.calls.filter(call => call.action === 'agents.getIssueThread').length, reads + 1, 'the child push supplies the terminal acknowledgement')
+  assert.equal(io.record.cleanup.status, 'passed')
+  assert.equal(io.record.cleanup.taskDeleted, true)
+  assert.equal(io.record.error, 'startup_ended_before_execution_proof', 'cleanup never changes failed execution evidence')
+  assert.ok(io.sockets.every(socket => socket.closed))
+})
+
+test('candidate cleanup retains both original and queued continuation IDs when no child terminal arrives', async () => {
+  const io = continuationCleanupFixture()
+  await cleanupCase(io.client, io.record, 'device', { ...io, timeoutMs: 20 })
+  assert.equal(io.record.cleanup.status, 'failed')
+  assert.equal(io.record.cleanup.errors[0].code, 'startup_cleanup_terminal_timeout')
+  assert.deepEqual(io.record.cleanup.retainedFixture, { issueId: io.record.issueId, runIds: [io.root, io.child] })
+  assert.equal(io.calls.some(call => call.action === 'issue-operations.setIssueDeleted'), false)
+  assert.equal(io.calls.filter(call => call.action === 'agents.stopRun').length, 1)
+  assert.ok(io.sockets.every(socket => socket.closed))
+})
+
+test('cleanup retains its fixture when Factory cancellation loses its revision fence', async () => {
+  const runId = id(80), issueId = id(81), taskId = id(82)
+  const record = { runId, issueId, title: '测试 1505 failed Factory cancellation' }
+  let deleted = false
+  const client = {
+    async json(path, init) {
+      if (path === `/api/factory/tasks?issueId=${issueId}`) return { issueId, tasks: [{ id: taskId, issueId }] }
+      assert.equal(path, `/api/factory/tasks/${taskId}`)
+      if (!init) return { task: { id: taskId, issueId, status: 'running', revision: 5 }, attempts: [{ runId }] }
+      const body = JSON.parse(init.body)
+      assert.deepEqual(body.binding, { taskId, revision: 5 })
+      assert.equal(body.action, 'cancel')
+      throw new Error('startup_http_409')
+    },
+    async rpc(action, args) {
+      if (action === 'agents.getIssueThread') { assert.deepEqual(args, [issueId, runId]); return { thread: { id: runId, status: 'failed', latestRunId: runId, attempts: [{ runId, status: 'failed' }] } } }
+      if (action === 'issues.getIssue') return { issue: { id: issueId, title: record.title, revision: 2 } }
+      assert.equal(action, 'issue-operations.setIssueDeleted')
+      deleted = true
+    },
+  }
+  await cleanupCase(client, record, 'device')
+  assert.equal(deleted, false, 'a producer that could still create an attempt must keep its issue recoverable')
+  assert.equal(record.cleanup.status, 'failed')
+  assert.deepEqual(record.cleanup.errors, [{ step: 'factoryCancelled', code: 'startup_http_409' }])
+  assert.deepEqual(record.cleanup.retainedFixture, { issueId, runIds: [runId] })
 })
 
 test('wrong provenance or cleanup failure fails and still signs out; completed stop races are confirmed', async () => {

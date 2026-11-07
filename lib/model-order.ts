@@ -278,12 +278,13 @@ export async function poolDevices(query: Query, ownerId: string): Promise<(PoolD
   }))
 }
 
-/** The page: credentials' candidates, the list with each entry's status, and 运行位置. */
-export async function orderView(query: Query, scope: OrderScope): Promise<OrderView> {
+/** The page: credentials' candidates, the list with each entry's status, and 运行位置.
+ * A display caller may share its own device read; execution/dispatch never consumes this projection. */
+export async function orderView(query: Query, scope: OrderScope, readDevices: () => Promise<PoolDevice[]> = () => poolDevices(query, scope.ownerId)): Promise<OrderView> {
   const candidates = await orderCandidates(query, scope)
   const order = await readOrder(query, scope, candidates)
   const states = await credentialStates(query, scope, order.entries, candidates, Date.now(), { probe: false, display: true })
-  const devices = await poolDevices(query, scope.ownerId)
+  const devices = await readDevices()
   const added = new Set(order.entries.map(entryKey))
   const agents = agentsByOffer(candidates)
   const { usableApiKeys } = await import('./model-api-keys')
@@ -310,8 +311,11 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
     cloudModels,
     places: {
       cloud: order.location === 'cloud' ? ready ? 'ready' : 'noKey' : null,
-      devices: [...devices].sort((a, b) => Number(b.server) - Number(a.server)).map(device => ({ id: device.id, name: device.name, server: device.server,
-        stage: placeStage(device, runnable.filter(entry => credential(entry).usable), order.preferredHarness), lastSeenAt: device.lastSeenAt ?? null })),
+      devices: [...devices].sort((a, b) => Number(b.server) - Number(a.server)).map(device => {
+        const lastSeenAt = device.lastSeenAt instanceof Date ? device.lastSeenAt.getTime() : typeof device.lastSeenAt === 'number' ? device.lastSeenAt : Date.parse(device.lastSeenAt ?? '')
+        return { id: device.id, name: device.name, server: device.server,
+          stage: placeStage(device, runnable.filter(entry => credential(entry).usable), order.preferredHarness), lastSeenAt: Number.isFinite(lastSeenAt) ? lastSeenAt : null }
+      }),
     },
     first: plan.kind === 'cloud' ? { kind: 'cloud' } : firstDevice ? { kind: 'device', id: firstDevice.id, name: firstDevice.name, server: firstDevice.server } : null,
     readyDeviceIds: devices.filter(device => planDispatch({ entries: runnable, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),

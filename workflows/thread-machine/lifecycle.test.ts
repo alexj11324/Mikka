@@ -15,7 +15,8 @@ let next: (now: number) => number = now => now + FALLBACK
 const passes: number[] = []
 const maintainThreadMachine = mock.fn(async () => { passes.push(fake.now()); return ended ? false as const : next(fake.now()) })
 const pauseAtCap = mock.fn(async () => {})
-mock.module(new URL('./steps.ts', import.meta.url).href, { namedExports: { maintainThreadMachine, pauseAtCap, MAINTENANCE_FALLBACK_MS: FALLBACK } })
+const handOffThreadMachine = mock.fn(async (_actor: unknown, _runId: string, _next: number) => {})
+mock.module(new URL('./steps.ts', import.meta.url).href, { namedExports: { maintainThreadMachine, pauseAtCap, handOffThreadMachine, MAINTENANCE_FALLBACK_MS: FALLBACK } })
 
 import { wakeTokens } from '../../lib/workflow-wake-tokens'
 let maintainUntilCap: typeof import('./lifecycle')['maintainUntilCap']
@@ -29,6 +30,8 @@ beforeEach(() => {
   passes.length = 0
   maintainThreadMachine.mock.resetCalls()
   pauseAtCap.mock.resetCalls()
+  handOffThreadMachine.mock.resetCalls()
+  handOffThreadMachine.mock.mockImplementation(async () => {})
 })
 
 test('an idle live machine is maintained at its deadlines: 13 passes in an hour where the 30 s loop made 120', async () => {
@@ -97,7 +100,7 @@ test('wakes that land during a pass are kept: the next wait returns at once', as
   maintainThreadMachine.mock.mockImplementation(async () => { passes.push(fake.now()); return ended ? false as const : next(fake.now()) })
 })
 
-test('a second execution for the same run nudges the holder and runs on its timer; the 12-hour cap still pauses', async () => {
+test('a second execution for the same run nudges the holder; the 12-hour cap hands the final maintenance deadline to recovery', async () => {
   const holder = maintainUntilCap(actor, 'run-twice')
   await fake.settle()
   let ownsSecond = true
@@ -120,6 +123,54 @@ test('a second execution for the same run nudges the holder and runs on its time
   const capped = maintainUntilCap(actor, 'run-capped')
   await fake.advance(THREAD_MACHINE_LIFETIME_MS + FALLBACK)
   await capped
-  assert.equal(pauseAtCap.mock.callCount(), 1)
-  assert.equal(passes.length, THREAD_MACHINE_LIFETIME_MS / FALLBACK, '144 passes over 12 hours instead of 1,440')
+  assert.equal(pauseAtCap.mock.callCount(), 0)
+  assert.equal(handOffThreadMachine.mock.callCount(), 1)
+  assert.equal(passes.length, THREAD_MACHINE_LIFETIME_MS / FALLBACK + 1, '144 ordinary passes and one final reconciliation at the cap')
+})
+
+test('#957: a terminal transition during the last wait is reconciled before the cap exits', async () => {
+  const capAt = fake.now() + THREAD_MACHINE_LIFETIME_MS
+  next = () => capAt
+  const lifecycle = maintainUntilCap(actor, 'run-terminal-at-cap')
+  await fake.settle()
+  ended = true
+  await fake.advance(THREAD_MACHINE_LIFETIME_MS)
+  await lifecycle
+  assert.deepEqual(passes, [capAt - THREAD_MACHINE_LIFETIME_MS, capAt])
+  assert.equal(handOffThreadMachine.mock.callCount(), 0, 'the final maintenance pass completed the run')
+  assert.equal(pauseAtCap.mock.callCount(), 0)
+})
+
+test('#957: an active machine at the cap is handed to durable recovery with its next deadline', async () => {
+  const capAt = fake.now() + THREAD_MACHINE_LIFETIME_MS
+  next = now => now === capAt ? capAt + FALLBACK : capAt
+  const lifecycle = maintainUntilCap(actor, 'run-active-at-cap')
+  await fake.advance(THREAD_MACHINE_LIFETIME_MS)
+  await lifecycle
+  assert.equal(passes.at(-1), capAt)
+  assert.deepEqual(handOffThreadMachine.mock.calls[0]?.arguments, [actor, 'run-active-at-cap', capAt + FALLBACK])
+  assert.equal(pauseAtCap.mock.callCount(), 0, 'a monitor lifetime never authorizes pausing a live CLI')
+})
+
+test('#957: a refused handoff fails the step instead of silently completing the lifecycle', async () => {
+  const capAt = fake.now() + THREAD_MACHINE_LIFETIME_MS
+  next = () => capAt + FALLBACK
+  handOffThreadMachine.mock.mockImplementation(async () => { throw new Error('owner unavailable') })
+  const failure = assert.rejects(maintainUntilCap(actor, 'run-handoff-refused'), /owner unavailable/)
+  await fake.advance(THREAD_MACHINE_LIFETIME_MS)
+  await failure
+  assert.equal(handOffThreadMachine.mock.callCount(), 1)
+})
+
+test('ownership lost during the final wait cannot reconcile or hand off a replacement owner', async () => {
+  let owns = true
+  next = () => fake.now() + THREAD_MACHINE_LIFETIME_MS
+  const lifecycle = maintainUntilCap(actor, 'run-stale-at-cap', async () => owns)
+  await fake.settle()
+  owns = false
+  await fake.advance(THREAD_MACHINE_LIFETIME_MS)
+  await lifecycle
+  assert.equal(passes.length, 1)
+  assert.equal(handOffThreadMachine.mock.callCount(), 0)
+  assert.equal(pauseAtCap.mock.callCount(), 0)
 })
