@@ -530,7 +530,6 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.ok(Number((await pool.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1 and action=\'scim.user_suspended\'', [organizationId])).rows[0].count) >= 1)
   })
   await t.test('revoking a provisioning connection closes unenforced workspace access and rejects old bearer replay', async () => {
-    const connection = { id: connectionId, organizationId, providerId }
     const listed = await requestScim('Users')
     const active = (await listed.json()).Resources.find((resource: { active: boolean }) => resource.active)
     assert.ok(active)
@@ -546,7 +545,11 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     await assert.rejects(scimStore.revokeConnection(organizationId, connectionId), /Fixture delivery unavailable/)
     assert.equal(await enterpriseWorkspaceAllowed(managedId, workspaceId), false)
     assert.equal((await requestScim('Users')).status, 401)
-    await scimStore.drain(connection)
+    const adminSessionId = randomUUID()
+    await pool.query('insert into session(id,token,"userId","expiresAt","createdAt","updatedAt") values($1,$2,$3,now()+interval \'1 hour\',now(),now())', [adminSessionId, randomUUID(), adminId])
+    const { manageIdentity } = await import('./management')
+    assert.deepEqual(await manageIdentity(organizationId, { user: { id: adminId }, session: { id: adminSessionId } },
+      { action: 'revoke-scim', connectionId }, appOrigin), { revoked: true }, 'administrative retry must drain the outbox after releasing its Organization authorization lease')
     assert.equal((await pool.query('select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [workspaceId, managedId])).rows[0].status, 'suspended')
     assert.equal((await pool.query('select count(*) from enterprise_scim_outbox where "connectionId"=$1 and "deliveredAt" is null', [connectionId])).rows[0].count, '0')
     const denied = await oidcLogin(); assert.equal(await session(denied.jar), null)

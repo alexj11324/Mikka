@@ -12,17 +12,18 @@ export async function enqueueIdentityAudit(tx: Pick<PoolClient, 'query'>, input:
 }
 
 /** Authentication configuration and its audit intent commit together in the auth database. */
-export async function commitIdentityChange<T>(input: OrganizationAuditInput, work: (tx: PoolClient) => Promise<T>) {
+export async function commitIdentityChange<T>(input: OrganizationAuditInput, work: (tx: PoolClient) => Promise<T>, options: { deferDelivery?: boolean } = {}) {
   const tx = await pool.connect()
   let value: T
   try {
     await tx.query('begin')
+    await tx.query("set local lock_timeout='5s'; set local statement_timeout='10s'")
     value = await work(tx)
     await enqueueIdentityAudit(tx, input)
     await tx.query('commit')
   } catch (error) { await tx.query('rollback'); throw error } finally { tx.release() }
   armDueTimerSoon('audit-retention')
-  await deliverIdentityAudits(input.organizationId)
+  if (!options.deferDelivery) await deliverIdentityAudits(input.organizationId)
   return value
 }
 

@@ -237,11 +237,12 @@ export class ScimStore {
   }
 
   /** Administrative revocation fences sign-in and provisioning before asynchronous workspace cleanup. */
-  async revokeConnection(organizationId: string, connectionId: string, beforeCommit?: (tx: PoolClient, connection: ScimConnection) => Promise<void>) {
+  async revokeConnection(organizationId: string, connectionId: string, beforeCommit?: (tx: PoolClient, connection: ScimConnection) => Promise<void>, options: { deferDelivery?: boolean } = {}) {
     const tx = await this.pool.connect()
     let connection: ScimConnection
     try {
       await tx.query('begin')
+      await tx.query("set local lock_timeout='5s'; set local statement_timeout='10s'")
       const { rows: [found] } = await tx.query<ScimConnection>('select id,"organizationId","providerId" from enterprise_scim_connection where id=$1 and "organizationId"=$2 for update', [connectionId, organizationId])
       if (!found) throw new ScimError(404, '', 'Provisioning connection not found')
       connection = found
@@ -256,7 +257,7 @@ export class ScimStore {
       await tx.query('commit')
       armDueTimerSoon('audit-retention')
     } catch (error) { await tx.query('rollback'); throw error } finally { tx.release() }
-    await this.drain(connection)
+    if (!options.deferDelivery) await this.drain(connection)
     return connection
   }
 }

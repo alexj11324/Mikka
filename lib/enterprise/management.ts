@@ -2,7 +2,8 @@ import 'server-only'
 import { X509Certificate, randomBytes, randomUUID } from 'node:crypto'
 import { resolveTxt } from 'node:dns/promises'
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
+import type { PoolClient } from 'pg'
 import { discoverOIDCConfig, deriveSAMLIdentityProviderEntityID, type SAMLConfig } from '@better-auth/sso'
 import { isPublicRoutableHost } from '@better-auth/core/utils/host'
 import { pool } from '@/lib/db'
@@ -12,6 +13,8 @@ import { requireOrganizationAdmin } from '@/lib/governance/organizations'
 import { resolveEntitlements } from '@/lib/governance/policy'
 import { deploymentMode } from '@/lib/governance/edition'
 import { GovernanceError } from '@/lib/governance/errors'
+import type { WorkspaceTransaction } from '@/lib/workspace-access'
+import type { OrganizationAuditInput } from '@/lib/governance/audit-events'
 import { withBasePath } from '@/lib/base-path'
 import { decryptSsoConfig, encryptSsoConfig } from './sso-plugin'
 import { requireEnterpriseOrganization } from './access'
@@ -52,15 +55,16 @@ const actionInput = z.discriminatedUnion('action', [
   z.object({ action: z.literal('retry-revocations') }).strict(),
 ])
 
+async function administratorInTransaction(tx: WorkspaceTransaction, organizationId: string, userId: string, licensed: boolean) {
+  const result = await requireOrganizationAdmin(tx, organizationId, userId)
+  if (licensed) {
+    const [grant] = await tx.select().from(organizationEntitlements).where(eq(organizationEntitlements.organizationId, organizationId))
+    if (resolveEntitlements({ mode: deploymentMode(), kind: 'team', grant }).plan !== 'enterprise') throw new GovernanceError('feature_unavailable')
+  }
+  return result
+}
 async function administrator(organizationId: string, userId: string, licensed: boolean) {
-  return workspaceDb.transaction(async tx => {
-    const result = await requireOrganizationAdmin(tx, organizationId, userId)
-    if (licensed) {
-      const [grant] = await tx.select().from(organizationEntitlements).where(eq(organizationEntitlements.organizationId, organizationId))
-      if (resolveEntitlements({ mode: deploymentMode(), kind: 'team', grant }).plan !== 'enterprise') throw new GovernanceError('feature_unavailable')
-    }
-    return result
-  })
+  return workspaceDb.transaction(tx => administratorInTransaction(tx, organizationId, userId, licensed))
 }
 
 export async function identitySummary(organizationId: string, userId: string) {
@@ -82,6 +86,21 @@ export async function manageIdentity(organizationId: string, session: { user: { 
     || action === 'policy' && (() => { const value = actionInput.parse(input); return value.action === 'policy' && !value.enforceSso && !value.allowMachineCredentials })()
   const admin = await administrator(organizationId, actorId, !recovery)
   if (action !== 'break-glass') await requireEnterpriseOrganization(actorId, organizationId, session.session.id)
+  // Network discovery/proof happens before this short lease. Final authorization
+  // remains locked through the Auth DB commit; delivery starts after its release.
+  const mutate = async <T>(work: () => Promise<T>) => {
+    const result = await workspaceDb.transaction(async tx => {
+      await tx.execute(sql`set local lock_timeout='5s'; set local statement_timeout='10s'`)
+      const current = await administratorInTransaction(tx, organizationId, actorId, !recovery)
+      if (action === 'break-glass' && current.membership.role !== 'owner') throw new GovernanceError('access_denied')
+      if (action !== 'break-glass') await requireEnterpriseOrganization(actorId, organizationId, session.session.id)
+      return work()
+    })
+    await deliverIdentityAudits(organizationId)
+    return result
+  }
+  const commit = <T>(audit: OrganizationAuditInput, work: (tx: PoolClient) => Promise<T>) =>
+    mutate(() => commitIdentityChange(audit, work, { deferDelivery: true }))
   if (action === 'configure-provider') {
     const value = configureInput.parse(input)
     const { rows: bound } = await pool.query('select "organizationScopeId",issuer,"samlConfig","oidcConfig" from enterprise_sso_provider where "providerId"=$1', [value.providerId])
@@ -123,7 +142,7 @@ export async function manageIdentity(organizationId: string, session: { user: { 
     }
     const token = randomBytes(32).toString('base64url')
     // Replacing authentication configuration invalidates old assurance and requires new DNS proof.
-    await commitIdentityChange({ organizationId, actorId, action: 'sso.configured', targetId: value.providerId, metadata: { providerId: value.providerId } }, async tx => {
+    await commit({ organizationId, actorId, action: 'sso.configured', targetId: value.providerId, metadata: { providerId: value.providerId } }, async tx => {
       await tx.query(`insert into enterprise_sso_provider (id,"providerId","organizationScopeId","userId",issuer,domain,"oidcConfig","samlConfig","domainTokenHash")
         values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict ("providerId") do update set issuer=excluded.issuer,domain=excluded.domain,
         "oidcConfig"=excluded."oidcConfig","samlConfig"=excluded."samlConfig","domainTokenHash"=excluded."domainTokenHash",
@@ -141,7 +160,7 @@ export async function manageIdentity(organizationId: string, session: { user: { 
     if (!rows[0] || identityTokenHash(value.token) !== rows[0].domainTokenHash) throw new GovernanceError('invalid_request')
     const records = await resolveTxt(`_mikka-sso.${rows[0].domain}`)
     if (!records.some(parts => parts.join('') === `mikka-sso=${value.token}`)) throw new GovernanceError('invalid_request')
-    await commitIdentityChange({ organizationId, actorId, action: 'sso.domain_verified', targetId: value.providerId, metadata: { providerId: value.providerId } }, async tx => {
+    await commit({ organizationId, actorId, action: 'sso.domain_verified', targetId: value.providerId, metadata: { providerId: value.providerId } }, async tx => {
       const verified = await tx.query(`update enterprise_sso_provider set "domainVerified"=true,"updatedAt"=now()
         where "providerId"=$1 and "organizationScopeId"=$2 and "domainTokenHash"=$3
         and not exists(select 1 from enterprise_org_policy where "organizationId"=$2 and "archivedAt" is not null)`, [value.providerId, organizationId, identityTokenHash(value.token)])
@@ -153,19 +172,20 @@ export async function manageIdentity(organizationId: string, session: { user: { 
     const { rows } = await pool.query('select id from enterprise_sso_provider where "providerId"=$1 and "organizationScopeId"=$2 and "domainVerified"', [value.providerId, organizationId])
     if (!rows.length) throw new GovernanceError('invalid_request')
     const token = `msc_${randomBytes(32).toString('base64url')}`
-    const { rows: connections } = await commitIdentityChange({ organizationId, actorId, action: 'sso.configured', targetId: value.providerId,
+    const { rows: connections } = await commit({ organizationId, actorId, action: 'sso.configured', targetId: value.providerId,
       metadata: { providerId: value.providerId, reason: 'scim_credential_rotated' } }, tx => tx.query<{ id: string }>(`insert into enterprise_scim_connection (id,"organizationId","providerId","tokenHash") values ($1,$2,$3,$4)
       on conflict ("organizationId","providerId") do update set "tokenHash"=excluded."tokenHash","revokedAt"=null returning id`, [randomUUID(), organizationId, value.providerId, identityTokenHash(token)]))
     return { id: connections[0].id, token, baseURL: `${origin}${withBasePath(`/api/scim/v2/${connections[0].id}`)}` }
   }
   if (value.action === 'revoke-scim') {
-    await new ScimStore(pool, synchronizeDirectoryUser, auditDirectoryGroup).revokeConnection(organizationId, value.connectionId, tx => enqueueIdentityAudit(tx,
-      { organizationId, actorId, action: 'sso.configured', targetId: value.connectionId, metadata: { reason: 'scim_credential_revoked' } }))
-    await deliverIdentityAudits(organizationId)
+    const store = new ScimStore(pool, synchronizeDirectoryUser, auditDirectoryGroup)
+    const connection = await mutate(() => store.revokeConnection(organizationId, value.connectionId, tx => enqueueIdentityAudit(tx,
+      { organizationId, actorId, action: 'sso.configured', targetId: value.connectionId, metadata: { reason: 'scim_credential_revoked' } }), { deferDelivery: true }))
+    await store.drain(connection)
     return { revoked: true }
   }
   if (value.action === 'disable-provider') {
-    await commitIdentityChange({ organizationId, actorId, action: 'sso.policy_changed', targetId: value.providerId, metadata: { reason: 'provider_disabled', enabled: false } }, async tx => {
+    await commit({ organizationId, actorId, action: 'sso.policy_changed', targetId: value.providerId, metadata: { reason: 'provider_disabled', enabled: false } }, async tx => {
       const disabled = await tx.query('update enterprise_sso_provider set "domainVerified"=false,"updatedAt"=now() where "providerId"=$1 and "organizationScopeId"=$2', [value.providerId, organizationId])
       if (!disabled.rowCount) throw new GovernanceError('not_found')
       await tx.query('update session set "enterpriseOrganizationId"=null,"enterpriseProviderId"=null,"enterpriseDirectoryUserId"=null,"enterpriseIdentityId"=null where "enterpriseProviderId"=$1', [value.providerId])
@@ -185,7 +205,7 @@ export async function manageIdentity(organizationId: string, session: { user: { 
         and not exists(select 1 from enterprise_scim_user u where u."organizationId"=$3::uuid and u."userId"=$2 and (not u.active or u.deleted))`, [session.session.id, actorId, organizationId])
       if (!rows.length) throw new GovernanceError('access_denied')
     }
-    await commitIdentityChange({ organizationId, actorId, action: 'sso.policy_changed', targetId: organizationId, metadata: { enabled: value.enforceSso } }, tx =>
+    await commit({ organizationId, actorId, action: 'sso.policy_changed', targetId: organizationId, metadata: { enabled: value.enforceSso } }, tx =>
       tx.query(`insert into enterprise_org_policy ("organizationId","enforceSso","allowMachineCredentials") values ($1,$2,$3)
         on conflict ("organizationId") do update set "enforceSso"=excluded."enforceSso","allowMachineCredentials"=excluded."allowMachineCredentials","updatedAt"=now()`, [organizationId, value.enforceSso, value.allowMachineCredentials]))
     return { enforceSso: value.enforceSso, allowMachineCredentials: value.allowMachineCredentials }
@@ -195,7 +215,7 @@ export async function manageIdentity(organizationId: string, session: { user: { 
     const { rows } = await pool.query('select id from session where id=$1 and "userId"=$2 and "createdAt">now()-interval \'5 minutes\' and "expiresAt">now()', [session.session.id, actorId])
     if (!rows.length) throw new GovernanceError('access_denied')
     const expiresAt = new Date(Date.now() + 15 * 60_000)
-    await commitIdentityChange({ organizationId, actorId, action: 'sso.policy_changed', targetId: organizationId, metadata: { reason: 'owner_break_glass', enabled: true } }, tx =>
+    await commit({ organizationId, actorId, action: 'sso.policy_changed', targetId: organizationId, metadata: { reason: 'owner_break_glass', enabled: true } }, tx =>
       tx.query(`insert into enterprise_break_glass ("organizationId","userId","sessionId","expiresAt",reason) values ($1,$2,$3,$4,$5)
         on conflict ("organizationId","sessionId") do update set "expiresAt"=excluded."expiresAt",reason=excluded.reason`, [organizationId, actorId, session.session.id, expiresAt, value.reason]))
     return { expiresAt: expiresAt.toISOString() }

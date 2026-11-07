@@ -157,7 +157,7 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
       await until(async () => mutationDone || (await pool.query('select exists(select 1 from pg_stat_activity where $1=any(pg_blocking_pids(pid))) as blocked', [blockerPid])).rows[0].blocked)
       assert.equal(mutationDone, false, 'the mutation has passed authorization and is waiting on the real Auth DB row')
       // This is the same Organization-first row lock taken by role changes. Its
-      // dedicated backend PID makes the competing transaction observable without sleeps.
+      // dedicated backend PID makes the competing transaction observable without timing assumptions.
       revocation = (async () => {
         await revoker.query('begin')
         await revoker.query('select id from mikka_organizations where id=$1 for update', [organizationId])
