@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { decode, encode, DESKTOP_RPC_VERSION, DESKTOP_RPC_PREVIOUS_VERSION, UPDATE_REQUIRED } from './wire'
+import { desktopSameOriginRequest } from '../desktop-auth'
 
 export type DesktopAction = { args: z.ZodType; invoke: (args: never[]) => Promise<unknown> }
 export type DesktopActions = Readonly<Record<string, DesktopAction>>
@@ -90,6 +91,7 @@ export function createDesktopRpc<Session>(options: RpcDispatchOptions<Session> &
   authenticate: (headers: Headers) => Promise<Session | null>
 }) {
   return async (request: Request): Promise<Response> => {
+    if (!desktopSameOriginRequest(request)) return failure(403, 'desktop_rpc_request_invalid')
     const headers = desktopBearerHeaders(request)
     if (!headers) return failure(401, 'desktop_session_expired')
     let session: Session | null

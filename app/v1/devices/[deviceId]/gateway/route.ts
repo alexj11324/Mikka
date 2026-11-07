@@ -2,6 +2,7 @@ import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { authenticateDevice, ownsDevice } from '@/lib/device-link'
 import { deviceGatewayTicket } from '@/lib/device-gateway-ticket'
+import { gatewayConfig, gatewayURL } from '@/lib/builtin-gateway/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,19 +19,17 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
   if (!await ownsDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
-  const base = process.env.DEVICE_GATEWAY_URL
-  const secret = process.env.DEVICE_GATEWAY_PUSH_SECRET
+  const config = gatewayConfig()
   // runControl: every write that ends, pauses or revokes a run wakes its device
   // (notifyRunControl), so a connected daemon drops its periodic check (#1212).
   // computerReviews: a web decision on a computer review wakes its device
   // (decideComputerReview), so the daemon stops syncing reviews every second.
   // coordinatorResults: a native Coordinator tool result wakes its device (finishTool).
-  if (!base || !secret) return NextResponse.json({ url: null, protocol: null, ...PUSHED })
-  let url: URL
-  try { url = new URL(`/v1/devices/${encodeURIComponent(deviceId)}/socket`, base) } catch { return NextResponse.json({ url: null, protocol: null, ...PUSHED }) }
+  if (!config) return NextResponse.json({ url: null, protocol: null, ...PUSHED })
+  const url = gatewayURL(config, `/v1/devices/${encodeURIComponent(deviceId)}/socket`)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   url.search = ''
-  const { protocol } = deviceGatewayTicket(deviceId, secret)
+  const { protocol } = deviceGatewayTicket(deviceId, config.secret)
   return NextResponse.json({ url: url.toString(), protocol, ...PUSHED }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 

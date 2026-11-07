@@ -114,7 +114,9 @@ export function forgetCoordinatorBots() {
  * Moves the person's Coordinator data still stored the old way (no bot: botId
  * NULL, or the key 'coordinator') onto their Coordinator row: chat messages,
  * session (memory, summary), inbox events, runs, model choice, chat settings,
- * schedules, factory tasks, suggestions, cards and the agent definition's head. One transaction
+ * schedules, factory tasks, suggestions, cards and the agent definition's head.
+ * A frozen execution identity (including an invalid snapshot) and its Factory
+ * family retain their original null-Bot scope, even after the run has ended. One transaction
  * per person under an advisory lock, so it is safe to run twice and while
  * the chat is in use: rows already moved are not touched again, and a late
  * row written the old way (an older instance during a rolling deploy) is
@@ -127,12 +129,16 @@ export async function backfillCoordinatorChat(pool: Pick<Pool, 'connect'>, owner
     await client.query("SET LOCAL lock_timeout = '5s'")
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`coordinator-backfill:${ownerId}`])
     // The same locks a turn takes to number its messages (lib/coordinator/store.ts nextPosition).
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-chat:${ownerId}:coordinator`])
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`bot-chat:${ownerId}:${bot.botId}`])
+    for (const key of [`bot-chat:${ownerId}:coordinator`, `bot-chat:${ownerId}:${bot.botId}`]) {
+      const { rows: [lock] } = await client.query<{ acquired: boolean }>('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired', [key])
+      if (!lock.acquired) throw Object.assign(new Error('coordinatorBackfillBusy'), { code: '55P03' })
+    }
     const owned = await client.query('SELECT 1 FROM coordinator_bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botId"=$3', [ownerId, bot.workspaceId, bot.botId])
     if (!owned.rowCount) throw new Error('coordinatorBotMissing')
+    const movedRuns = await moveExecutionRows(client, ownerId, bot.botId)
     await moveChat(client, ownerId, bot.botId)
     await moveKeyedRows(client, ownerId, bot)
+    if (movedRuns) await ownerListChanged(client, ownerId, ['thread_list', 'task_run_list'])
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')
@@ -141,7 +147,9 @@ export async function backfillCoordinatorChat(pool: Pick<Pool, 'connect'>, owner
 }
 
 async function moveChat(client: PoolClient, ownerId: string, botId: string) {
-  await client.query('SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND ("botId" IS NULL OR "botId"=$2) FOR UPDATE', [ownerId, botId])
+  // appendMessages locks its session before taking the chat advisory lock.
+  // If it already owns that row, release our chat lock by deferring this pass.
+  await client.query('SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND ("botId" IS NULL OR "botId"=$2) FOR UPDATE NOWAIT', [ownerId, botId])
   const target = (await client.query<{ last: number }>('SELECT coalesce(max(position),0)::int AS last FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2', [ownerId, botId])).rows[0].last
   // Positions stay as they were when the row holds no messages yet, so the session's summaryThrough still points at the same message.
   const messages = await client.query(`UPDATE coordinator_messages m SET "botId"=$2, position=$3 + n.rank
@@ -164,13 +172,85 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
       await client.query('DELETE FROM coordinator_sessions WHERE "userId"=$1 AND "botId" IS NULL', [ownerId])
     }
   }
-  await client.query('UPDATE coordinator_events SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
-  // The Coordinator's threads: every run of the person's with no bot (an MCP client's too), except a group chat's own.
-  const runs = await client.query(`UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL
-      AND r.kind <> 'group_chat'
-      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId])
   if (messages.rowCount || old) await botChatChanged(client, ownerId, botId)
-  if (runs.rowCount) await ownerListChanged(client, ownerId, ['thread_list', 'task_run_list'])
+}
+
+/**
+ * A run's frozen identity is execution authority, not a display/chat key. Keep
+ * its tasks, sibling attempts and source/terminal events in that same domain.
+ * A source may start several tasks, so retention follows those shared links.
+ * Runs owned by a different computer/group or barred by issue retirement must
+ * seed that retention too; merely excluding their UPDATE would split the family.
+ *
+ * Publication/completion lock issue -> run, and the run's scope trigger takes
+ * an issue SHARE lock even when only botId changes. Take that lock first.
+ * Factory writes lock task -> issue -> source (sourceAllowed); repository
+ * admission locks its request event. Every subsequent lock is NOWAIT too.
+ * Never wait in the opposite direction: NOWAIT rolls this whole best-effort
+ * migration back before it can obstruct an in-flight admission. Only the ids
+ * locked here are moved. A row committed between these lock statements is a
+ * retained seed, including its family, until the next pass. The final statement
+ * reads the newly committed family and updates all three tables in one snapshot.
+ */
+async function moveExecutionRows(client: PoolClient, ownerId: string, botId: string): Promise<number> {
+  const issues = (await client.query<{ id: string }>(`SELECT i.id FROM issues i WHERE EXISTS (
+    SELECT 1 FROM agent_runs r WHERE r."userId"=$1 AND r."botId" IS NULL AND r."issueId"=i.id
+  ) ORDER BY i.id FOR SHARE OF i NOWAIT`, [ownerId])).rows.map(row => row.id)
+  const tasks = (await client.query<{ id: string }>('SELECT id FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
+  const events = (await client.query<{ id: string }>('SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
+  const runs = (await client.query<{ id: string }>('SELECT id FROM agent_runs WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT', [ownerId])).rows.map(row => row.id)
+  const moved = await client.query(`WITH RECURSIVE
+    own_tasks AS MATERIALIZED (SELECT id,"sourceEventId" FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL),
+    own_runs AS MATERIALIZED (SELECT id,"botId","agentDefinition","issueId",kind FROM agent_runs WHERE "userId"=$1),
+    own_events AS MATERIALIZED (SELECT id,"botId","runId",payload FROM coordinator_events WHERE "userId"=$1),
+    task_sources AS (
+      SELECT id AS "taskId","sourceEventId"::text AS "eventId" FROM own_tasks
+      UNION ALL
+      SELECT a."taskId",v.id FROM factory_attempts a JOIN own_tasks t ON t.id=a."taskId"
+        CROSS JOIN LATERAL (VALUES (a.output->>'requestEpoch'),(a.output->>'previousRequestEpoch'),(a.output#>>'{handoff,requestEpoch}')) v(id)
+      UNION ALL
+      SELECT f."taskId",v.id FROM factory_events f JOIN own_tasks t ON t.id=f."taskId"
+        CROSS JOIN LATERAL (VALUES (f.request->>'sourceEventId'),(f.request->>'previousEpoch'),(f.result#>>'{task,sourceEventId}')) v(id)
+    ), links(kind,id,other_kind,other_id) AS (
+      SELECT 'task',a."taskId"::text,'run',r.id::text FROM factory_attempts a
+        JOIN own_tasks t ON t.id=a."taskId" JOIN own_runs r ON r.id=a."runId"
+      UNION ALL
+      SELECT 'task',s."taskId"::text,'event',e.id::text FROM task_sources s JOIN own_events e ON e.id::text=s."eventId"
+      UNION ALL
+      SELECT 'run',r.id::text,'event',e.id::text FROM own_runs r JOIN own_events e ON e."runId"=r.id
+      UNION ALL
+      SELECT 'run',r.id::text,'event',e.id::text FROM own_runs r JOIN own_events e ON e.payload->>'previousRunId'=r.id::text
+      UNION ALL
+      SELECT 'run',r.id::text,'event',e.id::text FROM own_runs r JOIN own_events e ON e.id::text=r."agentDefinition"#>>'{repositoryAdmission,requestEventId}'
+      UNION ALL
+      SELECT 'event',e.id::text,'event',origin.id::text FROM own_events e JOIN own_events origin ON origin.id::text=e.payload->>'originEventId'
+    ), edges AS (SELECT * FROM links UNION ALL SELECT other_kind,other_id,kind,id FROM links),
+    seeds(kind,id) AS (
+      SELECT 'run',r.id::text FROM own_runs r WHERE r."agentDefinition" ? 'executionIdentity'
+        OR r.kind='group_chat'
+        OR EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)
+        OR EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i.scope='personal' AND i."userId"<>$1)
+        OR (r."botId" IS NULL AND (NOT r.id=ANY($5::uuid[]) OR (r."issueId" IS NOT NULL AND NOT r."issueId"=ANY($6::uuid[]))))
+      UNION ALL
+      SELECT 'event',id::text FROM own_events WHERE "botId" IS NULL AND NOT id=ANY($4::uuid[])
+      UNION ALL
+      SELECT 'task',id::text FROM own_tasks WHERE NOT (id=ANY($3::uuid[]) AND "sourceEventId"=ANY($4::uuid[]))
+    ), retained(kind,id) AS (
+      SELECT kind,id FROM seeds
+      UNION
+      SELECT e.other_kind,e.other_id FROM retained r JOIN edges e ON e.kind=r.kind AND e.id=r.id
+    ), moved_events AS (
+      UPDATE coordinator_events e SET "botId"=$2 WHERE e."userId"=$1 AND e."botId" IS NULL AND e.id=ANY($4::uuid[])
+        AND NOT EXISTS (SELECT 1 FROM retained p WHERE p.kind='event' AND p.id=e.id::text) RETURNING e.id
+    ), moved_tasks AS (
+      UPDATE factory_tasks t SET "botId"=$2 WHERE t."userId"=$1 AND t."botId" IS NULL AND t.id=ANY($3::uuid[])
+        AND NOT EXISTS (SELECT 1 FROM retained p WHERE p.kind='task' AND p.id=t.id::text) RETURNING t.id
+    )
+    UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL AND r.id=ANY($5::uuid[])
+      AND r.kind <> 'group_chat'
+      AND NOT EXISTS (SELECT 1 FROM retained p WHERE p.kind='run' AND p.id=r.id::text)
+      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId, tasks, events, runs, issues])
+  return moved.rowCount ?? 0
 }
 
 /**
@@ -196,7 +276,6 @@ async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, works
   await client.query(`DELETE FROM chat_preferences WHERE "userId"=$1 AND "chatKey"='coordinator'`, [ownerId])
   await client.query(`UPDATE user_schedules s SET bot_id=$2, workspace_id=$3 WHERE s.owner_id=$1 AND s.bot_id IS NULL
       AND NOT EXISTS (SELECT 1 FROM user_schedules o WHERE o.owner_id=$1 AND o.bot_id=$2 AND o.request_id=s.request_id)`, [ownerId, botId, workspaceId])
-  await client.query('UPDATE factory_tasks SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
   await client.query('UPDATE suggestions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
   await client.query('UPDATE pending_actions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
   await copyAgentHead(client, ownerId, botId, workspaceId)

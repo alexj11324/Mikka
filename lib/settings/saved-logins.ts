@@ -2,7 +2,7 @@ import 'server-only'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
-import { awsKms } from '@/lib/credentials/kms'
+import { credentialKms } from '@/lib/credentials/kms'
 import { CredentialStore } from '@/lib/credentials/store'
 import { CredentialError, secretText, type Actor } from '@/lib/credentials/contracts'
 import { credentialVaultEnabled } from '@/lib/credentials/feature'
@@ -78,7 +78,7 @@ export async function deleteSavedLoginFor(actor: Actor, id: unknown): Promise<{ 
   const { rows: [row] } = await pool.query('SELECT origin, username FROM credentials WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL', [target, userId])
   if (!row) throw new ActionFailureError('savedLoginNotFound')
   // The KMS is never called by removal; the store needs one to be built.
-  await new CredentialStore(pool, awsKms('app')).remove(actor, row.origin, row.username)
+  await new CredentialStore(pool, credentialKms('app')).remove(actor, row.origin, row.username)
   return { id: target }
 }
 
@@ -107,7 +107,7 @@ export interface SavedLoginInput { site: string; account: string; password: stri
 
 function vault(): CredentialStore {
   if (!credentialVaultEnabled()) throw new ActionFailureError('savedLoginsUnavailable')
-  return new CredentialStore(pool, awsKms('app'))
+  return new CredentialStore(pool, credentialKms('app'))
 }
 
 /** Store failures as settings errors. The vault's own codes never reach the client. */

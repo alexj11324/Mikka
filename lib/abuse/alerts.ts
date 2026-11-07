@@ -1,8 +1,8 @@
 import 'server-only'
 import { pool } from '@/lib/db'
-import { AUTH_EMAIL_FROM } from '@/lib/auth-email'
+import { deliverMail, mailConfigured } from '@/lib/mail-delivery'
 import { abuseLimits, abuseAlertKinds } from './policy'
-/** Existing Resend delivery and server error logs; durable keys deduplicate alerts. */
+/** Shared SMTP/Resend delivery and server error logs; durable keys deduplicate alerts. */
 export async function checkAbuseAlerts(
   env = process.env,
   fetchImpl: typeof fetch = fetch,
@@ -38,29 +38,15 @@ export async function checkAbuseAlerts(
       spentMicroUsd: usage.spent,
       firstUses: first.n,
     })
-    if (!env.RESEND_API_KEY) continue // Retained for the next check; never treated as delivered.
+    if (!mailConfigured(env)) continue // Retained for the next check; never treated as delivered.
     try {
-      const response = await fetchImpl('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${env.RESEND_API_KEY}`,
-          'content-type': 'application/json',
-          'idempotency-key': `hosted-abuse-${alert.key}`,
-        },
-        body: JSON.stringify({
-          from: AUTH_EMAIL_FROM,
-          to: [env.MIKKA_ABUSE_ALERT_EMAIL ?? 'mikka@aspectlylabs.com'],
-          subject: `Mikka hosted usage: ${alert.kind}`,
-          text: `Rolling 24h free usage: $${(usage.spent / 1e6).toFixed(4)}. Cap: $${limits.dailyMicroUsd / 1e6}. New free workspaces in the last hour: ${first.n}.`,
-        }),
-        signal: AbortSignal.timeout(10_000),
-      })
-      if (response.ok)
-        await pool.query(
-          'UPDATE hosted_abuse_alerts SET "deliveredAt"=now() WHERE key=$1',
-          [alert.key],
-        )
-      else await response.body?.cancel()
+      await deliverMail({
+        to: env.MIKKA_ABUSE_ALERT_EMAIL ?? 'mikka@aspectlylabs.com',
+        subject: `Mikka hosted usage: ${alert.kind}`,
+        text: `Rolling 24h free usage: $${(usage.spent / 1e6).toFixed(4)}. Cap: $${limits.dailyMicroUsd / 1e6}. New free workspaces in the last hour: ${first.n}.`,
+        idempotencyKey: `hosted-abuse-${alert.key}`,
+      }, { env, fetch: fetchImpl })
+      await pool.query('UPDATE hosted_abuse_alerts SET "deliveredAt"=now() WHERE key=$1', [alert.key])
     } catch {
       console.error('hosted_abuse_alert_delivery_failed')
     }
