@@ -1,7 +1,7 @@
 {
   "MobileTaskSchedule": {
     "daily": "Every day at {time}",
-    "interval": "Every {minutes, plural, one {minute} other {# minutes}}"
+    "interval": "Every {minutes, plural, one {1 minute} other {# minutes}}"
   },
   "Common": {
     "appUpdated": "Mikka has been updated",
