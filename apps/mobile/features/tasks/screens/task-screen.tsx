@@ -12,7 +12,6 @@ import { GlassButton } from '@/components/GlassButton'
 import { HARNESS } from '@/lib/harness'
 import { useHome } from '@/lib/home'
 import { tasksLive } from '@/lib/live-keys'
-import { nextWhen } from '@/lib/clock'
 import type { TaskActivity, TaskDetail, ThreadGroup } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
@@ -71,7 +70,7 @@ export function TaskScreen() {
               {task.bot ? <Chip icon={<BotAvatar color={task.bot.color} shape={task.bot.shape} size={16} />} label={task.bot.name} /> : null}
               {task.agent ? <Chip icon={<Sparkles size={14} color={colors.secondary} strokeWidth={2} />} label={[HARNESS[task.agent.harness] ?? task.agent.harness, task.agent.model].filter(Boolean).join(' · ')} /> : null}
               {task.place ? <Chip icon={<MachineIcon machine={task.place.kind} size={15} />} label={task.place.name} /> : null}
-              {task.schedule ? <Chip icon={<CalendarClock size={14} color={colors.secondary} strokeWidth={2} />} label={task.schedule.nextAt ? `${task.schedule.label} · ${nextWhen(task.schedule.nextAt)}` : task.schedule.label} /> : null}
+              {task.schedule ? <Chip icon={<CalendarClock size={14} color={colors.secondary} strokeWidth={2} />} label={task.schedule.label} /> : null}
             </View>
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
             {data.activity.length ? <Text accessibilityRole="header" style={styles.section}>活动</Text> : null}

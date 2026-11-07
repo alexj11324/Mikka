@@ -35,7 +35,7 @@ const tasks = [
   task(TASK, '#1471', '修复 iOS 登录回调', { group: 'pending', status: 'review', priority: 'high', bot: frontend, createdAt: ago(0, 3) }),
   task('44444444-4444-4444-8444-444444444477', '#1477', '登录页要不要换新导航', { group: 'pending', bot: design, createdAt: ago(0, 5) }),
   task('44444444-4444-4444-8444-444444444462', '#1462', '整理竞品报告', { group: 'running', status: 'doing', bot: research, createdAt: ago(5) }),
-  task('44444444-4444-4444-8444-444444444401', '#1401', '行业研究周报', { group: 'running', status: 'doing', priority: 'low', bot: research, createdAt: ago(9), schedule: { label: '每周一', nextAt: new Date(Date.now() + 2 * 86_400_000).toISOString() } }),
+  task('44444444-4444-4444-8444-444444444401', '#1401', '行业研究周报', { group: 'running', status: 'doing', priority: 'low', bot: research, createdAt: ago(9), schedule: { label: '每天 09:00', nextAt: new Date(Date.now() + 86_400_000).toISOString() } }),
   task('44444444-4444-4444-8444-444444444446', '#1446', '设置页改用原生表单', { group: 'todo', priority: 'none', createdAt: ago(2) }),
   ...Array.from({ length: 12 }, (_, index) => task(`44444444-4444-4444-8444-4444444445${String(index).padStart(2, '0')}`, `#13${index + 10}`, `已完成的任务 ${index + 1}`, { group: 'done', status: 'done', bot: frontend, createdAt: ago(10 + index) })),
 ]

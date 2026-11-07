@@ -194,14 +194,18 @@ export type TaskActivity =
   | { kind: 'replaced'; runId: string; createdAt: string }
   | { kind: 'created'; by: string | null; createdAt: string }
 
-/** GET /api/mobile/tasks/:id: the task's detail and its 活动. */
+/** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
 export interface TaskDetail {
-  task: Task & {
+  task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group'> & {
+    bot: TaskBot | null
+    schedule: TaskSchedule | null
     description: string | null
     agent: { harness: string; model: string | null } | null
     place: { kind: MachineKind; name: string } | null
   }
   activity: TaskActivity[]
+  /** The channel its task and run keys arrive on. */
+  live?: { workspaceId: string }
 }
 
 export interface Preferences {

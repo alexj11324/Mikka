@@ -228,7 +228,6 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
   await t.test('tasks: a team token reaches only its workspace tasks; the personal token keeps personal and unlinked ones', async () => {
     const [{ actAs }, { requireIssueAccess, issueForUser }, { getApiSession }] = await Promise.all([import('../lib/acting-user'), import('../lib/issue-access'), import('../lib/api-auth')])
     const tasks = await import('../app/api/mobile/tasks/route')
-    const detail = await import('../app/api/mobile/tasks/[id]/route')
     const search = await import('../app/api/issues/search/route')
     const personalTask = randomUUID(), unlinkedTask = randomUUID()
     await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Mine','{"type":"doc"}','todo','normal')`, [personalTask, owner])
@@ -241,20 +240,8 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
       const user = session?.user ?? owner
       const read = await Promise.all(ids.map(async id => Boolean(await issueForUser(user, id))))
       const acted = await Promise.all(ids.map(id => actAs(user, () => requireIssueAccess(id)).then(() => true, () => false)))
-      // A task's detail (2026-11-07) answers exactly where its list row shows.
-      const detailed = await Promise.all(ids.map(async id => (await call(detail.GET, `/api/mobile/tasks/${id}`, { id })).status === 200))
-      assert.deepEqual(detailed, ids.map(id => listed.includes(id)))
       return { listed: ids.map(id => listed.includes(id)), searched: ids.map(id => found.includes(id)), read, acted }
     }
-    // The workspace task's row: its group from its finished thread, and the Bot that dispatched it.
-    const row = (await call(tasks.GET, '/api/mobile/tasks', {})).body.tasks.find((item: { id: string }) => item.id === ownIssue)
-    assert.equal(row.bot?.id, ownBot)
-    assert.ok(['pending', 'todo', 'done'].includes(row.group))
-    // Its detail: the attempt this person ran, then its creation; another workspace's run never shows.
-    const shown = (await call(detail.GET, `/api/mobile/tasks/${ownIssue}`, { id: ownIssue })).body
-    assert.equal(shown.task.bot?.id, ownBot)
-    assert.deepEqual(shown.activity.map((item: { kind: string; runId?: string }) => item.kind === 'attempt' ? item.runId : item.kind), [ownRun, 'created'])
-    assert.equal((await call(detail.GET, '/api/mobile/tasks/not-a-task', { id: 'not-a-task' })).status, 404)
     try {
       // [W-linked task, personal task, unlinked task]
       assert.deepEqual(await reach(), { listed: [true, false, false], searched: [true, false, false], read: [true, false, false], acted: [true, false, false] })

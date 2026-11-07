@@ -8,7 +8,7 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { Text } from '@/components/Text'
 import { underBar } from '@/components/NavBar'
 import { displayTitle } from '@/lib/display-title'
-import { nextWhen, shortWhen } from '@/lib/clock'
+import { shortWhen } from '@/lib/clock'
 import type { Task, TaskGroup } from '@/lib/types'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { tasksLive } from '@/lib/live-keys'
@@ -74,7 +74,7 @@ export function TaskGroupBar({ id, count, folded, onToggle }: { id: TaskGroup; c
 }
 
 /**
- * A task: priority, state, the dispatching bot's avatar, number, title and date; a scheduled task adds its next run
+ * A task: priority, state, the dispatching bot's avatar, number, title and date; a scheduled task adds its rule (「每天 09:00」, the server's words)
  * as a second line. It opens the task's detail, where its threads are (never a thread directly).
  */
 export function TaskRowView({ task }: { task: Task }) {
@@ -97,7 +97,7 @@ export function TaskRowView({ task }: { task: Task }) {
       {task.schedule ? (
         <View style={styles.schedule}>
           <CalendarClock size={13} color={colors.secondary} strokeWidth={2} />
-          <Text style={styles.scheduleText} numberOfLines={1}>{task.schedule.label}{task.schedule.nextAt ? ` · ${nextWhen(task.schedule.nextAt)}` : ''}</Text>
+          <Text style={styles.scheduleText} numberOfLines={1}>{task.schedule.label}</Text>
         </View>
       ) : null}
     </Pressable>
