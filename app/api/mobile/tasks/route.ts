@@ -1,11 +1,12 @@
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { actAs } from '@/lib/acting-user'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { listIssues, listWorkspaceIssues } from '@/app/actions/issues'
+import { pollIssues, listWorkspaceIssues } from '@/app/actions/issues'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { displayTaskTitle } from '@/lib/short-title'
 import { boardBlocks } from '@/components/blocks/kanban-board-1/components/data'
-import { newestTaskRuns } from '@/lib/task-block-runs'
+import { newestTaskRuns, taskScheduleLabels } from '@/lib/task-block-runs'
+import { mobileTaskGroup } from '@/lib/mobile-task-view'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,10 +15,16 @@ async function handleGET(request: Request) {
   const user = await mobileUser(request)
   noteLogUser(user?.id)
   if (!user) return unauthorized()
-  const workspaceId = (user as typeof user & { [tokenWorkspace]?: string })[tokenWorkspace]
-  const issues = workspaceId ? await actAs(user, () => listWorkspaceIssues(workspaceId)) : await listIssues()
-  const open = issues.filter(issue => !['done', 'canceled', 'duplicate'].includes(issue.status))
-  const blocks = boardBlocks(issues, await newestTaskRuns(user.id, open.map(issue => issue.id)))
+  const tokenWorkspaceId = (user as typeof user & { [tokenWorkspace]?: string })[tokenWorkspace]
+  // Keep the selected workspace already resolved by the existing list read; no extra context query.
+  const { issues, workspaceId } = tokenWorkspaceId
+    ? { issues: await actAs(user, () => listWorkspaceIssues(tokenWorkspaceId)), workspaceId: tokenWorkspaceId }
+    : await pollIssues().then(snapshot => ({ issues: snapshot.items!, workspaceId: snapshot.live.selectedWorkspaceId }))
+  const snapshots = await newestTaskRuns(user.id, issues.map(issue => issue.id), workspaceId, await taskScheduleLabels())
+  const runs = snapshots.flatMap(row => row.runId && row.status ? [{ ...row, runId: row.runId, status: row.status }] : [])
+  const byIssue = new Map(snapshots.map(row => [row.issueId, row]))
+  const runByIssue = new Map(runs.map(row => [row.issueId, row]))
+  const blocks = boardBlocks(issues, runs)
   return json({
     tasks: issues.map(issue => {
       const block = blocks.get(issue.id)
@@ -25,6 +32,8 @@ async function handleGET(request: Request) {
         // The short title the small model wrote, while the task keeps the title it was written from (lib/short-title.ts).
         id: issue.id, identifier: issue.identifier, title: displayTaskTitle(issue), status: issue.status, priority: issue.priority,
         owner: issue.ownerName, updatedAt: issue.updatedAt,
+        createdAt: issue.createdAt, group: mobileTaskGroup(issue, runByIssue.get(issue.id), Boolean(block)),
+        bot: byIssue.get(issue.id)?.bot ?? null, schedule: byIssue.get(issue.id)?.schedule ?? null,
         blocked: block ? { reason: block.reason, blocker: block.blockerIdentifier ?? null } : null,
       }
     }),
