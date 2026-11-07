@@ -27,7 +27,7 @@ before(async () => {
     const key = `${values[1]}:${values[0]}`
     return { rowCount: memberships.has(key) ? 1 : 0, rows: memberships.has(key) ? [{ personalHome: personalHomes.has(key) }] : [] }
   } } } })
-  mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_name: string, handler: (request: Request) => Promise<Response>) => handler } })
+  mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, handler: (request: Request) => Promise<Response>) => handler } })
   route = await import('../../app/api/live/ticket/route')
 })
 

@@ -37,7 +37,7 @@ mock.module(new URL('../../../../../lib/coordinator/coordinator-bot.ts', import.
   if (workspaceId !== coordinatorOf(owner).workspaceId) throw new Error('settings must use the open workspace\'s Coordinator')
   return coordinatorOf(owner)
 } } })
-mock.module(new URL('../../../../../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_route: string, handler: unknown) => handler, noteLogUser: () => {} } })
+mock.module(new URL('../../../../../lib/request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_route: string, handler: unknown) => handler, noteLogUser: () => {} } })
 mock.module(new URL('../../../../../lib/operations/write-transaction.ts', import.meta.url).href, { namedExports: { writeTransaction: async (_pool: unknown, work: (tx: typeof client) => Promise<unknown>) => work(client) } })
 
 let GET: typeof import('./route')['GET']
