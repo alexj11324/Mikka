@@ -34,6 +34,13 @@ Node、Mikka worker 源码与构建产物、daemon 依赖、gh 和 desktop 额�
 CLI 串行重探测。没有可复用结果或文件身份变化时仍走真实探测，不硬编码模型；
 自然刷新周期从实例接收 handoff 起算。探测不读取账号、凭证或任务，也不发模型请求。
 
+首次 handoff 可附带一次性的任务 ID 提示，通过单独的私有文件绑定本次 bootstrap
+完整字节的摘要；主 bootstrap 格式保持旧 worker 可读。提示只在内存中使用，不写入
+设备配置，也不包含任务授权或可用凭证。worker 完成真实注册后，以原有 claim 流程
+认领该任务，与首轮 heartbeat/repository 同步重叠；启动前仍等待完整仓库配置，
+并执行原有设备、凭证和 fresh policy 检查。无提示、过期或无效提示走原有发现流程，
+正常路径不增加 HTTP/数据库调用或定时轮询。
+
 同一次真实匿名探测还在 ready 前原子写入只读发布收据，绑定完整 source commit、
 worker digest、CLI manifest 和实际选择。CI 从新建的无身份候选实例读取并核对
 这些绑定与所需模型目录，不再启动第二个完整 daemon 和第二组 CLI 重做探测。
@@ -65,6 +72,22 @@ worker digest、CLI manifest 和实际选择。CI 从新建的无身份候选实
 仅 Codex 已观测到的两条 E2B root 引用可指向本次 provider 注入的 root。
 未列出的证书路径或目标也拒绝，不豁免整个证书目录。
 
+2026-11-07，主线候选的 fresh 检查拦下 Claude 的
+`/usr/local/share/ca-certificates/e2b-ca.crt` 摘要变化。随后用
+[一个纯官方 Claude 派生控制和一个 fresh 实例](https://github.com/alexj11324/Mikka/actions/runs/42328944425)
+复现：仅添加 `/opt/mikka` 下的测量脚本和收据，不安装 Node、worker、gh 或依赖，
+不执行 CLI、模型探测或订阅任务。这个普通文件在 before/ready/fresh 三阶段的类型
+和 root 属主一致；ready 只发生已有的 `0644 → 0777`，fresh 才轮换 SHA-256。
+原 Claude CLI 的三阶段 SHA-256 完全相同。另核实此前 desktop 的纯官方控制也有
+相同精确路径的摘要变化，因此只为 Claude 和 desktop 的该路径补充 SHA 轮换许可；
+Codex 已有的规则保持不变。
+[完整控制、失败样本和清理收据](../research/2026-11-07-e2b-provider-root-ca-rotation.json)
+绑定源提交、run、artifact 摘要和实际资源 ID。E2B 固定版本源码也有该路径的 CA
+写入及 finalization 权限处理；实测 envd 二进制摘要已记录，但没有把公开源码版本
+冒充该实例的运行版本。安装阶段仍不接受任何变化，类型、属主、未知权限或路径、
+原 CLI 和普通证书内容继续严格校验。此控制不代表全文件发布保全、真实订阅通过
+或生产时延达标；本次 Claude 控制模板和实例均已回收。
+
 构建记录轻量 CLI manifest，包含构建前官方 CLI 的真实路径和摘要；官方原本缺少
 某个 harness 时，才记录 `/opt/mikka` 内补装的位置。每个 worker release 保存
 自己的 `.mikka-original-cli.json`，与 worker symlink 一起切换和回退。生产 worker、
@@ -77,10 +100,35 @@ Codex (`gpt-6-luna`) 的一次执行，使用正常的设备注册、任务绑�
 只探测 CLI 版本、模型列表或启动进程不足以通过验收。两个结果和文件保全收据
 都必须绑定同一候选模板、source commit 和 worker digest。没有完整收据就不能
 公开候选模板或更新生产模板 ID。
+
+完整保全报告通过不可变 CI artifact 传递，跨 job 只传有界 ID、摘要和清理身份，
+不把报告 JSON 放进环境变量或 workflow output/input。2026-11-07 的一次
+[真实失败和恢复记录](../research/2026-11-07-e2b-report-artifact-transport.json)
+显示，310,446 字节的单个环境变量使订阅及清理的 shell 在执行前就失败。
+候选、接受后及发布报告仍完整保存；消费文件前校验字节摘要、source、worker、
+workflow run 与 producer attempt，再执行订阅、公开模板或修改生产配置。
+缺失、损坏或错绑不能放行，也不能跳过最终清理；清理只使用可信的有限身份，
+保留同 source/run 较早 attempt 的精确回收能力，不据此复用旧发布证明。
+
 任务开始证据须由官方 CLI 给出：Claude 使用同 session、同首条 prompt UUID 的
 user 回显，Codex 使用本次 `turn/start` 的 ACK；`system/init` 或进程启动不能代替。
-候选执行还必须有完整、未截断、绑定该 run 的 HTTP 收据，证明执行期间没有额外的
-Mikka 授权或 provider proxy 往返。真实回复和任务/模型/订阅绑定仍分别核对。
+候选执行还必须有完整、未截断、绑定该 run 的宿主 HTTP 收据，证明执行期间没有
+额外的 Mikka 授权或 provider proxy 往返。真实回复和任务/模型/订阅绑定仍分别核对。
+
+HTTP 证据按实际覆盖范围解释。`HttpServerLink` 与宿主 `taskFetch` 的物理发送计数
+覆盖宿主的授权、代理及任务传输入口；它不能独自证明官方 CLI 子进程发出的全部
+Mikka 请求。`mikka-mcp` 的唯一远程发送路径只允许工具目录发现与显式
+`record_decision` 业务写入，两者不是 `/v1/runs/:id/decision` 的权限判定请求。
+固定 worker 版本的闭式路径审计和真实进程回归，与宿主实际计数一起支持
+“执行时没有额外鉴权或代理往返”的判断，不能把业务 API 内部的权限校验说成不存在。
+
+冒烟及候选订阅门槛使用既有的本机观测接收器，另记这些子进程实际发送的固定业务
+种类、次数和耗时，不记录 URL、凭证、参数或内容。至少要观测到真实的目录请求
+开始和结束；非法、截断、错绑或未覆盖的远程 MCP 配置不能通过这一限定范围的证明。
+子进程可能由官方 CLI 重启或直接终止，因此已观测请求配平不等于全部进程世代完整。
+世代覆盖明确为未验证，全部第一方 HTTP 的完整性保持否；缺失的终态和总量是未知，
+不是零。观测不得增加远程鉴权请求、数据库请求或轮询，也不为等待统计而延迟原有
+取消与进程终止。官方 provider 的 OTLP 事件同样是尽力收集，不冒充完整调用总数。
 
 worker 升级重新构建带唯一版本名的三个模板，不覆盖旧模板或别名；上一版有效配置
 保存在 `MIKKA_CLOUD_RUNTIME_PREVIOUS`，旧模板继续保留以便回滚。三模板 ID、

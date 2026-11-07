@@ -801,10 +801,15 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     refreshPhase = timings.next('publish_bootstrap')
     const handoffStartedAt = (await pool.query('SELECT clock_timestamp() AS now')).rows[0].now as Date
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
-    await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(),
+    const bootstrap = JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(),
       traceContext: captureTraceContext({ runId }), tracing: daemonTraceSettings(),
-      ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root', ...runtimeRequestOptions(refreshBudget) })
-    await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka; install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next; mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', ...runtimeCommandOptions(10_000, refreshBudget) })
+      ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) })
+    // Keep the strict bootstrap schema readable by old workers during rollout
+    // and rollback. This optional locator binds to the same one-use bytes; it
+    // carries no assignment or usable credential. String multipart is one RPC.
+    const initialRun = refreshRuntime ? '' : JSON.stringify({ version: 1, runId, bootstrapSha256: createHash('sha256').update(bootstrap).digest('hex') })
+    await sandbox.files.write([{ path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun }], { user: 'root', useOctetStream: false, ...runtimeRequestOptions(refreshBudget) })
+    await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka && install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next && install -o user -g user -m 600 ${handoff}.run /home/user/.mikka/initial-run.next && mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${handoff} && unlink ${handoff}.run`, { user: 'root', ...runtimeCommandOptions(10_000, refreshBudget) })
     // The worker's output streams into the server logs only while this invocation lives;
     // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
     refreshPhase = timings.next('start_worker')

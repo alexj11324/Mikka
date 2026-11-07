@@ -1,9 +1,11 @@
 // Publishes the verified additive runtime configuration inside Web deploy's
 // production queue. The caller then builds on GitHub and uploads --prebuilt;
 // this module never requests a Vercel source build.
-// Inputs: the immutable RUNTIME_RELEASE_DIRECTORY artifact plus its expected
-// hashes, DESKTOP/CLAUDE/CODEX_TEMPLATE_ID and SOURCE_SHA (the worker hash),
-// the full source commit, GITHUB_TOKEN and VERCEL_TEAM_TOKEN. With --current it only prints
+// Inputs: DESKTOP_TEMPLATE_ID, CLAUDE_TEMPLATE_ID, CODEX_TEMPLATE_ID and SOURCE_SHA (the worker hash,
+// workerSha from build-template.py --json), the full source commit,
+// the verified report file argv, its byte/model digests, GITHUB_TOKEN and
+// VERCEL_TEAM_TOKEN. Complete reports never travel in the environment.
+// With --current it only prints
 // production's worker hash only when its complete runtime configuration agrees.
 // One upsert is followed by per-variable readback; mismatches refuse publication
 // and force a later revalidation (decision 2026-11-01-2335).
@@ -11,7 +13,8 @@ import { assertCurrentMain, assertProductionSource } from '../release/web-deploy
 import { isDeepStrictEqual } from 'node:util'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { readHandoff } from './release-handoff.mjs'
+import { mcpBusinessEvidence } from '../acceptance/cloud-startup-evidence.mjs'
+import { readRuntimeReport, templateModels, templateModelsDigest } from './runtime-report.mjs'
 
 const finalizationBytes = readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))
 const finalizationPolicy = JSON.parse(finalizationBytes)
@@ -123,7 +126,14 @@ export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, s
       || ack?.kind !== (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack')
       || !Number.isSafeInteger(ack?.at) || ack.at <= 0 || !Number.isFinite(ack?.ms) || ack.ms < 0
       || authorization?.source !== 'http_server_link' || authorization.complete !== true || authorization.truncated !== false
-      || authorization.extraRemoteCalls !== 0) fail(`runtime_release_subscription_missing ${kind}`)
+      || authorization.scope !== 'daemon_http_server_link_and_task_fetch'
+      || authorization.hostAuthorizationComplete !== true || authorization.allFirstPartyHttpComplete !== false
+      || authorization.basis !== 'host_authorization_census_and_closed_mcp_business_paths'
+      || authorization.extraRemoteCalls !== 0
+      || !Number.isSafeInteger(authorization.observedProviderEvents) || authorization.observedProviderEvents < 1
+      || authorization.officialDelivery !== 'best_effort_not_a_complete_call_count'
+      || mcpBusinessEvidence(authorization.mcpHttpTiming, { runIdHash: ack.runIdHash, harness }).status !== 'observed')
+      fail(`runtime_release_subscription_missing ${kind}`)
   }
 }
 
@@ -198,27 +208,25 @@ export async function publish({ token, githubToken, templates, sourceSha, source
   return { changed, requiresWebBuild: true, sourceCommit, workerSha: sourceSha }
 }
 
-export function releaseInputs(env = process.env) {
-  if (!env.RUNTIME_RELEASE_DIRECTORY) fail('runtime_handoff_directory_required')
-  const templates = { desktop: env.DESKTOP_TEMPLATE_ID, claude: env.CLAUDE_TEMPLATE_ID, codex: env.CODEX_TEMPLATE_ID }
-  const { report } = readHandoff(env.RUNTIME_RELEASE_DIRECTORY, 'release', {
-    ...env, RUNTIME_WORKER_SHA: env.SOURCE_SHA, RUNTIME_TEMPLATE_IDS: JSON.stringify(templates),
-  })
-  // pack-release already compared the full catalogue and conservation receipt
-  // against the candidate artifact. All existing publication gates run below.
-  return { templates, sourceSha: env.SOURCE_SHA, sourceCommit: env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT,
-    models: Object.fromEntries(Object.keys(TEMPLATE_ENV).map(kind => [kind, report.templates[kind].models])), releaseEvidence: report }
+export function publicationInputFromFile(file, { sha256, modelsSha256, sourceSha, sourceCommit, runId, runAttempt, templates }) {
+  const releaseEvidence = readRuntimeReport(file, { sha256, sourceCommit, workerSha: sourceSha, runId, runAttempt })
+  if (!/^[a-f0-9]{64}$/.test(modelsSha256 ?? '') || templateModelsDigest(releaseEvidence) !== modelsSha256)
+    fail('runtime_release_models_digest_mismatch')
+  return { templates, sourceSha, sourceCommit, models: templateModels(releaseEvidence), releaseEvidence }
 }
 
 if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--current')) {
   console.log(await currentWorkerSha({ token: process.env.VERCEL_TEAM_TOKEN }))
 } else if (import.meta.url === `file://${process.argv[1]}`) {
   try {
-    const result = await publish({ ...releaseInputs(), token: process.env.VERCEL_TEAM_TOKEN, githubToken: process.env.GITHUB_TOKEN })
+    const templates = { desktop: process.env.DESKTOP_TEMPLATE_ID, claude: process.env.CLAUDE_TEMPLATE_ID, codex: process.env.CODEX_TEMPLATE_ID }
+    const input = publicationInputFromFile(process.argv[2], { templates, sourceSha: process.env.SOURCE_SHA,
+      sourceCommit: process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT, sha256: process.env.RUNTIME_REPORT_SHA256,
+      modelsSha256: process.env.TEMPLATE_MODELS_SHA256, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT })
+    const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, githubToken: process.env.GITHUB_TOKEN, ...input })
     console.log(JSON.stringify({ event: 'official_runtime_env_verified', ...result }))
   } catch (error) {
-    // Helpers use closed error codes. Do not print a parser cause containing a
-    // receipt excerpt when a downloaded artifact is incomplete or corrupted.
+    // Keep parser causes for callers, never print receipt excerpts from them.
     console.error(error.message)
     process.exitCode = 1
   }

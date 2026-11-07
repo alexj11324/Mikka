@@ -71,7 +71,7 @@ const defaultIO: CliIO = {
 export async function runCli(
   argv: string[],
   io: CliIO = defaultIO,
-  privateConfig?: { protectionBypass?: string; preloadedModels?: HostedModelProbe }
+  privateConfig?: { protectionBypass?: string; preloadedModels?: HostedModelProbe; initialRunId?: string }
 ): Promise<number | null> {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -232,6 +232,7 @@ export async function runCli(
       retainResources: values["retain-resources"],
       hostedSubscriptions: values["hosted-subscriptions"],
       preloadedModels: privateConfig?.preloadedModels,
+      initialRunId: privateConfig?.initialRunId,
       e2bContainerRuntime: values["e2b-container-runtime"],
       cloudComputer: values["e2b-computer"],
       stallMs: values["stall-minutes"]

@@ -685,6 +685,75 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
         sandbox.kill()
 
 
+def observed_mcp_business_evidence(value, run_hash, harness):
+    """Validate the observed business path; whole-generation coverage is unknown."""
+    def count(number):
+        return type(number) is int and 0 <= number <= 1_000_000
+
+    def epoch(number):
+        return type(number) is int and 0 < number <= 2**53 - 1
+
+    def duration(number):
+        return type(number) in (int, float) and math.isfinite(number) and 0 <= number <= 86_400_000
+
+    if (not isinstance(value, dict) or type(value.get('version')) is not int or value['version'] != 1
+            or value.get('source') != 'mikka_mcp_physical_fetch' or value.get('scope') != 'observed_mikka_mcp_children'
+            or value.get('generationCoverage') != 'unverified' or value.get('allFirstPartyHttpComplete') is not False
+            or type(value.get('remoteMcpServerCount')) is not int or value['remoteMcpServerCount'] != 0
+            or type(value.get('childPathAuditVersion')) is not int or value['childPathAuditVersion'] != 1
+            or value.get('runIdHash') != run_hash or value.get('harness') != harness
+            or not epoch(value.get('startedAt')) or not epoch(value.get('endedAt')) or value['endedAt'] < value['startedAt']
+            or type(value.get('expectedChildren')) is not int or value['expectedChildren'] != 1
+            or type(value.get('observedComplete')) is not bool or type(value.get('childLifecycleComplete')) is not bool
+            or value.get('truncated') is not False or type(value.get('rejectedEvents')) is not int or value['rejectedEvents'] != 0
+            or not count(value.get('observedChildren')) or not 1 <= value['observedChildren'] <= 8
+            or not count(value.get('closedChildren')) or value['closedChildren'] > value['observedChildren']
+            or not isinstance(value.get('children'), list) or len(value['children']) != value['observedChildren']
+            or not isinstance(value.get('requests'), list) or len(value['requests']) > 128):
+        return False
+    children, requests, seen = value['children'], value['requests'], set()
+    for index, child in enumerate(children):
+        if (not isinstance(child, dict) or type(child.get('child')) is not int or child['child'] != index + 1
+                or not epoch(child.get('startedAt')) or not value['startedAt'] <= child['startedAt'] <= value['endedAt']
+                or 'closedAt' not in child or not (child['closedAt'] is None or epoch(child['closedAt']) and child['startedAt'] <= child['closedAt'] <= value['endedAt'])
+                or not all(count(child.get(key)) for key in ('lastSequence', 'sent', 'completed', 'lost'))
+                or child['lastSequence'] < 1 or child['completed'] > child['sent'] or child['lost'] != 0):
+            return False
+    if sum(child['closedAt'] is not None for child in children) != value['closedChildren']:
+        return False
+    for request in requests:
+        if not isinstance(request, dict) or not count(request.get('child')) or not 1 <= request['child'] <= len(children):
+            return False
+        child = children[request['child'] - 1]
+        if (not count(request.get('sequence')) or request['sequence'] < 1
+                or (request['child'], request['sequence']) in seen
+                or not all(key in request for key in ('status', 'endedAt', 'durationMs'))
+                or request.get('operation') not in ('decision_catalogue', 'decision_record')
+                or not epoch(request.get('startedAt')) or not child['startedAt'] <= request['startedAt'] <= (child['closedAt'] or value['endedAt'])
+                or request.get('outcome') not in ('ok', 'error', 'pending')
+                or not (request.get('status') is None or type(request['status']) is int and 100 <= request['status'] <= 599)):
+            return False
+        seen.add((request['child'], request['sequence']))
+        if request['outcome'] == 'pending':
+            if any(request.get(key) is not None for key in ('endedAt', 'durationMs', 'status')):
+                return False
+        elif (not epoch(request.get('endedAt')) or not request['startedAt'] <= request['endedAt'] <= (child['closedAt'] or value['endedAt'])
+              or not duration(request.get('durationMs'))
+              or request['outcome'] != ('ok' if type(request['status']) is int and 200 <= request['status'] < 300 else 'error')):
+            return False
+    for child in children:
+        observed = sorted((request for request in requests if request['child'] == child['child']), key=lambda row: row['sequence'])
+        if (len(observed) != child['sent'] or sum(row['outcome'] != 'pending' for row in observed) != child['completed']
+                or child['lastSequence'] != 1 + child['sent'] + child['completed'] + int(child['closedAt'] is not None)
+                or any(row['sequence'] != index + 1 for index, row in enumerate(observed))):
+            return False
+    observed_complete = all(row['outcome'] != 'pending' for row in requests)
+    if ((value['observedComplete'] and not observed_complete)
+            or (value['childLifecycleComplete'] and not (observed_complete and value['closedChildren'] == len(children)))):
+        return False
+    return any(row['operation'] == 'decision_catalogue' and row['outcome'] != 'pending' for row in requests)
+
+
 def verify_release_evidence(report):
     """Publishing cannot substitute a model-list probe for subscription execution."""
     if not re.fullmatch(r'[a-f0-9]{40}', report.get('sourceCommit', '')) or not re.fullmatch(r'[a-f0-9]{40}', report.get('workerSha', '')):
@@ -719,7 +788,13 @@ def verify_release_evidence(report):
                 or type(ack.get('at')) is not int or ack['at'] <= 0
                 or type(ack.get('ms')) not in (int, float) or not math.isfinite(ack['ms']) or ack['ms'] < 0
                 or authorization.get('source') != 'http_server_link' or authorization.get('complete') is not True
-                or authorization.get('truncated') is not False or authorization.get('extraRemoteCalls') != 0):
+                or authorization.get('scope') != 'daemon_http_server_link_and_task_fetch'
+                or authorization.get('truncated') is not False or type(authorization.get('extraRemoteCalls')) is not int or authorization['extraRemoteCalls'] != 0
+                or authorization.get('hostAuthorizationComplete') is not True or authorization.get('allFirstPartyHttpComplete') is not False
+                or authorization.get('basis') != 'host_authorization_census_and_closed_mcp_business_paths'
+                or type(authorization.get('observedProviderEvents')) is not int or authorization['observedProviderEvents'] < 1
+                or authorization.get('officialDelivery') != 'best_effort_not_a_complete_call_count'
+                or not observed_mcp_business_evidence(authorization.get('mcpHttpTiming'), ack.get('runIdHash'), harness)):
             raise ValueError(f'release_subscription_acceptance_missing {kind}')
     return report
 

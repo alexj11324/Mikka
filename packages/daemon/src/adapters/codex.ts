@@ -396,6 +396,7 @@ export class CodexAdapter implements AgentAdapter {
       github: options.github,
       githubEnvironment: options.githubEnvironment,
       mcp: options.mcp,
+      mcpHttpObservationUrl: options.mcpHttpObservationUrl,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
       machineEnvironment: options.machineEnvironment,

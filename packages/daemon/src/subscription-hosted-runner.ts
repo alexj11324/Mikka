@@ -90,6 +90,8 @@ export async function createHostedBotRunner(host: {
   link: ServerLink
   journal?: Pick<RunJournal, 'get'>
   binaries?: Partial<Record<'codex' | 'claude_code', string>>
+  /** Trusted host diagnostic opt-in; never changes the assignment or its authority. */
+  collectCliTiming?: boolean
   /** Kept for old trusted worker callers; no inner container is created. */
   dockerSocket?: 'unix:///run/mikka-container/docker.sock'
   computerBroker?: ComputerBroker
@@ -228,8 +230,11 @@ export async function createHostedBotRunner(host: {
         const computerMcp = computerGrant ? {
           command: process.execPath, args: [computerProxy, computerGrant.socketPath, computerGrant.token, '--captures'], env: {},
         } : undefined
-        if (assignment.taskEnv?.CLOUD_STARTUP_TIMING === '1') {
-          cliTiming = await startCliTimingCollector({ runId: assignment.runId, harness: kind, model: options.model })
+        if (host.collectCliTiming === true || assignment.taskEnv?.CLOUD_STARTUP_TIMING === '1') {
+          try {
+            cliTiming = await startCliTimingCollector({ runId: assignment.runId, harness: kind, model: options.model,
+              remoteMcpServerCount: options.apps?.apps.length ?? 0 })
+          } catch { /* Missing observation is unavailable evidence, not a business or authorization failure. */ }
           assertOpen()
         }
         const spawnHosted = (config: SpawnOptions, oauthToken?: string): SpawnedProcess => {
@@ -289,6 +294,7 @@ export async function createHostedBotRunner(host: {
             } } : {}),
           })
         const runtimeOptions = { ...options, env, cwd, machineEnvironment: true as const,
+          mcpHttpObservationUrl: cliTiming?.mcpHttpObservationUrl,
           credential: apiKey, ...(assignment.requireSessionResume ? { requireSessionResume: true } : {}) }
         const session = previous && !continuation
           ? await adapter.resume(previous.sessionId, runtimeOptions) : await adapter.start(runtimeOptions)

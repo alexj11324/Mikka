@@ -15,6 +15,18 @@
       "evidence": "docs/operations/evidence/1512-official-claude-ca.json"
     }
   ],
+  "additionalControls": [
+    {
+      "kind": "claude",
+      "run": "https://github.com/alexj11324/Mikka/actions/runs/42328944425",
+      "sourceCommit": "73a9c22575b17466635c56140e3925a1d662be3f"
+    },
+    {
+      "kind": "desktop",
+      "run": "https://github.com/alexj11324/Mikka/actions/runs/42285968840",
+      "sourceCommit": "051be3b291bdf7239f88ef2bfe33460ee03a49b2"
+    }
+  ],
   "common": {
     "/.e2b": {
       "sha256": "per-boot"
