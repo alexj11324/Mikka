@@ -1,0 +1,9 @@
+The bundle contains this ref:
+ad8d257129989be43a3cb92e48ccd1197a6d096c refs/heads/feat/1512-run-observability
+The bundle requires these 4 refs:
+82f58b2e849abc41f6a6886ab18aa2d9c0e7ea45 
+8fffe80c9827913541a3a824b3813326dd1f2ae8 
+b5271361bbef8a619e06d472a58a03925dc6489f 
+dab5439b315a9b236697ba7b89f5578c3d6b8e6c 
+The bundle uses this hash algorithm: sha1
+/workspace/scratch/812e3b7d6d45/ops1512/source-ad8d2571.bundle is okay

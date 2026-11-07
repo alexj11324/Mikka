@@ -1,0 +1,54 @@
+✔ a fresh project gets the dashboard, every insight, the note and five alerts; a second run writes nothing (6.981372ms)
+✔ the plan is read-only and names only what differs (4.07956ms)
+✔ production objects found by id keep their other tags and subscribers (0.247764ms)
+✔ every alert reads one row: no any_row, and each SQL alert query aggregates to a single row (0.512414ms)
+✔ the API key is required and never appears in errors (4.174253ms)
+✖ the exact error-alert SQL and fixtures retain their verified real HogQL result (0.475088ms)
+✖ the recorded engine response rejects truncation, extra columns and altered identities (0.196396ms)
+✔ the error insight description fits the official targeted update schema (0.115634ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 6
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 116.246344
+
+✖ failing tests:
+
+test at scripts/ops/posthog-observability.test.mjs:129:1
+✖ the exact error-alert SQL and fixtures retain their verified real HogQL result (0.475088ms)
+  Error: ENOENT: no such file or directory, open '/workspace/scratch/812e3b7d6d45/Mikka-alert1512/scripts/ops/posthog/error-spike-engine-receipt.json'
+      at readFileSync (node:fs:483:20)
+      at readEngineReceipt (file:///workspace/scratch/812e3b7d6d45/Mikka-alert1512/scripts/ops/posthog-observability.test.mjs:127:44)
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka-alert1512/scripts/ops/posthog-observability.test.mjs:130:19)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/workspace/scratch/812e3b7d6d45/Mikka-alert1512/scripts/ops/posthog/error-spike-engine-receipt.json'
+  }
+
+test at scripts/ops/posthog-observability.test.mjs:156:1
+✖ the recorded engine response rejects truncation, extra columns and altered identities (0.196396ms)
+  Error: ENOENT: no such file or directory, open '/workspace/scratch/812e3b7d6d45/Mikka-alert1512/scripts/ops/posthog/error-spike-engine-receipt.json'
+      at readFileSync (node:fs:483:20)
+      at readEngineReceipt (file:///workspace/scratch/812e3b7d6d45/Mikka-alert1512/scripts/ops/posthog-observability.test.mjs:127:44)
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka-alert1512/scripts/ops/posthog-observability.test.mjs:157:22)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: '/workspace/scratch/812e3b7d6d45/Mikka-alert1512/scripts/ops/posthog/error-spike-engine-receipt.json'
+  }

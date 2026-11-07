@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "kind": "main-increment-compatibility-readonly",
+  "observedAt": "2026-11-07T13:40:45.855Z",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pr": 1518,
+  "candidate": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+  "previousMain": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+  "newMain": "ba53326ab16c70340e39fc1ce17b9e2e75fb841b",
+  "upstreamPr": 1633,
+  "mainDelta": {
+    "files": [
+      {
+        "path": "components/slots/settings-frame-contract.ts",
+        "blob": "7a23500cf6195b86906f92e16709137237a9809b",
+        "additions": 3,
+        "deletions": 2
+      },
+      {
+        "path": "components/workspace/issue-workspace.tsx",
+        "blob": "f62ad72a08111f375f2908b287b6ac3ba946f951",
+        "additions": 5,
+        "deletions": 2
+      },
+      {
+        "path": "docs/ui-overlay.md",
+        "blob": "bfcdbd07562430f8bed442a2887f85a59bd9c06d",
+        "additions": 17,
+        "deletions": 3
+      },
+      {
+        "path": "lib/ui-overlay.mjs",
+        "blob": "a14bf225698b4665a473f95ee984ee468dc8e52a",
+        "additions": 27,
+        "deletions": 0
+      },
+      {
+        "path": "lib/ui-overlay.test.mjs",
+        "blob": "9b0c3bf87271ff02e86cbe46129d60644f92b53d",
+        "additions": 39,
+        "deletions": 0
+      }
+    ],
+    "candidateOwnedFileIntersection": [],
+    "allFiveCandidatePrePatchBlobsEqualPreviousMain": true
+  },
+  "findings": [
+    {
+      "code": "optional_slot_fallback_only",
+      "detail": "IssueWorkspace replaces named import of optional OWN_SETTINGS_FRAME with a namespace member tested by === true. SettingsFrame remains the same exported component."
+    },
+    {
+      "code": "default_startup_unchanged",
+      "detail": "The default settings-frame exports false. The only changed render predicate is gated by settingsShown; ordinary login/startup remains on the existing AppFrame path."
+    },
+    {
+      "code": "provider_and_read_identity_unchanged",
+      "detail": "ComputerAgentsProvider and BrowserNotesProvider remain outside the visual-frame branch. No hook call, SWR key, Live scope/ready barrier, owner fence, bootstrap phase, request, or counter sampling boundary is changed."
+    },
+    {
+      "code": "build_contract_addition",
+      "detail": "UI_SLOT_EXPORTS and its source test define required named exports; optional layer exports use namespace fallback. The table is not called from the runtime read or authentication path."
+    },
+    {
+      "code": "loose_check_applies",
+      "detail": "CONTRIBUTING.md Pull requests lines 35-41 permits a still-mergeable PR after an unrelated main merge without requiring a rebase. This independent five-file patch does not itself require a new candidate or CI run."
+    }
+  ],
+  "githubReadback": {
+    "at": "2026-11-07T13:40:09.572Z",
+    "mergeable": true,
+    "mergeableState": "unstable",
+    "baseSha": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+    "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+    "mergeCommitSha": "212b65491909f064a732c6c1af69a54a6022f184",
+    "updatedAt": "2026-11-07T13:30:49Z",
+    "syntheticRef": {
+      "ref": "refs/pull/1518/merge",
+      "sha": "212b65491909f064a732c6c1af69a54a6022f184"
+    },
+    "freshMainRef": "ba53326ab16c70340e39fc1ce17b9e2e75fb841b",
+    "newMainSyntheticCommitVerified": false,
+    "note": "PR and refs/pull/1518/merge reads still report the previous base 8ff and synthetic 212b; do not label that tree as ba533+ad8."
+  },
+  "existingCandidateCi": {
+    "runId": 42376245148,
+    "attempt": 1,
+    "conclusion": "success",
+    "actualSynthetic": "212b65491909f064a732c6c1af69a54a6022f184",
+    "tree": "6d2091214d32173a0cb08936ab4288af60ddf675",
+    "receipt": "evidence/ci-ad8-owned-final.json",
+    "receiptSha256": "b02b3ad19df6c20289cd89fdc9526cc713e185e3db258c4059083313ba4bfeee",
+    "nativeDesktopOutcome": "pending_owned_by_daemon_impl"
+  },
+  "publication": {
+    "previousMainE2b": {
+      "runId": 42374084345,
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-07T13:35:47Z",
+      "allSevenJobsSucceeded": true,
+      "cleanupJobId": 128418475728
+    },
+    "newMain": {
+      "webRunId": 42377683655,
+      "webStatus": "in_progress",
+      "desktopRunId": 42377683563,
+      "desktopStatus": "in_progress",
+      "note": "New main publication wait is still open. E2B short-workflow success is not evidence of fresh provider execution."
+    }
+  },
+  "conclusion": {
+    "staticCompatibility": "no_blocker_observed",
+    "newMainSyntheticVerification": "not_yet_available_from_observed_github_refs",
+    "productionAcceptance": null
+  },
+  "actions": {
+    "sourceEdits": 0,
+    "gitRefWrites": 0,
+    "testsRun": 0,
+    "ciReruns": 0,
+    "productionWrites": 0,
+    "providerCalls": 0,
+    "rawLogsPersisted": false
+  }
+}

@@ -1,0 +1,92 @@
+✖ a linked invocation keeps its exact successful delivery parent despite its separate run-origin link (6.979219ms)
+✖ continuous mode follows only the exact vqs.process delivery hop (2.451001ms)
+✖ linked mode follows only the exact vqs.process delivery hop (1.907801ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 145.078877
+
+✖ failing tests:
+
+test at posthog-observability.test.mjs:273:1
+✖ a linked invocation keeps its exact successful delivery parent despite its separate run-origin link (6.979219ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'legacy/http',
+  -   'legacy/sdk',
+  -   'legacy/wrapper'
+  - ]
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/alert-entry-queue-red-j1dbf23m/posthog-observability.test.mjs:277:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'legacy/http', 'legacy/sdk', 'legacy/wrapper' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at posthog-observability.test.mjs:280:37
+✖ continuous mode follows only the exact vqs.process delivery hop (2.451001ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'queue-attempt/http',
+  -   'queue-attempt/sdk',
+  -   'queue-attempt/wrapper'
+  - ]
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/alert-entry-queue-red-j1dbf23m/posthog-observability.test.mjs:281:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'queue-attempt/http', 'queue-attempt/sdk', 'queue-attempt/wrapper' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at posthog-observability.test.mjs:280:37
+✖ linked mode follows only the exact vqs.process delivery hop (1.907801ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + []
+  - [
+  -   'queue-attempt/http',
+  -   'queue-attempt/sdk',
+  -   'queue-attempt/wrapper'
+  - ]
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/ops1512/alert-entry-queue-red-j1dbf23m/posthog-observability.test.mjs:281:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [],
+    expected: [ 'queue-attempt/http', 'queue-attempt/sdk', 'queue-attempt/wrapper' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,1400 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "pr": 1518,
+  "recordedAt": "2026-11-07T14:04:46.211438+00:00",
+  "kind": "ad8 actual Native budget failure; exact-entry and array alert validation; unpublished read-wave source regression",
+  "archivePreparation": {
+    "state": "frozen_for_root_review_no_remote_write",
+    "repository": "alexj11324/Mikka",
+    "branch": "evidence/1512-observability",
+    "expectedEvidenceHead": "949fe8b2a4559f962f827ed73cac2b9c5fb2d6b1",
+    "expectedEvidenceTree": "7ea3a4eb1d41164ac52a121ba6c35f6ec104ca7c",
+    "additionalParent": "41179bb5b94a3c8f5ac986f8ccfdfd359c9195f7",
+    "force": false,
+    "remoteObjectsCreated": false,
+    "approvedForPreparationOnly": true,
+    "unitCorrectionPendingRootHashApproval": true
+  },
+  "sourceBindings": {
+    "actualNativeSourceAndHarness": "212b65491909f064a732c6c1af69a54a6022f184",
+    "actualTree": "6d2091214d32173a0cb08936ab4288af60ddf675",
+    "sourceImportRun": 42376150226,
+    "ciRun": 42376245148,
+    "desktopRun": 42376245091,
+    "attempt": 1,
+    "alertIntegrationCommit": "4164a4cd928790640b4a9c33a8c04f17b3685b77",
+    "mainIntegrated": "b56eedd06f65445114ef6e6c6b42d10bcdc09c70",
+    "readWaveCommit": {
+      "head": "cc22981669aee33ceb4d8e3f812169f4de8aa184",
+      "tree": "8b1472f1c6b694851dc754623a02afbe2883e2f3",
+      "parents": [
+        "4164a4cd928790640b4a9c33a8c04f17b3685b77"
+      ],
+      "mergeMainCommit": "4164a4cd928790640b4a9c33a8c04f17b3685b77",
+      "mergedMain": "b56eedd06f65445114ef6e6c6b42d10bcdc09c70"
+    },
+    "readWavePublicationStatus": "local_committed_unpublished_at_source_receipt",
+    "packagedCandidateUnderTest": "ad8d257129989be43a3cb92e48ccd1197a6d096c"
+  },
+  "nativeActual": {
+    "status": "actual_budget_failed",
+    "productionAcceptance": false,
+    "all22OriginalIndexFilesPreserved": true,
+    "sourceIndex": "evidence/desktop-ad8d/index.json",
+    "login": {
+      "first": 198,
+      "second": 183,
+      "difference": 15,
+      "firstNotAboveSecond": false
+    },
+    "startupFirstPair": {
+      "first": 159,
+      "second": 158,
+      "difference": 1,
+      "firstNotAboveSecond": false
+    },
+    "functional": {
+      "lifecycle": "passed",
+      "lifecycleChecks": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "unknown": 0
+      },
+      "parity": {
+        "result": "passed",
+        "total": 100,
+        "passed": 100,
+        "pageErrorCount": 0
+      },
+      "crypto": {
+        "passed": true,
+        "sameImmutablePackage": true,
+        "distinctProcesses": 3,
+        "cleanup": "passed"
+      },
+      "package": {
+        "passed": true,
+        "signatureVerifiedStrictDeep": true
+      }
+    },
+    "cleanup": {
+      "lifecycleTopLevelFieldPresent": false,
+      "lifecycleStages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "fixtures",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "lifecycleAllStagesPassed": true,
+      "nativeCleaned": true,
+      "leaseState": "released",
+      "blocked": false,
+      "ownerAfterMatchesSealedBaseline": true,
+      "peerAfterMatchesSealedBaseline": true,
+      "parity": "passed",
+      "smokeStages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "electron-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "smokeAllStagesPassed": true
+    },
+    "important": "CI and Desktop workflow success do not satisfy the separate Native<=Web and bundled<=hosted budget gates; no window, PKCE or background work was subtracted. The new source has not been measured in a packaged Native run."
+  },
+  "ad8ExactEntry": {
+    "status": "historical_source_regression_not_applied_to_live",
+    "sourceReceipt": "evidence/alert-entry-source-receipt.json",
+    "finalOfflineTests": {
+      "passed": 34,
+      "failed": 0
+    },
+    "queueTopology": "evidence/workflow-queue-topology-readonly/receipt.json",
+    "historicalReadBoundaries": "A single known historical trace proves one observed exact flow→vqs.process→workflow.execute parent chain. It does not prove the deployed SDK version, trace mode or universal topology."
+  },
+  "arrayAlert": {
+    "sourceReceipt": "evidence/alert-array-source-receipt.json",
+    "officialEntry": "source-alert-array/scripts/ops/posthog-alert-acceptance.mjs",
+    "engineReceipt": "source-alert-array/scripts/ops/posthog/error-spike-engine-receipt.json",
+    "realEngineValidation": {
+      "kind": "one pure synthetic SELECT comparing exact new SQL and saved owner SQL; no production table source",
+      "project_id": 670821,
+      "cases": 64,
+      "input_span_rows": 487,
+      "candidate_passed": 64,
+      "candidate_failed": 0,
+      "baseline_passed": 44,
+      "baseline_failed": 20,
+      "distinct_excluded_identities": 54,
+      "raw_excluded_rows": 55,
+      "baseline_distinct_excluded_identities": 14,
+      "baseline_raw_excluded_rows": 14,
+      "synthetic_query_sha256": "179cd513bfa717b8d395509129ed2df1689057c4312ae553bb96df703c9a8479",
+      "fixture_data_sha256": "249c6924547ce9658ebf3d12cc06711bd6370f69ac19c1988de697a8e7a977f2",
+      "mcp_roundtrip_ms": 9741,
+      "engine_duration_ms": null,
+      "negative_controls": "Old SQL actually failed successful non-root wake/cron and same-trace failed-child cases on the same input; historical linked root+queue remains positive in both versions.",
+      "duplicate_rows": "A deliberate duplicate physical HTTP row produces3distinct identities and4raw excluded rows; they are not conflated."
+    },
+    "actualHistoricalReads": {
+      "bounded": {
+        "utc_from": "2026-11-06T20:00:00Z",
+        "utc_to_exclusive": "2026-11-06T20:10:00Z",
+        "mcp_roundtrip_ms": 10019,
+        "success": true,
+        "aggregate_rows": 1
+      },
+      "full": {
+        "source_window_days": 8,
+        "mcp_roundtrip_ms": 8952,
+        "success": true,
+        "aggregate_rows": 1,
+        "evaluated_hour_utc": "2026-11-07T12:00:00Z",
+        "value": 0,
+        "breaching_sources": 0,
+        "evaluated_sources": 18,
+        "reported_top_source": {
+          "service": "mikka-daemon",
+          "error_code": "ENOTFOUND",
+          "estimated_error_spans": 20,
+          "median": 0,
+          "threshold": 50,
+          "covered_hours": 46
+        }
+      },
+      "caution": "The full query did not return all per-source rows. No claim is made that all unknown errors are zero, or that results at different read times are a controlled performance comparison."
+    },
+    "offlineValidation": {
+      "command": "node --test scripts/ops/posthog-observability.test.mjs",
+      "exit_code": 0,
+      "counts": {
+        "tests": 9,
+        "pass": 9,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "duration_ms": 224.971478,
+      "ci_contract": "CI verifies exact SQL, materialized fixture, official acceptance script, generated query and result hashes, then strict returned identity sets and counts. It does not execute HogQL or simulate the classification algorithm.",
+      "red_receipt_gate": "Before a real-engine receipt existed, the two receipt-dependent tests failed with missing evidence. This is not presented as the semantic red test; the real old/new synthetic query supplies that evidence.",
+      "query_only_entry": "The official posthog-alert-acceptance.mjs --query-only child emits the byte-exact already executed synthetic packet without contacting PostHog.",
+      "lint": {
+        "files": 3,
+        "exit_code": 0
+      },
+      "diff_check_exit_code": 0
+    },
+    "rootMergeOfflineTests": {
+      "log": "alert-array-main-merge-tests.tap",
+      "tests": 9,
+      "passed": 9,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "liveConfigurationApplied": false,
+    "boundary": "Pure synthetic SELECT cases validate actual HogQL semantics; CI verifies the source/fixture/query/result hashes and exact sets without executing a remote query. Full historical query success is not deployed-run production acceptance."
+  },
+  "liveDriftAndCompatibility": {
+    "owner1311SqlSha256": "7abab6631e0c1cd33c0cde46a15d369533f153d20b1f7f5ef8598f7ef29c5f8d",
+    "owner1311BaselineExactMainB56": true,
+    "retainedFullMetricTailByteEqual": true,
+    "sourceAnomalyChanged": false,
+    "alertThresholdOrSubscriberChanged": false,
+    "mainBaReview": "evidence/main-ba533-ad8-compatibility.json",
+    "boundary": "The earlier preflight and merge-plan files retain their original timestamps/statuses; they are not a fresh lease for a future live insight update.",
+    "mainPublicationReadback": "evidence/main-publication-8ff-ba-b56-readonly.json",
+    "mainPublicationBoundary": "The frozen readonly receipt distinguishes actual 8ff E2B cleanup success, ba mainChanged, and b56 Web READY. It is not evidence of this candidate model or Native performance acceptance."
+  },
+  "readWaveSourceOnly": {
+    "receipt": "evidence/native-read-wave-source-receipt.json",
+    "status": "local_committed_unpublished_at_source_receipt",
+    "productionAcceptance": false,
+    "red": {
+      "tests": 1,
+      "passed": 0,
+      "failed": 1,
+      "exitCode": 1,
+      "observedPhysical": 2,
+      "expectedPhysical": 1
+    },
+    "green": {
+      "tests": 24,
+      "passed": 24,
+      "failed": 0,
+      "exitCode": 0,
+      "includes": "after-microtask scope reset, stale inflight response, max16, locale, same ordinary codec, one exact unknown-action fallback, no other retry; later live refresh remains fresh"
+    },
+    "rendererTypes": {
+      "exitCode": 0
+    },
+    "benchmark": "evidence/native-read-wave-benchmark.json",
+    "benchmarkDriver": "native-read-wave-benchmark.mjs",
+    "benchmarkBoundary": "500 alternating CPU-only scheduling pairs; no HTTP/DB/UI/model/Native latency claim. The new source cannot retroactively change ad8 failure."
+  },
+  "privacy": {
+    "review": "privacy-review.json",
+    "nonFixtureSensitiveMatches": 0,
+    "syntheticTestCanaryOccurrences": 2,
+    "rawRuntimeLogsOrSignedUrls": false,
+    "originalBytesPreserved": true,
+    "correctedPayloadSupplement": {
+      "recordedAt": "2026-11-07T14:11:50.827804+00:00",
+      "path": "evidence/main-publication-8ff-ba-b56-readonly.json",
+      "reason": "The observed 316483 value is raw string UTF-16 code units, not UTF-8 bytes. The corrected source receipt preserves this measurement boundary.",
+      "oldBytes": 4980,
+      "oldSha256": "298b7c1bbfc9f7bf31697cd32b01d03114e82624cc5051a7becbc1b3f4cdfb49",
+      "newBytes": 5029,
+      "newSha256": "c7e19094546e5a33265494717608804d2593d11276d44e83d59ba0a9571581a1",
+      "changedJsonPaths": [
+        {
+          "path": "$.entries[1].closedLogProjection.rawBytes",
+          "kind": "removed"
+        },
+        {
+          "path": "$.entries[1].closedLogProjection.rawStringCodeUnits",
+          "kind": "added"
+        },
+        {
+          "path": "$.entries[1].closedLogProjection.rawUtf8BytesMeasured",
+          "kind": "added"
+        }
+      ],
+      "privacyRescan": {
+        "patternCounts": {
+          "email": 0,
+          "credential": 0,
+          "private_key": 0,
+          "bearer": 0,
+          "jwt": 0,
+          "signed_url": 0,
+          "credential_url": 0
+        },
+        "nonemptySensitiveStringFields": 0,
+        "strictUtf8AndNoNul": true
+      },
+      "otherFrozenOriginalPayloadsUnchanged": true,
+      "originalPrivacyReceiptPreserved": "privacy-review.json describes the previous snapshot; this supplement binds the only corrected payload and its fresh privacy check."
+    }
+  },
+  "verification": {
+    "receiptHashClaimsVerified": 61,
+    "committedProductHashClaimsVerified": 10,
+    "localAllBytesSha256GitBlobVerified": true,
+    "remoteReadback": "not performed before root approval; must verify every path at the immutable new commit after publication",
+    "additionalReferencedCommittedSourceHashesVerified": 12
+  },
+  "explicitExclusions": [
+    "binary source bundle/base64 transport payload",
+    "ZIP/DMG and PNG artifacts",
+    "raw private CI or runtime logs",
+    "signed download URLs",
+    "credentials/cookies/account emails",
+    "unrelated source files",
+    "feature/source transport ref mutations"
+  ],
+  "files": [
+    {
+      "sourcePath": "ops1512/evidence/source-integration-ad8d2571.json",
+      "relativePath": "evidence/source-integration-ad8d2571.json",
+      "groups": [
+        "ad8-source-and-ci"
+      ],
+      "bytes": 885,
+      "characters": 885,
+      "sha256": "5fc089114d6f33179a736cf790cc9493433705469a5d498a4ba738a3ad172a37",
+      "gitBlobSha1": "9cca78a4eb1381d94bd228be54175a5180d14859",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/source-integration-ad8d2571.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/000.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/ci-ad8-owned-final.json",
+      "relativePath": "evidence/ci-ad8-owned-final.json",
+      "groups": [
+        "ad8-source-and-ci"
+      ],
+      "bytes": 70297,
+      "characters": 70297,
+      "sha256": "b02b3ad19df6c20289cd89fdc9526cc713e185e3db258c4059083313ba4bfeee",
+      "gitBlobSha1": "5f661e0a873364a7ad4c50d1fe893994875f784e",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/ci-ad8-owned-final.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/001.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/source-ad8d2571-verify.log",
+      "relativePath": "source-ad8d2571-verify.log",
+      "groups": [
+        "ad8-source-and-ci"
+      ],
+      "bytes": 425,
+      "characters": 425,
+      "sha256": "502dc378e7223fab294bf1c06a738c4cd70bb67f2c8dfdf332724b08b437bce5",
+      "gitBlobSha1": "71c017dace7b4b50778052884d5cfa6709ed9b97",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-ad8d2571-verify.log",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/002.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/lifecycle.json",
+      "relativePath": "evidence/desktop-ad8d/lifecycle.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 188650,
+      "characters": 188650,
+      "sha256": "28e8e1de9e9885dc2238858dd3d523bd7f3eebef89c197470049cd49ddec345f",
+      "gitBlobSha1": "5a9a8ad96d58aecdc05f44c8f04f1c7d1accd3bb",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/lifecycle.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/003.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/parity/parity.json",
+      "relativePath": "evidence/desktop-ad8d/parity/parity.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 107017,
+      "characters": 107009,
+      "sha256": "7e904b9d576ba00a264dbc68b8d171b89e35ea6167b9e39852775f70c58c92bc",
+      "gitBlobSha1": "bc5ebdbab2beece57758cb42f0f62d0014047265",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/parity/parity.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/004.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/smoke.json",
+      "relativePath": "evidence/desktop-ad8d/smoke.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 3125,
+      "characters": 3125,
+      "sha256": "c71736ee1157865d699601f4dd2d9d92a95c7a7aa0591537e2eeb9949eeacd66",
+      "gitBlobSha1": "3fb2d78880c10ec11e007cb49b4deaf5848e8bb9",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/smoke.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/005.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/native-crypto.json",
+      "relativePath": "evidence/desktop-ad8d/native-crypto.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 2868,
+      "characters": 2868,
+      "sha256": "fe62e3249bd08c08bd807466219736451cfa1ebdfe7221477a81a561461f61db",
+      "gitBlobSha1": "ec72343198ea7b61a6dc8e33489afd5a3acb5e23",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/native-crypto.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/006.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/mac-acceptance-package.json",
+      "relativePath": "evidence/desktop-ad8d/mac-acceptance-package.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 957,
+      "characters": 957,
+      "sha256": "75a614b07cb2d077662073529ff9754f86fd832715764d383ece9e7c05fd6ec5",
+      "gitBlobSha1": "26009c4e5652b29bc9521b89dcfaa1c866b2bbf0",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/mac-acceptance-package.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/007.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/compiled/mikka-build.json",
+      "relativePath": "evidence/desktop-ad8d/compiled/mikka-build.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 8259,
+      "characters": 8259,
+      "sha256": "4a342a4190c28846d8934d4d5eb73140d2d57146c81a36ed7dd0cfe7070aed24",
+      "gitBlobSha1": "d75ebc23c12d7f4f6749750a30380b3044d67f84",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/compiled/mikka-build.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/008.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/summary.json",
+      "relativePath": "evidence/desktop-ad8d/summary.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 110834,
+      "characters": 110834,
+      "sha256": "9224872ef8cba39b06ce4cabe8bfe327f127b7ff85226a210cf7cee63bcbe1ce",
+      "gitBlobSha1": "6f5ca7b4d90fafff976725b6f929507c6b3d7ac0",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/summary.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/009.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/query-operations.json",
+      "relativePath": "evidence/desktop-ad8d/query-operations.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 14790,
+      "characters": 14790,
+      "sha256": "4c4734d3cd6bec555b41a40bb7c79b5e9868198e0a96de3f956f97642700a0e1",
+      "gitBlobSha1": "39fceda7a44c2571b74289743cd9bc59b7f5b694",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/query-operations.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/010.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/query-operations.md",
+      "relativePath": "evidence/desktop-ad8d/query-operations.md",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 1462,
+      "characters": 1462,
+      "sha256": "612b35335872afe97cc6d610527c3935d43665a7b9536075be08e4fbd17486f0",
+      "gitBlobSha1": "241653b594a73693aef3de5b29d16f0dbd8e2ebc",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/query-operations.md",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/011.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/findings.json",
+      "relativePath": "evidence/desktop-ad8d/findings.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 14482,
+      "characters": 14482,
+      "sha256": "68fabaee8f0792191c2ea276a59f976e7b218c29af280e6d84d54640ae72d679",
+      "gitBlobSha1": "258c82cc034bb10dd726436e02518b38c2f05cb8",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/findings.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/012.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/ci-final.json",
+      "relativePath": "evidence/desktop-ad8d/ci-final.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 26309,
+      "characters": 26309,
+      "sha256": "47f07bbc8517d061311e4937a697ba3be42e6c3fd9c9b8c79a7bcc1ce47aff6f",
+      "gitBlobSha1": "b5132c6de9dc263f1525c29bb2ffa2a6d679a8f6",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/ci-final.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/013.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/source-harness.json",
+      "relativePath": "evidence/desktop-ad8d/source-harness.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 2566,
+      "characters": 2566,
+      "sha256": "124b6409782e0931c2027e8956b77cb8b996958bacdc52041e45d617ce3d10a7",
+      "gitBlobSha1": "9a9f2dfdaf2f0fab70fb1c896fc07f36dc2b2b78",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/source-harness.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/014.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/download-receipt.json",
+      "relativePath": "evidence/desktop-ad8d/download-receipt.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 1444,
+      "characters": 1444,
+      "sha256": "9baf00df65493a07370d869aa8a59903d396ce3cb8ee595b662fbf51abbbda1e",
+      "gitBlobSha1": "ff8d32dae38cd652a70f5f1149d24ae0fc9afea5",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/download-receipt.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/015.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/privacy-scan.json",
+      "relativePath": "evidence/desktop-ad8d/privacy-scan.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 1931,
+      "characters": 1931,
+      "sha256": "aa8df5fab49684946edc1dd4c21cbf7ca312f086ec56c4834c6fd2bb3853d1a8",
+      "gitBlobSha1": "5f430152c3eb0a4cfe2ddabf9b82d2b7e35cd08b",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/privacy-scan.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/016.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/compiled-download-receipt.json",
+      "relativePath": "evidence/desktop-ad8d/compiled-download-receipt.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 884,
+      "characters": 884,
+      "sha256": "8dd413e8cded6b67f40e6df1fc68ae2f6d1989782ef655e2aeea7dc318cae385",
+      "gitBlobSha1": "16cefb55d9c389f459fc5a147351864aac527b2d",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/compiled-download-receipt.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/017.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/compiled-privacy-scan.json",
+      "relativePath": "evidence/desktop-ad8d/compiled-privacy-scan.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 538,
+      "characters": 538,
+      "sha256": "cb82a93ce3afe7a7e570cc5454bb189930ca701a7936d5918de86ea1b770dbd2",
+      "gitBlobSha1": "dc62a375955f5bba0fcc4851b4fd53f83353a066",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/compiled-privacy-scan.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/018.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-native-summary.mjs",
+      "relativePath": "desktop-native-summary.mjs",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 19258,
+      "characters": 19258,
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b",
+      "gitBlobSha1": "dad196c96077ab1504fd8858343d31b00cf0da3a",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/desktop-native-summary.mjs",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/019.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-query-operations-summary.mjs",
+      "relativePath": "desktop-query-operations-summary.mjs",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 7134,
+      "characters": 7134,
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2",
+      "gitBlobSha1": "17a54954b618fc3373715dbc73fa86669c2aa739",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/desktop-query-operations-summary.mjs",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/020.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-query-operations-summary.test.mjs",
+      "relativePath": "desktop-query-operations-summary.test.mjs",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 4248,
+      "characters": 4248,
+      "sha256": "b608c3aba813049bda7d6fa393214696d5bc602742a831236cf32c868bde80e0",
+      "gitBlobSha1": "8d7eed08f88bcca58788680aeef9e7459efce79d",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/desktop-query-operations-summary.test.mjs",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/021.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-query-operations-summary-tests-final.tap",
+      "relativePath": "desktop-query-operations-summary-tests-final.tap",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 623,
+      "characters": 597,
+      "sha256": "c9b38ed9c57d0bbb7ed47698d3f134549f5040c1059ad9eb3df6c68c09d64a67",
+      "gitBlobSha1": "30963be71dbdc2dec9f831c030ad274a2f792e9f",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/desktop-query-operations-summary-tests-final.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/022.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-query-operations-summary-validation.json",
+      "relativePath": "desktop-query-operations-summary-validation.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 1554,
+      "characters": 1554,
+      "sha256": "76bb571804455aa98b2356f93cc668dea62bc4568c6e73112abd9aed9b86b797",
+      "gitBlobSha1": "4b79bc615a9baaf76627a83456bc1076175588ae",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/desktop-query-operations-summary-validation.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/023.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/desktop-ad8d-download.py",
+      "relativePath": "desktop-ad8d-download.py",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 8902,
+      "characters": 8902,
+      "sha256": "88015fae629612a272ccd0a94f8b24e469db1098a9d43f770352789194a1c121",
+      "gitBlobSha1": "d88c63207a6b62955ae67f200a1cd67b873858d9",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/desktop-ad8d-download.py",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/024.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d/index.json",
+      "relativePath": "evidence/desktop-ad8d/index.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 7072,
+      "characters": 7072,
+      "sha256": "8d4083aab4990be1eaa7e359debb79322639d73b8ab207d91ea8624fbbe2d454",
+      "gitBlobSha1": "128dfe2c75d0e8f6c31adc99e4f0ffc2f38b98b5",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d/index.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/025.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/desktop-ad8d-startup-independent-analysis.json",
+      "relativePath": "evidence/desktop-ad8d-startup-independent-analysis.json",
+      "groups": [
+        "native-ad8-original"
+      ],
+      "bytes": 9830,
+      "characters": 9830,
+      "sha256": "eafade46c6918854afbe64d82ea56e9e342239d0cc5f8d902c3b41157576ba0e",
+      "gitBlobSha1": "767947b4443cb04fe20625c845eadf8b011fd04c",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/desktop-ad8d-startup-independent-analysis.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/026.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/alert-entry-source-receipt.json",
+      "relativePath": "evidence/alert-entry-source-receipt.json",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 9963,
+      "characters": 9963,
+      "sha256": "35a0a3106f815161c509f88de3c6f930c4db12d0ef9066b4c17fb57af848bf01",
+      "gitBlobSha1": "419f684cfc7a32fb75baef6fd15b19d461e36672",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/alert-entry-source-receipt.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/027.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-entry-scope-red.tap",
+      "relativePath": "alert-entry-scope-red.tap",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 2541,
+      "characters": 2541,
+      "sha256": "408a833a21806c1bfd0a6f20f02f72f358c853c5456173f50654c4d895bd079c",
+      "gitBlobSha1": "dae056278a5877973ca7115ac0eb1bb0c96057ef",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-entry-scope-red.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/028.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-entry-scope-green.tap",
+      "relativePath": "alert-entry-scope-green.tap",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 4243,
+      "characters": 4243,
+      "sha256": "508ae79d936de482690c0682a64f9ae18e800e90a114d506d4e52b34fef0d5ac",
+      "gitBlobSha1": "2e56b8532ddd901838464eb255921f654cb4097a",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-entry-scope-green.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/029.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-entry-scope-final.tap",
+      "relativePath": "alert-entry-scope-final.tap",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 4713,
+      "characters": 4713,
+      "sha256": "4f34995f21ea467e93a8d6ab677a746231e40b5a5103f9fb78c64cabd81c492f",
+      "gitBlobSha1": "ee63191c1406856ba79967a693b50615beb56550",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-entry-scope-final.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/030.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-entry-queue-red.tap",
+      "relativePath": "alert-entry-queue-red.tap",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 3557,
+      "characters": 3527,
+      "sha256": "c59c04df727cd0cbe35c963b6ce0ea8721dbe9135e8266a19a23b4e709395310",
+      "gitBlobSha1": "675fc41f9486bd14dfdf7038cd242cdfc26a0a7f",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-entry-queue-red.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/031.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-entry-queue-final.tap",
+      "relativePath": "alert-entry-queue-final.tap",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 3008,
+      "characters": 2924,
+      "sha256": "6767a26587aecfe3e5a7f0cc6f206565ecba91c7fd43bdb7e708f3c13565c2d5",
+      "gitBlobSha1": "7c8212edb5491d120a51ac851aa476b39ee366c1",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-entry-queue-final.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/032.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-entry-queue-oxlint.log",
+      "relativePath": "alert-entry-queue-oxlint.log",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-entry-queue-oxlint.log",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/033.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/alert-entry-links-schema.json",
+      "relativePath": "evidence/alert-entry-links-schema.json",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 9862,
+      "characters": 9862,
+      "sha256": "87668c86acbed3e813f60b0b182bf9d5a2066ff372bde4f73e12aeffc2376c2d",
+      "gitBlobSha1": "25c7beb6ebb265b4bd0fbf7fdfd19f4548f39a75",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/alert-entry-links-schema.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/034.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/alert-entry-sql-validation-stage.json",
+      "relativePath": "evidence/alert-entry-sql-validation-stage.json",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 52005,
+      "characters": 52005,
+      "sha256": "00416f6f77681ad512d8df921ffab03ca4bf1af70075c83d93624ee2a827090c",
+      "gitBlobSha1": "40f7a6f06a49fec74c7596867288a074766e095c",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/alert-entry-sql-validation-stage.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/035.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/alert-entry-sql-validation-final.json",
+      "relativePath": "evidence/alert-entry-sql-validation-final.json",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 55894,
+      "characters": 55892,
+      "sha256": "1891050f0159d6a06fc2d685cadbd8c476a94b3dff77365cee7e9e7cc458f881",
+      "gitBlobSha1": "507d25355225b24ecdccfdf642f9adf6d8e9fb35",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/alert-entry-sql-validation-final.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/036.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/main-dab-alert-readback.json",
+      "relativePath": "evidence/main-dab-alert-readback.json",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 24095,
+      "characters": 24021,
+      "sha256": "b63eadad278ccc3105513795c81748298019464d1d73703b48fd04af644749d1",
+      "gitBlobSha1": "de6f47c74a90b5df5fe4317db690e848f0a2861f",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/main-dab-alert-readback.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/037.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/workflow-queue-topology-readonly/receipt.json",
+      "relativePath": "evidence/workflow-queue-topology-readonly/receipt.json",
+      "groups": [
+        "ad8-exact-entry",
+        "alert-array-final"
+      ],
+      "bytes": 4259,
+      "characters": 4259,
+      "sha256": "a2fe43d7c71a1d4e0b48ea5d6085816118a64c6cb5e05487f76f531b415e8b68",
+      "gitBlobSha1": "7b6b9a74b17de7ae6e642038256d312f54f5401d",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/workflow-queue-topology-readonly/receipt.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/038.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/workflow-queue-topology-readonly/request.json",
+      "relativePath": "evidence/workflow-queue-topology-readonly/request.json",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 2215,
+      "characters": 2215,
+      "sha256": "8610c69d280fc7384bd2ecb49bcdd89763adaf4fe4660e4fb112797f265fcb59",
+      "gitBlobSha1": "090122831e098c8542aee46495a215493103f861",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/workflow-queue-topology-readonly/request.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/039.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/workflow-queue-topology-readonly/response.json",
+      "relativePath": "evidence/workflow-queue-topology-readonly/response.json",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "bytes": 802,
+      "characters": 802,
+      "sha256": "4e0edbdf05f546f04be74637c4e898ed3fd4ead8a0c2e1d020b75cefdb8573d8",
+      "gitBlobSha1": "4398868bbc2acdf505bd0c17bc271ec22a97241c",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/workflow-queue-topology-readonly/response.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/040.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/alert-array-source-receipt.json",
+      "relativePath": "evidence/alert-array-source-receipt.json",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 10921,
+      "characters": 10921,
+      "sha256": "a8b665577ab6c65e317ccf9ab83a27a849dd75f3e1505357c6e9620dd42539ba",
+      "gitBlobSha1": "1a54c256c70ea90bb62e2a1315a86e62a3221056",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/alert-array-source-receipt.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/041.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-array-final-tests.tap",
+      "relativePath": "alert-array-final-tests.tap",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 972,
+      "characters": 938,
+      "sha256": "a793d38888a10b06b8701d418398d52fccdf57c845f99ca64e2e7e8dadde3359",
+      "gitBlobSha1": "05f384cc617eb6b930a925c1546f84dbecdab811",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-array-final-tests.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/042.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-array-oxlint.log",
+      "relativePath": "alert-array-oxlint.log",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-array-oxlint.log",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/043.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-array-receipt-gate-red.tap",
+      "relativePath": "alert-array-receipt-gate-red.tap",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 3256,
+      "characters": 3218,
+      "sha256": "be3d6af139bf0615d05afa8c2342877112e7c1629449b238a898521e3e17158e",
+      "gitBlobSha1": "67356eb1c3e8718f48166b8bcf4e18c2d2292d19",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-array-receipt-gate-red.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/044.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-array-fixtures.sql",
+      "relativePath": "alert-array-fixtures.sql",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 117790,
+      "characters": 117790,
+      "sha256": "179cd513bfa717b8d395509129ed2df1689057c4312ae553bb96df703c9a8479",
+      "gitBlobSha1": "b7ae5c9eb3222a32cd9d4070735afda7e0d139dc",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-array-fixtures.sql",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/045.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/alert-array-synthetic-engine.json",
+      "relativePath": "evidence/alert-array-synthetic-engine.json",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 130534,
+      "characters": 130534,
+      "sha256": "0e4d95f921a2bfd25b2ccb9b54f9adf5f1e9be1923d4c02458f78cac760415b0",
+      "gitBlobSha1": "35842133483be5636a626a2c2ada8e15e6e93c45",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/alert-array-synthetic-engine.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/046.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/alert-array-query-validation.json",
+      "relativePath": "evidence/alert-array-query-validation.json",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 54444,
+      "characters": 54444,
+      "sha256": "991e064c86ae64aca3b709ec462907a59966212d2ce0d02eeb0d5b73fe619745",
+      "gitBlobSha1": "34a87576aaabc2040b70c893c2c94b930701c6db",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/alert-array-query-validation.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/047.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/error-insight-live-1311.sql",
+      "relativePath": "evidence/error-insight-live-1311.sql",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 8610,
+      "characters": 8610,
+      "sha256": "7abab6631e0c1cd33c0cde46a15d369533f153d20b1f7f5ef8598f7ef29c5f8d",
+      "gitBlobSha1": "b48c1bb8b4231a1ba4c4b8320137486596e83993",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/error-insight-live-1311.sql",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/048.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/error-insight-live-1311-description.txt",
+      "relativePath": "evidence/error-insight-live-1311-description.txt",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 309,
+      "characters": 304,
+      "sha256": "40748a612a6a3eb12950cf9f1c85456952288e2a0ea60cd8e25b30dde4afd0a7",
+      "gitBlobSha1": "cca2f673b42e0bce17f37e36ca577d1fe9bdb424",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/error-insight-live-1311-description.txt",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/049.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/error-insight-update-preflight-ad8d.json",
+      "relativePath": "evidence/error-insight-update-preflight-ad8d.json",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 23877,
+      "characters": 23821,
+      "sha256": "1a8a52ef018b8a10d879f65f635e2a0aae875ddb974446dde2a3e1fe5b47535f",
+      "gitBlobSha1": "bd8e68866fde9f38277164283a29e5f3b1f6637d",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/error-insight-update-preflight-ad8d.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/050.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:ad8d257129989be43a3cb92e48ccd1197a6d096c:scripts/ops/posthog/alert-error-spike.sql",
+      "relativePath": "source-ad8d2571/scripts/ops/posthog/alert-error-spike.sql",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "sourceCommit": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "bytes": 12523,
+      "characters": 12523,
+      "sha256": "f0a61a3699c8fcaa2d74a3df3d8e94cbb5ce65fc668a7daa72b7ba2119a99cb4",
+      "gitBlobSha1": "92f6dc01a5759e7366cbd44e190c91d8e57ee77a",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-ad8d2571/scripts/ops/posthog/alert-error-spike.sql",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/051.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:ad8d257129989be43a3cb92e48ccd1197a6d096c:scripts/ops/posthog-observability.test.mjs",
+      "relativePath": "source-ad8d2571/scripts/ops/posthog-observability.test.mjs",
+      "groups": [
+        "ad8-exact-entry"
+      ],
+      "sourceCommit": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "bytes": 20813,
+      "characters": 20813,
+      "sha256": "6bcd840e1f60d1843810319702fe59f82314e631da66632f0d38c38b8b0f08ac",
+      "gitBlobSha1": "d34e9167927a2c0a88db9cdcfcbdf116a8df268c",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-ad8d2571/scripts/ops/posthog-observability.test.mjs",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/052.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:4164a4cd928790640b4a9c33a8c04f17b3685b77:scripts/ops/posthog/alert-error-spike.sql",
+      "relativePath": "source-alert-array/scripts/ops/posthog/alert-error-spike.sql",
+      "groups": [
+        "alert-array-final"
+      ],
+      "sourceCommit": "4164a4cd928790640b4a9c33a8c04f17b3685b77",
+      "bytes": 12582,
+      "characters": 12582,
+      "sha256": "e43b0341fe51d192c1df4e8c6eb3380f311c1075d3ab745ae66673f4dc3fc472",
+      "gitBlobSha1": "bf6b49d1230627acc200849f124cac09b2c74eec",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-alert-array/scripts/ops/posthog/alert-error-spike.sql",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/053.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:4164a4cd928790640b4a9c33a8c04f17b3685b77:scripts/ops/posthog-observability.mjs",
+      "relativePath": "source-alert-array/scripts/ops/posthog-observability.mjs",
+      "groups": [
+        "alert-array-final"
+      ],
+      "sourceCommit": "4164a4cd928790640b4a9c33a8c04f17b3685b77",
+      "bytes": 22560,
+      "characters": 21290,
+      "sha256": "a5a11765d2f87a69cd3574334acac216c6a0fb56e9f0c8fcd55e0aba7c5e82fa",
+      "gitBlobSha1": "9db7d6253eaaec3920c6d776416b4d466b3bf96a",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-alert-array/scripts/ops/posthog-observability.mjs",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/054.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:4164a4cd928790640b4a9c33a8c04f17b3685b77:scripts/ops/posthog-observability.test.mjs",
+      "relativePath": "source-alert-array/scripts/ops/posthog-observability.test.mjs",
+      "groups": [
+        "alert-array-final"
+      ],
+      "sourceCommit": "4164a4cd928790640b4a9c33a8c04f17b3685b77",
+      "bytes": 11689,
+      "characters": 11689,
+      "sha256": "86fb0bb18b11bc925686502cc58f61b5c4a89cd2d9901fdd21b147c1f23d3a51",
+      "gitBlobSha1": "375d9bf3c1d79e91eb478a852e90aaa36f3d2585",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-alert-array/scripts/ops/posthog-observability.test.mjs",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/055.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:4164a4cd928790640b4a9c33a8c04f17b3685b77:scripts/ops/posthog-alert-acceptance.mjs",
+      "relativePath": "source-alert-array/scripts/ops/posthog-alert-acceptance.mjs",
+      "groups": [
+        "alert-array-final"
+      ],
+      "sourceCommit": "4164a4cd928790640b4a9c33a8c04f17b3685b77",
+      "bytes": 26596,
+      "characters": 26596,
+      "sha256": "247c48826ef331afc02bad3564d83fb863f6c98bd45825804d459c478e767bbc",
+      "gitBlobSha1": "86229fa9bed9910b5bf8f7e18468cffbec7d3f54",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-alert-array/scripts/ops/posthog-alert-acceptance.mjs",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/056.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:4164a4cd928790640b4a9c33a8c04f17b3685b77:scripts/ops/posthog/error-spike-engine-receipt.json",
+      "relativePath": "source-alert-array/scripts/ops/posthog/error-spike-engine-receipt.json",
+      "groups": [
+        "alert-array-final"
+      ],
+      "sourceCommit": "4164a4cd928790640b4a9c33a8c04f17b3685b77",
+      "bytes": 15776,
+      "characters": 15776,
+      "sha256": "ef415f7d8ad15047e9d7a9e8251b6abc27cb8014ae52035dfef7876947e1b24a",
+      "gitBlobSha1": "c92697dcaab19827fee29a504e140ca15a7fcb27",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-alert-array/scripts/ops/posthog/error-spike-engine-receipt.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/057.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/alert-array-main-merge-tests.tap",
+      "relativePath": "alert-array-main-merge-tests.tap",
+      "groups": [
+        "alert-array-final"
+      ],
+      "bytes": 971,
+      "characters": 937,
+      "sha256": "1d33ef4bacf2c2a6ff070c5065596a3768a63c1cddd7cb940c11f23d5d64708a",
+      "gitBlobSha1": "040c361d476af2d0bf3c752579e8f945abeb834d",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/alert-array-main-merge-tests.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/058.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/error-insight-1238-to-1311.diff",
+      "relativePath": "evidence/error-insight-1238-to-1311.diff",
+      "groups": [
+        "live-drift-and-main-compatibility"
+      ],
+      "bytes": 10471,
+      "characters": 10471,
+      "sha256": "cb03209942703d4003819b66aebe1b36507723a2153bc5aed896afd0a53ad411",
+      "gitBlobSha1": "f199ca2d85db069c19c1a54f8d695fc5ea853f66",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/error-insight-1238-to-1311.diff",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/059.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/error-insight-1311-merge-plan.json",
+      "relativePath": "evidence/error-insight-1311-merge-plan.json",
+      "groups": [
+        "live-drift-and-main-compatibility"
+      ],
+      "bytes": 9586,
+      "characters": 9579,
+      "sha256": "c8579195cef3e715168f2313a950e1bae31f4ace1e6bcc8f54a8a84d145d02af",
+      "gitBlobSha1": "1551fd4934bd46e6ff96678d191c2539859c3251",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/error-insight-1311-merge-plan.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/060.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/error-insight-update-tool-schema.json",
+      "relativePath": "evidence/error-insight-update-tool-schema.json",
+      "groups": [
+        "live-drift-and-main-compatibility"
+      ],
+      "bytes": 38826,
+      "characters": 38812,
+      "sha256": "939f0465cbfdefdc44ac1095a705cb4ff684de67f0b2c953403112c541c2368d",
+      "gitBlobSha1": "a81bb48deb5c57fd46ad7ed8bbe3b41a969ec712",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/error-insight-update-tool-schema.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/061.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/main-ba533-ad8-compatibility.json",
+      "relativePath": "evidence/main-ba533-ad8-compatibility.json",
+      "groups": [
+        "live-drift-and-main-compatibility"
+      ],
+      "bytes": 4791,
+      "characters": 4791,
+      "sha256": "4fcb87f8a2721665edbacdb6c2fc26eb3916b95a6fb61a04fa1ffea414997f03",
+      "gitBlobSha1": "28c6665171e298d3367a322262f7c10824630633",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/main-ba533-ad8-compatibility.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/062.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/native-read-wave-source-receipt.json",
+      "relativePath": "evidence/native-read-wave-source-receipt.json",
+      "groups": [
+        "read-wave-source-regression"
+      ],
+      "bytes": 4156,
+      "characters": 4156,
+      "sha256": "861139e184295c009e0ec6cb7facc84d4ead8d5341ae9654760ea6d7e740703f",
+      "gitBlobSha1": "840d102c4ac820c248121aaeb56bad8b2f07931e",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/native-read-wave-source-receipt.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/063.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:cc22981669aee33ceb4d8e3f812169f4de8aa184:apps/desktop/src/renderer/read-batch.ts",
+      "relativePath": "source-read-wave-cc229816/apps/desktop/src/renderer/read-batch.ts",
+      "groups": [
+        "read-wave-source-regression"
+      ],
+      "sourceCommit": "cc22981669aee33ceb4d8e3f812169f4de8aa184",
+      "bytes": 5484,
+      "characters": 5484,
+      "sha256": "62107abf2e2364cb9e552b0e81d299b0728fe14eed74a7d10a0fe0339809fd18",
+      "gitBlobSha1": "868622ca05b4bf700d8bc0265c3fe0757b2c1770",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-read-wave-cc229816/apps/desktop/src/renderer/read-batch.ts",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/064.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:cc22981669aee33ceb4d8e3f812169f4de8aa184:apps/desktop/scripts/read-batch.test.mjs",
+      "relativePath": "source-read-wave-cc229816/apps/desktop/scripts/read-batch.test.mjs",
+      "groups": [
+        "read-wave-source-regression"
+      ],
+      "sourceCommit": "cc22981669aee33ceb4d8e3f812169f4de8aa184",
+      "bytes": 14352,
+      "characters": 14352,
+      "sha256": "766eacc9b1f5e145ec04efb52cdf682221b2b510c9fc79f7dcc404fa3d6f0567",
+      "gitBlobSha1": "c86aa78a70a1b9e219e69ee0fcfad71ac6d5059d",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-read-wave-cc229816/apps/desktop/scripts/read-batch.test.mjs",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/065.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "git:cc22981669aee33ceb4d8e3f812169f4de8aa184:docs/operations/tracing.md",
+      "relativePath": "source-read-wave-cc229816/docs/operations/tracing.md",
+      "groups": [
+        "read-wave-source-regression"
+      ],
+      "sourceCommit": "cc22981669aee33ceb4d8e3f812169f4de8aa184",
+      "bytes": 58653,
+      "characters": 58511,
+      "sha256": "24489848d3a74026e89a63f83f7768e14da8915b3c4c988af803636850fb2d8d",
+      "gitBlobSha1": "7f4ecd06dd6beac61706f92c6323881fce3b8bd9",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/source-read-wave-cc229816/docs/operations/tracing.md",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/066.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-read-wave-red.tap",
+      "relativePath": "native-read-wave-red.tap",
+      "groups": [
+        "read-wave-source-regression"
+      ],
+      "bytes": 1128,
+      "characters": 1106,
+      "sha256": "a2b6aacde987ddfd55751e269769b4a7441a1532b09ba60d9bd9d72190ec507a",
+      "gitBlobSha1": "61969659313a7058dd3cc77a086b10aea4f267a4",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/native-read-wave-red.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/067.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-read-wave-green-final.tap",
+      "relativePath": "native-read-wave-green-final.tap",
+      "groups": [
+        "read-wave-source-regression"
+      ],
+      "bytes": 2211,
+      "characters": 2141,
+      "sha256": "bd39890741ee6c32e78d94db7f42fb3b4c0e35f4638ae6fd918bf2424a8536d6",
+      "gitBlobSha1": "95632d9458dd4dbf24fd8e756014a16ebd35343d",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/native-read-wave-green-final.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/068.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-read-wave-renderer-types.log",
+      "relativePath": "native-read-wave-renderer-types.log",
+      "groups": [
+        "read-wave-source-regression"
+      ],
+      "bytes": 0,
+      "characters": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/native-read-wave-renderer-types.log",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/069.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-read-wave-benchmark.mjs",
+      "relativePath": "native-read-wave-benchmark.mjs",
+      "groups": [
+        "read-wave-source-regression"
+      ],
+      "bytes": 3362,
+      "characters": 3362,
+      "sha256": "4d3410adda211167184123c1dbddc61a6bd197d0f9a43921317ab094264e159f",
+      "gitBlobSha1": "e4dd90b1c81b05e742c2420fd54c7a85b39be393",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/native-read-wave-benchmark.mjs",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/070.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/native-read-wave-benchmark.json",
+      "relativePath": "evidence/native-read-wave-benchmark.json",
+      "groups": [
+        "read-wave-source-regression"
+      ],
+      "bytes": 35603,
+      "characters": 35603,
+      "sha256": "57a01ce4ffeb4ae1fa12bee662623885ec5bde6ac2a60a1b68783d3dcc62cf65",
+      "gitBlobSha1": "5ff70d564783729276c0a5748cbb33560b8c103c",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/native-read-wave-benchmark.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/071.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/native-read-wave-green.tap",
+      "relativePath": "native-read-wave-green.tap",
+      "groups": [
+        "read-wave-source-regression-intermediate"
+      ],
+      "bytes": 2228,
+      "characters": 2158,
+      "sha256": "2d9e123178f7023c2d17dfcc9301fdc6a7084987471e0021aed439acef441003",
+      "gitBlobSha1": "55427eaac4102b8123f4db38f85a0b38cf427d53",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/native-read-wave-green.tap",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/072.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/main-publication-8ff-ba-b56-readonly.json",
+      "relativePath": "evidence/main-publication-8ff-ba-b56-readonly.json",
+      "groups": [
+        "main-publication-readonly"
+      ],
+      "bytes": 5029,
+      "characters": 5029,
+      "sha256": "c7e19094546e5a33265494717608804d2593d11276d44e83d59ba0a9571581a1",
+      "gitBlobSha1": "6cc06892021bf9281c74c0c3630555562cdf31e7",
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/evidence/main-publication-8ff-ba-b56-readonly.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/payloads/073.payload",
+      "originalBytesPreserved": true
+    },
+    {
+      "sourcePath": "ops1512/evidence/archive-ad8-native-alert-array-read-wave/privacy-review.json",
+      "relativePath": "privacy-review.json",
+      "bytes": 2167,
+      "characters": 2167,
+      "sha256": "65d65249a090334c47e3fa10cfd4c2325f9854983d8f2e622f4afb513e73c0ee",
+      "gitBlobSha1": "5a07b0b9120a7af80caade641c7da254e370d5a6",
+      "groups": [
+        "archive-privacy-review"
+      ],
+      "archivePath": "docs/operations/evidence/1512-raw/ad8-native-alert-array-read-wave/privacy-review.json",
+      "payloadPath": "evidence/archive-ad8-native-alert-array-read-wave/privacy-review.json",
+      "originalBytesPreserved": true
+    }
+  ]
+}

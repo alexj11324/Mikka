@@ -1,0 +1,22 @@
+{
+  "recordedAt": "2026-11-07T13:17:29.487332+00:00",
+  "candidate": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+  "tree": "6d2091214d32173a0cb08936ab4288af60ddf675",
+  "parents": [
+    "bf8f773df0fcaadc434a38d2011688766bdbe144"
+  ],
+  "sourceImportRun": 42376150226,
+  "sourceImportAttempt": 1,
+  "sourceImportConclusion": "success",
+  "sourceRefAndCommitTreeVerified": true,
+  "featureExpectedPrevious": "1f548a73304923da466ebe702c99b6a8f6096f15",
+  "featureForce": false,
+  "featureUpdateSucceeded": true,
+  "actualCiCheckout": "not_observed_yet",
+  "bundleBytes": 23279,
+  "bundleSha256": "0abe05fc4b226f39fc34120518b9ae73a540c4f8c80d4c7c11f93c5be8d3edcd",
+  "operationCommit": "41179bb5b94a3c8f5ac986f8ccfdfd359c9195f7",
+  "operationTree": "0d296c481e01d57b0c8e2fe5863aeef64c9241a0",
+  "reviewedMain": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+  "productionAcceptance": false
+}

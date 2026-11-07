@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "kind": "issue1512_historical_workflow_delivery_topology_readonly",
+  "recordedAt": "2026-11-07T13:11:57.015Z",
+  "queryAttemptedAt": "2026-11-07T13:10:31.140Z",
+  "sourceFixture": "ops1512/evidence/alert-entry-links-schema.json",
+  "scope": {
+    "service": "mikka-web",
+    "environment": "production",
+    "windowStartUtc": "2026-11-06T20:00:00Z",
+    "windowEndUtc": "2026-11-06T20:10:00Z",
+    "invocationTraceHex": "d800cdfe653e7cb1dd4f60c079008f82",
+    "invocationSpanHex": "5f6975f48cd14aac",
+    "existingLinkTraceBase64": "s7W2IvgvPyQj8LrQKd8P5A==",
+    "limit": 50,
+    "queryCalls": 1,
+    "truncate": false
+  },
+  "observedRows": [
+    {
+      "started_utc": "2026-11-06T20:01:22.176000Z",
+      "stage": "workflow.route.flow",
+      "trace_hex": "d800cdfe653e7cb1dd4f60c079008f82",
+      "span_hex": "c2ba0330e5e49ccf",
+      "parent_hex": "0000000000000000",
+      "status_code": "1",
+      "http_2xx": "1",
+      "link_count": "0",
+      "link_trace_hex": "",
+      "link_span_hex": ""
+    },
+    {
+      "started_utc": "2026-11-06T20:01:22.177000Z",
+      "stage": "vqs.process",
+      "trace_hex": "d800cdfe653e7cb1dd4f60c079008f82",
+      "span_hex": "e8a7329955b1c7da",
+      "parent_hex": "c2ba0330e5e49ccf",
+      "status_code": "0",
+      "http_2xx": "0",
+      "link_count": "1",
+      "link_trace_hex": "8ce0b2036d4653bbf82a02336c8f59f3",
+      "link_span_hex": "c855cd095df2157b"
+    },
+    {
+      "started_utc": "2026-11-06T20:01:22.179000Z",
+      "stage": "workflow.execute",
+      "trace_hex": "d800cdfe653e7cb1dd4f60c079008f82",
+      "span_hex": "5f6975f48cd14aac",
+      "parent_hex": "e8a7329955b1c7da",
+      "status_code": "1",
+      "http_2xx": "0",
+      "link_count": "1",
+      "link_trace_hex": "b3b5b622f82f3f2423f0bad029df0fe4",
+      "link_span_hex": "227f07dc85e9e4f6"
+    }
+  ],
+  "findings": {
+    "flowToQueueToInvocation": true,
+    "sameTraceParentEdges": true,
+    "flowHttp2xx": true,
+    "flowStatusCode": 1,
+    "queueStatusCode": 0,
+    "invocationStatusCode": 1,
+    "invocationSoleLinkPointsElsewhere": true
+  },
+  "sourceEvidence": [
+    {
+      "package": "@workflow/core",
+      "version": "5.2.3",
+      "path": "dist/runtime.js",
+      "sha256": "1e7a1dffc2dbb91668f07e6fe4dbcf6b245c2a22dfeb604655e4bf2e9ca2ef35",
+      "basis": "linked leaves active delivery context as invocation parent; continuous restores carrier parent; buildInvocationSpanLinks executes before restoration"
+    },
+    {
+      "package": "@workflow/core",
+      "version": "5.2.3",
+      "path": "dist/telemetry.js",
+      "sha256": "cd68b1af79068a5538b53af7dadf03cb5b4b4f661c09826400bbba6d04124760",
+      "basis": "linked links usable incoming carrier; continuous links current active span; baggage does not replace span; trace uses startActiveSpan"
+    },
+    {
+      "package": "@workflow/world-vercel",
+      "version": "5.2.3",
+      "path": "dist/queue.js",
+      "sha256": "456e74c0de5aa1bfd8fd18c060bf39beb969eb2f6b7c18cf20327545ac9e6eba",
+      "basis": "QueueClient options leave telemetry enabled; handleCallback wraps direct runtime handler"
+    },
+    {
+      "package": "@vercel/queue",
+      "version": "0.8.0",
+      "path": "dist/index.mjs",
+      "sha256": "8ea1402417c49d5fcb5588952adc3f7959bd12ef548a0db26c51229a3467d211",
+      "basis": "default telemetry enabled; withConsumerSpan creates vqs.process with local parent and producer link, makes it active, and ends it after handler"
+    },
+    {
+      "path": "Mikka/lib/tracing/sanitize.ts",
+      "sha256": "790c87370c1184511e200eb5d49626cc7ca832c642795c25da15a29f6679cb9c",
+      "basis": "preserves vqs.process name, original trace/parent identity, and link contexts; drops workflow.trace.mode attribute"
+    }
+  ],
+  "boundaries": {
+    "historicalObservationOnly": true,
+    "installedSdkRevisionIsNotAttestationOfHistoricalDeployment": true,
+    "traceModeInferredFromTopologyAndSdkNotDirectlyObserved": true,
+    "originLinkTargetNotObservedInFilteredResult": true,
+    "rowsetCompletenessNotClaimed": true,
+    "currentFeatureProductionAcceptance": false,
+    "additionalScans": 0,
+    "providerCalls": 0,
+    "recordingAccess": 0,
+    "rawAttributesReturned": false,
+    "sqlParametersOrUserContentReturned": false
+  }
+}

@@ -1,0 +1,30 @@
+✖ one startup read wave stays together across the real hydration gates used by SWR and list fetchers (40.822382ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 524.500316
+
+✖ failing tests:
+
+test at apps/desktop/scripts/read-batch.test.mjs:57:1
+✖ one startup read wave stays together across the real hydration gates used by SWR and list fetchers (40.822382ms)
+  AssertionError [ERR_ASSERTION]: all six ready reads share one ordinary authorization boundary
+  
+  2 !== 1
+  
+      at file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/scripts/read-batch.test.mjs:71:10
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async fixture (file:///workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/scripts/read-batch.test.mjs:27:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

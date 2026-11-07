@@ -1,0 +1,35 @@
+✔ Native coalesces allowed reads in one turn with one codec pass and ordered results (84.519454ms)
+✔ one startup read wave stays together across the real hydration gates used by SWR and list fetchers (24.699324ms)
+✔ single reads, excluded actions and Web keep their ordinary single-request path without a read cache (22.440639ms)
+✔ Native splits at sixteen items and captures each locale before the posted flush (19.049504ms)
+✔ only an exact unknown batch action on 404 falls back and disables batching for this page (38.054805ms)
+▶ batch HTTP and network failures do not retry or fall back
+  ✔ 404:not_found (15.224013ms)
+  ✔ 500:desktop_rpc_action_unknown (19.83856ms)
+  ✔ 401:authRequired (16.103711ms)
+  ✔ 426:desktop_client_update_required (53.150092ms)
+  ✔ 503:desktop_rpc_failed (13.107271ms)
+  ✔ network (14.814284ms)
+✔ batch HTTP and network failures do not retry or fall back (133.930427ms)
+✔ batch item failures retain their own error and status without failing successful siblings (15.282715ms)
+▶ malformed batch item count or shape rejects every item without retrying
+  ✔ [{"ok":true,"result":null}] (16.613606ms)
+  ✔ [{"ok":true,"result":null},{"ok":false,"status":"403","error":{"code":"workspaceAccessDenied"}}] (16.029163ms)
+✔ malformed batch item count or shape rejects every item without retrying (33.410999ms)
+✔ scope reset rejects queued old-identity reads before any transport and admits only the new generation (14.234088ms)
+✔ workspace selector changes cannot pair queued arguments with the new workspace before React effects run (41.613378ms)
+✔ explicit isCurrent guards drop stale queued reads and remain independent from other guards (16.079328ms)
+▶ retired in-flight batches cannot change current transport state or trigger old-server fallback
+  ✔ 401 (18.359301ms)
+  ✔ 503 (18.999338ms)
+  ✔ 404 (14.585113ms)
+✔ retired in-flight batches cannot change current transport state or trigger old-server fallback (52.695597ms)
+✔ an isCurrent change while a batch body is pending prevents stale results and state updates (14.698684ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1214.875473

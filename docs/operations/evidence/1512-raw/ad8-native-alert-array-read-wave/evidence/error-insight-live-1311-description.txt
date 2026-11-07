@@ -1,0 +1,1 @@
+Weighted error spans > max(3×7d hourly median,50). Excludes handled Workflow hook 404, duplicate 409 and terminal 410 chains with successful entries. Weight=1/sample_rate (legacy 0.1). Warmup 24 observed full hours; zero-fill only observed service hours. No current telemetry→NULL. Spans≠failed requests.

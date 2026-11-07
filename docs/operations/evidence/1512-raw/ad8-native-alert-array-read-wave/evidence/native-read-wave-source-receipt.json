@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "recordedAt": "2026-11-07T14:00:25.028344+00:00",
+  "kind": "native_read_wave_source_validation",
+  "status": "local_committed_unpublished",
+  "productionAcceptance": false,
+  "source": {
+    "head": "cc22981669aee33ceb4d8e3f812169f4de8aa184",
+    "tree": "8b1472f1c6b694851dc754623a02afbe2883e2f3",
+    "parents": [
+      "4164a4cd928790640b4a9c33a8c04f17b3685b77"
+    ],
+    "mergeMainCommit": "4164a4cd928790640b4a9c33a8c04f17b3685b77",
+    "mergedMain": "b56eedd06f65445114ef6e6c6b42d10bcdc09c70"
+  },
+  "rootCause": "The shared SWR hydration gate and the additional issue/thread/chat gates settle in different microtasks; a microtask flush split one already-ready read wave into separate HTTP batches.",
+  "change": "One posted MessageChannel task drains the current turn microtasks, closes both ports, and calls the existing bounded/fenced flush. No timer, polling, response cache or authorization change.",
+  "evidence": {
+    "red": {
+      "tests": 1,
+      "passed": 0,
+      "failed": 1,
+      "exitCode": 1,
+      "observedPhysical": 2,
+      "expectedPhysical": 1
+    },
+    "green": {
+      "tests": 24,
+      "passed": 24,
+      "failed": 0,
+      "exitCode": 0,
+      "includes": "after-microtask scope reset, stale inflight response, max16, locale, same ordinary codec, one exact unknown-action fallback, no other retry; later live refresh remains fresh"
+    },
+    "rendererTypes": {
+      "exitCode": 0
+    },
+    "desktopOxlint": {
+      "exitCode": 0
+    },
+    "diffCheck": {
+      "exitCode": 0
+    },
+    "independentReview": {
+      "agent": "acceptance_review",
+      "result": "no substantive blocker; requested narrow after-microtask reset guard is included"
+    },
+    "benchmark": "500 alternating offline pairs of actual bundled queue source; added scheduling mean0.025ms/p95 0.053ms/p99 0.211ms, no HTTP/DB/UI/production claim"
+  },
+  "nativeAcceptance": {
+    "referenceHead": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+    "referenceNativeLogin": 198,
+    "referenceWebLogin": 183,
+    "referenceBundledStartup": 159,
+    "referenceHostedStartup": 158,
+    "newSourceResult": "unknown; requires next actual packaged run; gates/windows/background unchanged"
+  },
+  "files": [
+    {
+      "path": "Mikka/apps/desktop/src/renderer/read-batch.ts",
+      "bytes": 5484,
+      "sha256": "62107abf2e2364cb9e552b0e81d299b0728fe14eed74a7d10a0fe0339809fd18",
+      "git_blob": "868622ca05b4bf700d8bc0265c3fe0757b2c1770"
+    },
+    {
+      "path": "Mikka/apps/desktop/scripts/read-batch.test.mjs",
+      "bytes": 14352,
+      "sha256": "766eacc9b1f5e145ec04efb52cdf682221b2b510c9fc79f7dcc404fa3d6f0567",
+      "git_blob": "c86aa78a70a1b9e219e69ee0fcfad71ac6d5059d"
+    },
+    {
+      "path": "Mikka/docs/operations/tracing.md",
+      "bytes": 58653,
+      "sha256": "24489848d3a74026e89a63f83f7768e14da8915b3c4c988af803636850fb2d8d",
+      "git_blob": "7f4ecd06dd6beac61706f92c6323881fce3b8bd9"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "ops1512/native-read-wave-red.tap",
+      "bytes": 1128,
+      "sha256": "a2b6aacde987ddfd55751e269769b4a7441a1532b09ba60d9bd9d72190ec507a",
+      "git_blob": "61969659313a7058dd3cc77a086b10aea4f267a4"
+    },
+    {
+      "path": "ops1512/native-read-wave-green-final.tap",
+      "bytes": 2211,
+      "sha256": "bd39890741ee6c32e78d94db7f42fb3b4c0e35f4638ae6fd918bf2424a8536d6",
+      "git_blob": "95632d9458dd4dbf24fd8e756014a16ebd35343d"
+    },
+    {
+      "path": "ops1512/native-read-wave-renderer-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "ops1512/native-read-wave-benchmark.mjs",
+      "bytes": 3362,
+      "sha256": "4d3410adda211167184123c1dbddc61a6bd197d0f9a43921317ab094264e159f",
+      "git_blob": "e4dd90b1c81b05e742c2420fd54c7a85b39be393"
+    },
+    {
+      "path": "ops1512/evidence/native-read-wave-benchmark.json",
+      "bytes": 35603,
+      "sha256": "57a01ce4ffeb4ae1fa12bee662623885ec5bde6ac2a60a1b68783d3dcc62cf65",
+      "git_blob": "5ff70d564783729276c0a5748cbb33560b8c103c"
+    }
+  ]
+}

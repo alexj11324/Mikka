@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "started_utc|stage|trace_hex|span_hex|parent_hex|status_code|http_2xx|link_count|link_trace_hex|link_span_hex\n2026-11-06T20:01:22.176000Z|workflow.route.flow|d800cdfe653e7cb1dd4f60c079008f82|c2ba0330e5e49ccf|0000000000000000|1|1|0||\n2026-11-06T20:01:22.177000Z|vqs.process|d800cdfe653e7cb1dd4f60c079008f82|e8a7329955b1c7da|c2ba0330e5e49ccf|0|0|1|8ce0b2036d4653bbf82a02336c8f59f3|c855cd095df2157b\n2026-11-06T20:01:22.179000Z|workflow.execute|d800cdfe653e7cb1dd4f60c079008f82|5f6975f48cd14aac|e8a7329955b1c7da|1|0|1|b3b5b622f82f3f2423f0bad029df0fe4|227f07dc85e9e4f6"
+    },
+    {
+      "type": "text",
+      "text": "{\"conversation_id\":\"01a1b621-f043-7ae0-a36c-3b36a968b67f\"}"
+    }
+  ],
+  "structuredContent": null,
+  "isError": false
+}

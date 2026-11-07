@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "kind": "main-publication-progress-readonly",
+  "capturedAt": "2026-11-07T14:04:52.713Z",
+  "repository": "alexj11324/Mikka",
+  "scope": {
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "gitRepository": "alexj11324/Mikka"
+  },
+  "entries": [
+    {
+      "source": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "workflow": {
+        "id": 42374084345,
+        "name": "E2B additive runtime release",
+        "headSha": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "runAttempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "updatedAt": "2026-11-07T13:35:47Z"
+      },
+      "publicationJobs": [
+        {
+          "id": 128408933101,
+          "name": "test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 128409321081,
+          "name": "check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 128409433638,
+          "name": "validate / build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 128411375610,
+          "name": "await-web",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 128412429140,
+          "name": "subscriptions",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 128413114675,
+          "name": "publish / deploy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 128418475728,
+          "name": "cleanup",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "deployment": {
+        "at": "2026-11-07T13:36:48.280Z",
+        "id": "dpl_GapgptxYMt1dQEzcFf37fZkdXC15",
+        "name": "mikka",
+        "state": "READY",
+        "readyState": "READY",
+        "target": "production",
+        "createdAt": 1794058064998,
+        "buildingAt": 1794058066152,
+        "ready": 1794058495262,
+        "metaCommitSha": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "metaKeys": [
+          "githubCommitRef",
+          "githubCommitSha",
+          "githubCommitMessage",
+          "githubRepo",
+          "githubOrg"
+        ],
+        "errorCode": null,
+        "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+        "createdAtUTC": "2026-11-07T13:27:44.998Z",
+        "buildingAtUTC": "2026-11-07T13:27:46.152Z",
+        "readyAtUTC": "2026-11-07T13:34:55.262Z"
+      },
+      "diagnostic": {
+        "inProgressJobLogReadAt": "2026-11-07T13:32:59.305Z",
+        "http404": true,
+        "rawPersisted": false,
+        "defaultAccountUnscopedEmptyResultsDidNotProveDeploymentAbsence": true,
+        "exactGitLinkedProjectLaterResolved": true
+      }
+    },
+    {
+      "source": "ba53326ab16c70340e39fc1ce17b9e2e75fb841b",
+      "workflow": {
+        "id": 42377683655,
+        "conclusion": "failure",
+        "failedJobId": 128418530872,
+        "failedStep": 24
+      },
+      "closedLogProjection": {
+        "at": "2026-11-07T13:43:15.190Z",
+        "runId": 42377683655,
+        "jobId": 128418530872,
+        "sourceSha": "ba53326ab16c70340e39fc1ce17b9e2e75fb841b",
+        "logReadable": true,
+        "withinParseBound": true,
+        "closedErrors": [
+          {
+            "at": "2026-11-07T13:41:12.9003976Z",
+            "code": "webDeploy:mainChanged"
+          }
+        ],
+        "exits": [],
+        "latestEventAt": "2026-11-07T13:41:13.4374797Z",
+        "rawPersisted": false,
+        "rawStringCodeUnits": 316483,
+        "rawUtf8BytesMeasured": false
+      },
+      "classification": "source_changed_guard"
+    },
+    {
+      "source": "b56eedd06f65445114ef6e6c6b42d10bcdc09c70",
+      "workflow": {
+        "id": 42378010816,
+        "name": "Web deploy",
+        "headSha": "b56eedd06f65445114ef6e6c6b42d10bcdc09c70",
+        "status": "completed",
+        "conclusion": "success",
+        "updatedAt": "2026-11-07T14:02:22Z"
+      },
+      "deployment": {
+        "at": "2026-11-07T14:04:16.104Z",
+        "id": "dpl_3mmD1FVhwAqNGcspjr7fDYQP67du",
+        "state": "READY",
+        "readyState": "READY",
+        "createdAtUTC": "2026-11-07T13:55:02.676Z",
+        "readyAtUTC": "2026-11-07T14:02:10.009Z",
+        "gitCommitSha": "b56eedd06f65445114ef6e6c6b42d10bcdc09c70",
+        "errorCode": null
+      },
+      "e2b": {
+        "runId": 42378010819,
+        "test": "success",
+        "check": "success",
+        "validate": "skipped",
+        "subscriptions": "skipped",
+        "publish": "skipped",
+        "cleanup": "skipped"
+      }
+    }
+  ],
+  "currentMainAtCapture": "ad224de9e30944dd4921cd8c6e87fe1f6d07c0f5",
+  "currentMainPublicationComplete": false,
+  "limits": {
+    "focusedObservedWorkflowsOnly": true,
+    "metadataDoesNotProveIssue1512Acceptance": true,
+    "rawLogsPersisted": false,
+    "productionWrites": 0,
+    "providerCalls": 0,
+    "ciReruns": 0
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "project_id": 670821,
+  "status": "readonly_schema_and_id_shape_confirmed",
+  "acceptance_evidence": false,
+  "created_at_utc": "2026-11-07T13:04:36.043Z",
+  "finding": {
+    "column": "posthog.trace_spans.links",
+    "type": "Array(String)",
+    "element_encoding": "JSON object",
+    "id_keys": [
+      "trace_id",
+      "span_id"
+    ],
+    "id_encoding": "base64, identical to trace_spans ID columns",
+    "observed_json_keys": [
+      "attributes",
+      "dropped_attributes_count",
+      "flags",
+      "span_id",
+      "trace_id",
+      "trace_state"
+    ],
+    "link_attribute_values_read": false,
+    "source_id": "d800cdfe653e7cb1dd4f60c079008f82/5f6975f48cd14aac"
+  },
+  "notes": [
+    "The generated MCP APM catalog reference omitted links, but actual project compilation and a bounded historical ID-only response confirmed the column and type.",
+    "Empty results from projections reusing trace_id/span_id as SELECT aliases were not treated as absence evidence; final IDs were checked with qualified source columns and distinct output aliases.",
+    "The fixed historical ten-minute sample is schema evidence only; it does not prove current production acceptance, completeness, or business success."
+  ],
+  "query_results": [
+    {
+      "key": "alertLinksSchemaProbe",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "links"
+          },
+          {
+            "type": "text",
+            "text": "{\"conversation_id\":\"01a1b60a-7bc3-7aa2-a4fa-419f6a6589db\"}"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    },
+    {
+      "key": "alertLinksRawProbe",
+      "result": {
+        "status": "fulfilled",
+        "value": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT links FROM posthog.trace_spans WHERE 0 LIMIT 0\"},\"results\":\"links\",\"__formatted_results_override\":\"links\"}"
+            },
+            {
+              "type": "text",
+              "text": "{\"conversation_id\":\"01a1b60a-f5aa-74d3-bef1-0291d2219f6a\"}"
+            }
+          ],
+          "structuredContent": null,
+          "isError": false
+        }
+      }
+    },
+    {
+      "key": "alertLinksTypeProbe",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT toTypeName(links) AS links_type, length(links) AS link_count FROM posthog.trace_spans WHERE trace_id = base64Encode(unhex('77cad3a99b9e154b27aaa2c6c0226283')) AND timestamp >= toDateTime('2026-11-06 20:00:00', 'UTC') AND timestamp < toDateTime('2026-11-06 20:10:00', 'UTC') ORDER BY timestamp, uuid LIMIT 1\"},\"results\":\"links_type|link_count\\nArray(String)|0\",\"__formatted_results_override\":\"links_type|link_count\\nArray(String)|0\"}"
+          },
+          {
+            "type": "text",
+            "text": "{\"conversation_id\":\"01a1b60b-5c09-752e-a498-06e78fd5cbfa\"}"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    },
+    {
+      "key": "alertLinksKeysProbe",
+      "result": {
+        "status": "fulfilled",
+        "value": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT lower(hex(tryBase64Decode(trace_id))) AS trace_id, lower(hex(tryBase64Decode(span_id))) AS span_id, arrayMap(link -> isValidJSON(link), links) AS link_json_valid, arrayMap(link -> JSONExtractKeys(link), links) AS link_json_keys FROM posthog.trace_spans WHERE trace_id = base64Encode(unhex('77cad3a99b9e154b27aaa2c6c0226283')) AND timestamp >= toDateTime('2026-11-06 20:00:00', 'UTC') AND timestamp < toDateTime('2026-11-06 20:10:00', 'UTC') AND length(links) > 0 ORDER BY timestamp, uuid LIMIT 3\"},\"results\":\"trace_id|span_id|link_json_valid|link_json_keys\",\"__formatted_results_override\":\"trace_id|span_id|link_json_valid|link_json_keys\"}"
+            },
+            {
+              "type": "text",
+              "text": "{\"conversation_id\":\"01a1b60c-0f01-797c-9196-c9e643a0e010\"}"
+            }
+          ],
+          "structuredContent": null,
+          "isError": false
+        }
+      }
+    },
+    {
+      "key": "alertNonemptyLinkKeysProbe",
+      "result": {
+        "status": "fulfilled",
+        "value": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT lower(hex(tryBase64Decode(trace_id))) AS trace_id, lower(hex(tryBase64Decode(span_id))) AS span_id, arrayMap(link -> isValidJSON(link), links) AS link_json_valid, arrayMap(link -> JSONExtractKeys(link), links) AS link_json_keys FROM posthog.trace_spans WHERE service_name = 'mikka-web' AND name = 'workflow.execute' AND timestamp >= toDateTime('2026-11-06 20:00:00', 'UTC') AND timestamp < toDateTime('2026-11-06 20:10:00', 'UTC') AND length(links) > 0 ORDER BY timestamp, uuid LIMIT 1\"},\"results\":\"trace_id|span_id|link_json_valid|link_json_keys\",\"__formatted_results_override\":\"trace_id|span_id|link_json_valid|link_json_keys\"}"
+            },
+            {
+              "type": "text",
+              "text": "{\"conversation_id\":\"01a1b60c-abc8-7dc2-8298-2c2f320bebf9\"}"
+            }
+          ],
+          "structuredContent": null,
+          "isError": false
+        }
+      }
+    },
+    {
+      "key": "alertLegacyLinkKeysProbe",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT lower(hex(tryBase64Decode(trace_id))) AS trace_id, lower(hex(tryBase64Decode(span_id))) AS span_id, arrayMap(link -> isValidJSON(link), links) AS link_json_valid, arrayMap(link -> JSONExtractKeys(link), links) AS link_json_keys FROM posthog.trace_spans WHERE service_name = 'mikka-web' AND (name = 'workflow.execute' OR name LIKE 'workflow.execute %') AND timestamp >= toDateTime('2026-11-06 20:00:00', 'UTC') AND timestamp < toDateTime('2026-11-06 20:10:00', 'UTC') AND length(links) > 0 ORDER BY timestamp, uuid LIMIT 1\"},\"results\":\"trace_id|span_id|link_json_valid|link_json_keys\\nd800cdfe653e7cb1dd4f60c079008f82|5f6975f48cd14aac|[1]|[['attributes', 'dropped_attributes_count', 'flags', 'span_id', 'trace_id', 'trace_state']]\",\"__formatted_results_override\":\"trace_id|span_id|link_json_valid|link_json_keys\\nd800cdfe653e7cb1dd4f60c079008f82|5f6975f48cd14aac|[1]|[['attributes', 'dropped_attributes_count', 'flags', 'span_id', 'trace_id', 'trace_state']]\"}"
+          },
+          {
+            "type": "text",
+            "text": "{\"conversation_id\":\"01a1b60d-237c-78c0-82be-96efcfc6160a\"}"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    },
+    {
+      "key": "alertLinkIdsProbe",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT lower(hex(tryBase64Decode(trace_id))) AS trace_id, lower(hex(tryBase64Decode(span_id))) AS span_id, arrayMap(link -> if(match(JSONExtractString(link, 'trace_id'), '^([0-9a-fA-F]{32}|[A-Za-z0-9+/]{22}==)$'), JSONExtractString(link, 'trace_id'), 'unrecognized'), links) AS link_trace_ids, arrayMap(link -> if(match(JSONExtractString(link, 'span_id'), '^([0-9a-fA-F]{16}|[A-Za-z0-9+/]{11}=)$'), JSONExtractString(link, 'span_id'), 'unrecognized'), links) AS link_span_ids FROM posthog.trace_spans WHERE trace_id = base64Encode(unhex('d800cdfe653e7cb1dd4f60c079008f82')) AND span_id = base64Encode(unhex('5f6975f48cd14aac')) AND timestamp >= toDateTime('2026-11-06 20:00:00', 'UTC') AND timestamp < toDateTime('2026-11-06 20:10:00', 'UTC') ORDER BY timestamp, uuid LIMIT 1\"},\"results\":\"trace_id|span_id|link_trace_ids|link_span_ids\",\"__formatted_results_override\":\"trace_id|span_id|link_trace_ids|link_span_ids\"}"
+          },
+          {
+            "type": "text",
+            "text": "{\"conversation_id\":\"01a1b60d-8cb2-748d-94b1-65cb59f4f174\"}"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    },
+    {
+      "key": "alertQualifiedLinkIdsProbe",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT lower(hex(tryBase64Decode(s.trace_id))) AS trace_id_hex, lower(hex(tryBase64Decode(s.span_id))) AS span_id_hex, arrayMap(link -> if(match(JSONExtractString(link, 'trace_id'), '^([0-9a-fA-F]{32}|[A-Za-z0-9+/]{22}==)$'), JSONExtractString(link, 'trace_id'), 'unrecognized'), s.links) AS link_trace_ids, arrayMap(link -> if(match(JSONExtractString(link, 'span_id'), '^([0-9a-fA-F]{16}|[A-Za-z0-9+/]{11}=)$'), JSONExtractString(link, 'span_id'), 'unrecognized'), s.links) AS link_span_ids FROM posthog.trace_spans s WHERE s.trace_id = base64Encode(unhex('d800cdfe653e7cb1dd4f60c079008f82')) AND s.span_id = base64Encode(unhex('5f6975f48cd14aac')) AND s.timestamp >= toDateTime('2026-11-06 20:00:00', 'UTC') AND s.timestamp < toDateTime('2026-11-06 20:10:00', 'UTC') ORDER BY s.timestamp, s.uuid LIMIT 1\"},\"results\":\"trace_id_hex|span_id_hex|link_trace_ids|link_span_ids\\nd800cdfe653e7cb1dd4f60c079008f82|5f6975f48cd14aac|['s7W2IvgvPyQj8LrQKd8P5A==']|['In8H3IXp5PY=']\",\"__formatted_results_override\":\"trace_id_hex|span_id_hex|link_trace_ids|link_span_ids\\nd800cdfe653e7cb1dd4f60c079008f82|5f6975f48cd14aac|['s7W2IvgvPyQj8LrQKd8P5A==']|['In8H3IXp5PY=']\"}"
+          },
+          {
+            "type": "text",
+            "text": "{\"conversation_id\":\"01a1b60e-0239-7921-95f5-e45d314687a3\"}"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      }
+    }
+  ]
+}

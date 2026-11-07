@@ -1,0 +1,17 @@
+✔ a fresh project gets the dashboard, every insight, the note and five alerts; a second run writes nothing (5.517382ms)
+✔ the plan is read-only and names only what differs (2.634759ms)
+✔ production objects found by id keep their other tags and subscribers (0.317559ms)
+✔ every alert reads one row: no any_row, and each SQL alert query aggregates to a single row (0.386614ms)
+✔ the API key is required and never appears in errors (5.620427ms)
+✔ the exact error-alert SQL and fixtures retain their verified real HogQL result (12.154856ms)
+✔ the recorded engine response rejects truncation, extra columns and altered identities (3.58871ms)
+✔ the error insight description fits the official targeted update schema (0.122485ms)
+✔ the official query-only acceptance entry emits the exact verified packet without contacting PostHog (71.608538ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 224.971478

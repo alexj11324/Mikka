@@ -1,0 +1,863 @@
+{
+  "schema_version": 1,
+  "observed_at_utc": "2026-11-07T13:24:38.631Z",
+  "source": "PostHog MCP info",
+  "tools": {
+    "insight-get": {
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Numeric primary key or 8-character `short_id` (for example `AaVQ8Ijw`) identifying the insight."
+          },
+          "filters_override": {
+            "description": "Object (or pre-encoded JSON string) to override the insight's filters for this request only (not persisted). Top-level keys replace; nested values are not deep-merged — pass the complete value for any key you override. Accepts the same keys as the dashboard filters schema (e.g., `date_from`, `date_to`, `properties`). Ignored when accessed via a sharing token.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            ]
+          },
+          "include_dashboards": {
+            "description": "Opt in to receiving the deprecated `dashboards` field in insight payloads. Once opt-in enforcement is enabled, API-token callers stop receiving it by default; use `dashboard_tiles` instead.",
+            "type": "boolean"
+          },
+          "variables_override": {
+            "description": "Object (or pre-encoded JSON string) to override the insight's HogQL variables for this request only (not persisted). Format: {\"<variable_id>\": {\"code_name\": \"<code_name>\", \"variableId\": \"<variable_id>\", \"value\": <new_value>}}. Each entry must include `code_name` — partial entries are silently dropped. The simplest workflow is to call `insight-get` first, copy the matching entry from the response, and mutate `value`. Top-level keys replace; nested values are not deep-merged. Ignored when accessed via a sharing token.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "readOnly": true
+    },
+    "insight-update": {
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "Numeric primary key or 8-character `short_id` (for example `AaVQ8Ijw`) identifying the insight."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 400
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dashboards": {
+            "description": "Dashboard IDs this insight should belong to. This is a full replacement — always include all existing dashboard IDs when adding a new one.",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "description": {
+            "description": "Optional, about 15 words. Omit if the name is enough. No change notes. Max 400 characters.",
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 400
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "items": {}
+          },
+          "favorited": {
+            "type": "boolean"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "default": "DataTableNode",
+                    "type": "string",
+                    "const": "DataTableNode"
+                  },
+                  "source": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "default": "EventsQuery",
+                        "type": "string",
+                        "const": "EventsQuery"
+                      },
+                      "select": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Event columns as HogQL expressions."
+                      }
+                    },
+                    "required": [
+                      "select"
+                    ],
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "source"
+                ],
+                "additionalProperties": {}
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "config": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {},
+                    "description": "Complete worksheet configuration, including shelves and filters. Validated by the insight API."
+                  },
+                  "kind": {
+                    "default": "BIVisualizationNode",
+                    "type": "string",
+                    "const": "BIVisualizationNode"
+                  },
+                  "source": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "default": "HogQLQuery",
+                        "type": "string",
+                        "const": "HogQLQuery"
+                      },
+                      "query": {
+                        "type": "string",
+                        "description": "The HogQL query to run."
+                      }
+                    },
+                    "required": [
+                      "query"
+                    ],
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "config",
+                  "source"
+                ],
+                "additionalProperties": {}
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "default": "InsightVizNode",
+                    "type": "string",
+                    "const": "InsightVizNode"
+                  },
+                  "source": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {},
+                    "description": "Product analtycs query objects like TrendsQuery, FunnelsQuery, RetentionQuery, PathsQuery, StickinessQuery, LifecycleQuery"
+                  },
+                  "vizSpecificOptions": {
+                    "type": "object",
+                    "properties": {
+                      "ActionsPie": {
+                        "type": "object",
+                        "properties": {
+                          "hideAggregation": {
+                            "type": "boolean",
+                            "description": "Hide the total on a pie chart."
+                          }
+                        }
+                      }
+                    },
+                    "description": "Chart rendering options."
+                  }
+                },
+                "required": [
+                  "source"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "chartSettings": {
+                    "type": "object",
+                    "properties": {
+                      "boxPlot": {
+                        "type": "object",
+                        "properties": {
+                          "excludeOutliers": {
+                            "type": "boolean",
+                            "description": "Clip whiskers to 1.5 times the interquartile range. Defaults to true."
+                          },
+                          "maxColumn": {
+                            "type": "string",
+                            "description": "Numeric column containing the maximum for each box."
+                          },
+                          "meanColumn": {
+                            "type": "string",
+                            "description": "Numeric column containing the mean for each box."
+                          },
+                          "medianColumn": {
+                            "type": "string",
+                            "description": "Numeric column containing the median for each box."
+                          },
+                          "minColumn": {
+                            "type": "string",
+                            "description": "Numeric column containing the minimum for each box."
+                          },
+                          "p25Column": {
+                            "type": "string",
+                            "description": "Numeric column containing the 25th percentile for each box."
+                          },
+                          "p75Column": {
+                            "type": "string",
+                            "description": "Numeric column containing the 75th percentile for each box."
+                          },
+                          "seriesColumn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Optional column that groups each X-axis value into separate colored series. Set to `null` for one series."
+                          },
+                          "xAxisColumn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "X-axis category column. Set to `null` for one overall distribution or one box per series."
+                          }
+                        },
+                        "required": [
+                          "maxColumn",
+                          "meanColumn",
+                          "medianColumn",
+                          "minColumn",
+                          "p25Column",
+                          "p75Column"
+                        ],
+                        "description": "Column mappings for `BoxPlot`. The SQL must return one pre-aggregated row per X-axis and series pair."
+                      },
+                      "goalLines": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "label": {
+                              "type": "string",
+                              "description": "Label rendered next to the goal line."
+                            },
+                            "value": {
+                              "type": "number",
+                              "description": "Y-axis value at which the goal line is drawn."
+                            }
+                          },
+                          "required": [
+                            "label",
+                            "value"
+                          ]
+                        },
+                        "description": "Horizontal goal lines drawn across the chart."
+                      },
+                      "leftYAxisSettings": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "description": "Label rendered beside this Y axis."
+                          },
+                          "scale": {
+                            "type": "string",
+                            "enum": [
+                              "linear",
+                              "logarithmic"
+                            ],
+                            "description": "Scale used for this Y axis."
+                          },
+                          "showGridLines": {
+                            "type": "boolean",
+                            "description": "Show grid lines for this Y axis."
+                          },
+                          "showTicks": {
+                            "type": "boolean",
+                            "description": "Show tick labels on this Y axis."
+                          },
+                          "startAtZero": {
+                            "type": "boolean",
+                            "description": "Whether this Y axis should start at zero."
+                          }
+                        },
+                        "description": "Settings for the left Y axis."
+                      },
+                      "legendPosition": {
+                        "type": "string",
+                        "enum": [
+                          "top",
+                          "bottom",
+                          "left",
+                          "right"
+                        ],
+                        "description": "Where the legend sits. Defaults to right for pie and donut, top for other charts."
+                      },
+                      "metric": {
+                        "type": "object",
+                        "properties": {
+                          "showChange": {
+                            "type": "boolean"
+                          },
+                          "summary": {
+                            "type": "string",
+                            "enum": [
+                              "total",
+                              "average",
+                              "latest"
+                            ]
+                          }
+                        },
+                        "description": "Settings for `Metric`. `summary` defaults to `latest`."
+                      },
+                      "pie": {
+                        "type": "object",
+                        "properties": {
+                          "showTotal": {
+                            "type": "boolean",
+                            "description": "Whether to show the aggregation total. Defaults to on only when slices show values."
+                          },
+                          "sliceContent": {
+                            "type": "string",
+                            "enum": [
+                              "labels",
+                              "values",
+                              "none"
+                            ],
+                            "description": "What to render on each slice. Defaults to values."
+                          },
+                          "valueDisplay": {
+                            "type": "string",
+                            "enum": [
+                              "absolute",
+                              "percentage"
+                            ],
+                            "description": "Whether slice values show as absolute amounts or shares of the total. Only applies when `sliceContent` is `values`."
+                          }
+                        },
+                        "description": "Settings for `ActionsPie` and `ActionsDonut`."
+                      },
+                      "rightYAxisSettings": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "description": "Label rendered beside this Y axis."
+                          },
+                          "scale": {
+                            "type": "string",
+                            "enum": [
+                              "linear",
+                              "logarithmic"
+                            ],
+                            "description": "Scale used for this Y axis."
+                          },
+                          "showGridLines": {
+                            "type": "boolean",
+                            "description": "Show grid lines for this Y axis."
+                          },
+                          "showTicks": {
+                            "type": "boolean",
+                            "description": "Show tick labels on this Y axis."
+                          },
+                          "startAtZero": {
+                            "type": "boolean",
+                            "description": "Whether this Y axis should start at zero."
+                          }
+                        },
+                        "description": "Settings for the right Y axis. Only applies when a Y series uses `settings.display.yAxisPosition: \"right\"`."
+                      },
+                      "seriesBreakdownColumn": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Column that splits a single Y series into multiple colored series — e.g. breaking down a line chart by `country`. Set to `null` or omit to disable. A breakdown buckets rows by x value, so it is ignored when `display` is `ScatterPlot`."
+                      },
+                      "showAnnotations": {
+                        "type": "boolean",
+                        "description": "Show annotations on the chart. Only applies to line, area, bar, and stacked bar charts whose X axis is a date or datetime column."
+                      },
+                      "showLegend": {
+                        "type": "boolean",
+                        "description": "Show the chart legend."
+                      },
+                      "showNullsAsZero": {
+                        "type": "boolean",
+                        "description": "Replace null aggregation results with zero."
+                      },
+                      "showTotalRow": {
+                        "type": "boolean",
+                        "description": "Show a total summing all Y series. Applies to line, bar, and area charts."
+                      },
+                      "showValuesOnSeries": {
+                        "type": "boolean",
+                        "description": "Render each data point's value as a label directly on the series."
+                      },
+                      "stackBars100": {
+                        "type": "boolean",
+                        "description": "Stack bars to 100% of the total. Only meaningful with `ActionsStackedBar`."
+                      },
+                      "xAxis": {
+                        "type": "object",
+                        "properties": {
+                          "column": {
+                            "type": "string",
+                            "description": "Name of a column returned by the SQL query."
+                          },
+                          "settings": {
+                            "type": "object",
+                            "properties": {
+                              "display": {
+                                "type": "object",
+                                "properties": {
+                                  "description": {
+                                    "type": "string",
+                                    "description": "Table column description shown in the header tooltip."
+                                  }
+                                },
+                                "description": "Display settings for this column."
+                              },
+                              "formatting": {
+                                "type": "object",
+                                "properties": {
+                                  "decimalPlaces": {
+                                    "type": "number",
+                                    "description": "Number of decimal places to display."
+                                  },
+                                  "prefix": {
+                                    "type": "string",
+                                    "description": "Text prepended to each value (e.g. `$`)."
+                                  },
+                                  "style": {
+                                    "type": "string",
+                                    "enum": [
+                                      "none",
+                                      "number",
+                                      "short",
+                                      "percent"
+                                    ],
+                                    "description": "`none`: unformatted; `number`: thousands separators; `short`: abbreviations (1.2k, 3.4M). `percent`: multiplies by 100 and adds `%`. Pass a 0–1 ratio (`a / b`) and omit the `%` suffix to avoid doubling it."
+                                  },
+                                  "suffix": {
+                                    "type": "string",
+                                    "description": "Value suffix (e.g. ` ms`). Omit for `percent`, which adds `%`."
+                                  }
+                                },
+                                "description": "Number-formatting settings for the values in this column."
+                              }
+                            },
+                            "description": "Optional display and number-formatting settings for this column."
+                          }
+                        },
+                        "required": [
+                          "column"
+                        ],
+                        "description": "Column used as the X axis. Typically a time bucket or categorical column, but `ScatterPlot` plots two measures against each other, so it needs a numeric column here too."
+                      },
+                      "xAxisLabel": {
+                        "type": "string",
+                        "description": "Label rendered under the X axis."
+                      },
+                      "yAxis": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "column": {
+                              "type": "string",
+                              "description": "Name of a column returned by the SQL query to map onto this axis."
+                            },
+                            "settings": {
+                              "type": "object",
+                              "properties": {
+                                "display": {
+                                  "type": "object",
+                                  "properties": {
+                                    "color": {
+                                      "type": "string",
+                                      "description": "Custom color for this series as a hex string (e.g. `#1d4aff`)."
+                                    },
+                                    "displayType": {
+                                      "type": "string",
+                                      "enum": [
+                                        "auto",
+                                        "line",
+                                        "bar",
+                                        "area"
+                                      ],
+                                      "description": "Chart type. `auto` uses `display`."
+                                    },
+                                    "excludeFromTotal": {
+                                      "type": "boolean",
+                                      "description": "Keep this series out of the tooltip's total row, e.g. a target line over stacked bars. A bar series still stacks, so set `displayType` to `line` for a series drawn over the stack."
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "description": "Series label in legends and tooltips; replaces the column name."
+                                    },
+                                    "trendLine": {
+                                      "type": "boolean",
+                                      "description": "Draw a linear trend line for this series. Only meaningful for line, bar, and area charts."
+                                    },
+                                    "valueLabels": {
+                                      "type": "string",
+                                      "enum": [
+                                        "auto",
+                                        "show",
+                                        "hide"
+                                      ],
+                                      "description": "Per-series override of chart-level `showValuesOnSeries`. `show` labels this series even when the chart setting is off, `hide` leaves it unlabeled when the setting is on, `auto` follows the chart."
+                                    },
+                                    "yAxisPosition": {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ],
+                                      "description": "Which Y axis this numeric series should use. Use `right` for a secondary Y axis."
+                                    }
+                                  },
+                                  "description": "Display settings for a plotted Y series."
+                                },
+                                "formatting": {
+                                  "type": "object",
+                                  "properties": {
+                                    "decimalPlaces": {
+                                      "type": "number",
+                                      "description": "Number of decimal places to display."
+                                    },
+                                    "prefix": {
+                                      "type": "string",
+                                      "description": "Text prepended to each value (e.g. `$`)."
+                                    },
+                                    "style": {
+                                      "type": "string",
+                                      "enum": [
+                                        "none",
+                                        "number",
+                                        "short",
+                                        "percent"
+                                      ],
+                                      "description": "`none`: unformatted; `number`: thousands separators; `short`: abbreviations (1.2k, 3.4M). `percent`: multiplies by 100 and adds `%`. Pass a 0–1 ratio (`a / b`) and omit the `%` suffix to avoid doubling it."
+                                    },
+                                    "suffix": {
+                                      "type": "string",
+                                      "description": "Value suffix (e.g. ` ms`). Omit for `percent`, which adds `%`."
+                                    }
+                                  },
+                                  "description": "Number-formatting settings for the values on this axis or series."
+                                }
+                              },
+                              "description": "Optional series settings. Only applies to Y-axis series."
+                            }
+                          },
+                          "required": [
+                            "column"
+                          ]
+                        },
+                        "description": "One or more numeric columns plotted as Y series."
+                      }
+                    },
+                    "description": "Chart configuration. Ignored when `display` is `ActionsTable` or `BoldNumber`."
+                  },
+                  "display": {
+                    "type": "string",
+                    "enum": [
+                      "ActionsTable",
+                      "BoldNumber",
+                      "Metric",
+                      "ActionsLineGraph",
+                      "ActionsBar",
+                      "ActionsBarValue",
+                      "ActionsPie",
+                      "ActionsDonut",
+                      "ActionsProportionBar",
+                      "ActionsStackedBar",
+                      "ActionsAreaGraph",
+                      "TwoDimensionalHeatmap",
+                      "ScatterPlot",
+                      "BoxPlot"
+                    ],
+                    "description": "Chart type (default `ActionsTable`): `BoldNumber` = one value; `Metric` = KPI; `ActionsLineGraph` / `ActionsAreaGraph` = time series; `ActionsPie` / `ActionsDonut` / `ActionsProportionBar` = shares; `ActionsBar` / `ActionsStackedBar` = categories; `ActionsBarValue` = horizontal rankings; `TwoDimensionalHeatmap` = 2D aggregates; `ScatterPlot` = two measures; `BoxPlot` = distribution summaries with `chartSettings.boxPlot`."
+                  },
+                  "kind": {
+                    "default": "DataVisualizationNode",
+                    "type": "string",
+                    "const": "DataVisualizationNode"
+                  },
+                  "source": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {},
+                    "description": "HogQL query object that produces the rows to visualize."
+                  },
+                  "tableSettings": {
+                    "type": "object",
+                    "properties": {
+                      "columns": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "column": {
+                              "type": "string",
+                              "description": "Name of a column returned by the SQL query."
+                            },
+                            "settings": {
+                              "type": "object",
+                              "properties": {
+                                "display": {
+                                  "type": "object",
+                                  "properties": {
+                                    "description": {
+                                      "type": "string",
+                                      "description": "Table column description shown in the header tooltip."
+                                    }
+                                  },
+                                  "description": "Display settings for this column."
+                                },
+                                "formatting": {
+                                  "type": "object",
+                                  "properties": {
+                                    "decimalPlaces": {
+                                      "type": "number",
+                                      "description": "Number of decimal places to display."
+                                    },
+                                    "prefix": {
+                                      "type": "string",
+                                      "description": "Text prepended to each value (e.g. `$`)."
+                                    },
+                                    "style": {
+                                      "type": "string",
+                                      "enum": [
+                                        "none",
+                                        "number",
+                                        "short",
+                                        "percent"
+                                      ],
+                                      "description": "`none`: unformatted; `number`: thousands separators; `short`: abbreviations (1.2k, 3.4M). `percent`: multiplies by 100 and adds `%`. Pass a 0–1 ratio (`a / b`) and omit the `%` suffix to avoid doubling it."
+                                    },
+                                    "suffix": {
+                                      "type": "string",
+                                      "description": "Value suffix (e.g. ` ms`). Omit for `percent`, which adds `%`."
+                                    }
+                                  },
+                                  "description": "Number-formatting settings for the values in this column."
+                                }
+                              },
+                              "description": "Optional display and number-formatting settings for this column."
+                            }
+                          },
+                          "required": [
+                            "column"
+                          ]
+                        },
+                        "description": "Columns to display and their order. Omit to show every column returned by the query."
+                      },
+                      "pinnedColumns": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Column names to pin to the left of the table."
+                      },
+                      "transpose": {
+                        "type": "boolean",
+                        "description": "Transpose rows and columns."
+                      }
+                    },
+                    "description": "Table configuration. Only applies when `display` is `ActionsTable` or omitted."
+                  }
+                },
+                "required": [
+                  "source"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "TrendsQuery",
+                          "FunnelsQuery",
+                          "RetentionQuery",
+                          "PathsQuery",
+                          "PathsV2Query",
+                          "StickinessQuery",
+                          "LifecycleQuery",
+                          "WebStatsTableQuery",
+                          "WebOverviewQuery"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "MetricsQuery",
+                          "MetricsHistogramQuery"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": {}
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "default": "HogQLQuery",
+                    "type": "string",
+                    "const": "HogQLQuery"
+                  },
+                  "query": {
+                    "type": "string",
+                    "description": "The HogQL query to run."
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "additionalProperties": {}
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "default": "EventsQuery",
+                    "type": "string",
+                    "const": "EventsQuery"
+                  },
+                  "select": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Event columns as HogQL expressions."
+                  }
+                },
+                "required": [
+                  "select"
+                ],
+                "additionalProperties": {}
+              }
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "readOnly": false
+    },
+    "alert-get": {
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A UUID string identifying this alert configuration."
+          },
+          "checks_date_from": {
+            "description": "Relative date string for the start of the check history window (e.g. '-24h', '-7d', '-14d'). Returns checks created after this time. Max retention is 14 days.",
+            "type": "string"
+          },
+          "checks_date_to": {
+            "description": "Relative date string for the end of the check history window (e.g. '-1h', '-1d'). Defaults to now if not specified.",
+            "type": "string"
+          },
+          "checks_limit": {
+            "description": "Maximum number of check results to return (default 5, max 500). Applied after date filtering.",
+            "type": "number"
+          },
+          "checks_offset": {
+            "description": "Number of newest checks to skip (0-based). Use with checks_limit for pagination. Default 0.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "readOnly": true
+    }
+  }
+}

@@ -1,0 +1,84 @@
+TAP version 13
+# Subtest: successful non-root wake and cron entries handle only their own exact hook attempts
+not ok 1 - successful non-root wake and cron entries handle only their own exact hook attempts
+  ---
+  duration_ms: 3.662521
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/scripts/ops/posthog-observability.test.mjs:202:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + []
+    - [
+    -   'cron/http',
+    -   'cron/resume',
+    -   'cron/sdk',
+    -   'wake/http',
+    -   'wake/resume',
+    -   'wake/sdk'
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'cron/http'
+    1: 'cron/resume'
+    2: 'cron/sdk'
+    3: 'wake/http'
+    4: 'wake/resume'
+    5: 'wake/sdk'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/scripts/ops/posthog-observability.test.mjs:211:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.start (node:internal/test_runner/test:1262:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+  ...
+# Subtest: another successful entry in the same trace never handles a failed child entry
+not ok 2 - another successful entry in the same trace never handles a failed child entry
+  ---
+  duration_ms: 1.147523
+  type: 'test'
+  location: '/workspace/scratch/812e3b7d6d45/Mikka/scripts/ops/posthog-observability.test.mjs:216:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + [
+    +   'trace/http',
+    +   'trace/resume',
+    +   'trace/sdk'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'trace/http'
+    1: 'trace/resume'
+    2: 'trace/sdk'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/Mikka/scripts/ops/posthog-observability.test.mjs:222:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 89.146978

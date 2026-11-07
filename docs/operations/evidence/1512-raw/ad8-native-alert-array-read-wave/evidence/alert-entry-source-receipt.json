@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "status": "frozen_source_and_readonly_validation_not_published",
+  "acceptance_evidence": false,
+  "created_at_utc": "2026-11-07T13:15:32.168892+00:00",
+  "source_head_at_freeze": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+  "owned_source_files": [
+    {
+      "path": "scripts/ops/posthog/alert-error-spike.sql",
+      "bytes": 12523,
+      "sha256": "f0a61a3699c8fcaa2d74a3df3d8e94cbb5ce65fc668a7daa72b7ba2119a99cb4",
+      "git_blob": "92f6dc01a5759e7366cbd44e190c91d8e57ee77a"
+    },
+    {
+      "path": "scripts/ops/posthog-observability.test.mjs",
+      "bytes": 20813,
+      "sha256": "6bcd840e1f60d1843810319702fe59f82314e631da66632f0d38c38b8b0f08ac",
+      "git_blob": "d34e9167927a2c0a88db9cdcfcbdf116a8df268c"
+    }
+  ],
+  "scope": [
+    "Only error-spike SQL and its existing source-only test file were modified by this agent.",
+    "No product tracing, threshold, sample-weight, history/warmup, source-anomaly, deployment, model, resource or PostHog configuration mutation."
+  ],
+  "merge_risk": {
+    "occurrence_1_to_10": 9,
+    "impact_1_to_10": 7,
+    "evidence": "Continuous workflow and after-job entries can be non-root; same-trace success was insufficiently scoped. Two original SQL regressions failed before the change. Installed queue SDK and one existing trace prove the finite vqs.process intermediary.",
+    "rollback": "Revert only the error-spike query and paired description. Missing or unrecognized graph proof remains counted, so unsupported topology adds noise rather than suppressing unknown failures."
+  },
+  "semantic_contract": {
+    "wake": "HTTP404 not-found / world.hooks.getByToken / hook.resume must belong to its exact successful after:workflow-wake ancestor, including non-root entries.",
+    "cron": "HTTP404 chain must belong to its exact cron:reconcile span and successful matching GET /api/cron/reconcile parent.",
+    "flow": "Closed HTTP409/410 event-create chains require their own successful workflow.execute and exact successful 2xx flow delivery. Proof is direct same-trace invocation parent, one vqs.process parent hop, or the unique valid invocation link to those exact delivery contexts. No arbitrary recursive ancestry or trace-wide success.",
+    "invocation_children": [
+      "direct event write",
+      "workflow.replay.load",
+      "workflow.run",
+      "step.execute"
+    ],
+    "links": "posthog.trace_spans.links is Array(String); each JSON link uses trace_id/span_id in native table base64 encoding. Links on vqs.process are not used as proof of its delivery.",
+    "fail_closed": [
+      "missing/ambiguous/malformed/unmatched link without exact local parent proof",
+      "unknown intermediate node",
+      "extra queue hop",
+      "failed or typed-error queue",
+      "missing/failed/typed-error delivery",
+      "failed/typed-error invocation",
+      "real SDK error code",
+      "unrelated sibling errors"
+    ],
+    "preserved_optimization": "Owner live query narrow workflow_spans scan and one handled_attempts role expansion are retained.",
+    "baseline_tail_byte_equal_to_owner_live_query": true,
+    "owner_live_query_sha256": "e1f060abcd8063a807b6936660ca0f9550d6b744ff798587523d4d39c7c2ccd4"
+  },
+  "verification": {
+    "original_main_regressions": {
+      "log": "alert-entry-scope-red.tap",
+      "tests": 2,
+      "passed": 0,
+      "failed": 2,
+      "exit_code": 1
+    },
+    "queue_and_legacy_against_previous_direct_link_draft": {
+      "log": "alert-entry-queue-red.tap",
+      "tests": 3,
+      "passed": 0,
+      "failed": 3,
+      "exit_code": 1,
+      "isolated_copy": true
+    },
+    "final_source_suite": {
+      "command": "node --test scripts/ops/posthog-observability.test.mjs",
+      "log": "alert-entry-queue-final.tap",
+      "tests": 34,
+      "passed": 34,
+      "failed": 0,
+      "exit_code": 0,
+      "duration_ms": 218.070216
+    },
+    "lint": {
+      "command": "./node_modules/.bin/oxlint scripts/ops/posthog-observability.test.mjs",
+      "log": "alert-entry-queue-oxlint.log",
+      "exit_code": 0
+    },
+    "diff_check": {
+      "command": "git diff --check -- scripts/ops/posthog/alert-error-spike.sql scripts/ops/posthog-observability.test.mjs",
+      "exit_code": 0
+    },
+    "bounded_posthog_query": {
+      "project_id": 670821,
+      "utc_from": "2026-11-06T20:00:00Z",
+      "utc_to_exclusive": "2026-11-06T20:10:00Z",
+      "aggregate_rows": 1,
+      "mcp_roundtrip_ms": 23884,
+      "engine_duration_ms": null,
+      "success": true
+    },
+    "full_posthog_query": {
+      "project_id": 670821,
+      "source_window_days": 8,
+      "sql_sha256": "f0a61a3699c8fcaa2d74a3df3d8e94cbb5ce65fc668a7daa72b7ba2119a99cb4",
+      "aggregate_rows": 1,
+      "mcp_roundtrip_ms": 22946,
+      "engine_duration_ms": null,
+      "value": 1,
+      "breaching_sources": 1,
+      "evaluated_sources": 18,
+      "evaluated_hour_utc": "2026-11-07T12:00:00Z",
+      "remaining_breach": {
+        "service": "mikka-web",
+        "error_code": "unknown_error",
+        "estimated_error_spans": 100,
+        "median": 20,
+        "threshold": 60,
+        "covered_hours": 57
+      }
+    },
+    "same_hour_result_comparison": "Earlier draft and final queries ran at different times; their output difference is not treated as a controlled measurement of only the SQL change."
+  },
+  "source_evidence": {
+    "workflow_core": "Installed @workflow/core 5.2.3 telemetry.js 67-71,361-366; runtime.js 596-629,752,1935,4474-4505; runtime/step-executor.js 117-118,190,432,498,743; runtime/suspension-handler.js wait_created; resume-hook.js hook.resume/getByToken.",
+    "queue": "Installed @workflow/world-vercel 5.2.3 queue.js 461,643; @vercel/queue 0.8.0 dist/index.mjs 417,1605,1715,2649. Normal vqs.process status is unset(0), failure is 2.",
+    "sanitizer": "lib/tracing/sanitize.ts preserves link contexts and strips workflow./step. display suffixes; it does not export trace.mode. Topology, not that attribute, is used.",
+    "actual_historical_topology": "evidence/workflow-queue-topology-readonly/receipt.json; one fixed known trace has flow(status1,2xx) -> vqs.process(status0) -> workflow.execute(status1), with execute link to a different origin. This does not identify historical installed SDK version or prove future telemetry completeness."
+  },
+  "remaining_boundaries": [
+    "Historical readonly query success is not production acceptance of #1512; insight application and deployed-run proof are still owned by root.",
+    "Finite graph matching intentionally retains errors when required ancestors/links are missing, dropped, outside the source window or use an unrecognized SDK topology.",
+    "Normal invocation return is not treated as business success without exact successful delivery proof; typed errors still remain counted.",
+    "Query durations include MCP transport and formatting; no ClickHouse engine-cost or latency SLA is inferred."
+  ],
+  "artifacts": [
+    {
+      "path": "alert-entry-scope-red.tap",
+      "bytes": 2541,
+      "sha256": "408a833a21806c1bfd0a6f20f02f72f358c853c5456173f50654c4d895bd079c",
+      "git_blob": "dae056278a5877973ca7115ac0eb1bb0c96057ef"
+    },
+    {
+      "path": "alert-entry-scope-green.tap",
+      "bytes": 4243,
+      "sha256": "508ae79d936de482690c0682a64f9ae18e800e90a114d506d4e52b34fef0d5ac",
+      "git_blob": "2e56b8532ddd901838464eb255921f654cb4097a"
+    },
+    {
+      "path": "alert-entry-scope-final.tap",
+      "bytes": 4713,
+      "sha256": "4f34995f21ea467e93a8d6ab677a746231e40b5a5103f9fb78c64cabd81c492f",
+      "git_blob": "ee63191c1406856ba79967a693b50615beb56550"
+    },
+    {
+      "path": "alert-entry-queue-red.tap",
+      "bytes": 3557,
+      "sha256": "c59c04df727cd0cbe35c963b6ce0ea8721dbe9135e8266a19a23b4e709395310",
+      "git_blob": "675fc41f9486bd14dfdf7038cd242cdfc26a0a7f"
+    },
+    {
+      "path": "alert-entry-queue-final.tap",
+      "bytes": 3008,
+      "sha256": "6767a26587aecfe3e5a7f0cc6f206565ecba91c7fd43bdb7e708f3c13565c2d5",
+      "git_blob": "7c8212edb5491d120a51ac851aa476b39ee366c1"
+    },
+    {
+      "path": "alert-entry-queue-oxlint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "evidence/alert-entry-links-schema.json",
+      "bytes": 9862,
+      "sha256": "87668c86acbed3e813f60b0b182bf9d5a2066ff372bde4f73e12aeffc2376c2d",
+      "git_blob": "25c7beb6ebb265b4bd0fbf7fdfd19f4548f39a75"
+    },
+    {
+      "path": "evidence/alert-entry-sql-validation-stage.json",
+      "bytes": 52005,
+      "sha256": "00416f6f77681ad512d8df921ffab03ca4bf1af70075c83d93624ee2a827090c",
+      "git_blob": "40f7a6f06a49fec74c7596867288a074766e095c"
+    },
+    {
+      "path": "evidence/alert-entry-sql-validation-final.json",
+      "bytes": 55894,
+      "sha256": "1891050f0159d6a06fc2d685cadbd8c476a94b3dff77365cee7e9e7cc458f881",
+      "git_blob": "507d25355225b24ecdccfdf642f9adf6d8e9fb35"
+    },
+    {
+      "path": "evidence/main-dab-alert-readback.json",
+      "bytes": 24095,
+      "sha256": "b63eadad278ccc3105513795c81748298019464d1d73703b48fd04af644749d1",
+      "git_blob": "de6f47c74a90b5df5fe4317db690e848f0a2861f"
+    },
+    {
+      "path": "evidence/workflow-queue-topology-readonly/receipt.json",
+      "bytes": 4259,
+      "sha256": "a2fe43d7c71a1d4e0b48ea5d6085816118a64c6cb5e05487f76f531b415e8b68",
+      "git_blob": "7b6b9a74b17de7ae6e642038256d312f54f5401d"
+    },
+    {
+      "path": "evidence/workflow-queue-topology-readonly/request.json",
+      "bytes": 2215,
+      "sha256": "8610c69d280fc7384bd2ecb49bcdd89763adaf4fe4660e4fb112797f265fcb59",
+      "git_blob": "090122831e098c8542aee46495a215493103f861"
+    },
+    {
+      "path": "evidence/workflow-queue-topology-readonly/response.json",
+      "bytes": 802,
+      "sha256": "4e0edbdf05f546f04be74637c4e898ed3fd4ead8a0c2e1d020b75cefdb8573d8",
+      "git_blob": "4398868bbc2acdf505bd0c17bc271ec22a97241c"
+    }
+  ]
+}

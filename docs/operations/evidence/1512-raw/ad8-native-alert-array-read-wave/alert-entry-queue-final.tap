@@ -1,0 +1,42 @@
+✔ a fresh project gets the dashboard, every insight, the note and five alerts; a second run writes nothing (7.548693ms)
+✔ the plan is read-only and names only what differs (3.33559ms)
+✔ production objects found by id keep their other tags and subscribers (0.228895ms)
+✔ every alert reads one row: no any_row, and each SQL alert query aggregates to a single row (0.443068ms)
+✔ the API key is required and never appears in errors (2.822576ms)
+✔ only confirmed handled Workflow attempts and their exact wrappers leave the error alert (3.988534ms)
+✔ successful non-root wake and cron entries handle only their own exact hook attempts (2.176022ms)
+✔ another successful entry in the same trace never handles a failed child entry (1.638792ms)
+✔ a missing link keeps the flow errors (1.816929ms)
+✔ a multiple links keeps the flow errors (2.36769ms)
+✔ a malformed link keeps the flow errors (1.708206ms)
+✔ a missing link trace ID keeps the flow errors (1.755117ms)
+✔ a wrong link trace keeps the flow errors (1.681506ms)
+✔ a wrong link span keeps the flow errors (1.874386ms)
+✔ a failed invocation keeps the flow errors (1.57832ms)
+✔ a business error on normal return keeps the flow errors (1.672072ms)
+✔ a unknown intermediate span keeps the flow errors (1.636327ms)
+✔ a successful delivery in the same trace cannot replace the failed linked delivery (3.044425ms)
+✔ a legacy run-origin link alone never impersonates the invocation delivery (2.046276ms)
+✔ a linked invocation keeps its exact successful delivery parent despite its separate run-origin link (1.999345ms)
+✔ continuous mode follows only the exact vqs.process delivery hop (2.121088ms)
+✔ linked mode follows only the exact vqs.process delivery hop (2.098694ms)
+✔ a failed queue cannot borrow another successful entry to hide errors (3.141187ms)
+✔ a typed queue error cannot borrow another successful entry to hide errors (3.334938ms)
+✔ a unknown queue span cannot borrow another successful entry to hide errors (3.035497ms)
+✔ a wrong queue parent cannot borrow another successful entry to hide errors (3.703845ms)
+✔ a cross-service queue cannot borrow another successful entry to hide errors (3.037461ms)
+✔ a failed delivery cannot borrow another successful entry to hide errors (3.142789ms)
+✔ a typed delivery error cannot borrow another successful entry to hide errors (3.616313ms)
+✔ a extra queue hop cannot borrow another successful entry to hide errors (3.028346ms)
+✔ two invocations in one trace retain the failed invocation even with a shared successful delivery (1.719252ms)
+✔ a direct event write uses its exact cross-trace invocation link without requiring a root delivery (1.573213ms)
+✔ a direct cron lookup still requires the corresponding successful HTTP entry (3.15007ms)
+✔ a real SDK error code or an unrelated failed sibling is never hidden (2.830558ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 218.070216

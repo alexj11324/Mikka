@@ -1,0 +1,2139 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_owned_ci_final_metadata",
+  "recordedAt": "2026-11-07T13:27:32.184Z",
+  "repository": "alexj11324/Mikka",
+  "run": {
+    "id": 42376245148,
+    "attempt": 1,
+    "event": "pull_request",
+    "workflow": "CI",
+    "path": ".github/workflows/ui-policy.yml",
+    "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+    "headBranch": "feat/1512-run-observability",
+    "status": "completed",
+    "conclusion": "success",
+    "createdAt": "2026-11-07T13:17:06Z",
+    "updatedAt": "2026-11-07T13:25:43Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42376245148"
+  },
+  "source": {
+    "candidate": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+    "base": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+    "actualCheckout": "212b65491909f064a732c6c1af69a54a6022f184",
+    "tree": "6d2091214d32173a0cb08936ab4288af60ddf675",
+    "parents": [
+      "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "ad8d257129989be43a3cb92e48ccd1197a6d096c"
+    ],
+    "basis": "All nine jobs that checkout source recorded the same exact SHA via actions/checkout git log -1 --format=%H; independently read back that immutable Git commit/tree/parents."
+  },
+  "totals": {
+    "jobs": 12,
+    "success": 11,
+    "skipped": 1,
+    "failure": 0,
+    "cancelled": 0
+  },
+  "jobs": [
+    {
+      "id": 128414302400,
+      "name": "Changed files",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:17:16Z",
+      "completedAt": "2026-11-07T13:17:25Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:16Z",
+          "completedAt": "2026-11-07T13:17:17Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:17Z",
+          "completedAt": "2026-11-07T13:17:22Z"
+        },
+        {
+          "number": 3,
+          "name": "Run git fetch origin main --no-tags",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:22Z",
+          "completedAt": "2026-11-07T13:17:23Z"
+        },
+        {
+          "number": 6,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:23Z",
+          "completedAt": "2026-11-07T13:17:23Z"
+        },
+        {
+          "number": 7,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:23Z",
+          "completedAt": "2026-11-07T13:17:23Z"
+        }
+      ],
+      "checkoutLog": {
+        "runId": 42376245148,
+        "jobId": 128414302400,
+        "name": "Changed files",
+        "rawChars": 241597,
+        "checkout": [
+          {
+            "basis": "checkout HEAD short",
+            "sha": "212b65491"
+          },
+          {
+            "basis": "checkout git log -1 --format=%H",
+            "sha": "212b65491909f064a732c6c1af69a54a6022f184"
+          }
+        ],
+        "rawLogPersisted": false
+      }
+    },
+    {
+      "id": 128414371258,
+      "name": "Integration unit checks",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:17:28Z",
+      "completedAt": "2026-11-07T13:24:33Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:29Z",
+          "completedAt": "2026-11-07T13:17:30Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:30Z",
+          "completedAt": "2026-11-07T13:17:33Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:33Z",
+          "completedAt": "2026-11-07T13:18:17Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm test:active-agents",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:17Z",
+          "completedAt": "2026-11-07T13:18:19Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm test:auth-composio",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:19Z",
+          "completedAt": "2026-11-07T13:18:23Z"
+        },
+        {
+          "number": 6,
+          "name": "Test environment binding and fail-closed guards",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:23Z",
+          "completedAt": "2026-11-07T13:18:28Z"
+        },
+        {
+          "number": 7,
+          "name": "Authentication email integration tests (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:28Z",
+          "completedAt": "2026-11-07T13:19:00Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm test:groups",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:00Z",
+          "completedAt": "2026-11-07T13:19:13Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm test:live-lists",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:13Z",
+          "completedAt": "2026-11-07T13:21:04Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm test:group-turns",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:04Z",
+          "completedAt": "2026-11-07T13:21:10Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:integrations",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:10Z",
+          "completedAt": "2026-11-07T13:22:01Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm test:github",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:01Z",
+          "completedAt": "2026-11-07T13:22:12Z"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm test:request-log",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:12Z",
+          "completedAt": "2026-11-07T13:22:16Z"
+        },
+        {
+          "number": 14,
+          "name": "Run pnpm test:legacy-reads",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:16Z",
+          "completedAt": "2026-11-07T13:22:17Z"
+        },
+        {
+          "number": 15,
+          "name": "Run pnpm test:slack",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:17Z",
+          "completedAt": "2026-11-07T13:22:18Z"
+        },
+        {
+          "number": 16,
+          "name": "Run pnpm test:telegram",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:18Z",
+          "completedAt": "2026-11-07T13:22:19Z"
+        },
+        {
+          "number": 17,
+          "name": "Run pnpm test:agent",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:19Z",
+          "completedAt": "2026-11-07T13:22:38Z"
+        },
+        {
+          "number": 18,
+          "name": "Run pnpm test:acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:38Z",
+          "completedAt": "2026-11-07T13:22:39Z"
+        },
+        {
+          "number": 19,
+          "name": "Run pnpm test:suggestions",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:39Z",
+          "completedAt": "2026-11-07T13:22:45Z"
+        },
+        {
+          "number": 20,
+          "name": "Run pnpm test:captures",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:45Z",
+          "completedAt": "2026-11-07T13:22:49Z"
+        },
+        {
+          "number": 21,
+          "name": "Run pnpm test:db-runner",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:49Z",
+          "completedAt": "2026-11-07T13:22:50Z"
+        },
+        {
+          "number": 22,
+          "name": "Run pnpm test:csv",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:50Z",
+          "completedAt": "2026-11-07T13:22:50Z"
+        },
+        {
+          "number": 23,
+          "name": "Run pnpm test:settings",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:50Z",
+          "completedAt": "2026-11-07T13:23:10Z"
+        },
+        {
+          "number": 24,
+          "name": "Run pnpm test:settings-backend",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:23:10Z",
+          "completedAt": "2026-11-07T13:23:13Z"
+        },
+        {
+          "number": 25,
+          "name": "Run pnpm test:workspace-settings",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:23:13Z",
+          "completedAt": "2026-11-07T13:23:19Z"
+        },
+        {
+          "number": 26,
+          "name": "Run pnpm test:settings-prefs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:23:19Z",
+          "completedAt": "2026-11-07T13:23:20Z"
+        },
+        {
+          "number": 27,
+          "name": "Run pnpm test:account",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:23:20Z",
+          "completedAt": "2026-11-07T13:23:24Z"
+        },
+        {
+          "number": 28,
+          "name": "Run pnpm test:issues",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:23:24Z",
+          "completedAt": "2026-11-07T13:24:12Z"
+        },
+        {
+          "number": 29,
+          "name": "Run pnpm test:issue-search",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:24:12Z",
+          "completedAt": "2026-11-07T13:24:13Z"
+        },
+        {
+          "number": 30,
+          "name": "Shared protocol unit tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:24:13Z",
+          "completedAt": "2026-11-07T13:24:17Z"
+        },
+        {
+          "number": 31,
+          "name": "E2B local API relay",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:24:17Z",
+          "completedAt": "2026-11-07T13:24:18Z"
+        },
+        {
+          "number": 32,
+          "name": "Audit business UI composition",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:24:18Z",
+          "completedAt": "2026-11-07T13:24:28Z"
+        },
+        {
+          "number": 33,
+          "name": "Show audit summary",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:24:28Z",
+          "completedAt": "2026-11-07T13:24:28Z"
+        },
+        {
+          "number": 34,
+          "name": "Upload detailed audit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:24:28Z",
+          "completedAt": "2026-11-07T13:24:29Z"
+        },
+        {
+          "number": 67,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:24:29Z",
+          "completedAt": "2026-11-07T13:24:30Z"
+        },
+        {
+          "number": 68,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:24:30Z",
+          "completedAt": "2026-11-07T13:24:30Z"
+        },
+        {
+          "number": 69,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:24:30Z",
+          "completedAt": "2026-11-07T13:24:30Z"
+        }
+      ],
+      "checkoutLog": {
+        "runId": 42376245148,
+        "jobId": 128414371258,
+        "jobName": "Integration unit checks",
+        "readAt": "2026-11-07T13:26:35.169Z",
+        "rawChars": 575575,
+        "checkout": [
+          "212b65491909f064a732c6c1af69a54a6022f184"
+        ],
+        "rawLogPersisted": false,
+        "projection": "checkout identity only; successful gate conclusion from actual job/step metadata"
+      }
+    },
+    {
+      "id": 128414371261,
+      "name": "Database checks (2/4)",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:17:27Z",
+      "completedAt": "2026-11-07T13:21:53Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:27Z",
+          "completedAt": "2026-11-07T13:17:28Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:28Z",
+          "completedAt": "2026-11-07T13:17:40Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:40Z",
+          "completedAt": "2026-11-07T13:17:42Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:42Z",
+          "completedAt": "2026-11-07T13:18:20Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:20Z",
+          "completedAt": "2026-11-07T13:18:20Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:20Z",
+          "completedAt": "2026-11-07T13:18:20Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:20Z",
+          "completedAt": "2026-11-07T13:18:22Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:18:22Z",
+          "completedAt": "2026-11-07T13:18:22Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:22Z",
+          "completedAt": "2026-11-07T13:18:22Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:22Z",
+          "completedAt": "2026-11-07T13:18:27Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:27Z",
+          "completedAt": "2026-11-07T13:18:30Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:30Z",
+          "completedAt": "2026-11-07T13:18:30Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:18:30Z",
+          "completedAt": "2026-11-07T13:18:30Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:18:30Z",
+          "completedAt": "2026-11-07T13:18:30Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:30Z",
+          "completedAt": "2026-11-07T13:21:50Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:50Z",
+          "completedAt": "2026-11-07T13:21:50Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:50Z",
+          "completedAt": "2026-11-07T13:21:51Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:51Z",
+          "completedAt": "2026-11-07T13:21:51Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:51Z",
+          "completedAt": "2026-11-07T13:21:51Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:51Z",
+          "completedAt": "2026-11-07T13:21:51Z"
+        }
+      ],
+      "checkoutLog": {
+        "runId": 42376245148,
+        "jobId": 128414371261,
+        "jobName": "Database checks (2/4)",
+        "readAt": "2026-11-07T13:24:27.972Z",
+        "rawChars": 658682,
+        "checkout": [
+          "212b65491909f064a732c6c1af69a54a6022f184"
+        ],
+        "postgresStartupVersions": [
+          "17.11"
+        ],
+        "targetTests": [],
+        "rawLogPersisted": false,
+        "projection": "exact checkout, version numbers and allowlisted public test outcomes only"
+      }
+    },
+    {
+      "id": 128414371284,
+      "name": "Daemon checks",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:17:38Z",
+      "completedAt": "2026-11-07T13:20:34Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:39Z",
+          "completedAt": "2026-11-07T13:17:40Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:40Z",
+          "completedAt": "2026-11-07T13:17:42Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:42Z",
+          "completedAt": "2026-11-07T13:18:20Z"
+        },
+        {
+          "number": 4,
+          "name": "Daemon unit and transport regression tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:20Z",
+          "completedAt": "2026-11-07T13:20:03Z"
+        },
+        {
+          "number": 5,
+          "name": "Existing mailbox CLI integration tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:03Z",
+          "completedAt": "2026-11-07T13:20:06Z"
+        },
+        {
+          "number": 6,
+          "name": "Daemon repository identity, GitHub credential and trusted endpoint tests",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:06Z",
+          "completedAt": "2026-11-07T13:20:07Z"
+        },
+        {
+          "number": 7,
+          "name": "Local computer authority through actual daemon and adapter protocol",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:07Z",
+          "completedAt": "2026-11-07T13:20:10Z"
+        },
+        {
+          "number": 8,
+          "name": "Preserve daemon unit evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:10Z",
+          "completedAt": "2026-11-07T13:20:12Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/daemon typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:12Z",
+          "completedAt": "2026-11-07T13:20:16Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/daemon build",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:16Z",
+          "completedAt": "2026-11-07T13:20:16Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm --filter @mikka/daemon test:package",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:16Z",
+          "completedAt": "2026-11-07T13:20:31Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:31Z",
+          "completedAt": "2026-11-07T13:20:31Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:31Z",
+          "completedAt": "2026-11-07T13:20:31Z"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:31Z",
+          "completedAt": "2026-11-07T13:20:31Z"
+        }
+      ],
+      "checkoutLog": {
+        "runId": 42376245148,
+        "jobId": 128414371284,
+        "jobName": "Daemon checks",
+        "readAt": "2026-11-07T13:22:31.264Z",
+        "rawChars": 107848,
+        "checkout": [
+          "212b65491909f064a732c6c1af69a54a6022f184"
+        ],
+        "rawLogPersisted": false,
+        "projection": "checkout identity only; successful gate conclusion from actual job/step metadata"
+      }
+    },
+    {
+      "id": 128414371321,
+      "name": "Core unit checks",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:17:30Z",
+      "completedAt": "2026-11-07T13:25:37Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:30Z",
+          "completedAt": "2026-11-07T13:17:31Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:31Z",
+          "completedAt": "2026-11-07T13:17:33Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:33Z",
+          "completedAt": "2026-11-07T13:18:10Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm test:factory-check-independence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:10Z",
+          "completedAt": "2026-11-07T13:18:11Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm test:factory-check-recovery",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:11Z",
+          "completedAt": "2026-11-07T13:18:13Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm test:factory-routing",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:13Z",
+          "completedAt": "2026-11-07T13:18:28Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:self-improvement-semantic-source",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:28Z",
+          "completedAt": "2026-11-07T13:18:31Z"
+        },
+        {
+          "number": 8,
+          "name": "Run node --test scripts/ci-docs-only.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:31Z",
+          "completedAt": "2026-11-07T13:18:33Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm test:ui-policy",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:33Z",
+          "completedAt": "2026-11-07T13:18:44Z"
+        },
+        {
+          "number": 10,
+          "name": "Idle request budget (main pages, no browser)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:44Z",
+          "completedAt": "2026-11-07T13:18:54Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:motion",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:54Z",
+          "completedAt": "2026-11-07T13:18:55Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm test:i18n",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:55Z",
+          "completedAt": "2026-11-07T13:18:56Z"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm i18n:check",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:56Z",
+          "completedAt": "2026-11-07T13:19:01Z"
+        },
+        {
+          "number": 14,
+          "name": "Run pnpm test:ssh-target",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:01Z",
+          "completedAt": "2026-11-07T13:19:01Z"
+        },
+        {
+          "number": 15,
+          "name": "Run pnpm test:linear-sync",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:01Z",
+          "completedAt": "2026-11-07T13:19:05Z"
+        },
+        {
+          "number": 16,
+          "name": "Run pnpm check:agent-definitions",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:05Z",
+          "completedAt": "2026-11-07T13:19:06Z"
+        },
+        {
+          "number": 17,
+          "name": "Release identity, vulnerability policy and artifact tamper regressions",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:06Z",
+          "completedAt": "2026-11-07T13:19:08Z"
+        },
+        {
+          "number": 18,
+          "name": "Run pnpm test:mailbox-verification",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:08Z",
+          "completedAt": "2026-11-07T13:19:08Z"
+        },
+        {
+          "number": 19,
+          "name": "Run pnpm test:factory-approval",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:08Z",
+          "completedAt": "2026-11-07T13:19:10Z"
+        },
+        {
+          "number": 20,
+          "name": "Run pnpm test:personal-mailbox-core",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:10Z",
+          "completedAt": "2026-11-07T13:19:20Z"
+        },
+        {
+          "number": 21,
+          "name": "Run pnpm test:factory-monitor",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:20Z",
+          "completedAt": "2026-11-07T13:19:20Z"
+        },
+        {
+          "number": 22,
+          "name": "Run pnpm test:execution-rules",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:20Z",
+          "completedAt": "2026-11-07T13:19:33Z"
+        },
+        {
+          "number": 23,
+          "name": "Run pnpm test:abuse",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:33Z",
+          "completedAt": "2026-11-07T13:19:38Z"
+        },
+        {
+          "number": 24,
+          "name": "Run pnpm test:hosted-usage",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:38Z",
+          "completedAt": "2026-11-07T13:19:39Z"
+        },
+        {
+          "number": 25,
+          "name": "Run pnpm test:model-admission",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:39Z",
+          "completedAt": "2026-11-07T13:19:42Z"
+        },
+        {
+          "number": 26,
+          "name": "Run pnpm test:audit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:42Z",
+          "completedAt": "2026-11-07T13:19:43Z"
+        },
+        {
+          "number": 27,
+          "name": "Run pnpm test:agent-kit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:43Z",
+          "completedAt": "2026-11-07T13:19:45Z"
+        },
+        {
+          "number": 28,
+          "name": "Run pnpm test:agent-kit-compat",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:45Z",
+          "completedAt": "2026-11-07T13:20:09Z"
+        },
+        {
+          "number": 29,
+          "name": "Run pnpm test:approved-writes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:09Z",
+          "completedAt": "2026-11-07T13:20:34Z"
+        },
+        {
+          "number": 30,
+          "name": "Run pnpm test:coordinator-events",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:34Z",
+          "completedAt": "2026-11-07T13:21:18Z"
+        },
+        {
+          "number": 31,
+          "name": "Run pnpm test:schedules",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:18Z",
+          "completedAt": "2026-11-07T13:21:21Z"
+        },
+        {
+          "number": 32,
+          "name": "Run pnpm test:run-recovery",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:21Z",
+          "completedAt": "2026-11-07T13:21:22Z"
+        },
+        {
+          "number": 33,
+          "name": "Run pnpm test:mvp-fixtures",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:22Z",
+          "completedAt": "2026-11-07T13:21:29Z"
+        },
+        {
+          "number": 34,
+          "name": "Run pnpm test:credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:29Z",
+          "completedAt": "2026-11-07T13:21:32Z"
+        },
+        {
+          "number": 35,
+          "name": "Run pnpm test:run-publication",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:32Z",
+          "completedAt": "2026-11-07T13:21:35Z"
+        },
+        {
+          "number": 36,
+          "name": "Run pnpm test:workflow-wakes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:35Z",
+          "completedAt": "2026-11-07T13:21:39Z"
+        },
+        {
+          "number": 37,
+          "name": "Factory daemon check regressions and shared report contract",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:39Z",
+          "completedAt": "2026-11-07T13:22:04Z"
+        },
+        {
+          "number": 38,
+          "name": "Run pnpm test:mobile-push",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:04Z",
+          "completedAt": "2026-11-07T13:22:06Z"
+        },
+        {
+          "number": 39,
+          "name": "Run pnpm test:mobile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:06Z",
+          "completedAt": "2026-11-07T13:22:17Z"
+        },
+        {
+          "number": 40,
+          "name": "Run pnpm test:coordinator-native-relay",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:17Z",
+          "completedAt": "2026-11-07T13:22:18Z"
+        },
+        {
+          "number": 41,
+          "name": "Run pnpm test:coordinator-native-scope",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:18Z",
+          "completedAt": "2026-11-07T13:22:22Z"
+        },
+        {
+          "number": 42,
+          "name": "Run pnpm test:coordinator-issue-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:22Z",
+          "completedAt": "2026-11-07T13:22:39Z"
+        },
+        {
+          "number": 43,
+          "name": "Run pnpm test:signup-turnstile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:39Z",
+          "completedAt": "2026-11-07T13:22:40Z"
+        },
+        {
+          "number": 44,
+          "name": "Run pnpm test:cloud-limits",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:40Z",
+          "completedAt": "2026-11-07T13:22:44Z"
+        },
+        {
+          "number": 45,
+          "name": "Run pnpm test:analytics",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:44Z",
+          "completedAt": "2026-11-07T13:22:45Z"
+        },
+        {
+          "number": 46,
+          "name": "Run pnpm test:artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:45Z",
+          "completedAt": "2026-11-07T13:22:57Z"
+        },
+        {
+          "number": 47,
+          "name": "Run pnpm test:factory-config",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:57Z",
+          "completedAt": "2026-11-07T13:22:58Z"
+        },
+        {
+          "number": 48,
+          "name": "Run pnpm test:user-message-text",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:58Z",
+          "completedAt": "2026-11-07T13:22:59Z"
+        },
+        {
+          "number": 49,
+          "name": "Run pnpm test:run-info",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:59Z",
+          "completedAt": "2026-11-07T13:23:01Z"
+        },
+        {
+          "number": 50,
+          "name": "Run pnpm test:thread-changes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:23:01Z",
+          "completedAt": "2026-11-07T13:23:03Z"
+        },
+        {
+          "number": 51,
+          "name": "Run pnpm check:agent-ui",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:23:03Z",
+          "completedAt": "2026-11-07T13:23:05Z"
+        },
+        {
+          "number": 52,
+          "name": "Run pnpm test:dev-local",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:23:05Z",
+          "completedAt": "2026-11-07T13:23:09Z"
+        },
+        {
+          "number": 53,
+          "name": "Run pnpm test:lib-units",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:23:09Z",
+          "completedAt": "2026-11-07T13:25:02Z"
+        },
+        {
+          "number": 54,
+          "name": "Run pnpm test:project-decisions",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:25:02Z",
+          "completedAt": "2026-11-07T13:25:06Z"
+        },
+        {
+          "number": 55,
+          "name": "Run pnpm test:unread",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:25:06Z",
+          "completedAt": "2026-11-07T13:25:06Z"
+        },
+        {
+          "number": 56,
+          "name": "Run pnpm test:issue-readonly-dom",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:25:06Z",
+          "completedAt": "2026-11-07T13:25:35Z"
+        },
+        {
+          "number": 111,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:25:35Z",
+          "completedAt": "2026-11-07T13:25:35Z"
+        },
+        {
+          "number": 112,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:25:35Z",
+          "completedAt": "2026-11-07T13:25:35Z"
+        },
+        {
+          "number": 113,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:25:35Z",
+          "completedAt": "2026-11-07T13:25:35Z"
+        }
+      ],
+      "checkoutLog": {
+        "runId": 42376245148,
+        "jobId": 128414371321,
+        "jobName": "Core unit checks",
+        "readAt": "2026-11-07T13:26:35.171Z",
+        "rawChars": 849244,
+        "checkout": [
+          "212b65491909f064a732c6c1af69a54a6022f184"
+        ],
+        "rawLogPersisted": false,
+        "projection": "checkout identity only; successful gate conclusion from actual job/step metadata"
+      }
+    },
+    {
+      "id": 128414371327,
+      "name": "Database checks (4/4)",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:17:47Z",
+      "completedAt": "2026-11-07T13:21:50Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:48Z",
+          "completedAt": "2026-11-07T13:17:49Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:49Z",
+          "completedAt": "2026-11-07T13:18:02Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:02Z",
+          "completedAt": "2026-11-07T13:18:05Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:05Z",
+          "completedAt": "2026-11-07T13:18:51Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:51Z",
+          "completedAt": "2026-11-07T13:18:51Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:51Z",
+          "completedAt": "2026-11-07T13:18:52Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:52Z",
+          "completedAt": "2026-11-07T13:18:54Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:18:54Z",
+          "completedAt": "2026-11-07T13:18:54Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:54Z",
+          "completedAt": "2026-11-07T13:18:54Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:54Z",
+          "completedAt": "2026-11-07T13:18:59Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:59Z",
+          "completedAt": "2026-11-07T13:19:02Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:02Z",
+          "completedAt": "2026-11-07T13:19:02Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:19:02Z",
+          "completedAt": "2026-11-07T13:19:02Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:19:02Z",
+          "completedAt": "2026-11-07T13:19:02Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:02Z",
+          "completedAt": "2026-11-07T13:21:46Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:46Z",
+          "completedAt": "2026-11-07T13:21:46Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:46Z",
+          "completedAt": "2026-11-07T13:21:46Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:46Z",
+          "completedAt": "2026-11-07T13:21:46Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:46Z",
+          "completedAt": "2026-11-07T13:21:47Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:21:47Z",
+          "completedAt": "2026-11-07T13:21:47Z"
+        }
+      ],
+      "checkoutLog": {
+        "runId": 42376245148,
+        "jobId": 128414371327,
+        "jobName": "Database checks (4/4)",
+        "readAt": "2026-11-07T13:24:27.967Z",
+        "rawChars": 483199,
+        "checkout": [
+          "212b65491909f064a732c6c1af69a54a6022f184"
+        ],
+        "postgresStartupVersions": [
+          "17.11"
+        ],
+        "targetTests": [
+          {
+            "name": "task run rows keep the newest owner run and the 200-row limit without unused fields",
+            "outcome": "passed",
+            "observedAt": "2026-11-07T13:21:20.2025567Z"
+          },
+          {
+            "name": "one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows",
+            "outcome": "passed",
+            "observedAt": "2026-11-07T13:21:20.2035865Z"
+          }
+        ],
+        "rawLogPersisted": false,
+        "projection": "exact checkout, version numbers and allowlisted public test outcomes only",
+        "targetResultFormat": "native Node spec reporter or TAP; exact public title with success/failure marker"
+      }
+    },
+    {
+      "id": 128414371345,
+      "name": "Source checks",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:17:50Z",
+      "completedAt": "2026-11-07T13:20:07Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:51Z",
+          "completedAt": "2026-11-07T13:17:52Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:52Z",
+          "completedAt": "2026-11-07T13:17:55Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:55Z",
+          "completedAt": "2026-11-07T13:18:44Z"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm lint:code",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:44Z",
+          "completedAt": "2026-11-07T13:18:46Z"
+        },
+        {
+          "number": 5,
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:46Z",
+          "completedAt": "2026-11-07T13:18:46Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm lint:runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:46Z",
+          "completedAt": "2026-11-07T13:18:47Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:api",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:47Z",
+          "completedAt": "2026-11-07T13:18:56Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm --filter @mikka/frontend test",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:56Z",
+          "completedAt": "2026-11-07T13:19:22Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:22Z",
+          "completedAt": "2026-11-07T13:19:57Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:57Z",
+          "completedAt": "2026-11-07T13:19:58Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm --filter @mikka/mobile typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:58Z",
+          "completedAt": "2026-11-07T13:20:05Z"
+        },
+        {
+          "number": 21,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:05Z",
+          "completedAt": "2026-11-07T13:20:05Z"
+        },
+        {
+          "number": 22,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:05Z",
+          "completedAt": "2026-11-07T13:20:05Z"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:20:05Z",
+          "completedAt": "2026-11-07T13:20:06Z"
+        }
+      ],
+      "checkoutLog": {
+        "runId": 42376245148,
+        "jobId": 128414371345,
+        "jobName": "Source checks",
+        "readAt": "2026-11-07T13:22:31.265Z",
+        "rawChars": 74227,
+        "checkout": [
+          "212b65491909f064a732c6c1af69a54a6022f184"
+        ],
+        "rawLogPersisted": false,
+        "projection": "checkout identity only; successful gate conclusion from actual job/step metadata"
+      }
+    },
+    {
+      "id": 128414371385,
+      "name": "Database checks (1/4)",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:18:06Z",
+      "completedAt": "2026-11-07T13:22:13Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:07Z",
+          "completedAt": "2026-11-07T13:18:08Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:08Z",
+          "completedAt": "2026-11-07T13:18:21Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:21Z",
+          "completedAt": "2026-11-07T13:18:24Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:24Z",
+          "completedAt": "2026-11-07T13:19:06Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:06Z",
+          "completedAt": "2026-11-07T13:19:06Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:06Z",
+          "completedAt": "2026-11-07T13:19:07Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:07Z",
+          "completedAt": "2026-11-07T13:19:09Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:19:09Z",
+          "completedAt": "2026-11-07T13:19:09Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:09Z",
+          "completedAt": "2026-11-07T13:19:09Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:09Z",
+          "completedAt": "2026-11-07T13:19:15Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:15Z",
+          "completedAt": "2026-11-07T13:19:17Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:17Z",
+          "completedAt": "2026-11-07T13:19:18Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:18Z",
+          "completedAt": "2026-11-07T13:19:19Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:19Z",
+          "completedAt": "2026-11-07T13:19:45Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:45Z",
+          "completedAt": "2026-11-07T13:22:08Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:08Z",
+          "completedAt": "2026-11-07T13:22:09Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:09Z",
+          "completedAt": "2026-11-07T13:22:10Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:10Z",
+          "completedAt": "2026-11-07T13:22:10Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:10Z",
+          "completedAt": "2026-11-07T13:22:10Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:10Z",
+          "completedAt": "2026-11-07T13:22:10Z"
+        }
+      ],
+      "checkoutLog": {
+        "runId": 42376245148,
+        "jobId": 128414371385,
+        "jobName": "Database checks (1/4)",
+        "readAt": "2026-11-07T13:24:27.975Z",
+        "rawChars": 293058,
+        "checkout": [
+          "212b65491909f064a732c6c1af69a54a6022f184"
+        ],
+        "postgresStartupVersions": [
+          "17.11"
+        ],
+        "targetTests": [],
+        "rawLogPersisted": false,
+        "projection": "exact checkout, version numbers and allowlisted public test outcomes only"
+      }
+    },
+    {
+      "id": 128414371400,
+      "name": "Database checks (3/4)",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:18:02Z",
+      "completedAt": "2026-11-07T13:22:04Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:03Z",
+          "completedAt": "2026-11-07T13:18:04Z"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:04Z",
+          "completedAt": "2026-11-07T13:18:16Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:16Z",
+          "completedAt": "2026-11-07T13:18:18Z"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:18Z",
+          "completedAt": "2026-11-07T13:19:02Z"
+        },
+        {
+          "number": 5,
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:02Z",
+          "completedAt": "2026-11-07T13:19:02Z"
+        },
+        {
+          "number": 6,
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:02Z",
+          "completedAt": "2026-11-07T13:19:03Z"
+        },
+        {
+          "number": 7,
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:03Z",
+          "completedAt": "2026-11-07T13:19:09Z"
+        },
+        {
+          "number": 8,
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:19:09Z",
+          "completedAt": "2026-11-07T13:19:09Z"
+        },
+        {
+          "number": 9,
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:09Z",
+          "completedAt": "2026-11-07T13:19:10Z"
+        },
+        {
+          "number": 10,
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:10Z",
+          "completedAt": "2026-11-07T13:19:15Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:15Z",
+          "completedAt": "2026-11-07T13:19:17Z"
+        },
+        {
+          "number": 12,
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:17Z",
+          "completedAt": "2026-11-07T13:19:18Z"
+        },
+        {
+          "number": 13,
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:19:18Z",
+          "completedAt": "2026-11-07T13:19:18Z"
+        },
+        {
+          "number": 14,
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T13:19:18Z",
+          "completedAt": "2026-11-07T13:19:18Z"
+        },
+        {
+          "number": 15,
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:18Z",
+          "completedAt": "2026-11-07T13:22:01Z"
+        },
+        {
+          "number": 16,
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:01Z",
+          "completedAt": "2026-11-07T13:22:01Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:01Z",
+          "completedAt": "2026-11-07T13:22:02Z"
+        },
+        {
+          "number": 31,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:02Z",
+          "completedAt": "2026-11-07T13:22:02Z"
+        },
+        {
+          "number": 32,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:02Z",
+          "completedAt": "2026-11-07T13:22:02Z"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:02Z",
+          "completedAt": "2026-11-07T13:22:02Z"
+        }
+      ],
+      "checkoutLog": {
+        "runId": 42376245148,
+        "jobId": 128414371400,
+        "jobName": "Database checks (3/4)",
+        "readAt": "2026-11-07T13:24:27.981Z",
+        "rawChars": 775871,
+        "checkout": [
+          "212b65491909f064a732c6c1af69a54a6022f184"
+        ],
+        "postgresStartupVersions": [
+          "17.11"
+        ],
+        "targetTests": [],
+        "rawLogPersisted": false,
+        "projection": "exact checkout, version numbers and allowlisted public test outcomes only"
+      }
+    },
+    {
+      "id": 128414372439,
+      "name": "Cloud credential access (OIDC)",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-07T13:17:25Z",
+      "completedAt": "2026-11-07T13:17:25Z",
+      "steps": [],
+      "checkoutLog": null
+    },
+    {
+      "id": 128415483059,
+      "name": "Production build and browser interactions",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:22:15Z",
+      "completedAt": "2026-11-07T13:22:17Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:16Z",
+          "completedAt": "2026-11-07T13:22:16Z"
+        },
+        {
+          "number": 2,
+          "name": "Require the full suite unless only documentation changed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:16Z",
+          "completedAt": "2026-11-07T13:22:16Z"
+        },
+        {
+          "number": 3,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:22:16Z",
+          "completedAt": "2026-11-07T13:22:16Z"
+        }
+      ],
+      "checkoutLog": null
+    },
+    {
+      "id": 128416257908,
+      "name": "UI policy (strict)",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:25:39Z",
+      "completedAt": "2026-11-07T13:25:43Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:25:40Z",
+          "completedAt": "2026-11-07T13:25:40Z"
+        },
+        {
+          "number": 2,
+          "name": "Require the full suite unless only documentation changed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:25:40Z",
+          "completedAt": "2026-11-07T13:25:40Z"
+        },
+        {
+          "number": 3,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:25:40Z",
+          "completedAt": "2026-11-07T13:25:40Z"
+        }
+      ],
+      "checkoutLog": null
+    }
+  ],
+  "pg4FixtureRegression": {
+    "previousRun": 42368835440,
+    "previousCandidate": "1f548a73304923da466ebe702c99b6a8f6096f15",
+    "previousFailureCode": "23505",
+    "previousConstraint": "agents_user_name_key",
+    "sourceFile": "tests/action-read-egress.db.test.ts",
+    "currentJob": 128414371327,
+    "postgresVersion": [
+      "17.11"
+    ],
+    "targetTests": [
+      {
+        "name": "task run rows keep the newest owner run and the 200-row limit without unused fields",
+        "outcome": "passed",
+        "observedAt": "2026-11-07T13:21:20.2025567Z"
+      },
+      {
+        "name": "one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows",
+        "outcome": "passed",
+        "observedAt": "2026-11-07T13:21:20.2035865Z"
+      }
+    ],
+    "requiredSuites": "success",
+    "containerCleanup": "success",
+    "oldFailureNotRewritten": true
+  },
+  "databaseCleanup": [
+    {
+      "jobId": 128414371261,
+      "job": "Database checks (2/4)",
+      "requiredSuites": "success",
+      "stopContainers": "success",
+      "postgresStartupVersions": [
+        "17.11"
+      ]
+    },
+    {
+      "jobId": 128414371327,
+      "job": "Database checks (4/4)",
+      "requiredSuites": "success",
+      "stopContainers": "success",
+      "postgresStartupVersions": [
+        "17.11"
+      ]
+    },
+    {
+      "jobId": 128414371385,
+      "job": "Database checks (1/4)",
+      "requiredSuites": "success",
+      "stopContainers": "success",
+      "postgresStartupVersions": [
+        "17.11"
+      ]
+    },
+    {
+      "jobId": 128414371400,
+      "job": "Database checks (3/4)",
+      "requiredSuites": "success",
+      "stopContainers": "success",
+      "postgresStartupVersions": [
+        "17.11"
+      ]
+    }
+  ],
+  "privacy": {
+    "rawLogsSaved": false,
+    "rawLogsHandledInRamOnly": true,
+    "retainedLogFields": [
+      "exact checkout SHA",
+      "PostgreSQL numeric version",
+      "two allowlisted public test titles and result markers",
+      "timestamps",
+      "source job ID and raw character count"
+    ],
+    "environmentValues": false,
+    "credentials": false,
+    "accountIdentifiers": false,
+    "signedUrls": false
+  },
+  "limits": {
+    "thisWorkflowOnly": true,
+    "otherFeatureWorkflowsNotClaimed": true,
+    "desktopWorkflow": 42376245091,
+    "desktopEvidenceOwner": "daemon_impl",
+    "desktopNativeResultNotClaimed": true,
+    "productionBuildAndBrowserInteractionsJobIsDatabaseAggregationGate": true,
+    "noProductionBuildOrBrowserRunClaimedFromThatJob": true,
+    "productionIssue1512Acceptance": null,
+    "lastObservedNativeLogin": {
+      "candidate": "1f548a73304923da466ebe702c99b6a8f6096f15",
+      "nativeQueries": 196,
+      "webQueries": 173,
+      "criterionMet": false,
+      "supersededOnlyByNewActualNativeReport": true
+    },
+    "remoteMutation": false,
+    "ciRetry": false,
+    "providerCallsByReviewer": 0,
+    "resourcesStartedByReviewer": 0
+  },
+  "methodNotes": [
+    "PG4 first extraction searched TAP result markers and found none; a second read of the same immutable job log recognized the real Node spec reporter success marks. No CI or database rerun occurred.",
+    "Skipped Cloud credential access (OIDC) remains skipped, not a claimed credential validation."
+  ]
+}

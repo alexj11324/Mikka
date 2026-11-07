@@ -1,0 +1,136 @@
+TAP version 13
+# Subtest: a fresh project gets the dashboard, every insight, the note and five alerts; a second run writes nothing
+ok 1 - a fresh project gets the dashboard, every insight, the note and five alerts; a second run writes nothing
+  ---
+  duration_ms: 6.071316
+  type: 'test'
+  ...
+# Subtest: the plan is read-only and names only what differs
+ok 2 - the plan is read-only and names only what differs
+  ---
+  duration_ms: 3.35111
+  type: 'test'
+  ...
+# Subtest: production objects found by id keep their other tags and subscribers
+ok 3 - production objects found by id keep their other tags and subscribers
+  ---
+  duration_ms: 0.24552
+  type: 'test'
+  ...
+# Subtest: every alert reads one row: no any_row, and each SQL alert query aggregates to a single row
+ok 4 - every alert reads one row: no any_row, and each SQL alert query aggregates to a single row
+  ---
+  duration_ms: 0.419694
+  type: 'test'
+  ...
+# Subtest: the API key is required and never appears in errors
+ok 5 - the API key is required and never appears in errors
+  ---
+  duration_ms: 2.757323
+  type: 'test'
+  ...
+# Subtest: only confirmed handled Workflow attempts and their exact wrappers leave the error alert
+ok 6 - only confirmed handled Workflow attempts and their exact wrappers leave the error alert
+  ---
+  duration_ms: 4.011136
+  type: 'test'
+  ...
+# Subtest: successful non-root wake and cron entries handle only their own exact hook attempts
+ok 7 - successful non-root wake and cron entries handle only their own exact hook attempts
+  ---
+  duration_ms: 2.008141
+  type: 'test'
+  ...
+# Subtest: another successful entry in the same trace never handles a failed child entry
+ok 8 - another successful entry in the same trace never handles a failed child entry
+  ---
+  duration_ms: 1.632595
+  type: 'test'
+  ...
+# Subtest: a missing link keeps the flow errors
+ok 9 - a missing link keeps the flow errors
+  ---
+  duration_ms: 1.603501
+  type: 'test'
+  ...
+# Subtest: a multiple links keeps the flow errors
+ok 10 - a multiple links keeps the flow errors
+  ---
+  duration_ms: 1.588067
+  type: 'test'
+  ...
+# Subtest: a malformed link keeps the flow errors
+ok 11 - a malformed link keeps the flow errors
+  ---
+  duration_ms: 1.410119
+  type: 'test'
+  ...
+# Subtest: a missing link trace ID keeps the flow errors
+ok 12 - a missing link trace ID keeps the flow errors
+  ---
+  duration_ms: 1.325952
+  type: 'test'
+  ...
+# Subtest: a wrong link trace keeps the flow errors
+ok 13 - a wrong link trace keeps the flow errors
+  ---
+  duration_ms: 1.453094
+  type: 'test'
+  ...
+# Subtest: a wrong link span keeps the flow errors
+ok 14 - a wrong link span keeps the flow errors
+  ---
+  duration_ms: 1.36399
+  type: 'test'
+  ...
+# Subtest: a failed invocation keeps the flow errors
+ok 15 - a failed invocation keeps the flow errors
+  ---
+  duration_ms: 1.315576
+  type: 'test'
+  ...
+# Subtest: a business error on normal return keeps the flow errors
+ok 16 - a business error on normal return keeps the flow errors
+  ---
+  duration_ms: 1.302426
+  type: 'test'
+  ...
+# Subtest: a unknown intermediate span keeps the flow errors
+ok 17 - a unknown intermediate span keeps the flow errors
+  ---
+  duration_ms: 1.299031
+  type: 'test'
+  ...
+# Subtest: a successful delivery in the same trace cannot replace the failed linked delivery
+ok 18 - a successful delivery in the same trace cannot replace the failed linked delivery
+  ---
+  duration_ms: 1.359522
+  type: 'test'
+  ...
+# Subtest: a direct event write uses its exact cross-trace invocation link without requiring a root delivery
+ok 19 - a direct event write uses its exact cross-trace invocation link without requiring a root delivery
+  ---
+  duration_ms: 1.386913
+  type: 'test'
+  ...
+# Subtest: a direct cron lookup still requires the corresponding successful HTTP entry
+ok 20 - a direct cron lookup still requires the corresponding successful HTTP entry
+  ---
+  duration_ms: 2.88101
+  type: 'test'
+  ...
+# Subtest: a real SDK error code or an unrelated failed sibling is never hidden
+ok 21 - a real SDK error code or an unrelated failed sibling is never hidden
+  ---
+  duration_ms: 2.878155
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 131.392941

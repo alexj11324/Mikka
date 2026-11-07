@@ -1,0 +1,35 @@
+✔ Native coalesces allowed reads in one turn with one codec pass and ordered results (36.11787ms)
+✔ one startup read wave stays together across the real hydration gates used by SWR and list fetchers (16.785376ms)
+✔ single reads, excluded actions and Web keep their ordinary single-request path without a read cache (15.226663ms)
+✔ Native splits at sixteen items and captures each locale before the posted flush (15.063286ms)
+✔ only an exact unknown batch action on 404 falls back and disables batching for this page (14.891913ms)
+▶ batch HTTP and network failures do not retry or fall back
+  ✔ 404:not_found (14.037457ms)
+  ✔ 500:desktop_rpc_action_unknown (13.836314ms)
+  ✔ 401:authRequired (19.338517ms)
+  ✔ 426:desktop_client_update_required (14.283198ms)
+  ✔ 503:desktop_rpc_failed (14.703213ms)
+  ✔ network (28.961573ms)
+✔ batch HTTP and network failures do not retry or fall back (106.773638ms)
+✔ batch item failures retain their own error and status without failing successful siblings (22.015994ms)
+▶ malformed batch item count or shape rejects every item without retrying
+  ✔ [{"ok":true,"result":null}] (30.783895ms)
+  ✔ [{"ok":true,"result":null},{"ok":false,"status":"403","error":{"code":"workspaceAccessDenied"}}] (21.943797ms)
+✔ malformed batch item count or shape rejects every item without retrying (53.311413ms)
+✔ scope reset after a microtask rejects unsent old-identity reads before the posted flush (20.178565ms)
+✔ workspace selector changes cannot pair queued arguments with the new workspace before React effects run (30.871983ms)
+✔ explicit isCurrent guards drop stale queued reads and remain independent from other guards (19.303959ms)
+▶ retired in-flight batches cannot change current transport state or trigger old-server fallback
+  ✔ 401 (18.73436ms)
+  ✔ 503 (15.81107ms)
+  ✔ 404 (17.130437ms)
+✔ retired in-flight batches cannot change current transport state or trigger old-server fallback (52.437618ms)
+✔ an isCurrent change while a batch body is pending prevents stale results and state updates (20.238096ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 836.019751

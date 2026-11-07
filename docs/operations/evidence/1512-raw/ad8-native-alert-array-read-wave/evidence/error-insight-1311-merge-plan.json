@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "status": "review_plan_only_ad8_patch_not_approved_for_apply",
+  "created_at_utc": "2026-11-07T13:24:40.525556+00:00",
+  "project_id": 670821,
+  "target_insight_id": 13703361,
+  "target_short_id": "STBizeTe",
+  "working_tree_source_commit": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+  "query_executions": 0,
+  "mutations": 0,
+  "product_files_modified": [],
+  "current_live": {
+    "last_modified_at": "2026-11-07T13:11:46.715633Z",
+    "sql": {
+      "path": "evidence/error-insight-live-1311.sql",
+      "bytes": 8610,
+      "sha256": "7abab6631e0c1cd33c0cde46a15d369533f153d20b1f7f5ef8598f7ef29c5f8d"
+    },
+    "description": {
+      "path": "evidence/error-insight-live-1311-description.txt",
+      "bytes": 309,
+      "sha256": "40748a612a6a3eb12950cf9f1c85456952288e2a0ea60cd8e25b30dde4afd0a7"
+    },
+    "query_canonical_sha256": "3476ed12217ea365806d164ca92b44a8e78313a35956ca1e7e94f543b9601da7",
+    "alert_config_canonical_sha256": "c04384e5a7c2e47841e21693bc51bdb7174ee989c958bf1e3ec02b2c54dcd5e1"
+  },
+  "owner_changes_since_1238": [
+    "workflow_traces groups candidate nodes once by service/trace, then arrayFilter/arrayExists matches client, SDK and wrapper IDs within each trace.",
+    "Trace-level HAVING also rejects a trace containing any failed/root HTTP>=400 span, while still requiring a successful root flow/cron/wake. This is not equivalent to proof of the particular non-root entry.",
+    "Additional closed SDK event wait_completed for flow HTTP409, hook_received for nudge HTTP404, and nudgeWorkflow hook lookup HTTP404.",
+    "service_start/service_coverage/per_code arrays replace repeated observed-hour and source baseline joins. Existing sample weighting, 24-hour warmup, observed-hour zero filling and max(3*median,50) remain visible."
+  ],
+  "complete_live_closed_cases": [
+    {
+      "client": "http POST",
+      "route": "/.well-known/workflow/v1/flow",
+      "status": 409,
+      "client_code": "HTTP 409",
+      "sdk": [
+        "world.events.create wait_created",
+        "world.events.create wait_completed",
+        "world.events.create step_started",
+        "world.events.create run_started"
+      ],
+      "added_sdk_since_1238": [
+        "world.events.create wait_completed"
+      ]
+    },
+    {
+      "client": "http POST",
+      "route": "/.well-known/workflow/v1/flow",
+      "status": 410,
+      "client_code": "HTTP 410",
+      "sdk": [
+        "world.events.create run_started"
+      ]
+    },
+    {
+      "client": "http GET",
+      "routes": [
+        "cron:reconcile",
+        "after:workflow-wake",
+        "workflow:coordinatorWakeDeadline/nudgeWorkflow"
+      ],
+      "status": 404,
+      "client_code": "not-found",
+      "sdk": [
+        "world.hooks.getByToken"
+      ],
+      "added_route_since_1238": "workflow:coordinatorWakeDeadline/nudgeWorkflow"
+    },
+    {
+      "client": "http POST",
+      "route": "workflow:coordinatorWakeDeadline/nudgeWorkflow",
+      "status": 404,
+      "client_code": "HTTP 404",
+      "sdk": [
+        "world.events.create hook_received"
+      ],
+      "new_since_1238": true
+    }
+  ],
+  "live_matching_requirements": {
+    "client_and_sdk": "Both status2, exact client.parent=SDK.span_id, same route, SDK error_code unknown_error.",
+    "wrapper": "Only unknown_error hook.resume for matched hooks.getByToken/hook_received parents or workflow.replay.load for matched run_started parent.",
+    "current_admission": "Successful root plus no failed root anywhere in that trace; this is the compatibility defect to replace, not preserve."
+  },
+  "recommended_merge_plan": [
+    "Retain the owner complete closed-case inventory and service_start/service_coverage/per_code metric tail. Do not roll back to the ad8 historical self-join baseline.",
+    "Expand the existing finite candidate scan to include successful non-root wake/cron/flow, workflow invocation/known wrappers and vqs.process; preserve raw parent IDs, original links and canonical workflow/step names.",
+    "Keep per-trace groupArray/arrayFilter processing. The grouped finite node array supplies exact local wake/cron ancestry and same-trace delivery/queue proof, replacing trace-wide HAVING admission.",
+    "Build a bounded delivery-context relation: each successful flow ID and each successful vqs.process whose exact parent is that flow. Do not consume links on the queue span or search arbitrary ancestors.",
+    "Build successful invocation IDs using either the exact local delivery-context parent or one valid invocation link joined by service+trace_id+span_id to that relation. This is the only necessary cross-trace graph join. Group admitted invocation IDs back by their execution trace for per-attempt array membership.",
+    "For each matched client/SDK pair, require its own finite wrapper/invocation proof or own exact wake/cron entry proof before adding client/SDK/allowed wrapper IDs. Other success within the trace cannot satisfy it.",
+    "Validate the new wait_completed/hook_received/nudge cases against actual installed SDK ancestry before claiming they are preserved. If their graph proof is missing or differs, retain errors rather than reintroducing trace-wide success.",
+    "Retain the current per-code weighted metric, observed-hour coverage, zero fill and threshold output. Validate equivalence on the original synthetic fixtures and bounded actual HogQL before a full-window timing read."
+  ],
+  "complexity": {
+    "assessment": "Moderate SQL-only follow-up; not a two-line patch. No product tracing field or schema change is required by the known parent/link data.",
+    "estimated_sql_delta_lines": [
+      60,
+      120
+    ],
+    "test_work": "Existing 34 semantic fixtures can be reused, plus owner new closed cases. The current SQLite helper executes finite SQL joins but cannot directly execute ClickHouse lambdas; array-stage verification needs an explicit, reviewed dialect adapter or bounded synthetic HogQL execution. Do not replace semantic tests with string-presence assertions.",
+    "performance_limit": "Grouping should avoid the previous per-error seven-join graph, but CTE reuse may still inline physical scans. Claim actual cost only after the final bounded/full query executes; no one-scan guarantee is made."
+  },
+  "description_candidate": {
+    "text": "Weighted errors >max(3×7d hourly median,50). Excludes closed Workflow 404/409/410 only with own successful wake/cron ancestry or invocation→2xx delivery (direct/one vqs.process parent or unique link). Missing proof stays counted. Weight=1/sample_rate (legacy 0.1); warmup 24 covered hours; zero-fill observed service hours only; no current telemetry→NULL. Spans≠failed requests.",
+    "characters": 378,
+    "mcp_max_length": 400,
+    "canonical_ad8_description_characters": 480,
+    "note": "This candidate describes exact-entry semantics and fits the actual tool schema; root must align the canonical description in any approved follow-up."
+  },
+  "review_patch": {
+    "file": {
+      "path": "error-insight-update-ad8d.patch.json",
+      "bytes": 13284,
+      "sha256": "e3c7d8eacc3b631e8908be7db2e2ea6ed7478741b033f986169afc695cb8536a"
+    },
+    "eligible_to_apply": false,
+    "reason": "It would overwrite owner 13:11 aggregation and added closed-case scope. It is retained only as the previously requested concrete ad8 payload for comparison."
+  },
+  "targeted_update_contract": {
+    "tool": "insight-update",
+    "input_keys": [
+      "id",
+      "query",
+      "description"
+    ],
+    "query_replacement": "The tool replaces the entire query. Clone the fresh full query definition and change only source.query, preserving visualization/source options.",
+    "description_max_length": 400,
+    "no_cas_field_in_schema": true,
+    "pre_apply": "Fresh-read the target query/description and alert snapshot; abort/rebase if baseline hashes changed.",
+    "post_apply": "Read back exact query/description and unchanged alert settings/subscriber-ID digest; source-anomaly remains untouched."
+  },
+  "source_anomaly": {
+    "id": 13703263,
+    "short_id": "k3M88Rs8",
+    "sql_sha256": "0380c78c1ba9ef7ed04ec70d4f5155da166c75ca71313ab44fc83e626488bbd4",
+    "query_canonical_sha256": "929e588230c9eadf7aab732866c4f877195735243827b035eb08a7078e908b58",
+    "description_sha256": "60a7400d2e33a0f5fdfa1de60371fd642d9a0113998ad7bc0c3e40b1b31e61b2",
+    "sql_and_description_exact_local_1512": true,
+    "action": "none"
+  },
+  "alert_preservation": {
+    "id": "01a1a144-b9d6-0000-6229-896dc85243ec",
+    "enabled": true,
+    "threshold_configuration": {
+      "type": "absolute",
+      "bounds": {
+        "upper": 0.5
+      }
+    },
+    "config": {
+      "type": "HogQLAlertConfig",
+      "column": "value",
+      "evaluation": "first_row",
+      "label_column": "source"
+    },
+    "calculation_interval": "hourly",
+    "schedule_start_time": "00:15",
+    "subscribed_users_count": 1,
+    "subscribed_user_ids_sha256": "f8cca028a25bf32bb44978d756d6623aa6a6979ff1e15cea21595b4bcd21264d",
+    "action": "none"
+  },
+  "evidence": [
+    {
+      "path": "evidence/error-insight-update-preflight-ad8d.json",
+      "bytes": 23877,
+      "sha256": "1a8a52ef018b8a10d879f65f635e2a0aae875ddb974446dde2a3e1fe5b47535f"
+    },
+    {
+      "path": "evidence/error-insight-1238-to-1311.diff",
+      "bytes": 10471,
+      "sha256": "cb03209942703d4003819b66aebe1b36507723a2153bc5aed896afd0a53ad411"
+    },
+    {
+      "path": "evidence/error-insight-update-tool-schema.json",
+      "bytes": 38826,
+      "sha256": "939f0465cbfdefdc44ac1095a705cb4ff684de67f0b2c953403112c541c2368d"
+    }
+  ]
+}

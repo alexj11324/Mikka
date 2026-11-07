@@ -1,0 +1,548 @@
+{
+  "version": 1,
+  "kind": "desktop_native_observed_findings",
+  "recordedAt": "2026-11-07T13:47:33.287Z",
+  "repository": "alexj11324/Mikka",
+  "runId": 42376245091,
+  "attempt": 1,
+  "source": {
+    "candidate": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+    "candidateTree": "6d2091214d32173a0cb08936ab4288af60ddf675",
+    "observedSynthetic": "212b65491909f064a732c6c1af69a54a6022f184",
+    "tree": "6d2091214d32173a0cb08936ab4288af60ddf675",
+    "parents": [
+      "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "ad8d257129989be43a3cb92e48ccd1197a6d096c"
+    ],
+    "sameProductTreeAsCandidate": true,
+    "checkouts": [
+      {
+        "job": "checks",
+        "jobId": 128414302327,
+        "sha": "212b65491909f064a732c6c1af69a54a6022f184",
+        "method": "checkout git log exact following SHA line; logs read in RAM only"
+      },
+      {
+        "job": "smoke",
+        "jobId": 128414302328,
+        "sha": "212b65491909f064a732c6c1af69a54a6022f184",
+        "method": "checkout git log exact following SHA line; logs read in RAM only"
+      },
+      {
+        "job": "native",
+        "jobId": 128415544379,
+        "sha": "212b65491909f064a732c6c1af69a54a6022f184",
+        "method": "checkout git log exact following SHA line; logs read in RAM only"
+      }
+    ]
+  },
+  "workflow": {
+    "status": "completed",
+    "conclusion": "success",
+    "completedJobs": 4,
+    "allJobsSucceeded": true,
+    "nativeCompletedAt": "2026-11-07T13:40:50Z"
+  },
+  "performance": {
+    "login": {
+      "first": 198,
+      "second": 183,
+      "difference": 15,
+      "firstNotAboveSecond": false
+    },
+    "startupFirstPair": {
+      "first": 159,
+      "second": 158,
+      "difference": 1,
+      "firstNotAboveSecond": false
+    },
+    "targetsMet": false,
+    "subtractPkceOrBackground": false,
+    "windows": {
+      "nativeLogin": {
+        "queryCalls": 198,
+        "valid": true,
+        "pair": null,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "queryCalls": 19,
+            "unknownReadings": 0
+          },
+          {
+            "phase": "native-pkce-and-automatic-renderer-to-public-session",
+            "queryCalls": 17,
+            "unknownReadings": 0
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "queryCalls": 162,
+            "unknownReadings": 0
+          }
+        ]
+      },
+      "webLogin": {
+        "queryCalls": 183,
+        "valid": true,
+        "pair": null,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "queryCalls": 19,
+            "unknownReadings": 0
+          },
+          {
+            "phase": "web-navigation-to-dom-content-loaded",
+            "queryCalls": 0,
+            "unknownReadings": 0
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "queryCalls": 164,
+            "unknownReadings": 0
+          }
+        ]
+      },
+      "startup-bundled": {
+        "queryCalls": 159,
+        "valid": true,
+        "pair": 1,
+        "segments": [
+          {
+            "phase": "launch-to-usable",
+            "queryCalls": 159,
+            "unknownReadings": 0
+          }
+        ]
+      },
+      "startup-hosted": {
+        "queryCalls": 158,
+        "valid": true,
+        "pair": 1,
+        "segments": [
+          {
+            "phase": "launch-to-usable",
+            "queryCalls": 158,
+            "unknownReadings": 0
+          }
+        ]
+      }
+    }
+  },
+  "partition": {
+    "valid": true,
+    "issues": [],
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "keys": 17,
+    "rows": [
+      {
+        "operation": "/api/auth/[...all]",
+        "nativeLogin": 22,
+        "webLogin": 21,
+        "startup-bundled": 0,
+        "startup-hosted": 3,
+        "loginDifference": 1,
+        "startupDifference": -3
+      },
+      {
+        "operation": "/api/desktop/begin",
+        "nativeLogin": 1,
+        "webLogin": 0,
+        "startup-bundled": 0,
+        "startup-hosted": 0,
+        "loginDifference": 1,
+        "startupDifference": 0
+      },
+      {
+        "operation": "/api/desktop/return",
+        "nativeLogin": 2,
+        "webLogin": 0,
+        "startup-bundled": 0,
+        "startup-hosted": 0,
+        "loginDifference": 2,
+        "startupDifference": 0
+      },
+      {
+        "operation": "/api/desktop/exchange",
+        "nativeLogin": 9,
+        "webLogin": 0,
+        "startup-bundled": 0,
+        "startup-hosted": 0,
+        "loginDifference": 9,
+        "startupDifference": 0
+      },
+      {
+        "operation": "/api/desktop/rpc",
+        "nativeLogin": 36,
+        "webLogin": 0,
+        "startup-bundled": 35,
+        "startup-hosted": 0,
+        "loginDifference": 36,
+        "startupDifference": 35
+      },
+      {
+        "operation": "/api/rpc",
+        "nativeLogin": 0,
+        "webLogin": 36,
+        "startup-bundled": 0,
+        "startup-hosted": 36,
+        "loginDifference": -36,
+        "startupDifference": -36
+      },
+      {
+        "operation": "/api/workspace",
+        "nativeLogin": 10,
+        "webLogin": 10,
+        "startup-bundled": 10,
+        "startup-hosted": 10,
+        "loginDifference": 0,
+        "startupDifference": 0
+      },
+      {
+        "operation": "/api/workspace/switcher",
+        "nativeLogin": 4,
+        "webLogin": 8,
+        "startup-bundled": 4,
+        "startup-hosted": 8,
+        "loginDifference": -4,
+        "startupDifference": -4
+      },
+      {
+        "operation": "/api/live/ticket",
+        "nativeLogin": 6,
+        "webLogin": 6,
+        "startup-bundled": 6,
+        "startup-hosted": 6,
+        "loginDifference": 0,
+        "startupDifference": 0
+      },
+      {
+        "operation": "/actions/coordinator/chat",
+        "nativeLogin": 0,
+        "webLogin": 0,
+        "startup-bundled": 0,
+        "startup-hosted": 0,
+        "loginDifference": 0,
+        "startupDifference": 0
+      },
+      {
+        "operation": "/actions/coordinator/poll",
+        "nativeLogin": 18,
+        "webLogin": 18,
+        "startup-bundled": 28,
+        "startup-hosted": 20,
+        "loginDifference": 0,
+        "startupDifference": 8
+      },
+      {
+        "operation": "/actions/coordinator/summaries",
+        "nativeLogin": 8,
+        "webLogin": 10,
+        "startup-bundled": 8,
+        "startup-hosted": 10,
+        "loginDifference": -2,
+        "startupDifference": -2
+      },
+      {
+        "operation": "/actions/threads/poll",
+        "nativeLogin": 10,
+        "webLogin": 10,
+        "startup-bundled": 8,
+        "startup-hosted": 8,
+        "loginDifference": 0,
+        "startupDifference": 0
+      },
+      {
+        "operation": "/actions/task-runs/read",
+        "nativeLogin": 6,
+        "webLogin": 0,
+        "startup-bundled": 6,
+        "startup-hosted": 3,
+        "loginDifference": 6,
+        "startupDifference": 3
+      },
+      {
+        "operation": "/actions/issues/poll",
+        "nativeLogin": 16,
+        "webLogin": 16,
+        "startup-bundled": 14,
+        "startup-hosted": 11,
+        "loginDifference": 0,
+        "startupDifference": 3
+      },
+      {
+        "operation": "/actions/projects/list",
+        "nativeLogin": 1,
+        "webLogin": 2,
+        "startup-bundled": 1,
+        "startup-hosted": 2,
+        "loginDifference": -1,
+        "startupDifference": -1
+      },
+      {
+        "operation": "unattributed",
+        "nativeLogin": 49,
+        "webLogin": 46,
+        "startup-bundled": 39,
+        "startup-hosted": 41,
+        "loginDifference": 3,
+        "startupDifference": -2
+      }
+    ],
+    "comparisons": {
+      "loginNativeVsWeb": {
+        "originalDifference": 15,
+        "operationDifference": 15,
+        "partitionMatchesOriginal": true,
+        "firstNotAboveSecond": false
+      },
+      "startupBundledVsHosted": {
+        "originalDifference": 1,
+        "operationDifference": 1,
+        "partitionMatchesOriginal": true,
+        "firstNotAboveSecond": false
+      }
+    }
+  },
+  "counterIntegrity": {
+    "expectedCheckpointCount": 12,
+    "observedCheckpointCount": 12,
+    "pid": 26949,
+    "pidConsistent": true,
+    "processStartConsistent": true,
+    "runtimeConsistent": true,
+    "cumulativeQueriesNondecreasing": true,
+    "unknownReadingsAllZero": true
+  },
+  "rpc": {
+    "measurement": "request and logical action counts; SQL is separately partitioned",
+    "physical": {
+      "nativeLogin": {
+        "startedInWindow": 15,
+        "completedInWindow": 15,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 11,
+        "completedInWindow": 11,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 16,
+        "crossesStart": 0,
+        "crossesEnd": 3,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    },
+    "logical": {
+      "nativeLogin": {
+        "startedInWindow": 20,
+        "completedInWindow": 20,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "webLogin": {
+        "startedInWindow": 17,
+        "completedInWindow": 17,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-bundled": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 16,
+        "crossesStart": 0,
+        "crossesEnd": 3,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0
+      }
+    },
+    "loginLogicalDifferences": [
+      {
+        "action": "task-runs.pollTaskRuns",
+        "native": 2,
+        "web": 0,
+        "difference": 2
+      },
+      {
+        "action": "desktop.session",
+        "native": 1,
+        "web": 0,
+        "difference": 1
+      }
+    ]
+  },
+  "functional": {
+    "lifecycle": "passed",
+    "lifecycleChecks": {
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "unknown": 0
+    },
+    "parity": {
+      "result": "passed",
+      "total": 100,
+      "passed": 100,
+      "pageErrorCount": 0
+    },
+    "crypto": {
+      "passed": true,
+      "sameImmutablePackage": true,
+      "distinctProcesses": 3,
+      "cleanup": "passed"
+    },
+    "package": {
+      "passed": true,
+      "signatureVerifiedStrictDeep": true
+    }
+  },
+  "cleanup": {
+    "lifecycleTopLevelFieldPresent": false,
+    "lifecycleStages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "lifecycleAllStagesPassed": true,
+    "nativeCleaned": true,
+    "leaseState": "released",
+    "blocked": false,
+    "ownerAfterMatchesSealedBaseline": true,
+    "peerAfterMatchesSealedBaseline": true,
+    "parity": "passed",
+    "smokeStages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "electron-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "smokeAllStagesPassed": true
+  },
+  "artifacts": [
+    {
+      "id": 13576252424,
+      "kind": "native",
+      "name": "desktop-native-evidence-212b65491909f064a732c6c1af69a54a6022f184",
+      "bytes": 14881862,
+      "sha256": "e6dea0331443e197e39c03b1e775ed740e4c63b1df549644bb284758fa3751ad",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "workflowRunId": 42376245091,
+      "digestVerified": true,
+      "zipRetained": false,
+      "knownMembersExtracted": [
+        "lifecycle.json",
+        "parity/parity.json",
+        "smoke.json"
+      ]
+    },
+    {
+      "id": 13576875507,
+      "kind": "package",
+      "name": "desktop-package-evidence-212b65491909f064a732c6c1af69a54a6022f184",
+      "bytes": 1595,
+      "sha256": "7c54440ad417fd8eb612663b339f0b939d0cebf140a46c244587cea176da8be1",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "workflowRunId": 42376245091,
+      "digestVerified": true,
+      "zipRetained": false,
+      "knownMembersExtracted": [
+        "native-crypto.json",
+        "mac-acceptance-package.json"
+      ]
+    },
+    {
+      "id": 13575028903,
+      "kind": "compiled",
+      "name": "desktop-api-build-212b65491909f064a732c6c1af69a54a6022f184",
+      "bytes": 47873618,
+      "sha256": "575fc74a9e0d188e6f658bc8db43c5615c4a6a0349b28cf833c11266ccf739a4",
+      "headSha": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+      "workflowRunId": 42376245091,
+      "digestVerified": true,
+      "zipRetained": false,
+      "knownMembersExtracted": [
+        "compiled/mikka-build.json"
+      ]
+    }
+  ],
+  "limits": [
+    "Hosted startup has three RPC calls crossing the ending checkpoint; all in-window SQL remains counted.",
+    "Unattributed is an included SQL bucket, not an unknown counter reading.",
+    "SQL operation labels do not identify individual statements or allocate shared batch SQL to each logical action.",
+    "Linux compiled artifact is independent of the ARM64 native build; its fixed manifest was verified without execution.",
+    "Functional CI success does not satisfy either query-count target."
+  ],
+  "productionAcceptance": null,
+  "status": "actual_budget_failed"
+}

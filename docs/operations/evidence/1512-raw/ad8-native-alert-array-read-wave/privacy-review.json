@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-07T14:04:46.211438+00:00",
+  "scope": "Exact original UTF-8 bytes in the closed manifest; no runtime logs or archive binaries.",
+  "scannedOriginalFiles": 74,
+  "scannedOriginalBytes": 1463555,
+  "checks": [
+    "strict UTF-8 and no NUL",
+    "JSON parsing for each JSON file",
+    "email",
+    "credential prefixes",
+    "private key blocks",
+    "Bearer values",
+    "JWT values",
+    "signed URLs",
+    "credential-bearing URLs",
+    "nonempty sensitive JSON string fields",
+    "closed per-file source/role review"
+  ],
+  "patternFindings": 2,
+  "intentionalSyntheticExceptions": [
+    {
+      "path": "source-ad8d2571/scripts/ops/posthog-observability.test.mjs",
+      "kind": "credential",
+      "line": 119,
+      "matchBytes": 21,
+      "matchSha256": "afd35c411aaed7df899f39f936b4eb05ca35a62d006673165d69bdc069e02a97",
+      "reason": "Static fake-fetch test canary in the API key never-appears-in-errors test; not an operational key and never sent to a real service."
+    },
+    {
+      "path": "source-alert-array/scripts/ops/posthog-observability.test.mjs",
+      "kind": "credential",
+      "line": 122,
+      "matchBytes": 21,
+      "matchSha256": "afd35c411aaed7df899f39f936b4eb05ca35a62d006673165d69bdc069e02a97",
+      "reason": "Static fake-fetch test canary in the API key never-appears-in-errors test; not an operational key and never sent to a real service."
+    }
+  ],
+  "nonFixtureSensitiveMatches": 0,
+  "nonemptyOperationalCredentialKeys": 0,
+  "originalBytesPreserved": true,
+  "redactionPerformed": false,
+  "rawPrivateCiLogsIncluded": false,
+  "runtimeLogsIncluded": false,
+  "signedDownloadUrlsIncluded": false,
+  "binaryArchivesOrScreenshotsIncluded": false,
+  "operationalAccountCookiesTokensOrEmailValuesIncluded": false,
+  "arbitraryApiOrModelPayloadsIncluded": false,
+  "includedRawResponses": "Only the explicitly selected closed-metadata PostHog schema/query receipts, exact synthetic SELECT responses and local offline test stdout.",
+  "boundary": "Local privacy review is not production acceptance; the only credential-shaped literals are fixed test canaries identified above."
+}

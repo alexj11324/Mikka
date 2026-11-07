@@ -1,0 +1,322 @@
+{
+  "version": 1,
+  "kind": "ad8-startup-independent-readonly-analysis",
+  "runId": 42376245091,
+  "attempt": 1,
+  "candidate": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+  "actualSource": "212b65491909f064a732c6c1af69a54a6022f184",
+  "actualHarness": "212b65491909f064a732c6c1af69a54a6022f184",
+  "originalMetricsUnchanged": true,
+  "windows": {
+    "startup-bundled": {
+      "status": "complete",
+      "total": {
+        "startedAt": "2026-11-07T13:37:34.834Z",
+        "finishedAt": "2026-11-07T13:37:38.581Z",
+        "durationMs": 3747,
+        "queryCalls": 159,
+        "pgProtocolReceiveBytes": 35507,
+        "pgProtocolSendBytes": 135457,
+        "closedConnections": 1,
+        "unknownReadings": 0,
+        "queryOperations": {
+          "/api/auth/[...all]": 0,
+          "/api/desktop/begin": 0,
+          "/api/desktop/return": 0,
+          "/api/desktop/exchange": 0,
+          "/api/desktop/rpc": 35,
+          "/api/rpc": 0,
+          "/api/workspace": 10,
+          "/api/workspace/switcher": 4,
+          "/api/live/ticket": 6,
+          "/actions/coordinator/chat": 0,
+          "/actions/coordinator/poll": 28,
+          "/actions/coordinator/summaries": 8,
+          "/actions/threads/poll": 8,
+          "/actions/task-runs/read": 6,
+          "/actions/issues/poll": 14,
+          "/actions/projects/list": 1,
+          "unattributed": 39
+        }
+      },
+      "rpcStarted": 19,
+      "rpcCompletedInWindow": 19
+    },
+    "startup-hosted": {
+      "status": "complete",
+      "total": {
+        "startedAt": "2026-11-07T13:37:40.361Z",
+        "finishedAt": "2026-11-07T13:37:44.112Z",
+        "durationMs": 3751,
+        "queryCalls": 158,
+        "pgProtocolReceiveBytes": 35978,
+        "pgProtocolSendBytes": 99366,
+        "closedConnections": 0,
+        "unknownReadings": 0,
+        "queryOperations": {
+          "/api/auth/[...all]": 3,
+          "/api/desktop/begin": 0,
+          "/api/desktop/return": 0,
+          "/api/desktop/exchange": 0,
+          "/api/desktop/rpc": 0,
+          "/api/rpc": 36,
+          "/api/workspace": 10,
+          "/api/workspace/switcher": 8,
+          "/api/live/ticket": 6,
+          "/actions/coordinator/chat": 0,
+          "/actions/coordinator/poll": 20,
+          "/actions/coordinator/summaries": 10,
+          "/actions/threads/poll": 8,
+          "/actions/task-runs/read": 3,
+          "/actions/issues/poll": 11,
+          "/actions/projects/list": 2,
+          "unattributed": 41
+        }
+      },
+      "rpcStarted": 19,
+      "rpcCompletedInWindow": 16
+    }
+  },
+  "logicalActions": [
+    {
+      "action": "bots.pollBots",
+      "bundled": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      }
+    },
+    {
+      "action": "coordinator.pollBotChatSummaries",
+      "bundled": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      }
+    },
+    {
+      "action": "coordinator.syncCoordinatorChat",
+      "bundled": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 2,
+        "completedInWindow": 1,
+        "crossesEnd": 1
+      }
+    },
+    {
+      "action": "desktop.bootstrap",
+      "bundled": {
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesEnd": 0
+      }
+    },
+    {
+      "action": "execution-settings.getBotModelMenu",
+      "bundled": {
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesEnd": 0
+      }
+    },
+    {
+      "action": "issues.syncIssueList",
+      "bundled": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 2,
+        "completedInWindow": 1,
+        "crossesEnd": 1
+      }
+    },
+    {
+      "action": "projects.listProjects",
+      "bundled": {
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 1,
+        "completedInWindow": 1,
+        "crossesEnd": 0
+      }
+    },
+    {
+      "action": "task-runs.pollTaskRuns",
+      "bundled": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 2,
+        "completedInWindow": 1,
+        "crossesEnd": 1
+      }
+    },
+    {
+      "action": "task-runs.syncThreadList",
+      "bundled": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      }
+    },
+    {
+      "action": "team-relations.listProjectTeams",
+      "bundled": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      }
+    },
+    {
+      "action": "teams.listTeams",
+      "bundled": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      },
+      "hosted": {
+        "startedInWindow": 2,
+        "completedInWindow": 2,
+        "crossesEnd": 0
+      }
+    }
+  ],
+  "sources": [
+    {
+      "path": "app/actions/task-runs.ts",
+      "sha256": "d881db08b12bd018dda2e9e04cb1424cc0bd8fe0bdfac645c45a852593eab08e"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a"
+    },
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "sha256": "c4337fa756eca07687808f9251e2316a02b2fee5df840f52335305e2476a3153"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "sha256": "8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "sha256": "4769b262e56c4ecf6a43e96cbbcafd86294209bbef6c3abe8cb016063cf49463"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "sha256": "eddf21c6fe1d381d154ddf257c28ae9923daaeff3ebc1d2b63c621add914af46"
+    },
+    {
+      "path": "lib/live/list-read-server.ts",
+      "sha256": "b6fa906a7eee521f91160f39d77098b33c640c0ec8ee15fc86a3df7e4518aff7"
+    },
+    {
+      "path": "lib/live/owner-scope.ts",
+      "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "sha256": "4673311b318c705301b14129ce38af905481064c02da19dcc6b2394ce6b94108"
+    }
+  ],
+  "findings": [
+    {
+      "code": "net_difference_not_unique_extra_query",
+      "detail": "The measured +1 is the net of several positive and negative operation buckets; it does not identify one uniquely unnecessary SQL query."
+    },
+    {
+      "code": "same_logical_starts",
+      "detail": "Both clients started the same 19 logical RPC actions, with identical per-action start counts. Native completed all 19 in-window; hosted completed 16, with three paired cross-end completions."
+    },
+    {
+      "code": "task_run_consumer_required",
+      "source": "components/desktop/desktop-integration.tsx:30-39; hooks/use-live-lists.ts:90-101",
+      "detail": "Both bundled and hosted are Electron desktop runtimes. The task-run read maintains badge/notification state and shares the same owner key with Board. Disabling it would remove product behavior."
+    },
+    {
+      "code": "task_run_query_shape",
+      "source": "app/actions/task-runs.ts:52-78; lib/live/revision-read.ts:22-28",
+      "detail": "Each poll authorizes the current session, reads owner scope/revision before data, performs one bounded newest-run rows query, then reuses the begun scope. No per-row/N+1 query or second task-data SELECT was found."
+    },
+    {
+      "code": "initial_live_catchup_requires_proof",
+      "source": "lib/live/channel.ts:395-419; lib/swr/read-observer.ts:82-96",
+      "detail": "Socket open creates a fresh invalidation boundary. A read whose fetcher began before that boundary cannot satisfy the catch-up. Later subscriptions require continuous acknowledged coverage and an actually committed matching read/revision."
+    },
+    {
+      "code": "actual_provenance_unavailable",
+      "detail": "These artifacts do not contain per-read began/coverage barriers or the Live open/ready/push event sequence. They cannot prove this specific second task-run request was redundant."
+    }
+  ],
+  "limits": {
+    "rpcCountsAreNotSqlCounts": true,
+    "crossEndWasNotSubtractedOrAdded": true,
+    "windowsUnchanged": true,
+    "backgroundNotRemoved": true,
+    "runtimeReproductionPerformed": false,
+    "sourceEdits": false,
+    "overallAcceptance": null
+  },
+  "originalFiles": [
+    {
+      "path": "evidence/desktop-ad8d/lifecycle.json",
+      "bytes": 188650,
+      "sha256": "28e8e1de9e9885dc2238858dd3d523bd7f3eebef89c197470049cd49ddec345f"
+    },
+    {
+      "path": "evidence/desktop-ad8d/query-operations.json",
+      "bytes": 14790,
+      "sha256": "4c4734d3cd6bec555b41a40bb7c79b5e9868198e0a96de3f956f97642700a0e1"
+    },
+    {
+      "path": "evidence/desktop-ad8d/source-harness.json",
+      "bytes": 2566,
+      "sha256": "124b6409782e0931c2027e8956b77cb8b996958bacdc52041e45d617ce3d10a7"
+    }
+  ]
+}

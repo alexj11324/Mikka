@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "status": "frozen_uncommitted_isolated_worktree_not_published",
+  "production_acceptance": false,
+  "created_at_utc": "2026-11-07T13:53:47.599546+00:00",
+  "worktree": "/workspace/scratch/812e3b7d6d45/Mikka-alert1512",
+  "branch": "fix/1512-alert-entry-proofs",
+  "base_commit": "ad8d257129989be43a3cb92e48ccd1197a6d096c",
+  "main_reviewed": "b56eedd06f65445114ef6e6c6b42d10bcdc09c70",
+  "owned_files": [
+    {
+      "path": "scripts/ops/posthog/alert-error-spike.sql",
+      "bytes": 12582,
+      "sha256": "e43b0341fe51d192c1df4e8c6eb3380f311c1075d3ab745ae66673f4dc3fc472",
+      "git_blob": "bf6b49d1230627acc200849f124cac09b2c74eec"
+    },
+    {
+      "path": "scripts/ops/posthog-observability.mjs",
+      "bytes": 22560,
+      "sha256": "a5a11765d2f87a69cd3574334acac216c6a0fb56e9f0c8fcd55e0aba7c5e82fa",
+      "git_blob": "9db7d6253eaaec3920c6d776416b4d466b3bf96a"
+    },
+    {
+      "path": "scripts/ops/posthog-observability.test.mjs",
+      "bytes": 11689,
+      "sha256": "86fb0bb18b11bc925686502cc58f61b5c4a89cd2d9901fdd21b147c1f23d3a51",
+      "git_blob": "375d9bf3c1d79e91eb478a852e90aaa36f3d2585"
+    },
+    {
+      "path": "scripts/ops/posthog-alert-acceptance.mjs",
+      "bytes": 26596,
+      "sha256": "247c48826ef331afc02bad3564d83fb863f6c98bd45825804d459c478e767bbc",
+      "git_blob": "86229fa9bed9910b5bf8f7e18468cffbec7d3f54"
+    },
+    {
+      "path": "scripts/ops/posthog/error-spike-engine-receipt.json",
+      "bytes": 15776,
+      "sha256": "ef415f7d8ad15047e9d7a9e8251b6abc27cb8014ae52035dfef7876947e1b24a",
+      "git_blob": "c92697dcaab19827fee29a504e140ca15a7fcb27"
+    }
+  ],
+  "main_worktree_modified_by_this_task": false,
+  "symlink_node_modules_staged": false,
+  "commits": 0,
+  "remote_mutations": 0,
+  "semantics": [
+    "Owner13:11/#1641 groupArray/arrayFilter/arrayConcat classification is retained; service_start/service_coverage/per_code and the remaining metric tail match current main byte-for-byte.",
+    "Candidate scan is only the closed named entry/context/error graph. Arbitrary roots are not scanned for admission; all unknown errors remain in the full spans/hourly metric path.",
+    "Exact same-trace parent or unique invocation link resolves only direct successful flow or one successful vqs.process with that exact flow parent. Queue origin links and arbitrary ancestors are never used.",
+    "Every client/SDK pair requires its own finite wrapper/invocation or wake/cron/inner-step proof. Same-trace success alone cannot admit another failed attempt.",
+    "All owner-added wait_completed/hook_received/nudge cases remain, now with exact proof. Nudge HTTP/SDK/hook.resume share the closed route and require their immediate successful step.execute parent; the inner step own route may still be flow.",
+    "Actual source order is step-executor.js trace(step.execute) at743 then contextStorage.run; workflows/wake.ts use-step calls wakeWorkflow which catches absent waiter. runtime.js2454-2489 directly writes wait_completed and catches EntityConflictError.",
+    "The targeted insight description is383characters and fits the MCP max400 schema. No alert threshold, subscriber, dashboard, or source-anomaly definition changed."
+  ],
+  "real_engine_validation": {
+    "kind": "one pure synthetic SELECT comparing exact new SQL and saved owner SQL; no production table source",
+    "project_id": 670821,
+    "cases": 64,
+    "input_span_rows": 487,
+    "candidate_passed": 64,
+    "candidate_failed": 0,
+    "baseline_passed": 44,
+    "baseline_failed": 20,
+    "distinct_excluded_identities": 54,
+    "raw_excluded_rows": 55,
+    "baseline_distinct_excluded_identities": 14,
+    "baseline_raw_excluded_rows": 14,
+    "synthetic_query_sha256": "179cd513bfa717b8d395509129ed2df1689057c4312ae553bb96df703c9a8479",
+    "fixture_data_sha256": "249c6924547ce9658ebf3d12cc06711bd6370f69ac19c1988de697a8e7a977f2",
+    "mcp_roundtrip_ms": 9741,
+    "engine_duration_ms": null,
+    "negative_controls": "Old SQL actually failed successful non-root wake/cron and same-trace failed-child cases on the same input; historical linked root+queue remains positive in both versions.",
+    "duplicate_rows": "A deliberate duplicate physical HTTP row produces3distinct identities and4raw excluded rows; they are not conflated."
+  },
+  "actual_historical_reads": {
+    "bounded": {
+      "utc_from": "2026-11-06T20:00:00Z",
+      "utc_to_exclusive": "2026-11-06T20:10:00Z",
+      "mcp_roundtrip_ms": 10019,
+      "success": true,
+      "aggregate_rows": 1
+    },
+    "full": {
+      "source_window_days": 8,
+      "mcp_roundtrip_ms": 8952,
+      "success": true,
+      "aggregate_rows": 1,
+      "evaluated_hour_utc": "2026-11-07T12:00:00Z",
+      "value": 0,
+      "breaching_sources": 0,
+      "evaluated_sources": 18,
+      "reported_top_source": {
+        "service": "mikka-daemon",
+        "error_code": "ENOTFOUND",
+        "estimated_error_spans": 20,
+        "median": 0,
+        "threshold": 50,
+        "covered_hours": 46
+      }
+    },
+    "caution": "The full query did not return all per-source rows. No claim is made that all unknown errors are zero, or that results at different read times are a controlled performance comparison."
+  },
+  "offline_validation": {
+    "command": "node --test scripts/ops/posthog-observability.test.mjs",
+    "exit_code": 0,
+    "counts": {
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "duration_ms": 224.971478,
+    "ci_contract": "CI verifies exact SQL, materialized fixture, official acceptance script, generated query and result hashes, then strict returned identity sets and counts. It does not execute HogQL or simulate the classification algorithm.",
+    "red_receipt_gate": "Before a real-engine receipt existed, the two receipt-dependent tests failed with missing evidence. This is not presented as the semantic red test; the real old/new synthetic query supplies that evidence.",
+    "query_only_entry": "The official posthog-alert-acceptance.mjs --query-only child emits the byte-exact already executed synthetic packet without contacting PostHog.",
+    "lint": {
+      "files": 3,
+      "exit_code": 0
+    },
+    "diff_check_exit_code": 0
+  },
+  "official_entry_adoption": {
+    "path": "scripts/ops/posthog-alert-acceptance.mjs",
+    "source_main": "b56eedd06f65445114ef6e6c6b42d10bcdc09c70",
+    "preserved": "Default posthog-cli api call for one project670821 synthetic read-only query,60s timeout; no event/configuration writes.",
+    "improved": "Import guard prevents CI imports from querying. Shared64fixture functions and strict result verifier replace the old19case direct-root assumptions; query-only mode enables MCP review without a duplicate entry.",
+    "helper_path_removed": "scripts/ops/posthog-error-fixtures.mjs was only an untracked draft; no parallel helper/entry remains.",
+    "no_repeat_remote_query": "Adopting the official entry changed no fixture data or generated query byte; both hashes were rechecked. No extra query was run for the rename/CLI packaging.",
+    "cli_json_argument_bytes": 119123,
+    "cli_per_argument_guard_bytes": 131072
+  },
+  "recommended_merge_resolution": {
+    "sql": "Use the isolated SQL file. It preserves main/#1641 full optimized metric tail and owner closed cases, replacing only unsafe trace-wide admission with exact proofs.",
+    "test": "Use the isolated test file: main original5API/sync/privacy tests are intact;4tests add receipt binding/strict-response checks/description limit/query-only official entry.",
+    "acceptance": "Use the isolated official entry at the same new-main path; add error-spike-engine-receipt.json. Do not resurrect the removed helper path.",
+    "description": "Use only the one error-insight description change in posthog-observability.mjs.",
+    "docs": "Root combines the existing exact-entry explanation with #1641 native-engine acceptance entry, recording64actual synthetic cases and9offline tests; CI does not rerun PostHog."
+  },
+  "remaining_boundaries": [
+    "No insight update has been applied. Fresh-read and drift-check the target before a later authorized update; preserve current query wrapper and all alert/source-anomaly configuration.",
+    "The finite graph intentionally counts errors when required ancestors/links are missing, outside the source window or use an unknown SDK topology.",
+    "Historical and synthetic validations are not deployed-candidate production acceptance and do not change the unresolved real Native/Web or model acceptance outcomes."
+  ],
+  "artifacts": [
+    {
+      "path": "alert-array-final-tests.tap",
+      "bytes": 972,
+      "sha256": "a793d38888a10b06b8701d418398d52fccdf57c845f99ca64e2e7e8dadde3359",
+      "git_blob": "05f384cc617eb6b930a925c1546f84dbecdab811"
+    },
+    {
+      "path": "alert-array-oxlint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "alert-array-receipt-gate-red.tap",
+      "bytes": 3256,
+      "sha256": "be3d6af139bf0615d05afa8c2342877112e7c1629449b238a898521e3e17158e",
+      "git_blob": "67356eb1c3e8718f48166b8bcf4e18c2d2292d19"
+    },
+    {
+      "path": "alert-array-fixtures.sql",
+      "bytes": 117790,
+      "sha256": "179cd513bfa717b8d395509129ed2df1689057c4312ae553bb96df703c9a8479",
+      "git_blob": "b7ae5c9eb3222a32cd9d4070735afda7e0d139dc"
+    },
+    {
+      "path": "evidence/alert-array-synthetic-engine.json",
+      "bytes": 130534,
+      "sha256": "0e4d95f921a2bfd25b2ccb9b54f9adf5f1e9be1923d4c02458f78cac760415b0",
+      "git_blob": "35842133483be5636a626a2c2ada8e15e6e93c45"
+    },
+    {
+      "path": "evidence/alert-array-query-validation.json",
+      "bytes": 54444,
+      "sha256": "991e064c86ae64aca3b709ec462907a59966212d2ce0d02eeb0d5b73fe619745",
+      "git_blob": "34a87576aaabc2040b70c893c2c94b930701c6db"
+    },
+    {
+      "path": "evidence/error-insight-live-1311.sql",
+      "bytes": 8610,
+      "sha256": "7abab6631e0c1cd33c0cde46a15d369533f153d20b1f7f5ef8598f7ef29c5f8d",
+      "git_blob": "b48c1bb8b4231a1ba4c4b8320137486596e83993"
+    },
+    {
+      "path": "evidence/error-insight-live-1311-description.txt",
+      "bytes": 309,
+      "sha256": "40748a612a6a3eb12950cf9f1c85456952288e2a0ea60cd8e25b30dde4afd0a7",
+      "git_blob": "cca2f673b42e0bce17f37e36ca577d1fe9bdb424"
+    },
+    {
+      "path": "evidence/error-insight-update-preflight-ad8d.json",
+      "bytes": 23877,
+      "sha256": "1a8a52ef018b8a10d879f65f635e2a0aae875ddb974446dde2a3e1fe5b47535f",
+      "git_blob": "bd8e68866fde9f38277164283a29e5f3b1f6637d"
+    },
+    {
+      "path": "evidence/workflow-queue-topology-readonly/receipt.json",
+      "bytes": 4259,
+      "sha256": "a2fe43d7c71a1d4e0b48ea5d6085816118a64c6cb5e05487f76f531b415e8b68",
+      "git_blob": "7b6b9a74b17de7ae6e642038256d312f54f5401d"
+    }
+  ]
+}
