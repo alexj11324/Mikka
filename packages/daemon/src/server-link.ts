@@ -31,6 +31,7 @@ import {
   type RunState,
   type StopReason,
   type RunCheckpoint,
+  type RunCheckpointReceipt,
   type DaemonVersions,
   type DeviceManagementCommand,
   type DeviceRegistered,
@@ -136,7 +137,7 @@ export interface ServerLink {
    * another machine can take the run over. Optional: links without it
    * keep work on this machine only.
    */
-  checkpointRun?(runId: string, checkpoint: RunCheckpoint): Promise<void>
+  checkpointRun?(runId: string, checkpoint: RunCheckpoint): Promise<RunCheckpointReceipt | void>
   /**
    * Messages people sent this device's runs and stops they asked for
    * (ADR 0018). Long-polls up to `waitSeconds` when nothing is pending;
@@ -467,7 +468,10 @@ export class MemoryServer {
       checkpointRun: async (runId, checkpoint) => {
         this.check()
         const run = this.runs.get(runId)
-        if (run && !isTerminalRunState(run.state)) run.checkpoint = checkpoint
+        if (!run || isTerminalRunState(run.state)) return
+        const takenAt = new Date().toISOString()
+        run.checkpoint = { ...checkpoint, takenAt }
+        return { runId, takenAt }
       },
       completeRun: async (runId, completion) => {
         this.check()
