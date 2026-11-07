@@ -3476,6 +3476,7 @@
       "separator": "，",
       "expandAll": "全部展开",
       "collapseAll": "全部收起",
+      "card": {"thinkingDone": "思考完毕", "finished": "{tool}完成", "failed": "失败", "args": "参数", "result": "结果", "waiting": "等待结果…", "empty": "没有参数或结果", "usedTools": "用了 {count} 个工具", "usingTools": "正在使用工具…", "showAll": "展开全部", "showLess": "收起"},
       "detail": {
         "handedTo": "交给",
         "query": "查询",

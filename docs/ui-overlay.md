@@ -28,6 +28,7 @@ A missing directory, or one outside the repository, fails the build.
 | --- | --- | --- | --- |
 | `bot-avatar` | bloub blob | `BotAvatarProps` in `components/slots/bot-avatar-contract.ts` (`id` is the bot's id when the caller has one; `coordinator` is set by `COORDINATOR_AVATAR`) | `BotAvatar`, `CoordinatorAvatar`, `colorFor`, `COORDINATOR_AVATAR` from `@/components/nav/bot-avatar` |
 | `chat-message` | today's message rows (`Message`, `Bubble`, `ReplyWaiting`) | `ChatMessageProps`, `ChatWaitingProps` in `components/slots/chat-message-contract.ts`; also exports `CHAT_SURFACE` | `coordinator-chat.tsx`, through `@ui-slot/chat-message` |
+| `reply-activity` | a reply's thinking and tool calls as Trace rows | `ActivityThinkingProps`, `ActivityToolView`, `ActivityGroupProps` in `components/slots/reply-activity-contract.ts`; exports `ActivityList`, `ActivityThinking`, `ActivityTool`, `ActivityGroup` | `components/coordinator/reply-activity.tsx`, through `@ui-slot/reply-activity` |
 
 A slot changes how something looks, never what it does. Data, state and
 behaviour stay in this repository and reach the slot as props. A layer slot
