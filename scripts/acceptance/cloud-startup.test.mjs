@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
-import { alignServerTimings, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace } from './cloud-startup.mjs'
+import { alignServerTimings, cleanupCase, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace } from './cloud-startup.mjs'
 import { readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
 
@@ -480,6 +480,38 @@ test('trusted candidate timing still refuses missing official CLI or MCP observa
   }
 })
 
+test('member production acceptance observes the cloud host without reading or writing workspace secrets', async () => {
+  for (const harness of ['claude_code', 'codex']) for (const timingSecret of [false, true]) {
+    const io = fixture({ runtime: true, timingSecret })
+    const report = await runCloudStartup(options(['--mode', 'acceptance', '--runs', '3', '--harness', harness,
+      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40)]), { env, ...io })
+    assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
+    assert.deepEqual(report.officialTiming, { enabled: true, source: 'trusted_host', scope: 'cloud_task', variableCreated: false, cleaned: true })
+    assert.equal(report.samples.length, 3)
+    assert.ok(report.samples.every(sample => sample.requireOfficialTiming && sample.requireRuntimeReceipt
+      && sample.runtimeEvidence?.status === 'passed' && sample.cleanup.status === 'passed'))
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
+test('trusted cloud timing refuses missing CLI/MCP observations and extra remote authorization', async () => {
+  for (const field of ['officialCliTiming', 'mcpHttpTiming', 'extraAuth']) {
+    const io = fixture({ runtime: true, extraAuth: field === 'extraAuth' })
+    io.onDetail = (_sample, detail) => {
+      for (const item of detail.chunks) if (item.chunk?.messageMetadata?.mikkaRuntimeTiming && field !== 'extraAuth')
+        delete item.chunk.messageMetadata.mikkaRuntimeTiming[field]
+    }
+    const report = await runCloudStartup(options(['--mode', 'acceptance', '--runs', '3', '--harness', 'codex',
+      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40)]), { env, ...io })
+    assert.equal(report.status, 'failed')
+    assert.equal(report.samples.length, 3)
+    assert.ok(report.samples.every(sample => sample.error === 'startup_runtime_evidence_failed' && sample.cleanup.status === 'passed'))
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+  }
+})
+
 test('trusted candidate timing cannot claim a host without a pinned device and agent', async () => {
   const io = fixture({ candidate: true, runtime: true })
   const report = await runCloudStartup(options(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
@@ -580,6 +612,86 @@ test('candidate cleanup deadline retains its fixture when the daemon never confi
   assert.ok(io.sockets.every(socket => socket.closed))
   assert.equal(io.calls.filter(call => call.path === '/api/auth/sign-out').length, 1)
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_/)
+})
+
+test('cleanup discovers a queued continuation behind a terminal root and waits before deleting its issue', async () => {
+  const runId = id(70), continuationId = id(71), issueId = id(72)
+  const record = { runId, issueId, title: '测试 1505 continuation cleanup' }
+  let continuationStatus = 'queued', stopRequested = false, deleted = false, socket, watchOpened
+  const watching = new Promise(resolve => { watchOpened = resolve })
+  const client = {
+    async json(path) {
+      if (path === `/api/factory/tasks?issueId=${issueId}`) return { issueId, tasks: [] }
+      assert.equal(path, `/api/live/ticket?workspace=${workspace}`)
+      return { url: 'wss://live.example.invalid/test', protocol: 'PRIVATE_LIVE_TICKET', expiresAt: epoch + 60000 }
+    },
+    async rpc(action, args) {
+      if (action === 'agents.getIssueThread') {
+        assert.equal(args[0], issueId)
+        assert.ok([runId, continuationId].includes(args[1]))
+        return { thread: { id: args[1], status: args[1] === runId ? 'failed' : continuationStatus,
+          attempts: [{ runId, status: 'failed' }, { runId: continuationId, status: continuationStatus }] },
+        chunks: [], live: { runs: [{ id: continuationId, workspaceId: workspace }] } }
+      }
+      if (action === 'agents.stopRun') { assert.deepEqual(args, [continuationId]); stopRequested = true; return { stoppedRunIds: [continuationId] } }
+      if (action === 'issues.getIssue') { assert.deepEqual(args, [issueId]); return { issue: { id: issueId, title: record.title, revision: 3 } } }
+      assert.equal(action, 'issue-operations.setIssueDeleted')
+      assert.deepEqual(args, [{ id: issueId, revision: 3 }])
+      deleted = true
+    },
+  }
+  class LiveSocket {
+    readyState = 1
+    constructor() {
+      socket = this
+      queueMicrotask(() => { this.onopen?.(); this.onmessage?.({ data: JSON.stringify({ type: 'live_ready', kinds: ['thread', 'run'] }) }); watchOpened() })
+    }
+    send(value) { assert.equal(value, 'ping') }
+    close() { this.closed = true }
+  }
+  const pending = cleanupCase(client, record, 'device', { timeoutMs: 1000, WebSocketImpl: LiveSocket, now: () => epoch })
+  try {
+    await Promise.race([watching, pending])
+    await new Promise(setImmediate)
+    assert.equal(stopRequested, true, 'a terminal root does not mean its same-issue continuation ended')
+    assert.equal(deleted, false, 'an accepted stop must not delete the issue while the continuation remains queued')
+  } finally {
+    continuationStatus = 'stopped'
+    socket?.onmessage?.({ data: JSON.stringify({ kind: 'run', id: continuationId }) })
+    await pending
+  }
+  assert.equal(deleted, true)
+  assert.equal(record.cleanup.status, 'passed')
+  assert.equal(record.cleanup[`runStopped_${continuationId}`], true)
+  assert.equal(socket.closed, true)
+})
+
+test('cleanup retains its fixture when Factory cancellation loses its revision fence', async () => {
+  const runId = id(80), issueId = id(81), taskId = id(82)
+  const record = { runId, issueId, title: '测试 1505 failed Factory cancellation' }
+  let deleted = false
+  const client = {
+    async json(path, init) {
+      if (path === `/api/factory/tasks?issueId=${issueId}`) return { issueId, tasks: [{ id: taskId, issueId }] }
+      assert.equal(path, `/api/factory/tasks/${taskId}`)
+      if (!init) return { task: { id: taskId, issueId, status: 'running', revision: 5 }, attempts: [{ runId }] }
+      const body = JSON.parse(init.body)
+      assert.deepEqual(body.binding, { taskId, revision: 5 })
+      assert.equal(body.action, 'cancel')
+      throw new Error('startup_http_409')
+    },
+    async rpc(action, args) {
+      if (action === 'agents.getIssueThread') { assert.deepEqual(args, [issueId, runId]); return { thread: { id: runId, status: 'failed' } } }
+      if (action === 'issues.getIssue') return { issue: { id: issueId, title: record.title, revision: 2 } }
+      assert.equal(action, 'issue-operations.setIssueDeleted')
+      deleted = true
+    },
+  }
+  await cleanupCase(client, record, 'device')
+  assert.equal(deleted, false, 'a producer that could still create an attempt must keep its issue recoverable')
+  assert.equal(record.cleanup.status, 'failed')
+  assert.deepEqual(record.cleanup.errors, [{ step: 'factoryCancelled', code: 'startup_http_409' }])
+  assert.deepEqual(record.cleanup.retainedFixture, { issueId, runIds: [runId] })
 })
 
 test('wrong provenance or cleanup failure fails and still signs out; completed stop races are confirmed', async () => {

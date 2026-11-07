@@ -123,7 +123,7 @@ export class OfficialCliTimingCollector {
   }
 }
 
-/** Call only for an explicitly configured acceptance task. The receiver is
+/** Called by a trusted cloud host or an explicitly configured diagnostic task. The receiver is
  * loopback-only and adds no remote I/O or provider interception. Configuration
  * is per child process; no official CLI file or config file is modified.
  * Sources: code.claude.com/docs/en/monitoring-usage and
@@ -170,7 +170,8 @@ export async function startCliTimingCollector({ runId, harness, remoteMcpServerC
   const env: Record<string, string> = {
     OTEL_METRICS_EXPORTER: "none", OTEL_TRACES_EXPORTER: "none", OTEL_LOGS_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_LOGS_PROTOCOL: "http/json", OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: endpoint,
-    OTEL_EXPORTER_OTLP_LOGS_HEADERS: "", OTEL_EXPORTER_OTLP_HEADERS: "", OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: "none",
+    OTEL_EXPORTER_OTLP_LOGS_HEADERS: "", OTEL_EXPORTER_OTLP_HEADERS: "",
+    ...(harness === "claude_code" ? { OTEL_EXPORTER_OTLP_LOGS_COMPRESSION: "none" } : {}),
     OTEL_LOGS_EXPORT_INTERVAL: "1000", OTEL_BLRP_SCHEDULE_DELAY: "1000",
     OTEL_LOG_USER_PROMPTS: "0", OTEL_LOG_ASSISTANT_RESPONSES: "0", OTEL_LOG_TOOL_DETAILS: "0", OTEL_LOG_TOOL_CONTENT: "0", OTEL_LOG_RAW_API_BODIES: "0",
     ...(harness === "claude_code" ? { CLAUDE_CODE_ENABLE_TELEMETRY: "1" } : {}),
@@ -178,10 +179,14 @@ export async function startCliTimingCollector({ runId, harness, remoteMcpServerC
   const args = harness === "codex" ? ["-c", `otel.exporter={otlp-http={endpoint=${JSON.stringify(endpoint)},protocol="json",headers={}}}`,
     "-c", "otel.trace_exporter=\"none\"", "-c", "otel.metrics_exporter=\"none\"", "-c", "otel.log_user_prompt=false",
     "-c", "otel.log_agent_responses=false", "-c", "otel.log_guardian_assessments=false"] : []
+  // Rust OTLP accepts only gzip/zstd strings; both env fallbacks must be absent
+  // for its default uncompressed JSON. Apply after merging the machine env.
+  const unsetEnv = harness === "codex"
+    ? ["OTEL_EXPORTER_OTLP_LOGS_COMPRESSION", "OTEL_EXPORTER_OTLP_COMPRESSION"] : []
   let closed: Promise<void> | undefined
   // Only the Mikka MCP child's private environment receives this URL. It is
   // not an authorization token and is never placed in the task or CLI env.
-  return { env, args, mcpHttpObservationUrl: `${origin}${mcpPath}`,
+  return { env, args, unsetEnv, mcpHttpObservationUrl: `${origin}${mcpPath}`,
     close: ({ cliExitObserved = false }: { cliExitObserved?: boolean } = {}) => closed ??= (async () => {
     await new Promise<void>(resolve => {
       const timer = setTimeout(() => { collector.truncate(); mcpCollector.truncate(); server.closeAllConnections() }, 1000)

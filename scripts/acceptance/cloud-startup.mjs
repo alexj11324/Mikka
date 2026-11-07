@@ -521,7 +521,14 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
     try { await operation(); cleanup[name] = true; return true }
     catch (error) { cleanup.errors.push({ step: name, code: safeError(error) }); return false }
   }
-  if (record.issueId) await step('factoryCancelled', async () => {
+  const rememberLiveAttempts = thread => {
+    // The requested run can be terminal while its same-issue chain has a live
+    // continuation. The Set traversal below also visits newly discovered runs.
+    for (const attempt of thread?.attempts ?? []) {
+      if (UUID.test(attempt.runId ?? '') && !TERMINAL.has(attempt.status)) runIds.add(attempt.runId)
+    }
+  }
+  const factoryCancelled = !record.issueId || await step('factoryCancelled', async () => {
     const listing = await client.json(`/api/factory/tasks?issueId=${record.issueId}`)
     assert(listing.issueId === record.issueId && Array.isArray(listing.tasks), 'factory_list_invalid')
     for (const item of listing.tasks) {
@@ -537,6 +544,7 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
     const stopped = await step(`runStopped_${runId}`, async () => {
       const detail = await client.rpc('agents.getIssueThread', [record.issueId, runId])
       if (target === 'device') assert(detail.thread?.id === runId, 'cleanup_scope_mismatch')
+      rememberLiveAttempts(detail.thread)
       if (TERMINAL.has(detail.thread?.status)) return
       try { await client.rpc('agents.stopRun', [runId]) }
       catch (error) {
@@ -544,6 +552,7 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
         // Confirm the owned run ended; never swallow an unrelated stop error.
         const latest = await client.rpc('agents.getIssueThread', [record.issueId, runId])
         if (target === 'device') assert(latest.thread?.id === runId, 'cleanup_scope_mismatch')
+        rememberLiveAttempts(latest.thread)
         if (!TERMINAL.has(latest.thread?.status)) throw error
         return
       }
@@ -556,12 +565,14 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
     if (target === 'device' && !stopped) runsEnded = false
     if (target === 'cloud') await step(`machineEnded_${runId}`, () => client.json(`/api/threads/${runId}/machine`, post({ action: 'end' }), 120000))
   }
-  if (record.issueId && runsEnded) await step('taskDeleted', async () => {
+  // Failed Factory cancellation can leave a producer able to create another
+  // attempt. Keep the issue accessible for recovery even if known runs ended.
+  if (record.issueId && runsEnded && factoryCancelled) await step('taskDeleted', async () => {
     const { issue } = await client.rpc('issues.getIssue', [record.issueId])
     assert(issue?.id === record.issueId && issue.title === record.title, 'cleanup_scope_mismatch')
     await client.rpc('issue-operations.setIssueDeleted', [{ id: issue.id, revision: issue.revision }])
   })
-  if (!runsEnded) cleanup.retainedFixture = { issueId: record.issueId, runIds: [...runIds] }
+  if (!runsEnded || !factoryCancelled) cleanup.retainedFixture = { issueId: record.issueId, runIds: [...runIds] }
   cleanup.status = cleanup.errors.length ? 'failed' : 'passed'
 }
 
@@ -678,6 +689,11 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
         // receipt still gates success. The runner closes its per-run collector,
         // and this path owns no workspace variable requiring admin deletion.
         report.officialTiming = { enabled: true, source: 'trusted_host', scope: 'candidate_device', variableCreated: false, cleaned: true }
+      } else if (options.mode === 'acceptance') {
+        // Released cloud workers collect through the same trusted host. The
+        // actual CLI/MCP receipt is still required below; old workers with no
+        // collector fail that gate instead of changing workspace permissions.
+        report.officialTiming = { enabled: true, source: 'trusted_host', scope: 'cloud_task', variableCreated: false, cleaned: true }
       } else {
         const listed = await client.rpc('workspace-secrets.listSecrets', [scope.workspaceId])
         assert(listed?.role === 'admin', 'timing_variable_cleanup_forbidden')

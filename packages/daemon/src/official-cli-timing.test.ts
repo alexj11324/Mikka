@@ -72,3 +72,19 @@ it("accepts a real loopback JSON export and attaches the bounded receipt to the 
       cliExitObserved: true, flush: "not_confirmed", events: [{ name: "codex.api_request", durationMs: 35 }] })
   } finally { await receiver.close(); run.close() }
 })
+
+it.each(['codex', 'claude_code'] as const)('%s keeps an uncompressed receiver compatible with its native exporter', async harness => {
+  const receiver = await startCliTimingCollector({ runId: 'compression-contract', harness, remoteMcpServerCount: 0 })
+  try {
+    if (harness === 'codex') {
+      expect(receiver.env).not.toHaveProperty('OTEL_EXPORTER_OTLP_LOGS_COMPRESSION')
+      expect(receiver.unsetEnv).toEqual(['OTEL_EXPORTER_OTLP_LOGS_COMPRESSION', 'OTEL_EXPORTER_OTLP_COMPRESSION'])
+    } else {
+      expect(receiver.env.OTEL_EXPORTER_OTLP_LOGS_COMPRESSION).toBe('none')
+      expect(receiver.unsetEnv).toEqual([])
+    }
+    const response = await fetch(receiver.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT, { method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-encoding': 'gzip' }, body: '{}' })
+    expect(response.status).toBe(400)
+  } finally { await receiver.close() }
+})

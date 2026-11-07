@@ -240,6 +240,7 @@ export async function createHostedBotRunner(host: {
         const spawnHosted = (config: SpawnOptions, oauthToken?: string): SpawnedProcess => {
           assertOpen()
           const childEnv = { ...env, ...config.env, ...cliTiming?.env }
+          for (const key of cliTiming?.unsetEnv ?? []) delete childEnv[key]
           if (oauthToken !== undefined) {
             childEnv.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = '3'
             delete childEnv.CLAUDE_CODE_OAUTH_TOKEN
