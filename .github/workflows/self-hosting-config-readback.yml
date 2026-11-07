@@ -56,6 +56,10 @@ jobs:
               const v=await response.json();
               if(v.slug!=='mikka-github'||String(v.id)!==appId||!v.permissions||!Array.isArray(v.events)) throw Error('APP_METADATA_INVALID');
               console.log(JSON.stringify({id:v.id,slug:v.slug,owner:v.owner?.login,html_url:v.html_url,permissions:v.permissions,events:v.events,readAt:new Date().toISOString()}));
+              const hook=await fetch('https://api.github.com/app/hook/config',{headers:{authorization:'Bearer '+jwt,accept:'application/vnd.github+json','x-github-api-version':'2022-11-28','user-agent':'Mikka-self-hosting-review'},redirect:'error',signal:AbortSignal.timeout(15000)});
+              if(!hook.ok){console.log(JSON.stringify({operation:'official_webhook_config',status:hook.status}));process.exitCode=1;}
+              else {const h=await hook.json();console.log(JSON.stringify({operation:'official_webhook_config',status:hook.status,urlMatches:h.url==='https://app.aspectlylabs.com/mikka/api/webhooks/github',contentTypeJson:h.content_type==='json',tlsVerificationEnabled:h.insecure_ssl==='0'||h.insecure_ssl===0,setupUrlInAppResponse:typeof v.setup_url==='string',setupUrlMatches:v.setup_url==null?null:v.setup_url==='https://app.aspectlylabs.com/mikka',secretValuesLogged:false}));}
+
             }
           } catch { console.log(JSON.stringify({available:false,code:'OFFICIAL_APP_METADATA_UNAVAILABLE'})); process.exitCode=1; }
           JS
