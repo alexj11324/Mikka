@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { accessFixture, cleanupScope } from './self-hosting-subscription-acceptance.mjs'
+import { accessFixture, cleanupScope, independentProviders } from './self-hosting-subscription-acceptance.mjs'
 const target = { ownerId: 'owned-local-user', workspaceId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222' }
 const row = { id: '33333333-3333-4333-8333-333333333333', ownerId: 'authorized-owner', workspaceId: '44444444-4444-4444-8444-444444444444', provider: 'codex' }
 const bundle = () => ({ schema: 1, connectionId: row.id, ownerId: row.ownerId, workspaceId: row.workspaceId, provider: row.provider,
@@ -35,3 +35,19 @@ test('independent cleanup can remove only this run exact dev folder and at most 
 // Real core image D75 additionally passed the ordinary auth/MCP contract with zero model calls.
 
 // Staging checkpoint: access-only fixture constraints and owned volume cleanup verified.
+
+test('a failed provider source or fixture preserves the independent bound model and executes the other provider', async () => {
+  for (const stage of ['source-authorization', 'subscription-fixture']) {
+    const providers = [{ provider: 'claude', model: 'claude-haiku-5-5', receipt: {} }, { provider: 'codex', model: 'gpt-6-luna', receipt: {} }]
+    const called = []
+    await independentProviders(providers, stage, async source => {
+      called.push(source.model)
+      if (source.provider === 'claude') throw Error('COMMUNITY_SOURCE_EXPIRY')
+      source.receipt.status = 'passed'
+    })
+    assert.deepEqual(called, ['claude-haiku-5-5', 'gpt-6-luna'])
+    assert.equal(providers[0].receipt.code, 'COMMUNITY_SOURCE_EXPIRY')
+    assert.equal(providers[1].receipt.status, 'passed')
+    assert.equal(providers[1].model, 'gpt-6-luna')
+  }
+})

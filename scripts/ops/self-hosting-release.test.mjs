@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {secretPlan,syncBody,TARGET,REQUIRED,reference,assertExecution} from './self-hosting-release.mjs'
+import {secretPlan,syncBody,TARGET,REQUIRED,reference,assertExecution,requestNativeBuildReadback} from './self-hosting-release.mjs'
 import { smokeAccount, verifyDelivery, acceptanceCode } from './self-hosting-cloud-acceptance.mjs'
 import { createHmac } from 'node:crypto'
 test('business acceptance refuses non-shared accounts and never projects arbitrary error text',()=>{assert.throws(()=>smokeAccount({SMOKE_OWNER_EMAIL:'someone@example.invalid',SMOKE_OWNER_PASSWORD:'fixture'}),/SMOKE_ACCOUNT_REQUIRED/);assert.equal(acceptanceCode(Error('secret-value-private')), 'ACCEPTANCE_FAILED')})
@@ -76,3 +76,22 @@ test('community staging source guard accepts the six reviewed operations files a
 // The isolated image contract validates real signup, signed consent and MCP without model requests.
 
 // Staging checkpoint: access-only fixture constraints and owned volume cleanup verified.
+
+test('native readback dispatch can only inspect the known existing build and never requests a new build or submission', async () => {
+ const report = {}, env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: TARGET.repo, GITHUB_REF: TARGET.ref, GITHUB_TOKEN: 'synthetic-only' }
+ const calls = []
+ await requestNativeBuildReadback(env, report, async (url, init) => { calls.push({ url, body: JSON.parse(init.body), redirect: init.redirect }); return new Response(null, { status: 204 }) })
+ assert.equal(calls.length, 1)
+ assert.equal(calls[0].url, 'https://api.github.com/repos/alexj11324/Mikka/actions/workflows/mobile-native.yml/dispatches')
+ assert.deepEqual(calls[0].body, { ref: 'main', inputs: { submit: 'false', existing_build_id: '958c42e7-3b00-460d-b100-c6b0426dbb1d', expected_commit: '62281b1995cb8fef16e7604dc1ea9a29c4dbbe32' } })
+ assert.equal(report.nativeBuildReadback.newBuildRequested, false)
+ assert.equal(report.nativeBuildReadback.submit, false)
+ await assert.rejects(requestNativeBuildReadback({ ...env, GITHUB_REF: 'refs/heads/arbitrary' }, {}, () => { throw Error('must not call') }), /NATIVE_READBACK_SCOPE/)
+})
+
+test('native dispatch denial retains the exact action and HTTP status without returning the workload token', async () => {
+ const report = {}, env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: TARGET.repo, GITHUB_REF: TARGET.ref, GITHUB_TOKEN: 'synthetic-do-not-return' }
+ await assert.rejects(requestNativeBuildReadback(env, report, async () => new Response(null, { status: 403 })), /NATIVE_READBACK_DISPATCH_FAILED/)
+ assert.deepEqual(report.requests, [{ operation: 'native_readback_dispatch', status: 403 }])
+ assert.ok(!JSON.stringify(report).includes(env.GITHUB_TOKEN))
+})

@@ -100,6 +100,7 @@ jobs:
       contents: read
       id-token: write
       issues: write
+      actions: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -108,7 +109,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
-      - run: node --test scripts/ops/self-hosting-release.test.mjs
+      - run: node --test scripts/ops/self-hosting-release.test.mjs scripts/ops/self-hosting-subscription-acceptance.test.mjs
       - run: node scripts/ops/self-hosting-release.mjs --preflight
       - name: Install the pinned HTTPS receiver tunnel before credential delivery
         run: |

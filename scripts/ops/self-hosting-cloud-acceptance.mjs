@@ -205,3 +205,5 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
 // Full community setup inspects ordinary protocol redirects rather than following them.
 
 // Staging checkpoint: access-only fixture constraints and owned volume cleanup verified.
+
+// Prepared release checkpoint: independent providers and existing iOS build readback.

@@ -78,6 +78,19 @@ export function accessFixture(raw, row, target, now = Date.now()) {
   return { value: encoded, digest: sha(encoded) }
 }
 
+// A provider-specific source/fixture failure cannot suppress the other path.
+export async function independentProviders(providers, stage, work) {
+  for (const provider of providers) {
+    provider.receipt.stage = stage
+    try { await work(provider) }
+    catch (error) {
+      Object.assign(provider.receipt, { status: 'failed',
+        code: /^(COMMUNITY_[A-Z0-9_]+|startup_[a-z0-9_]{1,80})$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_PROVIDER_FAILED',
+        errorClass: 'Error' })
+    }
+  }
+}
+
 export async function runCommunity(env = process.env) {
   check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === 'alexj11324/Mikka'
     && env.GITHUB_REF === INFI.ref && env.GITHUB_RUN_ATTEMPT === '1', 'EXECUTION')
@@ -135,7 +148,12 @@ export async function runCommunity(env = process.env) {
     const choices = (await cloud.json('/api/workspace')).choices
     check(Array.isArray(choices), 'WORKSPACES')
     const sources = []
-    for (const [provider, harness, model] of [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]) {
+    const providers = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']].map(([provider, harness, model]) => {
+      const receipt = { harness, model, status: 'failed', cleanup: {} }; report.cases.push(receipt)
+      return { provider, harness, model, receipt }
+    })
+    await independentProviders(providers, 'source-authorization', async source => {
+      const { provider, harness, model } = source
       let chosen, selectedWorkspace
       for (const workspace of choices.filter(w => w.kind === 'team')) {
         const view = await cloud.rpc('model-order.getModelOrder', [workspace.id])
@@ -151,9 +169,10 @@ export async function runCommunity(env = process.env) {
       // guessed canonical-grant path. Only the immutable access leaf is read.
       const [sourcePath, sourceEnvironment] = await Promise.all([secret('/vercel', 'MIKKA_BYOS_ACCESS_INFISICAL_PATH'), secret('/vercel', 'MIKKA_BYOS_INFISICAL_ENVIRONMENT')])
       const raw = await secret(sourcePath, row.accessSecretName, sourceEnvironment, false)
-      sources.push({ provider, harness, model, row, raw, selectedWorkspace })
-    }
+      Object.assign(source, { row, raw, selectedWorkspace }); sources.push(source)
+    })
     await privatePool.query('COMMIT'); await privatePool.end(); privatePool = undefined
+    check(sources.length > 0, 'NO_AUTHORIZED_SOURCES')
     // This new folder must not be recursively exported by an existing Sync.
     const syncs = await inf('/api/v1/secret-syncs/vercel?projectId=' + PROJECT)
     check(syncs.secretSyncs.every(s => s.environment?.slug !== 'dev' || !(s.folder?.path === '/' && s.syncOptions?.includeAllSubFolders)), 'NO_DEV_EXPORT')
@@ -249,7 +268,7 @@ export async function runCommunity(env = process.env) {
     const verification = await community.json('/api/integrations/github/repositories/verification', { ...post({ repository: 'alexj11324/Mikka', verifyCommand }), method: 'PATCH' })
     check(verification.verifyCommand === verifyCommand, 'VERIFICATION_COMMAND')
     report.stage = 'subscription-fixtures'
-    for (const s of sources) {
+    await independentProviders(sources, 'subscription-fixture', async s => {
       const connectionId = randomUUID(), secretName = 'mikka-byos-' + randomUUID()
       const fixture = accessFixture(s.raw, s.row, { ownerId: own.id, workspaceId: workspace.id, connectionId })
       await inf('/api/v4/secrets/' + secretName, 'POST', { projectId: PROJECT, environment: 'dev', secretPath: devPath, type: 'shared', secretValue: fixture.value }); createdSecrets.push(secretName)
@@ -260,8 +279,9 @@ export async function runCommunity(env = process.env) {
       await localPool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"credentialVersion","providerSubject","accessSecretName","accessDigest","modelCatalog",quota,"secretName","secretDigest") VALUES ($1,$2,$3,$4,'connected',1,1,$5,$6,$7,$8,$9,$10,$11)`,
         [connectionId, own.id, workspace.id, s.provider, s.row.providerSubject, secretName, fixture.digest, JSON.stringify({ revision: '1', models: [s.model] }), s.row.quota, absentGrant, sha('absent-canonical-grant:' + connectionId)])
       await localPool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,'catalogue',$4,1,$5,$6)`, [randomUUID(), own.id, workspace.id, connectionId, s.provider + '_cpa', s.model])
-      s.localConnection = connectionId; delete s.raw
-    }
+      s.localConnection = connectionId; s.ready = true; delete s.raw
+    })
+    check(sources.some(s => s.ready), 'NO_READY_SOURCES')
     // Obtain a genuine local MCP OAuth token through DCR, PKCE and consent.
     report.stage = 'mcp-oauth'
     const redirect = origin + '/mikka/release-mcp-callback'
@@ -291,8 +311,8 @@ export async function runCommunity(env = process.env) {
       return answer.result?.structuredContent ?? (answer.result?.content?.[0]?.text ? JSON.parse(answer.result.content[0].text) : answer.result)
     }
     await mcp('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'mikka-community-release', version: '1.0.0' } })
-    for (const s of sources) {
-      const row = { harness: s.harness, model: s.model, status: 'failed', cleanup: {} }; report.cases.push(row)
+    for (const s of sources.filter(source => source.ready)) {
+      const row = s.receipt
       let sandbox, deviceId, runId, issueId
       try {
         report.stage = 'thread-' + s.provider
