@@ -54,6 +54,9 @@ stub('../subscription-workflow-turn.ts',{runHostedWorkflowTurn:async(...args:unk
 }})
 stub('../../workflows/coordinator/native-steps.ts',{runtime:async()=>({harness:'ai_sdk'})})
 stub('../../workflows/coordinator/native-turn.ts',{nativeCoordinatorTurn:()=>{throw new Error('unexpected native dispatch')}})
+// These single-round fixtures never exhaust the bounded run. Its durable
+// handoff is exercised with the real implementation in coordinator/handoff.test.
+stub('../../workflows/coordinator/finish-turn.ts',{finishCoordinatorTurn:async()=>{throw new Error('unexpected bounded turn handoff')}})
 stub('../../workflows/coordinator/tools.ts',{coordinatorTools:(...args:unknown[])=>{record('tools')(...args);return {}}})
 stub('../../workflows/coordinator/agent-kit-steps.ts',{
   botRuntime:async()=>({harness:'ai_sdk',model:'connected-account-default'}),

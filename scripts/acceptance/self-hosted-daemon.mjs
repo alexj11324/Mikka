@@ -22,6 +22,18 @@ export function checkSessionTarget(session, env) {
     && !/[\r\n\0]/.test(session.cookie), 'SESSION_TARGET')
 }
 
+export function createOwnerRequest(session, fetchImpl = fetch) {
+  return async (path, method = 'GET', body) => {
+    check(path.startsWith('/api/') && !path.includes('://') && !path.includes('#'), 'OWNER_REQUEST')
+    const response = await fetchImpl(ORIGIN + '/mikka' + path, { method, redirect: 'error', signal: AbortSignal.timeout(15_000),
+      headers: { origin: ORIGIN, cookie: session.cookie, 'content-type': 'application/json',
+        ...(path === '/api/rpc' ? { 'x-mikka-rpc': '1' } : {}) },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
+    check(response.status === 200, 'OWNER_HTTP')
+    return response.json()
+  }
+}
+
 export async function runDaemonAcceptance(env = process.env) {
   const report = { kind: 'isolated-source-daemon', revision: env.GITHUB_SHA, origin: ORIGIN, status: 'failed',
     checks: {}, cleanup: {}, taskCompletion: false, subscriptionAcceptance: false, modelRequests: false }
@@ -53,14 +65,7 @@ export async function runDaemonAcceptance(env = process.env) {
     await rm(handoff)
     check(await realpath(process.cwd()) === await realpath(env.GITHUB_WORKSPACE)
       && execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() === env.GITHUB_SHA, 'CHECKOUT_REVISION')
-    owner = async (path, method = 'GET', body) => {
-      check(path.startsWith('/api/') && !path.includes('://') && !path.includes('#'), 'OWNER_REQUEST')
-      const response = await fetch(ORIGIN + '/mikka' + path, { method, redirect: 'error', signal: AbortSignal.timeout(15_000),
-        headers: { origin: ORIGIN, cookie: session.cookie, 'content-type': 'application/json' },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
-      check(response.status === 200, 'OWNER_HTTP')
-      return response.json()
-    }
+    owner = createOwnerRequest(session)
     const rpc = async (action, args = []) => {
       check(['agents.pollDevices', 'agents.removeDevice'].includes(action), 'RPC_ACTION')
       const response = await owner('/api/rpc', 'POST', { version: DESKTOP_RPC_VERSION, action, args: encode(args) })
