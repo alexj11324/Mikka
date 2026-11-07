@@ -489,7 +489,7 @@ dbTest('重试 re-runs a failed bot turn once, for the message already sent, in 
     const answered = await store.chatView(owner, 200, botId)
     assert.equal(answered.error, null, 'the chat-wide line clears once a turn ends cleanly')
     assert.deepEqual(answered.items.map(item => [item.from, item.text, item.failure ?? null]), [
-      ['person', 'Plan my week', { kind: 'hosted', code: 'verification_required' }],
+      ['person', 'Plan my week', { kind: 'hosted', code: 'verification_required', raw: 'verification_required' }],
       ['person', 'Then plan next week', null],
       ['coordinator', 'Here is the plan.', null],
     ])

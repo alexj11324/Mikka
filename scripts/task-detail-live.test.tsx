@@ -22,9 +22,9 @@ const body = (text: string): JSONContent => ({ type: 'doc', content: [{ type: 'p
 const bodyText = (content: JSONContent) => content.content?.[0]?.content?.[0]?.text ?? ''
 const translators = new Map<string, ((key: string, values?: Record<string, unknown>) => string) & { has: () => boolean }>()
 const format = { dateTime: () => '08:07', relativeTime: () => 'now' }
-const notices = new Map<string, { action?: { onClick: () => void } }>()
+const notices = new Map<string, { action?: { onClick: (event: Event) => void } }>()
 mock.module('sonner', { namedExports: { toast: {
-  error: (_message: string, options: { id: string; action?: { onClick: () => void } }) => { notices.set(options.id, options) },
+  error: (_message: string, options: { id: string; action?: { onClick: (event: Event) => void } }) => { notices.set(options.id, options) },
   dismiss: (id: string) => { notices.delete(id) }, success: () => {},
 } } })
 mock.module('next-intl', { namedExports: {
@@ -430,7 +430,7 @@ test('a background transport failure keeps the authorized editor, unsaved text a
   assert.ok(notice?.action, 'the retained editor offers an explicit read retry')
   readOverride = null
   const failedReads = issueReads
-  await act(async () => notice.action!.onClick())
+  await act(async () => notice.action!.onClick(new Event('click', { cancelable: true })))
   await until(() => issueReads > failedReads && !notices.has(`issue-detail-read-${issueId}`), 'retry succeeds and clears the read failure')
   assert.ok(title() === titleElement)
   assert.ok(description() === bodyElement)

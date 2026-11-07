@@ -473,6 +473,8 @@ export interface ChatView {
   working: boolean
   /** Why the last turn failed, when no turn has answered since. */
   error: string | null
+  /** Under a wake code: the last turn's own stored failure, for 详情 (chat-state.ts). */
+  cause?: string
   /** The issues and runs the replies cite, by id, that this person can see. */
   sources: Record<string, CitationSource>
   /** The artifacts shown as cards, by id. */
@@ -597,7 +599,7 @@ export async function chatView(userId: string, limit = 200, botId: string, windo
 /** Full readers sharing the live chat cache need its deadline, without a second version/body read. */
 export async function chatViewState(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<{ chat: ChatView } & ChatReadObservation> {
   const reader = await chatReader(userId, botId)
-  const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+  const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
   const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(and(messagesOf(userId, botId), window.after === undefined ? undefined : gt(coordinatorMessages.position, window.after), window.through === undefined ? undefined : sql`${coordinatorMessages.position} <= ${window.through}`))
@@ -609,7 +611,7 @@ export async function chatViewState(userId: string, limit = 200, botId: string, 
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? window.after ?? 0
-  const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}) }
+  const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}), createdAt: rows[0].createdAt }
   // A retry (重试, or an interrupted turn) re-answers a message already in the chat (postedToChat): no second bubble.
   const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
@@ -686,6 +688,7 @@ export interface ChatVersion {
   streamRunId?: string
   working: boolean
   error: string | null
+  cause?: string
 }
 
 /** The version plus when `working` changes with no write: the active turn's or a first wake's lease runs out. */
@@ -704,19 +707,20 @@ export async function chatVersion(userId: string, limit = 200, botId: string): P
 
 export async function chatVersionState(userId: string, limit = 200, botId: string): Promise<ChatVersionState> {
   await chatReader(userId, botId)
-  const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
-  const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message })
+  const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+  const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(limit).as('latest')
   const [stored] = await db.select({
     last: sql<number>`coalesce(max(${latest.position}), 0)::int`,
     hash: sql<string>`md5(coalesce(string_agg(${latest.id}::text || ':' || md5(${latest.message}::text), ',' order by ${latest.position}), ''))`,
     role: sql<string | null>`(array_agg(${latest.message}->>'role' order by ${latest.position} desc))[1]`,
     streamId: sql<string | null>`(array_agg(${latest.message}->>'mikkaStreamId' order by ${latest.position} desc))[1]`,
+    createdAt: sql<string | null>`(array_agg(${latest.createdAt} order by ${latest.position} desc))[1]`,
   }).from(latest)
-  const waiting = await db.select({ id: coordinatorEvents.id, payloadVersion: sql<string>`md5(${coordinatorEvents.payload}::text)`, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError }).from(coordinatorEvents)
+  const waiting = await db.select({ id: coordinatorEvents.id, payloadVersion: sql<string>`md5(${coordinatorEvents.payload}::text)`, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError, createdAt: coordinatorEvents.createdAt }).from(coordinatorEvents)
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
-  const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}) } : undefined
+  const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}), ...(stored.createdAt ? { createdAt: new Date(stored.createdAt) } : {}) } : undefined
   const now = new Date()
   return {
     version: createHash('sha256').update(`${limit}|${stored.hash}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`).digest('hex').slice(0, 32),

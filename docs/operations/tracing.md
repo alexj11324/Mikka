@@ -249,7 +249,7 @@ error code and its numbers.
 | Mikka monitoring collection failed or heartbeat absent | No healthy ops snapshot in the last hour (`heartbeat.sql`) | — |
 | [1324] Mikka 来源数据库小时异常 | One `mikka-web` route's sampled DB queries in the last full UTC hour exceed `max(3 × its 7-day hourly median, 200)` (≈2,000 real queries), or its sampled JSON bytes exceed `max(3 × median, 1 MB)` (≈10 MB). Needs 24 observed hours of history; bytes only when ≥95% of the hour's queries carry a size (`alert-source-anomaly.sql`) | `3 *` (the multiple) and the floors `200` / `1000000` in `metrics`; `covered_hours >= 24` for warm-up |
 | [1324] Mikka 日速率外推超过500GB月额度 | Today's Neon transfer so far, scaled to 24 h and to the month's days, exceeds 500 GB. Only from 03:00 UTC, with a snapshot ≤60 min and provider data ≤180 min old (`alert-daily-pace.sql`) | `500000000000` (the allowance) and `utc_hours >= 3` |
-| [1324] Mikka 错误码小时突增 | One service's error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 5)` (≈50 real spans), after 24 observed hours (`alert-error-spike.sql`) | `3 *` and the floor `5` in `metrics` |
+| [1324] Mikka 错误码小时突增 | One service's weighted error spans for one code in the last full UTC hour exceed `max(3 × its 7-day hourly median, 50)`, after 24 observed hours. Weight is `1 / sample_rate`, with legacy missing rates treated as `0.1`. Known handled Workflow hook 404, duplicate 409 and terminal 410 chains are excluded only with a successful entry and matching span ancestry (`alert-error-spike.sql`). | `3 *` and the floor `50` in `metrics` |
 
 Every alert query returns exactly one row and the alert reads it
 (`first_row`). PostHog refuses an `any_row` alert whose query its `LIMIT`
@@ -278,6 +278,9 @@ infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observabil
 Edit the definitions or SQL in a PR, then apply once it merges. A change made
 in the PostHog app shows as drift in the next `--check`; copy it back into the
 repository or it is overwritten on the next `--apply`.
+
+Validate the error-spike classifier with `node scripts/ops/posthog-alert-acceptance.mjs`.
+It uses the authenticated PostHog CLI to check synthetic query fixtures in project 670821.
 
 ## Sampling and cost
 
