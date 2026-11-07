@@ -105,7 +105,9 @@ function useStoredFlag(key: string, fallback: boolean) {
  * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string; workspaceId?: string;
+export function BoardPage({ issues, userId, workspaceId, personalWorkspace = false, onOpen, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string; workspaceId?: string;
+  /** In a personal workspace every task is the person's: no 全部 / 工作区 / 个人 segment and no lock on cards (glossary, Known naming debt). */
+  personalWorkspace?: boolean
   issues: Issue[]
   userId: string
   onOpen: (id: string) => boolean | void
@@ -120,7 +122,8 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const [settings, update] = useBoardSettings()
-  const { scope, view, display } = settings
+  const { view, display } = settings
+  const scope: Scope = personalWorkspace ? 'all' : settings.scope
   const [filters, setFilters] = useViewState<Filters>('board:filters', DEFAULT_FILTERS)
   useListExpiry(display.completed === 'all' ? [] : issues.filter(issue => issue.status === 'done')
     .map(issue => new Date(issue.updatedAt).getTime() + COMPLETED_DAYS[display.completed] * 86_400_000))
@@ -224,10 +227,10 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <h1 id={titleId} className="sr-only">{t('title')}</h1>
       <div role="toolbar" aria-label={t('toolbar')} className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 px-5 py-3">
-        <ToggleGroup aria-label={t('scopeLabel')} variant="segment" size="sm" spacing={0.5} value={[scope]} onValueChange={values => { const next = values[0] as Scope | undefined; if (next) update({ scope: next }) }}>
+        {!personalWorkspace && <ToggleGroup aria-label={t('scopeLabel')} variant="segment" size="sm" spacing={0.5} value={[scope]} onValueChange={values => { const next = values[0] as Scope | undefined; if (next) update({ scope: next }) }}>
           {(['all', 'workspace', 'personal'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`scope.${value}`)}</ToggleGroupItem>)}
-        </ToggleGroup>
-        <Separator orientation="vertical" className="mx-1 h-5" />
+        </ToggleGroup>}
+        {!personalWorkspace && <Separator orientation="vertical" className="mx-1 h-5" />}
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}><ListFilter data-icon="inline-start" />{t('filter')}</DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52"><DropdownMenuGroup>
@@ -285,7 +288,7 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks, personalWorkspace }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
         : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} blocks={blocks} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
