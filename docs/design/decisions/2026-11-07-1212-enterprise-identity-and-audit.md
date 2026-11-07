@@ -74,6 +74,8 @@ node --conditions=react-server --import tsx scripts/organization-plan.mjs --appl
 
 The default command previews before/after capabilities and the union of active human Workspace members. The explicit apply takes the same Organization lock used by admission and binding, rechecks the expected effective plan, and commits the grant with its audit event. Identical replays do not duplicate events. Reducing a limit preserves existing members and reports over-limit state; existing admission controls reject new seat consumption. It creates no Stripe object or charge. Expired licenses retain authority to disable providers, revoke provisioning credentials, disable SSO/machine policy, or use the bounded owner break-glass/retry paths; they cannot enable new enterprise authority.
 
+The Team operator command rejects a Workspace that is currently bound to an Organization, in both preview and apply. It checks the binding while holding the same Workspace lock used by attach/detach. This prevents a dormant local grant from reporting an upgrade that cannot affect the effective Organization plan. Unbound Team Workspaces retain their existing operator flow.
+
 ## Durability and audit
 
 Every SCIM User/Group mutation commits an opaque-ID outbox event in the same auth-database transaction. Delivery is serialized per connection and uses the same event ID for Organization audit insertion. PostgreSQL JSONB key reordering must not manufacture changes: semantic deep equality makes an identical replay a no-op. Failures retain the event; explicit retries and the existing durable audit-maintenance timer retry it. Background attempts are bounded and spaced; there is no added minute-polling job.

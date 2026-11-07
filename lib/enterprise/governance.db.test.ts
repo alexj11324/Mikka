@@ -24,6 +24,7 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
   const { createOrganizationAuditExport, readOrganizationAuditExport, applyOrganizationAuditRetention } = await import('../governance/audit-export')
   const { commitIdentityChange, deliverIdentityAudits } = await import('./audit-outbox')
   const { provisionOrganizationPlan } = await import('./provisioning')
+  const { provisionWorkspacePlan } = await import('../governance/provisioning')
   const { manageIdentity } = await import('./management')
   t.after(async () => { await Promise.all([pool.end(), workspacePool.end(), appPool.end()]) })
   const owner = { id: randomUUID(), name: 'Organization owner', email: `${randomUUID()}@org-fixture.example.invalid` }
@@ -74,6 +75,15 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     assert.equal(reduced.overLimit, true)
     assert.equal(reduced.activeHumans, 2, 'lowering a contract limit never evicts existing members')
     await provisionOrganizationPlan(pool, { ...grant, expectedPlan: 'enterprise', reason: 'correction' }, { apply: true })
+  })
+  await t.test('a bound Workspace cannot acquire a dormant local grant behind its Organization plan', async () => {
+    const grant = { workspaceId: wsA, expectedPlan: 'free', plan: 'pro', source: 'cloud', seatLimit: 20,
+      expiresAt: null, reason: 'evaluation', operator: 'enterprise-fixture' }
+    for (const apply of [false, true]) {
+      await assert.rejects(provisionWorkspacePlan(pool, grant, { apply }), error => (error as { detail?: string }).detail === 'workspace_attached')
+    }
+    assert.equal((await pool.query('select count(*) from mikka_workspace_entitlements where "workspaceId"=$1', [wsA])).rows[0].count, '0')
+    assert.equal((await pool.query('select plan from mikka_organization_entitlements where "organizationId"=$1', [organizationId])).rows[0].plan, 'enterprise')
   })
   await t.test('identity configuration keeps its audit intent through Workspace-store failure and retries exactly once', async () => {
     const constraint = `enterprise_audit_fixture_${randomUUID().replaceAll('-', '')}`

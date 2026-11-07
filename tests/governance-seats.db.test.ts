@@ -37,6 +37,7 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,'legacy-owner','Legacy','personal');`, [legacyPersonal])
     await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,'legacy-peer','Legacy','legacy@example.invalid','member')`, [legacyPersonal])
     await pool.query(await readFile(new URL('../drizzle/20261107121100_team_entitlements.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261107121200_organization_governance.sql', import.meta.url), 'utf8'))
     await pool.query('create table workspace_audit_outbox (id uuid primary key,"workspaceId" uuid not null,payload jsonb not null,"createdAt" timestamptz not null,"deliveredAt" timestamptz)')
     assert.equal((await pool.query('select status from mikka_workspace_members where "workspaceId"=$1', [legacyPersonal])).rows[0].status, 'suspended')
     await assert.rejects(pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1', [legacyPersonal]), /only its owner/)
