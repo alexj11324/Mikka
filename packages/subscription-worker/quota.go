@@ -37,6 +37,27 @@ func (w *Worker) Quota(ctx context.Context, epoch int64) (QuotaResult, error) {
 	return result, nil
 }
 
+// Allowance is the owner's fresh quota read used during model admission. It
+// keeps Usage's custody, readyAuth and final connected-epoch checks, but does
+// not fetch Settings-only profile information or return account metadata.
+func (w *Worker) Allowance(ctx context.Context, epoch int64) (QuotaResult, error) {
+	if w.ExecutionOnly || w.Use != nil {
+		return QuotaResult{}, ErrUnsupported
+	}
+	_, auth, err := w.readyAuth(ctx, epoch)
+	if err != nil {
+		return QuotaResult{}, err
+	}
+	result := QuotaResult{Body: map[string]any{}}
+	if quota, err := w.fetchQuota(ctx, auth); err == nil {
+		result = quota
+	}
+	if current, err := w.Repo.Lookup(ctx, w.Scope); err != nil || current.Epoch != epoch || current.State != "connected" {
+		return QuotaResult{}, ErrUnavailable
+	}
+	return result, nil
+}
+
 // UsageResult is the owner's Settings view: the same projection as Quota and
 // the account's sign-in email. No token, account id or provider text.
 type UsageResult struct {
