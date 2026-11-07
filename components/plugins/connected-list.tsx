@@ -13,7 +13,8 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empt
 import type { SettingsConnectionsProps } from '@/components/slots/settings-connections-contract'
 
 export type OwnAppState = 'connected' | 'notConnected' | 'paused' | null
-export interface OwnAppStates { states: Partial<Record<OwnAppId, OwnAppState>>; failed: OwnAppId[] }
+/** `codes`: each failed app's raw code, shown only under 详情 (decision 2026-11-05-0330). */
+export interface OwnAppStates { states: Partial<Record<OwnAppId, OwnAppState>>; failed: OwnAppId[]; codes?: Partial<Record<OwnAppId, string>> }
 export type OwnAppsRead = Pick<SWRResponse<OwnAppStates>, 'data' | 'error' | 'isLoading' | 'isValidating' | 'mutate'>
 
 /** A failed own-app read keeps its last state and says which apps could not be read. */

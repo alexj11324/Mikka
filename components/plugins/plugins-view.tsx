@@ -53,19 +53,25 @@ async function fetchSkills([path, query, page]: readonly [string, string, number
   return await response.json() as SkillsPage
 }
 
+/** An own app's status read failed: a stable code with the cause's kind, never its message (decision 2026-11-05-0330). */
+class OwnAppReadError extends Error {
+  constructor(readonly code: string, options?: ErrorOptions) { super(code, options); this.name = 'OwnAppReadError' }
+}
+const httpDetail = (response: Response) => `http_${response.status ?? 'unknown'}`
+
 /** A successful null means not configured; unreadable state rejects instead. */
 async function fetchOwnAppState(id: OwnAppId): Promise<OwnAppState> {
   if (id === 'github') {
     const response = await fetch(withBasePath('/api/integrations/github'), { cache: 'no-store' })
-    if (!response.ok) throw new Error('Connection state unavailable')
+    if (!response.ok) throw new OwnAppReadError(`github_status_failed (${httpDetail(response)})`)
     const state = await response.json() as { configured: boolean; connected: boolean; installed: boolean }
     return !state.configured ? null : state.connected && state.installed ? 'connected' : 'notConnected'
   }
   if (id === 'linear') {
     const response = await fetch(withBasePath('/api/integrations/linear/status'), { cache: 'no-store' })
-    if (!response.ok) throw new Error('Connection state unavailable')
+    if (!response.ok) throw new OwnAppReadError(`linear_status_failed (${httpDetail(response)})`)
     const availability = await response.json() as { enabled?: boolean; state?: string }
-    if (availability.state === 'unavailable' || typeof availability.enabled !== 'boolean') throw new Error('Connection state unavailable')
+    if (availability.state === 'unavailable' || typeof availability.enabled !== 'boolean') throw new OwnAppReadError('linear_status_failed (unavailable)')
     if (!availability.enabled) return 'paused'
     const state = await getLinearIntegrationState()
     return !state.configured ? null : state.connected ? 'connected' : 'notConnected'
@@ -74,19 +80,23 @@ async function fetchOwnAppState(id: OwnAppId): Promise<OwnAppState> {
   return !state.configured ? null : state.connected ? 'connected' : 'notConnected'
 }
 
-/** A partial failure keeps that app's last successful state, with a visible error. */
+/** A partial failure keeps that app's last successful state, with a visible error and its code under 详情. */
 export async function fetchOwnAppStates(previous: Partial<Record<OwnAppId, OwnAppState>> = {}): Promise<OwnAppStates> {
   const results = await Promise.allSettled(OWN_APPS.map(fetchOwnAppState))
   const states = { ...previous }
   const failed: OwnAppId[] = []
+  const codes: Partial<Record<OwnAppId, string>> = {}
   results.forEach((result, index) => {
     const id = OWN_APPS[index]
     if (result.status === 'fulfilled') states[id] = result.value
-    else failed.push(id)
+    else {
+      failed.push(id)
+      const reason: unknown = result.reason
+      codes[id] = reason instanceof OwnAppReadError ? reason.code : `${id}_status_failed (${reason instanceof Error ? reason.name : 'unknown'})`
+    }
   })
-  return { states, failed }
+  return { states, failed, codes }
 }
-
 
 /** Where a page sits: the app (`&app=`) or a store section (`&category=`), from the URL. */
 function readLocation() {

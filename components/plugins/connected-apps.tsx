@@ -149,9 +149,13 @@ export function useConnectedApps(enabled = true) {
   const state = data ?? null
   // The toolkit or account id an action is running for.
   const [pending, setPending] = useState('')
-  const [actionError, setError] = useState('')
+  const [actionError, setActionError] = useState<{ text: string; code: string } | null>(null)
+  const setError = (text: string, code = '') => setActionError(text ? { text, code } : null)
   const [notice, setNotice] = useState<{ tone: 'status' | 'alert'; text: string } | null>(null)
-  const error = actionError || (loadError ? t('loadFailed') : '')
+  const error = actionError?.text || (loadError ? t('loadFailed') : '')
+  /** The raw code behind `error`, for 详情 only (decision 2026-11-05-0330); never the upstream message. */
+  const errorCode = actionError?.text ? actionError.code
+    : loadError ? `composio_read_failed (${loadError instanceof ReadResponseError ? `http_${loadError.status}` : loadError instanceof Error ? loadError.name : 'unknown'})` : ''
 
   const refresh = async () => { if (enabled) await mutate() }
 
@@ -178,19 +182,19 @@ export function useConnectedApps(enabled = true) {
       if ('accountId' in body || window.mikka?.bundled) {
         const handoff = await openCurrentPageInBrowser()
         if (handoff === 'desktop') { checkOnReturn(); return }
-        if (handoff === 'unsupported') { setError(t('browserUpdateRequired')); return }
+        if (handoff === 'unsupported') { setError(t('browserUpdateRequired'), 'composio_connect_failed (browser_update_required)'); return }
       }
       const response = await fetch(integrationPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, returnTo: currentReturnPath() }) })
       const result = await response.json() as { redirectUrl?: unknown }
       const redirect = response.ok ? composioConnectRedirect(result.redirectUrl) : null
-      if (!redirect) throw new Error()
+      if (!redirect) throw new Error(`http_${response.status}`)
       // The desktop shell sends any off-origin navigation to the system browser
       // and stays here; the list reads once when the person comes back. On the web
       // this page navigates away and the callback lands on a fresh mount.
       checkOnReturn()
       window.location.assign(redirect.href)
-    } catch {
-      setError(t('connectFailed'))
+    } catch (cause) {
+      setError(t('connectFailed'), `composio_connect_failed (${cause instanceof Error && /^http_\d+$/.test(cause.message) ? cause.message : cause instanceof Error ? cause.name : 'unknown'})`)
     } finally {
       setPending('')
     }
@@ -207,7 +211,8 @@ export function useConnectedApps(enabled = true) {
     await mutate(current => current && { ...current, accounts: current.accounts.map(account => accountIds.includes(account.id) ? { ...account, enabled } : account) }, { revalidate: false })
     const results = await Promise.all(accountIds.map(accountId => patch({ accountId, enabled }).catch(() => null)))
     const ok = results.every(response => response?.ok)
-    if (!ok) setError(t('updateFailed'))
+    const refused = results.find(response => !response?.ok)
+    if (!ok) setError(t('updateFailed'), `composio_update_failed (${refused ? `http_${refused.status}` : 'network'})`)
     await refresh()
     return ok
   }
@@ -216,7 +221,7 @@ export function useConnectedApps(enabled = true) {
     setPending(accountId); setError('')
     try {
       const response = await patch({ accountId, default: true }).catch(() => null)
-      if (!response?.ok) setError(t('updateFailed'))
+      if (!response?.ok) setError(t('updateFailed'), `composio_update_failed (${response ? `http_${response.status}` : 'network'})`)
       await refresh()
       return Boolean(response?.ok)
     } finally {
@@ -280,7 +285,7 @@ export function useConnectedApps(enabled = true) {
   // Shown on the disabled 连接 buttons, so they say why instead of doing nothing.
   const unavailable = state && !canLink ? t('connectUnavailable') : undefined
   return {
-    state, pending, error, notice, canLink, canEnterKey, unavailable,
+    state, pending, error, errorCode, notice, canLink, canEnterKey, unavailable,
     // Nothing read yet: rows hold their place without guessing 连接 or the switch.
     loading: enabled && !state && !loadError,
     accountsFor: (app: string) => state?.accounts.filter(account => account.toolkit === app) ?? [],
