@@ -83,6 +83,22 @@ test('retains closed worker-claim phases and marks unavailable runtime proof hon
   assert.match(rendered, /best_effort/)
 })
 
+test('reports prepared and late initialization on separate interval origins without adding their overlap', () => {
+  const value = report(), sample = value.samples[0]
+  sample.daemonStartupTiming = { ms: 100, phases: [{ name: 'daemon.adapter.cli_init', startMs: 10, endMs: 30, ms: 20, outcome: 'ok' }] }
+  sample.daemonPreparationTiming = { ms: 2400, source: 'prepared_agent_start', phases: [
+    { name: 'daemon.adapter.cli_init.prewarm', startMs: 50, endMs: 1050, ms: 1000, outcome: 'ok' },
+    { name: 'daemon.adapter.cli_init', startMs: 2300, endMs: 2320, ms: 20, outcome: 'ok' },
+    { name: 'daemon.adapter.cli_init', startMs: 2310, endMs: 2330, ms: 20, outcome: 'ok' }] }
+  const rendered = markdown(summarizeTimings(value, [dispatch]))
+  assert.match(rendered, /\| `daemon\.adapter\.start` \| 0\.100 \| 0\.100 \| 0\.100 \|/)
+  assert.match(rendered, /\| `daemon\.adapter\.preparation` \| 2\.400 \| 2\.400 \| 2\.400 \|/)
+  assert.match(rendered, /\| `daemon\.adapter\.cli_init` \| 0\.020 \| 0\.020 \| 0\.020 \|/)
+  assert.match(rendered, /\| `daemon\.preparation\.cli_init` \| 0\.030 \| 0\.030 \| 0\.030 \|/)
+  assert.match(rendered, /\| `daemon\.preparation\.cli_init\.prewarm` \| 1\.000 \| 1\.000 \| 1\.000 \|/)
+  assert.match(rendered, /独立的预热起点.*等待 checkout.*不能相加/)
+})
+
 test('business request output preserves actual ACK ordering and unknown child generations without claiming all HTTP coverage', () => {
   const value = report(), sample = value.samples[0]
   sample.runtimeTiming = { complete: true, truncated: false, agentAccepted: { kind: 'claude_user_ack', at: epoch + 3500 },
