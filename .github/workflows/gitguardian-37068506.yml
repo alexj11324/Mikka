@@ -18,7 +18,7 @@ jobs:
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.event_name == 'push' && github.ref == 'refs/heads/ops/gitguardian-37068506' && github.run_attempt == 1
     runs-on: ubuntu-22.04
-    timeout-minutes: 6
+    timeout-minutes: 5
     permissions:
       contents: read
       id-token: write
@@ -49,6 +49,6 @@ jobs:
           recursive: false
           include-imports: false
       - name: Read back Mikka-only match range metadata
-        run: node scripts/ops/gitguardian-37068506.mjs --inspect
+        run: node scripts/ops/gitguardian-37068506.mjs --inspect-mikka-expression
 
 # Fresh rollout readback, 2026-11-07.
