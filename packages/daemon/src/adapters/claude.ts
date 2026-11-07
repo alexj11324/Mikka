@@ -582,9 +582,11 @@ export class ClaudeAdapter implements AgentAdapter {
     /** True once the session proved open, false if the CLI failed first. */
     let spoke: (value: boolean) => void = () => undefined
     const spoken = new Promise<boolean>((resolve) => (spoke = resolve))
-    /** The CLI is gone once this settles; the exit is told after it does. */
+    let checkingContinuation = mode === "continue"
+    /** The SDK stream has settled; native process exit is confirmed separately. */
     let finished: () => void = () => undefined
     const gone = new Promise<void>((resolve) => (finished = resolve))
+    let nativeExit = Promise.resolve(false)
 
     if(externalAuth && this.options.onHostedSession) {
       try{await this.options.onHostedSession(sessionId)}catch(error){throw new Error(SUBSCRIPTION_ERROR, { cause: error })}
@@ -656,6 +658,13 @@ export class ClaudeAdapter implements AgentAdapter {
           const child = this.options.spawnHosted
             ? this.options.spawnHosted(config, nativeToken)
             : spawnLocal(config)
+          nativeExit = new Promise<boolean>(resolve => {
+            child.once('exit', () => resolve(true))
+            // A spawn/transport error must not leave shutdown waiting for an
+            // exit that cannot arrive, or attest that a live process is gone.
+            child.once('error', () => resolve(false))
+            if (child.exitCode !== null || child.signalCode) resolve(true)
+          })
           // Capture the actual pipe. The SDK's stderr callback can remain
           // empty for a custom spawn, including when a result precedes exit.
           child.stderr?.on('data', (data: Buffer | string) => {
@@ -679,8 +688,9 @@ export class ClaudeAdapter implements AgentAdapter {
       prompts.close()
       session.close()
       await gone
+      const processExited = await nativeExit
       wipeRunCredentials(runDir)
-      if (event) queue.exit(event)
+      if (event) queue.exit({ ...event, ...(processExited ? {} : { sessionExited: false as const }) })
     }
     const turnEnded = () => {
       const handoff = ctx.readHandoff(log)
@@ -710,7 +720,10 @@ export class ClaudeAdapter implements AgentAdapter {
       ending = true
       providerFailure = failure ?? providerFailure ?? classifyProviderFailure({ code: assistantError })
       const handoff = ctx.readHandoff(log)
-      queue.exit(
+      // A missing continuation may be replaced by the caller below. Close
+      // this transport without revoking the gate that the fresh open rechecks.
+      const retryingContinuation = checkingContinuation && !options.requireSessionResume && !externalAuth && !providerFailure
+      void end(
         handoff ?? {
           outcome: "failed",
           error: externalAuth
@@ -718,7 +731,8 @@ export class ClaudeAdapter implements AgentAdapter {
             : providerFailure ? providerFailureMessage(providerFailure) : `claude exited before the turn ended: ${error}`,
           ...(quota ? { quota } : {}),
           ...(providerFailure ? { providerFailure } : {}),
-        }
+        },
+        !retryingContinuation,
       )
     }
 
@@ -742,7 +756,10 @@ export class ClaudeAdapter implements AgentAdapter {
           if (runtimeModel && ((message.type === "system" && message.subtype === "init") ||
             (message.type === "assistant" && message.parent_tool_use_id == null)))
             options.onRuntimeModel?.(sessionId, runtimeModel)
-          if (provesSession(message)) spoke(true)
+          if (provesSession(message)) {
+            checkingContinuation = false
+            spoke(true)
+          }
           // A new turn (the queued message) produces its own result.
           if (message.type === "assistant" || message.type === "user")
             clearTimeout(graceTimer)
@@ -880,6 +897,7 @@ export class ClaudeAdapter implements AgentAdapter {
       await end(null, false)
       return this.open(randomUUID(), "new", options.prompt ?? "", options)
     }
+    checkingContinuation = false
     log.info({ mode, sandbox: "claude-code" }, "claude session started")
 
     return {

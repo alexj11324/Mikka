@@ -50,6 +50,10 @@ function fixture() {
   const query = async (sql: string, values: unknown[] = []) => {
     queries.push(sql)
     const result = (rows: unknown[]) => ({ rows, rowCount: rows.length })
+    if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') {
+      assert.deepEqual(values, [run.id, actor.userId])
+      return result([{ issueId: run.issueId }])
+    }
     if (sql.startsWith('SELECT t.* FROM factory_tasks')) return result(
       run.sessionId === null && task.stage === 'spec' && task.status === 'blocked' && question.status === 'blocked' && question.continuationRunId === run.id ? [{ ...task }] : [])
     if (sql.startsWith('SELECT revision,"answerFingerprint",id FROM factory_questions')) return result([{ ...question }])
@@ -63,6 +67,9 @@ function fixture() {
       if (sql.startsWith('UPDATE thread_machines SET "workerLeaseId"=$2')) {
         machine.workerLeaseId = values[1] as string; machine.workerLeaseUntil = new Date(Date.now() + 60_000)
       }
+      if (sql.startsWith("UPDATE thread_machines SET state='running'")) return result([
+        { ...machine, state: 'running', epoch: 1, lifecycle: { phase: 'resumed' }, computeSeconds: 0 },
+      ])
       return result([{ runId: run.id }])
     }
     if (/^(BEGIN|COMMIT|ROLLBACK|SELECT set_config|SELECT pg_advisory_xact_lock|INSERT INTO (devices|device_repos|device_tokens)|UPDATE (device_tokens|agent_runs|factory_attempts))/.test(sql)) return result([])
