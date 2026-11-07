@@ -33,7 +33,8 @@ async function boot(
   dataDir: string,
   speed = Number.POSITIVE_INFINITY,
   stallMs?: number,
-  fixturesDir?: string
+  fixturesDir?: string,
+  collectCliTiming?: boolean
 ) {
   const daemon = await new Daemon({
     dataDir,
@@ -46,6 +47,7 @@ async function boot(
     heartbeatMs: 50,
     stallMs,
     fixturesDir,
+    collectCliTiming,
     quotaSource: null,
   }).start()
   daemons.push(daemon)
@@ -358,11 +360,9 @@ describe("mock runs", () => {
     expect(stageChunks).toHaveLength(3)
     expect(stageChunks[0].data.startupTiming).toBeUndefined()
     expect(stageChunks[1].data.startupTiming).toBeUndefined()
-    expect(stageChunks[2].data.startupTiming).toMatchObject({ version: 1, runIdHash: runIdHash(runId), harness: "mock", outcome: "ok", phases: [], truncated: false })
+    expect(stageChunks[2].data.startupTiming).toBeUndefined()
     const finalMessage = chunks.findLast(c => c.type === "finish")
-    expect(finalMessage?.type === "finish" && finalMessage.messageMetadata).toMatchObject({ mikkaRuntimeTiming: {
-      version: 1, runIdHash: runIdHash(runId), harness: "mock", source: "http_server_link", complete: true, truncated: false,
-    } })
+    expect(finalMessage).toEqual({ type: 'finish' })
     expect(chunks.some((c) => c.type === "data-file-change")).toBe(true)
     expect(server.issueStatus.get("issue-success-edit")).toBe("in_review")
     expect(server.runs.get(runId)?.state).toBe("succeeded")
@@ -385,7 +385,7 @@ describe("mock runs", () => {
 
   it("includes failed adapter startup timing in the same stored stage event", async () => {
     const { server, dataDir } = await setup()
-    const daemon = await boot(server, dataDir)
+    const daemon = await boot(server, dataDir, undefined, undefined, undefined, true)
     const runId = queue(server, "missing-startup-fixture")
     const run = await runToEnd(daemon, server, runId)
     expect(run.state).toBe("failed")

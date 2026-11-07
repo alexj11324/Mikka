@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Synthetic native-auth process only; no provider/network requests.
-import { closeSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { closeSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { execFileSync, spawn } from "node:child_process"
@@ -67,12 +67,7 @@ lines.on("line", async (line) => {
         isReplay: true, message: { role: 'user', content: [{ type: 'text', text: 'old task' }] } })
     }
     if (token.startsWith('fixture-delayed')) await new Promise(resolve => setTimeout(resolve, 12_000))
-    out({
-      type: "control_response",
-      response: {
-        subtype: "success",
-        request_id: frame.request_id,
-        response: {
+    const initialize = {
           commands: [],
           agents: [],
           models: [],
@@ -83,8 +78,11 @@ lines.on("line", async (line) => {
             ...(["fixture-unknown", "fixture-delayed-unknown"].includes(token) ? {} : { tokenSource: token === "fixture-environment" ? "CLAUDE_CODE_OAUTH_TOKEN" : "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR" })
           }
         }
-      }
-    })
+    if (frame.request.subtype === 'claim_session') {
+      process.chdir(frame.request.cwd)
+      out({ type: 'control_response', response: { subtype: 'success', request_id: frame.request_id,
+        response: { cwd: realpathSync(frame.request.cwd), session_id: sessionId, parked_ms: 0, sdk_mcp_settled: true, initialize } } })
+    } else out({ type: 'control_response', response: { subtype: 'success', request_id: frame.request_id, response: initialize } })
     return
   }
   const text = frame.message?.content?.[0]?.text
