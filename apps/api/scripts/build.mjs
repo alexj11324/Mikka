@@ -9,7 +9,7 @@ import { assertApiBuildConfiguration } from '../build-contract.mjs'
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const preset = process.env.NITRO_PRESET || (process.env.VERCEL ? 'vercel' : 'node-server')
 if (!['node-server', 'vercel'].includes(preset)) throw new Error('API_BUILD_PRESET_UNSUPPORTED')
-const revision = process.env.VERCEL_GIT_COMMIT_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+const revision = process.env.MIKKA_BUILD_REVISION || process.env.VERCEL_GIT_COMMIT_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
 if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('API_BUILD_SHA_REQUIRED')
 execFileSync(process.execPath, ['apps/api/scripts/generate-routes.mjs'], { cwd: root, stdio: 'inherit' })
 const html = await readFile(join(root, 'apps/frontend/dist/web/index.html'), 'utf8')

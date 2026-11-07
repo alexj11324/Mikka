@@ -57,6 +57,43 @@ with machine creation where the source is available. Remove full-history
 fetches from the mandatory startup path. No `runtime-git` clone and no
 second verification clone is made merely to hide the real `.git`.
 
+### Prepared Git credentials for the initial clone
+
+When a claim already contains the person's GitHub token, the daemon's own
+clone/fetch uses Git's standard credential-helper protocol with fixed shell
+builtins that read that existing `GH_TOKEN`. It does not launch `gh` merely
+to read the same credential. The helper is command configuration only: no
+Git/gh executable wrapper, extra credential file, provider proxy, remote
+authorization call or change to official files. Existing caller Git
+configuration is retained, including inherited `-c` parameters. Prepared
+local-device environments and older claims keep their existing behavior;
+the ordinary HOME credential preparation, background renewal, stop and
+compare-before-restore lifecycle are unchanged. The existing empty-repository
+default-branch lookup still uses native `gh` when needed.
+
+The credential keeps the previous `https://github.com` host scope. Normal
+same-host repository renames use Git's existing redirect behavior, while
+cross-host redirects must not carry the prepared credential. The initial
+`http.extraHeader` alternative was rejected after a real smart-HTTP fixture
+observed its Authorization on a later cross-host request. Standard
+credential-store also retains Basic authentication during a same-host
+redirect, so a stricter cross-path rule was not an existing product guarantee
+and is not added here. Repository admission and the token's GitHub permissions
+continue to control access; this change does not introduce a new permission
+check while Git runs. The existing run masker covers the token and its
+reversible Basic encoding in logger and terminal output.
+
+The three fresh, no-model repository profiles in workflow
+[`42375615582`](https://github.com/alexj11324/Mikka/actions/runs/42375615582)
+used the published `1edbeca68711` template and a fixed Handoff commit. They
+observed 4.737/4.752/7.512 seconds in the first `gh` credential child, nested
+inside clone, with no claim about that child's internal CPU or networking.
+These are component measurements with an App token and unknown region, not
+production dispatch timing or a measured saving from this change. Real Git
+HTTP regression tests prove direct prepared-credential use, inherited-config
+compatibility, redirect behavior, authentication failure and partial-clone
+cleanup. End-to-end improvement still requires the production gate below.
+
 ## A person's computer or server
 
 The local daemon also performs no extra remote authorization check before

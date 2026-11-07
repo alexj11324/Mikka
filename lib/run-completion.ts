@@ -1,4 +1,5 @@
 import 'server-only'
+import { completionFailureDetails } from './run-failure-details'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
 import { reachesReview, type RunCompleteRequest } from '@mikka/protocol/run'
@@ -68,7 +69,8 @@ async function completeRunTransaction(userId: string, hint: { id: string; issueI
     const { stopReason, report } = input
     let status: RunStatus = runStateForStop(stopReason)
     if (stopReason === 'submitted' && report?.verify.status !== 'passed' && run.run.kind !== 'plan') status = report?.verify.status === 'failed' ? 'failed' : 'stopped'
-    const [ended] = await tx.update(agentRuns).set({ status, pauseReason: null, resumeStatus: null, stopReason, report: report ?? null, finishedAt: new Date(), updatedAt: new Date() })
+    const [ended] = await tx.update(agentRuns).set({ status, pauseReason: null, resumeStatus: null, stopReason, report: report ?? null,
+      failureDetails: completionFailureDetails(input, hint.id, { status, stopRequested: Boolean(run.run.stopRequestedAt), sensitiveText: [run.run.prompt, run.run.agentDefinition?.instructions ?? ''] }), finishedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(agentRuns.id, hint.id), inArray(agentRuns.status, [...LIVE_STATUSES]))).returning({ id: agentRuns.id })
     if (!ended) return null
     await runListChanged(tx, ended.id)

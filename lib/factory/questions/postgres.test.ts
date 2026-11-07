@@ -152,6 +152,10 @@ test(
         ) => assignments.selectBaseline(userId, runId),
         workspaceId?: string,
       ) => {
+        // This fixture represents an online daemon. Refresh its heartbeat for
+        // each case so earlier database cases cannot age it past the real
+        // liveness window before a later continuation is claimed.
+        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId]);
         const issueId = randomUUID(),
           eventId = randomUUID(),
           questionId = randomUUID();

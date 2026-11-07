@@ -1,3 +1,4 @@
+import { failureFrom } from "@mikka/protocol/run-failure"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { resolve, join } from "node:path"
@@ -56,4 +57,21 @@ describe("Claude Coordinator", () => {
   it("cancels a hung real SDK subprocess", async () => {
     await expect(runClaudeCoordinator({ ...input, context: "HANG", timeoutMs: 150 }, host)).rejects.toThrow()
   })
+})
+
+it("captures the failed SDK result with its provider message and actual context redacted", async () => {
+  const context = "STRUCTURED_ERROR private coordinator context"
+  const error = await runClaudeCoordinator({ ...input, context }, { ...host, runId: "native-claude" }).catch(error => error)
+  const failure = failureFrom(error)
+  expect(failure).toMatchObject({ runId: "native-claude", provider: "claude", category: "subscription", status: 401 })
+  expect(failure?.providerMessage).toContain("Subscription session expired")
+  expect(failure?.providerMessage).not.toContain("private coordinator context")
+  expect(failure?.appVersion).not.toBe("unknown")
+})
+
+it("omits failed SDK prose that echoes actual user context", async () => {
+  const context = "STRUCTURED_ERROR_ECHO private coordinator context"
+  const error = await runClaudeCoordinator({ ...input, context }, host).catch(error => error)
+  expect(failureFrom(error)).toMatchObject({ category: "subscription", status: 401 })
+  expect(failureFrom(error)?.providerMessage).toBeUndefined()
 })

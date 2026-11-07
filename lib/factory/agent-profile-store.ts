@@ -7,6 +7,7 @@ import { orderCandidates } from '@/lib/model-order'
 import { entryKey } from '@/lib/model-order-plan'
 import { agentProfileDigest, AgentProfileError, parseAgentProfile, type AgentProfile, type AgentProfileDefinition, type AgentProfileScope, type AgentProfileSkill } from './agent-profile-definition'
 import { resolveAgentProfileSkills } from './agent-profile-skills'
+import { borrowTaskWorkspaceMembership } from '@/lib/task-workspace'
 
 export type ProfileQuery = Pick<Pool | PoolClient, 'query'>
 export interface ProfileRow {
@@ -15,9 +16,18 @@ export interface ProfileRow {
 }
 export interface ProfileMembership { check(): Promise<void>; close(): Promise<void> }
 export async function acquireProfileMembership(scope: AgentProfileScope): Promise<ProfileMembership> {
-  const [{ workspacePool }, { acquireWorkspaceMembership }] = await Promise.all([import('@/lib/workspace-db'), import('@/lib/workspace-membership-guard')])
-  try { return await acquireWorkspaceMembership(workspacePool, { workspaceId: scope.workspaceId, userId: scope.ownerId }) }
-  catch { throw new AgentProfileError('agentProfileScopeNotFound', 404) }
+  try {
+    const borrowed = borrowTaskWorkspaceMembership(scope.ownerId, scope.workspaceId)
+    if (borrowed) return {
+      async check() {
+        try { await borrowed.check() }
+        catch (cause) { throw new AgentProfileError('agentProfileScopeNotFound', 404, { cause }) }
+      },
+      close: () => borrowed.close(),
+    }
+    const [{ workspacePool }, { acquireWorkspaceMembership }] = await Promise.all([import('@/lib/workspace-db'), import('@/lib/workspace-membership-guard')])
+    return await acquireWorkspaceMembership(workspacePool, { workspaceId: scope.workspaceId, userId: scope.ownerId })
+  } catch (cause) { throw new AgentProfileError('agentProfileScopeNotFound', 404, { cause }) }
 }
 export function validateProfileScope(scope: AgentProfileScope) {
   z.string().min(1).max(256).parse(scope.ownerId); z.uuid().parse(scope.workspaceId)

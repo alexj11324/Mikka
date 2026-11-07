@@ -9,6 +9,7 @@ import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { runPromptParts } from '@/lib/run-prompt'
 import { freezeWorkerDefinition, type WorkerModelDispatch } from '@/lib/agent-kit/worker'
+import { captureTraceContext } from '@/lib/tracing/context'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { ComputerError } from './store'
 import { RunModelMissingError } from './run-model'
@@ -108,6 +109,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1
     const push = !github ? null : await (await import('./cloud-push')).admitCloudPush(client, { userId: actor.userId, issueId: input.issueId, agentId: input.agentId, deviceId: target.deviceId, deviceRepoId: input.deviceRepoId, ...(runBotId ? { workspaceId: actor.workspaceId } : {}), now: new Date() })
     const agentDefinition = push ? { ...frozen, repositoryAdmission: push.admission } : frozen
+    const traceContext = captureTraceContext({ runId, threadId: input.threadRunId ?? runId, taskId: input.issueId, posthogDistinctId: actor.userId, ...(push?.publication.identifier ? { taskNumber: push.publication.identifier } : {}) })
+    if (traceContext) agentDefinition.traceContext = traceContext
     await client.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt,"botId","agentDefinition","dispatchFingerprint","promptTaskStart","promptTaskLength")
       VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10,$11,0,$12)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, target.baseBranch, prompt, runBotId,JSON.stringify(agentDefinition), digest ? selectionFingerprint : null, promptTaskLength])
     if (push) await client.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")

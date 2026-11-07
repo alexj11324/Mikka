@@ -1,7 +1,8 @@
 import 'server-only'
 import type { LiveKind } from './events'
-import { readLiveRevisions, type LiveRef, type LiveRevisions } from './revisions'
+import type { LiveRef, LiveRevisions } from './revisions'
 import type { LiveScope } from './scope'
+import { readBatchRevisions } from '../desktop-rpc/read-batch-context'
 
 /** `scope` undefined: the home was not resolved here; ownerListRead reads it as before. */
 export type BegunListRead = { scope?: LiveScope | null; revisions: LiveRevisions }
@@ -13,7 +14,7 @@ const unavailable = (error: unknown) => console.warn('[live] revision read unava
 export async function readRevisions(refs: readonly LiveRef[]): Promise<LiveRevisions> {
   try {
     const { pool } = await import('../db/request-scope')
-    return await readLiveRevisions(pool, refs)
+    return await readBatchRevisions(pool, refs)
   } catch (error) { unavailable(error); return {} }
 }
 
@@ -21,8 +22,8 @@ export async function readRevisions(refs: readonly LiveRef[]): Promise<LiveRevis
 export async function beginOwnerListRead(ownerId: string, kinds: readonly LiveKind[], others: readonly LiveRef[] = []): Promise<BegunListRead> {
   let scope: LiveScope | null
   try {
-    const [{ workspacePool }, { ownerLiveScope }] = await Promise.all([import('../workspace-db'), import('./owner-scope')])
-    scope = await ownerLiveScope(workspacePool, ownerId)
+    const [{ workspacePool }, { ownerLiveReadScope }] = await Promise.all([import('../workspace-db'), import('./owner-scope')])
+    scope = await ownerLiveReadScope(workspacePool, ownerId)
   } catch (error) { unavailable(error); return { revisions: await readRevisions(others) } }
   return { scope, revisions: await readRevisions([...scope ? kinds.map(kind => ({ kind, id: scope.workspaceId })) : [], ...others]) }
 }

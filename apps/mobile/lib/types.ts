@@ -1,5 +1,6 @@
 /** The shapes app/api/mobile/* and /api/suggestions return (see those routes on the server). */
 import type { SubscriptionRefusalNotice } from '../../../lib/subscription-refusal'
+import type { CloudErrorCode } from '../../../lib/cloud-services/errors'
 import type { PresenceProof } from '../../../lib/live/presence'
 export type Source = 'gmail' | 'github' | 'slack' | 'notion' | 'linear' | 'googlecalendar'
 export type MachineKind = 'cloud' | 'laptop' | 'server'
@@ -88,7 +89,7 @@ export type ChatFailure = (
   | { kind: 'hosted'; code: string }
   | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
   | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
-  | { kind: 'failed'; reason?: 'balance' | 'tools' }
+  | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
   // The stored code(s), shown only under 详情 (the web's RunErrorDetails); older servers omit it.
 ) & { raw?: string }
 

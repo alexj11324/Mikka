@@ -1,3 +1,5 @@
+import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
+import { readCompactRunFailure, type CompactRunFailure } from './run-failure-view'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 
 /**
@@ -22,6 +24,7 @@ export interface RunChainQueryable {
 export const RUN_CHAIN_MAX_DEPTH = 64
 
 export interface RunAttempt {
+  failureDetails?: RunFailure | CompactRunFailure | null
   runId: string
   /** 1-based, in chain order: the root is attempt 1. */
   attempt: number
@@ -75,7 +78,15 @@ function chainSql(scope: string, depth: string) {
     )`
 }
 
-const SELECT_ATTEMPTS = `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x.outcome, x."stopRequestedAt", x."createdAt", x."finishedAt"`
+// Chain lists must not transfer the private response text from any attempt.
+const COMPACT_FAILURE = `CASE WHEN jsonb_typeof(x."failureDetails")='object' AND x."failureDetails"->>'schemaVersion'='1' THEN
+  jsonb_build_object('schemaVersion',x."failureDetails"->'schemaVersion','code',x."failureDetails"->'code',
+    'category',x."failureDetails"->'category','runId',x."failureDetails"->'runId',
+    'occurredAt',x."failureDetails"->'occurredAt','appVersion',x."failureDetails"->'appVersion') ||
+  jsonb_strip_nulls(jsonb_build_object('detail',x."failureDetails"->'detail','provider',x."failureDetails"->'provider',
+    'status',x."failureDetails"->'status','recovery',x."failureDetails"->'recovery')) END`
+const selectAttempts = (ownerDetail = false) => `a."depthExceeded", a.root::text AS "rootRunId", x.id::text AS "runId", x.status, x.outcome,
+  x."stopRequestedAt", x."createdAt", x."finishedAt", ${ownerDetail ? 'x."failureDetails"' : COMPACT_FAILURE} AS "failureDetails"`
 
 /**
  * The newest `limit` chains on an issue among `userIds`' runs. Runs are folded by root
@@ -89,7 +100,7 @@ export async function listIssueRunChains(q: RunChainQueryable, issueId: string, 
       SELECT DISTINCT a.root, n."createdAt" FROM assigned a JOIN runs n ON n.id = a.root
       ORDER BY n."createdAt" DESC, a.root DESC LIMIT $3
     )
-    SELECT ${SELECT_ATTEMPTS}, roots."createdAt" AS "rootCreatedAt"
+    SELECT ${selectAttempts()}, roots."createdAt" AS "rootCreatedAt"
     FROM assigned a JOIN roots ON roots.root = a.root JOIN agent_runs x ON x.id = a.id`, [issueId, [...userIds], limit, RUN_CHAIN_MAX_DEPTH])
   return foldChains(rows)
 }
@@ -128,7 +139,8 @@ function foldChains(rows: Record<string, unknown>[]): RunChain[] {
   for (const row of rows) {
     const root = String(row.rootRunId)
     const entry = byRoot.get(root) ?? { rootCreatedAt: row.rootCreatedAt as Date, runs: [] }
-    entry.runs.push({ runId: String(row.runId), status: String(row.status), outcome: (row.outcome as string | null) ?? null, stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
+    const failureDetails = readRunFailure(row.failureDetails) ?? readCompactRunFailure(row.failureDetails)
+    entry.runs.push({ ...(failureDetails ? { failureDetails } : {}), runId: String(row.runId), status: String(row.status), outcome: (row.outcome as string | null) ?? null, stopRequestedAt: (row.stopRequestedAt as Date | null) ?? null, createdAt: row.createdAt as Date, finishedAt: (row.finishedAt as Date | null) ?? null })
     byRoot.set(root, entry)
   }
   const order = (a: { createdAt: Date; runId: string }, b: { createdAt: Date; runId: string }) => a.createdAt.getTime() - b.createdAt.getTime() || (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0)
@@ -156,7 +168,7 @@ export async function readRunChain(q: RunChainQueryable, userId: string, runId: 
   if (!new RegExp(UUID.slice(1, -1)).test(runId)) return null
   const { rows } = await q.query(`
     WITH RECURSIVE ${selectedChainSql()}
-    SELECT ${SELECT_ATTEMPTS}, now() AS "rootCreatedAt"
+    SELECT ${selectAttempts(true)}, now() AS "rootCreatedAt"
     FROM selected a JOIN agent_runs x ON x.id = a.id`, [runId, userId, RUN_CHAIN_MAX_DEPTH])
   const [chain] = foldChains(rows)
   return chain && chain.attempts.some(attempt => attempt.runId === runId) ? chain : null

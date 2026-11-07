@@ -16,12 +16,16 @@ if (process.env.REQUIRE_DB === '1' && !url) throw new Error('Workspace governanc
 
 test('workspace ownership: real split-database migration, ACL, immutable provenance and membership races', { skip: !url, timeout: 240_000 }, async t => {
   let selectedWorkspace: string | undefined
+  let requestBearer: string | undefined
   const framework = await import('next/headers')
   const requestContext = mock.module('next/headers', { namedExports: { ...framework,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }),
-    headers: async () => new Headers(),
+    headers: async () => new Headers(requestBearer ? { authorization: `Bearer ${requestBearer}` } : undefined),
   } })
   t.after(() => requestContext.restore())
+  const localization = await import('next-intl/server')
+  const localeContext = mock.module('next-intl/server', { namedExports: { ...localization, getLocale: async () => 'en' } })
+  t.after(() => localeContext.restore())
   const admin = new Pool({ connectionString: url, max: 1 })
   const suffix = randomUUID().replaceAll('-', '')
   const appName = `governance_app_${suffix}_e2e`, workspaceName = `governance_ws_${suffix}_e2e`
@@ -37,7 +41,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const migrations = orderMigrations((await readdir(directory)).filter(file => file.endsWith('.sql')))
-    const boundary = '20261107121000_task_workspace_ownership.sql'
+    const boundary = '20261107180000_task_workspace_ownership.sql'
     for (const pool of [app, workspace]) await pool.query('CREATE TABLE schema_migrations (name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
     const migrate = async (names: string[]) => {
       for (const name of names) {
@@ -253,6 +257,72 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.equal(await sharedArtifact(link.token), null)
       assert.equal((await activeTaskWorkspaces(owner, beta))[0]?.id, beta)
       assert.equal((await activeTaskWorkspaces(owner, personal))[0]?.id, personal)
+    })
+    await t.test('task-run aggregates exclude an interrupted migration\'s unbound run until its own tenant is proved', async () => {
+      // Reuse the real pre-migration conflict row. Removing its contradictory
+      // grouping leaves one durable Bot proof; only the ordinary migration
+      // may bind the task. Simulate interruption after that commit, before
+      // derived resources: do not disable a trigger or invent a second reader.
+      assert.equal((await app.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1', [runConflict])).rows[0].workspaceId, null)
+      await workspace.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [conflict])
+      let interrupted = 0
+      const interruptedApplication = new Proxy(app, {
+        get(target, property, receiver) {
+          if (property === 'query') return (statement: unknown, ...parameters: unknown[]) => {
+            if (typeof statement === 'string' && statement.startsWith('SELECT id FROM agent_runs WHERE "workspaceId" IS NULL')) {
+              interrupted++
+              throw new Error('fixture backfill interrupted before derived resources')
+            }
+            return Reflect.apply(target.query, target, [statement, ...parameters])
+          }
+          const value = Reflect.get(target, property, receiver)
+          return typeof value === 'function' ? value.bind(target) : value
+        },
+      })
+      await assert.rejects(backfillTaskWorkspaces(interruptedApplication, workspace), { message: 'fixture backfill interrupted before derived resources' })
+      assert.equal(interrupted, 1)
+      assert.equal((await app.query('SELECT "workspaceId" FROM issues WHERE id=$1', [conflict])).rows[0].workspaceId, beta,
+        'the real task phase committed its unique verified tenant before the interruption')
+      assert.equal((await app.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1', [runConflict])).rows[0].workspaceId, null,
+        'the older run still has no independent persisted tenant proof')
+
+      const visibleAgent = randomUUID(), visibleRun = randomUUID(), day = 24 * 60 * 60 * 1000, now = Date.now()
+      const legacyAt = new Date(now - 29 * day), visibleAt = new Date(now - 7 * day)
+      await app.query('UPDATE agent_runs SET "createdAt"=$2 WHERE id=$1', [runConflict, legacyAt])
+      await app.query('INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,\'claude_code\',\'Tenant aggregate fixture\')', [visibleAgent, owner])
+      await app.query('INSERT INTO agent_runs(id,"userId","agentId","issueId",status,"createdAt") VALUES($1,$2,$3,$4,\'succeeded\',$5)', [visibleRun, owner, visibleAgent, conflict, visibleAt])
+      assert.equal((await app.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1', [visibleRun])).rows[0].workspaceId, beta,
+        'the normal run trigger binds the new row to its already-bound task')
+
+      const { auth } = await import('../lib/auth')
+      const authContext = await auth.$context
+      const session = await authContext.internalAdapter.createSession(owner)
+      assert.ok(session)
+      const previousWorkspace = selectedWorkspace, previousBearer = requestBearer
+      selectedWorkspace = beta; requestBearer = session.token
+      try {
+        const { pollTaskRuns } = await import('../app/actions/task-runs')
+        const pending = await pollTaskRuns()
+        const row = pending.items.find(item => item.issueId === conflict)
+        assert.equal(row?.runId, visibleRun)
+        assert.deepEqual(row?.harnesses, ['claude_code'], 'an unbound historical harness must not join the selected tenant list')
+        assert.equal(pending.live.workspaceId, beta)
+        assert.equal(pending.live.deadline?.at, new Date(visibleAt.getTime() + 30 * day).toISOString(),
+          'the selected tenant expiry must not use an unbound run\'s earlier timestamp')
+        assert.equal((await app.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1', [runConflict])).rows[0].workspaceId, null,
+          'a read cannot silently assign the quarantined run')
+
+        const resumed = await backfillTaskWorkspaces(app, workspace)
+        assert.equal(resumed.runsBound, 1)
+        assert.equal((await app.query('SELECT "workspaceId" FROM agent_runs WHERE id=$1', [runConflict])).rows[0].workspaceId, beta)
+        const resolved = await pollTaskRuns()
+        assert.deepEqual(resolved.items.find(item => item.issueId === conflict)?.harnesses, ['claude_code', 'codex'],
+          'the same historical row contributes only after its own migration commits')
+        assert.equal(resolved.live.deadline?.at, new Date(legacyAt.getTime() + 30 * day).toISOString())
+      } finally {
+        selectedWorkspace = previousWorkspace; requestBearer = previousBearer
+        await authContext.internalAdapter.deleteSession(session.token)
+      }
     })
     const migrationFrom = randomUUID(), migrationTo = randomUUID(), fromTeam = randomUUID(), toTeam = randomUUID()
     const fromBot = randomUUID(), toBot = randomUUID()

@@ -1,3 +1,4 @@
+import { captureRunFailure } from "@mikka/protocol/run-failure"
 import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
@@ -70,6 +71,7 @@ import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprin
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
 import { reusableHostedModels, type HostedModelProbe } from "./cloud-model-probe"
+import { prefetchHostedCliFiles, type HostedCliPrefetch } from "./hosted-cli-prefetch"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { preflightLocalSubscription } from "./subscription-preflight"
@@ -78,6 +80,7 @@ import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
 import { Outbox } from "./outbox"
+import type { RunTraceContext } from '@mikka/protocol/trace-context'
 import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
 import { daemonTracer, runIdHash } from "./tracing"
@@ -234,6 +237,7 @@ export class Daemon {
   private releaseLock: (() => Promise<void>) | null = null
   private rpc: RpcServer | null = null
   private outbox!: Outbox
+  private registrationTraceContext?: RunTraceContext
   private journal!: RunJournal
   private captureUploader!: CaptureUploader
   private worktrees!: WorktreeManager
@@ -351,7 +355,8 @@ export class Daemon {
       this.log,
       undefined,
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error),
-      this.options.retainResources
+      this.options.retainResources,
+      runId => this.journal.get(runId)?.assignment.traceContext,
     )
     this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
     this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
@@ -455,6 +460,12 @@ export class Daemon {
       // A frozen template can be weeks old. The binaries were checked above;
       // the natural refresh period starts when this machine accepts its owner.
       this.lastModelProbe = Date.now()
+    }
+    // Only the activated cloud entry point warms software pages. It does not
+    // delay registration/claim or replace the real CLI/model/identity checks.
+    if (hosted && this.options.e2bContainerRuntime && !this.stopped) {
+      this.cliPrefetch ??= prefetchHostedCliFiles(hosted.binaries,
+        preloadedModels ? this.options.preloadedModels?.manifest?.kind : undefined)
     }
     await this.cloudComputerBroker?.listen()
     if (this.stopped) throw new Error("daemon stopped during startup")
@@ -1085,6 +1096,7 @@ export class Daemon {
 
   /** The hosted runner's CLIs on a cloud machine (subscription-hosted-runner.ts), which its model probe asks. */
   private hostedBinaries: Partial<Record<"codex" | "claude_code", string>> | undefined
+  private cliPrefetch: HostedCliPrefetch | undefined
 
   private modelProbeOn() {
     // A cloud machine probes its own CLIs too (Alex, 2026-11-03): its runs start only on a model they reported.
@@ -1314,7 +1326,7 @@ export class Daemon {
 
   private async register(credential: string) {
     const { workspaceId, deviceId: knownDeviceId } = this.device
-    const { deviceId, tracing } = await this.options.link.registerDevice(
+    const { deviceId, tracing } = await daemonTracer.span("daemon.registration", {}, async () => this.options.link.registerDevice(
       credential,
       {
         name: hostname(),
@@ -1332,7 +1344,7 @@ export class Daemon {
           : {}),
       },
       knownDeviceId
-    )
+    ), { traceContext: this.registrationTraceContext })
     // A late registration must not restore the session replaced over RPC.
     if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) throw new Error('Device session changed during registration')
     if (deviceId !== this.device.deviceId) {
@@ -1597,8 +1609,9 @@ export class Daemon {
       }
       if (!matches) {
         const message = "Repository origin does not match the approved repository"
-        await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message) })
-        throw new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+        const error = new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+        await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message), failureDetails: captureRunFailure(error, { runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment.prompt] }) })
+        throw error
       }
     }
     if (assignment.computer && (!this.cloudComputerBroker || !cloudComputerGrantMatches(assignment, runId, deviceId))) throw new Error('Cloud computer runtime unavailable')
@@ -1627,6 +1640,7 @@ export class Daemon {
         .completeRun(runId, {
           stopReason: "error",
           report: baseReport(error.message),
+          failureDetails: captureRunFailure(error, { runId, appVersion: DAEMON_VERSION }),
         })
         .catch((err: unknown) =>
           this.log.warn({ run_id: runId, err }, "could not report refused run")
@@ -1762,7 +1776,7 @@ export class Daemon {
       "device.setCredential": (raw) => {
         this.reviewAbort?.abort()
         this.reviewAbort = null
-        const { credential, workspaceId } =
+        const { credential, workspaceId, traceContext } =
           daemonRpc["device.setCredential"].params.parse(raw)
         // The device id is kept, in every workspace (ADR ORV-284):
         // registering with it in another workspace joins this same device
@@ -1773,7 +1787,8 @@ export class Daemon {
         })
         this.revokeLocalComputerGrants()
         this.registered = false
-        void this.syncWithServer()
+        this.registrationTraceContext = traceContext
+        void daemonTracer.withContext(traceContext, () => this.syncWithServer())
         return { ok: true as const }
       },
       "device.clearCredential": () => {
@@ -1898,6 +1913,7 @@ export class Daemon {
 
   private async stopInternal() {
     this.stopped = true
+    this.cliPrefetch?.abort()
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
     await this.maintenance
@@ -1921,6 +1937,9 @@ export class Daemon {
     }
     await this.outbox?.close()
     await daemonTracer.shutdown()
+    // Cancellation of a real task is never held behind this optional read.
+    // Still drain its descriptor before releasing this daemon's lifecycle.
+    await this.cliPrefetch?.done
     const release = this.releaseLock
     this.releaseLock = null
     await release?.().catch((err: unknown) => {

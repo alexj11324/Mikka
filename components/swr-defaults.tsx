@@ -6,6 +6,7 @@ import { pageNeedsRefresh } from '@/lib/app-build'
 import { PersistentReadCache, waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import { isAutoRetryable, MAX_READ_RETRIES, retryRead } from '@/lib/swr/retry'
 import { liveKeyConnection } from '@/lib/swr/live-focus'
+import { acceptSWRRead, failSWRRead, observeSWRRead } from '@/lib/swr/read-observer'
 
 /** Data younger than this is fresh: focus leaves it alone. A hook may set a longer `focusThrottleInterval`. */
 export const FRESH_FOR_MS = 5 * 60_000
@@ -30,26 +31,34 @@ export const staleOnFocus: Middleware = useSWRNext => (key, fetcher, config) => 
   if (!mountedAt.current) mountedAt.current = Date.now()
   const id = key ? unstable_serialize(key) : ''
   // SWR passes the merged config, cache included, to every middleware.
-  const cache = (config as { cache?: object }).cache ?? fetchedAt
+  const cache = (config as { cache?: { get(key: string): { data?: unknown; error?: unknown } | undefined } }).cache
   const resumeAfterHydration = Boolean(fetcher) && config.revalidateOnMount !== false
-  const stamped = fetcher && id
-    ? async (...args: unknown[]) => {
+  const stamped = fetcher && id && cache
+    ? (...args: unknown[]) => observeSWRRead(cache, id, async () => {
       await waitForCacheHydration(cache)
       const result = await (fetcher as (...input: unknown[]) => unknown)(...args)
       stamps(cache).set(id, Date.now())
       return result
-    }
+    })
     : fetcher
   const allowed = config.revalidateOnFocus
   const focusAllowed = () => {
     if (!allowed) return false
-    const connected = liveKeyConnection(cache, id)
+    const connected = cache ? liveKeyConnection(cache, id) : undefined
     if (connected === false) return true
     const configured = config.focusThrottleInterval ?? FRESH_FOR_MS
     // Settings without a push subscription keep their previous freshness; a
     // hook's explicitly longer window (e.g. usage) remains its own policy.
     const freshFor = connected === undefined && configured === FRESH_FOR_MS ? WITHOUT_PUSH_FRESH_FOR_MS : configured
-    return Date.now() - (stamps(cache).get(id) ?? mountedAt.current) >= freshFor
+    return Date.now() - (cache ? stamps(cache).get(id) ?? mountedAt.current : mountedAt.current) >= freshFor
+  }
+  const onSuccess: NonNullable<SWRConfiguration['onSuccess']> = (data, key, configuration) => {
+    try { config.onSuccess?.(data, key, configuration) }
+    catch (error) {
+      if (cache) failSWRRead(cache, key, data, error)
+      throw error
+    }
+    if (cache) acceptSWRRead(cache, key, data)
   }
   // Hook-level pauses (for example Settings) must not override a required update.
   const gated = Object.defineProperty({
@@ -58,6 +67,7 @@ export const staleOnFocus: Middleware = useSWRNext => (key, fetcher, config) => 
     // This middleware gates against the last successful answer instead.
     focusThrottleInterval: 0,
     isPaused: () => pageNeedsRefresh() || (cache instanceof PersistentReadCache && (!cache.isHydrated || !cache.isEnabled)) || Boolean(config.isPaused?.()),
+    onSuccess,
   }, 'revalidateOnFocus', {
     enumerable: true,
     // SWR reads this when the focus event fires.

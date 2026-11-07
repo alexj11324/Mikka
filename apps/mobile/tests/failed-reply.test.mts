@@ -6,7 +6,8 @@ import { Window } from 'happy-dom'
 
 const workspace = 'f778b9a0-ecec-4ade-97a6-b7aa4221a177'
 const opened: string[] = []
-let calls = 0, picks = 0, reply: () => Promise<unknown> = async () => ({ queued: true })
+let calls = 0, picks = 0, cloudCalls = 0, reply: () => Promise<unknown> = async () => ({ queued: true })
+let cloudOpen: () => Promise<void> = async () => {}
 class FixtureApiError extends Error { constructor(readonly status: number, readonly code: string) { super(code) } }
 mock.module('react-native', { namedExports: { Platform: { OS: 'ios' }, StyleSheet: { create: (value: unknown) => value }, View: ({ children }: { children: ReactNode }) => createElement('div', null, children), Pressable: ({ children, onPress }: { children: ReactNode; onPress: () => void }) => createElement('button', { 'data-details': '', onClick: onPress }, children) } })
 mock.module(new URL('../components/cards.tsx', import.meta.url).href, { namedExports: { CardButton: ({ label, disabled, busy, onPress }: { label: string; disabled?: boolean; busy?: boolean; onPress: () => void }) => createElement('button', { disabled: disabled || busy, onClick: onPress }, label) } })
@@ -14,7 +15,7 @@ mock.module(new URL('../components/GlassButton.tsx', import.meta.url).href, { na
 mock.module(new URL('../components/Text.tsx', import.meta.url).href, { namedExports: { Text: ({ children }: { children: ReactNode }) => createElement('span', null, children) } })
 mock.module(new URL('../lib/home.tsx', import.meta.url).href, { namedExports: { useHome: () => ({ data: { workspace: { id: workspace } } }) } })
 mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: { api: async () => { calls++; return reply() }, ApiError: FixtureApiError } })
-mock.module(new URL('../lib/web.ts', import.meta.url).href, { namedExports: { openOnWeb: async (path: string) => { opened.push(path) }, webChatPath: (bot: string | null) => bot ? `/?section=coordinator&bot=${bot}` : '/?section=coordinator' } })
+mock.module(new URL('../lib/web.ts', import.meta.url).href, { namedExports: { openCloudBilling: async () => { cloudCalls++; await cloudOpen() }, openOnWeb: async (path: string) => { opened.push(path) }, webChatPath: (bot: string | null) => bot ? `/?section=coordinator&bot=${bot}` : '/?section=coordinator' } })
 mock.module(new URL('../lib/theme.ts', import.meta.url).href, { namedExports: { colors: { secondary: 'gray', danger: 'red' } } })
 const browser = new Window({ url: 'https://fixture.example/mikka' })
 let root: Root, container: HTMLDivElement
@@ -26,7 +27,7 @@ before(async () => {
   ;({ createRoot } = await import('react-dom/client'))
   ;({ FailedReply } = await import('../components/FailedReply'))
 })
-beforeEach(() => { opened.length = 0; calls = 0; picks = 0; reply = async () => ({ queued: true }); container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { opened.length = 0; calls = 0; picks = 0; cloudCalls = 0; cloudOpen = async () => {}; reply = async () => ({ queued: true }); container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const click = async () => { await act(async () => container.querySelector('button')!.click()) }
@@ -80,6 +81,30 @@ test('an explicit HTTP refusal is unavailable while lost transport stays unconfi
   await click()
   assert.match(container.textContent ?? '', /重试未确认/)
   assert.doesNotMatch(container.textContent ?? '', /fixture-private/)
+})
+
+test('cloud quota offers its own billing action on tap, with no local billing or retry request', async () => {
+  let finish!: () => void
+  cloudOpen = () => new Promise(resolve => { finish = resolve })
+  await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'failed', cloudCode: 'cloud_quota_exhausted' }, botId: null, onQueued: () => {} })))
+  assert.equal(container.querySelectorAll('button').length, 1)
+  assert.equal(container.querySelector('button')?.textContent, '去 Mikka Cloud 充值')
+  assert.equal(cloudCalls, 0)
+  await act(async () => { container.querySelector('button')!.click(); container.querySelector('button')!.click() })
+  assert.equal(cloudCalls, 1)
+  assert.equal(calls, 0)
+  assert.deepEqual(opened, [])
+  await act(async () => finish())
+  assert.equal(container.querySelector('button')?.disabled, false)
+})
+
+test('missing cloud permission offers the existing native model picker without opening web settings', async () => {
+  await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'failed', cloudCode: 'cloud_scope_missing' }, botId: 'fixture-bot', onQueued: () => {}, modelChoice: createElement('button', { onClick: () => { picks++ } }, 'fixture-native-menu') })))
+  await click()
+  assert.equal(picks, 1)
+  assert.equal(calls, 0)
+  assert.equal(cloudCalls, 0)
+  assert.deepEqual(opened, [])
 })
 
 test('the stored codes stay folded under 详情, under the words, never instead of them', async () => {

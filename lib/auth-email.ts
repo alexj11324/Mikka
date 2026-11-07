@@ -2,9 +2,10 @@ import { createHash, randomBytes } from 'node:crypto'
 import { APIError, type BetterAuthOptions, type User, type DBAdapter } from 'better-auth'
 import { getCurrentAdapter, runWithTransaction } from '@better-auth/core/context'
 import { verifyJWT } from 'better-auth/crypto'
+import { deliverMail, mailConfigured, mailFrom } from './mail-delivery'
 
 export const AUTH_EMAIL_TTL_SECONDS = 15 * 60
-export const AUTH_EMAIL_FROM = 'Mikka <noreply@aspectlylabs.com>'
+export const AUTH_EMAIL_FROM = mailFrom()
 
 type VerificationStore = {
   reserveVerificationValue(input: { identifier: string; value: string; expiresAt: Date }): Promise<boolean>
@@ -57,7 +58,7 @@ export function createAuthEmail(options: {
 
   async function send(kind: MailKind, data: MailData) {
     const key = options.apiKey()
-    if (!key) unavailable()
+    if (!mailConfigured(process.env, key)) unavailable()
     const context = await options.context()
     const window = Math.floor(Date.now() / 60_000)
     const allowed = await context.internalAdapter.reserveVerificationValue({
@@ -92,15 +93,8 @@ export function createAuthEmail(options: {
     }
     const subject = kind === 'verification' ? 'Verify your Mikka email address' : 'Reset your Mikka password'
     const deliver = async () => { try {
-      const response = await (options.fetch ?? fetch)('https://api.resend.com/emails', {
-        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10_000),
-        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ from: AUTH_EMAIL_FROM, to: [data.user.email], subject,
-          text: `${subject}\n\n${url.href}\n\nThis link expires in 15 minutes. If you did not request this, ignore this email.` }),
-      })
-      if (!response.ok) { await response.body?.cancel(); throw new Error('delivery rejected') }
-      const result: unknown = await response.json()
-      if (!result || typeof result !== 'object' || !('id' in result) || typeof result.id !== 'string' || !result.id) throw new Error('delivery not accepted')
+      await deliverMail({ to: data.user.email, subject,
+        text: `${subject}\n\n${url.href}\n\nThis link expires in 15 minutes. If you did not request this, ignore this email.` }, { apiKey: key, fetch: options.fetch })
       report({ kind, outcome: 'accepted_by_provider' })
     } catch {
       report({ kind, outcome: 'failed' })
@@ -140,7 +134,7 @@ export function createAuthEmail(options: {
       if (ctx.path === '/send-verification-email') callback(ctx.body?.callbackURL, verifyReturn)
       if (ctx.path === '/request-password-reset') callback(ctx.body?.redirectTo, resetReturn)
       if (ctx.path?.startsWith('/reset-password/')) callback(ctx.query?.callbackURL, resetReturn, false)
-      if (['/send-verification-email', '/request-password-reset'].includes(ctx.path ?? '') && !options.apiKey()) unavailable()
+      if (['/send-verification-email', '/request-password-reset'].includes(ctx.path ?? '') && !mailConfigured(process.env, options.apiKey())) unavailable()
       if (ctx.path === '/reset-password') {
         const token = ctx.body?.token || ctx.query?.token
         if (typeof token !== 'string' || !token || token.length > 4096) invalidLink('reset_token')

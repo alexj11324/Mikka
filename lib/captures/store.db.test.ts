@@ -78,7 +78,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       assert.deepEqual(original, { runId: firstRun, latestVersion: 2 }, 'the creator is immutable, while global latest remains useful outside per-run evidence')
       const receipts = (await pool.query(`SELECT "runId",payload->>'version' AS version FROM coordinator_events WHERE "dedupeKey" LIKE $1 ORDER BY "dedupeKey"`, [`artifact_submitted:${first.artifactId}:%`])).rows
       assert.deepEqual(receipts, [{ runId: firstRun, version: '1' }, { runId: nextRun, version: '2' }])
-      assert.equal(scheduled, 2)
+      assert.equal(scheduled, 4, 'each committed version schedules the receipt and submission wake hooks')
     })
 
     await t.test('a foreign owner cannot read the run, replace the file, or download its version', async () => {
@@ -123,6 +123,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
     })
 
     await t.test('a failed receipt write rolls back both the version and mutable latest pointer', async () => {
+      const beforeScheduled = scheduled
       const guard = `artifact_receipt_${randomUUID().replaceAll('-', '')}`
       await pool.query(`CREATE FUNCTION ${guard}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture_artifact_receipt_failure'; END $$`)
       await pool.query(`CREATE TRIGGER ${guard} BEFORE INSERT ON coordinator_events FOR EACH ROW WHEN (NEW."userId"='${alice}' AND NEW.kind='artifact_submitted') EXECUTE FUNCTION ${guard}()`)
@@ -131,7 +132,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       } finally { await pool.query(`DROP TRIGGER ${guard} ON coordinator_events`); await pool.query(`DROP FUNCTION ${guard}()`) }
       assert.equal((await pool.query('SELECT "latestVersion" FROM artifacts WHERE id=$1', [first.artifactId])).rows[0].latestVersion, 2)
       assert.deepEqual((await pool.query('SELECT version FROM artifact_versions WHERE "artifactId"=$1 ORDER BY version', [first.artifactId])).rows.map(row => row.version), [1, 2])
-      assert.equal(scheduled, 2, 'a rolled-back submission never schedules a wake')
+      assert.equal(scheduled, beforeScheduled, 'a rolled-back submission never schedules a wake or invalidation')
     })
 
     await t.test('owner evidence exposes only valid frozen execution identity, without credentials or live revalidation', async () => {

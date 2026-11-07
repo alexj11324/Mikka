@@ -14,6 +14,7 @@ import { captureDatabaseQuery, observePoolCommits } from '../db/commit-effects'
 import { groupListTargets, issueListTargets, issueListScopesBeforeChange, issueListScopeChanged, ownerListTargets, ownerSettingsTargets, runListChanged, runListTargets, workspaceListTargets } from './lists'
 import { liveChannelId, type LiveScope } from './scope'
 import type { LiveInvalidation } from './events'
+import { isolateCoordinatorWakes } from '../../tests/support/coordinator-wake'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'actual isolated PostgreSQL required')
@@ -34,6 +35,9 @@ before(async () => {
 after(() => mock.restoreAll())
 
 test('real PG: lists retain their reader scope and publish only the originating committed writes', { skip: !url, timeout: 180_000 }, async t => {
+  // Observe the writer's notifications only. A Coordinator wake can otherwise
+  // create its personal Bot and backfill old rows, producing unrelated lists.
+  const coordinator = await isolateCoordinatorWakes(t)
   const admin = new Pool({ connectionString: url, max: 1 })
   const names = [0, 1].map(() => `list_live_${randomUUID().replaceAll('-', '')}_e2e`)
   for (const name of names) await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
@@ -74,7 +78,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = `http://127.0.0.1:${(server.address() as { port: number }).port}`
   process.env.DEVICE_GATEWAY_PUSH_SECRET = 'fixture-only-list-live'
-  const drain = async () => { while (scheduled.length) await scheduled.shift()!(); assert.deepEqual(errors, []) }
+  const drain = async () => { await coordinator.flush(); while (scheduled.length) await scheduled.shift()!(); assert.deepEqual(errors, []) }
   const clear = async () => { await drain(); received.length = 0 }
   try {
     const directory = new URL('../../drizzle/', import.meta.url)
@@ -283,8 +287,6 @@ test('real PG: lists retain their reader scope and publish only the originating 
 
     await t.test('an actual unclaimed startup failure publishes its terminal lists once even when the completion event is already present', async () => {
       const { failUnclaimedCloudStart } = await import('../run-leases')
-      const { coordinatorEnabled } = await import('../coordinator/wake')
-      assert.equal(coordinatorEnabled(), false, 'this isolated writer regression must not start model work')
       const botId = randomUUID()
       await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Startup list fixture')`, [botId, home])
       const makeRun = async (deduped: boolean) => {

@@ -580,8 +580,11 @@ test('large runtime reports cross jobs only as immutable artifact files', () => 
   const [builder, runtime, web] = files
   assert.match(builder, /candidate-artifact-id:.*steps\.candidates\.outputs\.artifact-id/)
   assert.match(builder, /name: e2b-candidates-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
+  assert.match(builder, /name: e2b-candidate-build-cleanup-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
   assert.match(runtime, /artifact-ids: \$\{\{ needs\.validate\.outputs\.candidate-artifact-id \}\}/)
   assert.match(runtime, /name: e2b-release-evidence-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
+  assert.match(runtime, /name: e2b-template-subscription-diagnostics-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
+  assert.match(runtime, /name: e2b-runtime-release-cleanup-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
   assert.match(runtime, /runtime-release-artifact-id: \$\{\{ needs\.subscriptions\.outputs\.release-artifact-id \}\}/)
   assert.match(web, /artifact-ids: \$\{\{ inputs\.runtime-release-artifact-id \}\}/)
   for (const text of [runtime, web]) assert.match(text, /merge-multiple: true/,
@@ -592,6 +595,8 @@ test('large runtime reports cross jobs only as immutable artifact files', () => 
   const verify = subscription.indexOf('node scripts/e2b/runtime-report.mjs verify')
   assert.ok(reference > 0 && reference < download && download < verify && verify < subscription.indexOf('uses: Infisical/'))
   assert.ok(subscription.indexOf('assertReportIdentity(report') < subscription.indexOf('--publish-verified'))
+  assert.ok(subscription.indexOf('assertCandidatePreserved(report, candidate)') < subscription.indexOf('--publish-verified'))
+  assert.ok(subscription.indexOf('assertCandidatePreserved(report, candidate, { published: true })') > subscription.indexOf('--publish-verified'))
   const cleanup = runtime.slice(runtime.indexOf('\n  cleanup:'))
   assert.match(cleanup, /if: always\(\) && steps\.e2b-key\.outcome == 'success'/)
   assert.match(cleanup, /CANDIDATE_IDENTITIES: \$\{\{ needs\.validate\.outputs\.candidate-identities \}\}/)

@@ -6,6 +6,8 @@ import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, runMessages } from '../db/schema'
 import { sourcedEventMessage } from './message-safety'
+import { createApiHandler } from '../../apps/api/src/application'
+import * as apiServer from '../../apps/api/compat/server'
 
 // Real exported POST, mcp-handler/MCP SDK, OAuth verification function, MCP
 // actions/tools and transactional run-control code. Only persistence, wake and
@@ -132,8 +134,16 @@ stub('../../app/actions/issues.ts', { getIssue: () => {}, saveIssue: () => {} })
 stub('../../app/actions/issue-metadata.ts', { updateIssueMetadata: () => {} })
 stub('../../app/actions/issue-operations.ts', { updateIssueRelation: () => {} })
 stub('../../app/actions/projects.ts', { listProjects: () => {}, moveIssueToProject: () => {} })
+// Production resolves next/server through this compatibility layer and gives
+// every tool callback a request-owned after() queue.
+mock.module('next/server', { namedExports: apiServer })
 let POST: typeof import('../../app/api/mcp/route')['POST']
-before(async () => { ({ POST } = await import('../../app/api/mcp/route')) })
+before(async () => {
+  const module = await import('../../app/api/mcp/route')
+  const api = createApiHandler([{ path: '/mikka/api/mcp', template: '/api/mcp', source: 'app/api/mcp/route.ts',
+    methods: ['POST'], load: async () => module }])
+  POST = async request => api.fetch(request)
+})
 let id = 0
 async function request(name: string, args: unknown, bearer: string | null = syntheticBearer) {
   return POST(new Request('http://localhost/mikka/api/mcp', { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(bearer ? { authorization: 'Bearer ' + bearer } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name, arguments: { workspaceId: workspace, ...args as object } } }) }))

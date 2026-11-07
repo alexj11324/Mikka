@@ -5,7 +5,8 @@ import (
 	"net/http"
 )
 
-// Codes cross private IPC. Raw provider, SQL, credential or HTTP error bodies do not.
+// Codes and separately redacted provider diagnostics cross private IPC.
+// Raw provider, SQL, credential or HTTP error bodies never do.
 type Refusal string
 
 func (e Refusal) Error() string { return string(e) }
@@ -68,7 +69,11 @@ func providerEventFailure(kind string) Refusal {
 
 // The executor is replaceable. Preserve only our known public refusals rather
 // than trusting an arbitrary executor error's text or Refusal value.
-func executionFailure(err error) Refusal {
+func executionFailure(err error) error {
+	var diagnostic *providerDiagnosticFailure
+	if errors.As(err, &diagnostic) {
+		return diagnostic
+	}
 	for _, known := range []Refusal{ErrReauthenticate, ErrAccessDenied, ErrRateLimited, ErrRequestRejected, ErrTemporary, ErrUnsupported, ErrCredential} {
 		if errors.Is(err, known) {
 			return known

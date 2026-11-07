@@ -2,9 +2,11 @@ import type { State } from 'swr'
 import { persistentReadData, persistentReadKey } from './cache-policy'
 import { IndexedReadStorage, type ReadStorage } from './indexed-db'
 
-export type ReadCacheScope = { userId: string; workspaceId: string; build: string; role: string }
+export type ReadCacheScope = { userId: string; workspaceId: string; build: string; role: string; server?: string | null }
 export type ReadCacheState = State<unknown, unknown> & { _k?: unknown }
-export const readCacheNamespace = (scope: ReadCacheScope) => JSON.stringify([1, scope.userId, scope.workspaceId, scope.build, scope.role])
+export const readCacheNamespace = (scope: ReadCacheScope) => JSON.stringify(scope.server
+  ? [2, scope.server, scope.userId, scope.workspaceId, scope.build, scope.role]
+  : [1, scope.userId, scope.workspaceId, scope.build, scope.role])
 type Restore = (key: string, data: unknown) => Promise<unknown>
 type RevalidateHydratedRead = () => Promise<unknown>
 const activeCaches = new Set<PersistentReadCache>()

@@ -1,3 +1,4 @@
+import { readCompactRunFailure } from './run-failure-view'
 import type { RunView } from './agent-runs'
 
 /** A run's untyped transcript/report can echo a private prompt, memory or tool
@@ -7,7 +8,7 @@ export function workspaceRunView(run: RunView): RunView {
   return {
     id: run.id, issueId: run.issueId, agentId: '', agentName: run.harness,
     harness: run.harness, status: run.status, outcome: run.outcome ?? null, kind: 'implement',
-    stopReason: null, error: null, report: null,
+    stopReason: null, error: null, report: null, failureDetails: readCompactRunFailure(run.failureDetails),
     createdAt: run.createdAt, startedAt: run.startedAt, finishedAt: run.finishedAt,
   }
 }

@@ -1,3 +1,4 @@
+import { bindFactoryStoreWorkspace, bindFactoryQuestionsWorkspace, factoryTaskWorkspaceBoundary, factoryBackgroundReference } from './background-workspace';
 import { syncFactoryPresentation } from './stage-progress';
 import { createFactorySpecApproval } from './spec-approval';
 import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
@@ -30,19 +31,20 @@ import { createFactoryMonitorIssueLinks } from "./monitor-issue-links";
 import { readAuthorizedIssue } from "../github/user-access";
 
 // Resolve the effective human tenant; background work uses persisted task authority.
-const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
-  // Reuse the held transaction: a second pool checkout here can deadlock
-  // concurrent operations when the application connection pool is full.
+const authorize: FactoryAuthorize = (userId, issueId, tx) => withDatabaseClient(tx, async () => {
+  // The human entry has already pinned WS/member before this APP transaction.
+  // Canonical readers (including Enterprise) must reuse its APP connection.
   await tx.query("SELECT id FROM issues WHERE id=$1 FOR SHARE", [issueId]);
   return Boolean(await issueForUser(await factoryWorkspaceReader(userId), issueId, false, drizzle(tx)));
-};
+});
 const humanGates = {
   ...factoryCheckGates,
   approval: approvalGate,
   publish: publishGate,
   monitor: monitorGate,
 };
-export const factoryStore = createFactoryStore(pool, authorize, humanGates, { onTransition: syncFactoryPresentation });
+const backgroundWorkspace = factoryTaskWorkspaceBoundary(pool, null);
+export const factoryStore = bindFactoryStoreWorkspace(pool, createFactoryStore(pool, authorize, humanGates, { onTransition: syncFactoryPresentation }), null);
 const humanStoreForBot = (botId: string | null) => createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: humanGates, onTransition: syncFactoryPresentation });
 export const factoryHumanStore = createFactoryHumanStore(pool, humanStoreForBot, automaticFactoryDispatch(pool),
   createRetainedDeliverableObserver(pool, (tx, scope) => humanStoreForBot(scope.botId).lockTask(tx, scope.ownerId, scope.taskId)));
@@ -93,12 +95,14 @@ export const factoryMonitor = createFactoryMonitor(
   factoryMonitorWorkspaceKey,
   appendMonitorEvidence,
   configuredMonitorProbes(process.env),
+  null,
+  backgroundWorkspace,
 );
 export const factoryMonitorIssueLinks = createFactoryMonitorIssueLinks(pool, authorize, readAuthorizedIssue);
 
 import { queueFactoryRun } from "@/lib/agent-runs";
 import { createFactoryDispatch, defaultFactoryDispatchAdapters } from "./dispatch";
-export const dispatchFactoryRun = createFactoryDispatch(
+const dispatchFactoryRunWithinWorkspace = createFactoryDispatch(
   pool,
   factoryStore,
   async (tx, userId, input, botId, context) => await queueCloudQuestionContinuation(tx,userId,input,botId,context) ?? await queueLocalQuestionContinuation(tx,userId,input,botId,context) ?? queueFactoryRun(tx, userId, input, botId, context),
@@ -107,6 +111,8 @@ export const dispatchFactoryRun = createFactoryDispatch(
     lockAdmission: async (tx,userId,input) => { await lockCliAgentPolicy(tx,userId,input.agentId,null); },
   },
 );
+export const dispatchFactoryRun: typeof dispatchFactoryRunWithinWorkspace = (...args) =>
+  backgroundWorkspace(args[0], factoryBackgroundReference(args[1], 'taskId'), () => dispatchFactoryRunWithinWorkspace(...args), args[2]);
 import { createFactoryQuestions, type QuestionSkillGuards } from "./questions/store";
 export const questionSkillAssignments: QuestionSkillGuards = {
   lockAnswer: async (userId,questionId,tx) => {
@@ -144,7 +150,7 @@ export const questionSkillAssignments: QuestionSkillGuards = {
     }
   },
 };
-export const factoryQuestions = createFactoryQuestions(
+export const factoryQuestions = bindFactoryQuestionsWorkspace(pool, createFactoryQuestions(
   pool,
   authorize,
   factoryStore,
@@ -153,13 +159,16 @@ export const factoryQuestions = createFactoryQuestions(
   undefined,
   (userId,result)=>wakeCloudQuestionContinuation(pool,userId,result),
   (userId,scope)=>prepareCloudQuestionRecovery(pool,userId,scope),
-);
+), null);
 import { createFactoryReconciler } from "./reconcile";
 export const reconcileFactoryRuns = createFactoryReconciler(
   pool,
   factoryStore,
   factoryQuestions,
   {review:reconcileFactoryCheck,verify:reconcileFactoryCheck,monitor:createFactoryMonitorRunConsumer(factoryMonitor)},
+  null,
+  undefined,
+  backgroundWorkspace,
 );
 
 import { createExecutionClaim, createExecutionClaimGuard } from "./execution-claim";
@@ -173,13 +182,13 @@ export function factoryRoutingEnabled() {
 export function factoryForBot(botId: string | null) {
   if (!factoryRoutingEnabled())
     throw new FactoryError("factoryRoutingUnavailable");
-  return createFactoryStore(
+  return bindFactoryStoreWorkspace(pool, createFactoryStore(
     pool,
     async (owner, issue, tx) =>
       withDatabaseClient(tx, async () => Boolean(await issueForUser(owner, issue))),
     botId,
     { onTransition: syncFactoryPresentation },
-  );
+  ), botId);
 }
 /** References are host records, never model-supplied provenance or approval. */
 export async function factoryRequestSource(

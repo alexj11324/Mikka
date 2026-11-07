@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
+import type { RunFailure } from '@mikka/protocol/run-failure'
+import { measured } from './helpers/read-metrics'
 
 // BE-18 run chains against a real Postgres. Loopback only, and only a disposable *_e2e
 // database (CI: the Actions service 127.0.0.1:5432/mikka_e2e).
@@ -82,6 +84,23 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
     }
     assert.deepEqual(await requestRunStop(me.userId, a), { stoppedRunIds: [c] }, 'stop on an ended old run reaches the live tail')
     assert.equal(await stopRequested(c), true)
+  })
+
+  await t.test('failure details follow the latest attempt without provider text in chain lists', async () => {
+    const me = await owner(), issueId = await me.issue()
+    const a = await run(me, issueId, 'failed'), b = await run(me, issueId, 'failed', cont(a))
+    const failure: RunFailure = { schemaVersion: 1, code: 'run_api_key_invalid', category: 'api_key', provider: 'openai', status: 401,
+      providerMessage: 'Private provider reply for this attempt', causes: [{ name: 'APIError' }], runId: b, appVersion: 'test', occurredAt: '2026-11-07T12:00:00.000Z' }
+    await pool.query('UPDATE agent_runs SET "failureDetails"=$2 WHERE id=$1', [b, JSON.stringify(failure)])
+    const listed = await measured(() => listIssueRunChains(pool, issueId, [me.userId], 20))
+    assert.equal(listed.statements, 1)
+    assert.equal(listed.value[0].attempts[1].failureDetails?.code, 'run_api_key_invalid')
+    assert.doesNotMatch(JSON.stringify(listed.value), /Private provider reply|APIError/)
+    const detail = await measured(() => readRunChain(pool, me.userId, a))
+    assert.equal(detail.statements, 1)
+    assert.deepEqual(detail.value?.attempts[1].failureDetails, failure)
+    assert.equal(await readRunChain(pool, 'unrelated-owner', b), null)
+    assert.equal(detail.value?.attempts[0].failureDetails, undefined, 'historical attempts remain compatible')
   })
 
   await t.test('QA 1: middle alive + tail alive -> stop on B stops B and C', async () => {

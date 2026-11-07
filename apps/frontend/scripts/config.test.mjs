@@ -17,7 +17,18 @@ test('only the existing explicit public configuration is defined for the web gra
   assert.equal(config.define['process.env.NEXT_PUBLIC_MIKKA_BUILD'], JSON.stringify('a'.repeat(40)))
   assert.equal(config.define['process.env.MIKKA_DEPLOYMENT_ID'], '"release-1"')
   assert.equal(JSON.stringify(config.define).includes('not-public'), false)
-  assert.equal(Object.keys(config.define).filter(key => key.startsWith('process.env.NEXT_PUBLIC_')).length, 9)
+  assert.deepEqual(Object.keys(config.define).filter(key => key.startsWith('process.env.NEXT_PUBLIC_')).sort(), [
+    'NEXT_PUBLIC_MIKKA_BUILD',
+    'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
+    'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+    'NEXT_PUBLIC_POSTHOG_HOST',
+    'NEXT_PUBLIC_POSTHOG_KEY',
+    'NEXT_PUBLIC_COMPUTER_ACCEPTANCE',
+    'NEXT_PUBLIC_COMPUTER_DEPLOYMENT',
+    'NEXT_PUBLIC_COMPUTER_ENABLED',
+    'NEXT_PUBLIC_COMPUTER_MOCK',
+    'NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME',
+  ].map(key => `process.env.${key}`).sort())
 }))
 
 test('the production explicit computer rollout follows VERCEL_ENV without requiring PostHog', async () => environment({ VERCEL_ENV: 'production', NEXT_PUBLIC_COMPUTER_DEPLOYMENT: undefined, NEXT_PUBLIC_COMPUTER_ENABLED: '1', NEXT_PUBLIC_POSTHOG_KEY: undefined }, async () => {

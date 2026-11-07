@@ -1,6 +1,8 @@
+import assert from "node:assert/strict"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { tool } from "ai"
 import { z } from "zod"
+import { RunFailureError, runFailureSchema } from "@mikka/protocol/run-failure"
 import { nativeCoordinatorTurn } from "../workflows/coordinator/native-turn"
 import * as native from "../workflows/coordinator/native-steps"
 
@@ -12,6 +14,17 @@ const runtime = { harness: "codex",deviceId: "11111111-1111-4111-8111-1111111111
 // The person's Coordinator is an ordinary bot row; its turns name that bot.
 const coordinatorBot = "11111111-1111-4111-8111-0000000c0de1"
 const reply = 'root = TextContent("收到邮件，要帮你回复吗？")'
+
+function assertRunFailure(code, category) {
+  return error => {
+    expect(error).toBeInstanceOf(RunFailureError)
+    expect(error.code).toBe(code)
+    const failure = runFailureSchema.parse(error.failureDetails)
+    expect(failure).toMatchObject({ code, category, runId: "holder", provider: "codex" })
+    expect(failure.providerMessage).toBeUndefined()
+    return true
+  }
+}
 
 beforeEach(() => { vi.resetAllMocks(); vi.useFakeTimers({ toFake: ["Date"] }); vi.mocked(native.enqueue).mockResolvedValue("turn") })
 afterEach(() => { vi.useRealTimers() })
@@ -46,12 +59,13 @@ describe("durable Coordinator transport relay", () => {
   })
   it.each(["failed","closed"])("surfaces %s without another model", async status => {
     vi.mocked(native.poll).mockResolvedValue({status,reply:null,calls:[]})
-    await expect(nativeCoordinatorTurn("owner","holder",0,runtime,() => ({}),coordinatorBot)).rejects.toThrow("Failed")
+    await assert.rejects(nativeCoordinatorTurn("owner","holder",0,runtime,() => ({}),coordinatorBot),assertRunFailure("run_failed","internal"))
+    expect(native.enqueue).toHaveBeenCalledTimes(1)
     expect(native.close).toHaveBeenCalledTimes(1)
   })
   it("bounds waiting and does not start a replacement job", async () => {
     vi.mocked(native.poll).mockResolvedValue({status:"queued",reply:null,calls:[]})
-    await expect(nativeCoordinatorTurn("owner","holder",0,runtime,() => ({}),coordinatorBot)).rejects.toThrow("TimedOut")
+    await assert.rejects(nativeCoordinatorTurn("owner","holder",0,runtime,() => ({}),coordinatorBot),assertRunFailure("run_timeout","timeout"))
     expect(native.enqueue).toHaveBeenCalledTimes(1)
     // The 180 s job lifetime bounds it: a read per 15 s re-read (a lost wake) plus the deadline, where the 1 s loop read 180 times.
     expect(native.poll).toHaveBeenCalledTimes(13)

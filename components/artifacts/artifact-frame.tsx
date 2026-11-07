@@ -1,8 +1,11 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { ELEMENT_ROLES, type ElementRole, type FromFrame, type ToFrame } from '@mikka/protocol/artifact-frame'
+import { selectedWebServer, webSelectionVersion } from '@/lib/web-connection/selection'
+import { WebConnectionError } from '@/lib/web-connection/client'
+import { connectedAssetPath } from '@/lib/web-connection/assets'
 
 export interface ElementQuote { selector: string; label: string; text: string }
 
@@ -23,6 +26,21 @@ export function ArtifactFrame({ src, title, selecting, marked, onQuote, onSelect
 }) {
   const t = useTranslations('Artifact.roles')
   const frameRef = useRef<HTMLIFrameElement>(null)
+  const server = selectedWebServer(), generation = webSelectionVersion()
+  const [remote, setRemote] = useState<{ src: string; generation: number; html?: string; error?: Error } | null>(null)
+  useEffect(() => {
+    if (!server) return
+    const abort = new AbortController()
+    void fetch(connectedAssetPath(src, window.location.origin), { signal: abort.signal, cache: 'no-store' }).then(async response => {
+      if (!response.ok) throw new WebConnectionError('web_connection_download_failed')
+      const html = await response.text()
+      if (!abort.signal.aborted && generation === webSelectionVersion()) setRemote({ src, generation, html })
+    }).catch(error => {
+      if (!abort.signal.aborted && generation === webSelectionVersion()) setRemote({ src, generation,
+        error: error instanceof Error ? error : new WebConnectionError('web_connection_download_failed', { cause: error }) })
+    })
+    return () => abort.abort()
+  }, [src, server, generation])
   const state = useRef({ selecting, marked, onQuote, onSelectOff })
   state.current = { selecting, marked, onQuote, onSelectOff }
   const roles = Object.fromEntries(ELEMENT_ROLES.map(role => [role, t(role)])) as Record<ElementRole, string>
@@ -52,6 +70,8 @@ export function ArtifactFrame({ src, title, selecting, marked, onQuote, onSelect
   }, [])
   useEffect(sync, [selecting, marked])
 
-  return <iframe ref={frameRef} key={src} src={src} title={title} sandbox="allow-scripts allow-popups" referrerPolicy="no-referrer"
+  const loaded = remote?.src === src && remote.generation === generation ? remote : null
+  if (server && loaded?.error) throw loaded.error
+  return <iframe ref={frameRef} key={`${server ?? ''}:${src}`} src={server ? undefined : src} srcDoc={server ? loaded?.html ?? '' : undefined} title={title} sandbox="allow-scripts allow-popups" referrerPolicy="no-referrer"
     className="min-h-0 w-full flex-1 border-0" />
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
-import { alignServerTimings, cleanupCase, createSessionClient, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
+import { alignServerTimings, cleanupCase, createSessionClient, hasStartupInitialization, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
   startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from './cloud-startup.mjs'
 import { mcpBusinessEvidence, readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
@@ -506,6 +506,73 @@ test('startup intervals retain only closed fields and reject foreign run data or
   }
 })
 
+test('a prepared start keeps its actual earlier origin and requires both real initialization boundaries', () => {
+  const runId = id(98), late = { ...startupTiming(runId, 'claude_code'), phases: [] }
+  const early = { ...late, source: 'prepared_agent_start', startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
+    phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
+      { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
+  const record = { runIdHash: late.runIdHash, harness: 'claude_code' }, item = stage('agent_start', 3500)
+  item.chunk.data.startupTiming = late
+  item.chunk.data.preparationTiming = { ...early, cwd: 'PRIVATE', phases: early.phases.map(phase => ({ ...phase, token: 'PRIVATE' })) }
+  observeChunks(record, { chunks: [item] }, epoch + 4000)
+  assert.deepEqual(record.daemonStartupTiming, late)
+  assert.deepEqual(record.daemonPreparationTiming, early)
+  assert.equal(record.preparationTimingStatus, 'complete')
+  assert.equal(hasStartupInitialization(record), true)
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE|"cwd"|"token"/)
+  for (const preparation of [{ ...early, truncated: true }, { ...early, outcome: 'error' },
+    { ...early, phases: [early.phases[0]] }, { ...early, phases: [early.phases[1]] },
+    { ...early, phases: [{ ...early.phases[0], outcome: 'error' }, early.phases[1]] }]) {
+    const failed = { runIdHash: late.runIdHash, harness: 'claude_code' }
+    item.chunk.data.preparationTiming = preparation
+    observeChunks(failed, { chunks: [item] }, epoch + 4000)
+    assert.equal(hasStartupInitialization(failed), false)
+  }
+})
+
+test('invalid preparation evidence cannot hide behind an otherwise valid ordinary initialization', () => {
+  const late = startupTiming(id(97), 'claude_code')
+  const early = { ...late, source: 'prepared_agent_start', startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
+    phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
+      { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
+  const invalid = [{ ...early, source: 'unknown' }, { ...early, runIdHash: '0'.repeat(16) }, { ...early, harness: 'codex' },
+    { ...early, startedAt: late.startedAt + 1 }, { ...early, endedAt: late.endedAt + 1 },
+    { ...early, phases: [{ ...early.phases[0], startMs: -1 }] },
+    { ...early, phases: [{ ...early.phases[0], endMs: early.ms + 1 }] },
+    { ...early, phases: [{ ...early.phases[0], name: 'daemon.adapter.PRIVATE' }] },
+    { ...early, phases: Array.from({ length: 65 }, () => early.phases[0]) }]
+  for (const value of invalid) {
+    const record = { runIdHash: late.runIdHash, harness: 'claude_code' }, item = stage('agent_start', 3500)
+    item.chunk.data.startupTiming = late; item.chunk.data.preparationTiming = value
+    observeChunks(record, { chunks: [item] }, epoch + 4000)
+    assert.equal(record.startupTimingStatus, 'complete')
+    assert.equal(record.preparationTimingStatus, 'invalid')
+    assert.equal(record.daemonPreparationTiming, undefined)
+    assert.equal(hasStartupInitialization(record), false)
+    // Replayed history or a subsequent valid-looking stage cannot erase the
+    // malformed explicit preparation that was already observed for this run.
+    item.chunk.data.preparationTiming = early
+    observeChunks(record, { chunks: [item] }, epoch + 4001)
+    assert.equal(record.preparationTimingStatus, 'invalid')
+    assert.equal(hasStartupInitialization(record), false)
+  }
+})
+
+test('ordinary startup evidence stays compatible while missing or failed CLI initialization stays incomplete', () => {
+  for (const harness of ['claude_code', 'codex']) {
+    const timing = startupTiming(id(96), harness), record = { runIdHash: timing.runIdHash, harness }
+    const item = stage('agent_start', 3500); item.chunk.data.startupTiming = timing
+    observeChunks(record, { chunks: [item] }, epoch + 4000)
+    assert.equal(record.daemonPreparationTiming, undefined)
+    assert.equal(record.preparationTimingStatus, 'unavailable')
+    assert.equal(hasStartupInitialization(record), true)
+    for (const value of [{ ...timing, phases: [] }, { ...timing, truncated: true },
+      { ...timing, phases: [{ ...timing.phases[0], outcome: 'error' }] }])
+      assert.equal(hasStartupInitialization({ ...record, daemonStartupTiming: value }), false)
+    assert.equal(hasStartupInitialization({ runIdHash: timing.runIdHash, harness }), false)
+  }
+})
+
 test('the scoped runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness', () => {
   const sample = { runId: id(999), harness: 'codex', sampleId: 'proof', requireRuntimeReceipt: true, requireOfficialTiming: true }
   const value = runtimeTiming(sample)
@@ -681,6 +748,30 @@ test('member production acceptance observes its dedicated Bot window without rea
   }
 })
 
+test('formal prepared Claude acceptance needs the independently bounded initialization receipt and preserves cleanup', async () => {
+  for (const measured of [false, true]) {
+    const io = fixture({ runtime: true })
+    io.onDetail = (sample, detail) => {
+      for (const item of detail.chunks) if (item.chunk?.type === 'data-run-stage' && item.chunk.data.stage === 'agent_start') {
+        item.chunk.data.startupTiming = { ...startupTiming(sample.runId, sample.harness), phases: [] }
+        if (measured) item.chunk.data.preparationTiming = { ...startupTiming(sample.runId, sample.harness), source: 'prepared_agent_start',
+          startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
+          phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
+            { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
+      }
+    }
+    const report = await runCloudStartup(options(['--mode', 'acceptance', '--runs', '3', '--harness', 'claude_code',
+      '--expected-build', 'BUILD1', '--revision', 'a'.repeat(40), '--bot-id', botId]), { env, ...io })
+    assert.equal(report.status, measured ? 'awaiting_server_timings' : 'failed')
+    assert.equal(report.samples.length, 3)
+    assert.ok(report.samples.every(sample => measured ? hasStartupInitialization(sample) : sample.error === 'startup_daemon_startup_timing_incomplete'))
+    assert.ok(report.samples.every(sample => sample.daemonStartupTiming.phases.length === 0 && sample.cleanup.status === 'passed'))
+    assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
 test('trusted cloud timing refuses missing CLI/MCP observations and extra remote authorization', async () => {
   for (const field of ['officialCliTiming', 'mcpHttpTiming', 'extraAuth']) {
     const io = fixture({ runtime: true, extraAuth: field === 'extraAuth' })
@@ -727,6 +818,24 @@ test('trusted candidate timing cannot claim a host without a pinned device and a
   assert.equal(report.status, 'failed')
   assert.equal(report.error, 'startup_candidate_target_invalid')
   assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+})
+
+test('lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics', async () => {
+  const io = fixture()
+  io.onDetail = (sample, detail) => {
+    if (sample.reads > 1) {
+      sample.finished = true
+      detail.thread.status = 'stopped'
+      detail.thread.attempts[0].status = 'stopped'
+    }
+  }
+  const report = await runCloudStartup({ ...options(['--mode', 'candidate', '--runs', '2', '--harness', 'both']), leaseAudit: true }, { env, ...io })
+  assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+  assert.deepEqual(report.samples.map(sample => sample.harness), ['claude_code', 'codex'])
+  assert.ok(report.samples.every(sample => sample.requireTerminal && sample.requireReplyAfterTool
+    && sample.replyVerifiedAfterTool && sample.lastStatus === 'stopped' && sample.cleanup.status === 'passed'))
+  assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
+  assert.ok(io.calls.some(call => /^\/api\/threads\/.*\/machine$/.test(call.path)))
 })
 
 test('member cloud diagnostics fail before creating any variable they cannot delete', async () => {

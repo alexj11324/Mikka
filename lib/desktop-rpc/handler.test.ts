@@ -6,6 +6,7 @@ import { createDesktopRpc, desktopBearerHeaders, humanSessionHeaders } from './h
 import { desktopActionSchemas } from './schemas'
 import { currentDesktopSession, withDesktopSession, safeDesktopSession } from './session'
 import { decode, encode, UPDATE_REQUIRED } from './wire'
+import { withRequestLog } from '../request-log'
 
 const tokenA = 'A'.repeat(32)
 const tokenB = 'B'.repeat(32)
@@ -23,6 +24,7 @@ function fixture() {
     scope: withDesktopSession,
     actions: {
       'fixture.read': { args: z.tuple([]), invoke: async () => { calls++; return { session: currentDesktopSession(), at: new Date(0), optional: undefined } } },
+      'model-order.getModelOrder': { args: z.tuple([]), invoke: async () => { calls++; return [] } },
       'fixture.owned': { args: z.tuple([z.uuid()]), invoke: async ([id]) => {
         calls++
         const session = currentDesktopSession() as { user: { id: string } }
@@ -86,6 +88,29 @@ test('closed whitelist rejects arbitrary exports and prototype names before disp
   assert.equal(f.calls(), 0)
 })
 
+test('request attribution records only registry-owned RPC actions without arguments or credentials', async () => {
+  const lines: string[] = []
+  const handler = withRequestLog('/api/desktop/rpc', fixture().handle, line => { lines.push(line) })
+  const cases = [
+    { request: request(), status: 200, action: 'fixture.read' },
+    { request: request('model-order.getModelOrder'), status: 200, action: 'model-order.getModelOrder' },
+    { request: request('fixture.read', ['PRIVATE_ARGUMENT']), status: 400, action: 'fixture.read' },
+    { request: request('fixture.owned', [peer]), status: 500, action: 'fixture.owned' },
+    { request: request('private.actionCanary'), status: 404 },
+    { request: request('constructor'), status: 404 },
+    { request: request('fixture.read', [], { authorization: '' }), status: 401 },
+    { request: request('fixture.read', [], {}, 99), status: 426 },
+  ]
+  for (const value of cases) {
+    assert.equal((await handler(value.request)).status, value.status)
+    const entry = JSON.parse(lines.at(-1)!)
+    assert.equal(entry.rpcAction, value.action)
+    assert.equal(Object.hasOwn(entry, 'rpcAction'), value.action !== undefined)
+  }
+  assert.doesNotMatch(lines.join('\n'), /PRIVATE_ARGUMENT|private\.actionCanary|private-other-tenant-diagnostic/)
+  assert.equal(lines.some(line => line.includes(tokenA)), false)
+})
+
 test('all parameters are validated, including extras and malformed nested wire tags', async () => {
   const f = fixture()
   for (const args of [[], [null], ['invalid'], [owner, 'extra']]) assert.equal((await f.handle(request('fixture.owned', args))).status, 400)
@@ -105,6 +130,16 @@ test('native header adapter preserves browser authority but strips all bearer co
   assert.equal(humanSessionHeaders(cookie), cookie.headers)
   assert.equal(humanSessionHeaders(new Request('https://app.example')), null)
   assert.equal(desktopBearerHeaders(request('fixture.read', [], { cookie: 'browser=1' }))?.has('cookie'), false)
+})
+
+test('native bearer requests cannot import another origin or cross-site fetch metadata', async () => {
+  const f = fixture()
+  for (const headers of [{ origin: 'https://attacker.example' }, { origin: 'null' }, { 'sec-fetch-site': 'cross-site' }] as Record<string, string>[]) {
+    assert.equal((await f.handle(request('fixture.read', [], headers))).status, 403)
+  }
+  assert.equal(f.calls(), 0)
+  const ownOrigin = new URL(request().url).origin
+  assert.equal((await f.handle(request('fixture.read', [], { origin: ownOrigin }))).status, 200)
 })
 
 test('registry schemas reject forged authority, malformed nested input and extra arguments', () => {
@@ -127,6 +162,10 @@ test('explicit schemas and function map have exactly matching action names', () 
   const registry = readFileSync(new URL('./registry.ts', import.meta.url), 'utf8')
   const registered = [...registry.matchAll(/^  '([^']+)':/gm)].map(match => match[1]).sort()
   assert.deepEqual(registered, Object.keys(desktopActionSchemas).sort())
+  for (const name of registered) {
+    assert.ok(name.length <= 120, name)
+    assert.match(name, /^[a-z][\w-]*\.[a-z]\w*$/i)
+  }
 })
 
 test('billing re-export consumers accept only the existing workspace selector and purchase amounts', () => {

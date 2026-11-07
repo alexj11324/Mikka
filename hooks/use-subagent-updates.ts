@@ -31,7 +31,8 @@ function sharedFeed(channels: LiveChannels, workspaceId: string) {
         document.addEventListener('visibilitychange', changed)
         return () => document.removeEventListener('visibilitychange', changed)
       },
-      invalidations: refresh => channels.subscribe(workspaceId, 'subagent_events', workspaceId, [`computer-events:${workspaceId}`], refresh),
+      invalidations: refresh => channels.subscribe(workspaceId, 'subagent_events', workspaceId, [`computer-events:${workspaceId}`],
+        (_key, _required, _reuse, after) => refresh(after)),
       stopped: pageRefreshSignal(),
       later: (callback, milliseconds) => setTimeout(callback, milliseconds),
       cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),

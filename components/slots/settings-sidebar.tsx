@@ -19,10 +19,10 @@ const icons: Record<SettingsSectionId, LucideIcon> = {
   account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks,
   models: Gauge, logins: KeyRound, privacy: Lock, computers: Monitor, developer: SquareTerminal,
   general: Building2, members: Users, teams: SquareUserRound, permissions: CircleCheck, secrets: HardDrive,
-  audit: FileText, usage: ChartColumn, billing: CreditCard,
+  audit: FileText, usage: ChartColumn, billing: CreditCard, cloud: Blocks,
 }
 
-export function SettingsSidebar({ section, activeSection, admin, personal = false, workspaceName, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: SettingsSidebarProps) {
+export function SettingsSidebar({ section, activeSection, admin, personal = false, billing = true, cloudAdmin = false, workspaceName, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: SettingsSidebarProps) {
   const i18nText = useTranslations();
   const [query, setQuery] = useState('')
   const params = useSearchParams()
@@ -38,7 +38,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   const href = (id: SettingsSectionId) => settingsHref(id, workspaceId)
   const groups = (['personal', 'workspace'] as const).map(group => {
     const groupLabel = group === 'workspace' && workspaceName ? workspaceName : i18nText(`Settings.groups.${group}`)
-    const items = visibleSettingsSections({ admin, personal }).filter(item => item.group === group && settingsItemVisible({
+    const items = visibleSettingsSections({ admin, personal, billing, cloudAdmin }).filter(item => item.group === group && settingsItemVisible({
       query, groupTitle: group === 'personal' ? 'Account' : 'Workspace', groupLabel, itemTitle: item.title,
       label: i18nText(`Settings.sections.${item.id}.title` as never),
       keywords: i18nText.has(`Settings.sections.${item.id}.keywords` as never) ? i18nText(`Settings.sections.${item.id}.keywords` as never) : '',

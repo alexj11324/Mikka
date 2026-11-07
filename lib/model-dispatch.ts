@@ -6,7 +6,7 @@ import { defaultAgentCopy } from './agent-copy'
 import messages from '@/messages/zh-CN.json'
 import type { SubscriptionPreflightFailure } from '@mikka/protocol/harness'
 import { cloudReady } from './rule-dispatch'
-import { credentialStates, dispatchOrder, orderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
+import { credentialStates, dispatchOrder, orderCandidates, selectedOrderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
 import { deviceSupport, entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation, type SkippedEntry } from './model-order-plan'
 import { modelTier, supportedModelEfforts, type ModelRoutingSnapshot } from './model-routing'
 import { routeModelCandidates, type ModelRoutingContext } from './model-routing-server'
@@ -70,7 +70,11 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
 } = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
   if (!dependencies.skipCatalogueRefresh) await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
-  const candidates = await orderCandidates(pool, scope)
+  const exact = dependencies.exactEntry
+  // A host-frozen source cannot fall through to another account. A harness-only
+  // request still needs the full preference list to resolve its unspecified model.
+  const candidates = exact && (!asked || asked.model)
+    ? await selectedOrderCandidates(pool, scope, exact) : await orderCandidates(pool, scope)
   const stored = await readOrder(pool, scope, candidates)
   // The person named only the Agent ("派给 Codex"): its first model in 优先使用的模型, else the first one a connected credential offers on it.
   const agentModel = asked && !asked.model ? (stored.entries.find(entry => entry.harness === asked.harness) ?? candidates.find(candidate => candidate.harness === asked.harness))?.model : undefined
@@ -84,7 +88,6 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   // With no Agent named, the 优先使用的 Agent's own list first, then the other's (decision 2026-11-05-0400).
   const order = { ...stored, entries: dispatchOrder(stored.entries, stored.preferredHarness).filter(entry => allowedAgent(entry) && !excluded.has(entryKey(entry))), location: places }
   // A model the thread named: the first credential that offers it on that Agent (its own entry if it is listed).
-  const exact = dependencies.exactEntry
   if (exact && (!allowedAgent(exact) || (explicit && (explicit.harness !== exact.harness || explicit.model !== exact.model)) || !candidates.some(candidate => entryKey(candidate) === entryKey(exact)))) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', { agent: HARNESS_NAMES[exact.harness], model: exact.model }) }
   const canRoute = Boolean(dependencies.routing && stored.autoModelRouting && !asked?.model && !exact)
   // Naming an Agent alone has always permitted its first reported model when

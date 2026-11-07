@@ -98,10 +98,10 @@ const messageText = sql`case when jsonb_typeof(${coordinatorMessages.message}->'
 const mikkaEvent = sql`${coordinatorMessages.message}->>'role' = 'user'
   and coalesce(${coordinatorMessages.message}->'mikkaUserEvent', 'null'::jsonb) in ('null'::jsonb, 'false'::jsonb, '0'::jsonb, '""'::jsonb)
   and starts_with(coalesce(${messageText}, ''), '[Event]')`
-export const summaryChatMessage: SQL<Record<string, unknown>> = sql`case
+export const summaryChatMessage: SQL<Record<string, unknown>> = sql`(case
   when ${mikkaEvent} then jsonb_set(${coordinatorMessages.message}, '{content}', jsonb_build_array(jsonb_build_object('type', 'text', 'text', split_part(${messageText}, E'\n', 1))))
   when jsonb_typeof(${coordinatorMessages.message}->'content') = 'array'
   then jsonb_set(${coordinatorMessages.message}, '{content}', coalesce((
     select jsonb_agg(p order by ord) from jsonb_array_elements(${coordinatorMessages.message}->'content') with ordinality as part(p, ord)
     where p->>'type' = 'text'), '[]'::jsonb))
-  else ${coordinatorMessages.message} end`
+  else ${coordinatorMessages.message} end) - 'mikkaFailureDetails'`

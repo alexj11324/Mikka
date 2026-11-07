@@ -22,9 +22,11 @@ import { openPathInBrowser } from '@/lib/platform/open-settings'
 import { useCheckOnReturn, useChecksUntilDone } from '@/lib/hooks/use-check-on-return'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { GITHUB_APP_INSTALL_URL } from '@/lib/github/repository-match'
+import { GitHubAppSettings } from '@/components/plugins/github-app-settings'
+import { settingsHref } from '@/lib/settings-sections'
 
 type GitHubRepository = { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }
-type GitHubState = { viewerId: string; configured: boolean; connected: boolean; login?: string | null; installed: boolean; repositories: GitHubRepository[] }
+type GitHubState = { viewerId: string; configured: boolean; connected: boolean; source?: 'cloud' | 'own'; login?: string | null; installed: boolean; repositories: GitHubRepository[] }
 /** A readable state, or an account link GitHub no longer accepts. */
 type GitHubRead = { state: GitHubState; reconnect: false } | { state: null; reconnect: true }
 
@@ -219,7 +221,7 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
   // In the browser during the app's link, the page's own 关联 GitHub would link this browser's account: the link's own buttons take its place.
   const canLink = !connected && Boolean(githubState?.configured || githubReconnect) && !(browserIntent && (browserIntent.view.state === 'otherAccount' || browserIntent.view.state === 'waiting'))
   const status = githubLoading ? null : !userId ? t('githubSignInRequired') : githubState && !githubState.configured ? t('githubNotConfigured') : null
-  const login = githubState?.login ? t('githubLogin', { login: githubState.login }) : t('github')
+  const login = githubState?.source === 'cloud' ? t('githubCloudConnection') : githubState?.login ? t('githubLogin', { login: githubState.login }) : t('github')
   const errors = [githubError, githubLinkError, browserView?.state === 'expired' ? t('githubLinkExpired') : ''].filter(Boolean)
   const writes = ABILITIES.write.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
   const reads = ABILITIES.read.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
@@ -258,11 +260,15 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
 
     <p className="max-w-prose text-sm text-muted-foreground">{t('githubDescription')}</p>
 
+    {userId && <GitHubAppSettings userId={userId} />}
+
     {connected && githubState && <PageSection id="github-connection-heading" title={t('githubConnectionHeading')}><SettingsSection>
       <div className="flex items-center gap-3 py-3 pr-4 pl-5">
         <AppTile app="github" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{login}</span>
-        <Button type="button" variant="secondary" size="sm" disabled={githubLinking} onClick={() => { setGithubLinkError(''); setConfirming(true) }}>{t('githubDisconnect')}</Button>
+        {githubState.source === 'cloud'
+          ? <Button variant="secondary" size="sm" nativeButton={false} render={<a href={withBasePath(settingsHref('account'))} />}>{t('githubManageCloud')}</Button>
+          : <Button type="button" variant="secondary" size="sm" disabled={githubLinking} onClick={() => { setGithubLinkError(''); setConfirming(true) }}>{t('githubDisconnect')}</Button>}
       </div>
     </SettingsSection></PageSection>}
 

@@ -12,7 +12,12 @@ import {
 
 type Query = Pick<PoolClient, 'query'>
 export class HostedUsageStore {
-  constructor(readonly pool: Pool) {}
+  readonly metered: boolean
+  readonly allowTrial: boolean
+  constructor(readonly pool: Pool, options: { metered?: boolean; allowTrial?: boolean } = {}) {
+    this.metered = options.metered ?? true
+    this.allowTrial = options.allowTrial ?? true
+  }
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>) {
     const tx = await this.pool.connect()
     try {
@@ -62,6 +67,7 @@ export class HostedUsageStore {
     fingerprint: string | null,
     last4: string | null = null,
   ) {
+    if (!this.metered) return false
     return this.transaction(async (tx) => {
       await this.lock(tx, workspaceId)
       const verified = await tx.query(
@@ -108,6 +114,7 @@ export class HostedUsageStore {
     })
   }
   async balance(workspaceId: string, tx: Query = this.pool) {
+    if (!this.metered) return { verified: true, free: 0, purchased: 0 }
     // Already-incurred debt offsets unused free credit as well. Clamping each
     // bucket independently must not turn an overdraft into new spending power.
     const {
@@ -132,6 +139,7 @@ export class HostedUsageStore {
    * while this is 0 or more.
    */
   async trialLeft(workspaceId: string, balance: { verified: boolean; purchased: number }, tx: Query = this.pool) {
+    if (!this.metered) return null
     if (balance.verified || balance.purchased > 0) return null
     const { rows: [row] } = await tx.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM coordinator_events e JOIN bots b ON b.id=e."botId"
@@ -143,7 +151,9 @@ export class HostedUsageStore {
   }
   async canUseMikkaPaid(workspaceId: string) {
     const balance = await this.balance(workspaceId)
+    if (!this.metered) return balance
     if (!balance.verified && balance.purchased <= 0) {
+      if (!this.allowTrial) throw new PaidResourceError('verification_required')
       const left = await this.trialLeft(workspaceId, balance)
       if (left !== null && left >= 0) return { ...balance, trialLeft: left }
       throw new PaidResourceError('verification_required')
@@ -172,6 +182,7 @@ export class HostedUsageStore {
     env: Record<string, string | undefined> = process.env,
     estimate = HOSTED_CALL_HOLD_MICRO_USD,
   ) {
+    if (!this.metered) return { id, workspaceId }
     return this.transaction(async (tx) => {
       // One short platform admission lock; no SQL lock spans provider I/O.
       await tx.query(
@@ -189,7 +200,8 @@ export class HostedUsageStore {
       if (prior) throw new PaidResourceError('usage_in_progress') // Never replay a paid provider call.
       const balance = await this.balance(workspaceId, tx)
       // No card and nothing bought: only the first TRIAL_MESSAGES messages' turns, paid by the platform.
-      const trial = await this.trialLeft(workspaceId, balance, tx)
+      if (!this.allowTrial && !balance.verified && balance.purchased <= 0) throw new PaidResourceError('verification_required')
+      const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance, tx) : null
       if (trial !== null && trial < 0)
         throw new PaidResourceError('verification_required')
       const available = balance.free + balance.purchased
@@ -221,6 +233,7 @@ export class HostedUsageStore {
   }
   /** Persist the upstream lookup identity before exposing its first content. */
   async recordGeneration(id: string, generationId: string) {
+    if (!this.metered) return
     if (!generationId || generationId.length > 200) throw new Error('invalid_usage_generation')
     const result = await this.pool.query(
       `UPDATE hosted_usage SET "generationId"=COALESCE("generationId",$2)
@@ -237,6 +250,7 @@ export class HostedUsageStore {
     outputTokens = 0,
     generationId?: string,
   ) {
+    if (!this.metered) return
     return this.transaction(async (tx) => {
       await tx.query(
         "SELECT pg_advisory_xact_lock(hashtextextended('hosted-free-budget',0))",
@@ -314,6 +328,7 @@ export class HostedUsageStore {
     env: Record<string, string | undefined> = process.env,
   ) {
     const balance = await this.balance(workspaceId)
+    if (!this.metered) return { state: 'ready', balance, trialLeft: null }
     const flight = await this.inFlight(this.pool, workspaceId)
     const spent = Number(
       (
@@ -324,7 +339,7 @@ export class HostedUsageStore {
     )
     // Whether the next call would be admitted, by the same rules as reserve().
     const available = balance.free + balance.purchased
-    const trial = await this.trialLeft(workspaceId, balance)
+    const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance) : null
     const state = trial !== null
       ? trial > 0 ? (spent >= abuseLimits(env).dailyMicroUsd ? 'platform_paused' : 'ready') : 'verification_required'
       : !balance.verified
@@ -341,6 +356,7 @@ export class HostedUsageStore {
     return { state, balance, trialLeft: trial === null ? null : Math.max(0, trial) }
   }
   async recent(workspaceId: string) {
+    if (!this.metered) return []
     return (
       await this.pool.query(
         `SELECT id,model,state,"costMicroUsd","freeMicroUsd","purchasedMicroUsd","inputTokens","outputTokens","createdAt" FROM hosted_usage WHERE "workspaceId"=$1 ORDER BY "createdAt" DESC LIMIT 50`,
