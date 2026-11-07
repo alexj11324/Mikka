@@ -3,6 +3,10 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { seedCoordinator } from '../../tests/support/coordinator-bot'
+import { captureRunFailure } from '@mikka/protocol/run-failure'
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
+
+const fixtureWorkspace = async (ownerId: string) => seedFixtureWorkspace((await import('../db')).pool, ownerId)
 
 // Every bot chats on the Coordinator harness; botId keeps their chats apart.
 // Database regressions execute only in CI against ephemeral Postgres 17.
@@ -32,8 +36,8 @@ dbTest('failed wake state stays with its owner and bot, and recovery keeps the o
     // The person's Coordinator is an ordinary bot row in their personal workspace.
     const coordinator = (await seedCoordinator(owner)).botId
     await db.insert(schema.bots).values([
-      { id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Owner bot' },
-      { id: peerBotId, ownerId: peer, workspaceId: randomUUID(), name: 'Peer bot' },
+      { id: botId, ownerId: owner, workspaceId: await fixtureWorkspace(owner), name: 'Owner bot' },
+      { id: peerBotId, ownerId: peer, workspaceId: await fixtureWorkspace(peer), name: 'Peer bot' },
     ])
     await recordCoordinatorEvent(db, userMessageEvent(owner, 'Original pending request', { botId }))
     await recordCoordinatorEvent(db, userMessageEvent(owner, 'Separate Coordinator request', { botId: coordinator }))
@@ -94,7 +98,7 @@ dbTest('a bot and the Coordinator keep their own conversation, inbox and memory'
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${userId}, 'Bot owner', ${`${userId}@example.com`}, false, now(), now())`)
     // The person's Coordinator is an ordinary bot row in their personal workspace.
     const coordinator = (await seedCoordinator(userId)).botId
-    await db.insert(schema.bots).values({ id: botId, ownerId: userId, workspaceId: randomUUID(), name: 'Writer' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: userId, workspaceId: await fixtureWorkspace(userId), name: 'Writer' })
     await recordCoordinatorEvent(db, userMessageEvent(userId, 'to the Coordinator', { botId: coordinator }))
     await recordCoordinatorEvent(db, userMessageEvent(userId, 'to Writer', { botId }))
     assert.deepEqual((await store.wakingChats(userId)).sort(), [botId, coordinator].sort(), 'one wake per chat with waiting messages')
@@ -146,7 +150,7 @@ dbTest('personal provenance and STOP/pending survive actual inbox persistence an
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${userId}, 'Synthetic provenance owner', ${`${userId}@example.invalid`}, false, now(), now())`)
     // The person's Coordinator is an ordinary bot row in their personal workspace.
     const coordinator = (await seedCoordinator(userId)).botId
-    await db.insert(schema.bots).values({ id: botId, ownerId: userId, workspaceId: randomUUID(), name: 'Synthetic private Bot' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: userId, workspaceId: await fixtureWorkspace(userId), name: 'Synthetic private Bot' })
     const seeds = [
       { ...userMessageEvent(userId, 'STOP publication', { botId }), createdAt: new Date('2026-10-27T01:00:00Z') },
       // Peer messages carry no preset tier; this fixture supplies one triage (the Decisions API) already classified as a result.
@@ -398,7 +402,7 @@ dbTest('a workspace Telegram reply reads authorization once without cross-databa
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${userId}, 'Synthetic lock-order owner', ${`${userId}@example.invalid`}, false, now(), now())`)
     await pool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Synthetic lock order\')', [workspaceId, userId])
     await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'owner\',\'active\')', [workspaceId, userId, `${userId}@example.invalid`])
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Synthetic promotion\',$3,\'todo\',\'normal\',\'workspace\')', [issueId, userId, JSON.stringify({ type: 'doc', content: [] })])
+    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId") values ($1,$2,\'Synthetic promotion\',$3,\'todo\',\'normal\',\'workspace\',$4)', [issueId, userId, JSON.stringify({ type: 'doc', content: [] }), workspaceId])
     await db.insert(schema.bots).values({ id: botId, ownerId: userId, workspaceId, name: 'Synthetic workspace Bot' })
     await db.insert(schema.telegramLinks).values({ userId, telegramUserId })
     await recordCoordinatorEvent(db, userMessageEvent(userId, 'Synthetic issue Telegram message', { botId, issueId, telegram: { threadId, telegramUserId, messageId: 1 } }))
@@ -423,17 +427,22 @@ dbTest('a workspace Telegram reply reads authorization once without cross-databa
     assert.equal(workspaceReads, 1, 'one membership read without a workspace transaction')
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [peerId, `${peerId}@example.invalid`])
     await pool.query('UPDATE issues SET "userId"=$2 WHERE id=$1', [issueId, peerId])
-    await assert.rejects(replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ }), /telegramReplySourceUnavailable/, 'a foreign issue without a workspace link stays private')
-    await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [issueId, randomUUID(), workspaceId, peerId])
     await replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ })
-    assert.equal(sent, 2, 'a current workspace membership grants source access')
+    assert.equal(sent, 2, 'a bound task in the same workspace needs no Team link')
     await pool.query("UPDATE issues SET scope='personal' WHERE id=$1", [issueId])
-    await assert.rejects(replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ }), /telegramReplySourceUnavailable/, 'another person’s personal issue stays private')
+    await replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ })
+    assert.equal(sent, 3, 'the legacy publication scope cannot change tenant access')
+    const foreignIssue = randomUUID(), foreignWorkspace = await fixtureWorkspace(peerId)
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,'Foreign source','{"type":"doc","content":[]}','todo','normal')`, [foreignIssue, peerId, foreignWorkspace])
+    await pool.query('UPDATE coordinator_events SET "issueId"=$2 WHERE id=ANY($1::uuid[])', [target.sourceEventIds, foreignIssue])
+    await assert.rejects(replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ }), /telegramReplySourceUnavailable/, 'a historical cross-workspace event cannot disclose its task')
+    await pool.query('UPDATE coordinator_events SET "issueId"=$2 WHERE id=ANY($1::uuid[])', [target.sourceEventIds, issueId])
+    await pool.query('DELETE FROM issues WHERE id=$1', [foreignIssue])
     await pool.query('UPDATE issues SET "userId"=$2 WHERE id=$1', [issueId, userId])
     await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [issueId])
     await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspaceId, userId])
     await assert.rejects(replies.send(userId, botId, 'lock-order-turn', target, async () => { sent++ }), /telegramReplySourceUnavailable/)
-    assert.equal(sent, 2)
+    assert.equal(sent, 3, 'both rejected replies have no outbound side effect')
   })
 })
 
@@ -452,7 +461,7 @@ dbTest('重试 re-runs a failed bot turn once, for the message already sent, in 
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Retry fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
     // The person's Coordinator is an ordinary bot row in their personal workspace.
     const coordinator = (await seedCoordinator(owner)).botId
-    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Retry bot' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await fixtureWorkspace(owner), name: 'Retry bot' })
     assert.equal(await store.retryFailedTurn(owner, botId), false, 'nothing failed, nothing to retry')
     await recordCoordinatorEvent(db, userMessageEvent(owner, 'Plan my week', { botId }))
     await store.takeInbox(owner, 'wrun_failed-turn', botId)
@@ -481,12 +490,13 @@ dbTest('重试 re-runs a failed bot turn once, for the message already sent, in 
     const answered = await store.chatView(owner, 200, botId)
     assert.equal(answered.error, null, 'the chat-wide line clears once a turn ends cleanly')
     assert.deepEqual(answered.items.map(item => [item.from, item.text, item.failure ?? null]), [
-      ['person', 'Plan my week', { kind: 'hosted', code: 'verification_required' }],
+      ['person', 'Plan my week', { kind: 'hosted', code: 'verification_required', raw: 'verification_required', failureDetails: answered.items[0].failure?.failureDetails }],
       ['person', 'Then plan next week', null],
       ['coordinator', 'Here is the plan.', null],
     ])
+    assert.equal(answered.items[0].failure?.failureDetails?.runId, 'wrun_third-turn')
     const context = await store.loadConversation(owner, botId)
-    assert.ok(context.messages.every(({ message }) => !('mikkaFailure' in message)), 'the model never sees the mark')
+    assert.ok(context.messages.every(({ message }) => !('mikkaFailure' in message) && !('mikkaFailureDetails' in message)), 'the model never sees failure metadata')
   })
 })
 
@@ -504,7 +514,7 @@ dbTest('重新发送 retries a failed message in place: marked once, left out of
   await scope.run(async () => {
     for (const [id, bot] of [[owner, botId], [other, otherBot]]) {
       await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${id}, 'Resend fixture', ${`${id}@example.invalid`}, false, now(), now())`)
-      await db.insert(schema.bots).values({ id: bot, ownerId: id, workspaceId: randomUUID(), name: 'Resend bot' })
+      await db.insert(schema.bots).values({ id: bot, ownerId: id, workspaceId: await fixtureWorkspace(id), name: 'Resend bot' })
     }
     // A message whose turn failed (store.failTurn), and one of the other person's.
     const send = (userId: string, bot: string, text: string) => (tx: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(tx, userId, text, { botId: bot, submissionId: randomUUID() })
@@ -564,7 +574,7 @@ dbTest('重试 also re-runs a turn that ended with no reply and nothing recorded
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Unanswered fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Unanswered bot' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await fixtureWorkspace(owner), name: 'Unanswered bot' })
     await recordCoordinatorEvent(db, userMessageEvent(owner, '介绍一下北京的历史', { botId }))
     await store.takeInbox(owner, 'wrun_lost-turn', botId)
     assert.equal(await store.retryFailedTurn(owner, botId), false, 'no retry while the turn holds its lease')
@@ -593,7 +603,7 @@ dbTest('a turn that says something, calls a tool and then answers stays working 
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Working fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Dispatch bot' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await fixtureWorkspace(owner), name: 'Dispatch bot' })
     await recordCoordinatorEvent(db, userMessageEvent(owner, '派发任务，给 Mikka_test 写一个简单的 README', { botId }))
     assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the message waits for a turn')
     await store.takeInbox(owner, holder, botId)
@@ -628,7 +638,7 @@ dbTest('a run that dies after taking a message (a replay that fails after a depl
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Interrupted fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Interrupted bot' })
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await fixtureWorkspace(owner), name: 'Interrupted bot' })
     await recordCoordinatorEvent(db, userMessageEvent(owner, '重新派发 ALEX-5', { botId }))
     // The run takes the message (stored in the chat, lease held), then dies before it can answer or let go.
     assert.equal((await store.takeInbox(owner, 'wrun_killed', botId)).added, 1)
@@ -676,7 +686,7 @@ dbTest('own task completion returns to the original Bot with an exhausted team t
     await assert.rejects(new HostedUsageStore(pool).canUseMikkaPaid(workspaceId), { code: 'verification_required' }, 'the original Gateway classification is refused before a model call')
     const agentId = randomUUID(), runId = randomUUID(), issueId = randomUUID(), eventId = randomUUID()
     await db.insert(schema.agents).values({ id: agentId, userId: owner, harness: 'claude_code', name: 'Completion fixture' })
-    await db.insert(schema.issues).values({ id: issueId, userId: owner, title: 'Read-only completion', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })
+    await db.insert(schema.issues).values({ id: issueId, userId: owner, workspaceId, title: 'Read-only completion', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })
     await db.insert(schema.agentRuns).values({ id: runId, userId: owner, agentId, botId, issueId, status: 'succeeded', stopReason: 'submitted', finishedAt: sql`'2026-11-02T23:23:56.079887Z'::timestamptz`, report: { summary: 'Fixture task completed' } })
     await db.insert(schema.coordinatorEvents).values({ id: eventId, userId: owner, botId, issueId, runId, kind: 'run_finished', dedupeKey: `${owner}:result`, payload: { status: 'succeeded', stopReason: 'submitted', summary: 'Untrusted agent report' }, createdAt: sql`'2026-11-02T23:23:56.123456Z'::timestamptz` })
     await runTriageBatch(await store.untriagedEvents(owner, botId), {
@@ -720,7 +730,8 @@ dbTest('Factory completion delivery keeps historical handoffs and reads current 
       const original = `https://github.com/example/${name}-wrong.git`, target = `https://github.com/example/${name}-correct.git`
       await db.insert(schema.devices).values({ id: deviceId, ownerId: userId, name: 'Notice device' })
       await db.insert(schema.agents).values({ id: agentId, userId, deviceId, harness: 'claude_code', name: `Notice ${agentId}` })
-      await db.insert(schema.issues).values({ id: issueId, userId, title: name, content: { type: 'doc', content: [] }, status: 'review', priority: 'normal' })
+      const taskWorkspace = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1', [runBotId])).rows[0].workspaceId
+      await db.insert(schema.issues).values({ id: issueId, userId, workspaceId: taskWorkspace, title: name, content: { type: 'doc', content: [] }, status: 'review', priority: 'normal' })
       await db.insert(schema.deviceRepos).values([
         { id: wrongRepo, userId, deviceId, repoPath: `${name}-wrong`, remoteUrl: original },
         { id: targetRepo, userId, deviceId, repoPath: `${name}-correct`, remoteUrl: target },
@@ -815,10 +826,10 @@ dbTest('Factory completion delivery keeps historical handoffs and reads current 
     const distantWorkspace = randomUUID(), distantBot = randomUUID()
     await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name,slug,kind) VALUES ($1,$2,'Other workspace',$3,'team')`, [distantWorkspace, owner, `notice-${distantWorkspace}`])
     await db.insert(schema.bots).values({ id: distantBot, ownerId: owner, workspaceId: distantWorkspace, name: 'Distant notice Bot' })
-    await db.update(schema.factoryTasks).set({ botId: distantBot }).where(eq(schema.factoryTasks.id, linked.taskId))
-    assert.equal((await readLinked()).size, 0, 'a valid runtime binding cannot admit a Factory Bot from another workspace')
-    await db.update(schema.factoryTasks).set({ botId: peerBotId }).where(eq(schema.factoryTasks.id, linked.taskId))
-    assert.equal((await readLinked()).size, 0, 'the same binding cannot admit another owner’s Factory Bot')
+    const mismatch = (error: unknown) => (error as { code?: string; cause?: { code?: string } }).code === '23514' || (error as { cause?: { code?: string } }).cause?.code === '23514'
+    await assert.rejects(db.update(schema.factoryTasks).set({ botId: distantBot }).where(eq(schema.factoryTasks.id, linked.taskId)), mismatch)
+    await assert.rejects(db.update(schema.factoryTasks).set({ botId: peerBotId }).where(eq(schema.factoryTasks.id, linked.taskId)), mismatch)
+    assert.equal((await readLinked()).size, 1, 'rejected foreign bindings leave the authorized task unchanged')
 
     const epochs = await fixture(owner, botId, 'continued-request')
     const oldPublication = { url: 'https://github.com/example/continued-request-wrong/pull/8', state: 'open' as const }
@@ -868,5 +879,54 @@ dbTest('Factory completion delivery keeps historical handoffs and reads current 
     const plain = String((await store.loadConversation(owner, botId)).messages.at(-1)!.message.content)
     assert.ok(plain.includes('Plain task complete') && plain.includes('Verified GitHub pull request: https://github.com/example/plain/pull/1 (open)'))
     assert.ok(!plain.includes('Current host observation'), 'ordinary non-Factory notifications retain their own publication and result')
+  })
+})
+
+
+dbTest('structured failures survive a fresh chat read, retain the lease fence, and stay out of model/list projections', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { eq, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  ])
+  const owner = `test-run-failure-${randomUUID()}`, holder = 'wrun_structured_failure'
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  let botId = '', version = '', storedFailure: unknown
+  t.after(async () => { await scope.close() })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values (${owner},'Failure fixture',${`${owner}@example.invalid`},false,now(),now())`)
+    botId = (await seedCoordinator(owner)).botId
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'A private synthetic request for the bot.', { botId }))
+    await store.takeInbox(owner, holder, botId)
+    const failureDetails = captureRunFailure({ statusCode: 400, responseBody: JSON.stringify({ error: { type: 'invalid_request_error', message: 'The provider does not support this request format.' } }) }, { provider: 'codex', credential: 'subscription', runId: holder, appVersion: 'a'.repeat(40) })
+    await store.failTurn(owner, holder, 'subscription_generation_failed', botId, undefined, failureDetails)
+    const chat = await store.chatView(owner, 200, botId)
+    assert.equal(chat.failureDetails?.category, 'invalid_request')
+    assert.equal(chat.failureDetails?.providerMessage, 'The provider does not support this request format.')
+    assert.equal(chat.failureDetails?.runId, holder)
+    assert.deepEqual(chat.items[0].failure?.failureDetails, chat.failureDetails)
+    storedFailure = chat.failureDetails
+    version = (await store.chatVersion(owner, 200, botId)).version
+    await store.failTurn(owner, holder, 'late_overwrite', botId, undefined, captureRunFailure({ statusCode: 429 }))
+    assert.deepEqual((await store.chatView(owner, 200, botId)).failureDetails, storedFailure, 'the first release consumed this lease')
+  })
+  await scope.close()
+  const reloaded = createRequestDatabaseScope(databaseUrl!)
+  t.after(async () => { await reloaded.close() })
+  await reloaded.run(async () => {
+    const chat = await store.chatView(owner, 200, botId)
+    assert.deepEqual(chat.failureDetails, storedFailure, 'a new request/database scope reads the persisted record')
+    const context = await store.loadConversation(owner, botId)
+    assert.ok(context.messages.every(row => !('mikkaFailureDetails' in row.message)))
+    assert.doesNotMatch(JSON.stringify(await store.botChats(owner)), /providerMessage|The provider does not support/)
+    assert.equal((await store.chatView('another-owner', 200, botId)).failureDetails, undefined)
+    const altered = { ...chat.failureDetails!, occurredAt: new Date(Date.parse(chat.failureDetails!.occurredAt) + 1000).toISOString() }
+    await db.update(schema.coordinatorSessions).set({ lastFailure: altered }).where(eq(schema.coordinatorSessions.botId, botId))
+    assert.notEqual((await store.chatVersion(owner, 200, botId)).version, version, 'details alone change the existing snapshot hash')
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Try a fresh request.', { botId }))
+    await store.takeInbox(owner, 'wrun_recovered_failure', botId)
+    await store.appendMessages(owner, 'wrun_recovered_failure', [{ role: 'assistant', content: 'Recovered.', mikkaFailureDetails: altered } as unknown as import('ai').ModelMessage], null, botId)
+    const recovered = await store.chatView(owner, 200, botId)
+    assert.equal(recovered.failureDetails, undefined, 'a successful response clears current failure details')
+    assert.equal(recovered.items.at(-1)?.failure, undefined, 'model output cannot forge a host failure')
+    assert.deepEqual(recovered.items[0].failure?.failureDetails, storedFailure, 'historical failed message retains its own record')
   })
 })

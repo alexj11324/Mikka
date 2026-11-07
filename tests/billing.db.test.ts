@@ -13,7 +13,7 @@ test('workspace billing', { skip: !dbUrl }, async t => {
   const billing = await import('../lib/billing/service')
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
   const rejects = (promise: Promise<unknown>, code: string) => assert.rejects(promise, (error: unknown) => error instanceof WorkspaceError && error.code === code)
-  const env = { STRIPE_SECRET_KEY: 'sk_test_fake', STRIPE_TEAM_PRICE_ID: 'price_team' }
+  const env = { MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'sk_test_fake', STRIPE_TEAM_PRICE_ID: 'price_team' }
   const requests: Array<{ url: string; body: string }> = []
   const fake = (response: unknown, status = 200) => (async (url: string, init: RequestInit) => { requests.push({ url, body: String(init.body) }); return new Response(JSON.stringify(response), { status }) }) as unknown as typeof fetch
 

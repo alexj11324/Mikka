@@ -4,7 +4,7 @@ import type { ChatTool } from './context'
 import { restoreChatToolMetadata, type ChatToolMetadata } from './chat-tool-metadata'
 
 /** A poll whose version matched: only the chat's live state, the conversation itself is as before. */
-export type UnchangedChat = { unchanged: true; version: string; cursor: number; streamRunId?: string; working: boolean; error: string | null; botId: string; enabled: boolean; live?: ListLiveRead; metadata?: Pick<ChatView, 'sources' | 'artifacts'> }
+export type UnchangedChat = { unchanged: true; version: string; cursor: number; streamRunId?: string; working: boolean; error: string | null; cause?: string; botId: string; enabled: boolean; live?: ListLiveRead; metadata?: Pick<ChatView, 'sources' | 'artifacts'> }
 
 function currentChatMetadata(chat: Pick<ChatView, 'sources' | 'artifacts'> | UnchangedChat): Pick<ChatView, 'sources' | 'artifacts'> | undefined {
   return 'unchanged' in chat ? chat.metadata : chat

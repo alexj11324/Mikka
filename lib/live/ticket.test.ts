@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test, { before, after, mock } from 'node:test'
-import { liveChannelId } from './scope'
+import { liveChannelId, liveTicket } from './scope'
 import { deviceGatewayTicketValid } from '../device-gateway-ticket'
+import { readSessionLiveTicket } from './session-ticket'
 
 const workspace = '19df8afd-0f8c-4c6b-bc9c-20df0b046a72'
 const second = 'e4ec7f73-0a59-4ad4-8b3c-41f8cd510c6d'
@@ -20,14 +21,19 @@ before(async () => {
   mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async (input: { headers: Headers; query: { disableCookieCache: boolean } }) => {
     assert.equal(input.query.disableCookieCache, true)
     sessionHeaders = input.headers
-    return owner ? { user: { id: owner } } : null
+    return owner ? { user: { id: owner }, session: { id: `session-${owner}` } } : null
   } } } } })
-  mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: { query: async (_sql: string, values: unknown[]) => {
-    membershipReads.push(values)
-    const key = `${values[1]}:${values[0]}`
-    return { rowCount: memberships.has(key) ? 1 : 0, rows: memberships.has(key) ? [{ personalHome: personalHomes.has(key) }] : [] }
-  } } } })
-  mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_name: string, handler: (request: Request) => Promise<Response>) => handler } })
+  // Route/codec fixture only. The real membership, SSO and revocation barriers
+  // are exercised without authorization mocks in live-authority.db.test.ts.
+  mock.module(new URL('../task-workspace.ts', import.meta.url).href, { namedExports: { activeTaskWorkspaces: async (reader: { id: string }, workspaceId: string) => {
+    membershipReads.push([workspaceId, reader.id])
+    const key = `${reader.id}:${workspaceId}`
+    return memberships.has(key) ? [{ id: workspaceId, kind: personalHomes.has(key) ? 'personal' : 'team' }] : []
+  } } })
+  mock.module(new URL('../enterprise/live-authority.ts', import.meta.url).href, { namedExports: { workspaceLiveTicket: async (
+    scope: { ownerId: string; workspaceId: string }, sessionId: string, config: Parameters<typeof liveTicket>[1],
+  ) => ({ status: 'allowed', ticket: liveTicket(scope, config, Date.now(), sessionId) }) } })
+  mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, handler: (request: Request) => Promise<Response>) => handler } })
   route = await import('../../app/api/live/ticket/route')
 })
 
@@ -85,7 +91,7 @@ test('native session bearer uses the same membership boundary without trusting a
   assert.equal((await request(workspace, { authorization })).status, 401)
 })
 
-test('only the actual personal home receives a bounded routing proof from the existing single membership read', async () => {
+test('only the actual personal home receives a bounded routing proof from the selected workspace', async () => {
   owner = 'scope-owner'; memberships.add(`${owner}:${workspace}`); memberships.add(`${owner}:${second}`)
   personalHomes.add(`${owner}:${workspace}`)
   const before = membershipReads.length
@@ -100,4 +106,32 @@ test('only the actual personal home receives a bounded routing proof from the ex
   assert.equal(typeof team.protocol, 'string')
   assert.equal(team.homeScope, undefined)
   assert.equal(membershipReads.length, before + 2)
+})
+
+test('built-in tickets bind the freshly authenticated session while the public response stays opaque', async () => {
+  const keys = ['DEVICE_GATEWAY_URL', 'BETTER_AUTH_URL', 'BETTER_AUTH_SECRET', 'MIKKA_EDITION', 'VERCEL'] as const
+  const saved = Object.fromEntries(keys.map(key => [key, process.env[key]]))
+  try {
+    delete process.env.DEVICE_GATEWAY_URL
+    delete process.env.VERCEL
+    process.env.BETTER_AUTH_URL = 'https://self.test'
+    process.env.BETTER_AUTH_SECRET = 'isolated-session-ticket-secret'
+    process.env.MIKKA_EDITION = 'community'
+    owner = 'bound-owner'; memberships.add(`${owner}:${workspace}`)
+    const response = await request()
+    assert.equal(response.status, 200)
+    const issued = await response.json()
+    const channel = liveChannelId({ ownerId: owner, workspaceId: workspace })
+    const claims = readSessionLiveTicket(channel, issued.protocol, secret)
+    assert.equal(claims?.sessionId, `session-${owner}`)
+    assert.equal(claims?.expiresAt, issued.expiresAt)
+    assert.equal(issued.url, `wss://self.test/mikka/v1/live/${channel}/socket`)
+    assert.equal('sessionId' in issued, false)
+    assert.equal(deviceGatewayTicketValid(`live:${channel}`, issued.protocol, secret), false)
+  } finally {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key]
+      else process.env[key] = saved[key]
+    }
+  }
 })

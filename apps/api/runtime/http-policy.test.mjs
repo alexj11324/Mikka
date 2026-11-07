@@ -5,7 +5,7 @@ import customRoutes from 'next/dist/lib/load-custom-routes.js'
 import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match.js'
 import { prepareDestination } from 'next/dist/shared/lib/router/utils/prepare-destination.js'
 import { getRedirectStatus } from 'next/dist/lib/redirect-status.js'
-import { applySecurityHeaders, isMachinePath, localizePage, pageResponse } from './http-policy.mjs'
+import { applySecurityHeaders, isMachinePath, localizePage, pageRedirect, pageResponse } from './http-policy.mjs'
 
 const request = (path, init) => new Request(`https://example.test${path}`, init)
 const render = () => '<html lang="zh-CN"><body>shared app</body></html>'
@@ -70,9 +70,11 @@ test('page-only locale and legacy redirects retain query while machine paths nev
 test('security projection preserves body stream, raw cookies, status and route-specific headers', async () => {
   let cancelled = false
   const response = new Response(new ReadableStream({ cancel() { cancelled = true } }), { status: 206, headers: { 'content-range': 'bytes 0-9/50', 'referrer-policy': 'no-referrer' } })
+  response.crossws = { upgrade() { throw new Response(null, { status: 400 }) } }
   response.headers.append('set-cookie', 'a=1; Expires=Wed, 21 Oct 2037 07:28:00 GMT')
   response.headers.append('set-cookie', 'b=; Max-Age=0; Path=/mikka')
   const secured = applySecurityHeaders(request('/mikka/api/stream'), response)
+  assert.equal(secured.crossws, response.crossws)
   assert.equal(secured.body, response.body); assert.equal(secured.status, 206)
   assert.equal(secured.headers.get('content-range'), 'bytes 0-9/50')
   assert.equal(secured.headers.get('referrer-policy'), 'no-referrer')
@@ -89,4 +91,20 @@ test('token pages keep private headers in both locales; document requests alone 
   const document = await pageResponse(request('/mikka/en', { headers: { 'sec-fetch-dest': 'document' } }), render)
   assert.equal(document.headers.get('set-cookie'), 'NEXT_LOCALE=en; Max-Age=31536000; Path=/mikka; SameSite=Lax')
   assert.equal((await pageResponse(request('/mikka/en'), render)).headers.get('set-cookie'), null)
+})
+
+test('only official GitHub cloud installation state continues from the unchanged homepage Setup URL', () => {
+  const state = `mikka-gh.00000000-0000-4000-8000-000000000001.${'x'.repeat(43)}`
+  const path = `/mikka?installation_id=99&state=${state}&return_to=https://untrusted.example`
+  const response = pageRedirect(request(path), { edition: 'cloud' })
+  assert.equal(response.status, 302)
+  const target = new URL(response.headers.get('location'))
+  assert.equal(target.origin, 'https://example.test'); assert.equal(target.pathname, '/mikka/cloud/v1/github/setup')
+  assert.deepEqual([...target.searchParams.entries()].sort(), [['installation_id', '99'], ['state', state]])
+  assert.equal(response.headers.get('referrer-policy'), 'no-referrer'); assert.equal(response.headers.get('cache-control'), 'no-store')
+  for (const candidate of ['/mikka', '/mikka?installation_id=99', '/mikka?installation_id=99&state=ordinary-install', `${path}&state=duplicate`, path.replace('installation_id=99', 'installation_id=invalid'), path.replace('/mikka?', '/mikka/settings?')]) {
+    assert.equal(pageRedirect(request(candidate), { edition: 'cloud' }), undefined)
+  }
+  assert.equal(pageRedirect(request(path), { edition: 'community' }), undefined)
+  assert.equal(pageRedirect(request(path, { method: 'POST' }), { edition: 'cloud' }), undefined)
 })

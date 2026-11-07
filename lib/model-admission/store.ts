@@ -86,6 +86,10 @@ export class ModelAdmissionStore {
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
     return this.admit(scope, model, subscriptionModelRoute(route), options)
   }
+  selfHosted(scope: { workspaceId: string; ownerId?: string }, model: string, endpoint: string,
+    options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
+    return this.admit(scope, model, { provider: 'openai-compatible', endpoint }, options)
+  }
   private async admit(scope: { workspaceId: string; ownerId?: string }, model: string, transport: { provider: string; endpoint: string },
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
     const { signal } = options

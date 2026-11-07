@@ -134,7 +134,7 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   await t.test('task lookups by id stay in the token workspace', async () => {
     const ownIssue = randomUUID(), otherIssue = randomUUID()
     for (const [issueId, workspaceId, teamId] of [[ownIssue, ws.id, ownTeam.id], [otherIssue, other.id, otherTeam.id]]) {
-      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Task','{"type":"doc"}','todo','normal','workspace')`, [issueId, owner])
+      await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope) VALUES ($1,$2,$3,'Task','{"type":"doc"}','todo','normal','workspace')`, [issueId, owner, workspaceId])
       await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
     }
     const post = async (path: string, body: unknown) => {

@@ -30,6 +30,10 @@ export const modelAdmissionPolicySchema = z.strictObject({
     provider: z.literal('zerocat'), endpoint: z.literal(ZEROCAT_MODEL_ENDPOINT),
     model: modelId, servingProviders: z.tuple([z.literal('zerocat')]), ...routeScope,
   }), z.strictObject({
+    provider: z.literal('openai-compatible'),
+    endpoint: z.url().refine(value => { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash && !value.endsWith('/') }),
+    model: z.string().min(1).max(200).regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/), servingProviders: z.tuple([z.literal('openai-compatible')]), ...routeScope,
+  }), z.strictObject({
     provider: z.literal('openai-subscription'), endpoint: z.literal(CODEX_SUBSCRIPTION_ENDPOINT),
     model: subscriptionModelId, servingProviders: z.tuple([z.literal('openai')]), ...routeScope,
   }), z.strictObject({

@@ -6,6 +6,7 @@ import type { DevicePresenceWatch } from './session'
 export interface DeviceSessionStub {
   notify(): Promise<void>
   notifyLive(events: LiveInvalidation[]): Promise<void>
+  revokeLive(): Promise<void>
   status(): Promise<{ online: boolean; lastSeenAt: string | null }>
   fetch(request: Request): Promise<Response>
   watchPresence(input: DevicePresenceWatch): Promise<{ accepted: boolean; changed: boolean }>

@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { RunCheckpoint, RunCompletion, StopReason } from '@mikka/protocol'
+import type { RunCheckpoint, RunCheckpointReceipt, RunCompletion, StopReason } from '@mikka/protocol'
 import type { AgentAdapter, AgentEvent, ExitEvent, StartOptions } from '../src/adapters/types'
 import { createLogger } from '../src/log'
 import type { OutboxItem } from '../src/outbox'
@@ -24,7 +24,7 @@ async function fixture(exit: ExitEvent = { type: 'exit', outcome: 'succeeded', s
   const root = tempDir(), repo = await makeRepo(), runId = 'terminal-run'
   const journal = new RunJournal(join(root, 'journal.json'))
   const entered = deferred<StartOptions>(), release = deferred()
-  const order: string[] = [], saved: RunCheckpoint[] = []
+  const order: string[] = [], saved: RunCheckpoint[] = [], receipts: RunCheckpointReceipt[] = []
   let completion: RunCompletion | undefined
   const adapter: AgentAdapter = { harness: 'mock', capabilities: { supportsInterject: false, supportsResume: false }, envAllow: [],
     async start(options) {
@@ -33,10 +33,15 @@ async function fixture(exit: ExitEvent = { type: 'exit', outcome: 'succeeded', s
       return { sessionId: 'session', events: events ?? (async function* () { yield exit }), async cancel() {}, async send() {} }
     }, async resume() { throw Error('Unexpected resume') },
   }
-  const save = vi.fn<NonNullable<SupervisorDeps['saveCheckpoint']>>(async (_id, checkpoint) => {
+  const acknowledge = (id: string, checkpoint: RunCheckpoint): RunCheckpointReceipt => {
     saved.push(checkpoint)
     order.push('checkpoint confirmed')
-  })
+    // The server upload clock is independent of the daemon's capture clock.
+    const receipt = { runId: id, takenAt: '2026-01-02T03:04:05.678Z' }
+    receipts.push(receipt)
+    return receipt
+  }
+  const save = vi.fn<NonNullable<SupervisorDeps['saveCheckpoint']>>(async (id, checkpoint) => acknowledge(id, checkpoint))
   const supervisor = new RunSupervisor({ journal, log: createLogger({ level: 'silent' }),
     worktrees: new WorktreeManager(join(root, 'worktrees')), adapters: new Map([['mock', adapter]]),
     repository: () => ({ repoId: 'repo', name: 'fixture', path: repo }),
@@ -47,7 +52,7 @@ async function fixture(exit: ExitEvent = { type: 'exit', outcome: 'succeeded', s
   })
   supervisor.start({ runId, deviceId: 'device', issueId: 'issue', repoId: 'repo', harness: 'mock', prompt: 'work',
     leaseExpiresAt: new Date(Date.now() + 600_000).toISOString() })
-  return { supervisor, runId, entered, release, saved, save, order, completion: () => completion }
+  return { supervisor, runId, entered, release, saved, receipts, acknowledge, save, order, completion: () => completion }
 }
 
 const stops: StopReason[] = ['asked_human', 'blocked', 'submitted', 'turn_ended', 'error']
@@ -65,10 +70,10 @@ it.each(stops)('uploads the final workspace before %s releases its lease', async
     expect(f.completion()?.stopReason).toBe(stopReason)
     expect(f.saved[0]?.files).toBe(1)
     expect(gunzipSync(Buffer.from(f.saved[0]!.patch, 'base64')).toString()).toContain('final work before waiting')
+    expect(f.saved[0]!.takenAt).not.toBe(f.receipts[0]!.takenAt)
     expect(f.completion()?.report.safePoint).toEqual({
-      session: 'exited', checkpoint: 'ready', checkpointTakenAt: f.saved[0]!.takenAt, observedAt: expect.any(String),
+      session: 'exited', checkpoint: 'ready', checkpointTakenAt: f.receipts[0]!.takenAt, observedAt: f.receipts[0]!.takenAt,
     })
-    expect(Date.parse(f.completion()!.report.safePoint!.observedAt)).toBeGreaterThanOrEqual(Date.parse(f.saved[0]!.takenAt))
   } finally { f.release.resolve(); await f.supervisor.stop() }
 })
 
@@ -91,10 +96,10 @@ it('does not replace an unavailable final upload with an older heartbeat', async
 
 it('cannot report completion before the final upload has been acknowledged', async () => {
   const f = await fixture(), uploading = deferred(), uploaded = deferred()
-  f.save.mockImplementationOnce(async (_id, snapshot) => {
+  f.save.mockImplementationOnce(async (id, snapshot) => {
     uploading.resolve()
     await uploaded.promise
-    f.saved.push(snapshot)
+    return f.acknowledge(id, snapshot)
   })
   try {
     await f.entered.promise
@@ -107,9 +112,46 @@ it('cannot report completion before the final upload has been acknowledged', asy
     expect(f.save).toHaveBeenCalledTimes(1)
     uploaded.resolve()
     await f.supervisor.idle()
-    expect(f.completion()?.report.safePoint?.checkpointTakenAt).toBe(f.saved[0]?.takenAt)
+    expect(f.completion()?.report.safePoint?.checkpointTakenAt).toBe(f.receipts[0]?.takenAt)
     expect(f.saved[0]?.files).toBe(0)
   } finally { f.release.resolve(); uploaded.resolve(); await f.supervisor.stop() }
+})
+
+it('a legacy upload acknowledgement without a server receipt cannot certify retirement', async () => {
+  const f = await fixture()
+  try {
+    const start = await f.entered.promise
+    writeFileSync(join(start.cwd, 'draft.txt'), 'retained without an acknowledged snapshot identity\n')
+    // Older servers return 204: the bytes may be stored, but the daemon does
+    // not know the authoritative snapshot time that automatic retirement uses.
+    f.save.mockResolvedValueOnce(undefined)
+    f.release.resolve()
+    await f.supervisor.idle()
+    expect(f.save).toHaveBeenCalledOnce()
+    expect(f.completion()?.report.safePoint).toEqual({
+      session: 'exited', checkpoint: 'unavailable', observedAt: expect.any(String),
+    })
+    expect(readFileSync(join(start.cwd, 'draft.txt'), 'utf8')).toBe('retained without an acknowledged snapshot identity\n')
+  } finally { f.release.resolve(); await f.supervisor.stop() }
+})
+
+it.each([
+  ['another run', { runId: 'different-run', takenAt: '2026-01-02T03:04:05.678Z' }],
+  ['invalid server time', { runId: 'terminal-run', takenAt: 'not-a-time' }],
+  ['noncanonical server time', { runId: 'terminal-run', takenAt: '2026-01-02T03:04:05.678+00:00' }],
+  ['unknown receipt fields', { runId: 'terminal-run', takenAt: '2026-01-02T03:04:05.678Z', unverified: true }],
+] as const)('does not certify retirement from %s in an upload receipt', async (_reason, receipt) => {
+  const f = await fixture()
+  try {
+    await f.entered.promise
+    // Deliberately malformed runtime input bypasses the TypeScript transport contract.
+    f.save.mockResolvedValueOnce(receipt as unknown as RunCheckpointReceipt)
+    f.release.resolve()
+    await f.supervisor.idle()
+    expect(f.completion()?.report.safePoint).toEqual({
+      session: 'exited', checkpoint: 'unavailable', observedAt: expect.any(String),
+    })
+  } finally { f.release.resolve(); await f.supervisor.stop() }
 })
 
 it('does not turn an exhausted stream into a confirmed session exit', async () => {

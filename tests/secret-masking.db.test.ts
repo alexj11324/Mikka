@@ -48,7 +48,7 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values (gen_random_uuid(),$1,$2,$3,$4,now()+interval '1 hour')`, [admin, hashDeviceToken(token), device, ws.id])
   const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id as string
   // Output writes belong to a claimed live run, including its active lease.
-  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,'running',now()+interval '10 minutes') returning id`, [agent, admin, device])).rows[0].id as string
+  const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,$4,'running',now()+interval '10 minutes') returning id`, [agent, admin, device, ws.id])).rows[0].id as string
   const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
   /** The row is committed before Next's `after()` (the wake-up) runs; outside a request it throws. */
   const afterOnly = (error: unknown) => { if (!String((error as Error)?.message).includes('outside a request scope')) throw error }
@@ -139,8 +139,9 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     const checkpoint = await import('../app/v1/runs/[runId]/checkpoint/route')
     const diff = `--- a/.env\n+++ b/.env\n@@ -0,0 +1 @@\n+API_TOKEN=${SECRET}\n`
     const cp = await checkpoint.POST(call('POST', `/v1/runs/${runId}/checkpoint`, { baseCommit: 'a'.repeat(40), patch: gzipSync(diff).toString('base64'), files: 1, takenAt: new Date().toISOString() }), { params: Promise.resolve({ runId }) })
-    assert.equal(cp.status, 204, await cp.clone().text())
-    const { rows: [saved] } = await pool.query(`select patch, files from run_checkpoints where "runId"=$1`, [runId])
+    assert.equal(cp.status, 200, await cp.clone().text())
+    const { rows: [saved] } = await pool.query(`select patch, files, "takenAt" from run_checkpoints where "runId"=$1`, [runId])
+    assert.deepEqual(await cp.json(), { runId, takenAt: saved.takenAt.toISOString() })
     noPlain('checkpoint', gunzipSync(saved.patch).toString('utf8'))
     assert.ok(gunzipSync(saved.patch).toString('utf8').includes('+API_TOKEN=[secret:API_TOKEN]'))
 

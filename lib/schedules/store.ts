@@ -37,7 +37,7 @@ export function scheduledInbox(row: Occurrence | undefined, now: Date): { eventI
 /** Definitions, due slots and original-chat publication share PostgreSQL commits.
  * Model reads use the existing inbox; no external write permission is created. */
 export class ScheduleStore {
-  constructor(private pool: Pool, private workspace: WorkspaceGuard, private issue: IssueReader, private safeMessage: MessageGuard, private agentAvailable: () => boolean, private clock: () => Date = () => new Date()) {}
+  constructor(private pool: Pool, private workspace: WorkspaceGuard, private issue: IssueReader, private safeMessage: MessageGuard, private agentAvailable: (ownerId: string, botId: string | null) => boolean | Promise<boolean>, private clock: () => Date = () => new Date()) {}
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>): Promise<T> {
     observePoolCommits(this.pool)
     const tx = await this.pool.connect()
@@ -52,8 +52,8 @@ export class ScheduleStore {
   private async source(tx: PoolClient, actor: Actor) {
     if (!actor.sourceEventId || !(await tx.query(`SELECT id FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid AND kind='user_message'`, [actor.sourceEventId,actor.ownerId,actor.botId])).rowCount) throw new ScheduleError('scheduleUserSourceRequired',403)
   }
-  private async permission(tx: PoolClient, owner: string, def: Definition) {
-    if(def.task.kind==='agent_read'&&!this.agentAvailable())throw new ScheduleError('scheduleAgentReadUnavailable',503)
+  private async permission(tx: PoolClient, owner: string, botId: string | null, def: Definition) {
+    if(def.task.kind==='agent_read'&&!await this.agentAvailable(owner,botId))throw new ScheduleError('scheduleAgentReadUnavailable',503)
     if (def.task.kind !== 'issue_snapshot') return null
     const issue = await this.issue(tx,owner,def.task.issueId)
     if (!issue) throw new ScheduleError('scheduleTaskAccessDenied',403)
@@ -73,7 +73,7 @@ export class ScheduleStore {
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[JSON.stringify(['schedule',actor.ownerId,actor.botId,cmd.requestId])])
         const old = (await tx.query<Schedule>('SELECT * FROM user_schedules WHERE owner_id=$1 AND bot_id IS NOT DISTINCT FROM $2::uuid AND request_id=$3',[actor.ownerId,actor.botId,cmd.requestId])).rows[0]
         if (old) { if (!isDeepStrictEqual(old.request_definition,def) || old.workspace_id!==actor.workspaceId) throw new ScheduleError('scheduleRequestConflict'); return { schedule:old,replayed:true } }
-        await this.permission(tx,actor.ownerId,def)
+        await this.permission(tx,actor.ownerId,actor.botId,def)
         const next=nextTime(def,this.clock(),true)
         const {rows}=await tx.query<Schedule>(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status,next_at) VALUES($1,$2,$3,$4,$5,$6,$7,$7,'active',$8) RETURNING *`,[randomUUID(),actor.ownerId,actor.workspaceId,actor.botId,actor.sourceEventId,cmd.requestId,def,next])
         return {schedule:rows[0],replayed:false}
@@ -85,10 +85,10 @@ export class ScheduleStore {
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
       let def=row.definition, status=row.status, next=row.next_at
-      if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,actor.ownerId,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
+      if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,actor.ownerId,actor.botId,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
       else if(cmd.action==='pause'){status='paused';next=null}
       else if(cmd.action==='cancel'){status='cancelled';next=null}
-      else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');await this.permission(tx,actor.ownerId,def);next=nextTime(def,this.clock());status=next?'active':'completed'}
+      else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');await this.permission(tx,actor.ownerId,actor.botId,def);next=nextTime(def,this.clock());status=next?'active':'completed'}
       const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
       await this.lockChat(tx,row)
       for(const item of stale.rows){await this.retireEvent(tx,item.event_id);await this.report(tx,row,item,'cancelled',null,'scheduleChanged')}
@@ -137,7 +137,7 @@ export class ScheduleStore {
       await this.conversation(tx,{ownerId:row.owner_id,workspaceId:row.workspace_id,botId:row.bot_id})
       if(o.attempts>MAX_ATTEMPTS)throw new ScheduleError('scheduleRecoveryExhausted')
       const skipped=o.execution_decision==='skip'
-      const issue=skipped?null:await this.permission(tx,row.owner_id,o.definition)
+      const issue=skipped?null:await this.permission(tx,row.owner_id,row.bot_id,o.definition)
       const task=o.definition.task
       if(!skipped&&task.kind==='agent_read'){
         const eventId=randomUUID()

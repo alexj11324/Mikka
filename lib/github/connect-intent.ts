@@ -53,7 +53,7 @@ export async function createConnectIntent(query: Query, userId: string, now = ne
 }
 
 export type GitHubSteps = {
-  authorizeURL: (state: string, codeChallenge: string) => string
+  authorizeURL: (state: string, codeChallenge: string) => string | Promise<string>
   exchange: (code: string, codeVerifier: string) => Promise<{ identity: { githubAccountId: string; githubLogin: string }; sealed: { accessToken: string; refreshToken: string | null; accessTokenExpiresAt: Date | null; refreshTokenExpiresAt: Date | null } }>
   seal: (value: string) => Promise<string>
   unseal: (value: string) => Promise<string>
@@ -74,7 +74,7 @@ export async function startLoopbackIntent(query: Query, token: string, steps: Pi
   const started = await query.query('UPDATE github_connect_intents SET "usedAt"=$3,"stateHash"=$2,"codeVerifier"=$4 WHERE "tokenHash"=$1 AND "usedAt" IS NULL AND "expiresAt" > $3',
     [hash(token), hash(state), now, await steps.seal(verifier)])
   if (!started.rowCount) return { kind: 'expired' }
-  return { kind: 'github', url: steps.authorizeURL(state, s256(verifier)) }
+  return { kind: 'github', url: await steps.authorizeURL(state, s256(verifier)) }
 }
 
 export const isLoopbackState = (state: string | null): state is string => typeof state === 'string' && /^ghl_[A-Za-z0-9_-]{43}$/.test(state)

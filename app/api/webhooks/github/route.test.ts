@@ -5,6 +5,8 @@ import { after, before, beforeEach, mock, test } from 'node:test'
 
 const secret = 'source-only-github-webhook-secret'
 const originalSecret = process.env.GITHUB_WEBHOOK_SECRET
+const originalEdition = process.env.MIKKA_EDITION, originalBackend = process.env.MIKKA_CLOUD_BACKEND_URL
+mock.module(new URL('../../../../lib/github/app-config.ts', import.meta.url).href, { namedExports: { readGitHubAppConfig: async () => ({ webhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? null }) } })
 const callbacks: Array<() => Promise<void>> = []
 const refresh = mock.fn(async (_event: string, _payload: unknown) => {})
 const notifications = [{ userId: 'owner', source: 'github', externalId: 'comment:7' }]
@@ -27,6 +29,8 @@ let POST: typeof import('./route')['POST']
 before(async () => { ({ POST } = await import('./route')) })
 beforeEach(() => {
   process.env.GITHUB_WEBHOOK_SECRET = secret
+  process.env.MIKKA_EDITION = 'community'
+  delete process.env.MIKKA_CLOUD_BACKEND_URL
   callbacks.length = 0
   refresh.mock.resetCalls()
   refresh.mock.mockImplementation(async () => {})
@@ -38,6 +42,10 @@ after(() => {
   hooks.deregister()
   if (originalSecret === undefined) delete process.env.GITHUB_WEBHOOK_SECRET
   else process.env.GITHUB_WEBHOOK_SECRET = originalSecret
+  if (originalEdition === undefined) delete process.env.MIKKA_EDITION
+  else process.env.MIKKA_EDITION = originalEdition
+  if (originalBackend === undefined) delete process.env.MIKKA_CLOUD_BACKEND_URL
+  else process.env.MIKKA_CLOUD_BACKEND_URL = originalBackend
 })
 
 function request(event: string, payload: unknown, signature?: string) {
@@ -57,7 +65,7 @@ test('route import and signed no-op actions never load heavy modules or schedule
     ['issues', { action: 'opened', assignee: { id: 42 } }],
     ['issues', { action: 'closed', assignee: { id: 42 } }],
     ['issues', { action: 'edited', assignee: { id: 42 } }],
-    ['issue_comment', { action: 'edited', issue: { user: { id: 42 } } }], ['issues', null],
+    ['issue_comment', { action: 'edited', issue: { user: { id: 42 } } }],
   ] as const) {
     const response = await POST(request(event, payload))
     assert.equal(response.status, 204, event)
@@ -74,6 +82,8 @@ test('configuration, raw-body signature, size and JSON errors remain ahead of ev
   assert.equal((await POST(request('issues', {}, 'sha256=invalid'))).status, 401)
   assert.equal((await POST(rawRequest('issues', 'x'.repeat(1_000_001)))).status, 413)
   assert.equal((await POST(rawRequest('issues', '{'))).status, 400)
+  assert.equal((await POST(request('issues', null))).status, 400)
+  assert.equal((await POST(request('issues', []))).status, 400)
   assert.deepEqual(callbacks, [])
   assert.deepEqual(loaded, [])
 })
@@ -154,4 +164,29 @@ test('a publication refresh failure is logged and does not fail the delivery', a
     assert.equal(refresh.mock.callCount(), 1)
     assert.equal(error.mock.callCount(), 1)
   } finally { error.mock.restore() }
+})
+
+test('the official route keeps business handling in its own runtime and does not acknowledge a failed cloud bridge', async () => {
+  process.env.MIKKA_EDITION = 'cloud'; process.env.MIKKA_CLOUD_BACKEND_URL = 'https://private.example.com'
+  const body = JSON.stringify({ installation: { id: 99 }, action: 'synchronize', pull_request: { number: 7 }, privateBody: 'PRIVATE_WEBHOOK_FIXTURE' })
+  let status = 503, sends = 0
+  const send = mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
+    sends++; assert.equal(String(url), 'https://private.example.com/mikka/cloud/v1/github/webhook'); assert.equal(init?.body, body)
+    assert.equal(new Headers(init?.headers).get('x-github-delivery'), 'fixture-delivery')
+    return new Response('PRIVATE_PROVIDER_FIXTURE', { status })
+  })
+  const logs: unknown[] = [], error = mock.method(console, 'error', (...values: unknown[]) => { logs.push(values) })
+  try {
+    const invalid = rawRequest('pull_request', body, 'sha256=invalid'); invalid.headers.set('x-github-delivery', 'fixture-delivery')
+    assert.equal((await POST(invalid)).status, 401); assert.equal(sends, 0)
+    const input = rawRequest('pull_request', body); input.headers.set('x-github-delivery', 'fixture-delivery')
+    const failed = await POST(input)
+    assert.equal(failed.status, 503); assert.equal(sends, 1); assert.equal(callbacks.length, 1)
+    assert.equal((await failed.text()).includes('PRIVATE_'), false)
+    await callbacks.shift()!(); assert.equal(refresh.mock.callCount(), 1)
+    status = 202
+    const retry = rawRequest('pull_request', body); retry.headers.set('x-github-delivery', 'fixture-delivery')
+    assert.equal((await POST(retry)).status, 202); assert.equal(sends, 2); assert.equal(callbacks.length, 1)
+    assert.equal(JSON.stringify(logs).includes('PRIVATE_'), false)
+  } finally { send.mock.restore(); error.mock.restore() }
 })

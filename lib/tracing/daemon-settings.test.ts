@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { ROOT_CONTEXT, defaultTextMapGetter } from '@opentelemetry/api'
+import { ROOT_CONTEXT, TraceFlags, defaultTextMapGetter } from '@opentelemetry/api'
 import { W3CTraceContextPropagator } from '@opentelemetry/core'
 import { InMemorySpanExporter, SamplingDecision, TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
 import { deviceRegistered } from '../../packages/protocol/src/device'
@@ -36,7 +36,8 @@ test('at equal rates the server keeps exactly the daemon traces the daemon kept'
     const headers = { traceparent: `00-${traceId}-1234567890abcdef-${daemonKept ? '01' : '00'}` }
     const parent = w3c.extract(ROOT_CONTEXT, headers, defaultTextMapGetter)
     const span = tracer.startSpan('POST /v1/devices/[deviceId]/heartbeat', {}, parent)
-    assert.equal(span.isRecording(), daemonKept)
+    // Unsampled ordinary requests record locally until outcome/latency is known.
+    assert.equal(Boolean(span.spanContext().traceFlags & TraceFlags.SAMPLED), daemonKept)
     assert.equal(span.spanContext().traceId, traceId)
     if (daemonKept) kept++
     span.end()

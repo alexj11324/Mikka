@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { MailboxError } from '@/lib/mailbox-error'
+import { ActionFailureError } from '@/lib/action-error'
 import { GovernanceError } from './errors'
 
 export async function governanceSession(request: Request, workspaceId?: string) {
@@ -25,7 +26,8 @@ export async function governanceResponse(work: () => Promise<Response | unknown>
   } catch (error) {
     const known = error instanceof GovernanceError ? error
       : error instanceof z.ZodError ? new GovernanceError('invalid_request', error)
-        : error instanceof WorkspaceError || (error instanceof MailboxError && error.status === 403) ? new GovernanceError('access_denied', error) : null
+        : error instanceof WorkspaceError || (error instanceof MailboxError && error.status === 403)
+          || (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied') ? new GovernanceError('access_denied', error) : null
     if (!known) {
       console.error('governance_request_failed', { name: error instanceof Error ? error.name : 'UnknownError' })
       return Response.json({ error: { code: 'governance_denied' } }, { status: 500, headers: { 'cache-control': 'private, no-store' } })

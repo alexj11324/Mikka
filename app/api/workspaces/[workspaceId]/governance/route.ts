@@ -8,6 +8,7 @@ import { organizationMembers, organizations } from '@/lib/db/governance-schema'
 import { workspaceGovernanceSummary } from '@/lib/governance/entitlements'
 import { governanceJson, governanceResponse, governanceSession } from '@/lib/governance/http'
 import { applyApprovalTemplate, deleteApprovalTemplate, saveApprovalTemplate } from '@/lib/governance/templates'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 export const runtime = 'nodejs'
 type Context = { params: Promise<{ workspaceId: string }> }
 
@@ -15,7 +16,7 @@ export const GET = freshSessionRoute(async (request: Request, context: Context) 
   const { workspaceId } = await context.params
   const session = await governanceSession(request, workspaceId)
   return workspaceDb.transaction(async tx => {
-    const { membership } = await requireWorkspace(tx, workspaceId, session.user.id)
+    const { membership } = await requireWorkspace(tx, workspaceId, session.user.id, false, session.user[enterprisePrincipal])
     const summary = await workspaceGovernanceSummary(tx, workspaceId)
     const canEdit = membership.role === 'admin'
     const templates = canEdit && summary.approvalTemplates ? await tx.select().from(governanceApprovalTemplates).where(eq(governanceApprovalTemplates.workspaceId, workspaceId)).orderBy(asc(governanceApprovalTemplates.createdAt)) : []
@@ -32,8 +33,8 @@ export const POST = freshSessionRoute(async (request: Request, context: Context)
   const { workspaceId } = await context.params
   const session = await governanceSession(request, workspaceId)
   const value = operation.parse(await governanceJson(request))
-  if (value.action === 'save') return saveApprovalTemplate(workspaceId, session.user.id, value.template)
-  if (value.action === 'apply') return applyApprovalTemplate(workspaceId, session.user.id, value.templateId)
-  await deleteApprovalTemplate(workspaceId, session.user.id, value.templateId)
+  if (value.action === 'save') return saveApprovalTemplate(workspaceId, session.user, value.template)
+  if (value.action === 'apply') return applyApprovalTemplate(workspaceId, session.user, value.templateId)
+  await deleteApprovalTemplate(workspaceId, session.user, value.templateId)
   return { deleted: true }
 }))

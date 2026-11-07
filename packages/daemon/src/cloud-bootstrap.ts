@@ -2,6 +2,8 @@ import { constants, closeSync, existsSync, fstatSync, mkdirSync, openSync, readF
 import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
+import { deviceRegistered } from '@mikka/protocol/device'
+import { sanitizeTraceContext } from '@mikka/protocol/trace-context'
 import { readJson, writeJsonAtomic } from './fs-util'
 import { DAEMON_VERSION, daemonPaths } from './paths'
 import { connectDaemonInDataDir, isNoDaemon } from './rpc/client'
@@ -13,6 +15,8 @@ const configSchema = z.object({
   credential: z.string().regex(/^orv_[A-Za-z0-9_-]{43}$/),
   server: z.url({ protocol: /^https$/ }),
   protectionBypass: z.string().regex(/^[A-Za-z0-9_-]{20,256}$/).optional(),
+  traceContext: z.unknown().transform(sanitizeTraceContext).optional(),
+  tracing: deviceRegistered.shape.tracing,
 }).strict()
 
 const initialRunSchema = z.object({
@@ -118,7 +122,7 @@ export async function installCloudCredential(dataDir: string, config: z.infer<ty
       const status = await client.request('daemon.status')
       if (status.deviceId && status.deviceId !== config.deviceId) throw new Error('Cloud device identity changed')
       if (!current) throw new Error('Cloud device identity unavailable')
-      await client.request('device.setCredential', { credential: config.credential, workspaceId: config.workspaceId })
+      await client.request('device.setCredential', { credential: config.credential, workspaceId: config.workspaceId, traceContext: config.traceContext })
       return 'updated'
     } finally { client.close() }
   } catch (error) {

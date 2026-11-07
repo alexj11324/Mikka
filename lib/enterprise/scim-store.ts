@@ -3,6 +3,7 @@ import { isDeepStrictEqual } from 'node:util'
 import type { Pool, PoolClient, QueryResultRow } from 'pg'
 import { applyScimPatch, parseScim, ScimError, scimGroupInput, scimUserInput, type ScimGroupDocument, type ScimUserDocument } from './scim-protocol'
 import { armDueTimerSoon } from '../due-timer'
+import { lockOrganizationLiveAuthority, revokeOrganizationLiveCapabilities } from './live-store'
 
 export type ScimConnection = { id: string; organizationId: string; providerId: string }
 export type DirectoryUser = QueryResultRow & {
@@ -34,30 +35,37 @@ export class ScimStore {
       values ($1,$2,$3,$4,$5,$6)`, [randomUUID(), connection.id, connection.organizationId, kind, resourceId, action])
   }
 
-  /** The directory transaction commits before any workspace locks are acquired. Retries reuse the audit event ID. */
+  /** The directory mutation commits before delivery. Keep the per-directory
+   * serializer in WS, release every APP checkout before callbacks, and ACK
+   * only after the WS commit. A lost ACK safely reuses the stable audit ID. */
   async drain(connection: ScimConnection, force = true) {
-    const client = await this.pool.connect()
-    const key = `enterprise-scim:${connection.id}`
-    try {
-      const { rows: [lock] } = await client.query<{ acquired: boolean }>('select pg_try_advisory_lock(hashtextextended($1,0)) as acquired', [key])
-      if (!lock.acquired) return
-      try {
-        const { rows } = await client.query<{ id: string; kind: 'Users' | 'Groups'; resourceId: string; action: DirectoryChange['action'] }>(`select id,kind,"resourceId",action from enterprise_scim_outbox
-          where "connectionId"=$1 and "deliveredAt" is null and ($2 or "lastAttemptAt" is null or "lastAttemptAt"<=now()-interval '30 seconds')
-          order by "createdAt",id limit 100`, [connection.id, force])
-        for (const event of rows) {
-          await client.query('update enterprise_scim_outbox set "lastAttemptAt"=now() where id=$1', [event.id])
-          if (event.kind === 'Groups') await this.afterGroupChange(connection, event.resourceId, event.id)
-          else {
-            const { rows: [user] } = await client.query<DirectoryUser>('select * from enterprise_scim_user where id=$1 and "connectionId"=$2', [event.resourceId, connection.id])
-            if (!user) throw new Error('enterprise_directory_event_missing')
-            // Reconciliation always uses the newest durable directory state, never a stale request body.
-            await this.afterUserChange({ connection, user, action: event.action, eventId: event.id })
-          }
-          await client.query('update enterprise_scim_outbox set "deliveredAt"=now() where id=$1', [event.id])
+    const [{ drainOrganizationLiveRevocations }, { workspaceDb }, { sql }] = await Promise.all([
+      import('./live-authority'), import('../workspace-db'), import('drizzle-orm'),
+    ])
+    await drainOrganizationLiveRevocations(connection.organizationId)
+    const delivered = await workspaceDb.transaction(async workspace => {
+      const lock = await workspace.execute(sql`select pg_try_advisory_xact_lock(hashtextextended(${`enterprise-scim:${connection.id}`},0)) as acquired`)
+      if (lock.rows[0]?.acquired !== true) return []
+      const { rows } = await this.pool.query<{ id: string; kind: 'Users' | 'Groups'; resourceId: string; action: DirectoryChange['action'] }>(`select id,kind,"resourceId",action from enterprise_scim_outbox
+        where "connectionId"=$1 and "deliveredAt" is null and ($2 or "lastAttemptAt" is null or "lastAttemptAt"<=now()-interval '30 seconds')
+        order by "createdAt",id limit 100`, [connection.id, force])
+      const completed: string[] = []
+      for (const event of rows) {
+        const claim = await this.pool.query('update enterprise_scim_outbox set "lastAttemptAt"=now() where id=$1 and "deliveredAt" is null', [event.id])
+        if (!claim.rowCount) continue
+        if (event.kind === 'Groups') await this.afterGroupChange(connection, event.resourceId, event.id)
+        else {
+          const { rows: [user] } = await this.pool.query<DirectoryUser>('select * from enterprise_scim_user where id=$1 and "connectionId"=$2', [event.resourceId, connection.id])
+          if (!user) throw new Error('enterprise_directory_event_missing')
+          // Never replay request bodies. The serialized delivery observes the
+          // newest committed directory state, including a later disable.
+          await this.afterUserChange({ connection, user, action: event.action, eventId: event.id })
         }
-      } finally { await client.query('select pg_advisory_unlock(hashtextextended($1,0))', [key]) }
-    } finally { client.release() }
+        completed.push(event.id)
+      }
+      return completed
+    })
+    if (delivered.length) await this.pool.query('update enterprise_scim_outbox set "deliveredAt"=now() where id=any($1::uuid[]) and "deliveredAt" is null', [delivered])
   }
 
   private async transaction<T>(connection: ScimConnection, work: (tx: PoolClient) => Promise<T>): Promise<T> {
@@ -157,11 +165,13 @@ export class ScimStore {
     return rows[0]
   }
 
-  private async queueRevocation(tx: Executor, user: DirectoryUser) {
+  private async queueRevocation(tx: Executor, user: DirectoryUser, deferLive = false) {
     if (!user.userId) return
+    await lockOrganizationLiveAuthority(tx, user.organizationId)
     await tx.query('insert into enterprise_revocation (id,"organizationId","directoryUserId","userId") values ($1,$2,$3,$4)', [randomUUID(), user.organizationId, user.id, user.userId])
     // Removing only the organization proof leaves personal and unrelated organization sessions intact.
     await tx.query('update session set "enterpriseOrganizationId"=null,"enterpriseProviderId"=null,"enterpriseDirectoryUserId"=null,"enterpriseIdentityId"=null where "enterpriseDirectoryUserId"=$1', [user.id])
+    if (!deferLive) await revokeOrganizationLiveCapabilities(tx, user.organizationId, user.userId)
   }
 
   async deleteUser(connection: ScimConnection, id: string, ifMatch: string | null) {
@@ -249,10 +259,14 @@ export class ScimStore {
       await tx.query('update enterprise_scim_connection set "revokedAt"=coalesce("revokedAt",now()),fence=fence+1 where id=$1', [connection.id])
       const { rows: users } = await tx.query<DirectoryUser>(`update enterprise_scim_user set active=false,document=jsonb_set(document,'{active}','false'::jsonb),
         revision=revision+case when active then 1 else 0 end,"updatedAt"=now() where "connectionId"=$1 returning *`, [connection.id])
+      // Finish every session mutation before taking remaining cap row locks.
+      // A native session DELETE must never wait on a cap we hold while this
+      // transaction is waiting for that same session row.
       for (const user of users) {
-        await this.queueRevocation(tx, user)
+        await this.queueRevocation(tx, user, true)
         await this.enqueueChange(tx, connection, 'Users', user.id, user.deleted ? 'deleted' : 'suspended')
       }
+      for (const user of users) if (user.userId) await revokeOrganizationLiveCapabilities(tx, organizationId, user.userId)
       if (beforeCommit) await beforeCommit(tx, connection)
       await tx.query('commit')
       armDueTimerSoon('audit-retention')

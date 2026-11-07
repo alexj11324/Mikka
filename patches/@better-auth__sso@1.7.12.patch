@@ -49,7 +49,8 @@
 +		});
  		const idp = createIdP(config);
  		if (samlResponse) return handleLogoutResponse(ctx, sp, idp, relayState, providerId);
- 		return handleLogoutRequest(ctx, sp, idp, relayState, providerId);
+-		return handleLogoutRequest(ctx, sp, idp, relayState, providerId);
++		return handleLogoutRequest(ctx, sp, idp, relayState, providerId, options);
  	});
  };
 +function getSAMLLogoutRequestData(ctx) {
@@ -96,7 +97,9 @@
  	deleteSessionCookie(ctx);
  	const appOrigin = new URL(ctx.context.baseURL).origin;
  	const safeRedirectUrl = getSafeRedirectUrl([relayState], `${appOrigin}/sso/saml2/sp/slo/${providerId}`, appOrigin, (url, settings) => ctx.context.isTrustedOrigin(url, settings));
-@@ -4363,10 +4389,7 @@
+@@ -4362,11 +4388,8 @@
+-async function handleLogoutRequest(ctx, sp, idp, relayState, providerId) {
++async function handleLogoutRequest(ctx, sp, idp, relayState, providerId, options) {
  	const binding = ctx.method === "POST" && ctx.body?.SAMLRequest ? "post" : "redirect";
  	let parsed;
  	try {
@@ -108,7 +111,18 @@
  	} catch (error) {
  		ctx.context.logger.error("LogoutRequest validation failed", { error });
  		throw APIError.from("BAD_REQUEST", SAML_ERROR_CODES.INVALID_LOGOUT_REQUEST);
-@@ -4433,9 +4456,8 @@
+@@ -4377,3 +4400,10 @@
++	if (options?.saml?.onVerifiedLogoutRequest) {
++		const handled = await options.saml.onVerifiedLogoutRequest({ providerId, nameID, sessionIndex });
++		if (handled !== true) throw APIError.from("SERVICE_UNAVAILABLE", SAML_ERROR_CODES.INVALID_LOGOUT_REQUEST);
++		const res = sp.createLogoutResponse(idp, parsed, binding, relayState || "");
++		if (binding === "post" && res.entityEndpoint) return createSAMLPostForm(res.entityEndpoint, "SAMLResponse", res.context, relayState);
++		throw ctx.redirect(res.context);
++	}
+ 	const key = `${SAML_SESSION_KEY_PREFIX}${providerId}:${nameID}`;
+ 	const stored = await ctx.context.internalAdapter.findVerificationValue(key);
+ 	if (stored) {
+@@ -4433,9 +4463,8 @@
  		}
  		const logoutRequest = sp.createLogoutRequest(idp, "redirect", {
  			logoutNameID: nameID,

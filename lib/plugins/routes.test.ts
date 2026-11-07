@@ -7,7 +7,7 @@ const calls: unknown[][] = []
 let owner: string | null = 'owner'
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 stub('../api-auth.ts', { auth: { api: { getSession: async () => owner ? { user: { id: owner } } : null } } })
-stub('../request-log.ts', { noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
+stub('../request-log.ts', { noteLogRpcAction: () => {}, noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
 stub('./runtime.ts', { personalPlugins: {
   listMcp: async (userId: string) => { calls.push(['listMcp', userId]); return [] },
   createMcp: async (...args: unknown[]) => { calls.push(['createMcp', ...args]); return { id: randomUUID(), authKind: 'header' } },
@@ -53,7 +53,8 @@ let mcpShares: typeof import('../../app/api/integrations/mcp/shares/route')
 before(async () => { mcpShares = await import('../../app/api/integrations/mcp/shares/route') })
 before(async () => { mcp = await import('../../app/api/integrations/mcp/route'); skills = await import('../../app/api/skills/route'); catalog = await import('../../app/api/integrations/composio/catalog/route') })
 function request(path: string, method = 'GET', data?: unknown, origin = 'https://mikka.acme.dev') {
-  return new Request(`https://mikka.acme.dev${path}`, { method, headers: { origin, 'Content-Type': 'application/json' }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) })
+  // The session lookup above is synthetic, but human-only routes still inspect the actual header shape.
+  return new Request(`https://mikka.acme.dev${path}`, { method, headers: { origin, 'Content-Type': 'application/json', cookie: 'better-auth.session_token=synthetic-browser-session' }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) })
 }
 test('actual routes require authentication and same-origin mutations before storage/source access', async () => {
   owner = null; calls.length = 0
@@ -105,6 +106,26 @@ test('custom MCP sharing is a fresh owner HTTP action; workspace reads and mutat
   assert.equal((await mcp.GET(request(`/api/integrations/mcp?workspaceId=${workspaceId}`))).status, 200)
   assert.deepEqual(calls.at(-1), ['workspaceMcpList', 'owner', workspaceId])
   assert.equal((await mcp.GET(request('/api/integrations/mcp?workspaceId=invalid'))).status, 400)
+})
+
+test('MCP sharing rejects missing and delegated credentials before storage even when the session stub has an owner', async () => {
+  owner = 'owner'; calls.length = 0
+  const path = '/api/integrations/mcp/shares'
+  const input = { workspaceId: randomUUID(), serverId: randomUUID(), shared: true }
+  const missing = request(path, 'PATCH', input)
+  missing.headers.delete('cookie')
+  assert.equal((await mcpShares.PATCH(missing)).status, 401)
+  for (const prefix of ['mkp_', 'mka_', 'mkr_']) {
+    const delegated = request(path, 'PATCH', input)
+    delegated.headers.set('authorization', `Bearer ${prefix}${'x'.repeat(43)}`)
+    assert.equal((await mcpShares.PATCH(delegated)).status, 401, 'a cookie must not rescue delegated authorization')
+  }
+  assert.deepEqual(calls, [])
+  const native = request(path, 'PATCH', input)
+  native.headers.delete('cookie')
+  native.headers.set('authorization', `Bearer ${'n'.repeat(40)}`)
+  assert.equal((await mcpShares.PATCH(native)).status, 200)
+  assert.deepEqual(calls, [['workspaceMcpShare', 'owner', input]])
 })
 
 test('a key goes from the signed-in person to Composio and never back out, in a response or a log', async () => {

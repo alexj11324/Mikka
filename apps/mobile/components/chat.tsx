@@ -15,8 +15,7 @@ import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { press, tap } from '@/lib/haptics'
 import { splitQuoted } from '@/lib/quote'
-import { authHeaders } from '@/lib/api'
-import { API_URL } from '@/lib/config'
+import { apiConnection, authHeaders } from '@/lib/api'
 import type { Reaction, ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
@@ -73,13 +72,14 @@ export function FoldedWords({ text, color }: { text: string; color: string }) {
 
 /** A sent photo as the chat loads it: the person's own message, signed in. */
 export function useChatPhotos(): (messageId: string | undefined, count: number | undefined) => ImageURISource[] {
+  const [connection] = useState(apiConnection)
   const [headers, setHeaders] = useState<Record<string, string> | null>(null)
-  useEffect(() => { void authHeaders().then(setHeaders) }, [])
+  useEffect(() => { void authHeaders(connection).then(setHeaders) }, [connection])
   return (messageId, count) => {
     if (!count) return []
     // Still in the inbox (no message row yet): grey stand-ins until the next poll.
     if (!messageId || !headers) return Array.from({ length: count }, () => ({ uri: '' }))
-    return Array.from({ length: count }, (_, index) => ({ uri: `${API_URL}/api/mobile/chat/image?message=${messageId}&index=${index}`, headers }))
+    return Array.from({ length: count }, (_, index) => ({ uri: `${connection.account.server.url}/api/mobile/chat/image?message=${messageId}&index=${index}`, headers }))
   }
 }
 

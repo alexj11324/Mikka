@@ -22,18 +22,17 @@ async function handleGET(request: Request) {
     return Response.json({ error: 'invalid_query' }, { status: 400, headers: NO_STORE })
   }
 
-  let token: string
+  let token: string | undefined
   try {
     token = await getVercelOidcToken()
-  } catch {
-    return Response.json({ error: 'skills_oidc_unavailable' }, { status: 503, headers: NO_STORE })
-  }
+  } catch { /* skills.sh also exposes this catalog without deployment identity. */ }
 
   const url = skillsUpstreamUrl(query, page)
 
   try {
     const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      redirect: 'error',
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),
     })

@@ -5,22 +5,27 @@ import { retryMemberLifecycleOutbox } from '../governance/member-outbox'
 import { retryOrganizationPolicyOutbox } from '../governance/resource-policy'
 import { sweepOrganizationAuditRetention } from '../governance/audit-export'
 import { deliverIdentityAudits } from './audit-outbox'
+import { drainLiveRevocations } from './live-authority'
+import { liveGatewayConfig } from '../live/scope'
 
 /** Reuses the existing durable audit-maintenance timer; this is not a periodic polling loop. */
 export async function maintainEnterpriseGovernance() {
+  const live = await drainLiveRevocations({}, false)
   const directories = await retryEnterpriseDirectoryOutbox(undefined, false)
   const identityAudits = await deliverIdentityAudits(undefined, false)
   const members = await retryMemberLifecycleOutbox()
   const policies = await retryOrganizationPolicyOutbox()
   const retention = await sweepOrganizationAuditRetention()
-  return { directories, identityAudits, members, policies, retention }
+  return { live, directories, identityAudits, members, policies, retention }
 }
 
 export async function nextEnterpriseMaintenanceDue(main: Pick<Pool, 'query'>, workspace: Pick<Pool, 'query'>): Promise<number | null> {
   const [identity, governance] = await Promise.all([
     main.query<{ at: string | null }>(`select ceil(extract(epoch from min(at))*1000)::bigint::text as at from (
       select coalesce("lastAttemptAt"+interval '30 seconds',"createdAt") as at from enterprise_scim_outbox where "deliveredAt" is null
-      union all select coalesce("lastAttemptAt"+interval '30 seconds',"createdAt") from enterprise_audit_outbox where "deliveredAt" is null) pending`),
+      union all select coalesce("lastAttemptAt"+interval '30 seconds',"createdAt") from enterprise_audit_outbox where "deliveredAt" is null
+      union all select coalesce("lastAttemptAt"+interval '30 seconds',"createdAt") from enterprise_live_capabilities
+        where "revokedAt" is not null and "deliveredAt" is null and $1) pending`, [!!liveGatewayConfig(process.env)]),
     workspace.query<{ at: string | null }>(`select ceil(extract(epoch from min(at))*1000)::bigint::text as at from (
       select "createdAt" as at from mikka_governance_member_outbox where "deliveredAt" is null
       union all select "createdAt" from mikka_organization_policy_outbox where "deliveredAt" is null

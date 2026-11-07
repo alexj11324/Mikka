@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { type TestContext } from 'node:test'
 import { createServer, type Server } from 'node:http'
-import { randomBytes, randomUUID, generateKeyPairSync, sign, createHash } from 'node:crypto'
+import { randomBytes, randomUUID, generateKeyPairSync, sign, createHash, createHmac } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { inflateRawSync } from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
+import { enterprisePrincipal } from './principal'
 import { Pool } from 'pg'
 import { betterAuth } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
@@ -51,6 +53,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
   const oidcDomain = `oidc-${fixtureId}.example.invalid`, samlDomain = `saml-${fixtureId}.example.invalid`, otherDomain = `other-${fixtureId}.example.invalid`
   const email = `${randomUUID()}@${oidcDomain}`, subject = `subject-${randomUUID()}`
   const samlSubject = `${randomUUID()}@${samlDomain}`
+  let samlIdentity = samlSubject
   const bearer = `msc_${randomBytes(32).toString('base64url')}`, samlBearer = `msc_${randomBytes(32).toString('base64url')}`, otherBearer = `msc_${randomBytes(32).toString('base64url')}`
   const { synchronizeDirectoryUser, auditDirectoryGroup } = await import('./lifecycle')
   const { enterpriseWorkspaceAllowed } = await import('./access')
@@ -153,7 +156,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
         const xml = inflateRawSync(Buffer.from(url.searchParams.get('SAMLRequest')!, 'base64')).toString()
         const id = /\bID="([^"]+)"/.exec(xml)?.[1]
         assert.ok(id)
-        const response = await samlIdp.createLoginResponse(samlSp, { extract: { request: { id: mode === 'request' ? `wrong-${randomUUID()}` : id } } }, 'post', { email: samlSubject })
+        const response = await samlIdp.createLoginResponse(samlSp, { extract: { request: { id: mode === 'request' ? `wrong-${randomUUID()}` : id } } }, 'post', { email: samlIdentity })
         let encoded = response.context
         if (mode === 'tampered') encoded = Buffer.from(Buffer.from(encoded, 'base64').toString().replace(samlSubject, 'attacker@example.invalid')).toString('base64')
         outgoing.setHeader('content-type', 'application/json'); outgoing.end(JSON.stringify({ SAMLResponse: encoded, RelayState: url.searchParams.get('RelayState') })); return
@@ -178,7 +181,25 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
         ...(incoming.method === 'GET' || incoming.method === 'HEAD' ? {} : { body: Buffer.concat(chunks) }) })
       const url = new URL(request.url)
       const resource = /^\/scim\/([^/]+)(?:\/(.*))?$/.exec(url.pathname)
-      const response = resource ? await scim(request, resource[1], resource[2]?.split('/') ?? []) : await handler(request)
+      const governance = /^\/api\/workspaces\/([^/]+)\/governance(\/usage)?$/.exec(url.pathname)
+      let response: Response
+      if (resource) response = await scim(request, resource[1], resource[2]?.split('/') ?? [])
+      else if (governance) {
+        const context = { params: Promise.resolve({ workspaceId: governance[1] }) }
+        if (governance[2]) response = await (await import('../../app/api/workspaces/[workspaceId]/governance/usage/route')).GET(request, context)
+        else {
+          const route = await import('../../app/api/workspaces/[workspaceId]/governance/route')
+          response = request.method === 'GET' ? await route.GET(request, context) : await route.POST(request, context)
+        }
+      } else if (url.pathname === '/api/web/begin') response = await (await import('../../app/api/web/begin/route')).POST(request)
+      else if (url.pathname === '/api/web/return') response = await (await import('../../app/api/web/return/route')).GET(request)
+      else if (url.pathname === '/api/web/exchange') response = await (await import('../../app/api/web/exchange/route')).POST(request)
+      else if (url.pathname === '/api/live/ticket') response = await (await import('../../app/api/live/ticket/route')).GET(request)
+      else if (url.pathname === '/api/mobile/push-tokens') {
+        const route = await import('../../app/api/mobile/push-tokens/route')
+        response = request.method === 'POST' ? await route.POST(request) : await route.DELETE(request)
+      }
+      else response = await handler(request)
       outgoing.writeHead(response.status, { ...Object.fromEntries([...response.headers].filter(([name]) => name !== 'set-cookie')), 'set-cookie': response.headers.getSetCookie() })
       outgoing.end(await response.text())
     } catch (error) { outgoing.writeHead(500); outgoing.end(error instanceof Error ? error.name : 'FixtureError') }
@@ -189,7 +210,10 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } }, rateLimit: { enabled: false },
     session: { storeSessionInDatabase: true, additionalFields: enterpriseSessionFields },
     databaseHooks: {
-      session: { create: { before: async session => ({ data: { ...session, ...ssoSessionData(session.userId) } }) } },
+      session: {
+      create: { before: async session => ({ data: { ...session, ...ssoSessionData(session.userId) } }) },
+      delete: { after: async session => { (await import('./live-authority')).scheduleSessionLiveRevocation(session.userId) } },
+    },
       account: { create: { before: async account => ({ data: { ...account, idToken: null } }) }, update: { before: async account => ({ data: { ...account, idToken: null } }) } },
     },
     hooks: { after: createAuthMiddleware(completeEnterpriseSignIn) },
@@ -259,9 +283,11 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     jar.take(callback)
     return { callback, jar, upstream }
   }
-  async function samlLogin() {
+  async function samlLogin(nameID = samlSubject) {
     const { url, jar } = await startSso(samlProviderId)
-    const assertion = await fetch(url)
+    const previousIdentity = samlIdentity
+    let assertion: Response
+    try { samlIdentity = nameID; assertion = await fetch(url) } finally { samlIdentity = previousIdentity }
     assert.equal(assertion.status, 200, await assertion.clone().text())
     const payload = await assertion.json() as { SAMLResponse: string; RelayState: string }
     const send = () => fetch(`${appOrigin}/api/auth/sso/saml2/sp/acs/${samlProviderId}`, { method: 'POST',
@@ -288,6 +314,144 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const callback = new URL(endpoint.searchParams.get('post_logout_redirect_uri')!); callback.searchParams.set('state', state)
     const identifier = `enterprise-oidc-logout:${providerId}:${identityTokenHash(state)}`
     return { ...login, originalSessionId: active.session.id, endpoint, callback, identifier }
+  }
+  async function webHandoffFixture() {
+    const saved = Object.fromEntries(['MIKKA_EDITION', 'MIKKA_OFFICIAL_WEB_URL', 'VERCEL', 'DEVICE_GATEWAY_URL', 'BETTER_AUTH_SECRET'].map(key => [key, process.env[key]]))
+    const { auth: applicationAuth } = await import('../auth')
+    const applicationContext = await applicationAuth.$context
+    process.env.MIKKA_EDITION = 'community'
+    process.env.MIKKA_OFFICIAL_WEB_URL = 'https://official-web.example.invalid/mikka'
+    process.env.BETTER_AUTH_SECRET = applicationContext.secret
+    delete process.env.VERCEL
+    delete process.env.DEVICE_GATEWAY_URL
+    const { challengeFor } = await import('../desktop-auth-server')
+    const { webAuthStateHash } = await import('../web-connection/auth-server')
+    const official = process.env.MIKKA_OFFICIAL_WEB_URL, callback = `${official}/api/web/complete`
+    const sessions: string[] = [], states: string[] = []
+    async function request(token: string) {
+      const state = randomBytes(24).toString('base64url'), verifier = randomBytes(32).toString('base64url')
+      states.push(webAuthStateHash(state))
+      const post = (path: string, value: unknown) => fetch(`${appOrigin}${path}`, { method: 'POST', headers: {
+        origin: new URL(official).origin, 'content-type': 'application/json',
+      }, body: JSON.stringify(value), redirect: 'manual' })
+      assert.equal((await post('/api/web/begin', { state, challenge: challengeFor(verifier), callback })).status, 200)
+      // Real source token, application cookie signature and native verifier; no mocked auth.
+      const signature = createHmac('sha256', applicationContext.secret).update(token).digest('base64')
+      const cookie = `${applicationContext.authCookies.sessionToken.name}=${encodeURIComponent(`${token}.${signature}`)}`
+      const bound = await fetch(`${appOrigin}/api/web/return?${new URLSearchParams({ state, callback })}`, { headers: {
+        cookie, 'sec-fetch-site': 'same-origin', referer: `${appOrigin}/sign-in`,
+      }, redirect: 'manual' })
+      assert.equal(bound.status, 303)
+      const returned = new URL(bound.headers.get('location')!)
+      assert.equal(returned.origin + returned.pathname, callback)
+      const code = new URLSearchParams(returned.hash.slice(1)).get('code'); assert.ok(code)
+      const exchanged = await post('/api/web/exchange', { state, verifier, code, callback,
+        enterpriseOrganizationId: otherOrganizationId, enterpriseProviderId: otherProviderId, enterpriseIdentityId: randomUUID() })
+      if (exchanged.status === 200) sessions.push(((await exchanged.clone().json()) as { session: { id: string } }).session.id)
+      return exchanged
+    }
+    async function handoff(token: string) {
+      const exchanged = await request(token)
+      assert.equal(exchanged.status, 200)
+      const result = await exchanged.json() as { token: string; session: { id: string } }
+      assert.ok(result.token !== token, 'handoff issues an independent bearer')
+      assert.equal(exchanged.headers.has('set-cookie'), false)
+      return result
+    }
+    return { applicationContext, sessions, request, handoff, close: async () => {
+      await pool.query('delete from desktop_auth_requests where "stateHash"=any($1::text[])', [states])
+      await pool.query('delete from session where id=any($1::text[])', [sessions])
+      const { builtinGateway } = await import('../builtin-gateway/runtime')
+      await builtinGateway()?.stop()
+      for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value }
+    } }
+  }
+  async function cacheNamespace(token: string, workspaceId: string) {
+    const { getApiSession } = await import('../api-auth')
+    const { authorizedCacheWorkspace } = await import('../swr/cache-scope')
+    const active = await getApiSession({ headers: new Headers({ authorization: `Bearer ${token}` }), query: { disableCookieCache: true } })
+    assert.ok(active)
+    return authorizedCacheWorkspace({ id: active.user.id, [enterprisePrincipal]: { kind: 'session', sessionId: active.session.id } }, workspaceId)
+  }
+  async function phoneFixture(context: TestContext, workspaceId: string) {
+    type Push = { to: string; title: string; body: string; data: { userId: string; botId: string } }
+    const botId = randomUUID(), tokens: string[] = [], receipts: string[] = [], sent: Push[][] = [], failures: unknown[] = []
+    await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,\'Enterprise phone fixture\')', [botId, userId, workspaceId])
+    // Only external delivery and Workflow execution are intercepted. Native
+    // session authentication, token registration, tenant checks and receipts
+    // all use the production handlers and real PostgreSQL rows.
+    const receiptWorkflow = async () => { throw new Error('unexpected_fixture_workflow_execution') }
+    const workflow = context.mock.module(new URL('../../workflows/phone-push-receipts/workflow.ts', import.meta.url).href,
+      { namedExports: { phonePushReceipts: receiptWorkflow } })
+    const wake = context.mock.module('workflow/api', { namedExports: { start: async (work: unknown, args: unknown[]) => {
+      try {
+        assert.equal(work, receiptWorkflow)
+        assert.equal(args.length, 1)
+        const id = String(args[0]); assert.match(id, /^[0-9a-f-]{36}$/)
+        receipts.push(id)
+        // The delivery is still inside its APP transaction. Reuse its pinned
+        // connection rather than asking the independent observer to see an
+        // uncommitted receipt.
+        const { pool: applicationPool } = await import('../db')
+        assert.equal((await applicationPool.query('select id from mobile_push_receipts where id=$1 and user_id=$2', [id, userId])).rowCount, 1)
+      } catch (error) { failures.push(error); throw error }
+    } } })
+    const originalFetch = globalThis.fetch
+    const provider = context.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url !== 'https://exp.host/--/api/v2/push/send') {
+        if ([appOrigin, idpOrigin].includes(new URL(url).origin)) return originalFetch(input, init)
+        const error = new Error('unexpected_phone_fixture_network'); failures.push(error); throw error
+      }
+      try {
+        assert.equal(init?.method, 'POST')
+        const payload = JSON.parse(String(init?.body)) as Push[]
+        assert.ok(Array.isArray(payload) && payload.length > 0)
+        for (const item of payload) {
+          assert.ok(tokens.includes(item.to))
+          assert.equal(item.data.userId, userId); assert.equal(item.data.botId, botId)
+          assert.equal(item.body, 'Isolated enterprise reply')
+        }
+        sent.push(payload)
+        return Response.json({ data: payload.map(() => ({ status: 'ok', id: randomUUID() })) })
+      } catch (error) { failures.push(error); throw error }
+    })
+    let closed = false
+    async function closeFixture() {
+      if (closed) return
+      closed = true
+      provider.mock.restore(); wake.restore(); workflow.restore()
+      await pool.query('delete from mobile_push_tokens where token=any($1::text[])', [tokens])
+      await pool.query('delete from mobile_push_receipts where id=any($1::uuid[])', [receipts])
+      await pool.query('delete from bots where id=$1', [botId])
+      assert.equal(failures.length, 0, 'no unexpected external call or swallowed fixture assertion')
+    }
+    context.after(closeFixture)
+    return {
+      register: async (bearerToken: string, sessionId: string) => {
+        const token = 'ExpoPushToken[' + randomUUID().replaceAll('-', '') + ']'; tokens.push(token)
+        const registered = await fetch(appOrigin + '/api/mobile/push-tokens', { method: 'POST',
+          headers: { authorization: 'Bearer ' + bearerToken, 'content-type': 'application/json' },
+          body: JSON.stringify({ token, platform: 'ios', deviceName: 'Isolated enterprise fixture' }) })
+        assert.equal(registered.status, 200)
+        assert.equal((await pool.query('select "sessionId" from mobile_push_tokens where token=$1 and "userId"=$2', [token, userId])).rows[0]?.sessionId, sessionId)
+        return token
+      },
+      push: async () => {
+        const offset = sent.length, oldEdition = process.env.MIKKA_EDITION
+        process.env.MIKKA_EDITION = 'cloud'
+        try {
+          const { pushReply } = await import('../mobile-push')
+          await pushReply(userId, botId, 'Isolated enterprise reply', ['finished'])
+          assert.equal(failures.length, 0)
+          assert.equal((await pool.query('select count(*)::int as count from mobile_push_receipts where id=any($1::uuid[])', [receipts])).rows[0].count, receipts.length)
+          return sent.slice(offset).flatMap(batch => batch.map(item => item.to))
+        } finally {
+          if (oldEdition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = oldEdition
+        }
+      },
+      close: closeFixture,
+    }
   }
   const oidcReturn = (url: URL, jar: Cookies) => fetch(url, { headers: { cookie: jar.header() }, redirect: 'manual' })
   const nonceCount = async (identifier: string) => (await pool.query('select count(*) from verification where identifier=$1', [identifier])).rows[0].count as string
@@ -698,6 +862,381 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal(patch.status, 200); assert.equal((await patch.json()).members.length, 0)
     assert.equal((await requestScim(`Groups/${group.id}`, 'DELETE')).status, 204)
   })
+  await t.test('real governance HTTP usage, CSV and templates require the admitted SSO principal and current Workspace membership', async () => {
+    const previousEdition = process.env.MIKKA_EDITION
+    process.env.MIKKA_EDITION = 'cloud'
+    const workspaceId = randomUUID(), templateId = randomUUID(), plainSessionId = randomUUID(), plainToken = randomBytes(32).toString('hex')
+    const signedIn = await session(oidcCookies); assert.ok(signedIn)
+    const assuredToken = (await pool.query('select token from session where id=$1', [signedIn.session.id])).rows[0].token as string
+    await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Governance SSO fixture\',\'team\')', [workspaceId, userId])
+    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Directory user\',$3,\'admin\',\'active\')', [workspaceId, userId, email])
+    await pool.query('insert into mikka_organization_workspaces ("workspaceId","organizationId") values ($1,$2)', [workspaceId, organizationId])
+    await pool.query('insert into mikka_organization_entitlements ("organizationId",plan,source,"seatLimit") values ($1,\'enterprise\',\'cloud\',20)', [organizationId])
+    await pool.query('insert into enterprise_org_policy ("organizationId","enforceSso","allowMachineCredentials") values ($1,true,false)', [organizationId])
+    await pool.query('insert into mikka_governance_approval_templates (id,"workspaceId",name,rules,"createdBy") values ($1,$2,\'Read only\',$3,$4)', [templateId, workspaceId, { approvalMode: 'read_only' }, userId])
+    await pool.query('insert into session(id,token,"userId","expiresAt","createdAt","updatedAt") values($1,$2,$3,now()+interval \'1 hour\',now(),now())', [plainSessionId, plainToken, userId])
+    const call = (token: string, apply = false, csv = false) => fetch(`${appOrigin}/api/workspaces/${workspaceId}/governance${apply ? '' : `/usage${csv ? '?format=csv' : ''}`}`, {
+      method: apply ? 'POST' : 'GET', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      ...(apply ? { body: JSON.stringify({ action: 'apply', templateId }) } : {}), signal: AbortSignal.timeout(10_000),
+    })
+    const templateCall = (token: string, input?: unknown) => fetch(`${appOrigin}/api/workspaces/${workspaceId}/governance`, {
+      method: input === undefined ? 'GET' : 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      ...(input === undefined ? {} : { body: JSON.stringify(input) }), signal: AbortSignal.timeout(10_000),
+    })
+    const templateInput = { action: 'save', template: { name: 'SSO template', rules: { approvalMode: 'read_only' } } }
+    try {
+      assert.equal((await call(plainToken)).status, 403, 'ordinary authenticated session cannot read enforced-SSO usage')
+      assert.equal((await call(plainToken, false, true)).status, 403)
+      assert.equal((await call(plainToken, true)).status, 403, 'Workspace admin alone cannot apply an enforced-SSO template')
+      assert.equal((await templateCall(plainToken)).status, 403)
+      assert.equal((await templateCall(plainToken, templateInput)).status, 403)
+      assert.equal((await templateCall(plainToken, { action: 'delete', templateId })).status, 403)
+      assert.equal((await pool.query('select count(*) from workspace_computer_policies where "workspaceId"=$1', [workspaceId])).rows[0].count, '0')
+      assert.equal((await call(assuredToken)).status, 200, 'native bearer retains the real OIDC assurance through the governance lease')
+      assert.equal((await call(assuredToken, false, true)).status, 200)
+      const summary = await templateCall(assuredToken); assert.equal(summary.status, 200)
+      assert.ok((await summary.json()).templates.some((row: { id: string }) => row.id === templateId))
+      const saved = await templateCall(assuredToken, templateInput); assert.equal(saved.status, 200)
+      const savedId = (await saved.json()).id as string; assert.ok(savedId)
+      assert.equal((await templateCall(assuredToken, { action: 'delete', templateId: savedId })).status, 200)
+      assert.equal((await call(assuredToken, true)).status, 200)
+      assert.deepEqual((await pool.query('select cli_run_policy from workspace_computer_policies where "workspaceId"=$1', [workspaceId])).rows[0].cli_run_policy, { approvalMode: 'read_only' })
+      await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, userId])
+      assert.equal((await call(assuredToken)).status, 403, 'SSO assurance and Enterprise plan cannot restore Workspace membership')
+      assert.equal((await call(assuredToken, true)).status, 403)
+      assert.equal((await templateCall(assuredToken)).status, 403)
+      assert.equal((await templateCall(assuredToken, templateInput)).status, 403)
+    } finally {
+      await pool.query('delete from session where id=$1', [plainSessionId])
+      await pool.query('delete from workspace_computer_policies where "workspaceId"=$1', [workspaceId])
+      await pool.query('delete from enterprise_org_policy where "organizationId"=$1', [organizationId])
+      await pool.query('delete from mikka_organization_entitlements where "organizationId"=$1', [organizationId])
+      await pool.query('delete from mikka_workspaces where id=$1', [workspaceId])
+      if (previousEdition === undefined) delete process.env.MIKKA_EDITION
+      else process.env.MIKKA_EDITION = previousEdition
+    }
+  })
+  await t.test('real OIDC Web PKCE handoff retains only verified SSO assurance and live/cache/phone access enforces it', async t => {
+    const web = await webHandoffFixture()
+    const { applicationContext, sessions, handoff } = web
+    const { readSessionLiveTicket } = await import('../live/session-ticket')
+    const { builtinGatewayConfig } = await import('../builtin-gateway/config')
+    const workspaceId = randomUUID()
+    const source = await session(oidcCookies); assert.ok(source)
+    const original = (await pool.query('select * from session where id=$1', [source.session.id])).rows[0]
+    await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Web SSO fixture\',\'team\')', [workspaceId, userId])
+    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Directory user\',$3,\'admin\',\'active\')', [workspaceId, userId, email])
+    await pool.query('insert into mikka_organization_workspaces ("workspaceId","organizationId") values ($1,$2)', [workspaceId, organizationId])
+    await pool.query('insert into mikka_organization_entitlements ("organizationId",plan,source,"seatLimit") values ($1,\'enterprise\',\'license\',20)', [organizationId])
+    await pool.query('insert into enterprise_org_policy ("organizationId","enforceSso","allowMachineCredentials") values ($1,true,false)', [organizationId])
+    const readWorkspace = (token: string) => fetch(`${appOrigin}/api/workspaces/${workspaceId}/governance/usage`, { headers: { authorization: `Bearer ${token}` } })
+    const readLive = (token: string) => fetch(`${appOrigin}/api/live/ticket?workspace=${workspaceId}`, { headers: { authorization: `Bearer ${token}` } })
+    const phone = await phoneFixture(t, workspaceId)
+    try {
+      assert.deepEqual(await cacheNamespace(original.token, workspaceId), { workspaceId, role: 'admin' })
+      const derived = await handoff(original.token)
+      const copied = (await pool.query('select "enterpriseOrganizationId","enterpriseProviderId","enterpriseIdentityId" from session where id=$1', [derived.session.id])).rows[0]
+      assert.deepEqual(copied, { enterpriseOrganizationId: organizationId, enterpriseProviderId: providerId, enterpriseIdentityId: original.enterpriseIdentityId })
+      assert.equal((await readWorkspace(derived.token)).status, 200)
+      assert.deepEqual(await cacheNamespace(derived.token, workspaceId), { workspaceId, role: 'admin' })
+      const live = await readLive(derived.token); assert.equal(live.status, 200)
+      const ticket = await live.json(), gateway = builtinGatewayConfig(); assert.ok(gateway)
+      const channel = /\/v1\/live\/([a-f0-9]{64})\/socket$/.exec(new URL(ticket.url).pathname)?.[1]; assert.ok(channel)
+      assert.equal(readSessionLiveTicket(channel, ticket.protocol, gateway.secret)?.sessionId, derived.session.id)
+      const plain = await applicationContext.internalAdapter.createSession(userId); assert.ok(plain); sessions.push(plain.id)
+      assert.equal((await readWorkspace(plain.token)).status, 403)
+      assert.equal((await readLive(plain.token)).status, 403)
+      assert.equal(await cacheNamespace(plain.token, workspaceId), null, 'a plain session cannot hydrate an old SSO cache for the same user')
+      const ssoPhone = await phone.register(derived.token, derived.session.id)
+      await phone.register(plain.token, plain.id)
+      assert.deepEqual(await phone.push(), [ssoPhone], 'only the phone bound to the actual SSO session receives enterprise content')
+      await pool.query('insert into enterprise_break_glass ("organizationId","userId","sessionId","expiresAt",reason) values ($1,$2,$3,now()+interval \'5 minutes\',\'isolated fixture\')', [organizationId, userId, plain.id])
+      assert.equal((await readWorkspace(plain.token)).status, 200)
+      const ordinary = await handoff(plain.token)
+      assert.equal((await readWorkspace(ordinary.token)).status, 403, 'handoff never copies session-bound break-glass permission')
+      assert.equal((await readLive(ordinary.token)).status, 403)
+      assert.equal((await pool.query('select "enterpriseIdentityId" from session where id=$1', [ordinary.session.id])).rows[0].enterpriseIdentityId, null)
+      await pool.query('delete from enterprise_break_glass where "organizationId"=$1 and "sessionId"=$2', [organizationId, plain.id])
+      await pool.query('update enterprise_identity set "userId"=$2 where id=$1', [original.enterpriseIdentityId, adminId])
+      const invalidIdentity = await handoff(original.token)
+      assert.equal((await readWorkspace(invalidIdentity.token)).status, 403)
+      assert.equal((await readLive(invalidIdentity.token)).status, 403)
+      assert.equal(await cacheNamespace(derived.token, workspaceId), null, 'cache authorization rechecks the original identity owner')
+      assert.deepEqual(await phone.push(), [], 'identity ownership changes block the already registered SSO phone')
+      assert.equal((await pool.query('select "enterpriseIdentityId" from session where id=$1', [invalidIdentity.session.id])).rows[0].enterpriseIdentityId, null)
+      await pool.query('update enterprise_identity set "userId"=$2 where id=$1', [original.enterpriseIdentityId, userId])
+      await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, userId])
+      assert.equal((await readWorkspace(derived.token)).status, 403)
+      assert.equal((await readLive(derived.token)).status, 403)
+      assert.equal(await cacheNamespace(derived.token, workspaceId), null, 'SSO never restores a revoked cache membership')
+      assert.deepEqual(await phone.push(), [], 'suspended Workspace membership blocks the already registered SSO phone')
+      const afterMembershipRevoked = await handoff(original.token)
+      assert.equal((await readWorkspace(afterMembershipRevoked.token)).status, 403)
+      assert.equal((await readLive(afterMembershipRevoked.token)).status, 403)
+    } finally {
+      await pool.query('update enterprise_identity set "userId"=$2 where id=$1', [original.enterpriseIdentityId, userId])
+      await phone.close()
+      await web.close()
+      await pool.query('delete from enterprise_org_policy where "organizationId"=$1', [organizationId])
+      await pool.query('delete from mikka_organization_entitlements where "organizationId"=$1', [organizationId])
+      await pool.query('delete from mikka_workspaces where id=$1', [workspaceId])
+    }
+  })
+  await t.test('Web handoff commits its audit outbox before releasing a bearer and reclaims the target on audit failure', async () => {
+    const web = await webHandoffFixture()
+    const source = await session(oidcCookies); assert.ok(source)
+    const token = (await pool.query('select token from session where id=$1', [source.session.id])).rows[0].token as string
+    const constraint = `handoff_audit_${randomUUID().replaceAll('-', '')}`
+    const count = async () => (await pool.query('select count(*) from session where "userId"=$1', [source.user.id])).rows[0].count
+    const before = await count()
+    try {
+      await pool.query(`alter table enterprise_audit_outbox add constraint "${constraint}" check (payload->'metadata'->>'reason' is distinct from 'web_handoff') not valid`)
+      const denied = await web.request(token)
+      assert.equal(denied.status, 400); assert.equal(denied.headers.has('set-cookie'), false)
+      assert.equal(Object.hasOwn(await denied.json(), 'token'), false)
+      assert.equal(await count(), before, 'a failed audit rolls back assurance and the native target is reclaimed')
+      assert.equal((await session(oidcCookies))?.session.id, source.session.id)
+      await pool.query(`alter table enterprise_audit_outbox drop constraint "${constraint}"`)
+      const derived = await web.handoff(token)
+      const { rows } = await pool.query('select payload from enterprise_audit_outbox where "organizationId"=$1 and payload->>\'targetId\'=$2', [organizationId, derived.session.id])
+      assert.equal(rows.length, 1)
+      assert.equal(rows[0].payload.action, 'sso.signed_in')
+      assert.deepEqual(rows[0].payload.metadata, { providerId, reason: 'web_handoff' })
+      assert.ok(!JSON.stringify(rows[0]).includes(token) && !JSON.stringify(rows[0]).includes(derived.token), 'the durable intent contains no bearer')
+    } finally {
+      await pool.query(`alter table enterprise_audit_outbox drop constraint if exists "${constraint}"`)
+      await web.close()
+    }
+  })
+  await t.test('signed SAML Web handoffs preserve the original SLO family and reject missing native metadata', async () => {
+    const web = await webHandoffFixture(), workspaceId = randomUUID(), roots: string[] = []
+    const nativeContext = await auth.$context
+    const cookieFor = (token: string) => {
+      const jar = new Cookies(), signature = createHmac('sha256', nativeContext.secret).update(token).digest('base64')
+      jar.values.set(nativeContext.authCookies.sessionToken.name, encodeURIComponent(`${token}.${signature}`)); return jar
+    }
+    const login = async () => {
+      const result = await samlLogin(), active = await session(result.jar); assert.ok(active)
+      roots.push(active.session.id)
+      const row = (await pool.query('select * from session where id=$1', [active.session.id])).rows[0]
+      return { ...result, ...active, token: row.token as string }
+    }
+    const first = await login(), samlUserId = first.user.id
+    await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'SAML Web fixture\',\'team\')', [workspaceId, samlUserId])
+    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'SAML user\',$3,\'admin\',\'active\')', [workspaceId, samlUserId, samlSubject])
+    await pool.query('insert into mikka_organization_workspaces ("workspaceId","organizationId") values ($1,$2)', [workspaceId, organizationId])
+    await pool.query('insert into mikka_organization_entitlements ("organizationId",plan,source,"seatLimit") values ($1,\'enterprise\',\'license\',20)', [organizationId])
+    await pool.query('insert into enterprise_org_policy ("organizationId","enforceSso","allowMachineCredentials") values ($1,true,false)', [organizationId])
+    const readWorkspace = (token: string) => fetch(`${appOrigin}/api/workspaces/${workspaceId}/governance/usage`, { headers: { authorization: `Bearer ${token}` } })
+    const remaining = async (ids: string[]) => Number((await pool.query('select count(*) from session where id=any($1::text[])', [ids])).rows[0].count)
+    const metadata = async (id: string) => JSON.parse((await pool.query('select value from verification where identifier=$1', [`enterprise-saml-session:${id}`])).rows[0].value) as { sessionId: string; providerId: string; nameID: string; sessionIndex?: string }
+    const startLogout = (jar: Cookies, pid = samlProviderId) => fetch(`${appOrigin}/api/auth/sso/saml2/logout/${pid}`, { method: 'POST', headers: {
+      origin: appOrigin, 'content-type': 'application/json', cookie: jar.header(),
+    }, body: JSON.stringify({ callbackURL: `${appOrigin}/signed-out` }), redirect: 'manual' })
+    const completeLogout = async (response: Response, expected: Awaited<ReturnType<typeof metadata>>) => {
+      assert.equal(response.status, 302)
+      const url = new URL(response.headers.get('location')!)
+      const xml = inflateRawSync(Buffer.from(url.searchParams.get('SAMLRequest')!, 'base64')).toString()
+      assert.ok(xml.includes(expected.nameID))
+      if (expected.sessionIndex) assert.ok(xml.includes(expected.sessionIndex), 'SP logout uses the original login SessionIndex')
+      const idp = await fetch(url); assert.equal(idp.status, 200, 'the real IdP verifies the native SP signature')
+      const payload = await idp.json() as { SAMLResponse: string; RelayState: string }
+      const callback = await fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: {
+        origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded',
+      }, body: new URLSearchParams(payload), redirect: 'manual' })
+      assert.equal(callback.status, 302)
+    }
+    try {
+      const auditConstraint = `saml_handoff_audit_${randomUUID().replaceAll('-', '')}`
+      await pool.query(`alter table enterprise_audit_outbox add constraint "${auditConstraint}" check (payload->'metadata'->>'reason' is distinct from 'web_handoff') not valid`)
+      try {
+        const before = (await pool.query('select count(*) from session where "userId"=$1', [samlUserId])).rows[0].count
+        assert.equal((await web.request(first.token)).status, 400)
+        assert.equal((await pool.query('select count(*) from session where "userId"=$1', [samlUserId])).rows[0].count, before)
+        assert.equal((await pool.query('select count(*) from enterprise_saml_session_lineage where "rootSessionId"=$1', [first.session.id])).rows[0].count, '1')
+        assert.equal((await pool.query('select count(*) from verification where identifier=$1', [`enterprise-saml-session:${first.session.id}`])).rows[0].count, '1', 'audit failure preserves the root without publishing a child')
+      } finally { await pool.query(`alter table enterprise_audit_outbox drop constraint "${auditConstraint}"`) }
+      const child = await web.handoff(first.token), descendant = await web.handoff(child.token)
+      assert.equal((await readWorkspace(child.token)).status, 200)
+      assert.equal((await readWorkspace(descendant.token)).status, 200)
+      assert.deepEqual((await pool.query('select "rootSessionId" from enterprise_saml_session_lineage where "sessionId"=any($1::text[]) order by "sessionId"', [[child.session.id, descendant.session.id]])).rows,
+        [{ rootSessionId: first.session.id }, { rootSessionId: first.session.id }])
+      const snapshot = await metadata(child.session.id)
+      assert.deepEqual(Object.keys(snapshot).sort(), ['nameID', 'providerId', 'sessionId', ...(snapshot.sessionIndex === undefined ? [] : ['sessionIndex'])].sort())
+      assert.equal(snapshot.nameID, samlSubject); assert.equal(snapshot.providerId, samlProviderId)
+      const request = samlIdp.createLogoutRequest(samlSp, 'post', { logoutNameID: snapshot.nameID, sessionIndex: snapshot.sessionIndex })
+      const idpLogout = await fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: {
+        origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded', cookie: oidcCookies.header(),
+      }, body: new URLSearchParams({ SAMLRequest: request.context, RelayState: `${appOrigin}/signed-out` }), redirect: 'manual' })
+      assert.equal(idpLogout.status, 200)
+      assert.equal(await remaining([first.session.id, child.session.id, descendant.session.id]), 0, 'native IdP logout revokes every derived bearer')
+      assert.equal((await readWorkspace(child.token)).status, 401)
+
+      const rootSp = await login(), rootChild = await web.handoff(rootSp.token), rootSnapshot = await metadata(rootSp.session.id)
+      const afterRootSp = await login()
+      await completeLogout(await startLogout(rootSp.jar), rootSnapshot)
+      assert.equal(await remaining([rootSp.session.id, rootChild.session.id]), 0)
+      assert.equal((await session(afterRootSp.jar))?.session.id, afterRootSp.session.id)
+
+      const old = await login(), oldChild = await web.handoff(old.token), sibling = await web.handoff(oldChild.token)
+      const oldSnapshot = await metadata(oldChild.session.id), later = await login(), childJar = cookieFor(oldChild.token)
+      assert.equal((await startLogout(childJar, otherProviderId)).status, 403)
+      assert.equal(await remaining([old.session.id, oldChild.session.id, sibling.session.id]), 3)
+      await completeLogout(await startLogout(childJar), oldSnapshot)
+      assert.equal(await remaining([old.session.id, oldChild.session.id, sibling.session.id]), 0)
+      assert.equal((await session(later.jar))?.session.id, later.session.id, 'a later same-NameID SAML login is independent')
+      assert.equal((await session(oidcCookies))?.user.id, userId)
+
+      const expiring = await login(), expiredChild = await web.handoff(expiring.token)
+      await pool.query('update session set "expiresAt"=now()-interval \'1 second\' where id=$1', [expiring.session.id])
+      assert.equal((await readWorkspace(expiredChild.token)).status, 403, 'child assurance cannot outlive its original root')
+      const unmapped = await login()
+      await pool.query('update verification set value=$2 where identifier=$1', [`saml-session-by-id:${unmapped.session.id}`, `saml-session:${otherProviderId}:${samlSubject}`])
+      assert.equal((await web.request(unmapped.token)).status, 400)
+      await pool.query('delete from verification where identifier=$1', [`saml-session-by-id:${unmapped.session.id}`])
+      const before = Number((await pool.query('select count(*) from session where "userId"=$1', [samlUserId])).rows[0].count)
+      const refused = await web.request(unmapped.token)
+      assert.equal(refused.status, 400); assert.equal(Object.hasOwn(await refused.json(), 'token'), false)
+      assert.equal(Number((await pool.query('select count(*) from session where "userId"=$1', [samlUserId])).rows[0].count), before)
+      assert.equal((await session(unmapped.jar))?.session.id, unmapped.session.id)
+    } finally {
+      await web.close()
+      await pool.query('delete from session where id=any($1::text[])', [roots])
+      await pool.query('delete from enterprise_org_policy where "organizationId"=$1', [organizationId])
+      await pool.query('delete from mikka_organization_entitlements where "organizationId"=$1', [organizationId])
+      await pool.query('delete from mikka_workspaces where id=$1', [workspaceId])
+    }
+  })
+  await t.test('verified IdP SAML logout selects the original SessionIndex and preserves later or unrelated logins', async t => {
+    const web = await webHandoffFixture(), roots: string[] = []
+    const errors: unknown[][] = []; t.mock.method(console, 'error', (...args: unknown[]) => errors.push(args))
+    const login = async (nameID = samlSubject) => {
+      const result = await samlLogin(nameID), active = await session(result.jar); assert.ok(active); roots.push(active.session.id)
+      const row = (await pool.query('select token from session where id=$1', [active.session.id])).rows[0]
+      const snapshot = JSON.parse((await pool.query('select value from verification where identifier=$1', [`enterprise-saml-session:${active.session.id}`])).rows[0].value) as { nameID: string; sessionIndex?: string }
+      return { ...active, ...result, token: row.token as string, snapshot }
+    }
+    const remaining = async (ids: string[]) => Number((await pool.query('select count(*) from session where id=any($1::text[])', [ids])).rows[0].count)
+    const send = (request: string) => fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: {
+      origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded', cookie: oidcCookies.header(),
+    }, body: new URLSearchParams({ SAMLRequest: request, RelayState: `${appOrigin}/signed-out` }), redirect: 'manual' })
+    const signedRequest = (nameID: string, sessionIndex?: string) => samlIdp.createLogoutRequest(samlSp, 'post', { logoutNameID: nameID, ...(sessionIndex === undefined ? {} : { sessionIndex }) }).context
+    const otherSubject = `${randomUUID()}@${samlDomain}`
+    assert.equal((await requestScim('Users', 'POST', { schemas: [SCIM_USER], externalId: otherSubject, userName: otherSubject, active: true }, samlConnectionId, samlBearer)).status, 201)
+    try {
+      const unrelated = await login(otherSubject)
+      const old = await login(), child = await web.handoff(old.token), later = await login()
+      assert.ok(old.snapshot.sessionIndex && later.snapshot.sessionIndex)
+      assert.notEqual(old.snapshot.sessionIndex, later.snapshot.sessionIndex)
+      const oldRequest = signedRequest(samlSubject, old.snapshot.sessionIndex)
+      const tampered = Buffer.from(Buffer.from(oldRequest, 'base64').toString().replace(samlSubject, otherSubject)).toString('base64')
+      assert.equal((await send(tampered)).status, 400)
+      assert.equal(await remaining([old.session.id, child.session.id, later.session.id, unrelated.session.id]), 4)
+      assert.equal((await send(oldRequest)).status, 200)
+      assert.equal(await remaining([old.session.id, child.session.id]), 0)
+      assert.equal(await remaining([later.session.id, unrelated.session.id]), 2)
+      assert.ok(Number((await pool.query('select count(*) from verification where identifier=$1', [`saml-session:${samlProviderId}:${samlSubject}`])).rows[0].count) > 0, 'handled logout preserves the later canonical key')
+      assert.equal((await send(oldRequest)).status, 400, 'native replay protection precedes the application callback')
+      assert.equal((await send(signedRequest(samlSubject, later.snapshot.sessionIndex))).status, 200)
+      assert.equal(await remaining([later.session.id]), 0, 'the later root is independently revocable without a Web clone')
+
+      const groupA = await login(), groupB = await login(), groupChild = await web.handoff(groupA.token)
+      assert.equal((await send(signedRequest(samlSubject))).status, 200)
+      assert.equal(await remaining([groupA.session.id, groupB.session.id, groupChild.session.id]), 0, 'absent SessionIndex closes the matching provider and NameID roots')
+      assert.equal(await remaining([unrelated.session.id]), 1)
+      assert.equal((await session(oidcCookies))?.user.id, userId)
+
+      const failed = await login(), failedChild = await web.handoff(failed.token)
+      const constraint = `saml_logout_audit_${randomUUID().replaceAll('-', '')}`
+      await pool.query(`alter table enterprise_audit_outbox add constraint "${constraint}" check (payload->'metadata'->>'reason' is distinct from 'saml_idp_logout') not valid`)
+      try {
+        const response = await send(signedRequest(samlSubject, failed.snapshot.sessionIndex))
+        assert.equal(response.status, 503)
+        assert.equal(await remaining([failed.session.id, failedChild.session.id]), 2, 'audit failure rolls back the entire SLO family mutation')
+      } finally { await pool.query(`alter table enterprise_audit_outbox drop constraint "${constraint}"`) }
+      assert.equal((await send(signedRequest(samlSubject, failed.snapshot.sessionIndex))).status, 200)
+      assert.equal(await remaining([failed.session.id, failedChild.session.id]), 0)
+      assert.ok(errors.some(entry => entry[0] === '[enterprise] SAML logout unavailable'))
+      assert.ok(!JSON.stringify(errors).includes(failed.token) && !JSON.stringify(errors).includes(failedChild.token))
+    } finally {
+      await web.close()
+      await pool.query('delete from session where id=any($1::text[])', [roots])
+    }
+  })
+  await t.test('SAML root deletion fences concurrent handoffs and bulk family revocation without a missed child or FK deadlock', async () => {
+    const { inheritEnterpriseSession } = await import('./session-handoff')
+    const { auth: applicationAuth } = await import('../auth')
+    const { internalAdapter } = await applicationAuth.$context
+    const created: string[] = []
+    const source = async () => {
+      const login = await samlLogin(), active = await session(login.jar); assert.ok(active); created.push(active.session.id)
+      return active
+    }
+    const targetSession = async (id: string) => { const value = await internalAdapter.createSession(id); assert.ok(value); created.push(value.id); return value }
+    const until = async (ready: () => Promise<boolean>) => {
+      const deadline = Date.now() + 3000
+      while (!await ready()) { assert.ok(Date.now() < deadline, 'the database lock barrier must become observable'); await delay(10) }
+    }
+    const blocker = await pool.connect(), revoker = await pool.connect()
+    const blockerPid = (await blocker.query('select pg_backend_pid() as pid')).rows[0].pid
+    const revokerPid = (await revoker.query('select pg_backend_pid() as pid')).rows[0].pid
+    const pending: Promise<unknown>[] = []
+    try {
+      const root = await source(), child = await targetSession(root.user.id)
+      await blocker.query('begin'); await blocker.query('select id from session where id=$1 for update', [child.id])
+      const derived = inheritEnterpriseSession(root.session.id, child.id, root.user.id).then(value => ({ value, code: undefined }), error => ({ value: false, code: error.code ?? error.name })); pending.push(derived)
+      await until(async () => (await pool.query('select exists(select 1 from pg_stat_activity where $1=any(pg_blocking_pids(pid))) as blocked', [blockerPid])).rows[0].blocked)
+      await revoker.query('begin')
+      const removed = revoker.query('delete from session where id=$1', [root.session.id]).then(() => ({ code: undefined }), error => ({ code: error.code ?? error.name })); pending.push(removed)
+      await until(async () => (await pool.query('select cardinality(pg_blocking_pids($1))>0 as blocked', [revokerPid])).rows[0].blocked)
+      await blocker.query('commit')
+      assert.deepEqual(await derived, { value: true, code: undefined })
+      assert.equal((await removed).code, undefined)
+      await revoker.query('commit')
+      assert.equal((await pool.query('select count(*) from session where id=any($1::text[])', [[root.session.id, child.id]])).rows[0].count, '0', 'root deletion cannot miss a child admitted while it waited')
+
+      const lostRoot = await source(), lostTarget = await targetSession(lostRoot.user.id)
+      await blocker.query('begin'); await blocker.query('delete from session where id=$1', [lostRoot.session.id])
+      const refused = inheritEnterpriseSession(lostRoot.session.id, lostTarget.id, lostRoot.user.id).then(value => ({ value, code: undefined }), error => ({ value: true, code: error.code ?? error.name })); pending.push(refused)
+      await until(async () => (await pool.query('select exists(select 1 from pg_stat_activity where $1=any(pg_blocking_pids(pid))) as blocked', [blockerPid])).rows[0].blocked)
+      await blocker.query('commit')
+      assert.deepEqual(await refused, { value: false, code: undefined })
+      assert.equal((await pool.query('select "enterpriseIdentityId" from session where id=$1', [lostTarget.id])).rows[0].enterpriseIdentityId, null)
+
+      const family = await source(), familyChild = await targetSession(family.user.id)
+      assert.equal(await inheritEnterpriseSession(family.session.id, familyChild.id, family.user.id), true)
+      const spare = await targetSession(family.user.id)
+      await pool.query(`update session target set ("enterpriseOrganizationId","enterpriseProviderId","enterpriseIdentityId","enterpriseSamlRootSessionId") =
+        (select "enterpriseOrganizationId","enterpriseProviderId","enterpriseIdentityId",id from session where id=$2) where target.id=$1`, [spare.id, family.session.id])
+      const identity = (await pool.query('select "enterpriseIdentityId" from session where id=$1', [family.session.id])).rows[0].enterpriseIdentityId
+      const hashes = (await pool.query('select "nameIdHash","sessionIndexHash" from enterprise_saml_session_lineage where "sessionId"=$1', [family.session.id])).rows[0]
+      for (const [rootId, uid, org, pid, identityId] of [[familyChild.id, family.user.id, organizationId, samlProviderId, identity],
+        [family.session.id, adminId, organizationId, samlProviderId, identity], [family.session.id, family.user.id, otherOrganizationId, samlProviderId, identity],
+        [family.session.id, family.user.id, organizationId, otherProviderId, identity], [family.session.id, family.user.id, organizationId, samlProviderId, randomUUID()]])
+        await assert.rejects(pool.query('insert into enterprise_saml_session_lineage ("sessionId","rootSessionId","userId","organizationId","providerId","identityId","nameIdHash","sessionIndexHash") values($1,$2,$3,$4,$5,$6,$7,$8)',
+          [spare.id, rootId, uid, org, pid, identityId, hashes.nameIdHash, hashes.sessionIndexHash]), error => (error as { code?: string }).code === '23514')
+      await blocker.query('begin'); await blocker.query('delete from session where id=$1', [familyChild.id])
+      await revoker.query('begin')
+      const familyRemoved = revoker.query('delete from session where id=$1', [family.session.id]).then(() => ({ code: undefined }), error => ({ code: error.code ?? error.name })); pending.push(familyRemoved)
+      await until(async () => (await pool.query('select cardinality(pg_blocking_pids($1))>0 as blocked', [revokerPid])).rows[0].blocked)
+      await blocker.query('commit')
+      assert.equal((await familyRemoved).code, undefined, 'a child deletion cannot deadlock root FK cascade')
+      await revoker.query('commit')
+      assert.equal((await pool.query('select count(*) from enterprise_saml_session_lineage where "rootSessionId"=$1', [family.session.id])).rows[0].count, '0')
+
+      const bulk = await source(), bulkChild = await targetSession(bulk.user.id), bulkDescendant = await targetSession(bulk.user.id)
+      assert.equal(await inheritEnterpriseSession(bulk.session.id, bulkChild.id, bulk.user.id), true)
+      assert.equal(await inheritEnterpriseSession(bulkChild.id, bulkDescendant.id, bulk.user.id), true)
+      await pool.query('delete from session where id=any($1::text[])', [[bulk.session.id, bulkChild.id, bulkDescendant.id]])
+      assert.equal((await pool.query('select count(*) from session where id=any($1::text[])', [[bulk.session.id, bulkChild.id, bulkDescendant.id]])).rows[0].count, '0', 'native FK cascade also supports a single bulk DELETE containing root and descendants')
+      assert.equal((await pool.query('select count(*) from enterprise_saml_session_lineage where "rootSessionId"=$1', [bulk.session.id])).rows[0].count, '0')
+    } finally {
+      await blocker.query('rollback'); blocker.release()
+      await revoker.query('rollback'); revoker.release()
+      await Promise.allSettled(pending)
+      await pool.query('delete from session where id=any($1::text[])', [created])
+    }
+  })
   await t.test('SCIM user and group delivery failures persist and replay without duplicate identities or audit events', async () => {
     const document = { schemas: [SCIM_USER], externalId: `retry-${randomUUID()}`, userName: `${randomUUID()}@${oidcDomain}`, active: true }
     failNextUserDelivery = true
@@ -718,7 +1257,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal((await pool.query('select count(*) from enterprise_scim_outbox where "connectionId"=$1 and "deliveredAt" is null', [connectionId])).rows[0].count, '0')
     assert.equal((await pool.query('select count(*) from mikka_workspace_members where "userId"=$1', [pending.userId])).rows[0].count, '0')
   })
-  await t.test('SCIM disable revokes two organization workspaces and PATs while retaining personal/other organization identity', async () => {
+  await t.test('SCIM disable revokes two organization workspaces, phone delivery and PATs while retaining personal/other organization identity', async t => {
     const wsA = randomUUID(), wsB = randomUUID(), personal = randomUUID(), other = randomUUID()
     for (const [id, kind, org] of [[wsA, 'team', organizationId], [wsB, 'team', organizationId], [personal, 'personal', null], [other, 'team', otherOrganizationId]]) {
       await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Scoped identity fixture\',$3)', [id, userId, kind])
@@ -730,6 +1269,11 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const principal = { kind: 'session' as const, sessionId: signedIn.session.id }
     assert.equal(await enterpriseWorkspaceAllowed(userId, wsA, principal), true)
     assert.equal(await enterpriseWorkspaceAllowed(userId, wsB, principal), true)
+    const cacheToken = (await pool.query('select token from session where id=$1', [signedIn.session.id])).rows[0].token as string
+    assert.deepEqual(await cacheNamespace(cacheToken, wsA), { workspaceId: wsA, role: 'member' })
+    const phone = await phoneFixture(t, wsA)
+    const destination = await phone.register(cacheToken, signedIn.session.id)
+    assert.deepEqual(await phone.push(), [destination])
     assert.equal(await enterpriseWorkspaceAllowed(userId, personal, { kind: 'session', sessionId: 'wrong' }), true)
     const tokenA = randomUUID(), tokenOther = randomUUID()
     for (const [id, workspaceId] of [[tokenA, wsA], [tokenOther, other]]) await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,\'Fixture\',$4,\'test\')', [id, userId, workspaceId, identityTokenHash(randomUUID())])
@@ -741,7 +1285,11 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal(invalidEtag.status, 412)
     const disabled = await requestScim(`Users/${directoryId}`, 'PATCH', { schemas: [SCIM_PATCH], Operations: [{ op: 'replace', path: 'active', value: false }] }, connectionId, bearer, { 'if-match': current.headers.get('etag')! })
     assert.equal(disabled.status, 200, await disabled.clone().text())
-    for (const id of [wsA, wsB]) assert.equal(await enterpriseWorkspaceAllowed(userId, id, principal), false)
+    assert.deepEqual(await phone.push(), [], 'committed SCIM suspension prevents delivery to a previously admitted native session')
+    for (const id of [wsA, wsB]) {
+      assert.equal(await enterpriseWorkspaceAllowed(userId, id, principal), false)
+      assert.equal(await cacheNamespace(cacheToken, id), null, 'SCIM suspension cannot hydrate an earlier authorized cache namespace')
+    }
     assert.equal(await enterpriseWorkspaceAllowed(userId, personal, principal), true)
     assert.equal(await enterpriseWorkspaceAllowed(userId, other, principal), true)
     const memberships = (await pool.query('select "workspaceId",status from mikka_workspace_members where "userId"=$1', [userId])).rows

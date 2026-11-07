@@ -11,6 +11,7 @@ import { GovernanceError } from './errors'
 import { pool } from '@/lib/db'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
 import { enqueueMemberLifecycle, drainMemberLifecycleOutbox } from './member-outbox'
+import { fenceWorkspaceLive, markWorkspaceLiveBinding, retireWorkspaceLiveBinding } from '../enterprise/live-authority'
 
 export async function requireOrganizationAdmin(tx: WorkspaceTransaction, organizationId: string, userId: string, includeArchived = false) {
   z.uuid().parse(organizationId)
@@ -56,7 +57,7 @@ export async function organizationSummary(organizationId: string, userId: string
 }
 
 export async function attachOrganizationWorkspace(organizationId: string, workspaceId: string, userId: string) {
-  return workspaceDb.transaction(async tx => {
+  await workspaceDb.transaction(async tx => {
     const { workspace } = await requireWorkspace(tx, z.uuid().parse(workspaceId), userId, true)
     if (workspace.kind === 'personal') throw new GovernanceError('personal_workspace')
     await requireOrganizationAdmin(tx, organizationId, userId)
@@ -70,7 +71,9 @@ export async function attachOrganizationWorkspace(organizationId: string, worksp
     const seats = await activeHumanSeats(tx, workspaceId, organizationId)
     if (scope.entitlements.activeHumanLimit !== null && seats.length > scope.entitlements.activeHumanLimit) throw new GovernanceError('seat_limit')
     await enqueueOrganizationAudit(tx, { organizationId, actorId: userId, action: 'organization.workspace_attached', targetId: workspaceId })
+    await markWorkspaceLiveBinding(workspaceId, organizationId, tx)
   })
+  await fenceWorkspaceLive(workspaceId)
 }
 
 export async function detachOrganizationWorkspace(organizationId: string, workspaceId: string, userId: string) {
@@ -82,6 +85,7 @@ export async function detachOrganizationWorkspace(organizationId: string, worksp
     // Detaching or downgrading never destroys members. Further admissions enforce the resulting cap.
     await enqueueOrganizationAudit(tx, { organizationId, actorId: userId, action: 'organization.workspace_detached', targetId: workspaceId })
   })
+  await retireWorkspaceLiveBinding(workspaceId, organizationId)
 }
 
 export async function updateOrganizationMember(organizationId: string, actorId: string, input: unknown) {

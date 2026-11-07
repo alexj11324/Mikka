@@ -18,6 +18,8 @@ import { clearApiCache } from '@/lib/useApi'
 import { useSettings } from '@/lib/settings'
 import { versionLabel } from '@/lib/updates'
 import { colors } from '@/lib/theme'
+import { currentAccount, servers } from '@/lib/config'
+import { serverCopy } from '@/lib/server-copy'
 
 /** A row's icon (Comma design 18): a white glyph on a colored rounded square, as in the system Settings app. */
 const icon = (name: SymbolName, Icon: typeof Bell, background: string) => (
@@ -41,11 +43,13 @@ export default function SettingsScreen() {
   const signOut = async () => {
     if (leaving.current) return
     leaving.current = true; setSigningOut(true); setSignOutFailed(false)
+    const account = currentAccount(), client = authClient
     try {
       if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush().catch(() => undefined)
-      const result = await authClient.signOut()
+      const result = await client.signOut()
       if (result.error) throw new Error('signout_failed')
-      clearApiCache()
+      if (currentAccount().id === account.id) clearApiCache()
+      await servers.signedOut(account.id)
     } catch { setSignOutFailed(true) }
     finally { leaving.current = false; setSigningOut(false) }
   }
@@ -69,6 +73,7 @@ export default function SettingsScreen() {
           <PreferenceSaveNotice />
           <Group>
             <Row icon={<Avatar name={data.user.name || data.user.email} image={data.user.image} size={56} />} label={data.user.name || data.user.email} detail={data.user.email} onPress={() => router.push('/settings/profile')} />
+            <Row label={serverCopy.accounts} value={currentAccount().server.name} onPress={() => router.push('/settings/accounts')} />
           </Group>
           <Group>
             <Row icon={icon('briefcase.fill', BriefcaseBusiness, '#8E8E93')} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspaces')} />

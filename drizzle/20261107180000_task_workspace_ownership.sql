@@ -65,8 +65,11 @@ FOR EACH ROW EXECUTE FUNCTION advance_issue_scope_generation();
 -- A run is admitted to the task's frozen tenant. Checking only its owner's id
 -- used to allow the same account to dispatch a task through a foreign Bot.
 CREATE FUNCTION require_run_task_workspace() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE tenant uuid; task_tenant uuid; bot_tenant uuid; frozen text;
+DECLARE tenant uuid; task_tenant uuid; bot_tenant uuid; frozen text; origin text; parents uuid[];
 BEGIN
+  IF TG_OP = 'UPDATE' AND NEW."userId" IS DISTINCT FROM OLD."userId" THEN
+    RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+  END IF;
   IF TG_OP = 'UPDATE' AND OLD."workspaceId" IS NOT NULL AND NEW."workspaceId" IS DISTINCT FROM OLD."workspaceId" THEN
     RAISE EXCEPTION 'taskWorkspaceTransferDenied' USING ERRCODE = '23514';
   END IF;
@@ -75,6 +78,8 @@ BEGIN
   IF TG_OP = 'UPDATE' AND NEW.status IN ('cancelled','stopped','failed','succeeded')
     AND NEW."issueId" IS NOT DISTINCT FROM OLD."issueId" AND NEW."botId" IS NOT DISTINCT FROM OLD."botId"
     AND NEW."agentDefinition" IS NOT DISTINCT FROM OLD."agentDefinition"
+    AND NEW."retryOf" IS NOT DISTINCT FROM OLD."retryOf" AND NEW."continuesRunId" IS NOT DISTINCT FROM OLD."continuesRunId"
+    AND NEW."questionContinuation" IS NOT DISTINCT FROM OLD."questionContinuation"
     AND NEW."workspaceId" IS NOT DISTINCT FROM OLD."workspaceId" THEN RETURN NEW; END IF;
   tenant := NEW."workspaceId";
   IF NEW."issueId" IS NOT NULL THEN
@@ -97,11 +102,27 @@ BEGIN
     END IF;
     tenant := frozen::uuid;
   END IF;
+  -- New lineage never grants a different owner's or tenant's execution. A
+  -- metadata-only tenant backfill may encounter its parent later in the same
+  -- batch; unchanged historical edges are fenced by every chain read instead.
+  IF TG_OP = 'INSERT' OR (NEW."retryOf" IS NOT NULL AND NEW."retryOf" IS DISTINCT FROM OLD."retryOf")
+    OR (NEW."continuesRunId" IS NOT NULL AND NEW."continuesRunId" IS DISTINCT FROM OLD."continuesRunId")
+    OR (NEW."questionContinuation" IS NOT NULL AND NEW."questionContinuation" IS DISTINCT FROM OLD."questionContinuation")
+    OR NEW."agentDefinition" IS DISTINCT FROM OLD."agentDefinition"
+    OR (NEW.status IS DISTINCT FROM OLD.status AND NEW.status IN ('queued','preparing','running','waiting_input','finishing','paused')) THEN
+    origin := NEW."questionContinuation"->>'originRunId';
+    parents := ARRAY[NEW."retryOf", NEW."continuesRunId",
+      CASE WHEN origin ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN origin::uuid END];
+    IF EXISTS (SELECT 1 FROM unnest(parents) p(id) LEFT JOIN agent_runs r ON r.id=p.id
+      WHERE p.id IS NOT NULL AND (r.id IS NULL OR tenant IS NULL OR r."workspaceId" IS DISTINCT FROM tenant OR r."userId" IS DISTINCT FROM NEW."userId")) THEN
+      RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+    END IF;
+  END IF;
   NEW."workspaceId" := tenant;
   RETURN NEW;
 END;
 $$;
-CREATE TRIGGER require_run_task_workspace BEFORE INSERT OR UPDATE OF "workspaceId", "issueId", "botId", "agentDefinition", status ON agent_runs
+CREATE TRIGGER require_run_task_workspace BEFORE INSERT OR UPDATE OF "workspaceId", "issueId", "botId", "agentDefinition", status, "userId", "retryOf", "continuesRunId", "questionContinuation" ON agent_runs
 FOR EACH ROW EXECUTE FUNCTION require_run_task_workspace();
 -- Scope now controls provider publication only. Shared tasks need no Team link.
 DROP TRIGGER IF EXISTS require_run_issue_scope ON agent_runs;
@@ -129,10 +150,42 @@ CREATE TRIGGER require_factory_task_workspace BEFORE INSERT OR UPDATE OF "worksp
 FOR EACH ROW EXECUTE FUNCTION require_factory_task_workspace();
 
 CREATE OR REPLACE FUNCTION require_run_child_issue_scope() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE tenant uuid;
+DECLARE tenant uuid; run_owner text; mailbox_tenant text; mailbox_owner text; sender_tenant text; sender_owner text;
 BEGIN
-  SELECT "workspaceId" INTO tenant FROM agent_runs WHERE id=NEW."runId" FOR SHARE;
-  IF tenant IS NULL THEN RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514'; END IF;
+  IF NEW."runId" IS NOT NULL THEN
+    SELECT "workspaceId", "userId" INTO tenant, run_owner FROM agent_runs WHERE id=NEW."runId" FOR SHARE;
+    IF tenant IS NULL THEN RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514'; END IF;
+  ELSIF TG_TABLE_NAME <> 'run_messages' THEN
+    RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514';
+  END IF;
+  -- Conversation envelopes intentionally have no run. Their persisted mailbox
+  -- is their tenant authority; never infer it from the user's oldest workspace.
+  IF TG_TABLE_NAME = 'run_messages' THEN
+    IF run_owner IS NOT NULL AND run_owner <> NEW."userId" THEN
+      RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+    END IF;
+    IF NEW."mailboxId" IS NOT NULL THEN
+      SELECT "workspaceId", "userId" INTO mailbox_tenant, mailbox_owner
+        FROM session_mailboxes WHERE id=NEW."mailboxId" FOR SHARE;
+      IF mailbox_owner IS DISTINCT FROM NEW."userId" OR mailbox_tenant IS NULL
+        OR mailbox_tenant !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+        RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514';
+      END IF;
+      IF tenant IS NOT NULL AND tenant <> mailbox_tenant::uuid THEN
+        RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+      END IF;
+      tenant := mailbox_tenant::uuid;
+    END IF;
+    IF tenant IS NULL THEN RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514'; END IF;
+    IF NEW."senderMailboxId" IS NOT NULL THEN
+      SELECT "workspaceId", "userId" INTO sender_tenant, sender_owner
+        FROM session_mailboxes WHERE id=NEW."senderMailboxId" FOR SHARE;
+      IF sender_owner IS DISTINCT FROM NEW."userId" OR sender_tenant IS NULL
+        OR lower(sender_tenant) <> tenant::text THEN
+        RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+      END IF;
+    END IF;
+  END IF;
   RETURN NEW;
 END;
 $$;

@@ -9,6 +9,8 @@ import { DEFAULT_AGENT_DEFINITION } from './agent-kit/builtin'
 import { freezeWorkerDefinition } from './agent-kit/worker'
 import { mailboxInputs } from '@mikka/protocol/mailbox'
 import { overrideDeploymentSwitch } from './deployment-switches'
+import { createApiHandler } from '../apps/api/src/application'
+import * as apiServer from '../apps/api/compat/server'
 
 // Actual exported HTTP handler, runtime namespace resolver, strict action
 // parser and store. Token verification and SQL are controlled fixtures, not
@@ -106,8 +108,12 @@ mock.module(new URL('./mcp/auth.ts', import.meta.url).href, { namedExports: {
   mcpUserId: () => { throw Error('OAuth tool outside worker fixture') },
   mcpActor: () => { throw Error('OAuth tool outside worker fixture') },
 } })
+mock.module(new URL('./mcp/workspace.ts', import.meta.url).href, { namedExports: { withMcpWorkspace: () => { throw Error('OAuth workspace tools are outside the worker mailbox fixture') } } })
 for (const path of ['./mcp/actions.ts', './mcp/tools.ts', './mcp/artifacts.ts']) mock.module(new URL(path, import.meta.url).href, { namedExports: {} })
 mock.module(new URL('./composio.ts', import.meta.url).href, { namedExports: { runComposioAction: () => { throw Error('Provider forbidden') } } })
+// Production aliases next/server to this compatibility module. Exercise MCP
+// through the real API scope so retained tool callbacks own their after work.
+mock.module('next/server', { namedExports: apiServer })
 let POST: typeof import('../app/v1/mailbox/route').POST
 let mcpPOST: typeof import('../app/api/mcp/route').POST
 const originalFetch = globalThis.fetch, originalConnect = net.Socket.prototype.connect
@@ -115,7 +121,10 @@ before(async () => {
   globalThis.fetch = (() => { throw Error('Network forbidden in pure worker entry test') }) as typeof fetch
   net.Socket.prototype.connect = (() => { throw Error('Socket forbidden in pure worker entry test') }) as typeof net.Socket.prototype.connect
   ;({ POST } = await import('../app/v1/mailbox/route'))
-  ;({ POST: mcpPOST } = await import('../app/api/mcp/route'))
+  const module = await import('../app/api/mcp/route')
+  const api = createApiHandler([{ path: '/mikka/api/mcp', template: '/api/mcp', source: 'app/api/mcp/route.ts',
+    methods: ['POST'], load: async () => module }])
+  mcpPOST = async request => api.fetch(request)
 })
 after(() => {
   globalThis.fetch = originalFetch; net.Socket.prototype.connect = originalConnect

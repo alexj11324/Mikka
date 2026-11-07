@@ -32,8 +32,8 @@ async function handlePOST(request: Request) {
       .where(and(eq(bots.id, botId), eq(bots.ownerId, user.id), ...(workspace ? [eq(bots.workspaceId, workspace)] : []))).limit(1)
     if (!bot) return json({ error: 'botNotFound' }, 404)
   }
-  if (!coordinatorEnabled()) return json({ queued: false, reason: 'unavailable' })
   const resolved = await openChatBotId(user, botId)
+  if (!await coordinatorEnabled(user.id, resolved)) return json({ queued: false, reason: 'unavailable' })
   const queued = await retryFailedTurn(user.id, resolved)
   if (queued) {
     afterJob('after:coordinator-wake', () => wakeCoordinator(user.id))

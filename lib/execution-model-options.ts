@@ -25,7 +25,7 @@ export async function executionBinding(query: Query, scope: Scope, bindingId: st
  * Settings' candidate list needs only four public catalogue columns. Runtime
  * lookups and chat availability keep their full, exact subscription snapshot.
  */
-export async function executionModelOptions(query: Query, scope: Scope, catalogue = false) {
+export async function executionModelOptions(query: Query, scope: Scope, catalogue = false, selected?: { connectionId: string; model: string }) {
   const rows: QueryResultRow[] = []
   let cursor: Cursor | null = null
   for (;;) {
@@ -33,14 +33,15 @@ export async function executionModelOptions(query: Query, scope: Scope, catalogu
       SELECT DISTINCT ON (c.id,b."modelId") ${catalogue ? catalogueColumns : fullColumns},
         (b."workspaceId"=$2) AS "_preferred",b."createdAt"::text AS "_at",b.id AS "_id"
       ${connected}
-        AND (c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId")
+        AND (c."modelCatalog" IS NULL OR c."modelCatalog"->>'revision'<>c.epoch::text OR c."modelCatalog"->'models' ? b."modelId")${selected ? ' AND c.id=$7::uuid AND b."modelId"=$8' : ''}
       ORDER BY c.id,b."modelId",(b."workspaceId"=$2) DESC,b."createdAt" DESC,b.id
     ) SELECT * FROM choices
       WHERE ($3::boolean IS NULL OR "_preferred"<$3
         OR ("_preferred"=$3 AND "_at"::timestamptz<$4::timestamptz)
         OR ("_preferred"=$3 AND "_at"::timestamptz=$4::timestamptz AND "_id">$5::uuid))
       ORDER BY "_preferred" DESC,"_at"::timestamptz DESC,"_id" LIMIT $6`,
-    [scope.ownerId, scope.workspaceId, cursor?.preferred ?? null, cursor?.at ?? null, cursor?.id ?? null, EXECUTION_MODEL_PAGE_SIZE])).rows
+    [scope.ownerId, scope.workspaceId, cursor?.preferred ?? null, cursor?.at ?? null, cursor?.id ?? null, EXECUTION_MODEL_PAGE_SIZE,
+      ...(selected ? [selected.connectionId, selected.model] : [])])).rows
     for (const { _preferred, _at, _id, ...row } of page) rows.push(row)
     if (page.length < EXECUTION_MODEL_PAGE_SIZE) return rows
     const last = page.at(-1)!

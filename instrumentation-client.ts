@@ -1,7 +1,8 @@
 import posthog from 'posthog-js'
 import { posthogConfig } from '@/lib/posthog-config'
-import { sanitizeAnalyticsEvent } from '@/lib/analytics-policy'
+import { redactReplayRequest, sanitizeAnalyticsEvent } from '@/lib/analytics-policy'
 import { watchRemovedActions } from '@/lib/app-build'
+import { setLiveTelemetrySink } from '@/lib/live/telemetry'
 
 // Obsolete actions stop old traffic and offer a refresh without discarding the page.
 watchRemovedActions(window)
@@ -25,12 +26,31 @@ if (posthogConfig.token) {
   capture_performance: false,
   capture_heatmaps: false,
   capture_dead_clicks: false,
-  disable_session_recording: true,
+  // Only this application's API hosts receive opaque person/session headers.
+  tracing_headers: [window.location.hostname, 'app.aspectlylabs.com'],
+  disable_session_recording: false,
+  session_recording: {
+    maskAllInputs: true,
+    maskTextSelector: '*',
+    maskAllElementAttributes: true,
+    blockSelector: 'img,video,audio,canvas,iframe,object,embed,input[type="hidden"],input[type="file"],[contenteditable="true"]',
+    captureJsonLd: false,
+    inlineStylesheet: false,
+    recordCrossOriginIframes: false,
+    captureCanvas: { recordCanvas: false },
+    recordHeaders: false,
+    recordBody: false,
+    maskCapturedNetworkRequestFn: redactReplayRequest,
+    sampleRate: 1,
+  },
   enable_recording_console_log: false,
   disable_surveys: true,
   disable_product_tours: true,
   disable_web_experiments: true,
   before_send: sanitizeAnalyticsEvent,
-    loaded: client => client.register({ app: 'mikka', environment: process.env.NODE_ENV, runtime: window.mikka?.app?.runtime === 'electron' ? 'electron' : 'browser' }),
+    loaded: client => {
+      client.register({ app: 'mikka', environment: process.env.NODE_ENV, runtime: window.mikka?.app?.runtime === 'electron' ? 'electron' : 'browser' })
+      setLiveTelemetrySink((event, properties) => { client.capture(event, properties) })
+    },
   })
 }

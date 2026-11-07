@@ -121,7 +121,7 @@ export class SubscriptionRepository {
     const { rows } = await this.pool.query('select id from byos_bindings where "ownerId"=$1 and "consumerId"=$2 and route in (\'codex_cpa\',\'claude_cpa\') order by "createdAt" desc limit 1', [ownerId, consumerId])
     return rows[0]?.id ?? null
   }
-  async nativeBinding(ownerId: string, consumerId: string, harness: string, bindingId?: string, workspaceId?: string) {
+  async nativeBinding(ownerId: string, consumerId: string, harness: string, bindingId?: string, workspaceId?: string, options: { currentConnection?: true } = {}) {
     if (harness !== 'codex' && harness !== 'claude_code') return null
     const route = harness === 'codex' ? 'codex_cli' : 'claude_code_cli'
     // The task's Agent belongs to the caller. A binding may still belong to a different person
@@ -139,6 +139,19 @@ export class SubscriptionRepository {
         await authorizeSubscriptionWorkspace(row.ownerId, row.workspaceId, ownerId)
       } catch { return null }
     }
-    return this.binding(row.ownerId, row.id)
+    if (!options.currentConnection) return this.binding(row.ownerId, row.id)
+    // Membership may have awaited a different database. Re-read this exact
+    // binding, its original scope and its current connection together after it;
+    // never fall through to an older binding if the selected one was revoked.
+    const { rows: [current] } = await this.pool.query(`SELECT b.id,b."ownerId",b."workspaceId",b."consumerId",b."connectionId",b."connectionRevision",b.route,b."modelId"
+      FROM byos_bindings b JOIN agents a ON a.id::text=b."consumerId" AND a."userId"=$1
+      JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
+        AND c.state='connected' AND c.paused=false AND c.epoch=b."connectionRevision" AND c.provider=$7
+      WHERE b."consumerId"=$2 AND b.route=$3 AND b.id=$4 AND b."workspaceId"=$5 AND b."ownerId"=$6
+        AND ${runMayUseCredentialSql('b."ownerId"', '$1', 'b."workspaceId"')}`,
+    [ownerId, consumerId, route, row.id, row.workspaceId, row.ownerId, harness === 'codex' ? 'codex' : 'claude'])
+    if (!current) return null
+    const { modelId, ...binding } = current
+    return { ...subscriptionBindingSchema.parse({ ...binding, connectionRevision: Number(current.connectionRevision) }), modelId: String(modelId) }
   }
 }

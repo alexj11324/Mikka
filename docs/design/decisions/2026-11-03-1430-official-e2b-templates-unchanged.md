@@ -245,6 +245,15 @@ exact ACK 两者较晚的时间。没有入口标记或确切 ACK 的样本不�
 先测原流程分段基线，再测派生模板。只有仍不能达标时才按实测选择预热池或组合。
 运行费用由任务所有者自己的 E2B key 承担，空闲机器自动暂停或回收，不新增数据库轮询。
 
+自定义固定模型 Profile 的重复目标核验只读取已冻结的 source/model/harness，
+不再为这一步枚举无关账号、模型和 API key。实际 credential owner 仍由当前数据库
+记录及工作区分享策略推导；共享订阅的 owner 成员校验、原来源行锁、后置分享与
+凭证状态、epoch/catalogue、配额和持久 provider health 检查保持原边界。Profile
+版本与内容锁、requester 成员提交 fence 不变，不缓存或复用前一次授权结果。
+默认、继承模型和历史无 Profile 的路径继续读取完整目录，原候选排序、模型规划及
+回退不变。这项缩读的离线查询清单不能代替真实 PG 锁与等价回归，也不代表已测得
+生产耗时收益；正式完整入口到 ACK 的同版本样本仍是性能结论的依据。
+
 新领取的 hosted 仓库任务可将已授权远端的 clone/fetch 与原首次 policy GET 并行。
 claim 已给出的仓库身份和 GitHub 凭证仍是远端读取的依据；旧 claim 的凭证交换、
 本机凭证准备及恢复路径维持原顺序。原签名校验和 Skill/session 入口检查通过前，
@@ -267,6 +276,19 @@ initialize、initialized 和 tools/list；实际 tools/call 继续经过原服�
 claim 绑定同一 session 和规范 cwd，再执行原账号来源及本地有效租约检查，最后才
 发送本任务输入。初始化和接管完成都不冒充本任务的精确 ACK。
 
+启用本次诊断时，任务自己的 PreparedAgentStart 保存预热 Promise 的闭式计时，
+通过原 agent_start chunk 的 preparationTiming 字段回传。它声明
+source=prepared_agent_start，并有独立的起止时间、run/harness 绑定和单调区间；
+包含实际 cli_init.prewarm、接管后的 cli_init 与账号检查，准备总时间还包含等待
+checkout。原 startupTiming 仍只记录晚开始的 agent_start，不把此前发生的 span
+塞进该根区间，也不把两个时间轴或与 repository 的重叠相加。正式分段验证分别核对
+两个边界：预热路径必须有真实成功的预热及接管初始化，普通路径仍需原 cli_init；
+缺失、错误、截断或错绑不会用零或另一条路径替代。未启用诊断时不收集或新增字段。
+
+此修复针对 1edbeca 发布的真实 Claude 候选收据：晚阶段为 114.431ms，phases 为空，
+原因是已经开始的预热 Promise 没有继承后来的阶段 AsyncLocalStorage。它修复测量
+归属，不改变 prompt、租约、取消、CLI 或验收起止点；不从修复本身宣称启动加速。
+
 只有官方 SDK 在 claimed 阶段明确返回 project_settings_not_claimable，且没有
 发送用户输入时，才允许先关闭并等待该进程组退出，再以同一 session 走一次普通
 query；其他初始化、绑定、账号或取消错误均保留原失败。恢复、本机、旧 claim 和
@@ -277,6 +299,40 @@ query；其他初始化、绑定、账号或取消错误均保留原失败。恢
 目录缺失拒绝和项目设置拒绝，CLI 校验和不变，用户和模型消息均为零；这些是协议
 可用性证据。新增路径的发布仍必须通过同一候选的两种真实订阅及正式生产计时，
 不能由匿名对照或离线 SDK fixture 代替。
+
+### 完整派发实测后的继续优化
+
+2026-11-07 的[正式六次生产验收](https://github.com/alexj11324/Mikka/actions/runs/42392726232)
+固定 source `d75bee79966ff55c881e9f96b73ce51a98fb290c`、worker、三个派生模板及
+最终配套 Web，使用普通 SMOKE 账号和团队共享订阅。Claude 三次为
+26.370 / 23.254 / 20.843 秒，Codex 三次为 21.664 / 20.150 / 20.823 秒，
+全部超过 5 秒。[有界原件记录](../research/2026-11-07-e2b-formal-six-startup-failure.json)
+保留六条结果、完整公式、发布元组与 artifact 摘要。39 个要求的服务端阶段每次齐全，
+14 次实际版本核验、工具后回复、同任务原生 ACK 与资源清理通过；这些不抵消时延失败。
+起点仍是完整 dispatchRun 入口，终点取服务端 agent_start 收据加非负原生 ACK 偏移，
+不使用模板发布 gate 的内部 launch 时间替代，也不挑选较快样本。
+
+该批次 dispatch 为 8.432–11.842 秒，内部 ensure 之前已过 3.565–4.922 秒；
+worker claim 为 3.778–4.577 秒，仓库准备为 2.151–5.633 秒。阶段有包含及重叠，
+不能相加。下一轮保留原准入位置和新鲜度，通过缩小及复用同次读取减少往返：
+固定 Profile 的 dispatch、queue quota 和 claim quota 只读所选来源；继承、默认及
+仅指定 harness 的原完整选择顺序不变。native binding 在双方 membership 检查后
+同一查询重读原 binding 与当前 connection，保留 owner/workspace、分享及 epoch
+检查且不回退到旧 binding。Factory claim 复用同一事务已锁定的 repo 行。
+claim 的强制 fresh quota 仍在原位置；不在正常拒绝路径提前发 usage 或写入配额。
+
+bootstrap 的同一次文件上传仍承载私有凭据，root 命令原子发布后降为普通 user
+检查并唤醒现有 wait-bootstrap 进程。只有固定唤醒收据才省掉第二条远程启动命令；
+旧、缺失或退出的 preloader 保留原启动回退。信号成功不代替新设备凭证实际注册，
+原 lease/stop 栅栏和注册时限保持，凭据不进入命令、参数或日志。
+
+实例接收身份后，daemon 可在注册和 claim 期间异步只读预取已选择的官方 CLI 文件；
+Codex 还按官方 launcher 的安装布局读取其 native backend。每次 daemon 激活只做
+一次，256 KiB 缓冲、单文件 512 MiB、总量 768 MiB、10 秒预算；停止时先取消，
+任务原有终止完成后才等待在途读取关闭。此路径不执行 CLI、不读 HOME/账号配置、
+不改原文件，也不增加远端请求、数据库操作或轮询。它针对冷实例软件页读取的假设，
+不是已证实的加速结果；真实 CLI 初始化、模型目录、文件保全和双订阅 gate 均保持。
+下一候选仍须新的同版本完整六次生产验收，当前 #1505 未达标。
 
 本记录保留早期 #1131、#1124 的官方文件保护要求，并取代其中禁止派生模板的
 解释；独立的官方机器种类和所有者绑定凭证规则保持有效。

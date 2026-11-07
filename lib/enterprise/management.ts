@@ -23,6 +23,8 @@ import { retryEnterpriseRevocations, synchronizeDirectoryUser, auditDirectoryGro
 import { commitIdentityChange, enqueueIdentityAudit, deliverIdentityAudits } from './audit-outbox'
 import { samlSpMetadata, samlSpSigningInput } from './saml-signing'
 import { discoverEnterpriseOidcConfig } from './oidc-config'
+import { lockOrganizationLiveAuthority, revokeOrganizationLiveCapabilities } from './live-store'
+import { drainOrganizationLiveRevocations } from './live-authority'
 
 const publicHttps = z.url().max(2048).refine(value => {
   const url = new URL(value)
@@ -97,11 +99,21 @@ export async function manageIdentity(organizationId: string, session: { user: { 
       if (action !== 'break-glass') await requireEnterpriseOrganization(actorId, organizationId, session.session.id)
       return work()
     })
+    if (['configure-provider', 'disable-provider', 'policy', 'revoke-scim'].includes(action)) await drainOrganizationLiveRevocations(organizationId)
     await deliverIdentityAudits(organizationId)
     return result
   }
   const commit = <T>(audit: OrganizationAuditInput, work: (tx: PoolClient) => Promise<T>) =>
-    mutate(() => commitIdentityChange(audit, work, { deferDelivery: true }))
+    mutate(() => commitIdentityChange(audit, async tx => {
+      const changesAuthority = ['configure-provider', 'disable-provider', 'policy'].includes(action)
+      // Org -> session rows/triggers -> remaining cap rows. Native DELETE
+      // already owns its session row before its trigger; taking cap rows
+      // first would deadlock a simultaneous provider reset and sign-out.
+      if (changesAuthority) await lockOrganizationLiveAuthority(tx, organizationId)
+      const result = await work(tx)
+      if (changesAuthority) await revokeOrganizationLiveCapabilities(tx, organizationId)
+      return result
+    }, { deferDelivery: true }))
   if (action === 'configure-provider') {
     const value = configureInput.parse(input)
     const { rows: bound } = await pool.query('select "organizationScopeId",issuer,"samlConfig","oidcConfig" from enterprise_sso_provider where "providerId"=$1', [value.providerId])
@@ -221,6 +233,7 @@ export async function manageIdentity(organizationId: string, session: { user: { 
     return { expiresAt: expiresAt.toISOString() }
   }
   await retryEnterpriseRevocations(organizationId)
+  await drainOrganizationLiveRevocations(organizationId)
   await deliverIdentityAudits(organizationId)
   return { retried: true }
 }

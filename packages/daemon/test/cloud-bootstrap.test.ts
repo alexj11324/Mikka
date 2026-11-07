@@ -6,6 +6,9 @@ import { consumeCloudBootstrap, installCloudCredential, watchCloudBootstraps } f
 import { Daemon } from '../src/main'
 import { MemoryServer } from '../src/server-link'
 import { cleanupTempDirs, tempDir } from './helpers'
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
+import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
+import { daemonTracer } from '../src/tracing'
 
 afterEach(cleanupTempDirs)
 const config = () => ({ deviceId: randomUUID(), workspaceId: randomUUID(), credential: `orv_${'a'.repeat(43)}`, server: 'https://mikka.example/mikka' })
@@ -16,6 +19,19 @@ it('accepts and consumes a private scoped handoff', () => {
   writeFileSync(file, JSON.stringify(input), { mode: 0o600 })
   expect(consumeCloudBootstrap(file)).toEqual(input)
   expect(() => consumeCloudBootstrap(file)).toThrow()
+})
+
+it('accepts only sanitized correlation metadata and a public tracing token in the handoff', () => {
+  const file = join(tempDir(), 'handoff')
+  const traceparent = '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01'
+  const input = { ...config(), traceContext: { traceparent, runId: 'run_123', sessionId: 'alice@example.com', prompt: 'private prompt' },
+    tracing: { endpoint: 'https://us.i.posthog.com/i/v1/traces', projectToken: 'phc_fixture12345', sampleRate: 1 } }
+  writeFileSync(file, JSON.stringify(input), { mode: 0o600 })
+  const result = consumeCloudBootstrap(file)
+  expect(result.traceContext).toEqual({ traceparent, runId: 'run_123' })
+  expect(result.tracing).toEqual(input.tracing)
+  writeFileSync(file, JSON.stringify({ ...input, tracing: { ...input.tracing, projectToken: 'phx_personal_management_key' } }), { mode: 0o600 })
+  expect(consumeCloudBootstrap(file).tracing).toBeUndefined()
 })
 
 it('a preloaded worker serializes atomic handoffs and duplicate wakes without baking an identity', async () => {
@@ -64,11 +80,21 @@ it('seeds the bound device and rotates a running daemon through its private sock
   const device = join(dataDir, 'device.json')
   expect(statSync(device).mode & 0o077).toBe(0)
   expect(JSON.parse(readFileSync(device, 'utf8'))).toEqual({ deviceId: input.deviceId, workspaceId: input.workspaceId, credential: input.credential })
-  const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link: new MemoryServer(input.deviceId).link(), harnesses: [], quotaSource: null }).start()
+  const link = new MemoryServer(input.deviceId).link(), register = link.registerDevice.bind(link)
+  const headers: Record<string, string>[] = []
+  link.registerDevice = async (...args) => { headers.push(daemonTracer.headers()); return register(...args) }
+  daemonTracer.configure({ endpoint: 'https://us.i.posthog.com/i/v1/traces', projectToken: 'phc_fixture12345', sampleRate: 1 },
+    { exporter: new InMemorySpanExporter(), logExporter: new InMemoryLogRecordExporter(), aiSink: null, env: {} })
+  const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link, harnesses: [], quotaSource: null }).start()
   try {
     await daemon.syncWithServer()
-    const rotated = { ...input, credential: `orv_${'b'.repeat(43)}` }
+    const rotated = { ...input, credential: `orv_${'b'.repeat(43)}`, traceContext: {
+      traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01', runId: 'run_123', sessionId: 'session_123',
+    } }
     expect(await installCloudCredential(dataDir, rotated)).toBe('updated')
+    await daemon.syncWithServer()
+    expect(headers.at(-1)?.traceparent.slice(3, 35)).toBe(rotated.traceContext.traceparent.slice(3, 35))
+    expect(headers.at(-1)?.['x-mikka-trace-runid']).toBe(rotated.traceContext.runId)
     expect(JSON.parse(readFileSync(device, 'utf8')).credential).toBe(rotated.credential)
     await expect(installCloudCredential(dataDir, { ...rotated, deviceId: randomUUID() })).rejects.toThrow('identity changed')
     await expect(installCloudCredential(dataDir, { ...rotated, workspaceId: randomUUID() })).rejects.toThrow('identity changed')

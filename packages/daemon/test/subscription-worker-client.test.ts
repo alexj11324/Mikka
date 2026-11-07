@@ -5,7 +5,7 @@ import { SubscriptionWorkerClient } from '../src/subscription-worker-client'
 import { cleanupTempDirs, tempDir } from './helpers'
 
 afterEach(cleanupTempDirs)
-function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string; accessSnapshot?: {name: string; value: string} }>, accessProject?: string, snapshotMode = false, prepareFailure?: string) {
+function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string; accessSnapshot?: {name: string; value: string} }>, accessProject?: string, snapshotMode = false, prepareFailure?: string, streamFailure?: unknown) {
   const directory = tempDir('mikka-worker-boundary-')
   const journal = join(directory, 'calls')
   const binary = join(directory, 'worker.mjs')
@@ -16,6 +16,7 @@ let config;const lines=createInterface({input:process.stdin});lines.on('line',li
 const result={fullAuthority:Boolean(config.workloadToken||config.path),sourceAuthority:Boolean(config.enrollmentAttemptPath||config.enrollmentClaimPath||config.enrollmentGrantPath),accessAuthority:config.accessToken==='fixture-access-reader',snapshot:config.accessSnapshot?.name,binding:config.use?.bindingId,consumer:config.use?.consumerId,accessProject:config.accessProject};
 if(request.method==='prepare'){setTimeout(()=>{console.log(JSON.stringify({id:request.id,...(${JSON.stringify(prepareFailure)} ? {error:${JSON.stringify(prepareFailure)}} : {result:{ready:true}})}));lines.close()},${hold ? 500 : 0});return}
 if(request.method==='nativeStream'){console.log(JSON.stringify({id:request.id,head:{contentType:'application/json'}}));for(const byte of Buffer.from(JSON.stringify({...result,text:'汉字🙂'})))console.log(JSON.stringify({id:request.id,binaryChunk:Buffer.from([byte]).toString('base64')}));console.log(JSON.stringify({id:request.id,result:{done:true}}));lines.close();return}
+if(request.method==='executeStream'&&${JSON.stringify(Boolean(streamFailure))}){console.log(JSON.stringify({id:request.id,error:'provider_request_rejected',providerFailure:${JSON.stringify(streamFailure ?? null)}}));lines.close();return}
 if(request.method==='executeStream'){console.log(JSON.stringify({id:request.id,chunk:JSON.stringify(result)}));console.log(JSON.stringify({id:request.id,result:{done:true}}))}else console.log(JSON.stringify({id:request.id,result}));lines.close()})
 `)
   chmodSync(binary, 0o700)
@@ -45,6 +46,23 @@ it('keeps a fixed preparation refusal visible to the caller without starting inf
   const reader = client.stream(2, 'fixture-model', {}).getReader()
   await expect(reader.read()).rejects.toMatchObject({ name: 'WorkerRefusal', code: 'reconnect_required' })
   expect(readFileSync(journal, 'utf8')).not.toContain('executeStream')
+  reader.releaseLock()
+})
+it('preserves a redacted provider diagnosis across real worker IPC without changing the refusal code', async () => {
+  const { client } = fixture(false, undefined, undefined, false, undefined, { provider: 'codex', status: 400, error: { type: 'invalid_request_error', message: 'Unsupported field. [redacted]' } })
+  const reader = client.stream(2, 'fixture-model', { messages: [{ role: 'user', content: 'A private request fixture.' }] }).getReader()
+  const failure = await reader.read().then(() => { throw new Error('expected_failure') }, error => error)
+  expect(failure).toMatchObject({ name: 'WorkerRefusal', code: 'provider_request_rejected', failureDetails: { category: 'invalid_request', status: 400, provider: 'codex' } })
+  expect(failure.failureDetails.providerMessage).toContain('Unsupported field.')
+  expect(JSON.stringify(failure.failureDetails)).not.toContain('A private request fixture.')
+  reader.releaseLock()
+})
+it('ignores malformed worker diagnostics while preserving the original refusal', async () => {
+  const { client } = fixture(false, undefined, undefined, false, undefined, { provider: 'claude', status: 400, error: { type: 'invalid_request_error', message: 'wrong provider' } })
+  const reader = client.stream(2, 'fixture-model', {}).getReader()
+  const failure = await reader.read().then(() => { throw new Error('expected_failure') }, error => error)
+  expect(failure.code).toBe('provider_request_rejected')
+  expect(failure.failureDetails).toBeUndefined()
   reader.releaseLock()
 })
 it('native broker requests retain the task and access-reader boundary and preserve split UTF-8 bytes', async () => {

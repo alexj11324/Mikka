@@ -20,7 +20,9 @@
 - `f01529a3` 的 Enterprise suite 为 28/28；`3c2d7230` 的 P1 席位 9/9、实际治理 HTTP 6/6、纯策略/协议 12/12、DB runner 28/28。它们是各自固定版本的证据，不替代后续合流 head。
 - `ace63a1a` 的 P1 seats 8 个子测试通过，但父 fixture 清理因 PostgreSQL `42501` 失败，总计 8/9；不能记录为整组通过。
 
-OIDC RP-initiated logout 的 8 个新增子用例已计入 37 项：真实 OP 确认/退出、短期一次性回调、跨浏览器/provider/配置绑定、上游和 nonce/audit/session DELETE 故障均通过。治理 API 的普通会话拒绝、真实 OIDC 会话允许 usage/CSV/template apply、暂停 Workspace 成员后再次拒绝仍等待 P1 合流，不计入这些通过数。合流还需保留三处有效工作区门禁和 main 的精确 Profile 源筛选。
+OIDC RP-initiated logout 的 8 个新增子用例已计入 37 项：真实 OP 确认/退出、短期一次性回调、跨浏览器/provider/配置绑定、上游和 nonce/audit/session DELETE 故障均通过。本次 P1 合流已将完整可信 Reader 传给 usage/CSV、模板读取/保存/删除/应用和治理摘要接口；新增真实 HTTP 子例覆盖普通会话拒绝、真实 OIDC 会话允许以及暂停 Workspace 成员后再次拒绝，仍须在最终公开 head 实库执行，不计入上述通过数。WS→APP 锁顺序、三处有效工作区 SSO 门禁和 main 的 selectedKeyId 查询收窄均保留。
+
+主干 #1609 的 canonical edition、trusted origins 和 self-hosted request authority 保持原样；Enterprise 不另建 Cloud OAuth proxy 或 KMS 依赖。SSO 密文继续使用既有 WORKSPACE_SECRETS_KEY 和配置类型 AAD，自托管启动器按主干规则持久化该密钥。浏览器凭据的异步 DEK envelope 与此为不同密文域，本次没有声称迁移或复用了该 KMS。
 
 ### 本次记录摘要
 
@@ -32,6 +34,22 @@ OIDC RP-initiated logout 的 8 个新增子用例已计入 37 项：真实 OP �
 | `06e797f5-lint-ui.log` | 363 | `e02ab7713c9f4fbadb4a581f7e7a92a8a5532c44fcadc720bc98bd4bdf687ba3` |
 | `06e797f5-oidc-lint.log` | 89 | `c64e3ea685b5cf08198b8b57908eaae759ed559ca02cefb18ccad82e76b5ae62` |
 | `06e797f5-typecheck.log` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+
+## 最终合流新增，尚待公开 SHA 验证
+
+当前离线/远端 Git 对象准备合入最新 main、P0 和 P1，保留原有 OIDC 退出协议以及主干的 canonical origin、fresh human/actAs 和请求追踪。以下代码与新增回归尚未运行，不能计入上面的 37/37：
+
+- 官方 Web PKCE exchange 为新会话重新读取当前 SSO identity/provider/Organization/SCIM 证明；普通会话与 break-glass 权限不升级，目标会话和既有审计 outbox 在同一事务提交后才发布 bearer。审计故障回收未发布的目标会话。
+- SAML 每次已验证登录记录最小 SessionIndex 快照。Web 派生会话以原始根会话为唯一父级，使用原生 session FK CASCADE 保证退出/撤销关闭整个派生家族；不保留新的 bearer 或原始断言。
+- 原生库 provider+NameID 单记录会被后续独立登录覆盖。新增的窄回调在库完成签名、issuer、destination 和 replay 检查后，按原始 SessionIndex 选择根会话；无 SessionIndex 时关闭该 provider+NameID 的适用根会话，阻止随后原生逻辑误删较新登录的 canonical 索引。
+- 强制 SSO Workspace 的缓存 namespace 需要当前完整 session principal；普通会话、失效 identity、暂停成员和 SCIM 停用不能 hydrate 先前的企业缓存。非 Org 冷读因此从原来 1 条 membership 查询变为精确 2 条（另 1 条 canonical Org-link 查询）；保留精确预算断言，不读取任务正文或成员清单。
+- Organization 的实时元数据使用绑定真实 session 与 Workspace 的 opaque capability；策略/SCIM/session 撤权与 capability 撤销同一 APP 事务提交，源端停止 fan-out，现有 builtin 与 Worker 通道接收持久撤销控制。原生 session 删除和已验证 SAML 家族删除只在提交后唤醒既有投递；详情见 [实时权限契约](enterprise-live-authority.md)。
+- 手机注册仅接受当前原生会话，推送逐设备真实 session 重验 Workspace 与 Enterprise 门槛。新增 HTTP 断言覆盖真实 OIDC 允许、同用户普通会话拒绝、identity/成员撤回和 SCIM 停用；只替换 Expo 与 Workflow 外部执行，token、权限与收据仍用实际 PG。
+- 准备的 PostgreSQL 竞争回归覆盖派生/根删除相互等待、子会话先删、批量根/子删除、scope 约束、审计失败及旧 SLO 不影响后登录会话。新增原生 Web、live/cache/phone 和 SAML 用例与原有 Reader 回归均须在最终公开提交执行。
+
+审计 outbox 的投递也已准备解除旧 APP→WS checkout 反序：APP claim 提交释放、WS 稳定事件 ID 入库提交释放、APP 条件 ack。独立新增 4 个实库子例（含父共 5 项）针对两生产 pool max1、并发 claim、WS 失败和 WS 成功/APP ack 失败；尚未执行，不计入 37/37。
+
+本轮准备使用 `20261107180200` Organization、`180201` identity、`180202` SAML lineage 与 `180203` live capability 迁移；后面三条显式进入 Auth 所在 APP 数据库。前两条 SQL 仅顺延文件名，内容不变。手机 session 字段来自先行 P0 的 `180002`，P2 不另造一套手机身份表。新主线及这些 session 撤销补丁的最终验收都以同一个公开 SHA 为准。
 
 ## Issue 要求 → 后端证据
 

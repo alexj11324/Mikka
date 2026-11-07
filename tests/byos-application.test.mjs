@@ -25,6 +25,7 @@ import { buildChildEnv } from '../packages/daemon/src/env.ts'
 import { NoSandbox } from '../packages/daemon/src/agents/sandbox.ts'
 import { ToolApprovalGate } from '../packages/daemon/src/agents/tool-approval.ts'
 import { createLogger } from '../packages/daemon/src/log.ts'
+import { seedFixtureWorkspace } from './helpers/task-workspace.ts'
 
 const workspaceId = '20000000-0000-4000-8000-000000000001'
 const root = resolve(import.meta.dirname, '..')
@@ -169,11 +170,10 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
   let browserServer
   let browser
   try {
-    // Native admission initializes the real owner FK/Coordinator head through
-    // readCliRunPolicy. Model policy now reads the same real Workspace as the binding.
+    // Task-free native admission uses the persisted tenant and its active
+    // member, while readCliRunPolicy initializes the real Coordinator policy.
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('alice','BYOS fixture','alice@byos-fixture.invalid',true,now(),now()) ON CONFLICT (id) DO NOTHING`)
-    await pool.query(`INSERT INTO mikka_workspaces (id,"userId",name,kind) VALUES ($1,'alice','BYOS fixture','team') ON CONFLICT (id) DO NOTHING`, [workspaceId])
-    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,'alice','BYOS fixture','alice@byos-fixture.invalid','admin','active') ON CONFLICT ("workspaceId","userId") DO NOTHING`, [workspaceId])
+    await seedFixtureWorkspace(pool, 'alice', 'team', workspaceId)
     assert.equal((await http(new Request('http://localhost/api/subscriptions', { method: 'POST' }))).status, 401)
     assert.equal((await http(new Request('http://localhost/api/subscriptions', { method: 'POST', headers: { 'sec-fetch-site': 'cross-site' } }))).status, 403)
     assert.equal((await post({ action: 'connect', workspaceId, provider: 'codex', accessToken: 'never-import' })).status, 409)
@@ -262,7 +262,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       const noLoginCreates=secretMethods.filter(method=>method==='POST').length
       for(let task=0;task<2;task++){
         const runId=randomUUID()
-        await pool.query('insert into agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt") values($1,\'alice\',$2,$3,\'running\',now()+interval \'1 minute\')',[runId,agentId,deviceId])
+        await pool.query('insert into agent_runs(id,"userId","agentId","deviceId","workspaceId",status,"leaseExpiresAt") values($1,\'alice\',$2,$3,$4,\'running\',now()+interval \'1 minute\')',[runId,agentId,deviceId,workspaceId])
         await pool.query('insert into byos_native_runs("runId","bindingId") values($1,$2)',[runId,agentBinding.body.bindingId])
         const contextResponse=await nativePost(runId,{action:'context'})
         assert.equal(contextResponse.status,200)

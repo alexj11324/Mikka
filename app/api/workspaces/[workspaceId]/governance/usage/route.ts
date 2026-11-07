@@ -9,8 +9,8 @@ export const GET = freshSessionRoute(async (request: Request, context: Context) 
   const session = await governanceSession(request, workspaceId)
   const params = new URL(request.url).searchParams
   const range = { from: params.get('from'), to: params.get('to') }
-  if (params.get('format') === 'csv') return new Response(await exportWorkspaceUsage(workspaceId, session.user.id, range), {
+  if (params.get('format') === 'csv') return new Response(await exportWorkspaceUsage(workspaceId, session.user, range), {
     headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="workspace-usage.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' },
   })
-  return readWorkspaceUsage(workspaceId, session.user.id, range)
+  return readWorkspaceUsage(workspaceId, session.user, range)
 }))

@@ -19,6 +19,7 @@ export const runtime = 'nodejs'
 async function handleGET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   const intent = new URL(request.url).searchParams.get('intent')
+  const configured = await githubConnectConfigured()
   const plugin = (reason?: string) => {
     const back = new URL(GITHUB_PLUGIN_PATH, request.url)
     if (reason) back.searchParams.set('github', 'link-failed')
@@ -28,7 +29,7 @@ async function handleGET(request: Request) {
   }
   // A desktop app that takes the return on its loopback: the link is for the app's
   // account whatever this browser is signed in as, so it goes straight to GitHub.
-  if (intent !== null && githubConnectConfigured()) {
+  if (intent !== null && configured) {
     const loopback = await startLoopbackIntent(pool, intent, { authorizeURL: githubAuthorizeURL, seal: sealGitHubSecret })
     if (loopback?.kind === 'github') return NextResponse.redirect(loopback.url)
     if (loopback?.kind === 'expired') return plugin('expired')
@@ -39,13 +40,13 @@ async function handleGET(request: Request) {
     const next = '/?section=plugins&app=github' + (isIntentToken(intent) ? `&intent=${intent}` : '')
     return NextResponse.redirect(new URL(withBasePath(`/sign-in?next=${encodeURIComponent(next)}`), request.url))
   }
-  if (!githubConnectConfigured()) return plugin('failed')
+  if (!configured) return plugin('failed')
   if (intent !== null) {
     const claim = await claimConnectIntent(pool, intent, session.user.id)
     if (claim.kind === 'expired') return plugin('expired')
     if (claim.kind === 'otherAccount') return plugin('browser-account')
   }
-  const { url, cookie } = startGitHubConnect(session.user.id)
+  const { url, cookie } = await startGitHubConnect(session.user.id)
   const response = NextResponse.redirect(url)
   response.cookies.set(cookie.name, cookie.value, cookie.options)
   return response

@@ -10,6 +10,7 @@ function env(stub: Partial<DeviceSessionStub>): GatewayEnv {
   const session: DeviceSessionStub = {
     notify: async () => {},
     notifyLive: async () => {},
+    revokeLive: async () => {},
     status: async () => ({ online: false, lastSeenAt: null }),
     fetch: async () => new Response(null),
     watchPresence: async () => ({ accepted: true, changed: false }),

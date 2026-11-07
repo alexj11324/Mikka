@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -18,7 +19,7 @@ pg.Client.prototype.query = function (this: pg.Client, ...args: unknown[]) {
 } as typeof pg.Client.prototype.query
 async function counted<T>(work: () => Promise<T>) {
   statements = []
-  try { const value = await work(); return { value, queries: statements.length, bytes: Buffer.byteLength(JSON.stringify(value) ?? '') } }
+  try { const value = await work(); return { value, queries: statements.length, bytes: Buffer.byteLength(JSON.stringify(value) ?? ''), queryShapes: statements.map(sql => ({ command: sql.trim().split(/\s+/, 1)[0], tables: [...sql.matchAll(/(?:from|join)\s+"?([a-z_]+)"?/gi)].map(match => match[1]) })) } }
   finally { statements = null }
 }
 
@@ -48,7 +49,7 @@ test('the polled routes read with a fixed number of queries, whatever the number
       const bot = randomUUID(), issue = randomUUID(), run = randomUUID(), index = bots.length
       bots.push(bot); tasks.push(issue)
       await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,$4)', [bot, owner, workspaceId, `Bot ${index}`])
-      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)', [issue, owner, `Task ${index}`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: index + 1 } }, content: [] }), 'doing', 'normal', 'personal'])
+      await pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,$8,\'bound\')', [issue, owner, `Task ${index}`, JSON.stringify({ type: 'doc', attrs: { mikka: { number: index + 1 } }, content: [] }), 'doing', 'normal', 'personal', workspaceId])
       await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt) values($1,$2,$3,$4,$5,$6)', [run, owner, issue, agent, 'succeeded', `Fix thing ${index}`])
       await pool.query('insert into coordinator_messages(id,"userId","botId",position,message) values($1,$2,$3,1,$4)', [randomUUID(), owner, bot, JSON.stringify({ role: 'assistant', content: [{ type: 'text', text: `Started [[run:${run}]] for [[issue:${issue}]]` }] })])
     }
@@ -121,6 +122,7 @@ test('the polled routes read with a fixed number of queries, whatever the number
     const fourScopes = await counted(() => as(async () => json(await tasksRoute.GET(new Request(url)))))
     assert.deepEqual(fourScopes.value.tasks.map((task: { id: string }) => task.id).sort(), [...listed].sort())
     assert.equal(fourScopes.queries, twoScopes.queries, 'factory tasks: the same queries for 2 and 4 bot scopes')
+    if (fourScopes.queries > 13) t.diagnostic(JSON.stringify({ read: 'factory-task-list', queryShapes: fourScopes.queryShapes }))
     assert.ok(fourScopes.queries <= 13, `factory tasks: ${fourScopes.queries} queries`)
 
     await as(() => pollIssues())
@@ -165,8 +167,9 @@ test('issuesForUser answers as issueForUser does for each task: personal, shared
     }
     await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [sharedTeam, shared, owner, 'Shared', 'BSH'])
     await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,$4,$5)', [revokedTeam, revoked, owner, 'Revoked', 'BRV'])
-    const insert = (id: string, userId: string, scope: string, deleted = false) => pool.query('insert into issues(id,"userId",title,content,status,priority,scope) values($1,$2,$3,$4,$5,$6,$7)',
-      [id, userId, id, JSON.stringify({ type: 'doc', attrs: deleted ? { mikka: { deletedAt: new Date().toISOString() } } : {}, content: [] }), 'todo', 'normal', scope])
+    const insert = async (id: string, userId: string, scope: string, deleted = false) => pool.query('insert into issues(id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,$8,\'bound\')',
+      [id, userId, id, JSON.stringify({ type: 'doc', attrs: deleted ? { mikka: { deletedAt: new Date().toISOString() } } : {}, content: [] }), 'todo', 'normal', scope,
+        scope === 'personal' ? await seedFixtureWorkspace(pool, userId) : id === ids.revokedTask ? revoked : shared])
     await insert(ids.peerPersonal, peer, 'personal'); await insert(ids.peerDeleted, peer, 'personal', true); await insert(ids.ownerPersonal, owner, 'personal')
     await insert(ids.teamTask, owner, 'workspace'); await insert(ids.revokedTask, owner, 'workspace'); await insert(ids.peerWorkspace, peer, 'workspace')
     await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [ids.teamTask, sharedTeam, shared, owner])

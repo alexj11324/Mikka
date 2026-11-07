@@ -29,4 +29,3 @@ export function organizationAuditRow(input: OrganizationAuditInput) {
     createdAt: input.occurredAt ? z.date().parse(input.occurredAt) : new Date(),
   }
 }
-

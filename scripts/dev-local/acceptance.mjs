@@ -16,13 +16,15 @@ import { verifyMailbox } from './mailbox-acceptance.mjs'
 import { verifyWorkerMailbox } from './worker-mailbox-acceptance.mjs'
 import { assertHandoffConfiguration, verifyFactoryHandoff } from './factory-handoff-acceptance.mjs'
 import { verifyFactoryWatchdog } from './factory-watchdog-acceptance.mjs'
+import { verifyWorkspaceGovernance } from './workspace-governance-acceptance.mjs'
 import { assertFlashTestModel, assertTestModelRequest } from '../test-model-policy.mjs'
 import { prepareCloudAcceptance } from '../e2b/cloud-acceptance-release.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const selectedItems = process.env.LOCAL_LOOP_ITEMS?.split(',') ?? ['1', '2', '3', '4', '5', '6', '7']
-assert.ok(selectedItems.length && selectedItems.every(item => /^(?:[1-9]|10)$/.test(item)) && new Set(selectedItems).size === selectedItems.length, 'LOCAL_LOOP_ITEMS must be unique item numbers 1–10')
+assert.ok(selectedItems.length && selectedItems.every(item => /^(?:[1-9]|10|11)$/.test(item)) && new Set(selectedItems).size === selectedItems.length, 'LOCAL_LOOP_ITEMS must be unique item numbers 1–11')
 const needsDaemon = selectedItems.some(item => ['1', '2', '3', '7', '9', '10'].includes(item))
+const needsModels = selectedItems.some(item => item !== '11')
 // Keep the daemon Unix socket below Linux's 108-byte pathname limit even in
 // the separate fixed acceptance checkout. Evidence retains the full runId.
 const runId = randomUUID(), directory = resolve(root, '.cache/dev-local', `acceptance-${runId.replaceAll('-', '').slice(0, 16)}`)
@@ -215,7 +217,7 @@ async function setup() {
     await recordAuthenticationSecrets([decodeURIComponent(new URL(process.env.E2E_DATABASE_URL).password)], { environment })
   }
   await new TestAccountPool(pool, environment).prepare({ pairs: 4 })
-  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1',
+  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1', MIKKA_DEV_SKIP_MODEL_SETUP: needsModels ? '0' : '1',
     ...(selectedItems.some(item => ['9', '10'].includes(item)) ? { MIKKA_DEV_ACCEPTANCE_HANDOFF: '1' } : {}),
     ...(selectedItems.includes('10') ? { MIKKA_DEV_ACCEPTANCE_ONLINE_WATCHDOG: '1' } : {}), ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
   await step('server-ready', 180_000, signal => until(signal, async () => {
@@ -229,24 +231,31 @@ async function setup() {
       try { return (await fetch(`${origin}/mikka/zh-CN`, { signal: AbortSignal.any([signal, AbortSignal.timeout(90_000)]) })).ok } catch { return false }
     })
   })
+  // Vite can serve the shell before Nitro has compiled or started its worker.
+  // Wait for our owned runtime and a real API response before the one bounded
+  // attestation/login attempt. The account helper still proves the exact SHA
+  // and database with HMAC; the development version response has an empty build.
+  runtime = await step('runtime-ready', 120_000, signal => until(signal, async () => {
+    try {
+      const review = existing && process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE ? JSON.parse(await readFile(process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE, 'utf8')) : null
+      const value = JSON.parse(await readFile(resolve(review?.repositoryRoot ?? root, '.cache/dev-local/runtime.json'), 'utf8'))
+      if (!existing && value.daemonDataDir !== process.env.MIKKA_DEV_DAEMON_DIR) return null
+      const response = await fetch(`${origin}/mikka/api/version`, { redirect: 'error', credentials: 'omit', cache: 'no-store', signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]) })
+      const version = response.ok ? await response.json() : null
+      return typeof version?.build === 'string' ? value : null
+    } catch { return null }
+  }))
+  assert.equal(new URL(runtime.server ?? runtime.appUrl).origin, origin, 'runtime origin mismatch')
   accounts = await step('account-lease', 120_000, () => acquireTestAccounts({ environment, database: pool, runId, workerId: 'local-loop', requestId: runId }))
-  await step('local-account-ready', 120_000, signal => until(signal, async () => {
+  if (needsModels) await step('local-account-ready', 120_000, signal => until(signal, async () => {
     const refreshed = await fetch('http://127.0.0.1:3191/refresh', { method: 'POST', signal: AbortSignal.timeout(90_000) })
     if (!refreshed.ok) return false
     const keys = await query(`SELECT id FROM model_api_keys WHERE "ownerId"=$1 AND provider='deepseek'`, [accounts.owner.userId])
     assert.ok(keys.length, 'No real DeepSeek key seeded; refusing scripted/default model acceptance')
     return true
   }))
-  runtime = await step('runtime-ready', 120_000, signal => until(signal, async () => {
-    try {
-      const review = existing && process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE ? JSON.parse(await readFile(process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE, 'utf8')) : null
-      const value = JSON.parse(await readFile(resolve(review?.repositoryRoot ?? root, '.cache/dev-local/runtime.json'), 'utf8'))
-      return (existing || value.daemonDataDir === process.env.MIKKA_DEV_DAEMON_DIR) ? value : null
-    } catch { return null }
-  }))
-  assert.equal(new URL(runtime.server ?? runtime.appUrl).origin, origin, 'runtime origin mismatch')
   if (!needsDaemon) {
-    await writeFile(join(directory, 'environment-summary.json'), JSON.stringify({ revision, driverRevision, sourceFingerprint, items: selectedItems, origin, database: environment.database.name, instanceId: environment.instanceId, leaseId: accounts.lease.id, started: new Date(started).toISOString(), externalBoundaries: ['Real DeepSeek model', 'No daemon required by selected items', 'No browser tests', 'No production DB writes'] }, null, 2), { mode: 0o600 })
+    await writeFile(join(directory, 'environment-summary.json'), JSON.stringify({ revision, driverRevision, sourceFingerprint, items: selectedItems, origin, database: environment.database.name, instanceId: environment.instanceId, leaseId: accounts.lease.id, started: new Date(started).toISOString(), externalBoundaries: [needsModels ? 'Real DeepSeek model' : 'No model calls required by selected items', 'No daemon required by selected items', 'No browser tests', 'No production DB writes'] }, null, 2), { mode: 0o600 })
     return null
   }
   const standaloneDaemon = (args, persistent = false) => {
@@ -460,6 +469,12 @@ async function accept(device) {
       dispatch: (name, text) => dispatch(name, text, signal), observations, startSecondDaemon: () => secondDaemon(signal),
       stackPid: localStackChild.pid, registerCleanup: hook => cleanupHooks.push(hook) })
   })
+  if (only.includes('11')) await check('item11-workspace-governance', 180_000, signal => verifyWorkspaceGovernance({ accounts, pool, progress, signal, runId,
+    recordSecrets: async values => {
+      for (const value of values) secrets.add(value)
+      await recordAuthenticationSecrets(values, { environment })
+    },
+  }))
   if (only.includes('8')) await check('item8-cloud-loop', 900_000, async signal => {
     const reviewed = process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE
       ? await (await import('./reviewed-local-evidence.mjs')).verifyReviewedLocalEvidence(process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE, { environment, runtime }) : null

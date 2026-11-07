@@ -7,8 +7,8 @@ import 'server-only'
  * (claude_cpa, codex_cpa); mikka-byos-subscription-native lets it run threads
  * on a computer (claude_code_cli, codex_cli). The model menu, the bot's model
  * resolver and the subscription runtime all read this one check, so a route
- * that is off is neither offered nor run. Off when PostHog is unreachable
- * (serverFlagEnabled fails closed and logs). MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+ * that is off is neither offered nor run. Without a PostHog project, both
+ * shipped routes default on. A configured PostHog failure retains its closed behavior. MIKKA_BYOS_VALIDATED_MODEL_ROUTES
  * and MIKKA_BYOS_VALIDATED_NATIVE_ROUTES still turn a route on for every owner,
  * for test environments; production does not set them.
  */

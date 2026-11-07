@@ -14,7 +14,7 @@ mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExport
   json, mobileUser: async () => signedIn, writeAllowed: () => true,
   unauthorized: () => json({ error: 'authRequired' }, 401), forbiddenOrigin: () => json({ error: 'originNotAllowed' }, 403),
 } })
-mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_: string, handler: unknown) => handler, noteLogUser: () => {} } })
+mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_: string, handler: unknown) => handler, noteLogUser: () => {} } })
 mock.module(new URL('../lib/tokens/scope.ts', import.meta.url).href, { namedExports: { runOutsideToken: async () => outsideToken } })
 mock.module(new URL('../lib/agent-runs.ts', import.meta.url).href, { namedExports: { requestRunStop: (userId: string, runId: string) => { calls.push([userId, runId]); return stop(userId, runId) } } })
 const route = import('../app/api/mobile/threads/[id]/stop/route')

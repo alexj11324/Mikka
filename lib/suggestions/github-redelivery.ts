@@ -1,4 +1,6 @@
 import { createSign } from 'node:crypto'
+import { githubAppEnvironmentConfig } from '@/lib/github/app-env'
+import { officialGitHubRelayEndpoint } from '@/lib/github/official-cloud-relay'
 
 // GitHub's side of the hourly suggestions backfill. Mikka's GitHub App keeps a
 // log of every webhook delivery it sent (three days). Deliveries that did not
@@ -9,6 +11,7 @@ import { createSign } from 'node:crypto'
 const API = 'https://api.github.com'
 /** How far back failed deliveries are redelivered. Longer than the hourly interval, so one missed run is covered. */
 export const REDELIVERY_WINDOW_MS = 3 * 60 * 60 * 1000
+const CLOUD_REDELIVERY_WINDOW_MS = 24 * 60 * 60 * 1000
 /** At most this many redeliveries per run. */
 export const REDELIVERY_LIMIT = 25
 /** The events app/api/webhooks/github turns into suggestions; others are not worth redelivering. */
@@ -39,14 +42,14 @@ const succeeded = (delivery: GitHubDelivery) => delivery.status_code >= 200 && d
  * earlier redelivery may already have succeeded). One per guid, the latest
  * attempt, at most `limit`.
  */
-export function failedDeliveries(deliveries: readonly GitHubDelivery[], since: Date, limit = REDELIVERY_LIMIT): GitHubDelivery[] {
+export function failedDeliveries(deliveries: readonly GitHubDelivery[], since: Date, limit = REDELIVERY_LIMIT, allEvents = false): GitHubDelivery[] {
   const byGuid = new Map<string, GitHubDelivery[]>()
   for (const delivery of deliveries) byGuid.set(delivery.guid, [...byGuid.get(delivery.guid) ?? [], delivery])
   const failed: GitHubDelivery[] = []
   for (const attempts of byGuid.values()) {
     if (attempts.some(succeeded)) continue
     const latest = attempts.reduce((a, b) => new Date(b.delivered_at) > new Date(a.delivered_at) ? b : a)
-    if (new Date(latest.delivered_at) < since || !SUGGESTION_EVENTS.has(latest.event)) continue
+    if (new Date(latest.delivered_at) < since || !allEvents && !SUGGESTION_EVENTS.has(latest.event)) continue
     failed.push(latest)
   }
   return failed.sort((a, b) => new Date(a.delivered_at).getTime() - new Date(b.delivered_at).getTime()).slice(0, limit)
@@ -63,17 +66,22 @@ export interface RedeliveryResult { configured: boolean; scanned: number; failed
 
 /**
  * Redelivers the App's failed suggestion webhooks from the last few hours. A
- * no-op when GITHUB_APP_ID or GITHUB_APP_PRIVATE_KEY is not set. Logs counts,
+ * no-op when no App ID or signing key is configured. Logs counts,
  * never payloads.
  */
-export async function redeliverFailedGitHubWebhooks({ now = new Date(), fetcher = fetch, env = process.env }: { now?: Date; fetcher?: typeof fetch; env?: Record<string, string | undefined> } = {}): Promise<RedeliveryResult> {
+export async function redeliverFailedGitHubWebhooks({ now = new Date(), fetcher = fetch, env }: { now?: Date; fetcher?: typeof fetch; env?: Record<string, string | undefined> } = {}): Promise<RedeliveryResult> {
   const result: RedeliveryResult = { configured: false, scanned: 0, failed: 0, redelivered: 0, errors: 0 }
-  const appId = env.GITHUB_APP_ID
-  const privateKey = env.GITHUB_APP_PRIVATE_KEY
+  const config = env ? githubAppEnvironmentConfig(env) : await (await import('@/lib/github/app-config')).readGitHubAppConfig()
+  const appId = config.id
+  const privateKey = config.pem
   if (!appId || !privateKey) return result
   result.configured = true
   const headers = { authorization: `Bearer ${githubAppJwt(appId, privateKey, now)}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'mikka-suggestions-reconcile' }
-  const since = new Date(now.getTime() - REDELIVERY_WINDOW_MS)
+  // The same existing hourly sweep also covers a failed official -> private
+  // bridge. Its durable forwarding window is 24h and includes repository and
+  // installation events; community App suggestion backfills keep their scope.
+  const cloudRelay = officialGitHubRelayEndpoint(env) !== null
+  const since = new Date(now.getTime() - (cloudRelay ? CLOUD_REDELIVERY_WINDOW_MS : REDELIVERY_WINDOW_MS))
   const deliveries: GitHubDelivery[] = []
   let cursor: string | null = null
   // Newest first; stop once a page reaches past the window.
@@ -92,7 +100,7 @@ export async function redeliverFailedGitHubWebhooks({ now = new Date(), fetcher 
     if (!cursor || !rows.length || rows.some(row => new Date(row.delivered_at) < since)) break
   }
   result.scanned = deliveries.length
-  const failed = failedDeliveries(deliveries, since, Infinity)
+  const failed = failedDeliveries(deliveries, since, Infinity, cloudRelay)
   result.failed = failed.length
   for (const delivery of failed.slice(0, REDELIVERY_LIMIT)) {
     const response = await fetcher(`${API}/app/hook/deliveries/${delivery.id}/attempts`, { method: 'POST', headers })

@@ -24,6 +24,9 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
+  # Existing accounting/admission suites exercise the hosted deployment.
+  # The self-hosted image workflow separately runs the default community mode.
+  MIKKA_EDITION: cloud
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
   # to a normal install, which outlasts the short jobs' own timeouts.
@@ -143,6 +146,9 @@ jobs:
       - run: pnpm test:factory-monitor
       - run: pnpm test:execution-rules
       - run: pnpm test:abuse
+      - run: pnpm test:self-hosting
+      - run: pnpm test:self-hosted-byok
+      - run: pnpm test:cloud-services
       - run: pnpm test:hosted-usage
       - run: pnpm test:model-admission
       - run: pnpm test:audit
@@ -271,6 +277,10 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+      - run: pnpm check:cloud-boundary
+      - name: Verify all production release credentials use existing Infisical OIDC
+        run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
+        if: always()
       - run: pnpm lint:code
         if: always()
       - run: node apps/api/scripts/generate-routes.mjs --check
@@ -282,6 +292,8 @@ jobs:
       - run: pnpm --filter @mikka/frontend test
         if: always()
       - run: pnpm typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         if: always()
       - run: pnpm --filter @mikka/protocol typecheck
       - run: pnpm --filter @mikka/mobile typecheck
@@ -468,7 +480,7 @@ jobs:
           RUN_DISPATCH_DB_TESTS: '1'
           FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
           CREDENTIAL_TEST_RETAIN_RESOURCES: '1'
-          DB_TEST_EXPECTED: test:enterprise-db,test:project-decisions-db,test:chat-attachments-db,test:ops-db,test:model-admission-db,test:abuse-db,test:onboarding-db,test:execution-settings-db,test:device-enrollment-db,test:account-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:approved-writes-db,test:artifact-migration-db,test:audit-db,test:bot-chats-db,test:bot-threads-db,test:captures-db,test:cloud-backend-db,test:computer-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-issue-tools-db,test:coordinator-native,test:coordinator-task-binding-db,test:credentials-db,test:desktop-auth,test:factory,test:factory-all-dispatch-db,test:factory-approval-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-monitor-db,test:factory-routing-db,test:github-connections-db,test:group-turns,test:groups,test:issue-search-db,test:live-db,test:local-repository-migration-db,test:migration-steps-db,test:pat-db,test:pat-api-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:run-dispatch,test:run-publication-db,test:scope-detachment-db,test:secrets-db,test:session-mailbox-db,test:self-improvement-db,test:self-improvement-unit,test:settings-activity-db,test:settings-prefs-db,test:skill-semantic-db,test:suggestion-artifact-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-admin-db,test:workspace-migration-db,test:device-revocation-db,test:worker-authorization-db,test:schedules-db,test:run-recovery-db,test:plugins-db
+          DB_TEST_EXPECTED: test:enterprise-db,test:project-decisions-db,test:chat-attachments-db,test:ops-db,test:model-admission-db,test:abuse-db,test:onboarding-db,test:execution-settings-db,test:device-enrollment-db,test:account-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:approved-writes-db,test:artifact-migration-db,test:audit-db,test:bot-chats-db,test:bot-threads-db,test:captures-db,test:cloud-backend-db,test:cloud-services-db,test:computer-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-issue-tools-db,test:coordinator-native,test:coordinator-task-binding-db,test:credentials-db,test:desktop-auth,test:factory,test:factory-all-dispatch-db,test:factory-approval-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-monitor-db,test:factory-routing-db,test:github-connections-db,test:group-turns,test:groups,test:issue-search-db,test:live-db,test:local-repository-migration-db,test:migration-steps-db,test:pat-db,test:pat-api-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:run-dispatch,test:run-publication-db,test:scope-detachment-db,test:secrets-db,test:session-mailbox-db,test:self-improvement-db,test:self-improvement-unit,test:settings-activity-db,test:settings-prefs-db,test:skill-semantic-db,test:suggestion-artifact-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-admin-db,test:workspace-migration-db,test:device-revocation-db,test:worker-authorization-db,test:schedules-db,test:run-recovery-db,test:plugins-db,test:web-auth-db
       - name: Preserve synthetic CLI approval database evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

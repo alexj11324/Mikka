@@ -3,8 +3,9 @@ import type { Pool } from 'pg'
 import type { ExecutionSettings, ExecutionSettingsScope } from './execution-settings'
 import { HOSTED_CHOICE, type BotModelQuota } from './bot-model-menu-view'
 import { apiKeyChatBaseUrl } from './model-api-key-providers'
-import { usableApiKeys, type UsableApiKey } from './model-api-keys'
+import { botApiKeyChoice, usableApiKeys, type UsableApiKey } from './model-api-keys'
 import { subscriptionAvailability } from './subscription-quota'
+import { isCloudEdition } from './edition'
 
 type Settings = Pick<ExecutionSettings, 'chatModels' | 'chatBinding'> & Partial<Pick<ExecutionSettings, 'pooledBindings' | 'sharedChatBinding'>>
 export interface BotSubscriptionChoice {
@@ -29,6 +30,18 @@ export function apiKeyServesBotModel(key: UsableApiKey, model: string) {
   return Boolean(apiKeyChatBaseUrl(key) && key.models.includes(model))
 }
 
+/** Reads the saved preference without creating a default or cloning a binding. */
+export async function botModelPreference(pool: Pick<Pool, 'query'>, scope: ExecutionSettingsScope, botId: string | null) {
+  const key = await botApiKeyChoice(pool, scope, botId)
+  const { rows: [row] } = await pool.query<{ bindingId: string | null }>(
+    'SELECT "bindingId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+    [scope.ownerId, scope.workspaceId, botId ?? 'coordinator'],
+  )
+  // A saved key also has a null binding. Only a row without either explicitly
+  // selects Mikka default, which must stay selected even if subscriptions exist.
+  return { key, selected: key ? undefined : row ? row.bindingId ?? HOSTED_CHOICE : undefined }
+}
+
 /**
  * The next turn's read-only choice. The menu and reservation use this same
  * order; only reservation clones a binding and freezes its authorization.
@@ -49,6 +62,9 @@ export async function resolveBotModelChoice(
   const fallback = preference.key ? 'preference' as const : undefined
 
   const hosted = async (state: ChoiceState): Promise<BotModelChoice> => {
+    // Community defaults either spend their explicitly bound cloud workspace
+    // or their own provider. Local hosted balances never redirect that choice.
+    if (!isCloudEdition()) return { kind: 'hosted', ...state }
     const { hostedPointsRefusal, pointsFallback } = await import('./points-fallback')
     const next = await hostedPointsRefusal(scope.workspaceId) ? await pointsFallback(pool as Pool, scope) : null
     if (next?.kind === 'api_key') {

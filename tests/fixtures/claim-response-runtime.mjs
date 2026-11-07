@@ -1,5 +1,41 @@
 // In-memory claim boundary tests. No sockets, providers or database connections.
 import { registerHooks } from 'node:module'
+import assert from 'node:assert/strict'
+import { PgDialect } from 'drizzle-orm/pg-core'
+
+const dialect = new PgDialect()
+function workspaceQuery() {
+  let table, condition
+  const query = {
+    from(value) { table = value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')]; return query },
+    innerJoin() { return query },
+    where(value) { condition = dialect.sqlToQuery(value); return query },
+    async for(mode) {
+      const p = globalThis.claimResponseProbe
+      assert.equal(mode, 'share')
+      if (table === 'mikka_workspaces') {
+        assert.deepEqual(condition.params, [p.workspace.id])
+        p.locks.push('workspaces')
+        return [p.workspace]
+      }
+      assert.equal(table, 'mikka_workspace_members')
+      assert.deepEqual(condition.params, [p.workspace.id, p.run.userId, 'active'])
+      p.locks.push('workspace_members')
+      return p.memberAllowed ? [{ id: p.run.userId }] : []
+    },
+    async orderBy() {
+      const p = globalThis.claimResponseProbe
+      assert.equal(table, 'mikka_workspaces')
+      assert.deepEqual(condition.params, [p.run.userId, 'active', p.workspace.id, 'team', 'personal', p.run.userId])
+      return p.memberAllowed ? [p.workspace] : []
+    },
+  }
+  return query
+}
+// Keep withRunWorkspace, mayCompleteIssue and their lock order real. Only the
+// workspace database transport is modeled alongside the App transaction below.
+export const claimWorkspaceDatabase = { select: workspaceQuery, transaction: callback => callback({ select: workspaceQuery }) }
+export const claimWorkspacePool = { query() { throw new Error('unexpected raw workspace query in claim fixture') } }
 const nextServer = import.meta.resolve('next/server')
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
 const dbSource = `import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
@@ -40,6 +76,7 @@ const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],
   ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
   ['/lib/db/index.ts', dbSource],
+  ['/lib/workspace-db.ts', `export {claimWorkspaceDatabase as workspaceDb, claimWorkspacePool as workspacePool} from ${JSON.stringify(import.meta.url)}`],
   ['/lib/device-link.ts', 'export async function authenticateDevice(){const p=globalThis.claimResponseProbe;return Object.hasOwn(p,"caller") ? (p.caller && {tokenId:"synthetic-device-token",...p.caller}) : {userId:"member",tokenId:"synthetic-device-token"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device};export async function ownedDeviceWithReport(){return globalThis.claimResponseProbe.device}'],
   ['/lib/device-repositories.ts', 'export async function readRepositorySettings(...args){const p=globalThis.claimResponseProbe;p.preparation.push("settings");(p.settingsReads??=[]).push(args);return p.repositorySettings??null}'],
   ['/lib/agent-tool-approval/policy-store.ts', 'export async function readCliRunPolicy(){const p=globalThis.claimResponseProbe;p.preparation.push("policy");return structuredClone(p.cliPolicy)}'],
