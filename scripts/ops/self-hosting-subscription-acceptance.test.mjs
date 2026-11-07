@@ -65,3 +65,5 @@ test('a failed provider source or fixture preserves the independent bound model 
 // PR comments use explicit Pull requests write; Apple/EAS readbacks run independently of protocol completion.
 
 // Apple readback JWT scope includes the exact fixed build filters and sparse fields; no native redispatch.
+
+// Community release pin contains native-auth fix1668; production writers must complete before activation.

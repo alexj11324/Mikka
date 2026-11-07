@@ -228,3 +228,5 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
 // YAML mode expressions use block scalars because the commit prefix contains a colon.
 
 // Apple readback JWT scope includes the exact fixed build filters and sparse fields; no native redispatch.
+
+// Community release pin contains native-auth fix1668; production writers must complete before activation.

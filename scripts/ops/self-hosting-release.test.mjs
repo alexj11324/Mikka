@@ -142,3 +142,5 @@ test('Apple API denial preserves action/status without exposing raw provider err
 // YAML mode expressions use block scalars because the commit prefix contains a colon.
 
 // PR comments use explicit Pull requests write; Apple/EAS readbacks run independently of protocol completion.
+
+// Community release pin contains native-auth fix1668; production writers must complete before activation.
