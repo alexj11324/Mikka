@@ -12,8 +12,108 @@ spec = importlib.util.spec_from_file_location('official_files', Path(__file__).w
 files = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(files)
 
+ROOT_CA = '/usr/local/share/ca-certificates/e2b-ca.crt'
+# Desktop: official-only control artifact 13538924302, controls.desktop.created.
+# Claude: d63 runtime 42326876749 / job 128264238545 fresh-conservation failure.
+# The Claude failure is not by itself an official-only control or release pass.
+ROOT_CA_ROTATIONS = {
+    'desktop': ('7177f680c9c87f91ff9ab72a4409511cc4781d7c3dc549f302bfa17bd973b6b9',
+                '88a5a279fec06a155bf9de1dd28abc93aae0f17db5f9febe69d5e25b15f8ff4d'),
+    'claude': ('fd1175201e861f159f0d6ae42523b0f5d754ade8a36d105e8b7110b180101862',
+               '21899698fbaa1da5314e42bc049b146f16cddb2e7540822b2a15f009f8342996'),
+}
+
 
 class OfficialFiles(unittest.TestCase):
+    def test_measured_exact_root_ca_rotation_requires_finalization_and_strict_installation(self):
+        observations = []
+        for kind, (before_sha, after_sha) in ROOT_CA_ROTATIONS.items():
+            for after_mode in (0o644, 0o777):
+                observations.append((kind, before_sha, after_sha, after_mode))
+        observations.extend([
+            # Independent official-only controls 42329203806 and 42336374269:
+            # two creates on each resolved template/envd changed CA bytes while
+            # retaining 0644. Neither control reproduced the combined 0777 shape.
+            ('claude', '39092cfcc8ab45433c2f03884bc5e73540f1aec21fcd7b6047d8e1c37b22d488',
+             'b65c9222bdbe3f7aeecd78ad299a40b9a8440ac718b9102f28799df376cf8643', 0o644),
+            ('desktop', '767be311dc40f53638de0a6d09c76dae3e15785b122eae89b55d5873d70c7fed',
+             '492c78708de3514ad7bf8cafd5290fb044c450ce66759e2047ebed310e6bd92a', 0o644),
+            # Exact derived Desktop fresh-scan failure 42334937454 / 128289718639.
+            ('desktop', '4e067e215d0664f4cfeb733d74824a4ba52eb57635a6e365fd27bac0b19e5a9e',
+             '98d3ae906242016c071b5d1902c7b5c6fd5fe56b277c51b407d80d14cf6dde2d', 0o777),
+        ])
+        for kind, before_sha, after_sha, after_mode in observations:
+            with self.subTest(kind=kind, mode=after_mode, before=before_sha):
+                original = {'path': ROOT_CA, 'kind': 'file', 'mode': 0o644,
+                            'uid': 0, 'gid': 0, 'sha256': before_sha}
+                baseline = {'version': 1, 'entries': [original]}
+                with patch.object(files, 'entry', return_value=original):
+                    proof = files.verify(baseline)
+                updated = {**original, 'mode': after_mode, 'sha256': after_sha}
+                with patch.object(files, 'entry', return_value=updated):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify(baseline)
+                    proof['finalization'] = files.verify(baseline, kind)
+                self.assertIs(files.validate_receipt(proof, kind), proof)
+                final = proof['finalization']
+                self.assertEqual(final['before'], final['after'])
+                self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+                expected_before, expected_after = {'sha256': before_sha}, {'sha256': after_sha}
+                if after_mode != original['mode']:
+                    expected_before['mode'] = original['mode']
+                    expected_after['mode'] = after_mode
+                self.assertEqual(final['providerChanges'], [{'path': ROOT_CA, 'kind': 'file',
+                                 'before': expected_before, 'after': expected_after}])
+                invalid = deepcopy(proof)
+                invalid['after'] = final['originalAfter']
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt(invalid, kind)
+
+    def test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected(self):
+        before_sha, after_sha = ROOT_CA_ROTATIONS['desktop']
+        original = {'path': ROOT_CA, 'kind': 'file', 'mode': 0o644,
+                    'uid': 0, 'gid': 0, 'sha256': before_sha}
+        forbidden = [
+            {'uid': 1000}, {'gid': 1000}, {'mode': 0o666}, {'mode': 0o700}, {'sha256': 'not-a-digest'},
+            {'kind': 'link', 'sha256': None, 'target': '/opt/mikka/replaced.crt'},
+            {'kind': 'link', 'sha256': None, 'target': ROOT_CA},
+            {'kind': 'directory', 'sha256': None},
+        ]
+        # A permitted hash rotation must not hide a simultaneous forbidden change.
+        forbidden += [{**update, 'sha256': after_sha} for update in forbidden if 'sha256' not in update]
+        for kind in ('claude', 'desktop', 'codex'):
+            baseline = {'version': 1, 'entries': [original]}
+            for update in forbidden:
+                with self.subTest(kind=kind, update=update), patch.object(files, 'entry', return_value={**original, **update}):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify(baseline, kind)
+            with self.subTest(kind=kind, removed=True), patch.object(files, 'entry', side_effect=FileNotFoundError(ROOT_CA)):
+                with self.assertRaisesRegex(RuntimeError, 'official_files_removed'):
+                    files.verify(baseline, kind)
+            for path in ('/usr/local/share/ca-certificates/unobserved.crt',
+                         '/usr/local/share/ca-certificates/e2b-ca.crt.backup',
+                         '/etc/ssl/certs/unobserved.crt', '/usr/local/bin/claude', '/usr/local/bin/codex'):
+                before = {**original, 'path': path}
+                with self.subTest(kind=kind, path=path), patch.object(files, 'entry', return_value={**before, 'sha256': after_sha}):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': [before]}, kind)
+        with patch.object(files, 'entry', return_value={**original, 'sha256': after_sha}):
+            files.verify({'version': 1, 'entries': [original]}, 'codex')
+        with patch.object(files, 'entry', return_value={**original, 'mode': 0o777}):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify({'version': 1, 'entries': [original]}, 'codex')
+
+    def test_exact_root_ca_rotation_receipts_reject_invalid_hashes(self):
+        before_sha, after_sha = ROOT_CA_ROTATIONS['desktop']
+        for kind in ('claude', 'desktop', 'codex'):
+            rules, _ = files.finalization_policy(kind)
+            for side in ('before', 'after'):
+                for value in (None, '', 'f' * 63, 'g' * 64, 'A' * 64, 123):
+                    change = {'path': ROOT_CA, 'kind': 'file', 'before': {'sha256': before_sha}, 'after': {'sha256': after_sha}}
+                    change[side]['sha256'] = value
+                    with self.subTest(kind=kind, side=side, value=value):
+                        self.assertFalse(files.permitted_provider_change(change, rules))
+
     def test_missing_original_reports_the_exact_manifest_path_and_preserves_the_filesystem_cause(self):
         with tempfile.TemporaryDirectory() as name:
             cli = Path(name) / 'official-cli'
@@ -163,95 +263,6 @@ class OfficialFiles(unittest.TestCase):
         proof['after'] = {**proof['after'], 'sha256': 'c' * 64}
         with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
             files.validate_receipt(proof, 'claude')
-
-    def test_claude_per_create_root_is_only_permitted_during_finalization(self):
-        # Two official-only creates in run 42329203806 returned these different
-        # CA bytes with mode 0644. The existing 0644 -> 0777 rule was measured
-        # separately; keep both observations distinct while checking composition.
-        original = {'path': '/usr/local/share/ca-certificates/e2b-ca.crt',
-                    'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0,
-                    'sha256': '39092cfcc8ab45433c2f03884bc5e73540f1aec21fcd7b6047d8e1c37b22d488'}
-        baseline = {'version': 1, 'entries': [original]}
-        with patch.object(files, 'entry', return_value=original):
-            installation = files.verify(baseline)
-        for mode in (0o644, 0o777):
-            updated = {**original, 'mode': mode,
-                       'sha256': 'b65c9222bdbe3f7aeecd78ad299a40b9a8440ac718b9102f28799df376cf8643'}
-            with self.subTest(mode=mode), patch.object(files, 'entry', return_value=updated):
-                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                    files.verify(baseline)
-                final = files.verify(baseline, 'claude')
-                self.assertEqual(final['before'], final['after'])
-                self.assertNotEqual(final['originalBefore'], final['originalAfter'])
-                expected_before = {'sha256': original['sha256']}
-                expected_after = {'sha256': updated['sha256']}
-                if mode != original['mode']:
-                    expected_before['mode'] = original['mode']
-                    expected_after['mode'] = mode
-                self.assertEqual(final['providerChanges'], [{'path': original['path'], 'kind': 'file',
-                                 'before': expected_before, 'after': expected_after}])
-                proof = {**installation, 'finalization': final}
-                self.assertIs(files.validate_receipt(proof, 'claude'), proof)
-                proof['after'] = final['originalAfter']
-                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
-                    files.validate_receipt(proof, 'claude')
-
-    def test_measured_root_variation_keeps_other_metadata_and_paths_protected(self):
-        original = {'path': '/usr/local/share/ca-certificates/e2b-ca.crt',
-                    'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': 'a' * 64}
-        for kind in ('claude', 'desktop'):
-            for field, value in (('uid', 1000), ('gid', 1000), ('mode', 0o666),
-                                 ('mode', 0o700), ('kind', 'directory'), ('sha256', 'not-a-digest')):
-                updated = {**original, 'sha256': 'b' * 64, field: value}
-                with self.subTest(kind=kind, field=field, value=value), patch.object(files, 'entry', return_value=updated):
-                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                        files.verify({'version': 1, 'entries': [original]}, kind)
-            link = {key: value for key, value in original.items() if key != 'sha256'}
-            link.update(kind='link', mode=0o777, target='/opt/mikka/replacement.crt')
-            with self.subTest(kind=kind, target=link['target']), patch.object(files, 'entry', return_value=link):
-                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                    files.verify({'version': 1, 'entries': [original]}, kind)
-            for path in ('/usr/local/share/ca-certificates/other.crt', '/usr/local/bin/claude'):
-                before = {**original, 'path': path}
-                with self.subTest(kind=kind, path=path), patch.object(files, 'entry', return_value={**before, 'sha256': 'b' * 64}):
-                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                        files.verify({'version': 1, 'entries': [before]}, kind)
-
-    def test_desktop_observed_root_rotation_is_only_permitted_during_finalization(self):
-        # Exact fresh-scan failure from run 42334937454, job 128289718639.
-        # Official-only run 42336374269 independently measured different CA
-        # bytes on the same template/envd with mode 0644; it did not reproduce
-        # the failed derived image's combined mode-plus-content transition.
-        observations = [
-            ('4e067e215d0664f4cfeb733d74824a4ba52eb57635a6e365fd27bac0b19e5a9e',
-             '98d3ae906242016c071b5d1902c7b5c6fd5fe56b277c51b407d80d14cf6dde2d', 0o777),
-            ('767be311dc40f53638de0a6d09c76dae3e15785b122eae89b55d5873d70c7fed',
-             '492c78708de3514ad7bf8cafd5290fb044c450ce66759e2047ebed310e6bd92a', 0o644),
-        ]
-        for before_sha, after_sha, mode in observations:
-            original = {'path': '/usr/local/share/ca-certificates/e2b-ca.crt',
-                        'kind': 'file', 'mode': 0o644, 'uid': 0, 'gid': 0, 'sha256': before_sha}
-            updated = {**original, 'mode': mode, 'sha256': after_sha}
-            baseline = {'version': 1, 'entries': [original]}
-            with patch.object(files, 'entry', return_value=original):
-                installation = files.verify(baseline)
-            with self.subTest(mode=mode), patch.object(files, 'entry', return_value=updated):
-                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
-                    files.verify(baseline)
-                final = files.verify(baseline, 'desktop')
-                self.assertEqual(final['before'], final['after'])
-                self.assertNotEqual(final['originalBefore'], final['originalAfter'])
-                expected_before, expected_after = {'sha256': before_sha}, {'sha256': after_sha}
-                if mode != original['mode']:
-                    expected_before['mode'] = original['mode']
-                    expected_after['mode'] = mode
-                self.assertEqual(final['providerChanges'], [{'path': original['path'], 'kind': 'file',
-                                 'before': expected_before, 'after': expected_after}])
-                proof = {**installation, 'finalization': final}
-                self.assertIs(files.validate_receipt(proof, 'desktop'), proof)
-                proof['after'] = final['originalAfter']
-                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
-                    files.validate_receipt(proof, 'desktop')
 
     def test_an_unreadable_original_directory_cannot_be_silently_skipped(self):
         with tempfile.TemporaryDirectory() as name:

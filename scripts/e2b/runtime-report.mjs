@@ -1,79 +1,85 @@
-// Full conservation and subscription receipts travel as immutable artifact
-// files. Job outputs carry only this file's digest and the artifact's ID.
+// Complete preservation/subscription reports travel as immutable artifact files.
+// Job outputs contain only their identity, digest and bounded cleanup metadata.
 import { createHash } from 'node:crypto'
-import { appendFileSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 const SHA = /^[a-f0-9]{40}$/
 const DIGEST = /^[a-f0-9]{64}$/
-const NUMBER = /^[1-9][0-9]{0,19}$/
-const KINDS = ['desktop', 'claude', 'codex']
-const hash = bytes => createHash('sha256').update(bytes).digest('hex')
-const check = (value, code) => { if (!value) throw Error(`runtime_report_${code}`) }
+const NUMBER = /^[1-9][0-9]*$/
+export const TEMPLATE_KINDS = ['desktop', 'claude', 'codex']
+export const CLEANUP_IDENTITY_MAX_BYTES = 2048
+const fail = code => { throw Error(code) }
+const positive = value => typeof value === 'string' && NUMBER.test(value) && Number.isSafeInteger(Number(value))
 
-export function assertRuntimeArtifactReference({ artifactId, sha256, workerSha }) {
-  check(NUMBER.test(artifactId ?? '') && DIGEST.test(sha256 ?? '') && SHA.test(workerSha ?? ''), 'reference_invalid')
+export const reportDigest = bytes => createHash('sha256').update(bytes).digest('hex')
+export const templateModels = report => Object.fromEntries(TEMPLATE_KINDS.map(kind => [kind, report.templates[kind].models]))
+const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
+  ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value
+export const templateModelsDigest = report => reportDigest(JSON.stringify(canonical(templateModels(report))))
+
+export function assertArtifactReference({ artifactId, sha256 }) {
+  if (!positive(artifactId)) fail('runtime_report_artifact_id_invalid')
+  if (typeof sha256 !== 'string' || !DIGEST.test(sha256)) fail('runtime_report_digest_invalid')
 }
 
-export function runtimeModelsSha256(report) {
-  const models = KINDS.map(kind => [kind, report.templates[kind].models])
-  // Preserve the old deep-value comparison, independent of object key order.
-  return hash(JSON.stringify(models, (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
-    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]])) : value))
+export function assertReportIdentity(report, { sourceCommit, workerSha, runId, runAttempt }) {
+  if (!SHA.test(sourceCommit ?? '') || !SHA.test(workerSha ?? '') || !positive(runId) || !positive(runAttempt))
+    fail('runtime_report_expected_identity_invalid')
+  if (report?.sourceCommit !== sourceCommit || report?.workerSha !== workerSha)
+    fail('runtime_report_source_mismatch')
+  const ids = new Set()
+  for (const kind of TEMPLATE_KINDS) {
+    const row = report.templates?.[kind]
+    if (row?.baseTemplate !== kind || row.name !== `mikka-${sourceCommit.slice(0, 12)}-${runId}-${runAttempt}-${kind}`
+      || typeof row.templateId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(row.templateId) || ids.has(row.templateId))
+      fail('runtime_report_attempt_mismatch')
+    ids.add(row.templateId)
+  }
 }
 
-function identify(bytes, env, workerSha) {
-  check(env.GITHUB_REPOSITORY === 'alexj11324/Mikka' && SHA.test(env.GITHUB_SHA ?? '')
-    && NUMBER.test(env.GITHUB_RUN_ID ?? '') && NUMBER.test(env.GITHUB_RUN_ATTEMPT ?? ''), 'workflow_invalid')
+export function readRuntimeReport(file, expected) {
+  if (typeof expected.sha256 !== 'string' || !DIGEST.test(expected.sha256)) fail('runtime_report_digest_invalid')
+  if (typeof file !== 'string' || !file) fail('runtime_report_file_required')
+  let bytes
+  try { bytes = readFileSync(file) } catch (cause) { throw Error('runtime_report_read_failed', { cause }) }
+  if (reportDigest(bytes) !== expected.sha256) fail('runtime_report_digest_mismatch')
   let report
   try { report = JSON.parse(bytes) } catch (cause) { throw Error('runtime_report_json_invalid', { cause }) }
-  check(report?.sourceCommit === env.GITHUB_SHA && SHA.test(report.workerSha ?? '')
-    && (workerSha === undefined || SHA.test(workerSha) && report.workerSha === workerSha), 'source_mismatch')
-  for (const kind of KINDS) {
-    const row = report.templates?.[kind]
-    const name = new RegExp(`^mikka-${env.GITHUB_SHA.slice(0, 12)}-${env.GITHUB_RUN_ID}-([1-9][0-9]{0,19})-${kind}$`)
-    const match = name.exec(row?.name ?? '')
-    // A failed-job rerun may consume the immutable build artifact from an
-    // earlier attempt of this same run; never another source/run or future.
-    check(row?.baseTemplate === kind && row.preinstalled === true
-      && /^[A-Za-z0-9_-]+$/.test(row?.templateId ?? '') && match
-      && BigInt(match[1]) <= BigInt(env.GITHUB_RUN_ATTEMPT), 'candidate_identity_mismatch')
-  }
+  assertReportIdentity(report, expected)
   return report
 }
 
-export function sealRuntimeReport(file, { env = process.env } = {}) {
-  const bytes = readFileSync(file), report = identify(bytes, env)
-  return { report, sha256: hash(bytes), bytes: bytes.length, modelsSha256: runtimeModelsSha256(report) }
+/** Independent, small resource identities survive a failed report download.
+ * They authorize only this run's cleanup; they never substitute for a gate. */
+export function cleanupIdentity(report, expected) {
+  assertReportIdentity(report, expected)
+  const receipt = { version: 1, sourceCommit: expected.sourceCommit, runId: expected.runId, runAttempt: expected.runAttempt,
+    templates: Object.fromEntries(TEMPLATE_KINDS.map(kind => {
+      const row = report.templates[kind]
+      return [kind, { baseTemplate: kind, name: row.name, templateId: row.templateId }]
+    })) }
+  const text = JSON.stringify(receipt)
+  if (Buffer.byteLength(text) > CLEANUP_IDENTITY_MAX_BYTES) fail('runtime_report_cleanup_identity_too_large')
+  return text
 }
 
-export function readRuntimeReport(file, { sha256, workerSha, env = process.env } = {}) {
-  check(DIGEST.test(sha256 ?? ''), 'digest_required')
-  const bytes = readFileSync(file)
-  check(hash(bytes) === sha256, 'digest_mismatch')
-  return identify(bytes, env, workerSha)
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   try {
-    const [command, file] = process.argv.slice(2)
-    check(command === 'reference' || file && ['seal', 'verify'].includes(command), 'command_invalid')
-    if (command === 'reference') {
-      assertRuntimeArtifactReference({ artifactId: process.env.RUNTIME_ARTIFACT_ID,
-        sha256: process.env.RUNTIME_REPORT_SHA256, workerSha: process.env.RUNTIME_WORKER_SHA })
-    } else if (command === 'seal') {
-      const { report, sha256, bytes, modelsSha256 } = sealRuntimeReport(file)
-      check(process.env.GITHUB_OUTPUT, 'output_required')
-      appendFileSync(process.env.GITHUB_OUTPUT, `report-sha256=${sha256}\nworker-sha=${report.workerSha}\nmodels-sha256=${modelsSha256}\n`)
-      console.log(JSON.stringify({ event: 'runtime_report_sealed', bytes, sha256, sourceCommit: report.sourceCommit }))
-    } else {
-      const report = readRuntimeReport(file, { sha256: process.env.RUNTIME_REPORT_SHA256, workerSha: process.env.RUNTIME_WORKER_SHA })
-      console.log(JSON.stringify({ event: 'runtime_report_verified', sourceCommit: report.sourceCommit, workerSha: report.workerSha }))
-    }
+    const reference = { artifactId: process.env.RUNTIME_REPORT_ARTIFACT_ID, sha256: process.env.RUNTIME_REPORT_SHA256 }
+    assertArtifactReference(reference)
+    if (process.argv[2] === 'verify') {
+      const report = readRuntimeReport(process.argv[3], { sha256: reference.sha256, sourceCommit: process.env.GITHUB_SHA,
+        workerSha: process.env.SOURCE_SHA, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT })
+      console.log(JSON.stringify({ event: 'runtime_report_verified', sourceCommit: report.sourceCommit, workerSha: report.workerSha, sha256: reference.sha256 }))
+    } else if (process.argv[2] !== 'reference') fail('runtime_report_command_invalid')
   } catch (error) {
-    // JSON, filesystem or provider evidence must never be dumped as an error.
-    console.error(/^runtime_report_[a-z_]+$/.test(error?.message ?? '') ? error.message : 'runtime_report_failed')
+    // JSON parse causes can contain report text; keep the cause on the thrown
+    // function error for tests, but emit only this closed transport code in CI.
+    const codes = ['artifact_id_invalid', 'digest_invalid', 'file_required', 'read_failed', 'digest_mismatch',
+      'json_invalid', 'expected_identity_invalid', 'source_mismatch', 'attempt_mismatch', 'command_invalid']
+    const code = codes.map(value => `runtime_report_${value}`).includes(error?.message) ? error.message : 'runtime_report_failed'
+    console.error(JSON.stringify({ event: 'runtime_report_refused', code }))
     process.exitCode = 1
   }
 }

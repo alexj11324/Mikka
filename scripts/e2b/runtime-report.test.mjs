@@ -1,119 +1,153 @@
-import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
-import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import test from 'node:test'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { assertRuntimeArtifactReference, readRuntimeReport, sealRuntimeReport } from './runtime-report.mjs'
+import { spawnSync } from 'node:child_process'
+import { assertArtifactReference, cleanupIdentity, CLEANUP_IDENTITY_MAX_BYTES, readRuntimeReport,
+  reportDigest, templateModels, templateModelsDigest } from './runtime-report.mjs'
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url))
-const SHA = 'a'.repeat(40), WORKER = 'b'.repeat(40)
-const identity = { GITHUB_SHA: SHA, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '2', GITHUB_REPOSITORY: 'alexj11324/Mikka' }
-const hash = bytes => createHash('sha256').update(bytes).digest('hex')
-const candidate = () => ({ sourceCommit: SHA, workerSha: WORKER,
+const expected = { sourceCommit: 'a'.repeat(40), workerSha: 'b'.repeat(40), runId: '123456', runAttempt: '2' }
+const fixture = () => ({ sourceCommit: expected.sourceCommit, workerSha: expected.workerSha,
   templates: Object.fromEntries(['desktop', 'claude', 'codex'].map(kind => [kind, {
-    templateId: `template-${kind}`, baseTemplate: kind, preinstalled: true,
-    name: `mikka-${SHA.slice(0, 12)}-123-1-${kind}`,
-    // Full conservation evidence can exceed Linux's per-environment-string
-    // limit. Transport must preserve every byte, including unknown proof data.
-    conservation: { fixtureEvidence: 'x'.repeat(110000) },
+    name: `mikka-${expected.sourceCommit.slice(0, 12)}-${expected.runId}-${expected.runAttempt}-${kind}`,
+    baseTemplate: kind, templateId: `${kind}-candidate`, buildId: `build-${kind}`, preinstalled: true,
+    models: [{ harness: kind, models: ['measured-model'] }],
+    conservation: { before: { entries: 1200, sha256: 'c'.repeat(64) }, after: { entries: 1200, sha256: 'c'.repeat(64) },
+      preserved: Array.from({ length: 1200 }, (_, n) => ({ path: `/official/${kind}/${n}`, sha256: 'c'.repeat(64) })) },
   }])) })
 
-function runStep(workflow, name) {
-  const after = workflow.split(`      - name: ${name}\n`)[1]
-  assert.ok(after, `step ${name} exists`)
-  const block = after.split('\n      - ')[0]
-  const script = block.match(/        run: \|\n((?:          [^\n]*\n|\n)+)/)?.[1]
-  assert.ok(script, `step ${name} has a shell boundary`)
-  return { block, script: script.replace(/^          /gm, '') }
+function withReport(t, report = fixture()) {
+  const dir = mkdtempSync(join(tmpdir(), 'runtime-report-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const path = join(dir, 'candidates.json'), bytes = Buffer.from(JSON.stringify(report) + '\n')
+  writeFileSync(path, bytes, { mode: 0o600 })
+  return { dir, path, bytes, report, expected: { ...expected, sha256: reportDigest(bytes) } }
 }
 
-test('the real subscription shell transports a complete 310KB+ candidate without putting it in argv or env', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'runtime-report-'))
-  try {
-    const bytes = Buffer.from(JSON.stringify(candidate()) + '\n')
-    assert.ok(bytes.length >= 310446)
-    mkdirSync(join(directory, 'runtime-candidates'))
-    writeFileSync(join(directory, 'runtime-candidates/candidates.json'), bytes)
-    const consumer = join(directory, 'consume.mjs'), receipt = join(directory, 'consumed.json')
-    writeFileSync(consumer, `import {readFileSync,writeFileSync} from 'node:fs'; import {createHash} from 'node:crypto';
-      const bytes=readFileSync(process.argv[2]); writeFileSync(process.env.CONSUMED_RECEIPT,
-      JSON.stringify({bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}));\n`)
-    const workflow = readFileSync(resolve(ROOT, '.github/workflows/e2b-official-runtime.yml'), 'utf8')
-    const step = runStep(workflow, 'Require real Claude Code and Codex subscriptions on the private candidates')
-    const env = { PATH: process.env.PATH, ...identity, RUNNER_TEMP: directory, CONSUMED_RECEIPT: receipt,
-      RUNTIME_REPORT_SHA256: hash(bytes), RUNTIME_WORKER_SHA: WORKER }
-    if (/CANDIDATE_REPORT:/.test(step.block)) env.CANDIDATE_REPORT = bytes.toString()
-    const result = spawnSync('bash', ['--noprofile', '--norc', '-euo', 'pipefail', '-c',
-      step.script.replace('node scripts/e2b/validate-template-subscriptions.mjs', `node "${consumer}"`)],
-    { cwd: ROOT, env, encoding: 'utf8' })
-    assert.equal(result.error?.code, undefined, 'the subscription process must actually start')
-    assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(JSON.parse(readFileSync(receipt, 'utf8')), { bytes: bytes.length, sha256: hash(bytes) })
-  } finally { rmSync(directory, { recursive: true, force: true }) }
+test('a report larger than the failing 310446-byte payload remains byte-identical through the real file CLI', t => {
+  const f = withReport(t)
+  assert.ok(f.bytes.length > 310446)
+  assert.deepEqual(readRuntimeReport(f.path, f.expected), f.report)
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('./runtime-report.mjs', import.meta.url)), 'verify', f.path], {
+    encoding: 'utf8', env: { PATH: process.env.PATH, GITHUB_SHA: expected.sourceCommit, SOURCE_SHA: expected.workerSha,
+      GITHUB_RUN_ID: expected.runId, GITHUB_RUN_ATTEMPT: expected.runAttempt, RUNTIME_REPORT_ARTIFACT_ID: '123', RUNTIME_REPORT_SHA256: f.expected.sha256 },
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(JSON.parse(result.stdout).sha256, f.expected.sha256)
+  assert.doesNotMatch(result.stdout, /official\/|measured-model/)
+  assert.deepEqual(readFileSync(f.path), f.bytes, 'the transport does not rewrite, truncate or normalize the proof')
 })
 
-test('artifact bytes, source, worker and same-run attempt remain bound without truncating evidence', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'runtime-report-'))
-  try {
-    const file = join(directory, 'candidates.json'), report = candidate(), bytes = JSON.stringify(report) + '\n'
-    writeFileSync(file, bytes)
-    const sealed = sealRuntimeReport(file, { env: identity })
-    assert.equal(sealed.sha256, hash(bytes)); assert.equal(sealed.bytes, Buffer.byteLength(bytes))
-    assert.deepEqual(readRuntimeReport(file, { env: identity, sha256: sealed.sha256, workerSha: WORKER }), report)
-    assert.equal(readFileSync(file, 'utf8'), bytes)
-    assert.throws(() => readRuntimeReport(file, { env: identity }), /digest_required/)
-    assert.throws(() => readRuntimeReport(file, { env: identity, sha256: 'f'.repeat(64) }), /digest_mismatch/)
-    assert.throws(() => readRuntimeReport(file, { env: identity, sha256: sealed.sha256, workerSha: 'c'.repeat(40) }), /source_mismatch/)
-    for (const mutate of [value => { value.sourceCommit = 'c'.repeat(40) },
-      value => { value.templates.claude.name = `mikka-${SHA.slice(0, 12)}-999-1-claude` },
-      value => { value.templates.claude.name = `mikka-${SHA.slice(0, 12)}-123-3-claude` }]) {
-      const wrong = structuredClone(report); mutate(wrong)
-      const wrongBytes = JSON.stringify(wrong); writeFileSync(file, wrongBytes)
-      assert.throws(() => readRuntimeReport(file, { env: identity, sha256: hash(wrongBytes), workerSha: WORKER }),
-        /runtime_report_(source|candidate_identity)_mismatch/)
-    }
-    assert.doesNotThrow(() => assertRuntimeArtifactReference({ artifactId: '567', sha256: sealed.sha256, workerSha: WORKER }))
-    for (const artifactId of ['', '567,568', 'other-run', '0'])
-      assert.throws(() => assertRuntimeArtifactReference({ artifactId, sha256: sealed.sha256, workerSha: WORKER }), /reference_invalid/)
-  } finally { rmSync(directory, { recursive: true, force: true }) }
+test('an immutable reference accepts one numeric ID and a byte digest, never a list or an empty download selector', () => {
+  assertArtifactReference({ artifactId: '13557755477', sha256: 'a'.repeat(64) })
+  for (const artifactId of ['', '1,2', '1\n2', '0', '-1', 'latest', '9007199254740992', undefined])
+    assert.throws(() => assertArtifactReference({ artifactId, sha256: 'a'.repeat(64) }), /artifact_id_invalid/)
+  for (const sha256 of ['', 'a'.repeat(40), 'sha256:' + 'a'.repeat(64), undefined])
+    assert.throws(() => assertArtifactReference({ artifactId: '123', sha256 }), /digest_invalid/)
 })
 
-test('always-cleanup reaches the exact-run finalizer after upstream failure or an unusable artifact', () => {
-  const workflow = readFileSync(resolve(ROOT, '.github/workflows/e2b-official-runtime.yml'), 'utf8')
-  const cleanup = workflow.slice(workflow.indexOf('\n  cleanup:'))
-  assert.match(cleanup, /if: always\(\) &&/)
-  assert.match(cleanup, /continue-on-error: true\n        uses: actions\/download-artifact@/)
-  const step = runStep(workflow, "Close this attempt's instances and remove only its private candidates")
-  for (const scenario of [
-    { name: 'valid', outcome: 'success', id: '567', useReport: true, status: 0 },
-    { name: 'upstream-failed-before-report', outcome: 'skipped', id: '', useReport: false, status: 0 },
-    { name: 'download-failed', outcome: 'failure', id: '567', useReport: false, status: 1 },
-    { name: 'digest-mismatch', outcome: 'success', id: '567', useReport: false, status: 1 },
-  ]) {
-    const directory = mkdtempSync(join(tmpdir(), 'runtime-cleanup-'))
-    try {
-      const bytes = JSON.stringify(candidate()) + '\n', receipt = join(directory, 'called.json')
-      mkdirSync(join(directory, 'runtime-candidates'))
-      writeFileSync(join(directory, 'runtime-candidates/candidates.json'), bytes)
-      mkdirSync(join(directory, 'e2b-cleanup/bin'), { recursive: true })
-      writeFileSync(join(directory, 'e2b-cleanup/bin/python'), `#!${process.execPath}
-        const fs=require('node:fs'),crypto=require('node:crypto'); const args=process.argv.slice(2);
-        const index=args.indexOf('--report'), file=index<0?null:args[index+1];
-        fs.writeFileSync(process.env.CLEANUP_RECEIPT,JSON.stringify({called:true,report:file!==null,
-          sha256:file?crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'):null}));\n`, { mode: 0o755 })
-      const result = spawnSync('bash', ['--noprofile', '--norc', '-euo', 'pipefail', '-c', step.script], {
-        cwd: ROOT, encoding: 'utf8', env: { PATH: process.env.PATH, ...identity, RUNNER_TEMP: directory,
-          CLEANUP_RECEIPT: receipt, ARTIFACT_OUTCOME: scenario.outcome, CANDIDATE_ARTIFACT_ID: scenario.id,
-          RUNTIME_REPORT_SHA256: scenario.name === 'digest-mismatch' ? 'f'.repeat(64) : hash(bytes), RUNTIME_WORKER_SHA: WORKER },
-      })
-      assert.equal(result.error?.code, undefined, scenario.name)
-      assert.equal(result.status, scenario.status, `${scenario.name}: ${result.stderr}`)
-      assert.deepEqual(JSON.parse(readFileSync(receipt, 'utf8')), {
-        called: true, report: scenario.useReport, sha256: scenario.useReport ? hash(bytes) : null,
-      })
-    } finally { rmSync(directory, { recursive: true, force: true }) }
+test('changed bytes and foreign source or worker are refused before the report can reach a gate', t => {
+  const f = withReport(t)
+  assert.throws(() => readRuntimeReport(f.path, { ...f.expected, sha256: 'd'.repeat(64) }), /digest_mismatch/)
+  for (const patch of [{ sourceCommit: 'd'.repeat(40) }, { workerSha: 'd'.repeat(40) }])
+    assert.throws(() => readRuntimeReport(f.path, { ...f.expected, ...patch }), /source_mismatch/)
+  assert.throws(() => readRuntimeReport(f.path, { ...f.expected, sha256: '' }), /digest_invalid/)
+  assert.throws(() => readRuntimeReport('', f.expected), /file_required/)
+  assert.throws(() => readRuntimeReport(f.path + '-missing', f.expected), error => error.message === 'runtime_report_read_failed' && error.cause?.code === 'ENOENT')
+})
+
+test('a partial rerun cannot reuse a previous attempt or another run as subscription/publication proof', t => {
+  const f = withReport(t)
+  for (const patch of [{ runAttempt: '1' }, { runAttempt: '3' }, { runId: '999' }])
+    assert.throws(() => readRuntimeReport(f.path, { ...f.expected, ...patch }), /attempt_mismatch/)
+  for (const patch of [{ sourceCommit: 'main' }, { runId: '' }, { runAttempt: '0' }, { workerSha: undefined }])
+    assert.throws(() => readRuntimeReport(f.path, { ...f.expected, ...patch }), /expected_identity_invalid/)
+})
+
+test('only short cleanup identities cross the failure boundary, independent of every preservation proof byte', t => {
+  const f = withReport(t), text = cleanupIdentity(f.report, expected), receipt = JSON.parse(text)
+  assert.ok(Buffer.byteLength(text) < CLEANUP_IDENTITY_MAX_BYTES)
+  assert.deepEqual(Object.keys(receipt).sort(), ['version', 'sourceCommit', 'runId', 'runAttempt', 'templates'].sort())
+  for (const kind of ['desktop', 'claude', 'codex']) {
+    assert.deepEqual(Object.keys(receipt.templates[kind]).sort(), ['baseTemplate', 'name', 'templateId'])
+    assert.equal(receipt.templates[kind].templateId, f.report.templates[kind].templateId)
   }
+  assert.doesNotMatch(text, /preserved|models|sha256/)
+  assert.throws(() => cleanupIdentity(f.report, { ...expected, runAttempt: '3' }), /attempt_mismatch/)
+})
+
+test('model catalogue digest binds the original build while the full report remains in a file', () => {
+  const report = fixture(), original = templateModelsDigest(report)
+  assert.equal(original.length, 64)
+  assert.deepEqual(Object.keys(templateModels(report)), ['desktop', 'claude', 'codex'])
+  report.templates.codex.models[0].models.push('not-measured-at-build')
+  assert.notEqual(templateModelsDigest(report), original)
+})
+
+test('model digests ignore JSON object key order but preserve array order and model values', () => {
+  const report = fixture()
+  report.templates.codex.models[0].modelSlots = [{ id: 'one', effort: { medium: true, high: false } }, { id: 'two' }]
+  const reverse = value => Array.isArray(value) ? value.map(reverse) : value && typeof value === 'object'
+    ? Object.fromEntries(Object.keys(value).reverse().map(key => [key, reverse(value[key])])) : value
+  assert.equal(templateModelsDigest(report), templateModelsDigest(reverse(report)))
+  const changed = structuredClone(report)
+  changed.templates.codex.models[0].modelSlots.reverse()
+  assert.notEqual(templateModelsDigest(report), templateModelsDigest(changed))
+})
+
+function workflowNodeScript(file, argument) {
+  const lines = readFileSync(new URL('../../.github/workflows/' + file, import.meta.url), 'utf8').split('\n')
+  const start = lines.findIndex(line => line.includes(`node --input-type=module - "$RUNNER_TEMP/${argument}" <<'JS'`))
+  assert.ok(start >= 0, `actual workflow script for ${argument}`)
+  const end = lines.findIndex((line, i) => i > start && line.trim() === 'JS')
+  assert.ok(end > start)
+  const indent = lines[start].match(/^ */)[0].length
+  return lines.slice(start + 1, end).map(line => line.slice(indent)).join('\n')
+}
+
+test('the actual workflow producer and pre-publication scripts keep large proofs out of every job output', t => {
+  const f = withReport(t), output = join(f.dir, 'outputs')
+  const env = { PATH: process.env.PATH, GITHUB_SHA: expected.sourceCommit, SOURCE_SHA: expected.workerSha,
+    GITHUB_RUN_ID: expected.runId, GITHUB_RUN_ATTEMPT: expected.runAttempt, GITHUB_OUTPUT: output,
+    TEMPLATE_MODELS_SHA256: templateModelsDigest(f.report) }
+  const run = (workflow, argument, extra = {}) => spawnSync(process.execPath, ['--input-type=module', '-', f.path], {
+    input: workflowNodeScript(workflow, argument), encoding: 'utf8', env: { ...env, ...extra },
+    cwd: fileURLToPath(new URL('../../', import.meta.url)),
+  })
+  const build = run('e2b-template.yml', 'candidates.json')
+  assert.equal(build.status, 0, build.stderr)
+  const lines = readFileSync(output, 'utf8').trim().split('\n')
+  const values = Object.fromEntries(lines.map(line => { const i = line.indexOf('='); return [line.slice(0, i), line.slice(i + 1)] }))
+  assert.deepEqual(Object.keys(values).sort(), ['source-sha', 'template-models-sha256', 'candidate-sha256', 'candidate-identities'].sort())
+  assert.equal(values['candidate-sha256'], f.expected.sha256)
+  assert.equal(values['template-models-sha256'], templateModelsDigest(f.report))
+  assert.equal(values['candidate-identities'], cleanupIdentity(f.report, expected))
+  assert.ok(lines.every(line => Buffer.byteLength(line) < CLEANUP_IDENTITY_MAX_BYTES))
+  const accepted = run('e2b-official-runtime.yml', 'accepted.json')
+  assert.equal(accepted.status, 0, accepted.stderr)
+  assert.notEqual(run('e2b-official-runtime.yml', 'accepted.json', { GITHUB_RUN_ATTEMPT: '3' }).status, 0)
+  assert.notEqual(run('e2b-official-runtime.yml', 'accepted.json', { TEMPLATE_MODELS_SHA256: 'd'.repeat(64) }).status, 0)
+  writeFileSync(output, '')
+  const release = run('e2b-official-runtime.yml', 'release.json')
+  assert.equal(release.status, 0, release.stderr)
+  const releaseLines = readFileSync(output, 'utf8').trim().split('\n')
+  assert.equal(releaseLines.length, 2)
+  assert.equal(releaseLines[0], `release-sha256=${f.expected.sha256}`)
+  assert.ok(releaseLines.every(line => Buffer.byteLength(line) < CLEANUP_IDENTITY_MAX_BYTES))
+  assert.deepEqual(readFileSync(f.path), f.bytes)
+})
+
+test('malformed report text keeps its error cause but never reaches CLI diagnostics', t => {
+  const f = withReport(t), bytes = Buffer.from('{"private-marker-invalid-json')
+  writeFileSync(f.path, bytes)
+  const sha256 = reportDigest(bytes)
+  assert.throws(() => readRuntimeReport(f.path, { ...f.expected, sha256 }), error => error.message === 'runtime_report_json_invalid' && error.cause instanceof SyntaxError)
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('./runtime-report.mjs', import.meta.url)), 'verify', f.path], {
+    encoding: 'utf8', env: { PATH: process.env.PATH, RUNTIME_REPORT_ARTIFACT_ID: '123', RUNTIME_REPORT_SHA256: sha256 },
+  })
+  assert.equal(result.status, 1)
+  assert.deepEqual(JSON.parse(result.stderr), { event: 'runtime_report_refused', code: 'runtime_report_json_invalid' })
+  assert.doesNotMatch(result.stdout + result.stderr, /private-marker|candidates\.json/)
 })

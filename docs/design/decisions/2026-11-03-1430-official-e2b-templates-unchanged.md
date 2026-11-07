@@ -72,6 +72,22 @@ worker digest、CLI manifest 和实际选择。CI 从新建的无身份候选实
 仅 Codex 已观测到的两条 E2B root 引用可指向本次 provider 注入的 root。
 未列出的证书路径或目标也拒绝，不豁免整个证书目录。
 
+2026-11-07，主线候选的 fresh 检查拦下 Claude 的
+`/usr/local/share/ca-certificates/e2b-ca.crt` 摘要变化。随后用
+[一个纯官方 Claude 派生控制和一个 fresh 实例](https://github.com/alexj11324/Mikka/actions/runs/42328944425)
+复现：仅添加 `/opt/mikka` 下的测量脚本和收据，不安装 Node、worker、gh 或依赖，
+不执行 CLI、模型探测或订阅任务。这个普通文件在 before/ready/fresh 三阶段的类型
+和 root 属主一致；ready 只发生已有的 `0644 → 0777`，fresh 才轮换 SHA-256。
+原 Claude CLI 的三阶段 SHA-256 完全相同。另核实此前 desktop 的纯官方控制也有
+相同精确路径的摘要变化，因此只为 Claude 和 desktop 的该路径补充 SHA 轮换许可；
+Codex 已有的规则保持不变。
+[完整控制、失败样本和清理收据](../research/2026-11-07-e2b-provider-root-ca-rotation.json)
+绑定源提交、run、artifact 摘要和实际资源 ID。E2B 固定版本源码也有该路径的 CA
+写入及 finalization 权限处理；实测 envd 二进制摘要已记录，但没有把公开源码版本
+冒充该实例的运行版本。安装阶段仍不接受任何变化，类型、属主、未知权限或路径、
+原 CLI 和普通证书内容继续严格校验。此控制不代表全文件发布保全、真实订阅通过
+或生产时延达标；本次 Claude 控制模板和实例均已回收。
+
 构建记录轻量 CLI manifest，包含构建前官方 CLI 的真实路径和摘要；官方原本缺少
 某个 harness 时，才记录 `/opt/mikka` 内补装的位置。每个 worker release 保存
 自己的 `.mikka-original-cli.json`，与 worker symlink 一起切换和回退。生产 worker、
@@ -84,6 +100,16 @@ Codex (`gpt-6-luna`) 的一次执行，使用正常的设备注册、任务绑�
 只探测 CLI 版本、模型列表或启动进程不足以通过验收。两个结果和文件保全收据
 都必须绑定同一候选模板、source commit 和 worker digest。没有完整收据就不能
 公开候选模板或更新生产模板 ID。
+
+完整保全报告通过不可变 CI artifact 传递，跨 job 只传有界 ID、摘要和清理身份，
+不把报告 JSON 放进环境变量或 workflow output/input。2026-11-07 的一次
+[真实失败和恢复记录](../research/2026-11-07-e2b-report-artifact-transport.json)
+显示，310,446 字节的单个环境变量使订阅及清理的 shell 在执行前就失败。
+候选、接受后及发布报告仍完整保存；消费文件前校验字节摘要、source、worker、
+workflow run 与 producer attempt，再执行订阅、公开模板或修改生产配置。
+缺失、损坏或错绑不能放行，也不能跳过最终清理；清理只使用可信的有限身份，
+保留同 source/run 较早 attempt 的精确回收能力，不据此复用旧发布证明。
+
 任务开始证据须由官方 CLI 给出：Claude 使用同 session、同首条 prompt UUID 的
 user 回显，Codex 使用本次 `turn/start` 的 ACK；`system/init` 或进程启动不能代替。
 候选执行还必须有完整、未截断、绑定该 run 的宿主 HTTP 收据，证明执行期间没有

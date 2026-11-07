@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createHash } from 'node:crypto'
-import { assertConservation, currentWorkerSha, pairEnv, publish, releaseFileInputs, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
+import { assertConservation, assertReleaseEvidence, currentWorkerSha, pairEnv, publicationInputFromFile, publish, runtimeConfigurationSha, PROJECT, TEAM } from './publish-template-env.mjs'
+import { reportDigest, templateModelsDigest } from './runtime-report.mjs'
 import * as webRelease from '../release/web-deploy.mjs'
-import { runtimeModelsSha256 } from './runtime-report.mjs'
 
 const SHA = 'a'.repeat(40), COMMIT = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const report = harness => ({ harness, installed: true, version: null, models: ['fixture-model'] })
@@ -17,6 +17,13 @@ const POLICY_SHA = createHash('sha256').update(readFileSync(new URL('./e2b-final
 const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
   kind, policySha256: POLICY_SHA, before: PROOF, after: PROOF, originalBefore: PROOF, originalAfter: PROOF, providerChanges: [],
 } })
+const ROOT_CA = '/usr/local/share/ca-certificates/e2b-ca.crt'
+// Desktop is official-only artifact 13538924302; Claude is the d63 fresh-scan
+// failure (42326876749 / 128264238545), not by itself a production gate pass.
+const ROOT_CA_ROTATIONS = {
+  desktop: ['7177f680c9c87f91ff9ab72a4409511cc4781d7c3dc549f302bfa17bd973b6b9', '88a5a279fec06a155bf9de1dd28abc93aae0f17db5f9febe69d5e25b15f8ff4d'],
+  claude: ['fd1175201e861f159f0d6ae42523b0f5d754ade8a36d105e8b7110b180101862', '21899698fbaa1da5314e42bc049b146f16cddb2e7540822b2a15f009f8342996'],
+}
 const mcpTiming = (runId, harness) => ({ version: 1, source: 'mikka_mcp_physical_fetch', scope: 'observed_mikka_mcp_children',
   generationCoverage: 'unverified', allFirstPartyHttpComplete: false, remoteMcpServerCount: 0, childPathAuditVersion: 1,
   runIdHash: createHash('sha256').update(runId).digest('hex').slice(0, 16), harness, startedAt: 1010, endedAt: 1900,
@@ -43,34 +50,27 @@ STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
 const OLD_STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: OTHER, sourceCommit: OTHER, models: MODELS }).map(row => [row.key, row.value]))
 OLD_STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = OTHER
 
-test('the publication file keeps complete large evidence and still applies every real release gate', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'runtime-publication-'))
-  try {
-    const file = join(directory, 'release.json'), report = structuredClone(EVIDENCE)
-    for (const [kind, row] of Object.entries(report.templates)) row.name = `mikka-${COMMIT.slice(0, 12)}-123-1-${kind}`
-    report.templates.desktop.conservation.fixtureEvidence = 'x'.repeat(310446)
-    const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_SHA: COMMIT, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '1',
-      MIKKA_CLOUD_WORKER_SOURCE_COMMIT: COMMIT, SOURCE_SHA: SHA, RUNTIME_MODELS_SHA256: runtimeModelsSha256(report) }
-    const save = () => {
-      const bytes = JSON.stringify(report) + '\n'; writeFileSync(file, bytes)
-      env.RUNTIME_REPORT_SHA256 = createHash('sha256').update(bytes).digest('hex')
-    }
-    save()
-    const inputs = releaseFileInputs(file, { env })
-    assert.deepEqual(inputs.releaseEvidence, report)
-    assert.deepEqual(inputs.models, MODELS); assert.deepEqual(inputs.templates, TEMPLATES)
-    const good = fixture(); await good.run(inputs)
-    assert.ok(good.calls.length > 0)
-    report.templates.codex.models[0].models[0] = 'changed-after-build'
-    save()
-    assert.throws(() => releaseFileInputs(file, { env }), /runtime_release_models_mismatch/)
-    report.templates.codex.models = structuredClone(MODELS.codex)
-    delete report.subscriptionAcceptance.codex
-    save()
-    const rejected = fixture()
-    await assert.rejects(rejected.run(releaseFileInputs(file, { env })), /runtime_release_subscription_missing codex/)
-    assert.equal(rejected.calls.length, 0, 'missing real subscription proof fails before publication requests')
-  } finally { rmSync(directory, { recursive: true, force: true }) }
+test('publication reads complete file evidence and retains independently bound models, templates and all gates', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'publication-report-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const path = join(dir, 'release.json'), evidence = structuredClone(EVIDENCE)
+  for (const [kind, row] of Object.entries(evidence.templates)) row.name = `mikka-${COMMIT.slice(0, 12)}-123-2-${kind}`
+  const bytes = Buffer.from(JSON.stringify(evidence) + '\n')
+  writeFileSync(path, bytes)
+  const expected = { sha256: reportDigest(bytes), modelsSha256: templateModelsDigest(evidence), templates: TEMPLATES,
+    sourceSha: SHA, sourceCommit: COMMIT, runId: '123', runAttempt: '2' }
+  const input = publicationInputFromFile(path, expected)
+  assert.deepEqual(input.releaseEvidence, evidence)
+  assert.deepEqual(input.models, MODELS)
+  assert.doesNotThrow(() => assertReleaseEvidence(input))
+  assert.throws(() => publicationInputFromFile(path, { ...expected, modelsSha256: 'a'.repeat(64) }), /models_digest_mismatch/)
+  assert.throws(() => publicationInputFromFile(path, { ...expected, runAttempt: '3' }), /attempt_mismatch/)
+  assert.throws(() => publicationInputFromFile(path, { ...expected, sha256: 'c'.repeat(64) }), /digest_mismatch/)
+  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, templates: { ...TEMPLATES, codex: 'other' } })), /template_invalid/)
+  delete evidence.subscriptionAcceptance.claude
+  const invalid = Buffer.from(JSON.stringify(evidence))
+  writeFileSync(path, invalid)
+  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /subscription_missing/)
 })
 
 test('conservation requires both strict installation and exact provider-only finalization changes', () => {
@@ -88,6 +88,61 @@ test('conservation requires both strict installation and exact provider-only fin
     const invalid = structuredClone(proof); mutate(invalid)
     assert.throws(() => assertConservation(invalid, 'claude'), /runtime_release_conservation_invalid/)
   }
+})
+
+for (const [kind, [beforeSha, afterSha]] of Object.entries(ROOT_CA_ROTATIONS)) {
+  test(`${kind} exact root CA rotation permits only finalization with an unchanged installation proof`, () => {
+    for (const modeChanged of [false, true]) {
+      const proof = conservation(kind)
+      proof.finalization.originalAfter = { ...PROOF, sha256: 'e'.repeat(64) }
+      proof.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file',
+        before: { sha256: beforeSha, ...(modeChanged ? { mode: 420 } : {}) },
+        after: { sha256: afterSha, ...(modeChanged ? { mode: 511 } : {}) } }]
+      assert.doesNotThrow(() => assertConservation(proof, kind))
+      const invalid = structuredClone(proof)
+      invalid.after = proof.finalization.originalAfter
+      assert.throws(() => assertConservation(invalid, kind), /runtime_release_conservation_invalid/)
+    }
+  })
+}
+
+test('exact root CA publication rules preserve metadata and reject other certificate or CLI paths', () => {
+  const [beforeSha, afterSha] = ROOT_CA_ROTATIONS.desktop
+  const forbidden = [
+    { before: { uid: 0 }, after: { uid: 1000 } },
+    { before: { gid: 0 }, after: { gid: 1000 } },
+    { before: { mode: 420 }, after: { mode: 438 } },
+    { before: { kind: 'file', sha256: beforeSha, target: null }, after: { kind: 'link', sha256: null, target: '/opt/mikka/replaced.crt' } },
+    { before: { kind: 'file', sha256: beforeSha, target: null }, after: { kind: 'link', sha256: null, target: ROOT_CA } },
+    { before: { kind: 'file', sha256: beforeSha }, after: { kind: 'directory', sha256: null } },
+  ]
+  for (const kind of ['claude', 'desktop', 'codex']) {
+    for (const fields of forbidden) {
+      const proof = conservation(kind)
+      proof.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', ...fields }]
+      assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+    }
+    for (const path of ['/usr/local/share/ca-certificates/unobserved.crt', '/usr/local/share/ca-certificates/e2b-ca.crt.backup',
+      '/etc/ssl/certs/unobserved.crt', '/usr/local/bin/claude', '/usr/local/bin/codex']) {
+      const proof = conservation(kind)
+      proof.finalization.providerChanges = [{ path, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }]
+      assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+    }
+    for (const side of ['before', 'after']) {
+      for (const value of [null, '', 'f'.repeat(63), 'g'.repeat(64), 'A'.repeat(64), 123]) {
+        const proof = conservation(kind)
+        const change = { path: ROOT_CA, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }
+        change[side].sha256 = value
+        proof.finalization.providerChanges = [change]
+        assert.throws(() => assertConservation(proof, kind), /runtime_release_conservation_invalid/)
+      }
+    }
+  }
+  const codex = conservation('codex')
+  codex.finalization.providerChanges = [{ path: ROOT_CA, kind: 'file', before: { sha256: beforeSha }, after: { sha256: afterSha } }]
+  assert.doesNotThrow(() => assertConservation(codex, 'codex'))
+  codex.finalization.providerChanges[0] = { path: ROOT_CA, kind: 'file', before: { mode: 420 }, after: { mode: 511 } }
+  assert.throws(() => assertConservation(codex, 'codex'), /runtime_release_conservation_invalid/)
 })
 
 test('certificate conversion proof fixes the original bytes and exact link target', () => {

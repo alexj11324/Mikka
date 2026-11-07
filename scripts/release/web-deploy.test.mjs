@@ -275,15 +275,7 @@ test('both release paths use one non-cancelling pending queue, and the Web wait 
   assert.match(e2b, /if \[ "\$RUNTIME_REFRESH" = true \] \|\| \[ "\$wanted" != "\$live" \]; then echo "changed=true"/)
   assert.match(e2b, /validate:\n    needs: \[test, check\]\n    if: needs\.check\.outputs\.changed == 'true'/)
   assert.match(e2b, /runtime-worker-sha: \$\{\{ needs\.validate\.outputs\.source-sha \}\}/)
-  assert.match(e2b, /runtime-models-sha256: \$\{\{ needs\.validate\.outputs\.models-sha256 \}\}/)
-  assert.match(e2b, /runtime-release-artifact-id: \$\{\{ needs\.subscriptions\.outputs\.release-artifact-id \}\}/)
-  assert.match(e2b, /runtime-release-sha256: \$\{\{ needs\.subscriptions\.outputs\.release-sha256 \}\}/)
-  for (const workflow of [web, e2b, readFileSync(new URL('../../.github/workflows/e2b-template.yml', import.meta.url), 'utf8')]) {
-    assert.doesNotMatch(workflow, /CANDIDATE_REPORT:|RUNTIME_RELEASE_EVIDENCE:|runtime-template-models:|candidate-report=|release-evidence=/,
-      'complete proofs must remain in artifact files, never job outputs or process environment strings')
-  }
-  assert.match(web, /artifact-ids: \$\{\{ inputs\.runtime-release-artifact-id \}\}/)
-  assert.match(web, /RUNTIME_RELEASE_FILE: \$\{\{ runner\.temp \}\}\/runtime-release\/release\.json/)
+  assert.match(e2b, /runtime-template-models-sha256: \$\{\{ needs\.validate\.outputs\.template-models-sha256 \}\}/)
   const checkJob = e2b.slice(e2b.indexOf('\n  check:'), e2b.indexOf('\n  validate:'))
   assert.match(checkJob, /fetch-depth: 0/)
   const checkGuard = checkJob.indexOf('node scripts/release/web-deploy.mjs main')
@@ -576,4 +568,35 @@ test('every fromJSON of a workflow input has a fallback, since a push run has no
   const workflow = readFileSync(fileURLToPath(new URL('../../.github/workflows/web-deploy.yml', import.meta.url)), 'utf8')
   const bare = [...workflow.matchAll(/fromJSON\(\s*inputs\.[\w-]+\s*\)/g)].map(match => match[0])
   assert.deepEqual(bare, [])
+})
+
+test('large runtime reports cross jobs only as immutable artifact files', () => {
+  const files = ['e2b-template.yml', 'e2b-official-runtime.yml', 'web-deploy.yml']
+    .map(name => readFileSync(new URL('../../.github/workflows/' + name, import.meta.url), 'utf8'))
+  for (const text of files) {
+    assert.doesNotMatch(text, /candidate-report=|release-evidence=|CANDIDATE_REPORT:|RUNTIME_RELEASE_EVIDENCE:|TEMPLATE_MODELS:/,
+      'a complete report or model catalogue must not enter a job output, input, argv or environment')
+  }
+  const [builder, runtime, web] = files
+  assert.match(builder, /candidate-artifact-id:.*steps\.candidates\.outputs\.artifact-id/)
+  assert.match(builder, /name: e2b-candidates-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
+  assert.match(runtime, /artifact-ids: \$\{\{ needs\.validate\.outputs\.candidate-artifact-id \}\}/)
+  assert.match(runtime, /name: e2b-release-evidence-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
+  assert.match(runtime, /runtime-release-artifact-id: \$\{\{ needs\.subscriptions\.outputs\.release-artifact-id \}\}/)
+  assert.match(web, /artifact-ids: \$\{\{ inputs\.runtime-release-artifact-id \}\}/)
+  for (const text of [runtime, web]) assert.match(text, /merge-multiple: true/,
+    'download-artifact v4 otherwise creates a name subdirectory even for one artifact ID')
+  const subscription = runtime.slice(runtime.indexOf('\n  subscriptions:'), runtime.indexOf('\n  publish:'))
+  const reference = subscription.indexOf('node scripts/e2b/runtime-report.mjs reference')
+  const download = subscription.indexOf('uses: actions/download-artifact@')
+  const verify = subscription.indexOf('node scripts/e2b/runtime-report.mjs verify')
+  assert.ok(reference > 0 && reference < download && download < verify && verify < subscription.indexOf('uses: Infisical/'))
+  assert.ok(subscription.indexOf('assertReportIdentity(report') < subscription.indexOf('--publish-verified'))
+  const cleanup = runtime.slice(runtime.indexOf('\n  cleanup:'))
+  assert.match(cleanup, /if: always\(\) && steps\.e2b-key\.outcome == 'success'/)
+  assert.match(cleanup, /CANDIDATE_IDENTITIES: \$\{\{ needs\.validate\.outputs\.candidate-identities \}\}/)
+  assert.doesNotMatch(cleanup, /download-artifact|candidate-artifact-id/,
+    'cleanup uses independently bounded known IDs even when the full report download fails')
+  assert.match(web, /name: Require one immutable runtime release artifact reference\n        if: inputs\.runtime-refresh == true/)
+  assert.match(web, /name: Download the complete verified runtime release report\n        if: inputs\.runtime-refresh == true/)
 })
