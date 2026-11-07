@@ -67,3 +67,13 @@ test('once the turn holding the lease has stored its reply, the chat is no longe
   // A finished reply keeps the turn's warning, as a released lease does.
   assert.deepEqual(coordinatorChatState({ ...turn, lastError: 'length' }, [], now, { role: 'assistant', streamId: 'wrun_turn:0' }), { working: false, error: 'length' })
 })
+
+test('a wake code carries the turn failure stored while that message waited, never an older one', () => {
+  const sent = new Date(now.getTime() - 600_000)
+  const waited = { ...event, wakeAttempts: MAX_WAKE_ATTEMPTS, wakeLeaseUntil: null, wakeLastError: 'wake_exhausted', createdAt: sent }
+  const failed = { leaseHolder: null, leaseUntil: null, lastError: 'subscription_generation_failed (provider_request_rejected)', lastErrorAt: new Date(sent.getTime() + 60_000) }
+  assert.deepEqual(coordinatorChatState(failed, [waited], now), { working: false, error: 'wake_exhausted', cause: 'subscription_generation_failed (provider_request_rejected)' })
+  // A failure recorded before the message arrived belongs to an earlier message.
+  assert.deepEqual(coordinatorChatState({ ...failed, lastErrorAt: new Date(sent.getTime() - 1) }, [waited], now), { working: false, error: 'wake_exhausted' })
+  assert.deepEqual(coordinatorChatState({ ...failed, lastErrorAt: null }, [waited], now), { working: false, error: 'wake_exhausted' })
+})

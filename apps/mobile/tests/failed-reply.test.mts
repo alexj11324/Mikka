@@ -8,7 +8,7 @@ const workspace = 'f778b9a0-ecec-4ade-97a6-b7aa4221a177'
 const opened: string[] = []
 let calls = 0, picks = 0, reply: () => Promise<unknown> = async () => ({ queued: true })
 class FixtureApiError extends Error { constructor(readonly status: number, readonly code: string) { super(code) } }
-mock.module('react-native', { namedExports: { Platform: { OS: 'ios' }, StyleSheet: { create: (value: unknown) => value }, View: ({ children }: { children: ReactNode }) => createElement('div', null, children) } })
+mock.module('react-native', { namedExports: { Platform: { OS: 'ios' }, StyleSheet: { create: (value: unknown) => value }, View: ({ children }: { children: ReactNode }) => createElement('div', null, children), Pressable: ({ children, onPress }: { children: ReactNode; onPress: () => void }) => createElement('button', { 'data-details': '', onClick: onPress }, children) } })
 mock.module(new URL('../components/cards.tsx', import.meta.url).href, { namedExports: { CardButton: ({ label, disabled, busy, onPress }: { label: string; disabled?: boolean; busy?: boolean; onPress: () => void }) => createElement('button', { disabled: disabled || busy, onClick: onPress }, label) } })
 mock.module(new URL('../components/GlassButton.tsx', import.meta.url).href, { namedExports: { GlassButton: ({ label, disabled, busy, onPress }: { label: string; disabled?: boolean; busy?: boolean; onPress: () => void }) => createElement('button', { disabled: disabled || busy, onClick: onPress }, label) } })
 mock.module(new URL('../components/Text.tsx', import.meta.url).href, { namedExports: { Text: ({ children }: { children: ReactNode }) => createElement('span', null, children) } })
@@ -80,4 +80,18 @@ test('an explicit HTTP refusal is unavailable while lost transport stays unconfi
   await click()
   assert.match(container.textContent ?? '', /重试未确认/)
   assert.doesNotMatch(container.textContent ?? '', /fixture-private/)
+})
+
+test('the stored codes stay folded under 详情, under the words, never instead of them', async () => {
+  const failure = { kind: 'wake' as const, code: 'wake_exhausted' as const, raw: 'wake_exhausted\nsubscription_generation_failed (provider_request_rejected)' }
+  await act(async () => root.render(createElement(FailedReply, { failure, botId: null, onQueued: () => {} })))
+  assert.ok(!container.textContent?.includes('provider_request_rejected'), 'folded at first')
+  await act(async () => (container.querySelector('[data-details]') as HTMLElement).click())
+  assert.ok(container.textContent?.includes('subscription_generation_failed (provider_request_rejected)'))
+  assert.equal(calls, 0, 'opening 详情 retries nothing')
+})
+
+test('a failure without stored codes (an older server) shows no 详情', async () => {
+  await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'failed' as const }, botId: null, onQueued: () => {} })))
+  assert.equal(container.querySelector('[data-details]'), null)
 })

@@ -4,10 +4,12 @@ import { useTranslations } from 'next-intl'
 import { CircleAlert } from 'lucide-react'
 import { failureMessageKey, type ChatFailure } from '@/lib/chat-failure'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Link } from '@/i18n/navigation'
 import { settingsHref } from '@/lib/settings-sections'
 import { openModelPicker } from './bot-model-picker'
 import { subscriptionRecovery } from '@/lib/subscription-refusal'
+import { RunErrorDetails } from '@/components/workspace/run-error-text'
 
 const TRANSIENT = new Set(['usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable'])
 const ACTION = 'h-auto px-0 py-0.5 text-xs text-foreground underline'
@@ -36,7 +38,11 @@ export function FailureReason({ failure, botId, onResend, sending = false, retry
       : recovery === 'model' || (failure.kind === 'hosted' && failure.code === 'platform_paused') || (failure.kind === 'failed' && failure.reason === 'balance')
       ? <Button variant="link" size="xs" className={ACTION} onClick={() => openModelPicker(botId)}>{picker('changeModel')}</Button>
       : <Button variant="link" size="xs" className={ACTION} disabled={sending} onClick={onResend}>{retry ? common('retry') : chat('resend')}</Button>
-  return <p data-message-failure="past" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-    <CircleAlert aria-hidden="true" className="size-3.5 shrink-0" />{reason}<span aria-hidden="true">·</span>{action}
-  </p>
+  return <div className={cn('flex flex-col gap-0.5', retry ? 'items-start' : 'items-end')}>
+    <p data-message-failure="past" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <CircleAlert aria-hidden="true" className="size-3.5 shrink-0" />{reason}<span aria-hidden="true">·</span>{action}
+    </p>
+    {/* The stored code only under 详情, never in place of the words (decision 2026-11-05-0330). */}
+    {failure.raw && <RunErrorDetails code={failure.raw} />}
+  </div>
 }
