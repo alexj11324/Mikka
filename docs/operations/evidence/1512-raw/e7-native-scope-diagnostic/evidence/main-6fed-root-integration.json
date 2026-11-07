@@ -1,0 +1,64 @@
+{
+  "recordedAt": "2026-11-07T14:53:57.755082+00:00",
+  "previousFeature": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "main": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+  "mergeCommit": "7fc7df8d7193efb444c9266152e61e93637e6c16",
+  "tree": "5c39022a97d2c9cd38f0522ddd4c94115a4d466a",
+  "mergeConflicts": 0,
+  "ownerConnectorWorkflowCheckpoint": {
+    "commit": "fee9a2679a27e648588f7d017b606c09201a5a9e",
+    "tree": "633dbd29b0c341064a404601559479413a5695ed",
+    "parent": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+    "changedPath": ".github/workflows/e2b-official-runtime.yml",
+    "blob": "7a566cd48156e3a8daddfeed869a26140514defa",
+    "change": "Add inherited main cloud-startup-report.test.mjs to the existing test command",
+    "independentRemoteDiffAndTreeVerified": true,
+    "force": false,
+    "featureMoved": false
+  },
+  "combinedCommit": "905b37f4df9ccd4c4497194c501d3f33ab13c72d",
+  "combinedTreeSame": true,
+  "transportWorkflowUnchanged": true,
+  "workflowDiffFromSourceObjects": [],
+  "rootNodeTests": {
+    "files": 5,
+    "tests": 120,
+    "passed": 120,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "rootTypesExitCode": 0,
+  "evidence": [
+    {
+      "path": "main-6fed-root-related-tests.tap",
+      "bytes": 13739,
+      "sha256": "6270fb42aa1c6dffcbc62330251494289c799c34c8f7ec394d5ef1a3e97cca5e",
+      "exitCode": 0
+    },
+    {
+      "path": "main-6fed-root-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    }
+  ],
+  "daemonCompatibilityReview": {
+    "status": "passed_no_new_1512_blocker",
+    "receipt": "main-6fed-1512-daemon-compatibility.json",
+    "bytes": 10348,
+    "sha256": "16b55bd0002dab6fc4f8b429dff2c3799be5b5ceac0058f78884b76c182d229f",
+    "files": 5,
+    "tests": 48,
+    "passed": 48,
+    "exitCode": 0
+  },
+  "diagnostic": {
+    "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+    "sourceTests": 20,
+    "passed": 20,
+    "previousActualNativeLogin": "187/162 failed",
+    "newNativeBudget": "pending"
+  },
+  "productionAcceptance": false
+}

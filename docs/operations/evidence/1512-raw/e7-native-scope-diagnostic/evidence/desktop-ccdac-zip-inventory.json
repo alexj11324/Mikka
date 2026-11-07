@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "kind": "native_artifact_ram_inventory",
+  "runId": 42380585478,
+  "attempt": 1,
+  "artifactId": 13578480230,
+  "source": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+  "zipBytes": 14887712,
+  "zipSha256": "f7541f682fe77b520e57257a60663620f3ca6458dab31f23cd5439298acbc873",
+  "digestMatched": true,
+  "members": 308,
+  "memberKinds": {
+    "json": 3,
+    "png": 305,
+    "log": 0,
+    "txt": 0,
+    "directory": 0,
+    "other": 0
+  },
+  "knownReports": {
+    "lifecycle.json": true,
+    "parity/parity.json": true,
+    "smoke.json": true
+  },
+  "apiLogCandidateCount": 0,
+  "runtimeDirectoryMemberCount": 0,
+  "allLogMemberCount": 0,
+  "logContentsRead": false,
+  "memberNamesRetained": false,
+  "zipPersisted": false,
+  "downloadUrlRetained": false,
+  "outcome": "no_api_logs_in_native_artifact"
+}

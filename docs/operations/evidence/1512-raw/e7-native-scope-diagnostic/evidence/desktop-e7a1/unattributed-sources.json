@@ -1,0 +1,383 @@
+{
+  "version": 1,
+  "kind": "desktop_unattributed_sources_summary",
+  "status": "complete",
+  "valid": true,
+  "source": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "scope": "whole_primary_api_process",
+  "subtractPkceOrBackground": false,
+  "startupScope": "first_pair_only",
+  "vocabulary": {
+    "keys": 71,
+    "sourceFileSha256": "1bbc59ef965e6c658eec19ea11ea9a6df3b2693a4443a4e1952532fd2a692dd4",
+    "keysSha256": "7b6b51b3c8633b3cb089511cc8d967bd349aa684db77c30af101f8d374e5e427"
+  },
+  "integrity": {
+    "baseValid": true,
+    "counterIdentityMatched": true,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "originalCumulativeNondecreasing": true,
+    "sourceCumulativeNondecreasing": true,
+    "refinementRowsPresent": 24,
+    "refinementRowsExpected": 24
+  },
+  "windows": {
+    "nativeLogin": {
+      "queryCalls": 186,
+      "unattributed": 49,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 44
+        }
+      ],
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 16,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 151,
+          "unattributed": 49,
+          "nonzeroSources": [
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 44
+            }
+          ]
+        }
+      ]
+    },
+    "webLogin": {
+      "queryCalls": 162,
+      "unattributed": 24,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "after:live-notify",
+          "queryCalls": 1
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 23
+        }
+      ],
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 143,
+          "unattributed": 24,
+          "nonzeroSources": [
+            {
+              "source": "after:live-notify",
+              "queryCalls": 1
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 23
+            }
+          ]
+        }
+      ]
+    },
+    "startup-bundled": {
+      "queryCalls": 54,
+      "unattributed": 22,
+      "pair": 1,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 17
+        }
+      ],
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 54,
+          "unattributed": 22,
+          "nonzeroSources": [
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 17
+            }
+          ]
+        }
+      ]
+    },
+    "startup-hosted": {
+      "queryCalls": 176,
+      "unattributed": 40,
+      "pair": 1,
+      "baseValid": true,
+      "status": "complete",
+      "nonzeroSources": [
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        },
+        {
+          "source": "/v1/devices/[deviceId]/heartbeat",
+          "queryCalls": 1
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 34
+        }
+      ],
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 176,
+          "unattributed": 40,
+          "nonzeroSources": [
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            },
+            {
+              "source": "/v1/devices/[deviceId]/heartbeat",
+              "queryCalls": 1
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 34
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "comparisons": {
+    "loginNativeVsWeb": {
+      "first": "nativeLogin",
+      "second": "webLogin",
+      "queryDifference": 24,
+      "unattributedDifference": 25,
+      "sources": [
+        {
+          "source": "/api/settings/preferences",
+          "first": 2,
+          "second": 0,
+          "difference": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "first": 3,
+          "second": 0,
+          "difference": 3
+        },
+        {
+          "source": "after:live-notify",
+          "first": 0,
+          "second": 1,
+          "difference": -1
+        },
+        {
+          "source": "otherScoped",
+          "first": 44,
+          "second": 23,
+          "difference": 21
+        }
+      ],
+      "sourceDifferenceSum": 25,
+      "segments": [
+        {
+          "firstPhase": "common-email-authentication",
+          "secondPhase": "common-email-authentication",
+          "queryDifference": 0,
+          "unattributedDifference": 0,
+          "sources": [],
+          "sourceDifferenceSum": 0
+        },
+        {
+          "firstPhase": "native-pkce-and-automatic-renderer-to-public-session",
+          "secondPhase": "web-navigation-to-dom-content-loaded",
+          "queryDifference": 16,
+          "unattributedDifference": 0,
+          "sources": [],
+          "sourceDifferenceSum": 0
+        },
+        {
+          "firstPhase": "workspace-selection-to-usable",
+          "secondPhase": "workspace-selection-to-usable",
+          "queryDifference": 8,
+          "unattributedDifference": 25,
+          "sources": [
+            {
+              "source": "/api/settings/preferences",
+              "first": 2,
+              "second": 0,
+              "difference": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "first": 3,
+              "second": 0,
+              "difference": 3
+            },
+            {
+              "source": "after:live-notify",
+              "first": 0,
+              "second": 1,
+              "difference": -1
+            },
+            {
+              "source": "otherScoped",
+              "first": 44,
+              "second": 23,
+              "difference": 21
+            }
+          ],
+          "sourceDifferenceSum": 25
+        }
+      ]
+    },
+    "startupBundledVsHosted": {
+      "first": "startup-bundled",
+      "second": "startup-hosted",
+      "queryDifference": -122,
+      "unattributedDifference": -18,
+      "sources": [
+        {
+          "source": "/api/settings/preferences",
+          "first": 2,
+          "second": 2,
+          "difference": 0
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "first": 3,
+          "second": 3,
+          "difference": 0
+        },
+        {
+          "source": "/v1/devices/[deviceId]/heartbeat",
+          "first": 0,
+          "second": 1,
+          "difference": -1
+        },
+        {
+          "source": "otherScoped",
+          "first": 17,
+          "second": 34,
+          "difference": -17
+        }
+      ],
+      "sourceDifferenceSum": -18,
+      "segments": [
+        {
+          "firstPhase": "launch-to-usable",
+          "secondPhase": "launch-to-usable",
+          "queryDifference": -122,
+          "unattributedDifference": -18,
+          "sources": [
+            {
+              "source": "/api/settings/preferences",
+              "first": 2,
+              "second": 2,
+              "difference": 0
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "first": 3,
+              "second": 3,
+              "difference": 0
+            },
+            {
+              "source": "/v1/devices/[deviceId]/heartbeat",
+              "first": 0,
+              "second": 1,
+              "difference": -1
+            },
+            {
+              "source": "otherScoped",
+              "first": 17,
+              "second": 34,
+              "difference": -17
+            }
+          ],
+          "sourceDifferenceSum": -18
+        }
+      ]
+    }
+  },
+  "issues": [],
+  "productionAcceptance": null,
+  "limitations": [
+    "Lifecycle revision is checked; checkout and harness identity require their separate artifact receipts.",
+    "Closed source counts do not retain SQL, request bodies, IDs or arbitrary route values.",
+    "Legacy missing refinement is unavailable, not zero; whole-window totals are never reduced."
+  ],
+  "input": {
+    "bytes": 261085,
+    "sha256": "760d0d704d564eb2a040b6d600499d8fc01973772c2832ef3f35f4837f08897f"
+  }
+}

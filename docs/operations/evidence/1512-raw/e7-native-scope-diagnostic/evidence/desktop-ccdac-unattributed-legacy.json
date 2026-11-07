@@ -1,0 +1,344 @@
+{
+  "version": 1,
+  "kind": "desktop_unattributed_sources_summary",
+  "status": "unavailable",
+  "valid": false,
+  "source": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+  "scope": "whole_primary_api_process",
+  "subtractPkceOrBackground": false,
+  "startupScope": "first_pair_only",
+  "vocabulary": {
+    "keys": 71,
+    "sourceFileSha256": "1bbc59ef965e6c658eec19ea11ea9a6df3b2693a4443a4e1952532fd2a692dd4",
+    "keysSha256": "7b6b51b3c8633b3cb089511cc8d967bd349aa684db77c30af101f8d374e5e427"
+  },
+  "integrity": {
+    "baseValid": true,
+    "counterIdentityMatched": true,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "originalCumulativeNondecreasing": true,
+    "sourceCumulativeNondecreasing": null,
+    "refinementRowsPresent": 0,
+    "refinementRowsExpected": 24
+  },
+  "windows": {
+    "nativeLogin": {
+      "queryCalls": 187,
+      "unattributed": 49,
+      "baseValid": true,
+      "status": "unavailable",
+      "nonzeroSources": null,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": null
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 16,
+          "unattributed": 0,
+          "nonzeroSources": null
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 152,
+          "unattributed": 49,
+          "nonzeroSources": null
+        }
+      ]
+    },
+    "webLogin": {
+      "queryCalls": 162,
+      "unattributed": 24,
+      "baseValid": true,
+      "status": "unavailable",
+      "nonzeroSources": null,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": null
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "unattributed": 0,
+          "nonzeroSources": null
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 143,
+          "unattributed": 24,
+          "nonzeroSources": null
+        }
+      ]
+    },
+    "startup-bundled": {
+      "queryCalls": 162,
+      "unattributed": 50,
+      "pair": 1,
+      "baseValid": true,
+      "status": "unavailable",
+      "nonzeroSources": null,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 162,
+          "unattributed": 50,
+          "nonzeroSources": null
+        }
+      ]
+    },
+    "startup-hosted": {
+      "queryCalls": 186,
+      "unattributed": 49,
+      "pair": 1,
+      "baseValid": true,
+      "status": "unavailable",
+      "nonzeroSources": null,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 186,
+          "unattributed": 49,
+          "nonzeroSources": null
+        }
+      ]
+    }
+  },
+  "comparisons": {
+    "loginNativeVsWeb": {
+      "first": "nativeLogin",
+      "second": "webLogin",
+      "queryDifference": 25,
+      "unattributedDifference": 25,
+      "sources": null,
+      "sourceDifferenceSum": null,
+      "segments": [
+        {
+          "firstPhase": "common-email-authentication",
+          "secondPhase": "common-email-authentication",
+          "queryDifference": 0,
+          "unattributedDifference": 0,
+          "sources": null,
+          "sourceDifferenceSum": null
+        },
+        {
+          "firstPhase": "native-pkce-and-automatic-renderer-to-public-session",
+          "secondPhase": "web-navigation-to-dom-content-loaded",
+          "queryDifference": 16,
+          "unattributedDifference": 0,
+          "sources": null,
+          "sourceDifferenceSum": null
+        },
+        {
+          "firstPhase": "workspace-selection-to-usable",
+          "secondPhase": "workspace-selection-to-usable",
+          "queryDifference": 9,
+          "unattributedDifference": 25,
+          "sources": null,
+          "sourceDifferenceSum": null
+        }
+      ]
+    },
+    "startupBundledVsHosted": {
+      "first": "startup-bundled",
+      "second": "startup-hosted",
+      "queryDifference": -24,
+      "unattributedDifference": 1,
+      "sources": null,
+      "sourceDifferenceSum": null,
+      "segments": [
+        {
+          "firstPhase": "launch-to-usable",
+          "secondPhase": "launch-to-usable",
+          "queryDifference": -24,
+          "unattributedDifference": 1,
+          "sources": null,
+          "sourceDifferenceSum": null
+        }
+      ]
+    }
+  },
+  "issues": [
+    {
+      "category": "sources",
+      "window": "nativeLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 0
+    },
+    {
+      "category": "sources",
+      "window": "nativeLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 1
+    },
+    {
+      "category": "sources",
+      "window": "nativeLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 2
+    },
+    {
+      "category": "sources",
+      "window": "nativeLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 3
+    },
+    {
+      "category": "sources",
+      "window": "nativeLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "segment",
+      "index": 0
+    },
+    {
+      "category": "sources",
+      "window": "nativeLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "segment",
+      "index": 1
+    },
+    {
+      "category": "sources",
+      "window": "nativeLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "segment",
+      "index": 2
+    },
+    {
+      "category": "sources",
+      "window": "nativeLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "total"
+    },
+    {
+      "category": "sources",
+      "window": "webLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 0
+    },
+    {
+      "category": "sources",
+      "window": "webLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 1
+    },
+    {
+      "category": "sources",
+      "window": "webLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 2
+    },
+    {
+      "category": "sources",
+      "window": "webLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 3
+    },
+    {
+      "category": "sources",
+      "window": "webLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "segment",
+      "index": 0
+    },
+    {
+      "category": "sources",
+      "window": "webLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "segment",
+      "index": 1
+    },
+    {
+      "category": "sources",
+      "window": "webLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "segment",
+      "index": 2
+    },
+    {
+      "category": "sources",
+      "window": "webLogin",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "total"
+    },
+    {
+      "category": "sources",
+      "window": "startup-bundled",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 0
+    },
+    {
+      "category": "sources",
+      "window": "startup-bundled",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 1
+    },
+    {
+      "category": "sources",
+      "window": "startup-bundled",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "segment",
+      "index": 0
+    },
+    {
+      "category": "sources",
+      "window": "startup-bundled",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "total"
+    },
+    {
+      "category": "sources",
+      "window": "startup-hosted",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 0
+    },
+    {
+      "category": "sources",
+      "window": "startup-hosted",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "snapshot",
+      "index": 1
+    },
+    {
+      "category": "sources",
+      "window": "startup-hosted",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "segment",
+      "index": 0
+    },
+    {
+      "category": "sources",
+      "window": "startup-hosted",
+      "code": "SOURCE_PARTITION_UNAVAILABLE",
+      "kind": "total"
+    }
+  ],
+  "productionAcceptance": null,
+  "limitations": [
+    "Lifecycle revision is checked; checkout and harness identity require their separate artifact receipts.",
+    "Closed source counts do not retain SQL, request bodies, IDs or arbitrary route values.",
+    "Legacy missing refinement is unavailable, not zero; whole-window totals are never reduced."
+  ],
+  "input": {
+    "bytes": 181438,
+    "sha256": "14d915a077b835a56f901a6b979ca6fc38621c2f530a256a0ea6555038606d2e"
+  }
+}

@@ -1,0 +1,692 @@
+{
+  "version": 1,
+  "status": "login_query_budget_failed",
+  "recordedAt": "2026-11-07T15:35:03.708Z",
+  "runId": 42384327014,
+  "attempt": 1,
+  "candidate": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "compiledSource": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+  "workflow": {
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": 4,
+    "successfulJobs": 4
+  },
+  "counterIntegrity": {
+    "expectedCheckpointCount": 12,
+    "observedCheckpointCount": 12,
+    "pid": 30715,
+    "pidConsistent": true,
+    "processStartConsistent": true,
+    "runtimeConsistent": true,
+    "cumulativeQueriesNondecreasing": true,
+    "unknownReadingsAllZero": true
+  },
+  "refinementIntegrity": {
+    "baseValid": true,
+    "counterIdentityMatched": true,
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "originalCumulativeNondecreasing": true,
+    "sourceCumulativeNondecreasing": true,
+    "refinementRowsPresent": 24,
+    "refinementRowsExpected": 24
+  },
+  "windows": {
+    "nativeLogin": {
+      "queryCalls": 186,
+      "unattributed": 49,
+      "nonzeroSources": [
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 44
+        }
+      ],
+      "noScope": 0,
+      "otherScoped": 44,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 16,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 151,
+          "unattributed": 49,
+          "nonzeroSources": [
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 44
+            }
+          ]
+        }
+      ]
+    },
+    "webLogin": {
+      "queryCalls": 162,
+      "unattributed": 24,
+      "nonzeroSources": [
+        {
+          "source": "after:live-notify",
+          "queryCalls": 1
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 23
+        }
+      ],
+      "noScope": 0,
+      "otherScoped": 23,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "unattributed": 0,
+          "nonzeroSources": []
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 143,
+          "unattributed": 24,
+          "nonzeroSources": [
+            {
+              "source": "after:live-notify",
+              "queryCalls": 1
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 23
+            }
+          ]
+        }
+      ]
+    },
+    "startup-bundled": {
+      "queryCalls": 54,
+      "unattributed": 22,
+      "nonzeroSources": [
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 17
+        }
+      ],
+      "noScope": 0,
+      "otherScoped": 17,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 54,
+          "unattributed": 22,
+          "nonzeroSources": [
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 17
+            }
+          ]
+        }
+      ]
+    },
+    "startup-hosted": {
+      "queryCalls": 176,
+      "unattributed": 40,
+      "nonzeroSources": [
+        {
+          "source": "/api/settings/preferences",
+          "queryCalls": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "queryCalls": 3
+        },
+        {
+          "source": "/v1/devices/[deviceId]/heartbeat",
+          "queryCalls": 1
+        },
+        {
+          "source": "otherScoped",
+          "queryCalls": 34
+        }
+      ],
+      "noScope": 0,
+      "otherScoped": 34,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 176,
+          "unattributed": 40,
+          "nonzeroSources": [
+            {
+              "source": "/api/settings/preferences",
+              "queryCalls": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "queryCalls": 3
+            },
+            {
+              "source": "/v1/devices/[deviceId]/heartbeat",
+              "queryCalls": 1
+            },
+            {
+              "source": "otherScoped",
+              "queryCalls": 34
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "comparisons": {
+    "loginNativeVsWeb": {
+      "first": 186,
+      "second": 162,
+      "difference": 24,
+      "firstNotAboveSecond": false
+    },
+    "startupBundledVsHosted": {
+      "first": 54,
+      "second": 176,
+      "difference": -122,
+      "firstNotAboveSecond": true
+    }
+  },
+  "refinementComparisons": {
+    "loginNativeVsWeb": {
+      "first": "nativeLogin",
+      "second": "webLogin",
+      "queryDifference": 24,
+      "unattributedDifference": 25,
+      "sources": [
+        {
+          "source": "/api/settings/preferences",
+          "first": 2,
+          "second": 0,
+          "difference": 2
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "first": 3,
+          "second": 0,
+          "difference": 3
+        },
+        {
+          "source": "after:live-notify",
+          "first": 0,
+          "second": 1,
+          "difference": -1
+        },
+        {
+          "source": "otherScoped",
+          "first": 44,
+          "second": 23,
+          "difference": 21
+        }
+      ],
+      "sourceDifferenceSum": 25,
+      "segments": [
+        {
+          "firstPhase": "common-email-authentication",
+          "secondPhase": "common-email-authentication",
+          "queryDifference": 0,
+          "unattributedDifference": 0,
+          "sources": [],
+          "sourceDifferenceSum": 0
+        },
+        {
+          "firstPhase": "native-pkce-and-automatic-renderer-to-public-session",
+          "secondPhase": "web-navigation-to-dom-content-loaded",
+          "queryDifference": 16,
+          "unattributedDifference": 0,
+          "sources": [],
+          "sourceDifferenceSum": 0
+        },
+        {
+          "firstPhase": "workspace-selection-to-usable",
+          "secondPhase": "workspace-selection-to-usable",
+          "queryDifference": 8,
+          "unattributedDifference": 25,
+          "sources": [
+            {
+              "source": "/api/settings/preferences",
+              "first": 2,
+              "second": 0,
+              "difference": 2
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "first": 3,
+              "second": 0,
+              "difference": 3
+            },
+            {
+              "source": "after:live-notify",
+              "first": 0,
+              "second": 1,
+              "difference": -1
+            },
+            {
+              "source": "otherScoped",
+              "first": 44,
+              "second": 23,
+              "difference": 21
+            }
+          ],
+          "sourceDifferenceSum": 25
+        }
+      ]
+    },
+    "startupBundledVsHosted": {
+      "first": "startup-bundled",
+      "second": "startup-hosted",
+      "queryDifference": -122,
+      "unattributedDifference": -18,
+      "sources": [
+        {
+          "source": "/api/settings/preferences",
+          "first": 2,
+          "second": 2,
+          "difference": 0
+        },
+        {
+          "source": "/api/devices/enrollment",
+          "first": 3,
+          "second": 3,
+          "difference": 0
+        },
+        {
+          "source": "/v1/devices/[deviceId]/heartbeat",
+          "first": 0,
+          "second": 1,
+          "difference": -1
+        },
+        {
+          "source": "otherScoped",
+          "first": 17,
+          "second": 34,
+          "difference": -17
+        }
+      ],
+      "sourceDifferenceSum": -18,
+      "segments": [
+        {
+          "firstPhase": "launch-to-usable",
+          "secondPhase": "launch-to-usable",
+          "queryDifference": -122,
+          "unattributedDifference": -18,
+          "sources": [
+            {
+              "source": "/api/settings/preferences",
+              "first": 2,
+              "second": 2,
+              "difference": 0
+            },
+            {
+              "source": "/api/devices/enrollment",
+              "first": 3,
+              "second": 3,
+              "difference": 0
+            },
+            {
+              "source": "/v1/devices/[deviceId]/heartbeat",
+              "first": 0,
+              "second": 1,
+              "difference": -1
+            },
+            {
+              "source": "otherScoped",
+              "first": 17,
+              "second": 34,
+              "difference": -17
+            }
+          ],
+          "sourceDifferenceSum": -18
+        }
+      ]
+    }
+  },
+  "rpc": {
+    "physical": {
+      "status": "complete",
+      "duplicateRecords": 0,
+      "conflictingInvocations": 0,
+      "windows": {
+        "nativeLogin": {
+          "startedInWindow": 8,
+          "completedInWindow": 8,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        "webLogin": {
+          "startedInWindow": 17,
+          "completedInWindow": 17,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        "startup-bundled": {
+          "startedInWindow": 3,
+          "completedInWindow": 1,
+          "crossesStart": 0,
+          "crossesEnd": 2,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        "startup-hosted": {
+          "startedInWindow": 19,
+          "completedInWindow": 19,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        }
+      }
+    },
+    "logical": {
+      "status": "complete",
+      "duplicateRecords": 0,
+      "conflictingInvocations": 0,
+      "windows": {
+        "nativeLogin": {
+          "startedInWindow": 20,
+          "completedInWindow": 20,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        "webLogin": {
+          "startedInWindow": 17,
+          "completedInWindow": 17,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        "startup-bundled": {
+          "startedInWindow": 11,
+          "completedInWindow": 5,
+          "crossesStart": 0,
+          "crossesEnd": 6,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        },
+        "startup-hosted": {
+          "startedInWindow": 19,
+          "completedInWindow": 19,
+          "crossesStart": 0,
+          "crossesEnd": 0,
+          "completionNotObserved": 0,
+          "completionWithoutStart": 0
+        }
+      }
+    }
+  },
+  "functional": {
+    "lifecycle": {
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "unknown": 0
+    },
+    "smoke": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "unknown": 0
+    },
+    "parity": {
+      "passed": 100,
+      "total": 100,
+      "pageErrorCount": 0
+    },
+    "nativeCrypto": {
+      "passed": true,
+      "sameImmutablePackage": true,
+      "distinctProcesses": 3,
+      "cleanup": "passed"
+    },
+    "package": {
+      "passed": true,
+      "signatureVerifiedStrictDeep": true
+    }
+  },
+  "cleanup": {
+    "lifecycle": {
+      "result": "unknown",
+      "stages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "fixtures",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "nativeCleaned": true,
+      "reportedResourceCounts": {
+        "desktop_auth_requests": 2,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      },
+      "workspaceName": {
+        "captured": true,
+        "restored": false,
+        "ownerMatchesSealedBaseline": true,
+        "peerMatchesSealedBaseline": true
+      },
+      "accountObservation": {
+        "observed": true,
+        "state": "released",
+        "blocked": false,
+        "ownerBeforeMatchesBaseline": false,
+        "ownerAfterMatchesBaseline": true,
+        "peerBeforeMatchesBaseline": false,
+        "peerAfterMatchesBaseline": true
+      }
+    },
+    "parity": {
+      "result": "passed",
+      "stages": null,
+      "nativeCleaned": true,
+      "reportedResourceCounts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      },
+      "workspaceName": {
+        "captured": true,
+        "restored": false,
+        "ownerMatchesSealedBaseline": true,
+        "peerMatchesSealedBaseline": true
+      },
+      "accountObservation": {
+        "observed": null,
+        "state": "unknown",
+        "blocked": null,
+        "ownerBeforeMatchesBaseline": null,
+        "ownerAfterMatchesBaseline": null,
+        "peerBeforeMatchesBaseline": null,
+        "peerAfterMatchesBaseline": null
+      }
+    },
+    "smoke": {
+      "result": "unknown",
+      "stages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "electron-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "nativeCleaned": true,
+      "reportedResourceCounts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 0,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 0,
+        "device_tokens": 0,
+        "device_enrollments": 0,
+        "devices": 0
+      },
+      "workspaceName": {
+        "captured": true,
+        "restored": false,
+        "ownerMatchesSealedBaseline": true,
+        "peerMatchesSealedBaseline": true
+      },
+      "accountObservation": {
+        "observed": true,
+        "state": "released",
+        "blocked": false,
+        "ownerBeforeMatchesBaseline": true,
+        "ownerAfterMatchesBaseline": true,
+        "peerBeforeMatchesBaseline": true,
+        "peerAfterMatchesBaseline": true
+      }
+    },
+    "readerOwnedProcessesExited": true,
+    "zipRetained": false,
+    "signedUrlsPersisted": false,
+    "rawJobLogsPersisted": false,
+    "nativePostgresTeardown": "not independently attested by a distinct workflow step; do not infer from workflow success"
+  },
+  "projectionCommands": {
+    "nativeSummaryExit": 0,
+    "queryOperationsExit": 0,
+    "unattributedSourcesExit": 0
+  },
+  "transport": {
+    "compiledInputAttempt": {
+      "mode": "non-interactive stdin unavailable",
+      "exitCode": 1,
+      "downloadStarted": false,
+      "filesWritten": false
+    },
+    "compiledVerifiedAttempt": {
+      "sessionId": 80632,
+      "exitCode": 0
+    },
+    "nativeAndPackageVerifiedAttempt": {
+      "sessionId": 83833,
+      "exitCode": 0
+    },
+    "storage": "owned tmpfs absolute path after workspace overlay rematerialized; fixed source and digest contracts unchanged"
+  },
+  "fieldLocations": {
+    "allRawSnapshots": "lifecycle.json: queryCounts.windows.<window>.checkpoints[].snapshot",
+    "original17": "lifecycle.json: queryCounts.windows.<window>.total.queryOperations",
+    "source71": "lifecycle.json: queryCounts.windows.<window>.total.unattributedSources",
+    "sourceSegments": "lifecycle.json: queryCounts.windows.<window>.segments[].unattributedSources",
+    "physicalActions": "summary.json: queryCounts.rpcActions.physical.windows.<window>.actions",
+    "logicalActions": "summary.json: queryCounts.rpcActions.logical.windows.<window>.actions",
+    "rawPhysicalActions": "lifecycle.json: queryCounts.rpcActions.windows.<window>.actions",
+    "rawLogicalActions": "lifecycle.json: queryCounts.rpcActions.logical.windows.<window>.actions"
+  },
+  "limitations": [
+    "Whole original windows, PKCE and background work remain included.",
+    "Login 186 > 162 remains a failed budget; functional success is separate.",
+    "First startup pair 54 <= 176, with 2 physical and 6 logical Native requests completing after the original window; this is not proof of reduced total work.",
+    "otherScoped 44/23 is still unresolved and is not attributed to any route or device operation.",
+    "Compared revisions and executions differ; differences from earlier runs are not causal optimization evidence.",
+    "Top-level cleanup fields absent from reports remain unknown; explicit successful stages and lease release are retained."
+  ],
+  "productionAcceptance": null
+}

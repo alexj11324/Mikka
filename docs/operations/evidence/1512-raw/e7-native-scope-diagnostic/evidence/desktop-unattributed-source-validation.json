@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "status": "source_diagnostics_frozen",
+  "recordedAt": "2026-11-07T14:57:38.915Z",
+  "baseHead": "905b37f4df9ccd4c4497194c501d3f33ab13c72d",
+  "sourceObservation": {
+    "candidate": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+    "compiled": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+    "completeLogin": {
+      "native": 187,
+      "web": 162,
+      "passed": false
+    },
+    "unattributed": {
+      "native": 49,
+      "web": 24
+    },
+    "retroactiveAttribution": false
+  },
+  "files": [
+    {
+      "path": "apps/desktop/test/db-metrics.cjs",
+      "bytes": 8336,
+      "sha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+      "gitBlob": "340cf961029e706e76a6f3f0ccf08eb8cfc84cd9"
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "bytes": 2585,
+      "sha256": "1bbc59ef965e6c658eec19ea11ea9a6df3b2693a4443a4e1952532fd2a692dd4",
+      "gitBlob": "feecc97cc22edb097dd4c069170912ab193e88a4"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "bytes": 21791,
+      "sha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+      "gitBlob": "ecc5c28718320893bb96c5902cf3cae0dd965b5b"
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.test.mjs",
+      "bytes": 35968,
+      "sha256": "ec980487ef919458c966a718ebcdb25dd961399b28abc97500870514dad9d1b8",
+      "gitBlob": "0f19dc04577d0bfec95eacb287e8cb729592cca9"
+    }
+  ],
+  "originalPartition": {
+    "path": "apps/desktop/test/db-query-operations.cjs",
+    "bytes": 529,
+    "sha256": "03632f635faceb39a1e764f5680680d0829ce98635e17d49276957a684e9d575",
+    "gitBlob": "9011b6edb7296c8872d3e311074529a49987b575",
+    "count": 17,
+    "unchangedAgainstHead": true
+  },
+  "contract": {
+    "field": "unattributedSources",
+    "keys": 71,
+    "exactTemplateKeys": 45,
+    "exactAfterJobKeys": 24,
+    "residualKeys": [
+      "otherScoped",
+      "noScope"
+    ],
+    "arbitraryScopeValuesRetained": false,
+    "originalQueryTotalsUnchanged": true,
+    "measurementWindowsUnchanged": true,
+    "snapshotAndDeltaSum": "unattributedSources == queryOperations.unattributed",
+    "legacyAbsence": "preserved; not zero",
+    "partialHistory": "rejected",
+    "unknownLabel": "otherScoped",
+    "absentScope": "noScope",
+    "controlBodyLimitBytes": 8192,
+    "conservativeSerializationUpperBoundBytes": 4540,
+    "upperBoundMeaning": "all fields and buckets use maximum-safe integers for a conservative byte bound; not a valid or observed counter snapshot"
+  },
+  "validations": [
+    {
+      "path": "desktop-unattributed-preload-red.tap",
+      "bytes": 27218,
+      "sha256": "06c3dda02b37654e5c94b0e5effb20425155909dfcf56756704744e4a57bbc7e",
+      "gitBlob": "9fb092029b7f54dbe8f98ab1a52f6d6d92effd0c",
+      "exitCode": 1,
+      "tests": 3,
+      "pass": 0,
+      "fail": 3,
+      "format": "node-spec",
+      "scope": "preload missing closed refinement before instrumentation edit"
+    },
+    {
+      "path": "desktop-unattributed-preload-green.tap",
+      "bytes": 844,
+      "sha256": "4298f01f5d33dcf552e7f7683fd5908a421934287eb039328ee1a4b3ed22cfa5",
+      "gitBlob": "7a8232fcbbc448eca5be90e182126dbc5e406698",
+      "exitCode": 0,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "format": "tap",
+      "scope": "real installed PG CJS/ESM and OTel wrapper, deterministic connection without DB"
+    },
+    {
+      "path": "desktop-unattributed-projection-red.tap",
+      "bytes": 8522,
+      "sha256": "36728a5606bcc0e74732293b20e302f66015db730928814df4369ca6b7d2984a",
+      "gitBlob": "c8ad0e890128a166a95b17b6aa9f5752718679d2",
+      "exitCode": 1,
+      "tests": 3,
+      "pass": 0,
+      "fail": 3,
+      "format": "tap",
+      "scope": "missing refinement projection and validation before reader edit"
+    },
+    {
+      "path": "desktop-unattributed-projection-green.tap",
+      "bytes": 881,
+      "sha256": "3550f1e2f01f6ad665b96cdefa51a9c4a3eccb07cb2d50e5f834758b5e6a2a63",
+      "gitBlob": "4496b7d19c833772ceb929b261b489e8a953258d",
+      "exitCode": 0,
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "format": "tap",
+      "scope": "closed snapshot and delta validation"
+    },
+    {
+      "path": "desktop-unattributed-full-green.tap",
+      "bytes": 5369,
+      "sha256": "8a670f5083ba6947e8053c5d8ea64b28bfb67d878a182684175925abfae02b7c",
+      "gitBlob": "d6d50e6fd1d66ce862ee9695e797f4aa7cc934eb",
+      "exitCode": 0,
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "format": "tap",
+      "scope": "complete existing db-metrics test file"
+    }
+  ],
+  "lint": [
+    {
+      "path": "desktop-unattributed-lint-initial.log",
+      "bytes": 69,
+      "sha256": "199555da75a83fe0949c501d1cac91995db05712c9befa4b61a7ae062738439c",
+      "gitBlob": "fdc12f7375018b237081928945970a9b8bcc4258",
+      "exitCode": 1,
+      "scope": "default root config ignored all Desktop files; no files linted"
+    },
+    {
+      "path": "desktop-unattributed-lint-root-ignore.log",
+      "bytes": 69,
+      "sha256": "199555da75a83fe0949c501d1cac91995db05712c9befa4b61a7ae062738439c",
+      "gitBlob": "fdc12f7375018b237081928945970a9b8bcc4258",
+      "exitCode": 1,
+      "scope": "no-ignore still retained root config exclusion; no files linted"
+    },
+    {
+      "path": "desktop-unattributed-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "exitCode": 0,
+      "scope": "explicit existing apps/desktop/oxlint.json; all four owned files linted"
+    },
+    {
+      "path": "desktop-unattributed-diff-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "exitCode": 0,
+      "scope": "git diff --check scoped to owned files"
+    }
+  ],
+  "environment": {
+    "node": "v24.22.1",
+    "pg": "8.23.1",
+    "executedRealDatabase": false,
+    "newNativeRun": false,
+    "remoteCalls": false,
+    "models": false,
+    "ownedFixtureDirectoriesRemaining": 0
+  },
+  "limitations": [
+    "Source-only diagnostic tests do not measure production or Native query reductions.",
+    "The prior Native budget remains failed; old artifacts do not contain this refinement.",
+    "SQL text, parameters, request payloads and arbitrary scope values are never retained.",
+    "The original full windows, background work and PKCE calls remain included."
+  ]
+}

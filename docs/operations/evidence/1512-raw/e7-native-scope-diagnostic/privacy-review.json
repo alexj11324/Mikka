@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "kind": "e7-native-scope-diagnostic-local-privacy-review",
+  "recordedAt": "2026-11-07T15:48:50.839Z",
+  "status": "passed_with_explicit_synthetic_source_fixtures",
+  "sourceRoot": "/dev/shm/issue1512-ops-812e3b7d6d45",
+  "originalPayloadCount": 57,
+  "originalPayloadBytes": 946087,
+  "jsonFilesReviewed": 32,
+  "scanCategories": [
+    "email",
+    "credential_prefix",
+    "bearer_value",
+    "signed_url",
+    "database_url",
+    "private_key",
+    "credential_assignment",
+    "long_base64"
+  ],
+  "reviewedFindings": [
+    {
+      "relativePath": "source/apps/desktop/test/db-metrics.test.mjs",
+      "category": "database_url",
+      "count": 6,
+      "lines": [
+        57,
+        58,
+        59,
+        202,
+        203
+      ],
+      "matchSha256": [
+        "d06f5d20b5c7851ab464fa5248f3158f9990b74e30225fa266e86445f24e3e45"
+      ],
+      "classification": "static_source_fixture_only",
+      "reason": "Checked-in no-password loopback database URL for isolated driver-wrapper fixtures; not an operational credential or external endpoint."
+    },
+    {
+      "relativePath": "source/apps/desktop/test/db-metrics.test.mjs",
+      "category": "credential_assignment",
+      "count": 2,
+      "lines": [
+        218,
+        382
+      ],
+      "matchSha256": [
+        "864939c13be23ba157710aab6b3f81e8faad0961a5078b252a977eb9e2d46d54",
+        "e37c02f07f153577c93c03a0b7fd231fd354b47640a4a4c10d88fd652b21b1b1"
+      ],
+      "classification": "synthetic_privacy_canary_only",
+      "reason": "Two literal source-test canaries injected into snapshots and RPC records; assertions verify omission from projections."
+    },
+    {
+      "relativePath": "desktop-unattributed-sources-summary.test.mjs",
+      "category": "credential_assignment",
+      "count": 1,
+      "lines": [
+        51
+      ],
+      "matchSha256": [
+        "83dc63a668d5ebd00454e62e47380e4962cde90180b5b42a129cb45039c352fb"
+      ],
+      "classification": "synthetic_privacy_canary_only",
+      "reason": "Explicit fake token marker used by offline projection privacy regression; no usable credential."
+    }
+  ],
+  "unresolvedFindings": [],
+  "nonFixtureSensitiveMatches": 0,
+  "nonemptyOperationalCredentialKeys": 0,
+  "rawMixedCiLogsIncluded": false,
+  "realCredentialsIncluded": false,
+  "signedUrlsIncluded": false,
+  "downloadUrlsIncluded": false,
+  "rawSqlOrPromptPayloadIncluded": false,
+  "sourceTransportManifestOrBundleIncluded": false,
+  "base64PayloadsIncluded": false,
+  "compiledBuildIdentityReceiptIncluded": true,
+  "localPayloadManifestIsNotAnArchiveEntry": true,
+  "fixtureScope": "Synthetic marker values occur only in checked-in test sources. They are not production observations or usable credentials.",
+  "originalBytesChanged": false,
+  "reviewLimit": "Static local content and schema review of the exact 57 files; no remote inventory, account, model, or database calls were made.",
+  "historicalFailuresPreserved": [
+    "main-6fed launcher exit 127 did not run its intended test command",
+    "two initial lint invocations found no files and exited 1",
+    "preload red regression 0/3 and projection red regression 0/3",
+    "ccdac complete login 187 > 162 and legacy refinement unavailable exit 2",
+    "main-0dee obsolete-source publication failure metadata",
+    "e7 first compiled-download invocation exited 1 before any download or output file",
+    "e7 complete login 186 > 162 remains a failed budget"
+  ],
+  "truthBoundaries": [
+    "Original whole windows include PKCE and background work. No counts were subtracted or rescheduled.",
+    "The startup first pair is numerically 54 <= 176; 2 physical and 6 logical Native requests finish after the original window. This is not proof of reduced total work.",
+    "Native otherScoped 44 versus Web 23 remains unresolved. noScope is zero in all four windows; that does not identify the missing scope labels.",
+    "Fourteen successful workflows and main publication completion do not establish issue 1512 production acceptance.",
+    "Earlier root receipts retain their as-of pending language. The later Native raw reports and final index supply the observed result without rewriting those receipts.",
+    "Top-level cleanup absence and independently unverified provider or PostgreSQL teardown remain unknown."
+  ]
+}

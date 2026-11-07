@@ -1,0 +1,328 @@
+✖ next cjs: bind the actual PG after tracing, with distinct copies and no double count (246.624367ms)
+✖ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (173.916072ms)
+✖ nitro esm: bind the actual PG after tracing, with distinct copies and no double count (186.181171ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 697.425036
+
+✖ failing tests:
+
+test at apps/desktop/test/db-metrics.test.mjs:175:3
+✖ next cjs: bind the actual PG after tracing, with distinct copies and no double count (246.624367ms)
+  Error: Command failed: /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-NZqNlC/probe.cjs /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-NZqNlC /workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.cjs next cjs {"instrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation-pg@0.76.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+sdk-trace-node@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   '/api/coordinator/attention': 0,
+  -   '/api/coordinator/messages': 0,
+  -   '/api/coordinator/runtime': 0,
+  -   '/api/coordinator/stream': 0,
+  -   '/api/devices/enrollment': 0,
+  -   '/api/frontend/oauth-consent': 0,
+  -   '/api/integrations/composio': 0,
+  -   '/api/settings/[read]': 0,
+  -   '/api/settings/model-order': 0,
+  -   '/api/settings/preferences': 0,
+  -   '/api/teams/[teamId]/members': 0,
+  -   '/api/teams/directory': 0,
+  -   '/pages/settings': 0,
+  -   '/pages/workspace': 0,
+  -   '/v1/devices/[deviceId]/commands': 0,
+  -   '/v1/devices/[deviceId]/commands/ack': 0,
+  -   '/v1/devices/[deviceId]/computer': 0,
+  -   '/v1/devices/[deviceId]/coordinator': 0,
+  -   '/v1/devices/[deviceId]/fs/requests': 0,
+  -   '/v1/devices/[deviceId]/fs/requests/[requestId]': 0,
+  -   '/v1/devices/[deviceId]/gateway': 0,
+  -   '/v1/devices/[deviceId]/github-token': 0,
+  -   '/v1/devices/[deviceId]/heartbeat': 0,
+  -   '/v1/devices/[deviceId]/repos': 0,
+  -   '/v1/devices/[deviceId]/runs': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/attachments/[id]': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/claim': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/computer-authority': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/credentials/login': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/subscription': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/subscription-lease': 0,
+  -   '/v1/devices/enroll': 0,
+  -   '/v1/devices/register': 0,
+  -   '/v1/runs/[runId]': 0,
+  -   '/v1/runs/[runId]/captures': 0,
+  -   '/v1/runs/[runId]/captures/[captureId]': 0,
+  -   '/v1/runs/[runId]/captures/[captureId]/complete': 0,
+  -   '/v1/runs/[runId]/checkpoint': 0,
+  -   '/v1/runs/[runId]/complete': 0,
+  -   '/v1/runs/[runId]/decision': 0,
+  -   '/v1/runs/[runId]/events': 0,
+  -   '/v1/runs/[runId]/policy-snapshot': 0,
+  -   '/v1/runs/[runId]/screen': 0,
+  -   '/v1/runs/[runId]/skill-receipt': 0,
+  -   '/v1/runs/[runId]/tool-approval': 0,
+  -   'after:agent-images.revalidate': 0,
+  -   'after:auth-email': 0,
+  -   'after:composio-triggers': 0,
+  -   'after:composio-webhook': 0,
+  -   'after:coordinator-wake': 0,
+  -   'after:device-wake': 0,
+  -   'after:due-timer': 0,
+  -   'after:factory-dispatch-recovery': 0,
+  -   'after:github-webhook': 0,
+  -   'after:group-turn': 0,
+  -   'after:issue-effects': 0,
+  -   'after:linear-issue-sync': 0,
+  -   'after:linear-sync-batch': 0,
+  -   'after:linear-webhook': 0,
+  -   'after:linear-webhook-suggestions': 0,
+  -   'after:live-notify': 0,
+  -   'after:record-time-zone': 0,
+  -   'after:remember-locale': 0,
+  -   'after:run-outcome-judge': 0,
+  -   'after:short-title': 0,
+  -   'after:stop-recordings': 0,
+  -   'after:subagent-start': 0,
+  -   'after:suggestions-bootstrap': 0,
+  -   'after:workflow-wake': 0,
+  -   noScope: 1,
+  -   otherScoped: 1
+  - }
+  
+      at /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-NZqNlC/probe.cjs:103:10
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+      at genericNodeError (node:internal/errors:986:15)
+      at wrappedFn (node:internal/errors:540:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:28)
+      at maybeClose (node:internal/child_process:1172:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:335:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: '/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-NZqNlC/probe.cjs /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-NZqNlC /workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.cjs next cjs {"instrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation-pg@0.76.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+sdk-trace-node@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}',
+    stdout: '',
+    stderr: "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ undefined\n- {\n-   '/api/coordinator/attention': 0,\n-   '/api/coordinator/messages': 0,\n-   '/api/coordinator/runtime': 0,\n-   '/api/coordinator/stream': 0,\n-   '/api/devices/enrollment': 0,\n-   '/api/frontend/oauth-consent': 0,\n-   '/api/integrations/composio': 0,\n-   '/api/settings/[read]': 0,\n-   '/api/settings/model-order': 0,\n-   '/api/settings/preferences': 0,\n-   '/api/teams/[teamId]/members': 0,\n-   '/api/teams/directory': 0,\n-   '/pages/settings': 0,\n-   '/pages/workspace': 0,\n-   '/v1/devices/[deviceId]/commands': 0,\n-   '/v1/devices/[deviceId]/commands/ack': 0,\n-   '/v1/devices/[deviceId]/computer': 0,\n-   '/v1/devices/[deviceId]/coordinator': 0,\n-   '/v1/devices/[deviceId]/fs/requests': 0,\n-   '/v1/devices/[deviceId]/fs/requests/[requestId]': 0,\n-   '/v1/devices/[deviceId]/gateway': 0,\n-   '/v1/devices/[deviceId]/github-token': 0,\n-   '/v1/devices/[deviceId]/heartbeat': 0,\n-   '/v1/devices/[deviceId]/repos': 0,\n-   '/v1/devices/[deviceId]/runs': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/attachments/[id]': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/claim': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/computer-authority': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/credentials/login': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/subscription': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/subscription-lease': 0,\n-   '/v1/devices/enroll': 0,\n-   '/v1/devices/register': 0,\n-   '/v1/runs/[runId]': 0,\n-   '/v1/runs/[runId]/captures': 0,\n-   '/v1/runs/[runId]/captures/[captureId]': 0,\n-   '/v1/runs/[runId]/captures/[captureId]/complete': 0,\n-   '/v1/runs/[runId]/checkpoint': 0,\n-   '/v1/runs/[runId]/complete': 0,\n-   '/v1/runs/[runId]/decision': 0,\n-   '/v1/runs/[runId]/events': 0,\n-   '/v1/runs/[runId]/policy-snapshot': 0,\n-   '/v1/runs/[runId]/screen': 0,\n-   '/v1/runs/[runId]/skill-receipt': 0,\n-   '/v1/runs/[runId]/tool-approval': 0,\n-   'after:agent-images.revalidate': 0,\n-   'after:auth-email': 0,\n-   'after:composio-triggers': 0,\n-   'after:composio-webhook': 0,\n-   'after:coordinator-wake': 0,\n-   'after:device-wake': 0,\n-   'after:due-timer': 0,\n-   'after:factory-dispatch-recovery': 0,\n-   'after:github-webhook': 0,\n-   'after:group-turn': 0,\n-   'after:issue-effects': 0,\n-   'after:linear-issue-sync': 0,\n-   'after:linear-sync-batch': 0,\n-   'after:linear-webhook': 0,\n-   'after:linear-webhook-suggestions': 0,\n-   'after:live-notify': 0,\n-   'after:record-time-zone': 0,\n-   'after:remember-locale': 0,\n-   'after:run-outcome-judge': 0,\n-   'after:short-title': 0,\n-   'after:stop-recordings': 0,\n-   'after:subagent-start': 0,\n-   'after:suggestions-bootstrap': 0,\n-   'after:workflow-wake': 0,\n-   noScope: 1,\n-   otherScoped: 1\n- }\n\n    at /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-NZqNlC/probe.cjs:103:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: [Object],\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n"
+  }
+
+test at apps/desktop/test/db-metrics.test.mjs:175:3
+✖ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (173.916072ms)
+  Error: Command failed: /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-HLwOsF/probe.cjs /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-HLwOsF /workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.cjs nitro cjs {"instrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation-pg@0.76.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+sdk-trace-node@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   '/api/coordinator/attention': 0,
+  -   '/api/coordinator/messages': 0,
+  -   '/api/coordinator/runtime': 0,
+  -   '/api/coordinator/stream': 0,
+  -   '/api/devices/enrollment': 0,
+  -   '/api/frontend/oauth-consent': 0,
+  -   '/api/integrations/composio': 0,
+  -   '/api/settings/[read]': 0,
+  -   '/api/settings/model-order': 0,
+  -   '/api/settings/preferences': 0,
+  -   '/api/teams/[teamId]/members': 0,
+  -   '/api/teams/directory': 0,
+  -   '/pages/settings': 0,
+  -   '/pages/workspace': 0,
+  -   '/v1/devices/[deviceId]/commands': 0,
+  -   '/v1/devices/[deviceId]/commands/ack': 0,
+  -   '/v1/devices/[deviceId]/computer': 0,
+  -   '/v1/devices/[deviceId]/coordinator': 0,
+  -   '/v1/devices/[deviceId]/fs/requests': 0,
+  -   '/v1/devices/[deviceId]/fs/requests/[requestId]': 0,
+  -   '/v1/devices/[deviceId]/gateway': 0,
+  -   '/v1/devices/[deviceId]/github-token': 0,
+  -   '/v1/devices/[deviceId]/heartbeat': 0,
+  -   '/v1/devices/[deviceId]/repos': 0,
+  -   '/v1/devices/[deviceId]/runs': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/attachments/[id]': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/claim': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/computer-authority': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/credentials/login': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/subscription': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/subscription-lease': 0,
+  -   '/v1/devices/enroll': 0,
+  -   '/v1/devices/register': 0,
+  -   '/v1/runs/[runId]': 0,
+  -   '/v1/runs/[runId]/captures': 0,
+  -   '/v1/runs/[runId]/captures/[captureId]': 0,
+  -   '/v1/runs/[runId]/captures/[captureId]/complete': 0,
+  -   '/v1/runs/[runId]/checkpoint': 0,
+  -   '/v1/runs/[runId]/complete': 0,
+  -   '/v1/runs/[runId]/decision': 0,
+  -   '/v1/runs/[runId]/events': 0,
+  -   '/v1/runs/[runId]/policy-snapshot': 0,
+  -   '/v1/runs/[runId]/screen': 0,
+  -   '/v1/runs/[runId]/skill-receipt': 0,
+  -   '/v1/runs/[runId]/tool-approval': 0,
+  -   'after:agent-images.revalidate': 0,
+  -   'after:auth-email': 0,
+  -   'after:composio-triggers': 0,
+  -   'after:composio-webhook': 0,
+  -   'after:coordinator-wake': 0,
+  -   'after:device-wake': 0,
+  -   'after:due-timer': 0,
+  -   'after:factory-dispatch-recovery': 0,
+  -   'after:github-webhook': 0,
+  -   'after:group-turn': 0,
+  -   'after:issue-effects': 0,
+  -   'after:linear-issue-sync': 0,
+  -   'after:linear-sync-batch': 0,
+  -   'after:linear-webhook': 0,
+  -   'after:linear-webhook-suggestions': 0,
+  -   'after:live-notify': 0,
+  -   'after:record-time-zone': 0,
+  -   'after:remember-locale': 0,
+  -   'after:run-outcome-judge': 0,
+  -   'after:short-title': 0,
+  -   'after:stop-recordings': 0,
+  -   'after:subagent-start': 0,
+  -   'after:suggestions-bootstrap': 0,
+  -   'after:workflow-wake': 0,
+  -   noScope: 1,
+  -   otherScoped: 1
+  - }
+  
+      at /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-HLwOsF/probe.cjs:103:10
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+      at genericNodeError (node:internal/errors:986:15)
+      at wrappedFn (node:internal/errors:540:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:28)
+      at maybeClose (node:internal/child_process:1172:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:335:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: '/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-HLwOsF/probe.cjs /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-HLwOsF /workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.cjs nitro cjs {"instrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation-pg@0.76.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+sdk-trace-node@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}',
+    stdout: '',
+    stderr: "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ undefined\n- {\n-   '/api/coordinator/attention': 0,\n-   '/api/coordinator/messages': 0,\n-   '/api/coordinator/runtime': 0,\n-   '/api/coordinator/stream': 0,\n-   '/api/devices/enrollment': 0,\n-   '/api/frontend/oauth-consent': 0,\n-   '/api/integrations/composio': 0,\n-   '/api/settings/[read]': 0,\n-   '/api/settings/model-order': 0,\n-   '/api/settings/preferences': 0,\n-   '/api/teams/[teamId]/members': 0,\n-   '/api/teams/directory': 0,\n-   '/pages/settings': 0,\n-   '/pages/workspace': 0,\n-   '/v1/devices/[deviceId]/commands': 0,\n-   '/v1/devices/[deviceId]/commands/ack': 0,\n-   '/v1/devices/[deviceId]/computer': 0,\n-   '/v1/devices/[deviceId]/coordinator': 0,\n-   '/v1/devices/[deviceId]/fs/requests': 0,\n-   '/v1/devices/[deviceId]/fs/requests/[requestId]': 0,\n-   '/v1/devices/[deviceId]/gateway': 0,\n-   '/v1/devices/[deviceId]/github-token': 0,\n-   '/v1/devices/[deviceId]/heartbeat': 0,\n-   '/v1/devices/[deviceId]/repos': 0,\n-   '/v1/devices/[deviceId]/runs': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/attachments/[id]': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/claim': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/computer-authority': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/credentials/login': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/subscription': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/subscription-lease': 0,\n-   '/v1/devices/enroll': 0,\n-   '/v1/devices/register': 0,\n-   '/v1/runs/[runId]': 0,\n-   '/v1/runs/[runId]/captures': 0,\n-   '/v1/runs/[runId]/captures/[captureId]': 0,\n-   '/v1/runs/[runId]/captures/[captureId]/complete': 0,\n-   '/v1/runs/[runId]/checkpoint': 0,\n-   '/v1/runs/[runId]/complete': 0,\n-   '/v1/runs/[runId]/decision': 0,\n-   '/v1/runs/[runId]/events': 0,\n-   '/v1/runs/[runId]/policy-snapshot': 0,\n-   '/v1/runs/[runId]/screen': 0,\n-   '/v1/runs/[runId]/skill-receipt': 0,\n-   '/v1/runs/[runId]/tool-approval': 0,\n-   'after:agent-images.revalidate': 0,\n-   'after:auth-email': 0,\n-   'after:composio-triggers': 0,\n-   'after:composio-webhook': 0,\n-   'after:coordinator-wake': 0,\n-   'after:device-wake': 0,\n-   'after:due-timer': 0,\n-   'after:factory-dispatch-recovery': 0,\n-   'after:github-webhook': 0,\n-   'after:group-turn': 0,\n-   'after:issue-effects': 0,\n-   'after:linear-issue-sync': 0,\n-   'after:linear-sync-batch': 0,\n-   'after:linear-webhook': 0,\n-   'after:linear-webhook-suggestions': 0,\n-   'after:live-notify': 0,\n-   'after:record-time-zone': 0,\n-   'after:remember-locale': 0,\n-   'after:run-outcome-judge': 0,\n-   'after:short-title': 0,\n-   'after:stop-recordings': 0,\n-   'after:subagent-start': 0,\n-   'after:suggestions-bootstrap': 0,\n-   'after:workflow-wake': 0,\n-   noScope: 1,\n-   otherScoped: 1\n- }\n\n    at /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-HLwOsF/probe.cjs:103:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: [Object],\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n"
+  }
+
+test at apps/desktop/test/db-metrics.test.mjs:175:3
+✖ nitro esm: bind the actual PG after tracing, with distinct copies and no double count (186.181171ms)
+  Error: Command failed: /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-vH6ow2/probe.cjs /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-vH6ow2 /workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.cjs nitro esm {"instrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation-pg@0.76.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+sdk-trace-node@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + undefined
+  - {
+  -   '/api/coordinator/attention': 0,
+  -   '/api/coordinator/messages': 0,
+  -   '/api/coordinator/runtime': 0,
+  -   '/api/coordinator/stream': 0,
+  -   '/api/devices/enrollment': 0,
+  -   '/api/frontend/oauth-consent': 0,
+  -   '/api/integrations/composio': 0,
+  -   '/api/settings/[read]': 0,
+  -   '/api/settings/model-order': 0,
+  -   '/api/settings/preferences': 0,
+  -   '/api/teams/[teamId]/members': 0,
+  -   '/api/teams/directory': 0,
+  -   '/pages/settings': 0,
+  -   '/pages/workspace': 0,
+  -   '/v1/devices/[deviceId]/commands': 0,
+  -   '/v1/devices/[deviceId]/commands/ack': 0,
+  -   '/v1/devices/[deviceId]/computer': 0,
+  -   '/v1/devices/[deviceId]/coordinator': 0,
+  -   '/v1/devices/[deviceId]/fs/requests': 0,
+  -   '/v1/devices/[deviceId]/fs/requests/[requestId]': 0,
+  -   '/v1/devices/[deviceId]/gateway': 0,
+  -   '/v1/devices/[deviceId]/github-token': 0,
+  -   '/v1/devices/[deviceId]/heartbeat': 0,
+  -   '/v1/devices/[deviceId]/repos': 0,
+  -   '/v1/devices/[deviceId]/runs': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/attachments/[id]': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/claim': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/computer-authority': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/credentials/login': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/subscription': 0,
+  -   '/v1/devices/[deviceId]/runs/[runId]/subscription-lease': 0,
+  -   '/v1/devices/enroll': 0,
+  -   '/v1/devices/register': 0,
+  -   '/v1/runs/[runId]': 0,
+  -   '/v1/runs/[runId]/captures': 0,
+  -   '/v1/runs/[runId]/captures/[captureId]': 0,
+  -   '/v1/runs/[runId]/captures/[captureId]/complete': 0,
+  -   '/v1/runs/[runId]/checkpoint': 0,
+  -   '/v1/runs/[runId]/complete': 0,
+  -   '/v1/runs/[runId]/decision': 0,
+  -   '/v1/runs/[runId]/events': 0,
+  -   '/v1/runs/[runId]/policy-snapshot': 0,
+  -   '/v1/runs/[runId]/screen': 0,
+  -   '/v1/runs/[runId]/skill-receipt': 0,
+  -   '/v1/runs/[runId]/tool-approval': 0,
+  -   'after:agent-images.revalidate': 0,
+  -   'after:auth-email': 0,
+  -   'after:composio-triggers': 0,
+  -   'after:composio-webhook': 0,
+  -   'after:coordinator-wake': 0,
+  -   'after:device-wake': 0,
+  -   'after:due-timer': 0,
+  -   'after:factory-dispatch-recovery': 0,
+  -   'after:github-webhook': 0,
+  -   'after:group-turn': 0,
+  -   'after:issue-effects': 0,
+  -   'after:linear-issue-sync': 0,
+  -   'after:linear-sync-batch': 0,
+  -   'after:linear-webhook': 0,
+  -   'after:linear-webhook-suggestions': 0,
+  -   'after:live-notify': 0,
+  -   'after:record-time-zone': 0,
+  -   'after:remember-locale': 0,
+  -   'after:run-outcome-judge': 0,
+  -   'after:short-title': 0,
+  -   'after:stop-recordings': 0,
+  -   'after:subagent-start': 0,
+  -   'after:suggestions-bootstrap': 0,
+  -   'after:workflow-wake': 0,
+  -   noScope: 1,
+  -   otherScoped: 1
+  - }
+  
+      at /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-vH6ow2/probe.cjs:103:10
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+      at genericNodeError (node:internal/errors:986:15)
+      at wrappedFn (node:internal/errors:540:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:28)
+      at maybeClose (node:internal/child_process:1172:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:335:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: '/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-vH6ow2/probe.cjs /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-vH6ow2 /workspace/scratch/812e3b7d6d45/Mikka/apps/desktop/test/db-metrics.cjs nitro esm {"instrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation/build/src/index.js","pgInstrumentation":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+instrumentation-pg@0.76.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/instrumentation-pg/build/src/index.js","sdk":"/workspace/scratch/812e3b7d6d45/Mikka/node_modules/.pnpm/@opentelemetry+sdk-trace-node@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace-node/build/src/index.js"}',
+    stdout: '',
+    stderr: "AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n+ undefined\n- {\n-   '/api/coordinator/attention': 0,\n-   '/api/coordinator/messages': 0,\n-   '/api/coordinator/runtime': 0,\n-   '/api/coordinator/stream': 0,\n-   '/api/devices/enrollment': 0,\n-   '/api/frontend/oauth-consent': 0,\n-   '/api/integrations/composio': 0,\n-   '/api/settings/[read]': 0,\n-   '/api/settings/model-order': 0,\n-   '/api/settings/preferences': 0,\n-   '/api/teams/[teamId]/members': 0,\n-   '/api/teams/directory': 0,\n-   '/pages/settings': 0,\n-   '/pages/workspace': 0,\n-   '/v1/devices/[deviceId]/commands': 0,\n-   '/v1/devices/[deviceId]/commands/ack': 0,\n-   '/v1/devices/[deviceId]/computer': 0,\n-   '/v1/devices/[deviceId]/coordinator': 0,\n-   '/v1/devices/[deviceId]/fs/requests': 0,\n-   '/v1/devices/[deviceId]/fs/requests/[requestId]': 0,\n-   '/v1/devices/[deviceId]/gateway': 0,\n-   '/v1/devices/[deviceId]/github-token': 0,\n-   '/v1/devices/[deviceId]/heartbeat': 0,\n-   '/v1/devices/[deviceId]/repos': 0,\n-   '/v1/devices/[deviceId]/runs': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/attachments/[id]': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/claim': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/computer-authority': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/credentials/login': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/subscription': 0,\n-   '/v1/devices/[deviceId]/runs/[runId]/subscription-lease': 0,\n-   '/v1/devices/enroll': 0,\n-   '/v1/devices/register': 0,\n-   '/v1/runs/[runId]': 0,\n-   '/v1/runs/[runId]/captures': 0,\n-   '/v1/runs/[runId]/captures/[captureId]': 0,\n-   '/v1/runs/[runId]/captures/[captureId]/complete': 0,\n-   '/v1/runs/[runId]/checkpoint': 0,\n-   '/v1/runs/[runId]/complete': 0,\n-   '/v1/runs/[runId]/decision': 0,\n-   '/v1/runs/[runId]/events': 0,\n-   '/v1/runs/[runId]/policy-snapshot': 0,\n-   '/v1/runs/[runId]/screen': 0,\n-   '/v1/runs/[runId]/skill-receipt': 0,\n-   '/v1/runs/[runId]/tool-approval': 0,\n-   'after:agent-images.revalidate': 0,\n-   'after:auth-email': 0,\n-   'after:composio-triggers': 0,\n-   'after:composio-webhook': 0,\n-   'after:coordinator-wake': 0,\n-   'after:device-wake': 0,\n-   'after:due-timer': 0,\n-   'after:factory-dispatch-recovery': 0,\n-   'after:github-webhook': 0,\n-   'after:group-turn': 0,\n-   'after:issue-effects': 0,\n-   'after:linear-issue-sync': 0,\n-   'after:linear-sync-batch': 0,\n-   'after:linear-webhook': 0,\n-   'after:linear-webhook-suggestions': 0,\n-   'after:live-notify': 0,\n-   'after:record-time-zone': 0,\n-   'after:remember-locale': 0,\n-   'after:run-outcome-judge': 0,\n-   'after:short-title': 0,\n-   'after:stop-recordings': 0,\n-   'after:subagent-start': 0,\n-   'after:suggestions-bootstrap': 0,\n-   'after:workflow-wake': 0,\n-   noScope: 1,\n-   otherScoped: 1\n- }\n\n    at /workspace/scratch/812e3b7d6d45/ops1512/tmp/mikka-pg-binding-vH6ow2/probe.cjs:103:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: undefined,\n  expected: [Object],\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n"
+  }

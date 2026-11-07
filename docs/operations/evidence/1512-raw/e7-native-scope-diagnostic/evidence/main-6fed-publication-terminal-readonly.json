@@ -1,0 +1,673 @@
+{
+  "schemaVersion": 1,
+  "kind": "main-publication-read-only-terminal-receipt",
+  "observedAt": "2026-11-07T15:31:57Z",
+  "repository": "alexj11324/Mikka",
+  "main": {
+    "sha": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+    "pullRequest": 1638,
+    "refVerified": true
+  },
+  "workflows": [
+    {
+      "id": 42382959004,
+      "name": "CI",
+      "path": ".github/workflows/ui-policy.yml",
+      "event": "push",
+      "headSha": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T14:43:52Z",
+      "updatedAt": "2026-11-07T14:52:34Z"
+    },
+    {
+      "id": 42382958983,
+      "name": "Desktop release",
+      "path": ".github/workflows/desktop-release.yml",
+      "event": "push",
+      "headSha": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T14:43:52Z",
+      "updatedAt": "2026-11-07T15:18:09Z"
+    },
+    {
+      "id": 42382959016,
+      "name": "Web deploy",
+      "path": ".github/workflows/web-deploy.yml",
+      "event": "push",
+      "headSha": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T14:43:52Z",
+      "updatedAt": "2026-11-07T15:05:59Z"
+    },
+    {
+      "id": 42382958977,
+      "name": "E2B additive runtime release",
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "event": "push",
+      "headSha": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T14:43:52Z",
+      "updatedAt": "2026-11-07T15:31:02Z"
+    },
+    {
+      "id": 42382958889,
+      "name": "Publish daemon",
+      "path": ".github/workflows/publish-daemon.yml",
+      "event": "push",
+      "headSha": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T14:43:51Z",
+      "updatedAt": "2026-11-07T14:54:56Z"
+    }
+  ],
+  "e2bJobs": [
+    {
+      "id": 128434270072,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128434342766,
+      "name": "check",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128434438832,
+      "name": "validate / build",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128436930731,
+      "name": "await-web",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 128439593158,
+      "name": "subscriptions",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Refuse an obsolete source before real subscription work",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Require one immutable candidate artifact reference",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Download this run's complete private candidate report",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Bind the candidate bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Install only the pinned gate SDKs",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Read the existing candidate E2B key",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Read the authorized acceptance account email",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Read the authorized acceptance account password",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Preserve closed diagnostics and any accepted subscription proof",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Make only fully accepted candidates public",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Preserve the complete public release report",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 29,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 30,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 31,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 128440388294,
+      "name": "publish / deploy",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Refuse an obsolete source before release work",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Require one immutable runtime release artifact reference",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Download the complete verified runtime release report",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Bind the release bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Read the Vercel deploy token",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Skip documentation-only changes",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Read the private UI checkout credential",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Check out the private UI",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Pin the private UI revision",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Read the existing Vercel runtime release token",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Publish the verified additive runtime pair inside the deployment queue",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Read the production values Vercel withholds from `vercel pull`",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Pull the production project settings and environment",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Fill build-time values",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Choose the deployment id",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Install the pinned workspace dependencies",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Install private UI runtime dependencies without license scripts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Build (runs migrations last, as the Vercel build did)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Audit the public output for source and source maps",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Upload the prebuilt output to production",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Verify the public production version before releasing the deployment queue",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 47,
+          "name": "Post Check out the private UI",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 48,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 49,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 50,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 51,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 128445573257,
+      "name": "cleanup",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Install the pinned cleanup SDK",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Read this release's E2B key",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Close this attempt's instances and remove only its private candidates",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Preserve release cleanup receipt",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "deployments": {
+    "initialWeb": {
+      "id": "dpl_2Y7yvTyURmHjp7FEg8HaDXXB5M6o",
+      "readyState": "READY",
+      "state": "READY",
+      "target": "production",
+      "createdAt": 1794063493113,
+      "buildingAt": 1794063494142,
+      "ready": 1794063944037,
+      "errorCode": null,
+      "metaSha": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a"
+    },
+    "runtimeRefresh": {
+      "id": "dpl_FuWHMFbbegkSfNMBLkCafBJFWxaL",
+      "readyState": "READY",
+      "state": "READY",
+      "target": "production",
+      "createdAt": 1794064979389,
+      "buildingAt": 1794064980423,
+      "ready": 1794065423712,
+      "errorCode": null,
+      "metaSha": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a"
+    }
+  },
+  "independentAcceptanceStillActive": {
+    "at": "2026-11-07T15:32:11.070Z",
+    "runId": 42386756428,
+    "jobs": [
+      {
+        "id": 128445663240,
+        "name": "authorize",
+        "status": "completed",
+        "conclusion": "success",
+        "steps": [
+          {
+            "number": 1,
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 2,
+            "name": "Authenticate upstream metadata before any checkout or workload token",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 3,
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 4,
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 5,
+            "name": "Select lifecycle changes or an actually validated runtime candidate",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 9,
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 10,
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 11,
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 128445710406,
+        "name": "acceptance",
+        "status": "in_progress",
+        "conclusion": null,
+        "steps": [
+          {
+            "number": 1,
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 2,
+            "name": "Initialize containers",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 3,
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 4,
+            "name": "Run ./.github/actions/pnpm-install",
+            "status": "in_progress",
+            "conclusion": null
+          },
+          {
+            "number": 5,
+            "name": "Check source, official template and disposable database guards without allocating",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 6,
+            "name": "Recheck main and upstream attempt and attest the exact live Web build before credentials",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 7,
+            "name": "Read only the existing E2B key through the existing workload identity",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 8,
+            "name": "Exercise real E2B RPCs and injected transport faults on one owned disposable VM",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 9,
+            "name": "Recheck the exact source before independent Owner subscription cases",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 10,
+            "name": "Read only the shared smoke account email",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 11,
+            "name": "Read only the shared smoke account password",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 12,
+            "name": "Run normal Owner question and continuation on both official subscriptions",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 13,
+            "name": "Require both question-resume cases and provider cleanup evidence",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 14,
+            "name": "Preserve scoped evidence and cleanup receipts",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 26,
+            "name": "Post Run ./.github/actions/pnpm-install",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 27,
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "pending",
+            "conclusion": null
+          },
+          {
+            "number": 28,
+            "name": "Stop containers",
+            "status": "pending",
+            "conclusion": null
+          }
+        ]
+      }
+    ]
+  },
+  "conclusions": {
+    "allMainPublishersTerminal": true,
+    "allMainPublishersSuccess": true,
+    "realSubscriptionGateJobSuccess": true,
+    "releaseCleanupJobSuccess": true,
+    "cleanupEvidenceLevel": "GitHub job and step metadata only; provider inventory and individual receipts not independently read",
+    "currentTaskVmProviderOutcome": "not-yet-executed-at-recorded-step",
+    "issue1512ProductionAcceptance": null,
+    "scope": "publication completion at the recorded main SHA; not a substitute for #1512 Native budgets or PostHog/Replay/AI/Logs acceptance"
+  },
+  "privacy": {
+    "rawLogsRead": false,
+    "rawLogsSaved": false,
+    "credentialContentsRead": false,
+    "providerCalls": false,
+    "resourceMutations": false,
+    "remoteWrites": false
+  }
+}

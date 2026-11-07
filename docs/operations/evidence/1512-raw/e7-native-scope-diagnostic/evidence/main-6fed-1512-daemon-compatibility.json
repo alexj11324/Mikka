@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "status": "source_review_passed_no_new_1512_blocker",
+  "recordedAt": "2026-11-07T15:05:20.921626+00:00",
+  "reviewedMerge": {
+    "sha": "7fc7df8d7193efb444c9266152e61e93637e6c16",
+    "tree": "5c39022a97d2c9cd38f0522ddd4c94115a4d466a",
+    "parents": [
+      "ccdac744d0ae0745c5f75aef08e1298077f53525",
+      "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a"
+    ],
+    "main": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+    "baseline": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+    "workingTreeHeadAtReceipt": "e7a1a267335604004586f88e6b530c51b0da286d",
+    "allReviewedAndTestedFilesMatchFixedMerge": true
+  },
+  "productEdits": 0,
+  "remoteMutations": 0,
+  "findings": [
+    {
+      "code": "same_run_trace_carrier_preserved",
+      "source": [
+        "packages/daemon/src/runs/supervisor.ts:1366",
+        "packages/daemon/src/runs/supervisor.ts:1516",
+        "packages/daemon/src/runs/supervisor.ts:1574",
+        "packages/daemon/src/runs/supervisor.ts:1690"
+      ],
+      "result": "daemon.run extracts assignment.traceContext; baseOptions captures its active carrier once and supplies both task-owned preparation and final start. No daemon-global or previous-run carrier is introduced."
+    },
+    {
+      "code": "preparation_clock_independent",
+      "source": [
+        "packages/daemon/src/tracing.ts:210",
+        "packages/daemon/src/adapters/claude-prewarm.ts:17",
+        "packages/daemon/src/runs/supervisor.ts:1055"
+      ],
+      "result": "Opted-in preparation adds only a separate AsyncLocalStorage startup timing scope. It creates no OTel root, timer or remote request. Phase collection is bounded, closes on resolve/reject and preserves run hash/harness. Supervisor emits only a matching receipt on agent_start success/error; it does not rebase early intervals onto the later stage."
+    },
+    {
+      "code": "owned_prewarm_and_drain_preserved",
+      "source": [
+        "packages/daemon/src/adapters/claude-prewarm.ts",
+        "packages/daemon/src/adapters/claude.ts",
+        "packages/daemon/src/subscription-hosted-runner.ts",
+        "packages/daemon/src/runs/supervisor.ts"
+      ],
+      "result": "Existing binding, single-consume, current local lease, checkout/final-options and pre-input verification fences remain. Abort/cancel drains only the owned spare/group; ordinary fallback remains restricted to actual project_settings_not_claimable. Partial messages and per-message numeric metrics remain in the consumed SDK loop."
+    },
+    {
+      "code": "native_generation_and_safe_logs_unchanged",
+      "result": "Native receipt projection, model/usage/TTFT, per-child loopback configuration, CLI OTEL override/unset order, captured callback carrier, collector terminal receipt/drain and non-blocking queue flush are unchanged in the protected modules below."
+    },
+    {
+      "code": "startup_acceptance_strength_preserved",
+      "source": [
+        "scripts/acceptance/cloud-startup.mjs",
+        "scripts/acceptance/cloud-startup-report.mjs"
+      ],
+      "result": "Ordinary starts still require complete successful cli_init. A provided preparation receipt additionally must match the exact run/harness, own clock, both prewarm and final cli_init, and be nontruncated/successful; invalid or incomplete supplied proof cannot fall back to the old check. Reporting keeps preparation and stage origins separate and does not sum overlapping intervals."
+    },
+    {
+      "code": "prepared_git_credential_scope_static_review",
+      "source": [
+        "packages/daemon/src/agents/github-runtime.ts",
+        "packages/daemon/test/git-prepared-token.test.ts",
+        "packages/daemon/test/credential-journal.test.ts"
+      ],
+      "result": "New clone/fetch helper consumes only the already prepared task token, appends local process Git settings, scopes the helper to github.com and keeps the token in env rather than literal helper/config text. Existing prepared/local and legacy branches remain. Base64 Basic credential masking is covered by the locally run journal regression. Real loopback smart-HTTP redirect/auth tests were read but not rerun here."
+    },
+    {
+      "code": "fixed_profile_selection_static_review",
+      "source": [
+        "lib/factory/agent-profile.ts",
+        "lib/model-order.ts",
+        "lib/execution-model-options.ts",
+        "lib/model-api-keys.ts"
+      ],
+      "result": "Explicit/Decision custom fixed Profiles re-read the exact frozen candidate rather than enumerate unrelated candidates. Existing owner/share/catalogue checks and source row lock remain. This changes source selection work, not generation trace fields or release evidence; root owns its targeted Node tests."
+    }
+  ],
+  "protectedModules": [
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "gitBlob": "8104dbd4eb74a04b026b9e2f2f420efc935deb0c",
+      "sha256": "b3cdc02033acd0a1e2b2d1f7bce0fe7f2f67139c5bcfe1f50f8ff2a16e7ad514",
+      "unchangedFromCandidate": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "gitBlob": "9fc326395824c07b5a006cb3cd3e4b589c61edef",
+      "sha256": "82b07d79a3e396234dcd28f11c4a3859b36b1733439c3385df700e687de9f53f",
+      "unchangedFromCandidate": true
+    },
+    {
+      "path": "packages/daemon/src/adapters/generation-metrics.ts",
+      "gitBlob": "66e6054ae2acdbfc4a462b3de422643c35f76da0",
+      "sha256": "df427073be8987f77d8ae7180e03a6df0a3c79c67a700fd13e03e3ecb6dbbde9",
+      "unchangedFromCandidate": true
+    },
+    {
+      "path": "packages/daemon/src/codex-generation-telemetry.ts",
+      "gitBlob": "730035a20c2349ab1dc655e3e7e0bed436f42240",
+      "sha256": "1ccf1b86713a5eaaf40b0d422b0056d51850250c400a7678b29cf21ce704867e",
+      "unchangedFromCandidate": true
+    },
+    {
+      "path": "packages/daemon/src/official-cli-timing.ts",
+      "gitBlob": "44bf9cf0989e19992eb59aad34579e1670a0680c",
+      "sha256": "b35ffcce63177d7894f8ba6f88db3b2c73dfc2a6c1069a81d7cde17d17cafec4",
+      "unchangedFromCandidate": true
+    },
+    {
+      "path": "packages/daemon/src/tracing-ai.ts",
+      "gitBlob": "6f7d7414fb07809880603dc4c20f6525616219ab",
+      "sha256": "4b22e788f3df0d90fbae4b087a21c93b8df124941b78f43ad510ea6ccdf35850",
+      "unchangedFromCandidate": true
+    },
+    {
+      "path": "packages/daemon/src/tracing-logs.ts",
+      "gitBlob": "e8da68cec5d9976ed404e4494ba59037c9b4966e",
+      "sha256": "689dfa2f30d9ff220ac51a6636ce62a32e3632e51018c1e84bf45b48193248e9",
+      "unchangedFromCandidate": true
+    },
+    {
+      "path": "packages/protocol/src/trace-context.ts",
+      "gitBlob": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "sha256": "eb882501a08c02178edb4d2bd1293316923f5bca18210bbac43081f41fdb3acc",
+      "unchangedFromCandidate": true
+    }
+  ],
+  "validation": {
+    "command": "TMPDIR=/workspace/scratch/812e3b7d6d45/ops1512/tmp ./node_modules/.bin/vitest run src/tracing.test.ts src/run-runtime-timing.test.ts test/prewarm-timing.test.ts test/claude-prewarm.test.ts test/credential-journal.test.ts --maxWorkers=1 --no-file-parallelism",
+    "cwd": "packages/daemon",
+    "exitCode": 0,
+    "filesPassed": 5,
+    "testsPassed": 48,
+    "testsFailed": 0,
+    "reportedDurationSeconds": 4.19,
+    "files": [
+      "packages/daemon/src/tracing.test.ts",
+      "packages/daemon/src/run-runtime-timing.test.ts",
+      "packages/daemon/test/prewarm-timing.test.ts",
+      "packages/daemon/test/claude-prewarm.test.ts",
+      "packages/daemon/test/credential-journal.test.ts"
+    ],
+    "stdout": {
+      "path": "main-6fed-daemon-review-tests.log",
+      "bytes": 3397,
+      "sha256": "043609c6f3a73b67c8ec0de0241716fbc66eadbeb445a45d45fcf159a764edb6"
+    },
+    "priorLauncherAttempt": {
+      "exitCode": 127,
+      "testsExecuted": false,
+      "closedReason": "root-level vitest executable absent; corrected to existing daemon-local executable",
+      "stdout": {
+        "path": "main-6fed-daemon-review-launcher.log",
+        "bytes": 77,
+        "sha256": "3108fbb543812faf2208b5858bd5c392a097e3c960c2dbfed5136be4f9afda88"
+      }
+    },
+    "noPackageInstall": true,
+    "noProviderRequests": true,
+    "noDatabase": true,
+    "noVM": true,
+    "noServiceListener": true,
+    "scope": "in-memory exporters/fake HTTP transport and official SDK transport backed by owned synthetic child process; no genuine model execution"
+  },
+  "workflowTransport": {
+    "readOnlySourceRef": "9ff0476d94e9730261b97ecafc6d6e632816ab9d",
+    "workflow": ".github/workflows/issue1512-git-transport.yml",
+    "workflowBlob": "d07d4d44382266b9061c3f2236f79b9e4b23ebe9",
+    "guards": [
+      "exact bundle checksum and imported revision",
+      "sourceObjects remote head must be ancestor of imported revision",
+      "git diff of final .github/workflows trees must be empty",
+      "ordinary non-force push"
+    ],
+    "mainWorkflowDelta": {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "gitBlob": "7a566cd48156e3a8daddfeed869a26140514defa",
+      "meaning": "one existing test command adds cloud-startup-report.test.mjs"
+    },
+    "authorizedCompatiblePath": "Owner connector checkpoints that exact final workflow blob on sourceObjects; root fetches and ordinarily merges the checkpoint. The transport then verifies unchanged workflow tree plus ancestry before fast-forward. No guard changes or token permission escalation.",
+    "performedByThisReview": false
+  },
+  "remainingBoundaries": [
+    "No new Native performance or production model acceptance result is inferred. Existing ccdac login 187/162 remains failed; first-pair startup 162/186 remains passed.",
+    "Actual loopback Git helper and Unix mailbox/hosted execution tests remain normal CI/runtime gates; no root UID or socket constraint was bypassed.",
+    "Root separately executes source-selection/cloud-startup Node tests and manages final canonical CI. This receipt does not replace those results."
+  ],
+  "mergeRisk": {
+    "rating": "low",
+    "alignment": "good",
+    "impact": "medium",
+    "verification": "good_for_reviewed_interactions",
+    "rollbackCost": "low",
+    "errorDetection": "good"
+  },
+  "archiveAlreadyCompleted": {
+    "commit": "c543267b9dad94e3332004dca4879da688296104",
+    "tree": "34a76bca70929014090abba79d123fb11f77c381",
+    "files": 57,
+    "bytes": 931166,
+    "remoteOriginalBytesVerified": true,
+    "newReceiptsDeferred": true
+  }
+}

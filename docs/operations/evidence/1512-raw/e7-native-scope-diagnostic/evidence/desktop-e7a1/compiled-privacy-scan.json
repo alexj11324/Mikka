@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "status": "passed",
+  "scope": "Known JSON members only; ZIP digests verified in memory then discarded; no URL, PNG or runtime log retained.",
+  "files": [
+    {
+      "member": "compiled/mikka-build.json",
+      "bytes": 8259,
+      "sha256": "cea41c10fb6d14af8b69bb5bddf535a44d490c12eb9674cb68cbfbc16fe847e6",
+      "patternMatches": {
+        "email": 0,
+        "credential": 0,
+        "private_key": 0,
+        "bearer": 0,
+        "signed_query": 0
+      },
+      "sensitiveNonemptyStringFields": 0
+    }
+  ]
+}

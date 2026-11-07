@@ -1,0 +1,28 @@
+TAP version 13
+# Subtest: next cjs: bind the actual PG after tracing, with distinct copies and no double count
+ok 1 - next cjs: bind the actual PG after tracing, with distinct copies and no double count
+  ---
+  duration_ms: 276.65692
+  type: 'test'
+  ...
+# Subtest: nitro cjs: bind the actual PG after tracing, with distinct copies and no double count
+ok 2 - nitro cjs: bind the actual PG after tracing, with distinct copies and no double count
+  ---
+  duration_ms: 178.20881
+  type: 'test'
+  ...
+# Subtest: nitro esm: bind the actual PG after tracing, with distinct copies and no double count
+ok 3 - nitro esm: bind the actual PG after tracing, with distinct copies and no double count
+  ---
+  duration_ms: 188.868076
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 763.050927

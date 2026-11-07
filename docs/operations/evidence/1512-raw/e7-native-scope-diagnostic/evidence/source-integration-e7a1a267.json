@@ -1,0 +1,25 @@
+{
+  "recordedAt": "2026-11-07T15:01:56.731150+00:00",
+  "revision": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "tree": "1e21ead1e8ef95e0354d79c1a5ab76942d760d2f",
+  "parents": [
+    "905b37f4df9ccd4c4497194c501d3f33ab13c72d"
+  ],
+  "reviewedMain": "6fedfc0ffd879d552d0b861bbd5f2d9f10f4dc3a",
+  "bundleBytes": 8061,
+  "bundleSha256": "3a0fb1184b41498c2fb37b8c2dc5b6f0680819dcc4fe0cec434609b8ffa4a435",
+  "bundleVerifyExitCode": 0,
+  "previousSourceHead": "fee9a2679a27e648588f7d017b606c09201a5a9e",
+  "previousFeatureHead": "ccdac744d0ae0745c5f75aef08e1298077f53525",
+  "opsHead": "820b3cc4b1572b56d8524178214571067f16abbb",
+  "opsTree": "2631c8e2d478987dd132f0789c5a12d754449d3c",
+  "importRun": 42384192047,
+  "importJob": 128438024086,
+  "importConclusion": "success",
+  "independentRemoteCommitTreeParentsVerified": true,
+  "featureUpdatedWithExpectedSha": true,
+  "force": false,
+  "workflowChangesRelativeToPreviousSourceObjects": [],
+  "nativeBudget": "pending new diagnostic evidence; previous complete login 187>162 failed",
+  "productionAcceptance": false
+}

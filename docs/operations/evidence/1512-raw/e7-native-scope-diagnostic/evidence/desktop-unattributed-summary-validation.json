@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "kind": "desktop_unattributed_summary_validation",
+  "status": "frozen",
+  "recordedAt": "2026-11-07T15:05:20.608Z",
+  "productHead": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "files": [
+    {
+      "path": "desktop-unattributed-sources-summary.mjs",
+      "bytes": 14761,
+      "sha256": "9cbb7cb5492723591260f004eb75d1f31f2bc8ae1152f044ae7fcaa051dc3aae"
+    },
+    {
+      "path": "desktop-unattributed-sources-summary.test.mjs",
+      "bytes": 9815,
+      "sha256": "18743033dcb8cda930b6b714100f6da4404a42a27cc9dcb36400ff849f924ea4"
+    },
+    {
+      "path": "desktop-unattributed-sources-summary-tests.tap",
+      "bytes": 2250,
+      "sha256": "3a1c217fb31a2b4873ab88ece06102d3040f8886166d742b23f8d9695cccb558"
+    },
+    {
+      "path": "desktop-unattributed-sources-summary-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "desktop-unattributed-sources-summary-legacy.stdout.json",
+      "bytes": 424,
+      "sha256": "b1d06456c46bfa5d8bc944df93b7180254bdc8c221d60a67b4cd330d2769352f"
+    },
+    {
+      "path": "evidence/desktop-ccdac-unattributed-legacy.json",
+      "bytes": 8835,
+      "sha256": "4e45eaadee056f47a4c779e6239683eef68fbc890cac911a504e6a921a2f8c98"
+    }
+  ],
+  "vocabulary": {
+    "keys": 71,
+    "exactProductListMatch": true,
+    "sourceFileSha256": "1bbc59ef965e6c658eec19ea11ea9a6df3b2693a4443a4e1952532fd2a692dd4"
+  },
+  "dependencies": [
+    {
+      "path": "desktop-query-operations-summary.mjs",
+      "bytes": 7134,
+      "sha256": "68b134983adeb68b85b0f1b20deecbac5055043c25f6a474bb9bd460b05835d2"
+    },
+    {
+      "path": "desktop-native-summary.mjs",
+      "bytes": 19258,
+      "sha256": "3f6bdf8c8dd37ca88d73f711d3929bf9c86c33f09c78f699dde69c8c076c060b"
+    }
+  ],
+  "checks": {
+    "offline": {
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "exitCode": 0
+    },
+    "lint": {
+      "exitCode": 0
+    },
+    "actualLegacyReport": {
+      "source": "c6ffdf9d3c557c462047b9b81b55b3a0b4d7b9af",
+      "exitCode": 2,
+      "status": "unavailable",
+      "baseIntegrityValid": true,
+      "rowsPresent": 0,
+      "rowsExpected": 24,
+      "fullCounts": [
+        187,
+        162,
+        162,
+        186
+      ],
+      "inputBytes": 181438,
+      "inputSha256": "14d915a077b835a56f901a6b979ca6fc38621c2f530a256a0ea6555038606d2e",
+      "inputUnchanged": true
+    }
+  },
+  "command": "node ops1512/desktop-unattributed-sources-summary.mjs <original-lifecycle.json> <actual-compiled-source-sha> <new-summary.json>",
+  "exitCodes": {
+    "complete": 0,
+    "incompleteOrInvalid": 1,
+    "legacyUnavailable": 2
+  },
+  "boundaries": {
+    "readsOnly": true,
+    "network": false,
+    "actualDatabase": false,
+    "nativeRerun": false,
+    "productModified": false,
+    "subtractsPkceOrBackground": false,
+    "productionAcceptance": null,
+    "harnessIdentity": "must be established separately from the artifact checkout and parity receipts"
+  }
+}

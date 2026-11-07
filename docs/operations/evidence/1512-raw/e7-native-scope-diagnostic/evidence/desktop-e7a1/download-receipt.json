@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42384327014,
+  "attempt": 1,
+  "source": "e7a1a267335604004586f88e6b530c51b0da286d",
+  "harness": "383da169d23b9cb6bfae1951ef862f43919a89c8",
+  "artifacts": [
+    {
+      "id": 13579422912,
+      "kind": "native",
+      "name": "desktop-native-evidence-383da169d23b9cb6bfae1951ef862f43919a89c8",
+      "bytes": 14888365,
+      "sha256": "41b1742f7007d6238608b613bcda15d3068faf26ed20255a45edcd9c5511cd70",
+      "headSha": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "workflowRunId": 42384327014,
+      "digestVerified": true,
+      "zipRetained": false,
+      "knownMembersExtracted": [
+        "lifecycle.json",
+        "parity/parity.json",
+        "smoke.json"
+      ]
+    },
+    {
+      "id": 13579871965,
+      "kind": "package",
+      "name": "desktop-package-evidence-383da169d23b9cb6bfae1951ef862f43919a89c8",
+      "bytes": 1597,
+      "sha256": "2d4e14dfc2b8601ad572276458594b424b21e433c8901994164d70a870249b54",
+      "headSha": "e7a1a267335604004586f88e6b530c51b0da286d",
+      "workflowRunId": 42384327014,
+      "digestVerified": true,
+      "zipRetained": false,
+      "knownMembersExtracted": [
+        "mac-acceptance-package.json",
+        "native-crypto.json"
+      ]
+    }
+  ],
+  "scope": "Known JSON members only; ZIP digests verified in memory then discarded; no URL, PNG or runtime log retained.",
+  "reportsComplete": true,
+  "missingReports": []
+}
