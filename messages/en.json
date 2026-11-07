@@ -4268,6 +4268,12 @@
         "attempt": "Attempt {n}",
         "created": "Created the task",
         "createdBy": "{name} created the task",
+        "divider": "Attempt {n} {outcome} · retrying with {agent}",
+        "dividerOutcome": {
+          "failed": "failed",
+          "blocked": "was blocked",
+          "other": "ended"
+        },
         "replaced": "Started a new thread",
         "openPage": "Open task page",
         "more": "More",
@@ -4278,6 +4284,7 @@
         "notFound": "This task isn't in your list",
         "state": {
           "waiting": "Needs you",
+          "blocked": "Blocked",
           "failed": "Failed",
           "running": "Running",
           "queued": "Queued",

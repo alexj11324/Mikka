@@ -30,7 +30,7 @@ test('a closed task is done whatever its thread is doing', () => {
   assert.equal(groups.done[0]?.issue.id, 'a')
 })
 
-test('each task gets one state; the hand is only 等你处理, and the count leaves 失败 out', () => {
+test('each task gets one state; the hand is only 等你处理, and the count leaves 受阻 and 失败 out', () => {
   const issues = [issue('a'), issue('b'), issue('c'), issue('d', 'review'), issue('e'), issue('f', 'todo'), issue('g', 'backlog'), issue('h', 'duplicate'), issue('i')]
   const threads = [
     thread('ra', 'a', 'waiting_input', '2026-11-07T10:00:00Z'),
@@ -47,14 +47,15 @@ test('each task gets one state; the hand is only 等你处理, and the count lea
   const states = Object.fromEntries(TASK_GROUPS.flatMap(group => groups[group].map(row => [row.issue.id, [group, row.state, row.reason]])))
   assert.deepEqual(states, {
     a: ['pending', 'waiting', 'needsReply'], b: ['pending', 'failed', null], c: ['running', 'queued', null],
-    d: ['pending', 'waiting', 'review'], e: ['pending', 'waiting', 'quota'], f: ['todo', 'idle', null],
+    d: ['pending', 'waiting', 'review'], e: ['pending', 'blocked', 'quota'], f: ['todo', 'idle', null],
     g: ['running', 'running', null], h: ['done', 'duplicate', null], i: ['pending', 'waiting', 'confirm'],
   })
-  assert.equal(pendingTaskCount(threads, issues), 4)
+  assert.equal(pendingTaskCount(threads, issues), 3)
 })
 
 test('with no attempt a task shows its board status: backlog is 暂不处理, others 待办', () => {
   assert.deepEqual(localTaskState(issue('a', 'backlog')), { state: 'idle', reason: null })
   assert.deepEqual(localTaskState(issue('a', 'todo')), { state: 'todo', reason: null })
+  assert.deepEqual(localTaskState(issue('a'), { status: 'succeeded', outcome: 'blocked' }), { state: 'blocked', reason: null })
   assert.deepEqual(localTaskState(issue('a', 'done', [{ url: 'u', state: 'merged' }]), null), { state: 'done', reason: null })
 })

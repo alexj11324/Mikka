@@ -4268,6 +4268,12 @@
         "attempt": "第 {n} 次尝试",
         "created": "创建了任务",
         "createdBy": "{name} 创建了任务",
+        "divider": "第 {n} 次尝试{outcome} · 换 {agent} 再试",
+        "dividerOutcome": {
+          "failed": "失败",
+          "blocked": "受阻",
+          "other": "结束"
+        },
         "replaced": "换了新线程",
         "openPage": "打开任务页",
         "more": "更多",
@@ -4278,6 +4284,7 @@
         "notFound": "这个任务不在你的列表里",
         "state": {
           "waiting": "等你处理",
+          "blocked": "受阻",
           "failed": "失败",
           "running": "运行中",
           "queued": "排队中",

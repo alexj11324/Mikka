@@ -17,12 +17,13 @@ export const TASK_GROUPS: readonly TaskGroup[] = ['pending', 'running', 'todo', 
 export type TaskRow = { issue: Issue; current: Thread; attempts: number; group: TaskGroup; state: TaskState; reason: TaskReason | null }
 
 /**
- * One state per task, one icon per state (decision 2026-11-07-2230): 等你处理 (the only hand) and 失败 in 等待你;
+ * One state per task, one icon per state (decision 2026-11-07-2230, with 受阻 split out on #1681): 等你处理 (the only
+ * hand: 等你回复, 等你确认, 待审阅), 受阻 (login, key, permission, quota, device) and 失败 in 等待你;
  * 运行中 and 排队中 in 进行中; the board's open and closed statuses in 待办 and 已完成.
  */
-export type TaskState = 'waiting' | 'failed' | 'running' | 'queued' | 'todo' | 'idle' | 'done' | 'canceled' | 'duplicate'
-/** Why a task waits for the person, in its grey line. */
-export type TaskReason = 'needsReply' | 'confirm' | 'review' | 'blocked' | 'quota'
+export type TaskState = 'waiting' | 'blocked' | 'failed' | 'running' | 'queued' | 'todo' | 'idle' | 'done' | 'canceled' | 'duplicate'
+/** Why a task waits for the person, or what blocks it, in its grey line. */
+export type TaskReason = 'needsReply' | 'confirm' | 'review' | 'quota'
 
 type RunState = { status: string; outcome?: string | null }
 
@@ -36,10 +37,10 @@ export function localTaskState(issue: GroupIssue, run?: RunState | null): { stat
   if (!run) return { state: issue.status === 'backlog' ? 'idle' : 'todo', reason: null }
   if (threadIsActive(run)) return { state: run.status === 'queued' ? 'queued' : 'running', reason: null }
   if (run.status === 'waiting_input') return { state: 'waiting', reason: 'needsReply' }
-  if (run.status === 'paused') return { state: 'waiting', reason: 'quota' }
+  if (run.status === 'paused') return { state: 'blocked', reason: 'quota' }
   if (issue.metadata.pullRequests.some(pr => pr.state === 'merged')) return { state: 'done', reason: null }
   if (run.outcome === 'failed') return { state: 'failed', reason: null }
-  if (run.outcome === 'blocked') return { state: 'waiting', reason: 'blocked' }
+  if (run.outcome === 'blocked') return { state: 'blocked', reason: null }
   if (issue.status === 'review' || issue.metadata.pullRequests.some(pr => pr.state === 'open' || pr.state === 'draft')) return { state: 'waiting', reason: 'review' }
   if (run.outcome === 'done') return { state: 'done', reason: null }
   if (run.outcome === 'idle') return { state: 'idle', reason: null }
@@ -83,7 +84,7 @@ export function useTasksOf(threads: readonly Thread[], issues: readonly Issue[])
   return useMemo(() => tasksOf(threads, issues), [threads, issues])
 }
 
-/** How many tasks wait for the person (等你处理: the hand, not 失败), for 全部任务's count (decision 2026-11-07-2230). */
+/** How many tasks wait for the person (等你处理: the hand, not 受阻 or 失败), for 全部任务's count (decision 2026-11-07-2230). */
 export function pendingTaskCount(threads: readonly Thread[], issues: readonly Issue[]) {
   return tasksOf(threads, issues).pending.filter(row => row.state === 'waiting').length
 }
