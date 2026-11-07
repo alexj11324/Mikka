@@ -6,10 +6,7 @@ import { SubscriptionRepository } from '@/lib/subscription-repository'
 export async function nativeRunBinding(pool: Pick<Pool, 'query'>, userId: string, agentId: string, harness: string, workspaceId?: string, bindingId?: string) {
   if (harness !== 'codex' && harness !== 'claude_code') return null
   const repository = new SubscriptionRepository(pool)
-  const binding = await repository.nativeBinding(userId, agentId, harness, bindingId, workspaceId)
+  const binding = await repository.nativeBinding(userId, agentId, harness, bindingId, workspaceId, { currentConnection: true })
   if (!binding || binding.consumerId !== agentId || binding.route !== (harness === 'codex' ? 'codex_cli' : 'claude_code_cli') || (workspaceId && binding.workspaceId !== workspaceId)) return null
-  // The connection is the owner's from any workspace; the binding is the Bot's (decision 2026-10-31-2130).
-  const current = await pool.query(`SELECT 1 FROM byos_connections c WHERE c.id=$1 AND c."ownerId"=$2
-    AND c.state='connected' AND c.paused=false AND c.epoch=$3 AND c.provider=$4`, [binding.connectionId, binding.ownerId, binding.connectionRevision, harness === 'codex' ? 'codex' : 'claude'])
-  return current.rowCount ? binding : null
+  return binding
 }
