@@ -5259,6 +5259,9 @@
     "renderHint": "请重试打开页面。"
   },
   "HostedSettings": {
+    "general": {
+      "iconHint": "PNG、JPEG、WebP 或 GIF，最大 200 KB"
+    },
     "memory": {
       "title": "记忆",
       "count": "{count} 条记忆",

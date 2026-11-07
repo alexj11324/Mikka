@@ -5259,6 +5259,9 @@
     "renderHint": "Retry to reopen the view."
   },
   "HostedSettings": {
+    "general": {
+      "iconHint": "PNG, JPEG, WebP or GIF, up to 200 KB"
+    },
     "memory": {
       "title": "Memory",
       "count": "{count, plural, one {# memory} other {# memories}}",
