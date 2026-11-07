@@ -266,8 +266,11 @@ jobs:
           }
           const [main, runs] = await Promise.all([get('git/ref/heads/main'), get('actions/runs?head_sha=' + sha + '&per_page=100')])
           const compatible = process.env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION
-          if (compatible !== '9ea7b2cd61deb724f20330906f86df6df2cd9828' || ![sha, compatible].includes(main.object?.sha)) throw Error('COMMUNITY_MAIN_CHANGED')
-          if (main.object.sha === compatible) {
+          const live = await fetch('https://app.aspectlylabs.com/mikka/api/version', { redirect: 'error', headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(20000) })
+          if (!live.ok) throw Error('COMMUNITY_PUBLIC_BUILD_UNAVAILABLE')
+          const served = (await live.json()).build
+          if (compatible !== '9ea7b2cd61deb724f20330906f86df6df2cd9828' || ![sha, compatible].includes(served)) throw Error('COMMUNITY_PUBLIC_BUILD_CHANGED')
+          if (served === compatible) {
             const comparison = await get('compare/' + sha + '...' + compatible)
             const allowed = ['app/api/mobile/tasks/[id]/route.ts','app/api/mobile/tasks/route.ts','apps/api/generated/routes.json','apps/api/generated/routes.ts','lib/mobile-task-view.test.ts','lib/mobile-task-view.ts','lib/mobile-tasks.ts','lib/task-block-runs.ts','messages/en.json','messages/zh-CN.json','package.json','tests/mobile-tasks.db.test.ts']
             if (comparison.status !== 'ahead' || comparison.behind_by !== 0 || comparison.merge_base_commit?.sha !== sha
@@ -279,7 +282,7 @@ jobs:
             if (!run) throw Error('COMMUNITY_RELEASE_NOT_READY_' + name.replaceAll(' ', '_').toUpperCase())
             return { workflow: name, run: run.id }
           })
-          console.log(JSON.stringify({ kind: 'community-release-gate', revision: sha, sharedCompatibleMain: main.object.sha, compatibility: 'reviewed_mobile_task_read_api_only', status: 'passed', workflows: receipt, credentialsDelivered: false }))
+          console.log(JSON.stringify({ kind: 'community-release-gate', revision: sha, gitMain: main.object?.sha, sharedServedBuild: served, compatibility: 'reviewed_mobile_task_read_api_only', status: 'passed', workflows: receipt, credentialsDelivered: false }))
           JS
       - name: Prepare the exact released source and immutable public image before credentials
         env:

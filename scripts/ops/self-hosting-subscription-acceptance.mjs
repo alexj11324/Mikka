@@ -532,3 +532,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
 // Apple readback JWT scope includes the exact fixed build filters and sparse fields; no native redispatch.
 
 // Community release pin contains native-auth fix1668; production writers must complete before activation.
+
+// Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.

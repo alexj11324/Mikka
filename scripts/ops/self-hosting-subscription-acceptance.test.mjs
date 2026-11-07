@@ -141,3 +141,5 @@ test('failed thread receipts retain only registered codes and stages, excluding 
  assert.equal(out.code, 'run_failed'); assert.equal(out.detail, 'known'); assert.equal(out.causes[0].code, 'secret_not_found')
  assert.deepEqual(out.stages, [{ stage: 'repository', ok: false }]); assert.ok(!JSON.stringify(out).includes(secret))
 })
+
+// Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.

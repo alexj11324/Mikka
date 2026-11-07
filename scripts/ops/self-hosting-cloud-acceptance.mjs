@@ -236,3 +236,5 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
 // Secret environment values are read from their existing Infisical sync source, never Vercel write-only values.
 
 // Model list materializes virtual IDs before removal; failure receipts exclude provider text.
+
+// Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.
