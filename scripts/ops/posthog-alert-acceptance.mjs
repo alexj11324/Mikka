@@ -14,22 +14,29 @@ const rows = []
 
 function add(trace, { rootStatus = 1, rootHttp = 200, root = true, service = 'mikka-web',
   job = false, cron = false, sdk = 'world.events.create run_started', wrapper = 'workflow.replay.load',
-  http = 410, code = 'HTTP 410', route = '/.well-known/workflow/v1/flow' } = {}) {
+  http = 410, code = 'HTTP 410', method = http === 404 ? 'http GET' : 'http POST',
+  route = '/.well-known/workflow/v1/flow', rootRoute = route } = {}) {
   const row = (id, parent, name, status, error, httpCode = null, rootSpan = false, spanRoute = route) =>
     rows.push([service, trace, id, parent, Number(rootSpan), name, status, httpCode, spanRoute, error])
   if (root) row('root', '', job ? 'after:workflow-wake' : cron ? 'GET /api/cron/reconcile' : 'workflow.route.flow',
-    rootStatus, 'unknown_error', job ? null : rootHttp, true, cron ? '/api/cron/reconcile' : route)
+    rootStatus, 'unknown_error', job ? null : rootHttp, true, cron ? '/api/cron/reconcile' : rootRoute)
   if (wrapper) row('wrapper', 'root', wrapper, 2, 'unknown_error')
   row('sdk', 'wrapper', sdk, 2, 'unknown_error')
-  row('http', 'sdk', http === 404 ? 'http GET' : 'http POST', 2, code, http)
+  row('http', 'sdk', method, 2, code, http)
   row('transport', 'root', 'workflow.events.ws.connect', 2, 'TRANSPORT')
 }
 
 add('expired')
 add('duplicate-wait', { sdk: 'world.events.create wait_created', wrapper: 'workflow.run', http: 409, code: 'HTTP 409' })
+add('duplicate-completed', { sdk: 'world.events.create wait_completed', wrapper: 'workflow.run', http: 409, code: 'HTTP 409' })
 add('duplicate-step', { sdk: 'world.events.create step_started', wrapper: 'step.execute', http: 409, code: 'HTTP 409' })
 add('wake', { job: true, rootStatus: 0, sdk: 'world.hooks.getByToken', wrapper: 'hook.resume', http: 404, code: 'not-found', route: 'after:workflow-wake' })
 add('cron', { cron: true, sdk: 'world.hooks.getByToken', wrapper: 'cron:reconcile', http: 404, code: 'not-found', route: 'cron:reconcile' })
+add('deadline-get', { sdk: 'world.hooks.getByToken', wrapper: 'hook.resume', http: 404, code: 'not-found',
+  route: 'workflow:coordinatorWakeDeadline/nudgeWorkflow', rootRoute: '/.well-known/workflow/v1/flow' })
+add('deadline-received', { sdk: 'world.events.create hook_received', wrapper: 'hook.resume', http: 404, code: 'HTTP 404', method: 'http POST',
+  route: 'workflow:coordinatorWakeDeadline/nudgeWorkflow', rootRoute: '/.well-known/workflow/v1/flow' })
+add('hook-contention', { sdk: 'world.events.create hook_received', wrapper: 'hook.resume', http: 409, code: 'HTTP 409' })
 add('failed-entry', { rootStatus: 2, rootHttp: 500 })
 add('failed-http-entry', { rootHttp: 500 })
 add('missing-entry', { root: false })
@@ -40,6 +47,8 @@ add('other-error', { http: 500, code: 'not-found' })
 add('other-service', { service: 'mikka-daemon' })
 add('missing-grandparent', { wrapper: null })
 add('wrong-grandparent', { wrapper: 'workflow.run' })
+rows.push(['mikka-web', 'expired', 'run-failure', 'root', 0, 'workflow.run coordinatorTurn', 2, null, '/.well-known/workflow/v1/flow', 'unknown_error'])
+rows.push(['mikka-web', 'expired', 'db-failure', 'root', 0, 'pg.query:COMMIT', 2, null, 'after:live-notify', 'unknown_error'])
 
 const literal = value => value === null ? 'NULL' : typeof value === 'string' ? `'${value.replaceAll("'", "''")}'` : String(value)
 const fixtures = rows.map(row => `SELECT ${row.map((value, i) => `${literal(value)} AS ${columns[i]}`).join(', ')}`).join('\nUNION ALL\n')
@@ -54,8 +63,11 @@ assert.equal(header, 'service_name|trace_id|span_id')
 const excluded = data.map(line => line.split('|').join('/'))
 assert.deepEqual(excluded, [
   'cron/http', 'cron/sdk', 'duplicate-step/http', 'duplicate-step/sdk',
+  'duplicate-completed/http', 'duplicate-completed/sdk',
+  'deadline-get/http', 'deadline-get/sdk', 'deadline-get/wrapper',
+  'deadline-received/http', 'deadline-received/sdk', 'deadline-received/wrapper',
   'duplicate-wait/http', 'duplicate-wait/sdk', 'expired/http', 'expired/sdk', 'expired/wrapper',
   'missing-grandparent/http', 'missing-grandparent/sdk', 'wake/http', 'wake/sdk', 'wake/wrapper',
   'wrong-grandparent/http', 'wrong-grandparent/sdk',
-].map(span => `mikka-web/${span}`))
+].map(span => `mikka-web/${span}`).sort())
 console.log(`Native HogQL acceptance passed: ${excluded.length} handled spans excluded; genuine error fixtures retained.`)

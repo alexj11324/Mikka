@@ -22,7 +22,8 @@ WITH
           AND (resource_attributes['deployment.environment.name'] = 'production' OR resource_attributes['deployment.environment'] = 'production')
           AND (is_root_span OR status_code = 2 AND name IN (
               'http GET', 'http POST', 'world.hooks.getByToken', 'hook.resume', 'workflow.replay.load',
-              'world.events.create wait_created', 'world.events.create step_started', 'world.events.create run_started'))
+              'world.events.create wait_created', 'world.events.create wait_completed', 'world.events.create step_started',
+              'world.events.create run_started', 'world.events.create hook_received'))
     ),
     workflow_traces AS (
         -- Keep ancestry in each trace so matching does not rescan the historical window.
@@ -44,11 +45,15 @@ WITH
             arrayFilter(c ->
                 (c.3 = 'http POST' AND c.4 = '/.well-known/workflow/v1/flow'
                  AND (c.6 = 409 AND c.5 = 'HTTP 409' OR c.6 = 410 AND c.5 = 'HTTP 410')
-                 OR c.3 = 'http GET' AND c.6 = 404 AND c.5 = 'not-found' AND c.4 IN ('cron:reconcile', 'after:workflow-wake'))
+                 OR c.3 = 'http GET' AND c.6 = 404 AND c.5 = 'not-found'
+                    AND c.4 IN ('cron:reconcile', 'after:workflow-wake', 'workflow:coordinatorWakeDeadline/nudgeWorkflow')
+                 OR c.3 = 'http POST' AND c.6 = 404 AND c.5 = 'HTTP 404'
+                    AND c.4 = 'workflow:coordinatorWakeDeadline/nudgeWorkflow')
                 AND arrayExists(p -> p.1 = c.2 AND p.5 = 'unknown_error' AND p.4 = c.4 AND (
-                    c.6 = 409 AND p.3 IN ('world.events.create wait_created', 'world.events.create step_started', 'world.events.create run_started')
+                    c.6 = 409 AND p.3 IN ('world.events.create wait_created', 'world.events.create wait_completed', 'world.events.create step_started', 'world.events.create run_started')
                     OR c.6 = 410 AND p.3 = 'world.events.create run_started'
-                    OR c.6 = 404 AND p.3 = 'world.hooks.getByToken'), errors), errors) AS clients
+                    OR c.6 = 404 AND (c.3 = 'http GET' AND p.3 = 'world.hooks.getByToken'
+                        OR c.3 = 'http POST' AND p.3 = 'world.events.create hook_received')), errors), errors) AS clients
         FROM workflow_traces
     ),
     handled_parents AS (
@@ -62,7 +67,7 @@ WITH
                 arrayMap(c -> c.1, clients),
                 arrayMap(p -> p.1, parents),
                 arrayMap(g -> g.1, arrayFilter(g -> g.5 = 'unknown_error' AND (
-                    g.3 = 'hook.resume' AND arrayExists(p -> p.2 = g.1 AND p.3 = 'world.hooks.getByToken', parents)
+                    g.3 = 'hook.resume' AND arrayExists(p -> p.2 = g.1 AND p.3 IN ('world.hooks.getByToken', 'world.events.create hook_received'), parents)
                     OR g.3 = 'workflow.replay.load' AND arrayExists(p -> p.2 = g.1 AND p.3 = 'world.events.create run_started', parents)), errors))
             )) AS span_id
         FROM handled_parents
