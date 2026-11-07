@@ -1,0 +1,57 @@
+name: Issue 1503 read-only runtime snapshot
+on:
+  push:
+    branches: [ops/issue-1503-runtime-snapshot]
+    paths:
+      - .github/workflows/issue1503-runtime-snapshot.yml
+      - scripts/ops/issue1503/runtime-snapshot*
+  workflow_dispatch:
+    inputs:
+      expected_runtime_source:
+        description: Optional exact current runtime source commit
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: issue1503-runtime-snapshot
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/issue-1503-runtime-snapshot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Read only the existing Vercel inspection credential
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Snapshot the exact production runtime pair using GET only
+        run: node scripts/ops/issue1503/runtime-snapshot.mjs
+        env:
+          MIKKA_EXPECTED_RUNTIME_SOURCE: ${{ inputs.expected_runtime_source || '' }}
+      - name: Preserve the closed runtime metadata receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1503-runtime-snapshot
+          path: issue1503-report/runtime-snapshot.json
+          if-no-files-found: warn
+          retention-days: 7
