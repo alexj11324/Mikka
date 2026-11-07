@@ -5272,6 +5272,7 @@
       "noneHere": "这一类没有记忆",
       "editing": "Enter 保存 · Esc 取消",
       "deleted": "已删除「{text}」",
+      "learned": "从已连接的 App 学到",
       "edited": "你更正过"
     },
     "security": {

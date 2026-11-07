@@ -5272,6 +5272,7 @@
       "noneHere": "No memories here",
       "editing": "Enter to save · Esc to cancel",
       "deleted": "Deleted “{text}”",
+      "learned": "Learnt from your connected apps",
       "edited": "You corrected it"
     },
     "security": {
