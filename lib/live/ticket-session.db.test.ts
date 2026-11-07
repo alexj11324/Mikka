@@ -35,7 +35,9 @@ test('real tickets project only the active owned personal home and recheck a rev
   try {
     const [{ betterAuth }, fresh] = await Promise.all([import('better-auth'), import('../fresh-session')])
     const auth = betterAuth({ baseURL: origin, basePath: '/mikka/api/auth', database, secret: randomBytes(32).toString('hex'),
+      advanced: { database: { validateSchema: false } },
       emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, session: fresh.SESSION_OPTIONS })
+    assert.equal((await auth.$context).checkSchema, undefined, 'the auth fixture uses the production schema validation policy')
     fresh.readFreshSessionsInScope(auth.api)
     mocks.push(mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { auth } }))
     mocks.push(mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: database } }))

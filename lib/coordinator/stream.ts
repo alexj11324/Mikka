@@ -1,10 +1,23 @@
 import type { ModelCallStreamPart } from '@ai-sdk/workflow'
 
 export type CoordinatorWorkflowStreamPart = ModelCallStreamPart
-  | { type: 'coordinator-turn-start'; id: string; quietEligible: boolean }
+  | { type: 'coordinator-turn-start'; id: string; quietEligible: boolean; modelStream?: 'scoped-v1' }
+  /** All SDK parts, including resets and finish, keep their producer's turn. */
+  | { type: 'coordinator-model-part'; id: string; part: ModelCallStreamPart }
   /** 停止 cut turn `id` short: what streamed before it is the reply's last words (lib/coordinator/stop.ts). */
   | { type: 'coordinator-turn-stopped'; id: string }
   | { type: 'coordinator-turn-committed'; id: string; through: number; quiet: boolean }
+
+/** Old recorded runs keep their raw format; a scoped turn accepts only its own envelope. */
+export function coordinatorModelPart(part: CoordinatorWorkflowStreamPart, id: string, scoped: boolean): ModelCallStreamPart | null {
+  switch (part.type) {
+    case 'coordinator-model-part': return part.id === id ? part.part : null
+    case 'coordinator-turn-start':
+    case 'coordinator-turn-stopped':
+    case 'coordinator-turn-committed': return null
+    default: return scoped ? null : part
+  }
+}
 
 export type CoordinatorStreamEvent =
   | { type: 'start'; id: string }

@@ -43,7 +43,9 @@ func NewAccessSnapshot(snapshot AccessSnapshot) (SecretStore, error) {
 	}
 	return snapshot, nil
 }
-func (s AccessSnapshot) Read(_ context.Context, name string) ([]byte, error) {
+func (s AccessSnapshot) Read(ctx context.Context, name string) ([]byte, error) {
+	defer timingSpan(ctx, timingRead)()
+	timingBackend(ctx, "snapshot")
 	if name != s.Name {
 		return nil, ErrMissing
 	}
@@ -151,6 +153,7 @@ func (i *Infisical) request(ctx context.Context, method, name string, raw []byte
 	return []byte(result.Secret.Value), nil
 }
 func (i *Infisical) Create(ctx context.Context, name string, raw []byte) error {
+	defer timingSpan(ctx, timingCreate)()
 	// Never PATCH a shared secret. A unique operation name + pinned v1 read
 	// removes any need to invent compare-and-swap semantics for Infisical.
 	stored, err := i.request(ctx, http.MethodPost, name, raw)
@@ -160,9 +163,12 @@ func (i *Infisical) Create(ctx context.Context, name string, raw []byte) error {
 	return err
 }
 func (i *Infisical) Read(ctx context.Context, name string) ([]byte, error) {
+	defer timingSpan(ctx, timingRead)()
+	timingBackend(ctx, "vault")
 	return i.request(ctx, http.MethodGet, name, nil)
 }
 func (i *Infisical) Delete(ctx context.Context, name string) error {
+	defer timingSpan(ctx, timingDelete)()
 	_, err := i.request(ctx, http.MethodDelete, name, nil)
 	return err
 }

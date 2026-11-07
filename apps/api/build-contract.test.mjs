@@ -78,6 +78,41 @@ test('actual Nitro router accepts multiple named parameters and preserves route 
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test('actual Nitro Vercel output opts MCP into cancellation without changing other functions', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mikka-mcp-cancellation-'))
+  let nitro
+  try {
+    const declarations = [['/api/mcp', 120], ['/api/coordinator/stream', 300], ['/api/other', 60]]
+    const routes = []
+    for (const [template, maxDuration] of declarations) {
+      const source = `app${template}/route.ts`, text = `export const maxDuration=${maxDuration}; export const POST=handler`
+      await mkdir(join(root, `app${template}`), { recursive: true })
+      await writeFile(join(root, source), text)
+      routes.push({ template, path: `/mikka${template}`, source, methods: ['POST'], maxDuration,
+        sourceHash: createHash('sha256').update(text).digest('hex') })
+    }
+    await mkdir(join(root, 'apps/api/generated'), { recursive: true })
+    await writeFile(join(root, 'apps/api/generated/routes.json'), JSON.stringify({ version: 1, basePath: '/mikka', routes }))
+    nitro = await createNitro({ rootDir: root, workspaceDir: root, serverDir: false, preset: 'vercel',
+      vercel: { functions: { runtime: 'nodejs24.x' }, functionRules: await routeFunctionRules(root) },
+    }, { dotenv: false })
+    await prepare(nitro)
+    await writeFile(join(nitro.options.output.serverDir, 'index.mjs'), 'export default () => new Response("fixture")')
+    // Exercise the installed preset's real config emitter, without compiling
+    // or invoking an application, fetching credentials, or deploying anything.
+    await nitro.hooks.callHook('compiled', nitro)
+    const readConfig = async path => JSON.parse(await readFile(join(nitro.options.output.dir, `functions/${path}.func/.vc-config.json`), 'utf8'))
+    const mcp = await readConfig('mikka/api/mcp')
+    assert.equal(mcp.supportsCancellation, true, 'MCP_HTTP_CANCELLATION_NOT_ENABLED')
+    assert.equal(mcp.maxDuration, 120)
+    assert.equal(mcp.supportsResponseStreaming, true)
+    assert.equal(mcp.runtime, 'nodejs24.x')
+    assert.equal((await readConfig('mikka/api/coordinator/stream')).supportsCancellation, true)
+    assert.equal((await readConfig('mikka/api/other')).supportsCancellation, undefined)
+    assert.equal((await readConfig('__server')).supportsCancellation, undefined)
+  } finally { await nitro?.close(); await rm(root, { recursive: true, force: true }) }
+})
+
 test('actual Nitro copy excludes SPA index and internal metadata without exposing root/public', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mikka-public-assets-'))
   let nitro
