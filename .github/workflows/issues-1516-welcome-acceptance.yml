@@ -6,6 +6,12 @@ on:
         description: Exact deployed application SHA
         required: true
         type: string
+      acceptance_cases:
+        description: Real welcome cases or read-only structure diagnosis of the retained failed B fixture
+        required: true
+        default: all
+        type: choice
+        options: [all, claude-b, diagnose-b]
 permissions:
   contents: read
 jobs:
@@ -93,7 +99,7 @@ jobs:
       - name: Exercise the real fresh Coordinator welcome through the normal account
         env:
           APPLICATION_SHA: ${{ inputs.application_sha || 'f7225f3eb1e38762dfdecde0395792c85b81ec22' }}
-          ACCEPTANCE_CASES: all
+          ACCEPTANCE_CASES: ${{ inputs.acceptance_cases }}
         run: MIKKA_OPS_DEPENDENCIES="$RUNNER_TEMP/issue1515-diagnostic" node --experimental-transform-types scripts/ops/issues-1516-welcome-acceptance.mjs
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

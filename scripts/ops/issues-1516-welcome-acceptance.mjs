@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { decode, encode } from '../../lib/desktop-rpc/wire.ts'
 import { parseOpenUI, isComponent } from '../../lib/openui-lang.ts'
+import { detectAgentUISource } from '../../lib/agent-ui-source.ts'
 import { invalidToolParts } from '../../lib/coordinator/invalid-tool-call.ts'
 import { selectTeamWorkspace, isTeamWorkspaceReadPath, publicTeamWorkspaceFailure } from '../acceptance/team-workspace.mjs'
 
@@ -72,15 +73,16 @@ export async function runAcceptance() {
   check(process.env.GITHUB_REPOSITORY === 'alexj11324/Mikka' && process.env.GITHUB_REF === BRANCH, 'acceptance_scope_mismatch')
   const applicationSha = process.env.APPLICATION_SHA
   check(/^[a-f0-9]{40}$/.test(applicationSha ?? ''), 'application_sha_required')
-  const selectedCases = process.env.ACCEPTANCE_CASES === 'claude-d' ? cases.filter(item => item.id === 'claude-d') : cases
-  check(['claude-d', 'all'].includes(process.env.ACCEPTANCE_CASES), 'acceptance_cases_invalid')
+  const selection = process.env.ACCEPTANCE_CASES
+  check(['claude-d','claude-b','diagnose-b','all'].includes(selection), 'acceptance_cases_invalid')
+  const selectedCases = cases.filter(item => selection === 'all' || item.id === selection)
   const email = process.env.SMOKE_OWNER_EMAIL, password = process.env.SMOKE_OWNER_PASSWORD
   check(email && password && process.env.MIKKA_DATABASE_URL, 'acceptance_credentials_required')
   const require = createRequire(resolve(process.env.MIKKA_OPS_DEPENDENCIES, 'package.json'))
   const { Pool } = require('pg')
   const pool = new Pool({ connectionString: process.env.MIKKA_DATABASE_URL, max: 1, connectionTimeoutMillis: 15000, application_name: 'mikka-1516-acceptance-readonly' })
   const report = { issue: 1516, applicationSha, driverRevision: process.env.GITHUB_SHA, startedAt: new Date().toISOString(), cases: [],
-    transport: 'published_web_rpc_and_real_ndjson_stream', status: 'running', ordinaryAccountSession: false }
+    mode: selection === 'diagnose-b' ? 'readonly_original_welcome_shape' : 'welcome_acceptance', transport: 'published_web_rpc_and_real_ndjson_stream', status: 'running', ordinaryAccountSession: false }
   const jar = new Map()
   let published, ownerId, originalWorkspace, teamScope, baseline, baselineAt, baselineBotIds = []
   const fixtures = new Map(), baselineIssueIds = new Set()
@@ -333,6 +335,32 @@ export async function runAcceptance() {
       UNION ALL SELECT 'inbox',kind,count(*)::int FROM coordinator_events WHERE "userId"=$1 AND "botId"::text=ANY($2::text[]) AND "deliveredAt" IS NULL AND kind='user_message' GROUP BY kind
       UNION ALL SELECT 'run',status,count(*)::int FROM agent_runs WHERE "userId"=$1 AND "botId"::text=ANY($2::text[]) AND status IN ('queued','preparing','running','paused','waiting_input','finishing') GROUP BY status`,[ownerId,baselineBotIds])
     check(active.n===0,'shared_account_busy')
+    if(selection === 'diagnose-b'){
+      const prior=existing.filter(bot=>bot.name==='Issue 1516 acceptance 42371117713-1 claude-b')
+      check(prior.length===1 && hash(prior[0].id)==='4a9f4e5aae4a8adee6cbf3a07d6dac69480c3d438093f0b803775a590659d49d','diagnostic_fixture_mismatch')
+      const rows=await readSql(`SELECT m.message FROM coordinator_messages m JOIN bots b ON b.id=m."botId"
+        WHERE m."userId"=$1 AND m."botId"=$2 AND b."ownerId"=$1 AND b."workspaceId"=$3 AND m.message->>'role'='assistant' ORDER BY m.position`,[ownerId,prior[0].id,teamScope.workspaceId])
+      report.originalWelcomeShape=rows.map(row=>{
+        const content=row.message?.content
+        const text=typeof content==='string'?content:Array.isArray(content)?content.filter(part=>part?.type==='text').map(part=>part.text??'').join(''):''
+        const detected=detectAgentUISource(text)
+        const shape=value=>{
+          const components=[],questions=[]
+          const walk=(node,depth=0)=>{
+            if(depth>25 || !node || typeof node!=='object')return
+            if(Array.isArray(node)){for(const child of node)walk(child,depth+1);return}
+            if(isComponent(node)){
+              components.push(['Stack','TextContent','BeQuestions'].includes(node.name)?node.name:'other')
+              if(node.name==='BeQuestions')for(const q of Array.isArray(node.props.questions)?node.props.questions:[])questions.push({id:q?.id==='start'?'start':'other',options:Array.isArray(q?.options)?q.options.length:0,validValues:Array.isArray(q?.options)?q.options.filter(o=>['a','b','c','d'].includes(o?.value)).length:0})
+              for(const child of Object.values(node.props))walk(child,depth+1)
+            }
+          }
+          walk(value);return{parsed:value!==null,components,questions}
+        }
+        return{chars:text.length,sha256:hash(text),matchesFailedStream:hash(text)==='7fa055e80740129680755d4a1c0c88e1928f72e9d5032d3fa827c879e85499e7',detectedAsUI:detected.isOpenUI,raw:shape(parseOpenUI(text)),rendered:shape(parseOpenUI(detected.source))}
+      })
+      check(report.originalWelcomeShape.length>0,'diagnostic_welcome_missing')
+    }
     for (const item of selectedCases) {
       const result = { case: item.id, model: item.model, status: 'running' }
       let botId, selection
