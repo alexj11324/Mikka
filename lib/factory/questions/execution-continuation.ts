@@ -3,6 +3,7 @@ import type { FactoryTask } from '../store'
 import { FactoryError } from '../contract'
 import { factoryRunBotMatches } from '../run-scope'
 import { factoryEventId } from '../event-id'
+import { runMayUseCredentialSql } from '../../personal-policy'
 import { contextQuestionAnswerSchema, humanQuestionAnswerSchema, orchestratorMayAnswer, questionFingerprint, questionRecoverySchema } from './contract'
 
 type Query = Pick<PoolClient, 'query'>
@@ -160,7 +161,7 @@ async function readQuestionContinuation(tx: Query, scope: Scope, continuationAtt
       AND o."agentDefinition"->'subscription' IS NOT DISTINCT FROM p."agentDefinition"->'subscription'
       AND o."agentDefinition"->'apiKey' IS NOT DISTINCT FROM p."agentDefinition"->'apiKey'
       AND ((COALESCE(p."agentDefinition"->'subscription','null'::jsonb)='null'::jsonb AND e.request->>'kind'='question_resume') OR
-        (b."ownerId"=t."userId" AND b."consumerId"=p."agentId"::text
+        (${runMayUseCredentialSql('b."ownerId"', 't."userId"', 'b."workspaceId"')} AND b."consumerId"=p."agentId"::text
           AND (pc."runId" IS NULL OR b."workspaceId"=pc."workspaceId"::text)
           AND b."modelId"=p."agentDefinition"->>'model' AND b."modelId"=p."agentDefinition"->'subscription'->>'modelId'
           AND b.route=p."agentDefinition"->'subscription'->>'route'
