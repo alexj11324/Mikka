@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomUUID } from 'node:crypto'
+import { isAPIError } from '@better-auth/core/utils/is-api-error'
 import { sso, type SSOOptions, type SSOUserResolutionInput, type SSOUserResolutionContext } from '@better-auth/sso'
 import { APIError, type BetterAuthPlugin, type DBTransactionAdapter } from 'better-auth'
 import { createAuthMiddleware, getSessionFromCtx } from 'better-auth/api'
@@ -172,10 +173,10 @@ async function finishEnterpriseAuthentication(ctx: EnterpriseAuthenticationConte
   if (previous) {
     // Only a completed native SP redirect may revoke the initiating child's root.
     if (previous.samlRoot && ctx.path === '/sso/saml2/logout/:providerId'
-      && ctx.context.returned instanceof APIError && ctx.context.returned.statusCode === 302)
+      && isAPIError(ctx.context.returned) && ctx.context.returned.statusCode === 302)
       await (await import('./saml-session-lineage')).finishDerivedSamlLogout({ ...previous, ...previous.samlRoot })
     const [{ workspaceDb }, { enqueueOrganizationAudit }] = await Promise.all([import('../workspace-db'), import('../governance/audit')])
-    const denied = previous.failed || (ctx.context.returned instanceof APIError && ctx.context.returned.statusCode >= 400)
+    const denied = previous.failed || (isAPIError(ctx.context.returned) && ctx.context.returned.statusCode >= 400)
     await workspaceDb.transaction(tx => enqueueOrganizationAudit(tx, { organizationId: previous.organizationId, actorId: previous.userId,
       action: denied ? 'sso.logout_failed' : 'sso.signed_out', targetId: previous.sessionId, result: previous.failed ? 'failure' : denied ? 'denied' : 'success', correlationId: request.correlationId,
       metadata: { providerId: previous.providerId, ...(previous.reason ? { reason: previous.reason } : {}) } }))
@@ -184,7 +185,7 @@ async function finishEnterpriseAuthentication(ctx: EnterpriseAuthenticationConte
   if (logoutProvider) {
     const [{ pool }, { workspaceDb }, { enqueueOrganizationAudit }] = await Promise.all([import('../db'), import('../workspace-db'), import('../governance/audit')])
     const { rows: [provider] } = await pool.query<{ organizationId: string }>('select "organizationScopeId" as "organizationId" from enterprise_sso_provider where "providerId"=$1', [logoutProvider])
-    const denied = ctx.context.returned instanceof APIError && ctx.context.returned.statusCode >= 400
+    const denied = isAPIError(ctx.context.returned) && ctx.context.returned.statusCode >= 400
     if (provider) await workspaceDb.transaction(tx => enqueueOrganizationAudit(tx, { organizationId: provider.organizationId, actorId: `saml:${logoutProvider}`,
       action: denied ? 'sso.logout_failed' : 'sso.signed_out', targetId: logoutProvider, result: denied ? 'denied' : 'success',
       correlationId: request.correlationId, metadata: { providerId: logoutProvider, reason: denied ? 'invalid' : 'single_logout' } }))
