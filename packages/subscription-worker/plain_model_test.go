@@ -276,6 +276,119 @@ func TestClaudeSubscriptionRequestPreservesInstructionsAndToolHistory(t *testing
 	}
 }
 
+func TestClaudeSubscriptionLayeredCacheBreakpoints(t *testing.T) {
+	cc := map[string]any{"type": "ephemeral"}
+	wantSystem, err := json.Marshal([]any{
+		map[string]any{"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."},
+		map[string]any{"type": "text", "text": "fixture-rules", "cache_control": cc},
+		map[string]any{"type": "text", "text": "fixture-repositories-and-models", "cache_control": cc},
+		map[string]any{"type": "text", "text": "fixture-live-tail"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var countMarkers func(any) int
+	countMarkers = func(value any) int {
+		count := 0
+		switch node := value.(type) {
+		case map[string]any:
+			if _, exists := node["cache_control"]; exists {
+				count++
+			}
+			for _, child := range node {
+				count += countMarkers(child)
+			}
+		case []any:
+			for _, child := range node {
+				count += countMarkers(child)
+			}
+		}
+		return count
+	}
+	const systems = `{"role":"system","content":"fixture-rules","cache_control":{"type":"ephemeral"}},{"role":"system","content":"fixture-repositories-and-models","cache_control":{"type":"ephemeral"}},{"role":"system","content":"fixture-live-tail"}`
+	for _, test := range []struct {
+		name        string
+		history     string
+		role        string
+		wantContent []any
+	}{
+		{
+			name:    "user text",
+			history: `{"role":"user","content":"fixture-request","cache_control":{"type":"ephemeral"}}`,
+			role:    "user",
+			wantContent: []any{
+				map[string]any{"type": "text", "text": "fixture-request", "cache_control": cc},
+			},
+		},
+		{
+			name: "assistant tool call with duplicated SDK metadata",
+			// The compatible SDK retains metadata on both the assistant message
+			// and its last tool call. CPA must emit just one final tool_use marker.
+			history: `{"role":"user","content":"fixture-request"},{"role":"assistant","content":"fixture-text","cache_control":{"type":"ephemeral"},"tool_calls":[{"id":"fixture-call","type":"function","function":{"name":"lookup","arguments":"{}"},"cache_control":{"type":"ephemeral"}}]}`,
+			role:    "assistant",
+			wantContent: []any{
+				map[string]any{"type": "text", "text": "fixture-text"},
+				map[string]any{"type": "tool_use", "id": "fixture-call", "name": "lookup", "input": map[string]any{}, "cache_control": cc},
+			},
+		},
+		{
+			name:    "tool result",
+			history: `{"role":"user","content":"fixture-request"},{"role":"assistant","content":null,"tool_calls":[{"id":"fixture-call","type":"function","function":{"name":"lookup","arguments":"{}"}}]},{"role":"tool","tool_call_id":"fixture-call","content":"fixture-result","cache_control":{"type":"ephemeral"}}`,
+			role:    "user",
+			wantContent: []any{
+				map[string]any{"type": "tool_result", "tool_use_id": "fixture-call", "content": "fixture-result", "cache_control": cc},
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			called := false
+			model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				called = true
+				raw, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var body map[string]any
+				if err := json.Unmarshal(raw, &body); err != nil {
+					t.Fatal(err)
+				}
+				var wire struct{ System json.RawMessage }
+				if err := json.Unmarshal(raw, &wire); err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(wire.System, wantSystem) {
+					t.Fatal("the four outgoing system blocks changed bytes or marker placement")
+				}
+				messages, _ := body["messages"].([]any)
+				if len(messages) == 0 {
+					t.Fatal("conversation lost")
+				}
+				last := objectMap(messages[len(messages)-1])
+				if last["role"] != test.role || !reflect.DeepEqual(last["content"], test.wantContent) {
+					t.Fatal("the final content or its single cache breakpoint changed")
+				}
+				if countMarkers(body) != 3 {
+					t.Fatal("expected exactly three breakpoints in the actual Anthropic request")
+				}
+				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader("data: {\"type\":\"message_stop\"}\n\n"))}, nil
+			})}}
+			payload := []byte(fmt.Sprintf(`{"model":"fixture-model","messages":[%s,%s],"tools":[{"type":"function","function":{"name":"lookup","description":"Read one value","parameters":{"type":"object","properties":{}}}}]}`, systems, test.history))
+			result, err := model.ExecuteStream(context.Background(), &core.Auth{Metadata: map[string]any{"access_token": "fixture-access"}}, ex.Request{Model: "fixture-model", Payload: payload}, ex.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for chunk := range result.Chunks {
+				if chunk.Err != nil {
+					t.Fatal(chunk.Err)
+				}
+			}
+			if !called {
+				t.Fatal("the actual CPA translator did not reach the test HTTP transport")
+			}
+		})
+	}
+}
+
 func TestCodexSubscriptionStreamWithoutContentType(t *testing.T) {
 	for _, test := range []struct {
 		name        string

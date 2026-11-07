@@ -6,6 +6,7 @@ import { endLostSession } from '@/lib/session'
 import { apiCache } from './api-cache'
 import { mobileTraceHeaders } from './tracing'
 import { accountStorageKey } from './server-store'
+import { presenceScope } from './presence-scope'
 
 export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string) {
@@ -56,6 +57,10 @@ export const REQUEST_TIMEOUT_MS = 30_000
 export async function api<T>(path: string, init: { method?: string; body?: unknown; timeoutMs?: number } = {}, connection: ApiConnection = apiConnection()): Promise<T> {
   const context = apiCache.context()
   const headers: Record<string, string> = { accept: 'application/json', ...await authHeaders(connection) }
+  if (path === '/api/mobile/threads' && (init.method ?? 'GET').toUpperCase() === 'GET') {
+    const proof = presenceScope.token(context)
+    if (proof) headers['x-mikka-presence-scope'] = proof
+  }
   if (init.body !== undefined) headers['content-type'] = 'application/json'
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? REQUEST_TIMEOUT_MS)

@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg'
-import { isLiveRevisionKind, LIVE_ID, type LiveInvalidation, type LiveKind } from './events'
+import { isLiveRevisionKind, liveRevision, LIVE_ID, type LiveInvalidation, type LiveKind } from './events'
 
 type Database = Pick<PoolClient, 'query'>
 export type LiveRef = { kind: LiveKind; id: string }
@@ -57,4 +57,13 @@ export function heldRevision(read: { live?: { revisions?: LiveRevisions } } | un
   if (!id) return undefined
   const value = read?.live?.revisions?.[liveRevisionKey(kind, id.toLowerCase())]
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined
+}
+
+/** A shared snapshot may satisfy a push only when it proves every required revision. */
+export function coversLiveRevisions(read: unknown, required?: Readonly<LiveRevisions>): boolean {
+  const revisions = (read as { live?: { revisions?: Readonly<Record<string, unknown>> } } | null)?.live?.revisions
+  return Object.entries(required ?? {}).every(([key, revision]) => {
+    const held = revisions?.[key]
+    return liveRevision(held) && held >= revision
+  })
 }
