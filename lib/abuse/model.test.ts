@@ -66,7 +66,11 @@ const gateway = Object.assign(() => { gatewayCalls++; return model }, {
   }),
 })
 mock.module(new URL('../default-model-config.ts', import.meta.url).href, {
-  namedExports: { selfHostedDefaultModelConfig: () => selfHostedConfig },
+  namedExports: { selfHostedDefaultModelConfig: () => selfHostedConfig, defaultModelConfigured: () => Boolean(selfHostedConfig) },
+})
+// This unit fixture has no cloud binding; cloud-backed admission has its own tests.
+mock.module(new URL('../cloud-services/runtime.ts', import.meta.url).href, {
+  namedExports: { cloudClient: { capability: async () => null } },
 })
 mock.module(new URL('../posthog-server.ts', import.meta.url).href, {
   namedExports: { serverPostHog: () => ({ capture: (event: Generation) => captured.push(event) }) },
