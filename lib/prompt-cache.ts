@@ -6,14 +6,11 @@ import type { LanguageModel, SystemModelMessage } from 'ai'
  * A provider caches a request's prefix: tools, then system, then messages. The
  * system prompt separates rules (including the card catalog and personal
  * instructions), repository/model context, and the changing memory/live tail.
- * The first two have their own breakpoints, so changes to the repository list
- * do not invalidate the earlier tools and rules. The last conversation message
- * also has a breakpoint for calls that share the same history.
- *
- * Claude's layered prompt uses three `ephemeral` cache_control breakpoints.
- * Supported Codex models retain implicit history caching and also mark the two
- * stable system layers explicitly: the implicit initial developer boundary is
- * after the changing tail. Old persisted prompts keep their existing layout.
+ * Claude's stable layers and last conversation message have their own
+ * `ephemeral` cache_control breakpoints. Supported Codex subscription models
+ * use the provider's implicit caching: the stable system layers stay first and
+ * the changing system tail follows all history, retaining its instruction role.
+ * Unknown prompt layouts keep their existing order.
  */
 
 type V4Model = Extract<LanguageModel, { specificationVersion: 'v4' }>
@@ -72,23 +69,25 @@ export function withCacheBreakpoints(prompt: Prompt, key: 'openaiCompatible' | '
 }
 
 /**
- * Carry only preparation's stable-system hints through the compatible SDK.
- * The worker verifies CPA's developer text/order before converting this private
- * marker to Responses content-block breakpoints. Implicit caching stays on.
+ * Recognize only preparation's layered prompt. Move its dynamic tail after
+ * history without changing any message, role or option. CPA maps each system
+ * message to developer; the tail must follow all tool results, not split a
+ * call/result pair. No subscription-specific cache fields are sent.
  */
-export function withCodexSystemCacheBreakpoints(prompt: Prompt, modelId: string): Prompt {
-  // A capability gate, not a model selection catalogue. Keep the worker's gate
-  // in sync; unknown aliases and older generations retain their wire format.
+export function withCodexStablePrefix(prompt: Prompt, modelId: string): Prompt {
+  // A layout gate, not a model selection catalogue. Unknown aliases and older
+  // generations retain their existing wire format.
   if (!/^gpt-(?:5\.6(?:-(?:luna|sol|terra))?|6-(?:luna|sol|astra)|6\.1-(?:sol|terra))$/.test(modelId)) return prompt
-  let marked: Prompt | undefined
-  let count = 0
-  for (let index = 0; index < prompt.length && prompt[index].role === 'system'; index++) {
-    const message = prompt[index]
+  let stable = 0
+  for (const message of prompt) {
+    if (message.role !== 'system') break
     const hint = message.providerOptions?.anthropic?.cacheControl
-    if (count === 2 || !hint || typeof hint !== 'object' || Array.isArray(hint) || !('type' in hint) || hint.type !== 'ephemeral') continue
-    marked ??= [...prompt]
-    marked[index] = { ...message, providerOptions: { ...message.providerOptions, openaiCompatible: { ...message.providerOptions?.openaiCompatible, mikka_cache_breakpoint: 'stable_system_v1' } } }
-    count++
+    if (!hint || typeof hint !== 'object' || Array.isArray(hint) || !('type' in hint) || hint.type !== 'ephemeral') break
+    if (typeof message.content !== 'string' || message.content.length === 0 || ++stable > 2) return prompt
   }
-  return marked ?? prompt
+  const tail = prompt[stable]
+  if (stable === 0 || tail?.role !== 'system' || typeof tail.content !== 'string' || tail.content.length === 0 || tail.providerOptions?.anthropic?.cacheControl !== undefined) return prompt
+  const history = prompt.slice(stable + 1)
+  if (history.length === 0 || history.some(message => message.role !== 'user' && message.role !== 'assistant' && message.role !== 'tool')) return prompt
+  return [...prompt.slice(0, stable), ...history, tail]
 }
