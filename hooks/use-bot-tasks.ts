@@ -3,7 +3,9 @@
 import { useMemo } from 'react'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
-import { taskGroup, type TaskGroup } from '@/lib/mobile-task-group'
+import { mobileTaskGroup, type MobileTaskGroup as TaskGroup } from '@/lib/mobile-task-view'
+
+export type { TaskGroup }
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
@@ -16,8 +18,8 @@ export type TaskRow = { issue: Issue; current: Thread; attempts: number; group: 
 /**
  * Lists show tasks; a thread is reached from inside its task (decision
  * 2026-11-07-2045). The tasks behind `threads`, each in its group by its
- * current thread's state (R-52, through the same `taskGroup` the phone's list
- * uses). It reads the thread and task lists the workspace already keeps live:
+ * current thread's state (R-52, through `mobileTaskGroup`, the mapping the
+ * phone's task API uses). It reads the thread and task lists the workspace already keeps live:
  * no read per task. A thread with no task, or whose task is not in the list
  * (older than the list reads), has no row.
  */
@@ -36,8 +38,8 @@ export function tasksOf(threads: readonly Thread[], issues: readonly Issue[]): R
   for (const thread of threads) {
     if (!thread.issueId || newest.get(thread.issueId) !== thread) continue
     const issue = byId.get(thread.issueId)!
-    // 受阻 on the board (a task block) is not in the list the web keeps; the thread's own state covers a blocked run.
-    const group = taskGroup(issue, thread, false)
+    // The one task mapping (#1673): threadGroup() collapsed to four groups, a closed task always 已完成.
+    const group = mobileTaskGroup(issue, { runId: thread.id, status: thread.status, outcome: thread.outcome ?? null })
     groups[group].push({ issue, current: thread, attempts: attempts.get(thread.issueId)!, group })
   }
   return groups
