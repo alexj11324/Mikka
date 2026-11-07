@@ -5260,6 +5260,7 @@
   },
   "HostedSettings": {
     "models": {
+      "defaults": "默认",
       "filterLabel": "筛选模型",
       "filterAll": "全部",
       "filterSubscription": "订阅",

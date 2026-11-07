@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import useSWR, { unstable_serialize } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
+import { harnessName } from '@/components/labels/entity-labels'
 import { arrayMove } from '@dnd-kit/sortable'
 import { changeModelOrder, checkModelOrderQuota, type getModelOrder } from '@/app/actions/model-order'
 import { useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
@@ -106,4 +107,42 @@ export function useModelOrder(workspaceId: string) {
 
   const loadError = order.data?.error || order.error ? actionError(order.data?.error) : null
   return { data, loadError, e2b, pending, failed, unsaved, shown, offered, other, backup, offeredOther, checkQuota, save, move, remove, reload: order.mutate }
+}
+
+/**
+ * What a row of 优先使用的模型 says about itself: 顺序未保存 (it wins until 重试
+ * or the next change, R3), 待检查, 可用, or why it cannot run now.
+ */
+export function useOrderRowStatus() {
+  const t = useTranslations('Settings.modelOrder')
+  const runtimeT = useTranslations('RunErrors.subscription_local_runtime_unavailable')
+  const format = useFormatter()
+  return (row: OrderRow, unsaved = false) => {
+    const block = row.block
+    const checking = !unsaved && block?.reason === 'checking'
+    const warn = Boolean((block && !checking) || unsaved)
+    const status = unsaved ? t('orderUnsaved') : checking ? t('blocked.checking')
+      : !block ? t('ready')
+      : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.dateTime(new Date(block.resetsAt), { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) })
+        : block.reason === 'noDevice' ? (block.device.why === 'subscriptionRuntimeUnavailable' ? runtimeT(block.device.detail ?? 'default') : block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
+          : t(`blocked.${block.reason}`)
+    return { status, checking, warn }
+  }
+}
+
+/** What fixes a row that cannot run (R1): check its quota, open 设备, or go to its subscription or key. */
+export type OrderRowRepair =
+  | { kind: 'checkQuota'; connectionId: string }
+  | { kind: 'devices' }
+  | { kind: 'anchor'; anchor: string; label: 'enableSubscription' | 'reconnectSubscription' | 'openApiKey' | 'openSubscription' }
+
+export function orderRowRepair(row: OrderRow): OrderRowRepair | null {
+  const reason = row.block?.reason
+  if (reason === 'checking' && row.source.kind === 'subscription') return { kind: 'checkQuota', connectionId: row.source.connectionId }
+  if (reason === 'noDevice') return { kind: 'devices' }
+  if ((reason === 'paused' || reason === 'expired') && row.source.kind === 'subscription') return { kind: 'anchor', anchor: `subscription-${row.source.connectionId}`, label: reason === 'paused' ? 'enableSubscription' : 'reconnectSubscription' }
+  if (reason === 'keyRefused' && row.source.kind === 'api_key') return { kind: 'anchor', anchor: `api-key-${row.source.keyId}`, label: 'openApiKey' }
+  // A removed source may have no row left: its source section keeps the recovery control.
+  if (reason === 'missing' || reason === 'removed') return { kind: 'anchor', anchor: row.source.kind === 'subscription' ? 'subscriptions-heading' : 'api-keys-heading', label: row.source.kind === 'subscription' ? 'openSubscription' : 'openApiKey' }
+  return null
 }

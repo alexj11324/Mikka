@@ -5260,6 +5260,7 @@
   },
   "HostedSettings": {
     "models": {
+      "defaults": "Defaults",
       "filterLabel": "Filter models",
       "filterAll": "All",
       "filterSubscription": "Subscriptions",
