@@ -5276,6 +5276,54 @@
     "renderFailed": "此页面未能打开",
     "renderHint": "请重试打开页面。"
   },
+  "HostedSettings": {
+    "general": {
+      "iconHint": "PNG、JPEG、WebP 或 GIF，最大 200 KB"
+    },
+    "memory": {
+      "title": "记忆",
+      "count": "{count} 条记忆",
+      "off": "已停止学习",
+      "offNote": "不再从已连接的 App 中学习新的记忆，已有的记忆会保留。",
+      "category": "类别",
+      "all": "全部",
+      "search": "搜索记忆",
+      "closeSearch": "关闭搜索",
+      "noMatch": "没有提到「{query}」的记忆",
+      "noneHere": "这一类没有记忆",
+      "editing": "Enter 保存 · Esc 取消",
+      "deleted": "已删除「{text}」",
+      "learned": "从已连接的 App 学到",
+      "edited": "你更正过"
+    },
+    "security": {
+      "othersDone": "其他设备已退出",
+      "othersTitle": "退出其他设备",
+      "othersHint": "除这台设备外，所有已登录的设备都会退出，需要重新登录。",
+      "othersConfirm": "立即退出"
+    },
+    "account": {
+      "note": "账户信息对你所在的所有团队都生效。",
+      "pictureHint": "PNG、JPEG 或 WebP"
+    },
+    "models": {
+      "defaults": "默认",
+      "filterLabel": "筛选模型",
+      "filterAll": "全部",
+      "filterSubscription": "订阅",
+      "filterApiKey": "API Key",
+      "filterCustom": "自定义",
+      "search": "搜索模型",
+      "clearSearch": "清除搜索",
+      "noMatch": "没有匹配「{query}」的模型",
+      "noCustom": "还没有自定义服务商",
+      "defaultBadge": "默认",
+      "readOnly": "暂时不能逐个停用模型",
+      "providerOn": "{on}/{total} 个可用",
+      "firstModel": "任务先用",
+      "keyProvider": "服务商"
+    }
+  },
   "DesktopServer": {
     "title": "选择服务器",
     "server": "服务器",
