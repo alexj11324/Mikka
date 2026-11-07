@@ -10,15 +10,28 @@
 
 ## 固定版本证据
 
-已验证候选：[`ace63a1a0bff58540a5f56213878237b353d5cea`](https://github.com/alexj11324/Mikka/commit/ace63a1a0bff58540a5f56213878237b353d5cea)，tree `e69bc9ac414baa7966c315f68d190d821706651b`。环境为已授权 Docker Medium、Node 24.22.1、PostgreSQL 17 独立 loopback 数据库；源码先从公开 GitHub fetch 固定 SHA，没有上传未公开源码到沙盒。
+已验证候选：[`06e797f5e6eabcc0a30a2b19ecc37fa7ccd456f0`](https://github.com/alexj11324/Mikka/commit/06e797f5e6eabcc0a30a2b19ecc37fa7ccd456f0)，tree `35420292f4500ce49ad27eecd6f5d1f2d3b242da`。环境为已授权 Docker Medium、Node 24.22.1、PostgreSQL 17 独立 loopback 数据库；源码先从公开 GitHub fetch 固定 SHA，没有上传未公开源码到沙盒。
 
 - `pnpm exec tsrs --noEmit` 通过。
-- `REQUIRE_DB=1 pnpm test:enterprise-db`：**29/29，0 skip**。其中 Organization 服务/数据库套件 13 项、协议 HTTP 套件 16 项；计数包含父测试。
+- `REQUIRE_DB=1 pnpm test:enterprise-db`：**37/37，0 skip**。其中 Organization 服务/数据库套件 13 项、协议 HTTP 套件 24 项；计数包含父测试。
+- 本轮 5 个 Enterprise 源码/测试文件的 `oxlint --deny-warnings`：0 warning/error；`pnpm lint:ui`：0 error。
+- 前一候选 `cb63972c` 为 35/37：唯一失败子例将原生 Origin middleware 的 403 误写为 400；公开 `06e797f5` 按具体输入分别断言 403/400，并把 native session-delete 失败改为安全 503 和白名单 cause 诊断。相同实库回归全过，没有放宽为任意拒绝状态。
 - `ace63a1a` 的 GitHub Desktop workflow 已完成 frozen install、全迁移、完整 Web 后端构建及 Desktop checks。[smoke job](https://github.com/alexj11324/Mikka/actions/runs/42381335533/job/128429450876) 在 Electron 启动前的 `desktop-links.db.test.ts` 失败：匿名分享的 Markdown props 和 HTML frame 均返回 404 而预期 200。旧 fixture 未写 Artifact 的 Workspace、且前例移除了分享者成员资格；公开 P0 `98f3710e` 已修正这两项前置并保留撤权拒绝断言。该定位不等于 smoke 已通过，完整 Desktop 与全库 CI 仍需合流后验收。
 - `f01529a3` 的 Enterprise suite 为 28/28；`3c2d7230` 的 P1 席位 9/9、实际治理 HTTP 6/6、纯策略/协议 12/12、DB runner 28/28。它们是各自固定版本的证据，不替代后续合流 head。
 - `ace63a1a` 的 P1 seats 8 个子测试通过，但父 fixture 清理因 PostgreSQL `42501` 失败，总计 8/9；不能记录为整组通过。
 
-最新合流前正在补的 HTTP 用例尚未计入上述通过数：OIDC RP-initiated logout 的真实 OP 确认/退出、短期一次性回调、跨浏览器/组织/配置绑定、上游和 nonce/audit 故障；以及普通会话拒绝、真实 OIDC 会话允许 usage/CSV/template apply、暂停 Workspace 成员后再次拒绝。前者是当前独立补丁，后者等待 P1 合流。合流还需保留三处有效工作区门禁和 main 的精确 Profile 源筛选。
+OIDC RP-initiated logout 的 8 个新增子用例已计入 37 项：真实 OP 确认/退出、短期一次性回调、跨浏览器/provider/配置绑定、上游和 nonce/audit/session DELETE 故障均通过。治理 API 的普通会话拒绝、真实 OIDC 会话允许 usage/CSV/template apply、暂停 Workspace 成员后再次拒绝仍等待 P1 合流，不计入这些通过数。合流还需保留三处有效工作区门禁和 main 的精确 Profile 源筛选。
+
+### 本次记录摘要
+
+以下是同一次固定版本串行验收的日志摘要；执行脚本启用了 `set -euo pipefail`，最终退出码为 0。空 typecheck 日志表示该命令无诊断，退出成功由后续命令及最终退出码证实。记录只保留文件名、字节数和摘要，不公开认证值或完整协议报文。
+
+| 日志 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| `06e797f5-enterprise.log` | 4833 | `bd8aaa9f93b62582ea5f704d5a4c0c5319e1c0d37f96191cc2b0e666373ee7da` |
+| `06e797f5-lint-ui.log` | 363 | `e02ab7713c9f4fbadb4a581f7e7a92a8a5532c44fcadc720bc98bd4bdf687ba3` |
+| `06e797f5-oidc-lint.log` | 89 | `c64e3ea685b5cf08198b8b57908eaae759ed559ca02cefb18ccad82e76b5ae62` |
+| `06e797f5-typecheck.log` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
 
 ## Issue 要求 → 后端证据
 
@@ -27,6 +40,7 @@
 | Organization 管两个独立 Shared Workspace；角色与席位去重 | 创建、改名、成员角色、最后 owner、绑定/解绑、归档；相同两个人在两个 Workspace 只计两席；Org admin 不能因组织角色读取 Workspace | `governance.db.test.ts` 调用真实服务和 PG；不是管理 UI 或所有 Org HTTP 路由的端到端证明 |
 | 组织计费归属且不扣费 | Enterprise 运维 CLI 的独立 Node 子进程完成 preview/apply、并发 expected-plan、重复 no-op、降额保留成员和审计；绑定 Org 的 Workspace 拒绝本地 dormant grant | 真实 CLI/PG；没有调用 Stripe 或创建价格、订阅、收费对象 |
 | OIDC 登录、账号绑定和会话 assurance | 真实 authorization/code exchange、PKCE、RSA JWT/JWKS；拒绝错误 issuer、签名、过期及错误 state；同邮箱个人账号必须持短期、一次性、当前会话同意才能绑定；不提升角色或自动加 Workspace 成员 | `http.db.test.ts` 本机 HTTP IdP + Better Auth 原生验证器；不是 Okta/Entra/客户生产互通认证 |
+| OIDC RP-initiated logout | 一个原生验证的 discovery snapshot；真实 OP 对无 hint 的 client_id 请求确认后注销；先撤销原 Mikka 会话；固定回跳、5 分钟 nonce、signed browser verifier 和 provider/配置绑定；原子单次消费且保留后来登录的会话 | `06e797f5` 的 8 个实际 HTTP/PG 子例；不保留 ID token；OP 503、nonce/audit/原生 DELETE 故障分别实证。回调只证明该退出请求返回，不代表已证明所有 OP 会话结束 |
 | SAML 2.0 登录与退出 | 独立 SP/IdP 密钥签名 AuthnRequest/assertion；POST/Redirect 的 SP 与 IdP SLO；签名、RelayState、过期、provider 绑定、关联和并发 replay 正反例；不注销无关 OIDC 会话 | 真实 HTTP、Samlify 和持久 verification；不是 mock hook。固定 SSO patch 保留库密码学实现 |
 | SCIM Users/Groups 生命周期 | HTTP 创建/读取/更新/PATCH/删除、分页/过滤、ETag、并发重复、停用/撤销连接；Group 不授予 Workspace 权限；交付故障留 durable outbox，重试不重复身份和审计 | 真实 HTTP/PG 的受限 SCIM profile；不宣称覆盖所有供应商扩展或配置模板 |
 | 离职、停用与现有资源撤权 | 两个 Org Workspace 的成员暂停、范围内 PAT 撤销、旧 bearer 拒绝；保留个人账户、其他 Workspace/Organization 身份；管理接口重试可完成后续交付 | 真实生命周期服务/PG；最终 Task/Factory/Artifact/MCP HTTP 组合回归仍与 P0/#1615 合流一起完成 |
@@ -35,14 +49,14 @@
 | 元数据审计、失败不丢、可授权导出 | 配置与 audit intent 同事务；故障重试只投递一次；登录审计失败不能发布 cookie/redirect；导出逐页重验当前角色和 tenant、摘要完整性、数量上限；legal hold/有效导出阻止清理；归档保留历史 | 实际认证事件、故障注入和 PG 导出/清理；不是外部 SIEM 接入或合规认证 |
 | 基础隔离不受套餐控制；Community 核心保留 | Workspace 成员表仍唯一；Org 只是管理层；Cloud/license entitlement 独立于 ACL；个人和无 Org Workspace 不被强制 SSO 套餐门禁影响 | P1 政策/席位和 P2 拒绝用例；独立自托管部署尚未另作验收，不宣称连接 Cloud 才可运行 |
 
-源码证据：[`http.db.test.ts`](https://github.com/alexj11324/Mikka/blob/ace63a1a0bff58540a5f56213878237b353d5cea/lib/enterprise/http.db.test.ts)、[`governance.db.test.ts`](https://github.com/alexj11324/Mikka/blob/ace63a1a0bff58540a5f56213878237b353d5cea/lib/enterprise/governance.db.test.ts)、[`protocol.test.ts`](https://github.com/alexj11324/Mikka/blob/ace63a1a0bff58540a5f56213878237b353d5cea/lib/enterprise/protocol.test.ts)。接口字段、依赖许可和迁移/回滚见 [Enterprise ADR](../design/decisions/2026-11-07-1212-enterprise-identity-and-audit.md)。
+源码证据：[`http.db.test.ts`](https://github.com/alexj11324/Mikka/blob/06e797f5e6eabcc0a30a2b19ecc37fa7ccd456f0/lib/enterprise/http.db.test.ts)、[`governance.db.test.ts`](https://github.com/alexj11324/Mikka/blob/06e797f5e6eabcc0a30a2b19ecc37fa7ccd456f0/lib/enterprise/governance.db.test.ts)、[`protocol.test.ts`](https://github.com/alexj11324/Mikka/blob/06e797f5e6eabcc0a30a2b19ecc37fa7ccd456f0/lib/enterprise/protocol.test.ts)。接口字段、依赖许可和迁移/回滚见 [Enterprise ADR](../design/decisions/2026-11-07-1212-enterprise-identity-and-audit.md)。
 
 ## 当前没有声称完成的事项
 
 - 新 P0/P1/main/#1615 主链的完整 CI、可信 Reader 传播和上述新 HTTP 用例尚需在最终公开 head 验证。
 - 管理 UI 的实现与本地生产构建截图由 Claude 会话独立交付；当前后端 PR 的接口交接不是 UI 验收证据。
 - 没有连接真实客户或供应商 IdP。协议 fixture 直接建立隔离 provider 和域名验证前置状态；它不证明真实公共 DNS TXT 验证、外部 OIDC discovery、生产证书轮换和客户控制台配置已经执行。
-- 固定版本 `ace63a1a` 的 OIDC 只有 Mikka 本地 `/api/auth/sign-out` 会话退出与审计。当前补丁增加 RP-initiated IdP `end_session_endpoint` 请求和回调，使用原生验证的 discovery、加密配置和一次性 verification；新增真实 HTTP 回归尚待公开版本执行，不能提前记为已通过。SAML 已验证的双向 SLO 仍是独立证据。
+- OIDC RP-initiated logout 已在上述标准 OP fixture 验证；未接真实客户 OP，也未承诺供应商会注销所有全局会话。原生 `/api/auth/sign-out` 仍只负责本地退出，客户端须显式使用新增 provider logout 接口发起上游流程。没有 `end_session_endpoint` 时明确 local-only。
 - 强制 SSO、break-glass 和安全配置后端均存在。当前证据包含 access-policy 规则和过期许可恢复限制；五分钟 fresh-session/十五分钟恢复期限的完整管理 HTTP 操作没有单独记录为已通过。
 - Task/Factory/Artifact/MCP 的最终范围隔离依赖 P0 与 #1615 的真实回归；本文件不把直接 `enterpriseWorkspaceAllowed` 断言等同于整条 API 链已验。
 - 没有外部 SIEM/DLP、专属地域机房、SOC 2/ISO 认证或已签订的 DPA/SLA 交付声明。
@@ -70,4 +84,4 @@
 | SCIM | 现有测试目录的 provisioning 配置，能把 `externalId` 映射到 OIDC `sub`/SAML subject | 使用 `rotate-scim` 一次返回的 endpoint/token 配置已授权测试目录；先读 `ServiceProviderConfig`/Users/Groups；停用/撤权和故障注入继续采用隔离验收记录，不对共享 smoke 身份重复进行生产破坏性测试 |
 | 审计 | 已有管理角色与上述真实外部事件 | `POST /:id/audit-log` 建有界导出，`GET` 分页读取；验证 manifest/digests，仅保存脱敏元数据；外部 SIEM 不在本次测试路径 |
 
-OIDC 原生应用会话退出与供应商的全局会话退出不是同一能力。新的 RP-initiated logout 将结果区分为本地完成、上游已请求、上游返回或失败；回调本身不能证明所有供应商会话都已终止。没有 `end_session_endpoint` 的 provider 明确只做本地退出。当前已记录的双向全局退出协议通过证据为 SAML SLO，新的 OIDC 通过数须在公开候选实测后补入；不宣称客户生产互通已验。
+OIDC 原生应用会话退出与供应商的全局会话退出不是同一能力。RP-initiated logout 将结果区分为本地完成、上游已请求、上游返回或失败；回调本身不能证明所有供应商会话都已终止。没有 `end_session_endpoint` 的 provider 明确只做本地退出。实际退出及取消/无回调故障在标准 OP fixture 均有记录；测试中的 OP 主动返回 error 是兼容性负例，不假定所有供应商在失败时都会回调。SAML SLO 也有独立协议证据；不宣称客户生产互通已验。
