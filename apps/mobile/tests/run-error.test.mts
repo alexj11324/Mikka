@@ -11,7 +11,8 @@ test('a registered code reads as its words, by detail when it has one', () => {
 })
 
 test('anything else reads as the generic line; the raw text is kept only for 详情', () => {
-  const shown = runErrorLine('agent_exited: codex exited with code 1')
+  // The sandbox's network is not the model provider's: an unregistered code never borrows another's words.
+  const shown = runErrorLine('agent_exited: codex exited with code 1 (E_SANDBOX_NETWORK)')
   assert.equal(shown.line, messages.RunErrors.run_failed.default)
-  assert.equal(shown.raw, 'agent_exited: codex exited with code 1')
+  assert.equal(shown.raw, 'agent_exited: codex exited with code 1 (E_SANDBOX_NETWORK)')
 })

@@ -204,7 +204,9 @@ export interface TaskSchedule { label: string; nextAt: string | null }
 export type TaskActivity =
   | { kind: 'attempt'; runId: string; n: number; group: ThreadGroup; harness: string; createdAt: string; failed: boolean
     /** Its own result (2026-11-07-2230); absent from an older server. */
-    state?: 'running' | 'waiting' | 'failed' | 'blocked' | 'done' }
+    state?: 'running' | 'waiting' | 'failed' | 'blocked' | 'done'
+    /** The pull request it opened; absent from an older server. */
+    pullRequest?: { number: number; url?: string | null } | null }
   | { kind: 'replaced'; runId: string; createdAt: string }
   | { kind: 'created'; by: string | null; createdAt: string }
 

@@ -120,7 +120,7 @@ function ActivityRow({ item, last, onOpen }: { item: TaskActivity; last: boolean
           {item.kind === 'attempt' ? `第 ${item.n} 次尝试` : item.kind === 'replaced' ? '换了新线程' : item.by ? `${item.by} 创建了任务` : '创建了任务'}
         </Text>
         <Text style={styles.activityMeta} numberOfLines={1}>
-          {result && item.kind === 'attempt' ? [ATTEMPT_WORD[result], HARNESS[item.harness] ?? item.harness, day(item.createdAt)].filter(Boolean).join(' · ') : day(item.createdAt)}
+          {result && item.kind === 'attempt' ? [ATTEMPT_WORD[result], result === 'done' && item.pullRequest ? `开了 PR #${item.pullRequest.number}` : null, HARNESS[item.harness] ?? item.harness, day(item.createdAt)].filter(Boolean).join(' · ') : day(item.createdAt)}
         </Text>
       </View>
       {onOpen ? <ChevronRight size={18} color={colors.tertiary} strokeWidth={2} /> : null}
