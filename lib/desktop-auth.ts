@@ -34,6 +34,35 @@ export function desktopAuthReturnPath(state: string, next: string, callback?: st
   return withBasePath(desktopAuthCallbackPath(state, next, callback))
 }
 
+export type DesktopBrowserStep =
+  | { kind: 'form' }
+  /** The browser already has a web session: ask before handing it to the app. */
+  | { kind: 'choose-account' }
+  /** The app asked for this provider: start it without another click. */
+  | { kind: 'oauth'; provider: 'google' | 'github'; selectAccount: boolean }
+
+/**
+ * What the browser's sign-in page does for a desktop handoff. A web session is
+ * never handed over without the person seeing which account it is; choosing
+ * another account asks the provider to show its account picker.
+ */
+export function desktopBrowserStep(input: {
+  desktop: boolean
+  signedIn: boolean
+  addAccount: boolean
+  switchAccount: boolean
+  refused: boolean
+  provider: 'google' | 'github' | null
+}): DesktopBrowserStep {
+  if (!input.desktop || input.refused) return { kind: 'form' }
+  if (input.signedIn && !input.addAccount && !input.switchAccount) return { kind: 'choose-account' }
+  if (input.provider) return { kind: 'oauth', provider: input.provider, selectAccount: input.signedIn }
+  return { kind: 'form' }
+}
+
+/** Provider parameters that make Google and GitHub show their account picker. */
+export const SELECT_ACCOUNT_PARAMS = { prompt: 'select_account' } as const
+
 /** A PKCE-style S256 challenge: base64url(sha256(verifier)), 43 characters. */
 export const DESKTOP_AUTH_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/
 /** The verifier the desktop keeps; RFC 7636 allows 43-128 unreserved characters. */

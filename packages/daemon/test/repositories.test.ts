@@ -70,6 +70,38 @@ describe('repository URL boundary', () => {
 })
 
 describe('daemon-owned clone cache', () => {
+  it('shallow-clones a fresh machine without losing current files or alternate branches', async () => {
+    const source = await makeRepo()
+    for (let i = 0; i < 60; i++) git(source, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '--allow-empty', '-qm', `history ${i}`)
+    git(source, 'branch', 'alternate')
+    const remote = pathToFileURL(source).href, cache = new RepositoryCache(join(tempDir(), 'repos'), true)
+    await cache.prepare(remote)
+    const cloned = cache.pathFor(remote)
+    expect(git(cloned, 'rev-parse', '--is-shallow-repository')).toBe('true')
+    expect(Number(git(cloned, 'rev-list', '--count', 'origin/main'))).toBe(50)
+    expect(git(cloned, 'rev-parse', 'origin/alternate')).toBe(git(source, 'rev-parse', 'alternate'))
+    const worktree = await new WorktreeManager(tempDir()).create('shallow-task', cloned, await cache.baseRef(remote))
+    expect(readFileSync(join(worktree, 'README.md'), 'utf8')).toBe(readFileSync(join(source, 'README.md'), 'utf8'))
+    expect(git(worktree, 'status', '--porcelain')).toBe('')
+  })
+
+  it('uses the default branch recorded by a new clone and refreshes it on later prepares', async () => {
+    const source = await makeRepo()
+    git(source, 'branch', 'trunk')
+    const remote = pathToFileURL(source).href
+    const root = tempDir('mikka-clone-head-')
+    const trace = join(root, 'git-trace.jsonl')
+    const cache = new RepositoryCache(join(root, 'repos'), true)
+    await cache.prepare(remote, undefined, { GIT_TRACE2_EVENT: trace })
+    const connections = readFileSync(trace, 'utf8').trim().split('\n').map(line => JSON.parse(line) as { event?: string; argv?: string[] })
+      .filter(event => event.event === 'start' && /(?:^|\/)git-upload-pack$/.test(event.argv?.[0] ?? ''))
+    expect(connections).toHaveLength(1)
+    expect(await cache.baseRef(remote)).toBe('origin/main')
+    git(source, 'symbolic-ref', 'HEAD', 'refs/heads/trunk')
+    await cache.prepare(remote)
+    expect(await cache.baseRef(remote)).toBe('origin/trunk')
+  })
+
   it('switches repositories through a fresh clone and worktree while retaining the wrong checkout and its dirty files', async () => {
     const wrong = await makeRepo(), correct = await makeRepo()
     writeFileSync(join(correct, 'TARGET.txt'), 'correct repository\n')

@@ -23,6 +23,8 @@ export class BundledAuth {
     serverUrl: string; version: string; fetch: Fetcher; vault: SessionVault
     openExternal(url: string): Promise<void>; changed(): void; returned(next: string): void
     scopeChanged?(): void
+    /** A new app link for the browser's callback page to open (app-link.ts). */
+    appLink?(): string
   }) { this.base = remoteBase(options.serverUrl) }
 
   restore(): Promise<void> {
@@ -262,7 +264,7 @@ export class BundledAuth {
         await this.accept(await response.json(), generation, responseSessionCache(response.headers))
         if (generation === this.generation) this.options.returned(next)
       })().catch(() => { if (generation === this.generation) this.options.changed() })
-    })
+    }, this.options.appLink?.())
     if (generation !== this.generation) { listener.close(); return }
     this.listener = listener
     this.timeout = setTimeout(() => { if (generation === this.generation) this.cancel() }, 10 * 60_000)

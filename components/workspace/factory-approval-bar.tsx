@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import { Ban, Check, CircleCheck, CircleX, Clock, ExternalLink, GitMerge, RefreshCw, Server, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Spinner } from '@/components/ui/spinner'
 import { ShortSha } from './short-sha'
 import { PullRequestIcon } from './pull-request-icon'
@@ -41,6 +41,11 @@ export type ApprovalBarProps = {
   pullRequestUrl?: string
   /** GitHub refused the last merge (a githubMerge… code): the bar names why and offers the PR. */
   refusal?: string
+  /**
+   * P4 (decision 2026-11-06-1615): 批准并合并 asks once more, naming what is still unverified and
+   * the account and branch it merges as; 合并 then calls `onAccept`.
+   */
+  confirm?: { title: string; detail: string; warn: boolean; onCancel: () => void }
 }
 
 function StateIcon({ state, refused }: { state: AcceptanceState; refused: boolean }) {
@@ -66,8 +71,19 @@ function ActionIcon({ icon: Icon, busy }: { icon: LucideIcon; busy: boolean }) {
  * the right. While it waits for you the header's state chip says so, so the
  * bar carries no title; every later state names itself. Purely presentational.
  */
-export function ApprovalBar({ state, flow, isSkill, isDeliverable = false, environment, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject, onAccept, pullRequestUrl, refusal }: ApprovalBarProps) {
+export function ApprovalBar({ state, flow, isSkill, isDeliverable = false, environment, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject, onAccept, pullRequestUrl, refusal, confirm }: ApprovalBarProps) {
   const t = useTranslations('FactoryAcceptance')
+  if (confirm) return <Item variant="outline" size="sm" data-slot="merge-confirm" className="bg-popover shadow-lg">
+    {confirm.warn && <ItemMedia variant="icon"><TriangleAlert aria-hidden="true" className="text-warning-foreground" /></ItemMedia>}
+    <ItemContent className="min-w-0">
+      <ItemTitle className="truncate">{confirm.title}</ItemTitle>
+      <ItemDescription className="truncate">{confirm.detail}</ItemDescription>
+    </ItemContent>
+    <ItemActions>
+      <Button size="sm" variant="ghost" disabled={busy} onClick={confirm.onCancel}>{t('cancel')}</Button>
+      <Button size="sm" disabled={busy || !canApprove} aria-busy={busy} onClick={onAccept}><ActionIcon icon={GitMerge} busy={busy} />{t('mergeConfirm')}</Button>
+    </ItemActions>
+  </Item>
   const refused = state === 'pending' && Boolean(refusal)
   const icon = flow ? null : StateIcon({ state, refused })
   // After GitHub refuses, the fix is usually on GitHub, so opening the PR leads and merging again follows.

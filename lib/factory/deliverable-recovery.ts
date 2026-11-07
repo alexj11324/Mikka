@@ -121,7 +121,8 @@ export async function retainedDeliverableForRecovery(tx: DeliverableRecoveryQuer
       AND q."expiresAt">now() AND q."waitingBinding"->>'revision'=t.revision::text
       AND cp."unavailableReason" IS NULL AND cp."baseCommit"=producer.report->>'sourceCommit' AND cp.files>0 AND octet_length(cp.patch)<=$8
       AND cp."takenAt">=producer."startedAt" AND cp."takenAt"<=producer."finishedAt"
-      AND m.state='paused' AND m."sandboxId" IS NOT NULL AND m."snapshotId" IN ('desktop','codex','claude')
+      AND m.state='paused' AND m."sandboxId" IS NOT NULL
+      AND (m."templateKind" IN ('desktop','codex','claude') OR (m."templateKind" IS NULL AND m."snapshotId" IN ('desktop','codex','claude')))
       AND (producer."questionContinuation"->>'requiredSandboxId' IS NULL OR producer."questionContinuation"->>'requiredSandboxId'=m."sandboxId")
       AND (($9::uuid IS NULL AND ((m."workerLeaseId" IS NULL AND m."workerLeaseUntil" IS NULL) OR m."workerLeaseUntil"<=now())) OR
         ($9::uuid IS NOT NULL AND m."workerLeaseId"=$9 AND m."workerLeaseUntil">now()))

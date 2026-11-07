@@ -6,6 +6,9 @@
 import { readFile, writeFile, rename, lstat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { readFileSync, watch } from 'node:fs'
+import { constants as osConstants } from 'node:os'
+import { join, isAbsolute } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const MAX_CACHE_AGE = 50 * 60_000
@@ -50,6 +53,10 @@ export function matchesGitRepository(input) {
 }
 
 export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.now, minValidityMs = 60_000 } = {}) {
+  // New claims already resolved the run owner's token. Ordinary git/gh
+  // operations reuse it; no age-based reauthorization is introduced.
+  if (typeof config.token === 'string' && config.token &&
+    (config.expiresAt == null || Date.parse(config.expiresAt) - now() > minValidityMs)) return config.token
   const cachePath = `${config.file}.cache`
   try {
     const stat = await lstat(cachePath)
@@ -59,6 +66,7 @@ export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.no
         cached.createdAt <= now() && now() - cached.createdAt < MAX_CACHE_AGE && Date.parse(cached.expiresAt) - now() > minValidityMs) return cached.token
     }
   } catch { /* No reusable run-local token. */ }
+  if (!config.runToken) throw new RunGitHubCredentialError('runGitHubUnavailable')
   const response = await fetcher(config.endpoint, {
     method: 'POST', redirect: 'error', cache: 'no-store',
     headers: { authorization: `Bearer ${config.runToken}` }, signal: AbortSignal.timeout(15_000),
@@ -109,8 +117,94 @@ export async function runGh(config, args, deps = {}) {
   }
 }
 
+/** Local gh uses the prepared native login. go-gh caches hosts.yml once per
+ * process (gh v2.83.2 / go-gh v2.13.0), so only an actual credential-file
+ * rotation restarts a read-only watch. No clock, token exchange or retry of
+ * any other command belongs on this operation path. */
+export async function runPreparedGh(binary, directory, args) {
+  if (!isAbsolute(binary) || !isAbsolute(directory)) throw new Error('Invalid native GitHub command')
+  const watching = args[0] === 'pr' && args[1] === 'checks' && args.includes('--watch')
+  const credentialFile = join(directory, 'hosts.yml')
+  let previous = watching ? readFileSync(credentialFile, 'utf8') : ''
+  let child, timer, rotated = false, stopping = false
+  const stop = signal => {
+    if (!child || child.exitCode !== null || child.signalCode !== null) return false
+    const signalled = child.kill(signal)
+    if (signalled) {
+      clearTimeout(timer)
+      const active = child
+      timer = setTimeout(() => active.kill('SIGKILL'), 2000)
+      timer.unref()
+    }
+    return signalled
+  }
+  const changed = () => {
+    let next
+    try { next = readFileSync(credentialFile, 'utf8') } catch { return }
+    if (stopping || next === previous) return
+    previous = next
+    if (stop('SIGTERM')) rotated = true
+  }
+  const observer = watching ? watch(directory, { persistent: false }, (_event, name) => {
+    if (name == null || String(name) === 'hosts.yml') changed()
+  }) : undefined
+  const interrupt = () => { stopping = true; stop('SIGINT') }
+  const terminate = () => { stopping = true; stop('SIGTERM') }
+  process.on('SIGINT', interrupt)
+  process.on('SIGTERM', terminate)
+  try {
+    for (;;) {
+      rotated = false
+      const result = await new Promise((resolve, reject) => {
+        child = spawn(binary, args, { stdio: 'inherit', env: {
+          ...process.env, GH_CONFIG_DIR: directory, GH_HOST: 'github.com', GH_TOKEN: '', GITHUB_TOKEN: '',
+        } })
+        child.once('error', reject)
+        child.once('close', (code, signal) => resolve({ code, signal }))
+      })
+      clearTimeout(timer)
+      child = undefined
+      if (!stopping && rotated && (result.signal === 'SIGTERM' || result.signal === 'SIGKILL' || result.code === 143)) continue
+      return result.code ?? (result.signal ? 128 + (osConstants.signals[result.signal] ?? 1) : 1)
+    }
+  } finally {
+    clearTimeout(timer)
+    observer?.close()
+    process.removeListener('SIGINT', interrupt)
+    process.removeListener('SIGTERM', terminate)
+    if (child) child.kill('SIGTERM')
+  }
+}
+
 async function main() {
   const [mode, file, ...args] = process.argv.slice(2)
+  if (mode === 'prepared-git') {
+    if (args[0] !== 'get') return
+    let text = ''
+    for await (const chunk of process.stdin) {
+      text += chunk
+      if (text.length > 8192) throw new Error('Invalid git credential request')
+    }
+    const input = Object.fromEntries(text.trim().split('\n').map(line => { const index = line.indexOf('='); return [line.slice(0, index), line.slice(index + 1)] }))
+    if (!matchesGitRepository(input)) return
+    // This is the exact private native file written by prepareMachineGitHub.
+    // No gh executable or server request is needed for ordinary Git auth.
+    const lines = readFileSync(join(file, 'hosts.yml'), 'utf8').split('\n')
+    const start = lines.indexOf('github.com:')
+    let token
+    for (let i = start + 1; start >= 0 && i < lines.length && /^[\t ]/.test(lines[i]); i++) {
+      const match = /^\s+oauth_token: (.+)$/.exec(lines[i])
+      if (match) { token = JSON.parse(match[1]); break }
+    }
+    if (typeof token !== 'string' || !token || token.length > 32768 || /[\r\n\0]/.test(token)) throw new Error('Invalid prepared GitHub credential')
+    process.stdout.write(`username=x-access-token\npassword=${token}\n\n`)
+    return
+  }
+  if (mode === 'native-gh') {
+    const [directory, ...flags] = args
+    process.exitCode = await runPreparedGh(file, directory, flags)
+    return
+  }
   const config = { ...JSON.parse(await readFile(file, 'utf8')), file }
   if (mode === 'git') {
     if (args[0] !== 'get') return

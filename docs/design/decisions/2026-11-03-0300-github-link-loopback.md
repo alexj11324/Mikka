@@ -4,6 +4,7 @@
 - Source: the coordinator session, confirmed point by point: follow RFC 8252 for the desktop app; authorize in the system browser; bind the link to the account signed in to the app, not the browser's Mikka session; return to the app automatically; (a) a loopback, no custom URL scheme; (b) the answer waits until the return reaches this computer and the app sends a verifier only it holds; (c) an older desktop keeps the browser-session check with an update hint, no forced update; (d) PKCE where GitHub supports it, checked against GitHub's documentation.
 - Rule: —
 - Partly replaces: [2026-11-03-0230](2026-11-03-0230-github-link-from-desktop.md) for desktop builds that have the loopback return
+- Partly superseded by: [2026-11-06-1900](2026-11-06-1900-desktop-sign-in-returns-to-the-app.md) (the sign-in return page opens an app link that only brings the app forward)
 
 A desktop build with `prepareReturn` starts Link GitHub by opening a one-shot
 listener on `http://127.0.0.1:<port>/return` and asking the server for a

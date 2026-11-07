@@ -46,6 +46,32 @@ test('failed provisioning preserves the original error without publishing its me
   assert.ok(!JSON.stringify({ attributes: span.attributes, events: span.events, status: span.status }).includes(failure.message))
 })
 
+test('claim phases and parallel credential spans keep the claim parent', async () => {
+  memory.reset()
+  const attributes = cloudStartupRunAttributes('15050000-0000-4000-8000-000000000002')
+  await cloudStartupSpan('cloud.worker.claim', attributes, async () => {
+    const phases = cloudStartupPhases(attributes, 'cloud.worker.claim')
+    phases.next('authorize')
+    await Promise.resolve()
+    phases.next('assignment_context')
+    await Promise.all([
+      cloudStartupSpan('cloud.worker.claim.native_credentials', attributes, async () => undefined),
+      cloudStartupSpan('cloud.worker.claim.github_credentials', attributes, async () => undefined),
+    ])
+    phases.next('response_fence')
+    phases.end()
+  })
+  await provider.forceFlush()
+  const spans = memory.getFinishedSpans()
+  const parent = spans.find(span => span.name === 'cloud.worker.claim')!
+  assert.equal(spans.length, 6)
+  for (const span of spans) {
+    assert.equal(span.attributes['mikka.run.id_hash'], attributes['mikka.run.id_hash'])
+    if (span !== parent) assert.equal(span.parentSpanContext?.spanId, parent.spanContext().spanId)
+  }
+  assert.ok(spans.every(span => span.name.startsWith('cloud.worker.claim')))
+})
+
 test('remote bootstrap receipts produce exact phase durations without exporting command output', async () => {
   memory.reset()
   const startedAt = Date.now() - 5_000

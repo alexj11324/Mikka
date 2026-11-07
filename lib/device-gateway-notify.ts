@@ -66,9 +66,9 @@ const ACTIVE_RUN_STATUSES = ['preparing', 'running', 'paused', 'waiting_input', 
  * Wakes each device (local or cloud) holding one of these runs, so its daemon
  * checks run control again at once (#1212). A daemon on the gateway runs no
  * periodic check, so every write that can stop, pause or revoke a run, or
- * change its policy, calls this after commit. The wake is a hint: the daemon
- * reads its authority from the tool-approval route. Waking too many costs one
- * check per run; waking too few leaves a run live until the next wake.
+ * change its policy, calls this after commit. The wake makes current daemons
+ * consume persisted stop/pause commands. Legacy daemons also refresh their
+ * cached control state; current provider and tool calls need no remote check.
  */
 export async function notifyRunControl(database: {
   query: (text: string, values: unknown[]) => Promise<{ rows: { deviceId: string }[] }>

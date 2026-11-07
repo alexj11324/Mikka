@@ -1,9 +1,12 @@
 import { execFileSync } from 'node:child_process'
+import { dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import createNextIntlPlugin from 'next-intl/plugin'
 import { withWorkflow } from 'workflow/next'
 import { basePath } from './lib/base-path-config.mjs'
 import { configuredDeploymentId } from './lib/deployment-id.mjs'
 import { localTestAccountsMode } from './packages/protocol/src/local-test-mode.ts'
+import { overlayAliases } from './lib/ui-overlay.mjs'
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
@@ -23,6 +26,10 @@ function appBuild() {
 // x-deployment-id on Server Action and RSC requests, so an open page keeps
 // reaching its own deployment after the next deploy.
 const deploymentId = configuredDeploymentId()
+
+// UI slots: today's components, or the hosted layer's when MIKKA_UI_OVERLAY_DIR
+// is set (docs/ui-overlay.md).
+const uiSlots = overlayAliases(dirname(fileURLToPath(import.meta.url)))
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -48,6 +55,7 @@ const nextConfig = {
   turbopack: {
     resolveAlias: {
       'react-syntax-highlighter': './components/workspace/agent-syntax-highlighter.tsx',
+      ...uiSlots.turbopack,
     },
   },
   webpack(config, { dev }) {
@@ -55,6 +63,8 @@ const nextConfig = {
     // buffers and does not make a restart much faster (docs/dev-workflow.md).
     if (dev) config.cache = { type: 'memory' }
     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
+    for (const [specifier, file] of Object.entries(uiSlots.absolute)) config.resolve.alias[`${specifier}$`] = file
+    if (uiSlots.dir) config.resolve.alias['@hosted'] = uiSlots.dir
     return config
   },
   onDemandEntries: {

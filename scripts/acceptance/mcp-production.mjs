@@ -9,6 +9,7 @@ import { responseCookieJar } from './read-cache-production.mjs'
 import { assertCurrentMain, waitForWebDeployment } from '../release/web-deploy.mjs'
 import { authorizeMcpSession } from '../../tests/support/mcp-closeout-session.mjs'
 import { DeployedTargetError, deployedTargetGuard, assertDeployedTarget, publicTargetFailure } from './deployed-target.mjs'
+import { TeamWorkspaceError, selectTeamWorkspace, isTeamWorkspaceReadPath, isTeamWorkspaceSwitchRequest, publicTeamWorkspaceFailure } from './team-workspace.mjs'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
 export const OPS_REF = 'refs/heads/ops/issue1415-production-functional'
@@ -78,7 +79,7 @@ export async function runProductionMcpProof({
       normalSessionClosed: false, sessionAbsent: false, unresolvedResources: false,
     }, registrationAttempts: 0, toolsInvoked: 0, modelCalls: 0, sqlUsed: false,
     registrationMode: 'owner-managed', requestedScopes: ['mikka'], refreshRequested: false, browserConsentUI: false,
-    loopbackCallbackObserved: false }
+    loopbackCallbackObserved: false, teamAdminMembershipVerified: false }
   const secretValues = new Set(), remember = values => {
     for (const value of values) if (typeof value === 'string' && value.length > 0) secretValues.add(value)
   }
@@ -190,6 +191,23 @@ export async function runProductionMcpProof({
     remember([ownerId])
     sessionObserved = true
     record('normal-owner-session')
+    Object.assign(report, await selectTeamWorkspace({ ownerId, json: async (path, body) => {
+      need(body === undefined
+        ? isTeamWorkspaceReadPath(path) || path === AUTH + '/get-session'
+        : path === BASE + '/api/rpc' && isTeamWorkspaceSwitchRequest(body), 'request_denied')
+      const response = await raw(path, body === undefined ? {} : {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-mikka-rpc': '1' },
+        body: JSON.stringify(body),
+      }, { cookie: true })
+      const value = await json(response)
+      need(response.status === 200, 'response_invalid')
+      return value
+    } }))
+    // This proves the normal owner session's team. tools/list is a user-level
+    // catalogue; this probe never calls a tool or verifies workspace data.
+    report.teamBindingScope = 'owner-session'
+    report.catalogueWorkspaceDataVerified = false
+    record('normal-owner-team-session')
     baselineIds = new Set((await readClients(false)).map(row => row.client_id))
     remember([...baselineIds])
     await assertBinding()
@@ -277,7 +295,9 @@ export async function runProductionMcpProof({
     completed = true
   } catch (error) {
     if (error instanceof DeployedTargetError) report.targetFailure = publicTargetFailure(error)
-    report.failureCode = error instanceof ProbeError || error instanceof DeployedTargetError ? error.code : 'protocol_failed'
+    if (error instanceof TeamWorkspaceError) report.teamFailure = publicTeamWorkspaceFailure(error)
+    report.failureCode = error instanceof ProbeError || error instanceof DeployedTargetError || error instanceof TeamWorkspaceError
+      ? error.code : 'protocol_failed'
   } finally {
     // Cleanup remains authorized if main advances: only the exact newly owned
     // client/token and this run's session are removed. Never repeat registration.

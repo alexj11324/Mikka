@@ -20,6 +20,18 @@ test('only a person\'s own enabled device with the capability takes a lease', ()
   assert.equal(leaseDevice(null), false)
 })
 
+test('a cloud run receives a lease only on the exact machine bound to its device token', () => {
+  const cloud = { enabled: true, kind: 'cloud', harnesses: broker }
+  assert.equal(leaseDevice(cloud, ids.deviceId, ids.deviceId), true)
+  assert.equal(leaseDevice(cloud, ids.deviceId), false)
+  assert.equal(leaseDevice(cloud), false)
+  assert.equal(leaseDevice(cloud, ids.deviceId, ids.runId), false)
+  assert.equal(leaseDevice({ ...cloud, kind: 'local' }, ids.deviceId, ids.runId), false)
+  assert.equal(leaseDevice({ ...cloud, enabled: false }, ids.deviceId, ids.deviceId), false)
+  assert.equal(leaseDevice({ ...cloud, harnesses: [{}] }, ids.deviceId, ids.deviceId), false)
+  assert.equal(leaseDevice({ ...cloud, harnesses: [{ subscriptionBroker: true, subscriptionPreflight: 'cli_missing' }] }, ids.deviceId, ids.deviceId), false)
+})
+
 test('the hosted broker takes a cloud computer bound to its own token, or an allow-listed device', () => {
   const cloud = { enabled: true, kind: 'cloud', harnesses: broker }
   assert.equal(hostedBrokerDevice(cloud, ids.deviceId, ids.deviceId, ''), true, 'no id to list: the bound token is enough')

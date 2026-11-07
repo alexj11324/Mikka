@@ -306,13 +306,15 @@ export async function runEvidence(userId: string, runId: string) {
   // authorization check. Schema projection strips private/unknown fields.
   const identity = executionIdentitySchema.safeParse(run.executionIdentity)
   const routing = modelRoutingEvidenceSchema.safeParse(run.modelRouting)
+  // Names for the identity's references, so the owner reads people and machines, not IDs.
+  const labels = identity.success ? await (await import('@/lib/execution-identity-labels')).executionIdentityLabels(pool, (await import('@/lib/workspace-db')).workspacePool, userId, identity.data) : null
   const captures = await db.select().from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'ready'))).orderBy(asc(runCaptures.createdAt))
   const documents = await runArtifactSubmissions(pool, userId, [runId])
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'recording'))).limit(1)
   return {
-    run: { ...run, executionIdentity: identity.success ? identity.data : null, modelRouting: routing.success ? routing.data : null },
+    run: { ...run, executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null },
     recording: recording.length > 0,
     captures: captures.map(captureView),
     artifacts: documents.map(document => ({ ...document, createdAt: document.createdAt.toISOString() })),

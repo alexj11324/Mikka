@@ -89,6 +89,19 @@ session only after the OS keychain encrypts it. Signup stays in the system
 browser with its existing Turnstile protection. The local protocol is for
 packaged assets, not an OAuth callback handler.
 
+The loopback's page then opens the app link `mikka-auth://auth/done?id=…`
+(`mikka-dev-auth` for Mikka Dev; `protocols` in the electron-builder configs),
+so the system brings the app to the front: macOS does not let an app take the
+front from the browser by itself. The link carries no code or page; main
+accepts only an id it issued in the last ten minutes (`src/main/app-link.ts`,
+`open-url` on macOS, `second-instance` on Windows and Linux). The page then
+tries to close its tab and otherwise shows 已登录，可以关闭此页 with 打开 Mikka.
+
+In the browser, `continue=google` or `continue=github` starts that provider
+without another click. A browser that already has a Mikka web session shows
+that account first (以 <名字> 继续 / 换个账号); 换个账号 opens the provider's
+account picker.
+
 ## Transition and rollback
 
 Bundled mode is the default. Set `MIKKA_DESKTOP_RENDERER=hosted` when launching

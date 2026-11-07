@@ -26,6 +26,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@ui-slot/*": [
+        "./components/slots/*"
       ]
     }
   },
@@ -39,6 +42,7 @@
     "node_modules",
     "packages",
     "apps",
+    ".hosted-ui",
     "cloudflare/device-gateway",
     ".output"
   ]

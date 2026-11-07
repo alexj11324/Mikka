@@ -49,11 +49,13 @@ synthetic canonical publication and deletion tests.
    Claude OAuth inference retains its required opening system block before
    Mikka's host instructions; omitting it returns 429 even with quota available.
    Errors, retries, cancellation and revocation fail closed without paid fallback.
-7. Bot claims pin a native binding to the run. The opt-in hosted Linux daemon
-   uses the existing adapters in a network-isolated Docker runtime. Its external
-   Unix-socket broker injects credentials in Go; the CLI receives only a public
-   placeholder. CPA remains the refresh authority. See the current hosted broker
-   section in the integration document for boundaries and unverified gates.
+7. Task claims pin the selected native binding and machine authority to the run.
+   Under [Alex's #1505 decision](../../docs/design/decisions/2026-11-06-1800-machine-is-the-execution-boundary.md),
+   the initial claim prepares a real short-lived subscription access lease for
+   the assigned machine. Official Claude Code and Codex use it directly with
+   their providers, with normal cloud HOME/environment/Git and no extra Docker,
+   placeholder, provider proxy or per-call remote authorization. CPA remains
+   the refresh-grant custodian; natural renewal happens in the background.
 
 The worker is permanently scoped to one owner connection. No global tenant store
 switch or account pool is used. Refresh claims serialize across processes;
@@ -68,8 +70,10 @@ full grant and an independently validated access-only projection. Both reference
 publish in one Postgres transaction. Execution children receive only the access
 reader identity; they cannot invoke custody methods or fall back to full bundles.
 A trusted prepare call handles refresh and upgrades legacy projections without
-another login. Go enforces owner/workspace/consumer/binding/route/model/revision
-and quota at use, not only in the TypeScript caller. Quota HTTP stays in Go and
+another login. Go checks the owner/workspace/consumer/binding/route/model/revision
+context of the authorized custody operation, not only the TypeScript caller.
+Native Agent requests then go directly to their provider; they do not invoke
+this worker for a permission check before every call. Quota HTTP stays in Go and
 returns a numeric/boolean projection without bearer tokens or raw diagnostics.
 
 `MIKKA_BYOS_ACCESS_INFISICAL_PATH` and `MIKKA_BYOS_ACCESS_INFISICAL_TOKEN` are new
@@ -80,12 +84,16 @@ access. Source checks do not establish actual IAM policy. No identities, grants
 or permissions were configured during synthetic validation. Ordinary trusted
 platform custody remains readable to its authorized runtime/operators.
 
-The production executable refuses raw native credential export unconditionally.
-Its nativeContext/nativeStream RPCs return metadata and brokered protocol bytes,
-never the bearer token. They require a live owner-bound run and exact model.
-The device route additionally requires an operator allow-list and advertised
-hosted-broker capability. Fake CLI integration and real Claude offline shell
-acceptance passed; actual vendor compatibility and E2B delivery remain unverified.
+Production `nativeAuth` may return the access-only lease when the trusted
+launcher explicitly sets `exportAccessLease: true` for an owner-bound run with
+its frozen model and machine authority. The initial native task claim uses this
+path. Ordinary RPC configurations, execution-only children and requests without
+that explicit grant cannot export it. The provider refresh grant remains in
+the custody worker and has no field in the native response. Metadata and
+server-side model operations retain their ordinary authenticated interfaces;
+they are not a mandatory proxy for the assigned machine's provider traffic.
+Real official CLI/subscription execution and production timing remain distinct
+release evidence; synthetic tests do not establish either.
 
 ## Credential deletion
 
@@ -124,10 +132,12 @@ remain untested; logical stop and physical deletion are distinct outcomes.
 The production executable reads one trusted configuration frame over stdin,
 then private RPC. It opens no HTTP listener and reads no local provider credentials.
 Status APIs contain metadata only; connection ceremony responses additionally
-contain the public authorization URL, opaque attempt handle and device user code. Native access material is returned only by explicitly enabled library/test
-capabilities; the production nativeAuth RPC refuses export. Model RPC cannot
-select custody methods. Infisical workload credentials never enter CLI
-environments. The broker interface can be implemented by a private remote channel.
+contain the public authorization URL, opaque attempt handle and device user code.
+Native access material is returned by the explicitly authorized production
+access-lease path described above, as well as the corresponding test capability.
+A generic model RPC cannot enable native export or select custody methods.
+Refresh grants and Infisical workload credentials stay in the custody service;
+the assigned CLI receives the real provider access token, not a placeholder.
 
 Three small original bridge files are installed in the ignored pinned upstream
 checkout: data/converter aliases, a plain Codex HTTP constructor, and a plain
@@ -150,9 +160,12 @@ handoff in the Mikka form. Arbitrary Mikka HTTPS redirects are not supported.
 The protocol is defined by the source in this package.
 
 Config directories are not a security boundary against a same-user shell.
-The web runtime never attests native isolation. Real E2B wiring must keep the
-credential broker/control-plane secrets outside untrusted compute. No topology
-or metered provisioning was selected here.
+One task owns one E2B VM, and that VM is the execution boundary. The machine
+receives the credentials it needs; its Agent may read those ordinary runtime
+files. Reusable templates contain none. Revocation persists and pushes a stop
+or reclaims the VM, while local stops preserve unrelated work. This replaces
+the former requirement to hide provider credentials behind a task-side proxy;
+it does not export the custody service's refresh grants or workload identity.
 
 Provider revocation, pre-journal orphan discovery and deployment workload-token
 delivery/renewal remain operational integration work. Durable known-artifact
