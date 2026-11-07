@@ -258,6 +258,26 @@ function workflowIdentity(env) {
   return { repository: env.GITHUB_REPOSITORY, sourceCommit: env.GITHUB_SHA, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT }
 }
 
+export async function createConfiguredStore(env, report, checkpoint, create = createStore) {
+  report.identity = workflowIdentity(env)
+  report.stage = 'configuration'; await checkpoint()
+  for (const name of ['MIKKA_DATABASE_URL', 'DATABASE_URL']) {
+    let url; try { url = new URL(env[name]) } catch (error) { fail('database_configuration_missing', error) }
+    check(['postgres:', 'postgresql:'].includes(url.protocol) && url.hostname.endsWith('.neon.tech'), 'database_target_invalid')
+  }
+  check(env.NODE_ENV === 'production' && env.VERCEL_ENV === 'production'
+    && env.DEVICE_GATEWAY_PUSH_SECRET, 'runtime_configuration_missing')
+  let gateway; try { gateway = new URL(env.DEVICE_GATEWAY_URL) } catch (error) { fail('gateway_configuration_missing', error) }
+  check(gateway.protocol === 'https:' && !gateway.username && !gateway.password, 'gateway_configuration_invalid')
+  // Normal services import lib/auth; its asynchronous production initialization
+  // rejects without the real secret even though this operator never signs in.
+  check(typeof env.BETTER_AUTH_SECRET === 'string' && env.BETTER_AUTH_SECRET.trim().length > 0,
+    'auth_configuration_missing')
+  check(env.BETTER_AUTH_URL === 'https://app.aspectlylabs.com', 'auth_origin_invalid')
+  report.stage = 'service_import'; await checkpoint()
+  return create()
+}
+
 async function main() {
   const output = resolve('issue1503-report/cad-app-cleanup.json')
   const report = { version: 1, issue: 1503, phase: 'cad_app_fixture_cleanup', status: 'starting' }
@@ -265,19 +285,11 @@ async function main() {
   const contextSymbol = Symbol.for('@vercel/request-context'), prior = globalThis[contextSymbol], pending = []
   let store
   try {
-    report.identity = workflowIdentity(process.env)
-    for (const name of ['MIKKA_DATABASE_URL', 'DATABASE_URL']) {
-      let url; try { url = new URL(process.env[name]) } catch (error) { fail('database_configuration_missing', error) }
-      check(['postgres:', 'postgresql:'].includes(url.protocol) && url.hostname.endsWith('.neon.tech'), 'database_target_invalid')
-    }
-    check(process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'production'
-      && process.env.DEVICE_GATEWAY_PUSH_SECRET, 'runtime_configuration_missing')
-    let gateway; try { gateway = new URL(process.env.DEVICE_GATEWAY_URL) } catch (error) { fail('gateway_configuration_missing', error) }
-    check(gateway.protocol === 'https:' && !gateway.username && !gateway.password, 'gateway_configuration_invalid')
     // Existing non-Next waitUntil contract; drain real commit notifications
     // before closing pools. This is not a user session or an auth substitute.
     globalThis[contextSymbol] = { get: () => ({ waitUntil: promise => pending.push(Promise.resolve(promise)) }) }
-    store = await createStore()
+    store = await createConfiguredStore(process.env, report, checkpoint)
+    report.stage = 'read_exact_fixture'; await checkpoint()
     await cleanupCadFixture(store, { report, checkpoint })
   } catch (error) { report.status = 'failed'; report.code = safeCode(error) }
   finally {

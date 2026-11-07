@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
-import { cleanupCadFixture, FIXTURE, validateSnapshot } from './cad-app-cleanup.mjs'
+import { fileURLToPath } from 'node:url'
+import { cleanupCadFixture, createConfiguredStore, FIXTURE, validateSnapshot } from './cad-app-cleanup.mjs'
 
 const PROFILE = 'f3897bf8-0726-4b5c-9a94-49fd7be8480f'
 const HASH = 'a'.repeat(64)
@@ -96,4 +101,60 @@ test('unknown timing-variable residue is retained and cannot be reported as comp
   assert.equal(result.status, 'failed')
   assert.equal(result.code, 'issue1503_cad_cleanup_timing_variable_retained')
   assert.equal(result.timingVariableReadback.mutated, false)
+})
+
+// These values only exercise the configuration gate. The loader is stubbed or
+// rejected before any service import; no database/provider connection is made.
+const runtimeEnvironment = {
+  GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/ops/issue-1503-cad-app-cleanup',
+  GITHUB_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '42341975974', GITHUB_RUN_ATTEMPT: '1',
+  NODE_ENV: 'production', VERCEL_ENV: 'production',
+  MIKKA_DATABASE_URL: 'postgresql://unused:unused@offline-test.neon.tech/unused',
+  DATABASE_URL: 'postgresql://unused:unused@offline-test.neon.tech/unused',
+  DEVICE_GATEWAY_URL: 'https://offline-test.invalid', DEVICE_GATEWAY_PUSH_SECRET: 'unused',
+  BETTER_AUTH_URL: 'https://app.aspectlylabs.com',
+}
+
+test('missing auth configuration is rejected with a checkpoint before service loading', async () => {
+  for (const auth of [{}, { BETTER_AUTH_SECRET: '  ' },
+    { BETTER_AUTH_SECRET: 'offline-gate-value', BETTER_AUTH_URL: 'https://app.aspectlylabs.com/mikka' }]) {
+    const report = { status: 'starting' }, checkpoints = []
+    let loaded = false
+    await assert.rejects(createConfiguredStore({ ...runtimeEnvironment, ...auth }, report,
+      async () => checkpoints.push(structuredClone(report)), async () => { loaded = true }),
+    /^Error: issue1503_cad_cleanup_auth_(configuration_missing|origin_invalid)$/)
+    assert.equal(loaded, false)
+    assert.deepEqual(checkpoints.map(value => value.stage), ['configuration'])
+    assert.equal(checkpoints[0].identity.runId, runtimeEnvironment.GITHUB_RUN_ID)
+    assert.equal(JSON.stringify(report).includes('offline-gate-value'), false)
+  }
+})
+
+test('starting service-import checkpoint is persisted before the loader can fail', async () => {
+  const report = { status: 'starting' }, checkpoints = [], failure = new Error('offline loader failure')
+  await assert.rejects(createConfiguredStore({ ...runtimeEnvironment, BETTER_AUTH_SECRET: 'offline-gate-value' }, report,
+    async () => checkpoints.push(structuredClone(report)), async () => {
+      assert.deepEqual(checkpoints.map(value => value.stage), ['configuration', 'service_import'])
+      assert.ok(checkpoints.every(value => value.status === 'starting'))
+      throw failure
+    }), error => error === failure)
+  assert.equal(checkpoints.at(-1).identity.sourceCommit, runtimeEnvironment.GITHUB_SHA)
+})
+
+test('CLI missing-secret failure leaves a closed safe receipt without importing services', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'mikka-cad-config-'))
+  try {
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./cad-app-cleanup.mjs', import.meta.url))],
+      { cwd, env: runtimeEnvironment, encoding: 'utf8', timeout: 10000 })
+    assert.equal(result.status, 1)
+    assert.equal(result.stderr, '')
+    const report = JSON.parse(await readFile(join(cwd, 'issue1503-report/cad-app-cleanup.json'), 'utf8'))
+    assert.equal(report.status, 'failed')
+    assert.equal(report.code, 'issue1503_cad_cleanup_auth_configuration_missing')
+    assert.equal(report.stage, 'configuration')
+    assert.equal(report.identity.runId, runtimeEnvironment.GITHUB_RUN_ID)
+    assert.equal(report.background.waitUntilPromisesAwaited, 0)
+    assert.equal(report.before, undefined)
+    assert.equal(report.actions, undefined)
+  } finally { await rm(cwd, { recursive: true, force: true }) }
 })

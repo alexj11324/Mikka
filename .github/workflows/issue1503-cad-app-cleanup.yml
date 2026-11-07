@@ -71,11 +71,23 @@ jobs:
           secret-name: DEVICE_GATEWAY_PUSH_SECRET
           recursive: false
           include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: BETTER_AUTH_SECRET
+          recursive: false
+          include-imports: false
       - name: Clean only the recorded cad fixture without creating a login
         run: node --import ./scripts/server-test.mjs --import tsx scripts/ops/issue1503/cad-app-cleanup.mjs
         env:
           NODE_ENV: production
           VERCEL_ENV: production
+          BETTER_AUTH_URL: https://app.aspectlylabs.com
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
