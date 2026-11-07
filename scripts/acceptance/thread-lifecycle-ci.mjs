@@ -21,6 +21,16 @@ const REQUEST_DEADLINE = Object.freeze({ operation: 'setTimeout', requestTimeout
   errorName: 'TimeoutError', earlyReplayIo: 0, recovered: true })
 const requestDeadlineProved = value => value !== null && typeof value === 'object' && !Array.isArray(value)
   && Object.entries(REQUEST_DEADLINE).every(([key, expected]) => value[key] === expected)
+const RETIREMENT_FLAGS = ['restoredBeforeKill', 'restoredAfterKill', 'uploadClockAuthoritative', 'openRetentionRetained',
+  'closedGraceRetained', 'missingCheckpointRetained', 'deviceTokenRevoked', 'automaticKillConfirmed', 'historyPreserved']
+const retirementProved = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+  && value.scope === 'confirmed-checkpoint-to-automatic-retirement' && value.clock === 'controlled-paused-deadline'
+  && /^[a-f0-9]{64}$/.test(value.checkpointSha256 ?? '') && RETIREMENT_FLAGS.every(key => value[key] === true)
+  && ['requestedAt', 'observedAt'].every(key => typeof value[key] === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value[key]))
+  && Number.isFinite(Date.parse(value.requestedAt)) && Number.isFinite(Date.parse(value.observedAt))
+  && Date.parse(value.observedAt) >= Date.parse(value.requestedAt)
+const retirementReceipt = value => ({ scope: value.scope, clock: value.clock, checkpointSha256: value.checkpointSha256,
+  ...Object.fromEntries(RETIREMENT_FLAGS.map(key => [key, true])), requestedAt: value.requestedAt, observedAt: value.observedAt })
 const QUESTION_RESUME_SCOPE = 'real_owner_factory_question_pause_resume_with_native_report'
 const ISSUE_PENDING = ['external_wait_and_adjacent_stage_continuity', 'terminal_revoke_and_close_grace_retention',
   'provider_timeout_fault_injection', 'latency_and_cost_measurement']
@@ -62,7 +72,7 @@ export function assertReleaseIdentity(expected, workflow, run) {
 /** Only lifecycle source/driver changes or an actually validated candidate spend money. */
 export function lifecycleChanged(files) {
   return files.some(file => /^(?:lib\/cloud-computer\/thread-(?:machines|lifecycle(?:-provider|-due|-log)?)\.ts|workflows\/thread-machine\/[^/]+\.ts)$/.test(file)
-    || /^scripts\/(?:acceptance\/thread-lifecycle(?:-ci)?(?:\.test)?\.mjs|e2b\/thread-lifecycle-acceptance(?:\.test)?\.ts)$/.test(file)
+    || /^scripts\/(?:acceptance\/thread-lifecycle(?:-ci)?(?:\.test)?\.mjs|e2b\/thread-lifecycle-(?:acceptance|archive)(?:\.test)?\.ts)$/.test(file)
     || file === '.github/workflows/thread-lifecycle-acceptance.yml')
 }
 
@@ -173,12 +183,14 @@ export async function providerReceipt({ sourceCommit, run }) {
       && report.subscriptionAcceptance === false && report.modelCalls === 0
       && report.resumeScope === PROVIDER_SCOPE.resumeScope
       && report.requestDeadlineScope === PROVIDER_SCOPE.requestDeadlineScope && requestDeadlineProved(report.requestDeadline)
+      && retirementProved(report.retirement) && report.counters?.kill === 1
       && JSON.stringify(report.cases) === JSON.stringify(PROVIDER_CASES)
       && ['info', 'keepAlive', 'pause', 'kill'].every(key => Number.isSafeInteger(report.counters?.[key]) && report.counters[key] >= 0)
       && report.cleanup?.provider === 'confirmed_missing' && report.cleanup?.database === 'dropped', 'provider_report')
     return { ...base, status: 'passed', acceptance: report.acceptance, workerHash: report.workerHash,
       template: report.template, sandboxId: report.sandboxId, runId: report.runId, cases: [...PROVIDER_CASES],
       requestDeadline: { ...REQUEST_DEADLINE },
+      retirement: retirementReceipt(report.retirement),
       counters: Object.fromEntries(['info', 'keepAlive', 'pause', 'kill'].map(key => [key, report.counters[key]])),
       cleanup: { status: 'passed', provider: 'confirmed_missing', database: 'dropped' } }
   } catch (error) {
@@ -197,6 +209,7 @@ export function completeEvidence(sourceCommit, provider, owner, outcomes) {
   const providerPassed = outcomes.provider === 'success' && provider?.sourceCommit === sourceCommit
     && provider.status === 'passed' && provider.cleanup?.status === 'passed'
     && provider.scope?.requestDeadlineScope === PROVIDER_SCOPE.requestDeadlineScope && requestDeadlineProved(provider.requestDeadline)
+    && retirementProved(provider.retirement) && provider.counters?.kill === 1
     && JSON.stringify(provider.cases) === JSON.stringify(PROVIDER_CASES)
   const questionResumePassed = outcomes.owner === 'success' && owner?.sourceCommit === sourceCommit && owner.scope === QUESTION_RESUME_SCOPE
     && owner.issueAcceptance === 'incomplete' && owner.status === 'passed' && owner.cleanup?.status === 'passed'
@@ -209,6 +222,7 @@ export function completeEvidence(sourceCommit, provider, owner, outcomes) {
     scope: 'provider_controller_faults_and_task_vm_question_resume', status: passed ? 'passed' : 'failed',
     issueAcceptance: 'incomplete', pending: ISSUE_PENDING.filter(item => item !== 'provider_timeout_fault_injection' || !providerPassed),
     providerIntegration: providerPassed ? 'passed' : 'incomplete',
+    automaticRetirement: providerPassed ? 'passed' : 'incomplete',
     questionResume: questionResumePassed ? 'passed' : 'incomplete', providerScope: PROVIDER_SCOPE }
 }
 

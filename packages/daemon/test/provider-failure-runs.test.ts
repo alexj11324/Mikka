@@ -158,8 +158,9 @@ it.each(providerStops)("confirms an empty first-request snapshot before publishi
       order.push("upload")
       uploading.resolve(snapshot)
       await release.promise
-      await save(runId, snapshot)
+      const receipt = await save(runId, snapshot)
       order.push("confirmed")
+      return receipt
     }
     link.completeRun = async (runId, report) => {
       order.push("complete")
@@ -193,7 +194,7 @@ it("marks a failed final upload unavailable and continues only with the retained
     const save = link.checkpointRun!
     link.checkpointRun = async (runId, snapshot) => {
       if (++uploads === 2) throw new Error("Controlled final checkpoint upload failure")
-      await save(runId, snapshot)
+      return save(runId, snapshot)
     }
   })
   expect(uploads).toBe(2)
@@ -244,8 +245,9 @@ it("waits for an in-flight heartbeat before saving the final tree", async () => 
         uploading.resolve()
         await releaseUpload.promise
       }
-      await save(runId, snapshot)
+      const receipt = await save(runId, snapshot)
       uploaded.push(snapshot)
+      return receipt
     }
   })
   expect(uploaded).toHaveLength(2)
@@ -266,7 +268,7 @@ it.each(providerStops)("keeps repeated cancellation authoritative while the $sto
     link.checkpointRun = async (runId, snapshot) => {
       uploading.resolve()
       await release.promise
-      await save(runId, snapshot)
+      return save(runId, snapshot)
     }
   })
   expect(completion?.stopReason).toBe("cancelled")
