@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { workspaceDb, workspacePool } from '@/lib/workspace-db'
-import { acquireWorkspaceMembership } from '@/lib/workspace-membership-guard'
+import { withTaskWorkspace } from '@/lib/task-workspace'
 import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 import { requireWorkspace } from '@/lib/workspace-access'
 import { readGovernanceLease } from './lease'
@@ -24,32 +24,21 @@ export function usageRange(input: { from?: string | null; to?: string | null }, 
 /** Actual hosted ledger only: BYOS runs never acquire a synthetic cost or charge here. */
 export async function readWorkspaceUsage(workspaceId: string, userId: string, range: { from?: string | null; to?: string | null }) {
   const { from, to } = usageRange(range)
-  // Acquire APP before workspace, matching hosted reservation and policy writes.
-  // Holding workspace while waiting for an exhausted APP pool forms a cycle.
-  return writeTransaction(pool, async () => ({
-    from: from.toISOString(), toExclusive: to.toISOString(), currency: 'USD', costUnit: 'microUSD',
-    hosted: [] as UsageRow[], runs: [] as { status: string; count: number }[],
-  }), {
-    guard: async (_tx, signal) => {
-      const lease = await acquireWorkspaceMembership(workspacePool, { workspaceId, userId, pinWorkspace: true }, signal)
-      try {
-        const scope = await readGovernanceLease(lease.workspaceClient!, workspaceId, userId)
-        if (scope.role !== 'admin') throw new GovernanceError('access_denied')
-        if (!scope.entitlements.usageExport) throw new GovernanceError('feature_unavailable')
-        return lease
-      } catch (error) { await lease.close(); throw error }
-    },
-    guardedWork: async (tx, result) => {
-      const { rows } = await tx.query<UsageRow>(`select to_char("createdAt" at time zone 'UTC','YYYY-MM-DD') as day,model,
-        count(*)::int as requests,sum("inputTokens")::text as "inputTokens",sum("outputTokens")::text as "outputTokens",
-        coalesce(sum("costMicroUsd"),0)::text as "costMicroUsd",sum("freeMicroUsd")::text as "freeMicroUsd",sum("purchasedMicroUsd")::text as "purchasedMicroUsd"
-        from hosted_usage where "workspaceId"=$1 and "createdAt">=$2 and "createdAt"<$3 and state='settled'
-        group by day,model order by day,model limit 50001`, [workspaceId, from, to])
-      if (rows.length > 50000) throw new GovernanceError('invalid_request')
-      const { rows: runs } = await tx.query<{ status: string; count: number }>('select status,count(*)::int as count from agent_runs where "workspaceId"=$1 and "createdAt">=$2 and "createdAt"<$3 group by status order by status', [workspaceId, from, to])
-      return { ...result, hosted: rows, runs }
-    },
-  })
+  // Match task writers' WS -> APP order. workspacePool reuses the pinned
+  // workspace transaction, including composed reads with a bounded pool.
+  return withTaskWorkspace(userId, workspaceId, () => writeTransaction(pool, async tx => {
+    const scope = await readGovernanceLease(workspacePool, workspaceId, userId)
+    if (scope.role !== 'admin') throw new GovernanceError('access_denied')
+    if (!scope.entitlements.usageExport) throw new GovernanceError('feature_unavailable')
+    const { rows } = await tx.query<UsageRow>(`select to_char("createdAt" at time zone 'UTC','YYYY-MM-DD') as day,model,
+      count(*)::int as requests,sum("inputTokens")::text as "inputTokens",sum("outputTokens")::text as "outputTokens",
+      coalesce(sum("costMicroUsd"),0)::text as "costMicroUsd",sum("freeMicroUsd")::text as "freeMicroUsd",sum("purchasedMicroUsd")::text as "purchasedMicroUsd"
+      from hosted_usage where "workspaceId"=$1 and "createdAt">=$2 and "createdAt"<$3 and state='settled'
+      group by day,model order by day,model limit 50001`, [workspaceId, from, to])
+    if (rows.length > 50000) throw new GovernanceError('invalid_request')
+    const { rows: runs } = await tx.query<{ status: string; count: number }>('select status,count(*)::int as count from agent_runs where "workspaceId"=$1 and "createdAt">=$2 and "createdAt"<$3 group by status order by status', [workspaceId, from, to])
+    return { from: from.toISOString(), toExclusive: to.toISOString(), currency: 'USD', costUnit: 'microUSD', hosted: rows, runs }
+  }))
 }
 
 export async function exportWorkspaceUsage(workspaceId: string, userId: string, range: { from?: string | null; to?: string | null }) {

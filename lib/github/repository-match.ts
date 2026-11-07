@@ -1,5 +1,7 @@
-/** The Mikka GitHub App's page where a person picks which repositories it may reach. */
-export const GITHUB_APP_INSTALL_URL = 'https://github.com/apps/mikka-github/installations/new'
+import { withBasePath } from '@/lib/base-path'
+
+/** Resolve the deployment's GitHub App on the server, including runtime configuration. */
+export const GITHUB_APP_INSTALL_URL = withBasePath('/api/integrations/github/install')
 
 /** A repository named without its owner ("Mikka_test"): not owner/repo, not a URL or SSH address. */
 export function isBareRepositoryName(repo: string) {

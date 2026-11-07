@@ -1,5 +1,7 @@
 'use server'
 
+import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
+
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { deploymentSwitch } from '@/lib/deployment-switches'
@@ -42,7 +44,7 @@ import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, threadQuestionR
 import { readThreadQuestionState, type ThreadQuestionDeadline } from '@/lib/issue-thread-questions'
 import { runIsActive } from '@/lib/issue-run-conversation'
 import { issueThreadListText } from '@/lib/issue-thread-list-projection'
-import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
+import { listIssueRunChains, readRunChain, readRunChainCheckpoint } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
 import { threadPromptView } from '@/lib/thread-prompt'
@@ -230,7 +232,7 @@ async function issueThreadAccess(issueId: string) {
 const threadColumns = {
   id: agentRuns.id, issueId: agentRuns.issueId, userId: agentRuns.userId, status: agentRuns.status, prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength,
   // Only the report's summary: runSummaryText reads nothing else of it.
-  sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
+  sessionId: agentRuns.sessionId, deviceRepoId: agentRuns.deviceRepoId, failureDetails: agentRuns.failureDetails, report: sql<Record<string, unknown> | null>`case when jsonb_typeof(${agentRuns.report}) = 'object' then jsonb_build_object('summary', ${agentRuns.report}->'summary') end`, error: agentRuns.error, createdAt: agentRuns.createdAt, finishedAt: agentRuns.finishedAt,
   agentName: runBotName, harness: agents.harness, ownerName: users.name, stopRequestedAt: agentRuns.stopRequestedAt, outcome: agentRuns.outcome,
   botColor: sql<string | null>`(select b.color from bots b where b.id = ${runBotId})`, botShape: sql<string | null>`(select b.shape from bots b where b.id = ${runBotId})`,
 }
@@ -317,9 +319,16 @@ export async function findThreadIssue(runId: string): Promise<{ issueId: string 
 
 async function readThreadIssue(runId: string): Promise<{ issueId: string | null } | null> {
   if (!z.uuid().safeParse(runId).success) return null
-  const [run] = await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(eq(agentRuns.id, runId)).limit(1)
+  const [run] = await db.select({ ...threadIdentityColumns, issueId: agentRuns.issueId, workspaceId: agentRuns.workspaceId })
+    .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, runId)).limit(1)
   if (!run) return null
   try {
+    if (run.issueId === null) {
+      const user = await getWorkspaceReader()
+      // The first read already has the task-free identity. Authorization still
+      // selects the current workspace and checks active membership on every call.
+      return run.userId === user.id && run.workspaceId === user[tokenWorkspace] ? { issueId: null } : null
+    }
     await readableThread(run.issueId, runId, threadIdentityColumns)
     return { issueId: run.issueId }
   } catch { return null }
@@ -329,7 +338,7 @@ export interface IssueThreadDetail {
   /** Authorized scopes for every attempt; browser state never guesses them. */
   live?: { runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null; revisions?: Record<string, number> }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; /** `prompt` is the task alone; the Agent also received system instructions (getThreadInstructions). */ hasInstructions?: true; stopRequestedAt: Date | null; /** Host projection for the existing controls; mutations still revalidate. */ replyAvailable: boolean; retryAvailable: boolean; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
+  thread: IssueThread & { failureDetails: RunFailure | null; prompt: string; /** `prompt` is the task alone; the Agent also received system instructions (getThreadInstructions). */ hasInstructions?: true; stopRequestedAt: Date | null; /** Host projection for the existing controls; mutations still revalidate. */ replyAvailable: boolean; retryAvailable: boolean; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
   /** Where `chunks` ends; passed back, the next read returns only later chunks. */
@@ -443,13 +452,15 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   // Failure and Retry address that same run. Keep the root's name, prompt and
   // identity while reading the latest failed continuation's masked error.
   let error: string | null = null
+  let failureDetails = readRunFailure(live && live.runId !== row.id ? live.failureDetails : row.failureDetails)
   if ((live?.status ?? row.status) === 'failed') {
     if (!live || live.runId === row.id) error = row.error ?? null
     else {
-      const [failed] = await db.select({ error: agentRuns.error }).from(agentRuns)
+      const [failed] = await db.select({ error: agentRuns.error, failureDetails: agentRuns.failureDetails }).from(agentRuns)
         .where(and(eq(agentRuns.id, live.runId), eq(agentRuns.userId, row.userId),
           row.issueId === null ? isNull(agentRuns.issueId) : eq(agentRuns.issueId, row.issueId), eq(agentRuns.status, 'failed'))).limit(1)
       error = failed?.error ?? null
+      failureDetails = readRunFailure(failed?.failureDetails)
     }
   }
   const questionWake = thread.questionWake ?? null
@@ -486,7 +497,7 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   ])
   return {
     live: { runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
-    thread: { ...thread, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
@@ -514,10 +525,7 @@ export async function getThreadChanges(issueId: string | null, runId: string): P
 
 async function readThreadChanges(issueId: string | null, runId: string): Promise<ThreadChangesResult> {
   const { row } = await readableThread(issueId, runId, threadIdentityColumns)
-  const chain = await readRunChain(pool, row.userId, row.id)
-  const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
-  const { rows: [checkpoint] } = await pool.query<{ patch: Buffer; unavailableReason: string | null }>(
-    'SELECT patch,"unavailableReason" FROM run_checkpoints WHERE "runId"=ANY($1::uuid[]) ORDER BY "updatedAt" DESC LIMIT 1', [runIds])
+  const { runIds, checkpoint } = await readRunChainCheckpoint(pool, row.userId, row.id)
   if (!checkpoint) return { state: 'none' }
   if (checkpoint.unavailableReason) return { state: 'tooLarge' }
   let text: string

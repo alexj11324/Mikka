@@ -5,6 +5,8 @@ import { attestDeployedTarget } from '../acceptance/deployed-target.mjs'
 import { PROJECT, TEAM, PRODUCTION_ALIAS } from '../ops/deployment-regression.mjs'
 import { encode, decode } from '../../lib/desktop-rpc/wire.ts'
 import { runMobileDaemonProof, newEnrollmentCredential } from './production-mobile-daemon.mjs'
+import { CORE_MODE, CORE_WORKFLOW, CORE_ISSUES, attestCoreProduction } from '../acceptance/self-hosted-production-target.mjs'
+import { liveReady } from '../../lib/live/events.ts'
 
 const id = n => '30000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const OWNER = id(1), WORKSPACE = id(2), OLD_DEVICE = id(3), NEW_DEVICE = id(4), OLD_TOKEN = id(5), NEW_TOKEN = id(6)
@@ -28,6 +30,23 @@ function fixture(options = {}) {
   const oldDevice = { id: OLD_DEVICE, name: 'Existing protected device', enabled: true, online: false,
     hostname: 'existing', platform: 'other', arch: 'other', harnesses: [], lastSeenAt: null, repos: [] }
   const requests = []
+  const sockets = []
+  const ticketProtocol = () => 'mikka-ticket-' + Math.floor((clock + 299_000) / 1000) + '-' + 'a'.repeat(64)
+  const socketFactory = (url, protocol) => {
+    assert.equal(protocol, ticketProtocol())
+    const socket = new EventTarget()
+    Object.assign(socket, { url, readyState: 0,
+      send(value) { assert.equal(value, 'ping'); queueMicrotask(() => socket.dispatchEvent(new MessageEvent('message', { data: 'pong' }))) },
+      close() { socket.readyState = 3; socket.dispatchEvent(new Event('close')) },
+    })
+    sockets.push(socket)
+    queueMicrotask(() => {
+      socket.readyState = 1; socket.dispatchEvent(new Event('open'))
+      if (url.includes('/v1/live/')) socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(liveReady()) }))
+      else if (options.gatewayCloses) socket.close()
+    })
+    return socket
+  }
   const choices = [{ id: WORKSPACE, name: 'Personal', kind: 'personal' },
     ...(options.teamCount === 0 ? [] : [
       { id: SECOND_TEAM, name: 'Other team', kind: 'team' },
@@ -102,6 +121,20 @@ function fixture(options = {}) {
         workspaces: choices, bots: [], threads: { running: 0, waiting: 0 },
         live: { ownerId: OWNER, workspaceId: null },
       })
+      if (path.endsWith('/api/desktop/discovery')) {
+        assert.equal(options.core, true); assert.equal(method, 'GET')
+        return response({ version: ENV.GITHUB_SHA, edition: 'cloud', basePath: '/mikka', desktopProtocol: { min: 0, max: 1 },
+          cloud: { connected: false }, mobileReady: true, signIn: { email: true, google: true, github: true } })
+      }
+      if (path.endsWith('/api/live/ticket')) {
+        assert.equal(options.core, true); assert.equal(method, 'GET')
+        // Owner device lists use the personal channel, even after the normal
+        // cookie has selected the authorized shared team for business reads.
+        assert.equal(selectedTeam(headers), true); assert.equal(url.search, '?workspace=' + WORKSPACE)
+        const channel = createHash('sha256').update(JSON.stringify([OWNER, WORKSPACE])).digest('hex')
+        return response({ url: 'wss://mikka-gateway.aspectlylabs.com/v1/live/' + channel + '/socket',
+          protocol: ticketProtocol(), expiresAt: clock + 299_000 })
+      }
       if (path.endsWith('/renderer-manifest.json')) return response({ version: 1, target: 'web',
         usedActions: options.missingAction ? ['agents.pollDevices', 'agents.setDeviceEnabled']
           : ['agents.pollDevices', 'agents.setDeviceEnabled', 'agents.removeDevice'] })
@@ -123,7 +156,11 @@ function fixture(options = {}) {
           return response({ version: 1, ok: true, result: encode({ ok: true, data: { workspaceId: TEAM_WORKSPACE } }) },
             200, options.dropSwitchCookie ? undefined : { 'set-cookie': 'mikka-workspace=' + TEAM_WORKSPACE + '; Path=/; Secure; HttpOnly; SameSite=Lax' })
         }
-        if (body.action === 'agents.pollDevices') result = { devices: devices(), live: { ownerId: OWNER, workspaceId: WORKSPACE } }
+        if (body.action === 'desktop.bootstrap') {
+          assert.equal(options.core, true); assert.deepEqual(args, [TEAM_WORKSPACE])
+          result = { user: { id: OWNER }, cacheWorkspace: { workspaceId: TEAM_WORKSPACE, role: 'member' }, edition: 'cloud',
+            emailEnabled: true, features: { cloudComputer: true, flags: { 'mikka-computer-billing': false, 'mikka-computer-tab-off': false } } }
+        } else if (body.action === 'agents.pollDevices') result = { devices: devices(), live: { ownerId: OWNER, workspaceId: WORKSPACE } }
         else if (body.action === 'agents.setDeviceEnabled') {
           assert.deepEqual(args, [{ deviceId: NEW_DEVICE, enabled: false }])
           assert.equal(newDevice.id, NEW_DEVICE)
@@ -161,8 +198,16 @@ function fixture(options = {}) {
       newDevice = { id: NEW_DEVICE, name: options.wrongDeviceMarker ? 'Unconfirmed other device' : body.name,
         hostname: body.hostname, platform: body.platform,
         arch: body.arch, harnesses: [], online: true, enabled: true, seen: clock, repos: [] }
+      sockets.find(socket => socket.url.includes('/v1/live/'))?.dispatchEvent(new MessageEvent('message', {
+        data: JSON.stringify({ kind: 'device_list', id: WORKSPACE }),
+      }))
       if (options.lostRegisterReply) throw new Error('transport-error-' + CREDENTIAL + '-' + COOKIE)
       return response({ deviceId: NEW_DEVICE, workspaceId: WORKSPACE })
+    }
+    if (path === '/mikka/v1/devices/' + NEW_DEVICE + '/gateway') {
+      assert.equal(options.core, true); assert.equal(method, 'GET'); assert.equal(newDevice.enabled, false)
+      return response({ url: 'wss://mikka-gateway.aspectlylabs.com/v1/devices/' + NEW_DEVICE + '/socket', protocol: ticketProtocol(),
+        runControl: 'push', computerReviews: 'push', coordinatorResults: 'push' })
     }
     if (path === '/mikka/v1/devices/' + NEW_DEVICE + '/heartbeat') {
       assert.equal(newDevice.enabled, false)
@@ -173,7 +218,7 @@ function fixture(options = {}) {
     }
     assert.fail('Unexpected path: ' + path)
   }
-  return { requests, tokenRows, oldDevice, fetchImpl, now: () => clock, get removed() { return removed },
+  return { requests, tokenRows, oldDevice, fetchImpl, socketFactory, sockets, now: () => clock, get removed() { return removed },
     run: overrides => runMobileDaemonProof({ env: ENV, fetchImpl, now: () => clock,
       wait: async ms => { clock += ms }, deploymentGate: async () => {}, ...overrides }) }
 }
@@ -456,6 +501,76 @@ test('mobile requires the switched cookie readback and the actual home to identi
       assert.equal(report.checks.mobileHomeOwner, false)
       assert.ok(report.errors.some(row => row.code === 'mobile_home_failed'))
     }
+    noSensitiveReport(report)
+  }
+})
+
+function coreFixture(business, { changed = () => false } = {}) {
+  const env = { ...ENV, MIKKA_ACCEPTANCE_TARGET_MODE: CORE_MODE, GITHUB_REPOSITORY_OWNER: 'alexj11324',
+    GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REF: 'refs/heads/main', GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/' + CORE_WORKFLOW + '@refs/heads/main' }
+  const repository = { full_name: 'alexj11324/Mikka', owner: { login: 'alexj11324' } }
+  const api = 'https://api.github.com/repos/alexj11324/Mikka'
+  const release = { id: 51, run_attempt: 1, url: api + '/actions/runs/51', name: 'Web deploy', path: '.github/workflows/web-deploy.yml',
+    repository, head_repository: repository, event: 'push', head_branch: 'main', head_sha: env.GITHUB_SHA,
+    status: 'completed', conclusion: 'success' }
+  const event = { action: 'completed', repository, workflow_run: release }
+  const fetchImpl = async (input, init) => {
+    const url = new URL(input), headers = new Headers(init.headers)
+    if (url.origin === 'https://api.github.com') {
+      assert.equal(init.method, 'GET'); assert.equal(headers.has('cookie'), false)
+      assert.equal(headers.get('authorization'), 'Bearer ' + env.GH_TOKEN)
+      if (url.href === api + '/actions/runs/17') return response({ id: 17, run_attempt: 1, repository, head_repository: repository,
+        url: url.href, path: CORE_WORKFLOW, event: 'workflow_run', head_branch: 'main', head_sha: env.GITHUB_SHA,
+        status: 'in_progress', conclusion: null })
+      if (url.pathname.includes('/issues/')) {
+        const number = Number(url.pathname.split('/').at(-1)); assert.ok(CORE_ISSUES.includes(number))
+        return response({ number, url: url.href, repository_url: api, state: 'open' })
+      }
+      if (url.href === api + '/git/ref/heads/main') return response({ ref: 'refs/heads/main', object: { type: 'commit', sha: changed() ? 'c'.repeat(40) : env.GITHUB_SHA } })
+      if (url.href === release.url) return response(release)
+      if (url.href === release.url + '/attempts/1/jobs?per_page=100') return response({ total_count: 1, jobs: [{
+        id: 61, name: 'deploy', run_id: 51, head_sha: env.GITHUB_SHA, status: 'completed', conclusion: 'success',
+        steps: ['Verify the official runtime stays on the cloud edition', 'Build (runs migrations last, as the Vercel build did)',
+          'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
+          .map(name => ({ name, status: 'completed', conclusion: 'success' })),
+      }] })
+      assert.fail('Unexpected core target metadata')
+    }
+    if (url.pathname === '/mikka/api/version') {
+      assert.equal(headers.has('authorization'), false); assert.equal(headers.has('cookie'), false)
+      return response({ build: env.GITHUB_SHA })
+    }
+    return business.fetchImpl(input, init)
+  }
+  return { env, event, fetchImpl, now: business.now, socketFactory: business.socketFactory,
+    proof: () => attestCoreProduction({ env, event, fetchImpl, now: business.now }) }
+}
+
+test('core workflow_run composes real source daemon HTTP, current target guards, both sockets and exact cleanup', async () => {
+  const f = fixture({ core: true }), target = coreFixture(f)
+  const report = await f.run({ ...target, attestation: await target.proof() })
+  assert.equal(report.status, 'pass', JSON.stringify(report))
+  assert.equal(report.scope, 'mikka-cloud-core-compatibility'); assert.equal(report.targetMode, CORE_MODE)
+  assert.ok(Object.values(report.checks).every(Boolean)); assert.ok(Object.values(report.cleanup).every(Boolean))
+  assert.equal(report.core.billing.status, 'not_authorized')
+  assert.equal(report.boundaries.quotaEnforcementExercised, false)
+  assert.equal(report.boundaries.modelRequestsByDriver, 0)
+  assert.equal(f.sockets.length, 2); assert.ok(f.sockets.every(socket => socket.readyState === 3))
+  assert.equal(f.requests.filter(row => row.path.endsWith('/register')).length, 1)
+  assert.equal(f.requests.some(row => row.action?.startsWith('billing.')), false)
+  assert.equal(f.removed, true); noSensitiveReport(report)
+})
+
+test('core gateway refusal and later deployment drift still close sockets and clean only this attempt', async () => {
+  for (const gatewayCloses of [true, false]) {
+    const f = fixture({ core: true, gatewayCloses }), target = coreFixture(f, { changed: () => !gatewayCloses && f.removed })
+    const report = await f.run({ ...target, attestation: await target.proof() })
+    assert.equal(report.status, 'fail'); assert.ok(Object.values(report.cleanup).every(Boolean), JSON.stringify(report))
+    assert.ok(f.sockets.every(socket => socket.readyState === 3)); assert.equal(f.removed, true)
+    assert.equal(f.requests.filter(row => row.path.endsWith('/register')).length, 1)
+    if (gatewayCloses) assert.ok(report.errors.some(error => error.phase === 'core-device-gateway' && error.code === 'core_socket'))
+    else assert.deepEqual(report.targetFailure, { code: 'core_target_changed', detail: 'main' })
     noSensitiveReport(report)
   }
 })

@@ -36,7 +36,7 @@ stub('../issue-visibility.ts', { issueVisibility: () => {} })
 stub('../task-identifier-server.ts', { taskIdentifiers: () => {} })
 stub('../artifacts/store.ts', { artifactSummaries: () => {} })
 stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () => {} })
-stub('../live/coordinator-session.ts', { coordinatorSessionChanged: async () => {} })
+stub('../live/coordinator-session.ts', { coordinatorSessionChanged: async () => {}, coordinatorSessionScope: async () => null })
 
 let store: typeof import('./store')
 before(async () => { store = await import('./store') })

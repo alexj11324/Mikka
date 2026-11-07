@@ -17,7 +17,7 @@ const dialect = new PgDialect()
 type Stored = { id: string; userId: string; botId: string | null; kind: string; dedupeKey: string; issueId: null; runId: null; payload: { text: string; taskDestination?: TaskDestination; profileId?: string; humanSessionId?: string } }
 function fixture() {
   const rows = new Map<string, Stored>()
-  const botRows = new Map<string, { id: string; name: string; ownerId: string }>([[COORDINATOR_BOT, { id: COORDINATOR_BOT, name: 'Coordinator', ownerId: 'owner' }]])
+  const botRows = new Map<string, { id: string; name: string; ownerId: string; workspaceId: string; coordinator?: boolean }>([[COORDINATOR_BOT, { id: COORDINATOR_BOT, name: 'Coordinator', ownerId: 'owner', workspaceId: PROFILE_WORKSPACE, coordinator: true }]])
   const deviceRows = new Map<string, { id: string; ownerId: string; kind: string; enabled: boolean }>()
   const trace: string[] = []
   const state: { insertError?: Error; selectError?: Error; arbitrate?: (event: Stored) => Promise<void>; missingRead?: boolean } = {}
@@ -41,7 +41,7 @@ function fixture() {
       return { where(condition: SQL) {
         const query = dialect.sqlToQuery(condition)
         if (table === coordinatorEvents) assert.match(query.sql, /"coordinator_events"\."dedupeKey"/)
-        else if (table === bots) { assert.match(query.sql, /"bots"\."id"/); assert.match(query.sql, /"bots"\."ownerId"/) }
+        else if (table === bots) { assert.match(query.sql, /"bots"\."id"/); assert.match(query.sql, /"bots"\."ownerId"/); assert.match(query.sql, /"bots"\."workspaceId"/) }
         else { assert.match(query.sql, /"devices"\."id"/); assert.match(query.sql, /"devices"\."ownerId"/); assert.match(query.sql, /"devices"\."kind"/); assert.match(query.sql, /"devices"\."enabled"/) }
         return { async limit(count: number) {
           assert.equal(count, 1)
@@ -49,7 +49,7 @@ function fixture() {
           if (state.selectError) throw state.selectError
           if (state.missingRead) return []
           const row = table === coordinatorEvents ? rows.get(query.params[0] as string)
-            : table === bots ? [...botRows.values()].find(bot => query.params.includes(bot.id) && query.params.includes(bot.ownerId))
+            : table === bots ? [...botRows.values()].find(bot => query.params.includes(bot.id) && query.params.includes(bot.ownerId) && query.params.includes(bot.workspaceId))
               : [...deviceRows.values()].find(device => query.params.includes(device.id) && query.params.includes(device.ownerId) && query.params.includes(device.kind) && query.params.includes(device.enabled))
           return row ? [structuredClone(row)] : []
         } }
@@ -199,15 +199,30 @@ let suggestion: SuggestionRow | null = null
 const dismissed: string[] = []
 let dismissError: Error | null = null
 let transactionTail: Promise<unknown> = Promise.resolve()
+async function transaction(run: (tx: unknown) => Promise<unknown>) {
+  const state = current, rows = structuredClone([...state.rows]), dismissedBefore = [...dismissed]
+  try { return await run(state.executor) }
+  catch (error) {
+    state.rows.clear()
+    for (const [key, value] of rows) state.rows.set(key, value)
+    dismissed.splice(0, dismissed.length, ...dismissedBefore)
+    throw error
+  }
+}
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId }, session: { id: 'synthetic-browser-session' } } : null } } } })
-  // A transaction runs on the same in-memory executor; the real one rolls back when the callback throws.
+  mock.module('@/lib/workspace-access', { namedExports: { loadWorkspaceContext: async (_requested: unknown, user: { id: string }) => {
+    assert.equal(user.id, userId)
+    return { workspace: { id: PROFILE_WORKSPACE } }
+  } } })
+  // Match the real transaction: a readiness refusal after claiming the actual
+  // suggestion bot rolls back both the dismissal and any inserted message.
   mock.module('@/lib/execution-settings', { namedExports: { executionWorkspace: async (owner: string, botId: string) => { assert.equal(owner, userId); assert.equal(botId, COORDINATOR_BOT); return PROFILE_WORKSPACE } } })
   mock.module('@/lib/db', { namedExports: { pool: { async query(sql: string, params: string[]) {
     assert.match(sql, /SELECT \* FROM factory_agent_profiles WHERE id=\$1 AND "ownerId"=\$2 AND "workspaceId"=\$3/)
     const row = profileRows.get(params[0])
     return { rows: row?.ownerId === params[1] && row.workspaceId === params[2] ? [structuredClone(row)] : [] }
-  } }, db: new Proxy({}, { get(_target, key) { return key === 'transaction' ? (run: (tx: unknown) => Promise<unknown>) => { const result = transactionTail.then(() => run(current.executor)); transactionTail = result.catch(() => {}); return result } : Reflect.get(current.executor, key) } }) } })
+  } }, db: new Proxy({}, { get(_target, key) { return key === 'transaction' ? (run: (tx: unknown) => Promise<unknown>) => { const result = transactionTail.then(() => transaction(run)); transactionTail = result.catch(() => {}); return result } : Reflect.get(current.executor, key) } }) } })
   mock.module('@/lib/suggestions/store', { namedExports: {
     readClaimedSuggestion: async (owner: string, id: string) => owner === 'owner' && suggestion?.id === id ? suggestion : null,
     claimSuggestion: async (owner: string, id: string) => {
@@ -218,7 +233,7 @@ before(async () => {
     },
   } })
   mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { coordinatorBot: async () => ({ botId: COORDINATOR_BOT, workspaceId: 'a4000000-0000-4000-8000-0000000c0de2' }), chatBotId: async (_owner: string, botId: string | null | undefined) => botId ?? COORDINATOR_BOT, openChatBotId: async (_user: unknown, botId: string | null | undefined) => botId ?? COORDINATOR_BOT } })
-  mock.module('@/lib/request-log', { namedExports: { noteLogUser: () => undefined, withRequestLog: (_path: string, handler: unknown) => handler } })
+  mock.module('@/lib/request-log', { namedExports: { noteLogRpcAction: () => {}, noteLogUser: () => undefined, withRequestLog: (_path: string, handler: unknown) => handler } })
   mock.module('@/lib/coordinator/store', { namedExports: {
     chatView: async () => { chatReadTrace.push('view'); return chatSnapshot() },
     chatViewState: async (owner: string, limit: number, bot: string) => {
@@ -265,10 +280,12 @@ test('shared full chat reads do not guess a live workspace when the owned home i
   } finally { chatHome = CHAT_HOME }
 })
 
-test('both chat readers reject foreign bots and anonymous requests before resolving live scope', async () => {
+test('both chat readers reject foreign bots, other workspaces and anonymous requests before resolving live scope', async () => {
   current = fixture(); userId = 'owner'; chatReadTrace.length = 0
   const foreign = 'b4000000-0000-4000-8000-000000000099'
-  current.botRows.set(foreign, { id: foreign, name: 'Other Bot', ownerId: 'foreign' })
+  current.botRows.set(foreign, { id: foreign, name: 'Other Bot', ownerId: 'foreign', workspaceId: PROFILE_WORKSPACE })
+  for (const read of [() => getCoordinatorChat(foreign), () => pollCoordinatorChat(foreign)]) await assert.rejects(read)
+  current.botRows.set(foreign, { id: foreign, name: 'Other workspace Bot', ownerId: 'owner', workspaceId: CHAT_HOME })
   for (const read of [() => getCoordinatorChat(foreign), () => pollCoordinatorChat(foreign)]) await assert.rejects(read)
   userId = null
   try {
@@ -346,7 +363,7 @@ test('legacy HTTP and action calls without IDs remain valid separate submissions
 test('action checks actual Bot ownership before new submissions and duplicate retries', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const botId = 'b4000000-0000-4000-8000-000000000002'
-  current.botRows.set(botId, { id: botId, name: 'Synthetic Bot', ownerId: 'foreign' })
+  current.botRows.set(botId, { id: botId, name: 'Synthetic Bot', ownerId: 'foreign', workspaceId: PROFILE_WORKSPACE })
   assert.deepEqual(await sendCoordinatorMessage('hello', null, botId, submissionId), { error: 'botNotFound', params: undefined })
   assert.equal(current.rows.size, 0); assert.equal(callbacks.length, 0)
   current.botRows.get(botId)!.ownerId = 'owner'

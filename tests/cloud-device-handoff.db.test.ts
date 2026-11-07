@@ -55,7 +55,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       const remoteKey = `v2/github.com/mikka-ci/cloud-handoff-${id}`, remoteUrl = `https://github.com/mikka-ci/cloud-handoff-${id}.git`
       await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
       await pool.query('INSERT INTO issue_prefixes("userId",prefix) VALUES($1,\'CHOF\')', [userId])
-      await pool.query('INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,\'Cloud handoff fixture\')', [workspaceId, userId])
+      await pool.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'Cloud handoff fixture\',\'team\')', [workspaceId, userId])
       await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [workspaceId, userId, `${userId}@example.invalid`])
       await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Cloud handoff Bot\')', [botId, userId, workspaceId])
       for (const [device, agent, kind] of [[parentDevice, agentId, 'cloud'], [deviceB, agentB, 'local']]) {
@@ -70,7 +70,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,\'test\')', [userId, e2b.ciphertext, e2b.iv, e2b.keyVersion])
       const key = sealSecret('synthetic-model-fixture', ['model_api_key', keyId, userId].join('\0'))
       await pool.query('INSERT INTO model_api_keys(id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models) VALUES($1,$2,\'openai\',\'openai\',$3,$4,$5,\'test\',\'["gpt-5"]\')', [keyId, userId, key.ciphertext, key.iv, key.keyVersion])
-      await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,\'Cloud handoff task\',\'{"type":"doc","attrs":{"mikka":{"number":1}},"content":[]}\',\'todo\',\'normal\',\'personal\')', [issueId, userId])
+      await pool.query('INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES($1,$2,$3,\'bound\',\'Cloud handoff task\',\'{"type":"doc","attrs":{"mikka":{"number":1}},"content":[]}\',\'todo\',\'normal\',\'workspace\')', [issueId, userId, workspaceId])
       const sourceEventId = randomUUID()
       await pool.query('INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,"deliveredAt") VALUES($1::uuid,$2,$3,$4,\'user_message\',$1::text,$5,now())', [sourceEventId, userId, botId, issueId,
         JSON.stringify({ text: 'Keep the current goal and receipts.', ...(destination ? { taskDestination: { kind: destination } } : {}) })])

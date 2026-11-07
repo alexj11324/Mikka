@@ -23,7 +23,7 @@ test('team single-MD review, tenant-bound assignment and withdrawal use the exis
   const directory=await mkdtemp(join(tmpdir(),'mikka-team-skill-'))
   t.after(async()=>{await rm(directory,{recursive:true,force:true});await pool.end();await(await import('../db')).pool.end();await(await import('../workspace-db')).workspacePool.end()})
   async function run(userId=member,workspaceId=workspace.id,harness='codex') {
-    const botId=await seedBot(pool,workspaceId,userId),issueId=await seedIssue(pool,userId)
+    const botId=await seedBot(pool,workspaceId,userId),issueId=await seedIssue(pool,userId,workspaceId)
     const deviceId=randomUUID(),agentId=randomUUID(),repoId=randomUUID(),id=randomUUID()
     await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled) VALUES($1,$2,\'Team fixture device\',\'local\',true)',[deviceId,userId])
     await pool.query('INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,$4,$5)',[agentId,userId,deviceId,harness,agentId])

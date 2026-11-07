@@ -20,8 +20,10 @@ test('computer events authorize real sessions and read bounded owner/workspace p
     const [{ betterAuth }, fresh] = await Promise.all([import('better-auth'), import('../fresh-session')])
     const auth = betterAuth({
       baseURL: origin, basePath: '/mikka/api/auth', database, secret: randomBytes(32).toString('hex'),
+      advanced: { database: { validateSchema: false } },
       emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, session: fresh.SESSION_OPTIONS,
     })
+    assert.equal((await auth.$context).checkSchema, undefined, 'the auth fixture uses the production schema validation policy')
     fresh.readFreshSessionsInScope(auth.api)
     // Only inject the isolated dependencies. Session verification, signed cache
     // cookies, membership SQL and event reads all use their real implementations.
@@ -29,7 +31,7 @@ test('computer events authorize real sessions and read bounded owner/workspace p
     mocks.push(mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: database } }))
     mocks.push(mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: database } }))
     mocks.push(mock.module(new URL('../request-log.ts', import.meta.url).href, {
-      namedExports: { withRequestLog: (_name: string, route: (request: Request) => Promise<Response>) => route },
+      namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, route: (request: Request) => Promise<Response>) => route },
     }))
     const { GET } = await import('../../app/api/computer/events/route')
 

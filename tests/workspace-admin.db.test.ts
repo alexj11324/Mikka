@@ -147,7 +147,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
         [`insert into session_mailboxes (id,"userId","workspaceId",kind,"sessionKey") values ($1,$2,$3,'run',$4)`, [mailbox, member, workspaceId, randomUUID()]],
         [`insert into agent_runs (id,"userId","agentId","mailboxId",status) values ($1,$2,$3,$4,'succeeded')`, [randomUUID(), member, agent, mailbox]],
       ] as const) await pool.query(text, [...values])
-      return { bot, run, team, issue, project }
+      return { bot, run, team, issue, project, mailbox, agent }
     }
     // Every main-database table keyed by a workspace, except those that stay on purpose (lib/workspace-rows.ts).
     const { KEPT_WITH_WORKSPACE, WORKSPACE_COLUMNS } = await import('../lib/workspace-rows')
@@ -161,6 +161,21 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     }
     const doomed = await seed(ws.id)
     const kept = await seed(keep.id)
+    // A newly tenant-keyed legacy row can have only its mailbox provenance.
+    // Cleanup may follow that relation, but cannot sweep a bound foreign run.
+    const foreignRun = randomUUID()
+    await pool.query(`insert into agent_runs(id,"userId","agentId","mailboxId","workspaceId",status) values($1,$2,$3,$4,$5,'succeeded')`, [foreignRun, member, kept.agent, doomed.mailbox, keep.id])
+    const { workspaceDeletionStatements } = await import('../lib/workspace-rows')
+    const transaction = await pool.connect()
+    try {
+      await transaction.query('BEGIN')
+      const cleanup = (await workspaceDeletionStatements(transaction, ws.id)).filter(statement => statement.table === 'agent_runs' && statement.text.includes('session_mailboxes'))
+      assert.equal(cleanup.length, 1)
+      for (const statement of cleanup) await transaction.query(statement.text, statement.values)
+      assert.equal((await transaction.query('select id from agent_runs where "mailboxId"=$1 and "workspaceId" is null', [doomed.mailbox])).rowCount, 0)
+      assert.equal((await transaction.query('select id from agent_runs where id=$1', [foreignRun])).rowCount, 1)
+    } finally { await transaction.query('ROLLBACK'); transaction.release() }
+    await pool.query('delete from agent_runs where id=$1', [foreignRun])
     const personalIssue = (await pool.query(`insert into issues (id,"userId",title,content,status,priority) values ($1,$2,'Mine','{}','todo','normal') returning id`, [randomUUID(), member])).rows[0].id
 
     await rejects(general.deleteWorkspaceData(member, ws.id, 'Doomed'), 'workspaceAccessDenied')

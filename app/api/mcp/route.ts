@@ -3,10 +3,12 @@ import type { AuthInfo } from '@modelcontextprotocol/server'
 import type { MailboxToolName } from '@mikka/protocol/mailbox'
 import { mailboxAck, mailboxSend } from '@/lib/mailbox-tools'
 import { createMcpHandler, withMcpAuth } from 'mcp-handler'
+import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
 import { mcpActor, mcpUserId, verifyMcpToken } from '@/lib/mcp/auth'
 import { withMcpWorkspace } from '@/lib/mcp/workspace'
+import { requestOwnedMcpTools } from '@/lib/mcp/tool-lifetime'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { MCP_SCOPE } from '@/lib/mcp/resource'
 import { COMPOSIO_ACTIONS } from '@/lib/composio-actions'
@@ -27,6 +29,10 @@ export const maxDuration = 120
 
 function json(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] }
+}
+
+function retainTool(work: Promise<void>) {
+  afterJob('after:mcp_tool_settlement', () => work)
 }
 
 function message(value: string) {
@@ -63,7 +69,8 @@ const SUBMIT_ARTIFACT = {
  * OAuth (lib/auth.ts); every tool acts as the person who approved them, and
  * writes go through the same server actions as the UI (lib/mcp/actions.ts).
  */
-const handler = createMcpHandler(server => {
+const handler = createMcpHandler(instance => {
+  const server = requestOwnedMcpTools(instance, retainTool)
   server.registerTool('send_to_coordinator', {
     title: 'Send a message to the Coordinator',
     description: 'Send a message to the person\'s Mikka Coordinator, the agent that plans work and dispatches runs, as Agent coordination data, not user input or approval. The Coordinator answers in its own time; call read_coordinator_messages with the returned `after` and waitSeconds to get the reply.',
@@ -274,7 +281,8 @@ const authed = withMcpAuth(handler, verifyMcpToken, {
  * URL into each run with the run token from the claim; the token's prefix
  * picks these tools instead of the person's.
  */
-function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return createMcpHandler(server => {
+function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return createMcpHandler(instance => {
+  const server = requestOwnedMcpTools(instance, retainTool)
   for (const [name, action] of Object.entries({ mailbox_recipients: 'recipients', mailbox_send: 'send', mailbox_inbox: 'inbox', mailbox_ack: 'ack', mailbox_sent: 'sent' }).filter(([name]) => mailbox.includes(name as MailboxToolName))) {
     server.registerTool(name, {
       description: action === 'send' ? 'Queue a short personal peer message; use a stable key for exact retries and replyTo for replies. No user authority or execution is granted.' : 'Inspect or acknowledge your authenticated personal mailbox at a safe boundary. No automatic wake or terminal resume. Read is not ACK.',

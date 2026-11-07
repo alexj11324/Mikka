@@ -1,3 +1,4 @@
+import type { RunFailure } from '@mikka/protocol/run-failure'
 import { AgentProfileError, builtinAgentProfileSelection } from '@/lib/factory/agent-profile-definition'
 import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { queueTaskRun } from '@/lib/factory/queue-local'
@@ -138,9 +139,9 @@ export async function releaseLease(userId: string, holder: string, botId: string
   return store.releaseLease(userId, holder, botId)
 }
 
-export async function failTurn(userId: string, holder: string, error: string, botId: string, completed?: { messages: ModelMessage[]; streamId: string }) {
+export async function failTurn(userId: string, holder: string, error: string, botId: string, completed?: { messages: ModelMessage[]; streamId: string }, failureDetails?: RunFailure) {
   'use step'
-  await store.failTurn(userId, holder, error, botId, completed)
+  await store.failTurn(userId, holder, error, botId, completed, failureDetails)
   // Messages that arrived during the failed turn are not part of it: start their turn now
   // rather than at the next reconciliation sweep (#1212). The failed message itself was delivered.
   if (await store.hasPendingEvents(userId, botId)) {

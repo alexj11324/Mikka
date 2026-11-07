@@ -61,3 +61,20 @@ test('a historical failure uses the same recovery and only resends on request', 
   await act(async () => container.querySelector('button')!.click())
   assert.equal(sent, 1)
 })
+
+test('a failure line keeps its words and folds the stored codes under 详情 (decision 2026-11-05-0330)', async () => {
+  const raw = 'wake_exhausted\nsubscription_generation_failed (provider_request_rejected)'
+  await render(<FailureReason failure={{ kind: 'wake', code: 'wake_exhausted', raw }} botId="fixture-bot" onResend={() => {}} />)
+  assert.match(container.textContent ?? '', /Coordinator\.wakeErrors\.wake_exhausted/)
+  const details = container.querySelector('[data-slot="run-error-details"]')
+  assert.ok(details, '详情 is there')
+  assert.match(details.textContent ?? '', /IssueThreads\.errorDetails/)
+  // The first button is the line's own action; 详情 is the trigger inside the details area.
+  await act(async () => (details.querySelector('button') as HTMLElement).click())
+  assert.match(details.textContent ?? '', /subscription_generation_failed \(provider_request_rejected\)/)
+})
+
+test('without stored codes there is no 详情', async () => {
+  await render(<FailureReason failure={{ kind: 'failed' }} botId="fixture-bot" onResend={() => {}} />)
+  assert.equal(container.querySelector('[data-slot="run-error-details"]'), null)
+})

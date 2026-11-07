@@ -1,7 +1,13 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
+// Next captures AsyncLocalStorage when its work stores are first imported.
+import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
+import type { RunFailure } from '@mikka/protocol/run-failure'
+import { APP_BUILD } from '../lib/app-build'
+import { measured } from './helpers/read-metrics'
 import type { PublishedPullRequest } from '../lib/run-publication-result'
 import type { OwnerPullRequestOpener } from '../lib/run-publications'
 import { remoteKey as repositoryKey } from '@mikka/protocol/repository'
@@ -16,7 +22,7 @@ if (connection) {
 if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Run publication DB tests cannot skip in required CI')
 
 type Fixture = {
-  userId: string; deviceId: string; agentId: string; repoId: string; issueId: string; runId: string
+  workspaceId: string; userId: string; deviceId: string; agentId: string; repoId: string; issueId: string; runId: string
   remoteUrl: string; remoteKey: string; identifier: string; branch: string; githubAccountId: string
   /** The receipt admission wrote from the GitHub App grant, when the fixture is admitted to push. */
   admission?: Record<string, unknown>
@@ -74,16 +80,17 @@ test('run result publication commits one owner-scoped result through retries and
     const remoteKey = options.remoteUrl ? repositoryKey(options.remoteUrl) : options.remoteKey ?? `v2/github.com/mikka-ci/repo-${seed}`
     const row: Fixture = {
       userId: `publication-${seed}`, deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID(), issueId: randomUUID(), runId: randomUUID(),
-      remoteUrl: options.remoteUrl ?? `https://${remoteKey.slice(3)}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId),
+      workspaceId: randomUUID(), remoteUrl: options.remoteUrl ?? `https://${remoteKey.slice(3)}.git`, remoteKey, identifier: `${prefix}-${number}`, branch: `mikka/${prefix.toLowerCase()}-${number}`, githubAccountId: String(++githubId),
     }
     fixtures.push(row)
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,true,now(),now())', [row.userId, `${row.userId}@example.invalid`])
+    await seedFixtureWorkspace(pool, row.userId, options.scope === 'workspace' ? 'team' : 'personal', row.workspaceId)
     await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2)', [row.userId, prefix])
     await pool.query('insert into account (id,"accountId","providerId","userId","createdAt","updatedAt") values ($1,$2,\'github\',$3,now(),now())', [randomUUID(), row.githubAccountId, row.userId])
     await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Publication CI computer\',\'local\',$3)', [row.deviceId, row.userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents (id,"userId","deviceId",harness,name) values ($1,$2,$3,\'codex\',$4)', [row.agentId, row.userId, row.deviceId, `codex ${row.deviceId}`])
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,null)', [row.repoId, row.deviceId, row.userId, row.remoteKey, row.remoteUrl])
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal'])
+    await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$5,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal', row.workspaceId])
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',null,\'Fix redirect\')', [row.runId, row.userId, row.issueId, row.agentId, row.deviceId, row.repoId])
     await pool.query('insert into run_tokens (id,"runId","userId","tokenHash","expiresAt") values ($1,$2,$3,$4,now()+interval \'1 hour\')', [randomUUID(), row.runId, row.userId, `synthetic-${randomUUID()}`])
     if (options.approved) await admit(row)
@@ -92,6 +99,109 @@ test('run result publication commits one owner-scoped result through retries and
 
   try {
     assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
+
+    await t.test('runtime failure details survive an independent connection and first-completion replay', async () => {
+      const { Client } = await import('pg')
+      const { visibleRuns } = await import('../lib/agent-runs')
+      const { newestTaskRuns } = await import('../lib/task-block-runs')
+      const f = await fixture()
+      const before = await visibleRuns(f.userId, { issueId: f.issueId, teams: [] })
+      assert.equal(before[0]?.failureDetails, null, 'old rows have no invented diagnostic')
+      const failureDetails: RunFailure = { schemaVersion: 1, code: 'run_api_key_invalid', category: 'api_key', provider: 'openai', status: 401,
+        providerMessage: 'Provider fixture: authentication refused for this account', causes: [{ name: 'APIError', code: 'invalid_api_key' }],
+        recovery: 'configure_api_key', runId: 'untrusted-run', appVersion: 'untrusted-version', occurredAt: '2026-11-07T12:00:00.000Z' }
+      await persistRunCompletion(f.userId, f.runId, { stopReason: 'error', failureDetails })
+      const reload = new Client({ connectionString: connection })
+      await reload.connect()
+      let stored: RunFailure
+      try {
+        const { rows: [row] } = await reload.query('select status,"failureDetails" from agent_runs where id=$1', [f.runId])
+        assert.equal(row.status, 'failed')
+        stored = row.failureDetails
+        assert.equal(stored.runId, f.runId)
+        assert.equal(stored.appVersion, APP_BUILD || 'unknown')
+        assert.equal(stored.providerMessage, failureDetails.providerMessage)
+      } finally { await reload.end() }
+      const full = await measured(() => visibleRuns(f.userId, { issueId: f.issueId, teams: [] }))
+      const brief = await measured(() => visibleRuns(f.userId, { issueId: f.issueId, teams: [], brief: true }))
+      assert.deepEqual(full.value[0].failureDetails, stored!)
+      assert.equal(brief.value[0].failureDetails?.code, 'run_api_key_invalid')
+      assert.equal(Object.hasOwn(brief.value[0].failureDetails!, 'providerMessage'), false)
+      assert.equal(Object.hasOwn(brief.value[0].failureDetails!, 'causes'), false)
+      assert.equal(brief.statements, full.statements, 'brief reads use the existing query budget')
+      assert.ok(brief.resultBytes < full.resultBytes)
+      const blocks = await newestTaskRuns(f.userId, [f.issueId])
+      assert.equal(blocks[0]?.failureDetails?.code, 'run_api_key_invalid')
+      assert.doesNotMatch(JSON.stringify(blocks), /Provider fixture|APIError/)
+      await Promise.all([
+        persistRunCompletion(f.userId, f.runId, { stopReason: 'cancelled' }),
+        persistRunCompletion(f.userId, f.runId, { stopReason: 'error', failureDetails: { ...failureDetails, code: 'run_quota_exceeded', category: 'quota' } }),
+      ])
+      const current = (await pool.query('select status,"failureDetails" from agent_runs where id=$1', [f.runId])).rows[0]
+      assert.equal(current.status, 'failed')
+      assert.deepEqual(current.failureDetails, stored!)
+      assert.deepEqual(await counts(f), { versions: 0, events: 1 })
+    })
+
+    await t.test('normal completion clears stale diagnostics while failed verification stores a generic code', async () => {
+      const failureDetails: RunFailure = { schemaVersion: 1, code: 'run_quota_exceeded', category: 'quota', providerMessage: 'Must not label a normal completion', causes: [],
+        runId: null, appVersion: 'worker', occurredAt: '2026-11-07T12:00:00.000Z' }
+      for (const stopReason of ['cancelled', 'submitted'] as const) {
+        const f = await fixture()
+        await pool.query('update agent_runs set "failureDetails"=$2 where id=$1', [f.runId, JSON.stringify(failureDetails)])
+        await persistRunCompletion(f.userId, f.runId, { ...completion(f), stopReason, failureDetails })
+        assert.equal((await pool.query('select "failureDetails" from agent_runs where id=$1', [f.runId])).rows[0].failureDetails, null)
+      }
+      for (const stopReason of ['submitted', 'blocked'] as const) {
+        const f = await fixture()
+        const submitted = completion(f)
+        await persistRunCompletion(f.userId, f.runId, { ...submitted, stopReason, failureDetails, report: { ...submitted.report!, verify: { status: 'failed' } } })
+        const row = (await pool.query('select status,"failureDetails" from agent_runs where id=$1', [f.runId])).rows[0]
+        assert.equal(row.status, stopReason === 'submitted' ? 'failed' : 'stopped')
+        if (stopReason === 'submitted') {
+          assert.equal(row.failureDetails.code, 'run_failed')
+          assert.equal(row.failureDetails.providerMessage, undefined)
+        } else assert.equal(row.failureDetails, null)
+      }
+    })
+
+    await t.test('device completion and server terminal transitions persist diagnostics under their existing fences', async () => {
+      const { completeRunForDevice } = await import('../lib/run-completion')
+      const { failRunForDaemonUpgrade } = await import('../lib/run-leases')
+      const { AfterContext } = await import('next/dist/server/after/after-context')
+      const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
+      const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
+      const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
+      const { NextRequest } = await import('next/server')
+      // Like issue-scope-detachment.db.test.ts, supply Next's real request
+      // lifecycle and drain after() work without replacing any database writer.
+      async function failFromRequest(...args: Parameters<typeof failRunForDaemonUpgrade>) {
+        const waits: Promise<unknown>[] = [], errors: unknown[] = [], closes: Array<() => void> = []
+        const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: close => { closes.push(close) }, onTaskError: error => { errors.push(error) } })
+        const request = new NextRequest(`http://127.0.0.1/mikka/v1/runs/${args[0]}/complete`)
+        const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
+        return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
+          try { return await failRunForDaemonUpgrade(...args) }
+          finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
+        }))
+      }
+      const f = await fixture()
+      const stranger = await fixture()
+      assert.equal(await completeRunForDevice(stranger.userId, { id: f.runId, issueId: f.issueId }, { stopReason: 'timeout' }), null)
+      assert.ok(await completeRunForDevice(f.userId, { id: f.runId, issueId: f.issueId }, { stopReason: 'timeout' }))
+      const first = (await pool.query('select "failureDetails" from agent_runs where id=$1', [f.runId])).rows[0].failureDetails
+      assert.equal(first.code, 'run_timeout')
+      assert.equal(first.runId, f.runId)
+      assert.equal(await completeRunForDevice(f.userId, { id: f.runId, issueId: f.issueId }, { stopReason: 'error' }), null)
+      assert.deepEqual((await pool.query('select "failureDetails" from agent_runs where id=$1', [f.runId])).rows[0].failureDetails, first)
+      const queued = await fixture()
+      await pool.query("update agent_runs set status='queued' where id=$1", [queued.runId])
+      assert.equal(await failFromRequest(queued.runId, stranger.deviceId, queued.userId), false)
+      assert.equal(await failFromRequest(queued.runId, queued.deviceId, stranger.userId), false)
+      assert.equal(await failFromRequest(queued.runId, queued.deviceId, queued.userId), true)
+      assert.equal((await pool.query('select "failureDetails" from agent_runs where id=$1', [queued.runId])).rows[0].failureDetails.code, 'run_failed')
+      assert.equal(await failFromRequest(queued.runId, queued.deviceId, queued.userId), false)
+    })
 
     await t.test('an unlinked workspace task publishes with its owner number without changing scope', async () => {
       const { admitCloudPush } = await import('../lib/computer/cloud-push')
@@ -422,7 +532,7 @@ test('run result publication commits one owner-scoped result through retries and
       const { sendOwnedRunMessage, stopOwnedRun } = await import('../lib/run-control')
       const { db } = await import('../lib/db')
       const { coordinatorEnabled } = await import('../lib/coordinator/wake')
-      assert.equal(coordinatorEnabled(), false, 'this DB suite cannot invoke a real model')
+      assert.equal(await coordinatorEnabled(), false, 'this DB suite cannot invoke a real model')
       assert.equal(process.env.GITHUB_APP_ID, undefined, 'no GitHub App check is needed to admit')
       const f = await fixture({ prefix: 'ADMI' })
       // This fixture supplies historical publication/legacy-alias evidence.
@@ -432,9 +542,7 @@ test('run result publication commits one owner-scoped result through retries and
       await pool.query('update devices set "protocolVersion"=3 where id=$1', [f.deviceId])
       const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, model: 'fixture-model' }
       const eventId = randomUUID()
-      const {seedWorkspace}=await import('./support/workspace-admin-db')
-      const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])
-      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null, workspace.id)
+      const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null, f.workspaceId)
       await pool.query('insert into coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,$6,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId, coordinator])
       const before = Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n)
       const admitted = await Promise.all([queueRun(f.userId, input, coordinator, undefined, eventId), queueRun(f.userId, input, coordinator, undefined, eventId)])

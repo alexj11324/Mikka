@@ -3,6 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { failureLine, failureSettingsPath } from '../lib/chat-failure.ts'
 import { subscriptionRecovery, type SubscriptionRefusalNotice } from '../../../lib/subscription-refusal.ts'
+import { CLOUD_ERROR_CODES, type CloudErrorCode } from '../../../lib/cloud-services/errors.ts'
 
 const copy = JSON.parse(readFileSync(new URL('../../../messages/zh-CN.json', import.meta.url), 'utf8')).Coordinator.subscriptionRefusal
 const notices: SubscriptionRefusalNotice[] = ['unavailable', 'reconnect', 'quotaUsed', 'retry', 'quotaChecking', 'rateLimited', 'accessDenied', 'modelRejected', 'runtimeUnavailable', 'selectionChanged']
@@ -46,4 +47,17 @@ test('billing recovery retains the selected workspace rather than a browser defa
   assert.equal(failureSettingsPath('billing', undefined), null)
   assert.equal(failureSettingsPath('billing', 'private-text'), null)
   assert.equal(failureSettingsPath('models'), '/settings?section=models')
+})
+
+test('cloud failures reuse fixed web copy, preserve native model recovery and open cloud billing only for quota', () => {
+  const messages = JSON.parse(readFileSync(new URL('../../../messages/zh-CN.json', import.meta.url), 'utf8'))
+  for (const code of CLOUD_ERROR_CODES) {
+    const line = failureLine({ kind: 'failed', cloudCode: code })
+    assert.equal(line.text, messages.RunErrors[code].default, code)
+    const retry = code === 'cloud_rate_limited' || code === 'cloud_unavailable'
+    assert.equal(line.retry, retry, code)
+    assert.equal(line.recovery, code === 'cloud_quota_exhausted' ? 'cloudBilling' : retry ? null : 'model', code)
+  }
+  const unknown = failureLine({ kind: 'failed', cloudCode: 'fixture_private_cloud_value' as CloudErrorCode })
+  assert.deepEqual(unknown, failureLine({ kind: 'failed' }))
 })

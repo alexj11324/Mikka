@@ -7,6 +7,8 @@ import { invokeDecision } from './coordinator/decide'
 import { maskFactoryNote } from './factory/note-mask'
 import { issueContentToMarkdown } from './linear-sync/markdown'
 import { modelTier, supportedModelEfforts, routingDecisionQuestions, selectModelRouting, escalateModelRouting, modelRoutingDiagnostics, routingTaskContent, type FrozenModelRoutingSnapshot, type ModelRoutingSnapshot } from './model-routing'
+import { trace } from '@opentelemetry/api'
+import { withRunSpan } from './tracing/context'
 
 /** Supplied by the dispatch host, never accepted as a model/tool permission. */
 export interface ModelRoutingContext {
@@ -24,6 +26,18 @@ export interface ModelRoutingContext {
  * alone; candidates, sources and order stay on the host, which maps its scores. */
 export async function routeModelCandidates(pool: Pool, scope: OrderScope, entries: readonly OrderEntry[], context: ModelRoutingContext,
   enabled: boolean, decision: typeof invokeDecision = invokeDecision) {
+  return withRunSpan('model.routing', {}, async () => {
+    const selected = await selectCandidates(pool, scope, entries, context, enabled, decision)
+    if (selected) trace.getActiveSpan()?.setAttributes({
+      'mikka.ai.tier': selected.snapshot.tier, 'mikka.ai.effort': selected.snapshot.effort,
+      'mikka.ai.routing_reason': selected.snapshot.reason, 'mikka.ai.required_tier': selected.snapshot.required,
+    })
+    return selected
+  })
+}
+
+async function selectCandidates(pool: Pool, scope: OrderScope, entries: readonly OrderEntry[], context: ModelRoutingContext,
+  enabled: boolean, decision: typeof invokeDecision) {
   const catalog = entries.map((entry, position) => ({ id: `candidate:${position}`, model: entry.model, harness: entry.harness,
     tier: modelTier(entry.model), position, efforts: supportedModelEfforts(entry.model, entry.harness) }))
   const eligible = context.effort ? catalog.filter(candidate => candidate.efforts.includes(context.effort!))
@@ -65,6 +79,11 @@ export async function routeModelCandidates(pool: Pool, scope: OrderScope, entrie
   const answers = result?.answers ?? null
   const selected = selectModelRouting(eligible, answers)
   // Scores, confidence and the outcome only: no task, note or candidate text.
-  console.info(JSON.stringify({ event: 'model_routing_decision', ...modelRoutingDiagnostics(answers, selected) }))
+  const diagnostics = modelRoutingDiagnostics(answers, selected)
+  for (const name of ['tier', 'effort'] as const) {
+    const score = diagnostics[name]
+    if (score && score !== 'invalid') trace.getActiveSpan()?.setAttributes({ [`mikka.ai.${name}_score`]: score.score, [`mikka.ai.${name}_confidence`]: score.confidence })
+  }
+  console.info(JSON.stringify({ event: 'model_routing_decision', ...diagnostics }))
   return withExplicitEffort(selected)
 }

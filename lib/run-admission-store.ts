@@ -23,6 +23,7 @@ import { dispatchFingerprint, type DispatchCredential, type DispatchInput } from
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import { notifyDeviceWork } from './device-gateway-notify'
 import type { RunInvalidReason } from './run-invalid-reason'
+import { captureTraceContext } from './tracing/context'
 
 /** Existing rows and JSON only: admission, run and publication commit together. */
 export async function acceptLocalRun(input: {
@@ -82,7 +83,8 @@ export async function acceptLocalRun(input: {
     const profileOriginRunId = await admitProfileSelection(client, { ownerId: input.userId, workspaceId: executionIdentity.workspaceId ?? '', issueId: task.id, harness: input.definition.harness, model: input.definition.model, apiKeyId: input.definition.apiKey?.keyId, subscriptionBindingId: input.definition.subscription?.bindingId, selection: input.definition.agentProfile, sourceRunId: questionSource ?? input.profileSourceRunId, factoryContext: input.factoryContext })
     // A question's host receipt grants the same native execution. Its origin,
     // child and wake receipt must keep the exact original definition digest.
-    const definition = { ...input.definition, executionIdentity, ...(profileOriginRunId && !questionSource ? { profileOriginRunId } : {}) }
+    const traceContext = captureTraceContext({ runId: input.id, threadId: input.sourceRunId ?? input.id, taskId: task.id, posthogDistinctId: input.userId })
+    const definition = { ...input.definition, ...(traceContext ? { traceContext } : {}), executionIdentity, ...(profileOriginRunId && !questionSource ? { profileOriginRunId } : {}) }
     if (profileOriginRunId && !questionSource) definition.definitionDigest = workerDefinitionDigest(definition)
     const context = { workspaceId: task.workspaceId!, ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }
     const replayMatches = async (prior: typeof agentRuns.$inferSelect) => {
@@ -132,6 +134,7 @@ export async function acceptLocalRun(input: {
     const [previous] = await tx.select().from(runPublications).where(and(eq(runPublications.issueId, task.id), eq(runPublications.remoteKey, repo.repoPath), sql`${runPublications.branch} is not null`)).orderBy(asc(runPublications.createdAt)).limit(1)
     const identifiers = await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }], tx)
     const identifier = previous?.identifier ?? identifiers.get(task.id) ?? null
+    if (definition.traceContext && identifier) definition.traceContext.taskNumber = identifier
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (!branch) throw invalid('taskIdentifierRequired')
     const admission = admitRepositoryTask({ ...context, userId: input.userId, issueId: task.id, deviceId: input.deviceId, agentId: input.agentId, remoteKey: repo.repoPath, remoteUrl: repo.remoteUrl, targetBranch: branch, now: new Date() })

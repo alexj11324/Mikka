@@ -36,7 +36,7 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
     const legacyPersonal = randomUUID()
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,'legacy-owner','Legacy','personal');`, [legacyPersonal])
     await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,'legacy-peer','Legacy','legacy@example.invalid','member')`, [legacyPersonal])
-    await pool.query(await readFile(new URL('../drizzle/20261107121100_team_entitlements.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261107180100_team_entitlements.sql', import.meta.url), 'utf8'))
     await pool.query('create table workspace_audit_outbox (id uuid primary key,"workspaceId" uuid not null,payload jsonb not null,"createdAt" timestamptz not null,"deliveredAt" timestamptz)')
     assert.equal((await pool.query('select status from mikka_workspace_members where "workspaceId"=$1', [legacyPersonal])).rows[0].status, 'suspended')
     await assert.rejects(pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1', [legacyPersonal]), /only its owner/)
@@ -164,7 +164,7 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
       await db.insert(workspaceEntitlements).values({ workspaceId: id, plan: 'pro', source: 'cloud', seatLimit: 20 })
       await pool.query('insert into hosted_verifications values($1)', [id])
       await pool.query('insert into workspace_credit_grants values($1,$2,1000,\'purchased\')', [randomUUID(), id])
-      const store = new HostedUsageStore(pool, workspaceId => acquireHostedQuota(workspaceId, quotaPool, 'cloud'))
+      const store = new HostedUsageStore(pool, { quota: workspaceId => acquireHostedQuota(workspaceId, quotaPool, 'cloud') })
       const calls = Array.from({ length: 33 }, () => randomUUID())
       const outcomes = await Promise.allSettled(calls.map(call => store.reserve(id, 'fixture', call)))
       assert.equal(outcomes.filter(value => value.status === 'fulfilled').length, 32)
@@ -183,46 +183,47 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
       assert.equal((await pool.query('select count(*)::int as n from workspace_credit_grants where "workspaceId"=$1', [id])).rows[0].n, 1)
     })
 
-    await t.test('status and reservation do not invert bounded APP and workspace pool checkouts', async () => {
+    await t.test('hosted reservation and status leave APP available while a workspace writer owns the only WS connection', async () => {
       const id = await workspace(1)
       await db.insert(workspaceEntitlements).values({ workspaceId: id, plan: 'pro', source: 'cloud', seatLimit: 20 })
       await pool.query('insert into workspace_credit_grants values($1,$2,1000,\'purchased\')', [randomUUID(), id])
       const app = new Pool({ connectionString: target.toString(), max: 1, connectionTimeoutMillis: 2000 })
       const workspacePool = new Pool({ connectionString: target.toString(), max: 1, connectionTimeoutMillis: 2000 })
-      let reservationReachedQuota!: () => void, resumeReservation!: () => void, statusReadApp!: () => void
-      const atQuota = new Promise<void>(resolve => { reservationReachedQuota = resolve })
-      const continueQuota = new Promise<void>(resolve => { resumeReservation = resolve })
-      const atStatusRead = new Promise<void>(resolve => { statusReadApp = resolve })
-      const appView = new Proxy(app, { get(target, property) {
-        if (property === 'query') return (...args: unknown[]) => {
-          // reserve uses its checked-out client; status uses the pool directly.
-          statusReadApp()
-          return Reflect.apply(target.query, target, args)
-        }
-        const value = Reflect.get(target, property)
-        return typeof value === 'function' ? value.bind(target) : value
+      const writer = await workspacePool.connect()
+      let writerReleased = false, reachedQuota!: () => void
+      const atQuota = new Promise<void>(resolve => { reachedQuota = resolve })
+      const releaseWriter = async () => {
+        if (writerReleased) return
+        writerReleased = true
+        await writer.query('rollback'); writer.release()
+      }
+      const store = new HostedUsageStore(app, { quota: workspaceId => {
+        reachedQuota()
+        return acquireHostedQuota(workspaceId, workspacePool, 'cloud')
       } })
-      let quotaCalls = 0
-      const leases: { close(): Promise<void> }[] = []
-      const store = new HostedUsageStore(appView, async workspaceId => {
-        quotaCalls++
-        if (quotaCalls === 1) { reservationReachedQuota(); await continueQuota }
-        const lease = await acquireHostedQuota(workspaceId, workspacePool, 'cloud')
-        leases.push(lease)
-        return lease
-      })
-      const reservation = store.reserve(id, 'fixture', randomUUID())
-      let status: ReturnType<typeof store.status> | undefined
+      let reservation: ReturnType<typeof store.reserve> | undefined, status: ReturnType<typeof store.status> | undefined
       try {
+        // A normal P0 writer pins WS/member before it asks the APP pool.
+        await writer.query('begin')
+        await writer.query('select id from mikka_workspaces where id=$1 for share', [id])
+        await writer.query('select "userId" from mikka_workspace_members where "workspaceId"=$1 and "userId"=\'human-0\' and status=\'active\' for share', [id])
+        reservation = store.reserve(id, 'fixture', randomUUID())
+        void reservation.catch(() => {})
         await atQuota
         status = store.status(id)
-        await atStatusRead
-        assert.equal(quotaCalls, 1, 'status must not hold workspace while APP belongs to reserve')
-        resumeReservation()
+        void status.catch(() => {})
+        // This checkout times out with APP -> WS reservation ordering.
+        const application = await app.connect()
+        try {
+          await application.query('begin')
+          await application.query('select id from bots where "workspaceId"=$1 for update', [id])
+          await application.query('commit')
+        } finally { application.release() }
+        await releaseWriter()
         await Promise.all([reservation, status])
+        assert.equal((await app.query('select count(*)::int as n from hosted_usage where "workspaceId"=$1', [id])).rows[0].n, 1)
       } finally {
-        for (const lease of leases) await lease.close()
-        resumeReservation()
+        await releaseWriter()
         await Promise.allSettled([reservation, status])
         await Promise.all([app.end(), workspacePool.end()])
       }

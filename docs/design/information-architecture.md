@@ -352,3 +352,7 @@ threads sit only inside the panel of the bot that dispatched them.
 | GitHub | User settings: profile, SSH and GPG keys, PATs, notifications, billing; a personal repository has secrets and environments | Organizations add members, teams, roles, audit log, organization secrets | Notifications inbox and search in the header, command palette |
 | ChatGPT | Settings: general, notifications, personalization and memory, connectors, data controls, security | Workspace settings for admins: members, billing, permissions | Search chats, projects, library in the sidebar |
 | Claude | Settings: profile, appearance, account, privacy, billing, capabilities and memory, connectors | Organization settings for admins: members, billing, data | Search, projects, Artifacts, recents in the sidebar |
+
+## Self-hosted cloud connections (#1564)
+
+Community servers expose the operator-owned registration and team key in Settings → Mikka Cloud, visible only to explicit server administrators. A person’s own cloud grant lives in Settings → Account → Mikka Cloud. Workspace-admin status never grants server authority. Issuer consent, cloud credit selection and connected-server management live in the private cloud application.

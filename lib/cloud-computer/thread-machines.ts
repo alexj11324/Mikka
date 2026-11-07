@@ -1,5 +1,7 @@
 import { runChanged } from '../live/panels'
 import { cloudStartupSpan, cloudStartupPhases, cloudStartupRunAttributes } from '@/lib/computer/startup-tracing'
+import { captureTraceContext, withRunSpan } from '@/lib/tracing/context'
+import { daemonTraceSettings } from '@/lib/tracing/config'
 import 'server-only'
 import { runListChanged } from '../live/lists'
 import { rebindExecutionDevice, revalidateExecutionIdentity } from '../execution-identity'
@@ -14,7 +16,7 @@ import { matchesRepositoryAdmission } from '@/lib/repository-admission'
 import { ComputerError } from '@/lib/computer/store'
 import { computerPermission } from '@/lib/computer/permission'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease } from '@/lib/computer/e2b-provider'
-import { CLOUD_WORKER_COMMAND } from '@/lib/computer/worker-command'
+import { CLOUD_WORKER_COMMAND, CLOUD_PRELOADER_WAKE_COMMAND, CLOUD_PRELOADER_WAKE_RECEIPT } from '@/lib/computer/worker-command'
 import { cloudTemplateOrigin, threadMachineTemplateKind } from '@/lib/cloud-template-models'
 import { computerTemplate, e2bApiKey, taskTemplate, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { bootstrapOfficialInstance, isOfficialE2BTemplate, stageOfficialWorkerRelease, switchOfficialWorkerRelease, runtimeCommandOptions, runtimeRequestOptions, type RuntimeBudget } from '@/lib/computer/official-runtime'
@@ -607,6 +609,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
       WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+    return await withRunSpan('cloud.thread.provision', { ...cloudStartupRunAttributes(runId), 'mikka.run_id': runId }, async () => {
     if (!refreshRuntime) {
       refreshPhase = timings.next('execution_identity')
       await revalidateExecutionIdentity(client, run)
@@ -987,18 +990,25 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     refreshPhase = timings.next('publish_bootstrap')
     const handoffStartedAt = (await pool.query('SELECT clock_timestamp() AS now')).rows[0].now as Date
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
-    const bootstrap = JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) })
+    const bootstrap = JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(),
+      traceContext: captureTraceContext({ runId }), tracing: daemonTraceSettings(),
+      ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) })
     // Keep the strict bootstrap schema readable by old workers during rollout
     // and rollback. This optional locator binds to the same one-use bytes; it
     // carries no assignment or usable credential. String multipart is one RPC.
     const initialRun = refreshRuntime ? '' : JSON.stringify({ version: 1, runId, bootstrapSha256: createHash('sha256').update(bootstrap).digest('hex') })
     await sandbox.files.write([{ path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun }], { user: 'root', useOctetStream: false, ...runtimeRequestOptions(refreshBudget) })
-    await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka && install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next && install -o user -g user -m 600 ${handoff}.run /home/user/.mikka/initial-run.next && mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${handoff} && unlink ${handoff}.run`, { user: 'root', ...runtimeCommandOptions(10_000, refreshBudget) })
+    // The foreground command must finish the atomic publication before waking
+    // the existing watcher as user. Keep credential bytes in the file upload,
+    // never in this command/argv/env. Only an acknowledged signal skips the
+    // redundant remote start; absent/old preloaders keep the original fallback.
+    const publication = await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka && install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next && install -o user -g user -m 600 ${handoff}.run /home/user/.mikka/initial-run.next && mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${handoff} && unlink ${handoff}.run && runuser -u user -- sh -c '${CLOUD_PRELOADER_WAKE_COMMAND}'`, { user: 'root', ...runtimeCommandOptions(10_000, refreshBudget) })
+    const preloadedWorkerWoken = publication.stdout.trim() === CLOUD_PRELOADER_WAKE_RECEIPT
     // The worker's output streams into the server logs only while this invocation lives;
     // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
     refreshPhase = timings.next('start_worker')
     const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
-    await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...runtimeRequestOptions(refreshBudget), ...workerOutputForwarder(runId, mask) })
+    if (!preloadedWorkerWoken) await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...runtimeRequestOptions(refreshBudget), ...workerOutputForwarder(runId, mask) })
     refreshPhase = timings.next('worker_register')
     const deadline = Math.min(Date.now() + 30_000, refreshDeadline ?? Infinity)
     let ready = false
@@ -1025,6 +1035,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     await runChanged(pool, runId)
     logThreadLifecycle(finished.rows[0], { phase: finished.rows[0].lifecycle.phase, reason: finished.rows[0].lifecycle.phase, provider: 'running', deadline: Date.now(), computeSeconds: finished.rows[0].computeSeconds })
     return { runId, state: 'running' }
+    }, run.agentDefinition?.traceContext)
   } catch (error) {
     // Capture the rejecting branch before cleanup and the start wrapper hide
     // it. Admission can fail before the exact-question flag is available.
@@ -1127,7 +1138,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     try {
       if (sandboxId) await threadMachineProvider.kill(sandboxId, actor.userId).catch(error => { if (!sandboxGone(error)) throw error })
       const retired = await pool.query(`UPDATE thread_machines SET "sandboxId"=NULL,"lifecycleAt"=NULL,
-        lifecycle=lifecycle||jsonb_build_object('phase','retired','owner','run-recovery','failures',0)
+        lifecycle=(lifecycle-'reconcileId'-'reconcileUntil')||jsonb_build_object('phase','retired','owner','run-recovery','failures',0)
         WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND state='ended'
           AND "sandboxId" IS NOT DISTINCT FROM $5::text RETURNING "computeSeconds"`, [runId, actor.userId, actor.workspaceId, epoch, sandboxId])
       if (retired.rowCount) logThreadLifecycle({ runId, issueId: machine.issueId, sandboxId, epoch }, { phase: 'retired', provider: sandboxId ? 'kill_ack' : 'not_observed', deadline: null, computeSeconds: retired.rows[0].computeSeconds })

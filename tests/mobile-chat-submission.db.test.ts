@@ -5,6 +5,8 @@ import { tokenWorkspace } from '../lib/tokens/principal'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { marked, queued, sendFailureState, submissionBody, unsettled } from '../apps/mobile/lib/outbox'
 
+mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+
 test('mobile chat response-loss retries use the real immutable submission ledger', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })

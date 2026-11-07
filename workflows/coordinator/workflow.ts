@@ -1,7 +1,9 @@
+import { captureRunFailure } from '@mikka/protocol/run-failure'
 import { runHostedWorkflowTurn, type ToolTiming } from '@/lib/subscription-workflow-turn'
 import { isStepCount } from 'ai'
 import { createHook, getWorkflowMetadata, getWritable } from 'workflow'
 import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
+import { ScopedCoordinatorWritable } from '@/lib/coordinator/scoped-stream'
 import { coordinatorStep, turnWarning } from '@/lib/coordinator/model'
 import { AGENT_MAX_ROUNDS } from '@/lib/agent-rounds'
 import { splitTelegramText } from '@/lib/telegram/messages'
@@ -16,6 +18,7 @@ import { coordinatorStopToken, lastAssistantText, stoppedMessages, untilStopped 
 import type { ModelMessage } from 'ai'
 import { promptOptions } from '@/lib/prompt-cache'
 import { isWelcomeOnlyTurn } from '@/lib/agent-welcome'
+import { finishCoordinatorTurn } from './finish-turn'
 export { coordinatorTools } from './tools'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -64,6 +67,8 @@ export async function coordinatorTurn(userId: string, botId: string) {
     let starting: ReturnType<typeof steps.writeStreamPart> | undefined
     let preparationBodyMs: { begin: number; prepare: number } | undefined
     const streamId = `${holder}:${round}`
+    const modelWritable = new ScopedCoordinatorWritable(writable, streamId)
+    const streamStart: CoordinatorWorkflowStreamPart = { type:'coordinator-turn-start',id:streamId,quietEligible:inbox.handoffOnly,...(selected.harness === 'ai_sdk' ? {modelStream:'scoped-v1' as const} : {}) }
     const finished: ModelMessage[] = []
     // A tool's finish record does not hold up the next model call; every record is awaited before the reply is stored.
     const audits: Promise<unknown>[] = []
@@ -77,7 +82,7 @@ export async function coordinatorTurn(userId: string, botId: string) {
       if (selected.harness === 'ai_sdk' && typeof agentKitEnabled === 'boolean') {
         // This is a single Workflow event-clock span, not the old two step timings.
         preparing = timedPreparation(phaseMs, 'agentPreparation', () => prepareHostedAgentRound(userId,botId,holder,round,selected,mailboxEnabled,Boolean(inbox.scheduledRead),agentKitEnabled))
-        starting = steps.writeStreamPart(writable,{type:'coordinator-turn-start',id:streamId,quietEligible:inbox.handoffOnly})
+        starting = steps.writeStreamPart(writable,streamStart)
         const [preparation] = await Promise.all([preparing,starting])
         if (preparation.kind === 'ready') {
           execution = preparation.execution
@@ -90,7 +95,7 @@ export async function coordinatorTurn(userId: string, botId: string) {
         }
       } else {
         // Native harnesses and older recorded settings retain their original boundaries.
-        ;[execution] = await Promise.all([timedPreparation(phaseMs, 'begin', () => kit.beginAgentExecution(userId,botId,holder,round,selected)),steps.writeStreamPart(writable,{type:'coordinator-turn-start',id:streamId,quietEligible:inbox.handoffOnly})])
+        ;[execution] = await Promise.all([timedPreparation(phaseMs, 'begin', () => kit.beginAgentExecution(userId,botId,holder,round,selected)),steps.writeStreamPart(writable,streamStart)])
         if (execution && execution.snapshot.runtime.harness !== selected.harness) throw new Error('agent_runtime_changed')
         hosted = selected.harness === 'ai_sdk' ? execution?.snapshot.runtime ?? await kit.botRuntime(userId,botId) : null
         prepared = selected.harness === 'ai_sdk'
@@ -103,7 +108,7 @@ export async function coordinatorTurn(userId: string, botId: string) {
       const turn = signal.aborted && !inbox.scheduledRead
         ? Promise.resolve({ text:'',finishReason:'stop',responseMessages:[] as ModelMessage[] })
         : selected.harness === 'ai_sdk'
-        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),welcomeOnly ? {} : coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,audits,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),{ ...promptOptions(prepared.prompt!),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,...(welcomeOnly ? {toolChoice:'none' as const,activeTools:[]} : {}),writable,preventClose:true,onStepEnd:step => { finished.push(...step.response.messages) },...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,botId })
+        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),welcomeOnly ? {} : coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,audits,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),{ ...promptOptions(prepared.prompt!),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,...(welcomeOnly ? {toolChoice:'none' as const,activeTools:[]} : {}),writable:modelWritable,preventClose:true,onStepEnd:step => { finished.push(...step.response.messages) },...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,botId })
         : nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),botId,execution?.snapshot,inbox.scheduledRead ? undefined : signal,finished)
       // A scheduled read is not stoppable from the chat: it posts only its fenced result. Otherwise 停止 ends a hosted
       // turn at once: the model call in flight is aborted, a tool call already running finishes on its own and nothing
@@ -175,18 +180,19 @@ export async function coordinatorTurn(userId: string, botId: string) {
         if (failedPreparation) await kit.failAgentPreparation(userId,botId,holder,round)
         else await kit.finishAgentExecution(userId,botId,execution?.id,'turn_failed')
       } catch { /* the durable execution remains inspectable */ }
+      const failureDetails = captureRunFailure(error, { runId: holder })
       const reason = error instanceof Error ? error.message : String(error)
       const completed = reason === 'model_tool_unavailable' && finished.length ? { messages:finished,streamId } : undefined
-      try { await steps.failTurn(userId,holder,reason,botId,completed) }
+      try { await steps.failTurn(userId,holder,reason,botId,completed,failureDetails) }
       catch (persistenceError) {
         // A credential guard can refuse these receipts before the transaction.
         // Still release the failed turn's lease once, without persisting unsafe
         // output, and retain both causes for server diagnostics.
-        if (completed) await steps.failTurn(userId,holder,reason,botId)
+        if (completed) await steps.failTurn(userId,holder,reason,botId,undefined,failureDetails)
         throw new AggregateError([error,persistenceError],reason,{ cause:persistenceError })
       }
       throw error
     }
   }
-  await steps.releaseLease(userId,holder,botId)
+  await finishCoordinatorTurn(userId,holder,botId)
 }

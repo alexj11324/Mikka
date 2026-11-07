@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BotAvatar, SourceIcon, Spinner } from '@/components/icons'
@@ -7,6 +7,11 @@ import { authClient } from '@/lib/auth'
 import { clearSessionExpired, sessionExpired } from '@/lib/session'
 import { signInErrorLine } from '@/lib/sign-in-error'
 import { colors, font } from '@/lib/theme'
+import { ServerSelection } from '@/features/accounts/components/server-selection'
+import { CardButton } from '@/components/cards'
+import { currentAccount, servers } from '@/lib/config'
+import { selectMobileAccount } from '@/lib/server-actions'
+import { serverCopy as copy } from '@/lib/server-copy'
 
 /**
  * Sign in, with the web's words (messages/zh-CN.json Auth): Google and GitHub
@@ -15,10 +20,14 @@ import { colors, font } from '@/lib/theme'
  */
 export function SignIn() {
   const insets = useSafeAreaInsets()
+  const state = useSyncExternalStore(servers.subscribe, servers.snapshot, servers.snapshot)
+  const account = currentAccount()
+  const [choosing, setChoosing] = useState(false)
+  const [switching, setSwitching] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [active, setActive] = useState<'google' | 'github' | 'email' | null>(null)
-  const busy = active !== null
+  const busy = active !== null || switching
   // After the session was lost (lib/session.ts) the first thing shown says why the app signed out.
   const [error, setError] = useState(() => sessionExpired() ? '登录已失效，请重新登录。' : '')
 
@@ -37,6 +46,13 @@ export function SignIn() {
     }
   }
 
+  const select = async (id: string) => {
+    if (busy) return
+    setSwitching(true); setError('')
+    try { await selectMobileAccount(id); clearSessionExpired() }
+    catch { setError(copy.switchFailed) }
+    finally { setSwitching(false) }
+  }
   const social = (provider: 'google' | 'github') => run(provider, () => authClient.signIn.social({ provider, callbackURL: '/' }))
   const submit = () => {
     if (!email.trim() || !password) return
@@ -50,17 +66,20 @@ export function SignIn() {
         <BotAvatar size={56} />
         <Text style={styles.title}>Mikka</Text>
       </View>
+      <ServerSelection choosing={choosing} setChoosing={setChoosing} disabled={busy} />
+      {!choosing ? <>
       <View style={{ gap: 10 }}>
-        <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy, busy: active === 'google' }} aria-disabled={Platform.OS === 'web' ? busy : undefined} aria-busy={Platform.OS === 'web' ? active === 'google' : undefined} disabled={busy} onPress={() => social('google')} style={({ pressed }) => [styles.provider, pressed && styles.pressed]}>
+        {account.server.signIn.google ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy, busy: active === 'google' }} aria-disabled={Platform.OS === 'web' ? busy : undefined} aria-busy={Platform.OS === 'web' ? active === 'google' : undefined} disabled={busy} onPress={() => social('google')} style={({ pressed }) => [styles.provider, pressed && styles.pressed]}>
           {active === 'google' ? <Spinner size={20} /> : <SourceIcon source="google" size={20} />}
           <Text style={styles.providerText}>使用 Google 继续</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy, busy: active === 'github' }} aria-disabled={Platform.OS === 'web' ? busy : undefined} aria-busy={Platform.OS === 'web' ? active === 'github' : undefined} disabled={busy} onPress={() => social('github')} style={({ pressed }) => [styles.provider, pressed && styles.pressed]}>
+        </Pressable> : null}
+        {account.server.signIn.github ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy, busy: active === 'github' }} aria-disabled={Platform.OS === 'web' ? busy : undefined} aria-busy={Platform.OS === 'web' ? active === 'github' : undefined} disabled={busy} onPress={() => social('github')} style={({ pressed }) => [styles.provider, pressed && styles.pressed]}>
           {active === 'github' ? <Spinner size={20} /> : <SourceIcon source="github" size={20} />}
           <Text style={styles.providerText}>使用 GitHub 继续</Text>
-        </Pressable>
+        </Pressable> : null}
       </View>
-      <Text style={styles.or}>或</Text>
+      {account.server.signIn.email ? <>
+      {account.server.signIn.google || account.server.signIn.github ? <Text style={styles.or}>或</Text> : null}
       <View style={{ gap: 10 }}>
         <TextInput accessibilityLabel="邮箱" editable={!busy} value={email} onChangeText={setEmail} placeholder="邮箱" placeholderTextColor={colors.secondary} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" style={styles.input} />
         <TextInput accessibilityLabel="密码" editable={!busy} value={password} onChangeText={setPassword} placeholder="密码" placeholderTextColor={colors.secondary} secureTextEntry autoComplete="current-password" textContentType="password" style={styles.input} onSubmitEditing={submit} />
@@ -68,6 +87,12 @@ export function SignIn() {
           <Text style={styles.submitText}>{active === 'email' ? '登录中' : '登录'}</Text>
         </Pressable>
       </View>
+      </> : null}
+      </> : null}
+      {!choosing && state.accounts.some(saved => saved.user && saved.id !== account.id) ? <View style={{ gap: 10 }}>
+        <Text style={styles.or}>{copy.savedAccounts}</Text>
+        {state.accounts.filter(saved => saved.user && saved.id !== account.id).map(saved => <CardButton key={saved.id} label={`${saved.user!.email} · ${saved.server.name}`} disabled={busy} onPress={() => void select(saved.id)} />)}
+      </View> : null}
       {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
       </ScrollView>
     </KeyboardAvoidingView>

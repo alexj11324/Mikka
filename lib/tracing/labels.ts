@@ -23,10 +23,10 @@ type StepContext = { stepMetadata?: { stepName?: unknown }; workflowMetadata?: {
 const STEP_CONTEXT = Symbol.for('WORKFLOW_STEP_CONTEXT_STORAGE')
 
 /** `step//./workflows/run-publication/steps//publishResult` → `publishResult`. Identifier characters only. */
-function shortName(name: unknown): string | undefined {
+export function shortName(name: unknown): string | undefined {
   if (typeof name !== 'string' || !name) return undefined
   const short = (name.split('//').at(-1) ?? '').split('/').at(-1)?.replace(/[^A-Za-z0-9_.-]/g, '')
-  return short || undefined
+  return short?.slice(0, 128) || undefined
 }
 
 /** `workflow:<workflow>/<step>` while a Workflow step body runs, else undefined. */

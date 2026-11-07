@@ -1,3 +1,5 @@
+import { captureRunFailure, failureFrom, type RunFailure } from "@mikka/protocol/run-failure"
+import { DAEMON_VERSION } from "../paths"
 import { runCriterion, reviewVerdict } from "@mikka/protocol/run"
 // Run supervisor: owns the run state machine
 //   queued -> preparing -> running <-> waiting_input -> finishing -> succeeded
@@ -57,10 +59,12 @@ import {
   emptyRunReport,
   isTerminalRunState,
   runStateForStop,
+  runCheckpointReceiptSchema,
   type HandoffReport,
   type HeartbeatRun,
   type Harness,
   type RunCheckpoint,
+  type RunCheckpointReceipt,
   type RunPublish,
   type RunState,
   type RunSummary,
@@ -116,7 +120,7 @@ export interface SupervisorDeps {
   collectCliTiming?: boolean
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
   /** Existing authenticated checkpoint route, before terminal completion releases the lease. */
-  saveCheckpoint?(runId: string, checkpoint: RunCheckpoint): Promise<void>
+  saveCheckpoint?(runId: string, checkpoint: RunCheckpoint): Promise<RunCheckpointReceipt | void>
   journal: RunJournal
   /** Same adapter state root used by RunContext; never supplied by the model. */
   adapterStateDir?: string
@@ -333,7 +337,7 @@ export class RunSupervisor {
    * the next one.
    */
   async saveCheckpoints(
-    save: (runId: string, checkpoint: RunCheckpoint) => Promise<void>,
+    save: (runId: string, checkpoint: RunCheckpoint) => Promise<RunCheckpointReceipt | void>,
     now = Date.now(),
   ) {
     for (const [runId, run] of this.active) {
@@ -347,7 +351,7 @@ export class RunSupervisor {
   }
 
   private async saveCheckpoint(runId: string, run: ActiveRun,
-    save: (runId: string, checkpoint: RunCheckpoint) => Promise<void>, now = Date.now(), force = false): Promise<boolean> {
+    save: (runId: string, checkpoint: RunCheckpoint) => Promise<RunCheckpointReceipt | void>, now = Date.now(), force = false): Promise<boolean> {
     // A heartbeat may already be uploading an older tree. Its upload must
     // finish before the terminal one, so it cannot overwrite the final state.
     if (run.checkpointing) await run.checkpointing
@@ -385,19 +389,21 @@ export class RunSupervisor {
     // Even an older uploaded snapshot cannot stand in for this final tree.
     // The server may continue an unavailable one only in its original worktree.
     run.safePoint = undefined
-    let checkpointTakenAt: string | undefined
+    let receipt: RunCheckpointReceipt | undefined
     const save = this.deps.saveCheckpoint
     const ready = save && await this.saveCheckpoint(runId, run, async (id, checkpoint) => {
-      await save(id, checkpoint)
-      checkpointTakenAt = checkpoint.takenAt
+      const accepted = runCheckpointReceiptSchema.safeParse(await save(id, checkpoint))
+      if (accepted.success && accepted.data.runId === id) receipt = accepted.data
     }, Date.now(), true)
-    const checkpoint = ready && checkpointTakenAt
-      ? { checkpoint: 'ready' as const, checkpointTakenAt }
+    const checkpoint = ready && receipt
+      ? { checkpoint: 'ready' as const, checkpointTakenAt: receipt.takenAt }
       : { checkpoint: 'unavailable' as const }
     // The synthetic cancelled/error exits used to detach a stuck adapter
     // cannot establish that the native process stopped writing its workspace.
     if (finishingComplete && run.sessionExited && !this.stopping)
-      run.safePoint = { session: 'exited', observedAt: new Date().toISOString(), ...checkpoint }
+      // Native exit precedes the final upload. Its server acknowledgement
+      // establishes that order even when the device's clock is ahead or behind.
+      run.safePoint = { session: 'exited', observedAt: receipt?.takenAt ?? new Date().toISOString(), ...checkpoint }
     return checkpoint
   }
 
@@ -628,7 +634,7 @@ export class RunSupervisor {
     })
     this.push(assignment.runId, {
       kind: "complete",
-      completion: { stopReason: "error", report: baseReport(error.message) },
+      completion: { stopReason: "error", report: baseReport(error.message), failureDetails: captureRunFailure(error, { runId: assignment.runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment.prompt] }) },
     })
     this.disposeMasker(assignment.runId)
     throw error
@@ -912,6 +918,10 @@ export class RunSupervisor {
   /** Serialize Errors before masking so non-enumerable message/stack/cause
    * fields cannot bypass the same dynamic credential set as run output. */
   private logError(runId: string, error: unknown) {
+    // Captured provider exceptions can retain raw SDK causes in memory. Log
+    // only their registered identity and bounded cause fields, never messages.
+    const failure = failureFrom(error)
+    if (failure) return { code: failure.code, ...(failure.detail ? { detail: failure.detail } : {}), causes: failure.causes }
     const masker = this.maskers.get(runId)
     if (!masker) return error
     const seen = new WeakSet<object>()
@@ -937,6 +947,7 @@ export class RunSupervisor {
     stopReason: StopReason,
     error?: string,
     report: HandoffReport = baseReport(error),
+    failureDetails?: RunFailure,
   ) {
     this.active.get(runId)?.toolApproval?.revoke()
     // Report collection and capture uploads can await after the provider's
@@ -1011,13 +1022,21 @@ export class RunSupervisor {
         waitingQuestionId: report.question.questionId,
       })
     }
+    // A provider's terminal failure is an ordinary iterator result, not a
+    // throw. Mark its run span explicitly without passing private CLI text.
+    if (state === 'failed') active?.span?.fail({ name: 'RunFailure' }, stopReason)
+    else active?.span?.set('mikka.outcome', stopReason)
     this.setState(runId, state, {
       stopReason,
       ...(error ? { error } : {}),
     })
+    const terminalFailure = state === "failed" && !active?.cancelRequested && !active?.forcedStop
+      ? captureRunFailure(failureDetails ?? new Error(error ?? report.summary), {
+        runId, appVersion: DAEMON_VERSION, sensitiveText: [entry?.assignment.prompt ?? ""],
+      }) : undefined
     this.push(runId, {
       kind: "complete",
-      completion: { stopReason, report },
+      completion: { stopReason, report, ...(terminalFailure ? { failureDetails: terminalFailure } : {}) },
     })
     this.disposeMasker(runId)
     const run = this.active.get(runId)
@@ -1040,10 +1059,14 @@ export class RunSupervisor {
    * shows which stage it reached. The stage's own result or error passes
    * through unchanged.
    */
-  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>, reportAfter?: Promise<unknown>): Promise<T> {
+  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>, reportAfter?: Promise<unknown>, prepared?: PreparedAgentStart): Promise<T> {
     const started = performance.now()
     const attributes = { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": this.deps.journal.get(runId)?.assignment.harness }
     let startupTiming: DaemonStartupTiming | undefined
+    const preparationTiming = () => {
+      const timing = this.active.get(runId)?.runtimeTiming && prepared?.preparationTiming
+      return timing?.runIdHash === attributes['mikka.run.id_hash'] && timing.harness === attributes['mikka.harness'] ? timing : undefined
+    }
     try {
       const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(),
         this.active.get(runId)?.runtimeTiming ? { onStartupTiming: timing => { startupTiming = timing } } : undefined)
@@ -1052,12 +1075,12 @@ export class RunSupervisor {
       // duration, but produce no speculative stage/user message before it.
       if (reportAfter) await reportAfter
       if (stage === "agent_start") this.active.get(runId)?.runtimeTiming?.executing()
-      this.emit(runId, runStageChunk(stage, elapsed, true, startupTiming))
+      this.emit(runId, runStageChunk(stage, elapsed, true, startupTiming, preparationTiming()))
       return value
     } catch (error) {
       const elapsed = performance.now() - started
       if (reportAfter) await reportAfter
-      this.emit(runId, runStageChunk(stage, elapsed, false, startupTiming))
+      this.emit(runId, runStageChunk(stage, elapsed, false, startupTiming, preparationTiming()))
       throw error
     }
   }
@@ -1351,10 +1374,10 @@ export class RunSupervisor {
     const harness = assignment?.harness
     if (assignment && runDiagnosticsEnabled(assignment.taskEnv, this.deps.collectCliTiming))
       run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
-    run.done = daemonTracer.span("daemon.run", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
+    run.done = daemonTracer.span("daemon.run", { "mikka.run_id": runId, "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
       run.span = span
       return this.drive(runId, repo, run, initialClaim)
-    }, { root: true })
+    }, { root: true, traceContext: assignment?.traceContext })
       .catch(async (error: unknown) => {
         run.repositoryPreparing?.refuseEffects(error)
         run.repositoryPreparing?.abort.abort()
@@ -1373,6 +1396,7 @@ export class RunSupervisor {
             run.cancelRequested ? run.forcedStop ?? "cancelled" : providerFailure ? "provider_failure" : error instanceof CheckpointRecoveryError ? 'blocked' : "error",
             run.cancelRequested ? undefined : message,
             { ...baseReport(run.cancelRequested ? undefined : message), ...(providerFailure ? { providerFailure, providerCheckpoint: checkpoint.checkpoint } : {}) },
+            captureRunFailure(error, { runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment?.prompt ?? ""] }),
           )
         } catch (finishError) {
           this.deps.log.error(
@@ -1390,7 +1414,12 @@ export class RunSupervisor {
         finally {
           try { run.github?.close() }
           catch { this.deps.log.warn('GitHub credential cleanup failed') }
-          finally { clearTimeout(run.cancelTimer); run.runtimeTiming?.close(); this.active.delete(runId) }
+          finally {
+            clearTimeout(run.cancelTimer); run.runtimeTiming?.close(); this.active.delete(runId)
+            // Start draining all three telemetry queues before an idle cloud VM
+            // can pause; the completed run never waits for the collector.
+            void daemonTracer.flush()
+          }
         }
       })
   }
@@ -1497,6 +1526,7 @@ export class RunSupervisor {
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
     const baseOptions = {
+      traceContext: daemonTracer.capture(),
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
       github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
         ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
@@ -1744,7 +1774,7 @@ export class RunSupervisor {
             continueSession,
             requireSessionResume: assignment.requireSessionResume,
           })
-        })())
+        })(), undefined, preparedSession)
     } catch (error) {
       if (assignment.skillReceipt) this.deps.journal.update(runId, { skillMount: undefined, execution: undefined, runtime: undefined })
       throw error
@@ -1917,7 +1947,7 @@ export class RunSupervisor {
         const checkpoint = await this.saveTerminalCheckpoint(runId, run, capturesSaved)
         if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: checkpoint.checkpoint }
         if (this.stopping) return
-        this.finish(runId, stopReason, error ?? verifyError, report)
+        this.finish(runId, stopReason, error ?? verifyError, report, event.failureDetails)
         log.info(
           { outcome: event.outcome, stop_reason: stopReason },
           "run ended",

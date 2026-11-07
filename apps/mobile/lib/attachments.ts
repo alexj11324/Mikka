@@ -7,8 +7,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 import { fetch as nativeFetch } from 'expo/fetch'
 import { CHAT_FILE_MAX_BYTES, chatFileSchema, supportedChatFile, type ChatFile, type ChatFileScope } from '@mikka/protocol/chat-attachments'
-import { api, ApiError, authHeaders } from './api'
-import { API_URL } from './config'
+import { api, apiConnection, ApiError, authHeaders } from './api'
 
 /**
  * What the composer's 「+」 attaches. The server takes up to two images, each
@@ -88,46 +87,49 @@ export async function pickChatFile(): Promise<Extract<Attachment, { kind: 'file'
 interface UploadTicket { id: string; chunkSize?: number; nextPart?: number; uploadUrl?: string; headers?: Record<string, string>; uploaded?: boolean }
 const uploadTickets = new Map<string, UploadTicket>()
 export async function uploadPickedFile(item: Extract<Attachment, { kind: 'file' }>, scope: ChatFileScope): Promise<ChatFile> {
+  const connection = apiConnection()
+  const request: typeof api = (path, init) => api(path, init, connection)
+  const baseUrl = connection.account.server.url
   const body = item.file ?? new File(item.uri)
-  const ticketKey = `${scope.kind}:${scope.id}:${item.key}`
+  const ticketKey = `${connection.account.id}:${scope.kind}:${scope.id}:${item.key}`
   let started = uploadTickets.get(ticketKey)
   if (!started) {
-    started = await api<UploadTicket>('/api/chat/attachments', { method: 'POST', body: { operation: 'init', scope, name: item.name, mediaType: item.mediaType, size: body.size } })
+    started = await request<UploadTicket>('/api/chat/attachments', { method: 'POST', body: { operation: 'init', scope, name: item.name, mediaType: item.mediaType, size: body.size } })
     uploadTickets.set(ticketKey, started)
   } else {
-    try { return chatFileSchema.parse(await api(`/api/chat/attachments/${started.id}?info`)) } catch { /* Completion may still be pending. Reuse its identity. */ }
+    try { return chatFileSchema.parse(await request(`/api/chat/attachments/${started.id}?info`)) } catch { /* Completion may still be pending. Reuse its identity. */ }
   }
   if (started.chunkSize) {
     const ticket = started, chunkSize = started.chunkSize
     try {
       for (let part = ticket.nextPart ?? 0; part < Math.ceil(body.size / chunkSize); part++) {
         const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 120_000)
-        const response = await nativeFetch(`${API_URL}/api/chat/attachments?id=${ticket.id}&part=${part}`, { method: 'POST', credentials: 'include', headers: { ...await authHeaders(), 'content-type': 'application/octet-stream' }, body: body.slice(part * chunkSize, (part + 1) * chunkSize), signal: controller.signal }).finally(() => clearTimeout(timer))
+        const response = await nativeFetch(`${baseUrl}/api/chat/attachments?id=${ticket.id}&part=${part}`, { method: 'POST', credentials: Platform.OS === 'web' ? 'include' : 'omit', redirect: 'error', headers: { ...await authHeaders(connection), 'content-type': 'application/octet-stream' }, body: body.slice(part * chunkSize, (part + 1) * chunkSize), signal: controller.signal }).finally(() => clearTimeout(timer))
         if (!response.ok) { const data = await response.json().catch(() => null) as { error?: string } | null; throw new ApiError(response.status, data?.error ?? 'unavailable') }
         ticket.nextPart = part + 1
       }
-      const uploaded = chatFileSchema.parse(await api('/api/chat/attachments', { method: 'POST', body: { operation: 'complete', id: ticket.id }, timeoutMs: 120_000 }))
+      const uploaded = chatFileSchema.parse(await request('/api/chat/attachments', { method: 'POST', body: { operation: 'complete', id: ticket.id }, timeoutMs: 120_000 }))
       uploadTickets.delete(ticketKey)
       return uploaded
     } catch (error) {
-      if (error instanceof ApiError && error.status >= 400 && error.status < 500) { uploadTickets.delete(ticketKey); void api(`/api/chat/attachments/${ticket.id}`, { method: 'DELETE' }).catch(() => {}) }
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500) { uploadTickets.delete(ticketKey); void request(`/api/chat/attachments/${ticket.id}`, { method: 'DELETE' }).catch(() => {}) }
       throw error
     }
   }
   const direct = Boolean(started.uploadUrl)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 120_000)
-  const response = !started.uploaded ? await nativeFetch(started.uploadUrl ?? `${API_URL}/api/chat/attachments?id=${started.id}`, {
-    method: direct ? 'PUT' : 'POST', headers: direct ? started.headers : { ...await authHeaders(), 'content-type': 'application/octet-stream' }, body, signal: controller.signal,
+  const response = !started.uploaded ? await nativeFetch(started.uploadUrl ?? `${baseUrl}/api/chat/attachments?id=${started.id}`, {
+    method: direct ? 'PUT' : 'POST', redirect: 'error', headers: direct ? started.headers : { ...await authHeaders(connection), 'content-type': 'application/octet-stream' }, body, signal: controller.signal,
   }).finally(() => clearTimeout(timer)) : (clearTimeout(timer), null)
-  if (response && !response.ok) { uploadTickets.delete(ticketKey); void api(`/api/chat/attachments/${started.id}`, { method: 'DELETE' }).catch(() => {}); const data = await response.json().catch(() => null) as { error?: string } | null; throw Error(data?.error ?? 'unavailable') }
+  if (response && !response.ok) { uploadTickets.delete(ticketKey); void request(`/api/chat/attachments/${started.id}`, { method: 'DELETE' }).catch(() => {}); const data = await response.json().catch(() => null) as { error?: string } | null; throw Error(data?.error ?? 'unavailable') }
   if (direct) started.uploaded = true
   let completed: unknown
-  try { completed = direct ? await api('/api/chat/attachments', { method: 'POST', body: { operation: 'complete', id: started.id }, timeoutMs: 120_000 }) : await response!.json() }
+  try { completed = direct ? await request('/api/chat/attachments', { method: 'POST', body: { operation: 'complete', id: started.id }, timeoutMs: 120_000 }) : await response!.json() }
   catch (error) {
     if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
       uploadTickets.delete(ticketKey)
-      void api(`/api/chat/attachments/${started.id}`, { method: 'DELETE' }).catch(() => {})
+      void request(`/api/chat/attachments/${started.id}`, { method: 'DELETE' }).catch(() => {})
     }
     throw error
   }

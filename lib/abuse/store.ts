@@ -13,7 +13,18 @@ import {
 type Query = Pick<PoolClient, 'query'>
 export type HostedQuotaLease = { limit: number; close(): Promise<void> }
 export class HostedUsageStore {
-  constructor(readonly pool: Pool, private readonly quota?: (workspaceId: string) => Promise<HostedQuotaLease>) {}
+  readonly metered: boolean
+  readonly allowTrial: boolean
+  private readonly quota?: (workspaceId: string) => Promise<HostedQuotaLease>
+  constructor(readonly pool: Pool, options: {
+    metered?: boolean
+    allowTrial?: boolean
+    quota?: (workspaceId: string) => Promise<HostedQuotaLease>
+  } = {}) {
+    this.metered = options.metered ?? true
+    this.allowTrial = options.allowTrial ?? true
+    this.quota = options.quota
+  }
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>) {
     const tx = await this.pool.connect()
     try {
@@ -63,6 +74,7 @@ export class HostedUsageStore {
     fingerprint: string | null,
     last4: string | null = null,
   ) {
+    if (!this.metered) return false
     return this.transaction(async (tx) => {
       await this.lock(tx, workspaceId)
       const verified = await tx.query(
@@ -109,6 +121,7 @@ export class HostedUsageStore {
     })
   }
   async balance(workspaceId: string, tx: Query = this.pool) {
+    if (!this.metered) return { verified: true, free: 0, purchased: 0 }
     // Already-incurred debt offsets unused free credit as well. Clamping each
     // bucket independently must not turn an overdraft into new spending power.
     const {
@@ -133,6 +146,7 @@ export class HostedUsageStore {
    * while this is 0 or more.
    */
   async trialLeft(workspaceId: string, balance: { verified: boolean; purchased: number }, tx: Query = this.pool) {
+    if (!this.metered) return null
     if (balance.verified || balance.purchased > 0) return null
     const { rows: [row] } = await tx.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM coordinator_events e JOIN bots b ON b.id=e."botId"
@@ -144,7 +158,9 @@ export class HostedUsageStore {
   }
   async canUseMikkaPaid(workspaceId: string) {
     const balance = await this.balance(workspaceId)
+    if (!this.metered) return balance
     if (!balance.verified && balance.purchased <= 0) {
+      if (!this.allowTrial) throw new PaidResourceError('verification_required')
       const left = await this.trialLeft(workspaceId, balance)
       if (left !== null && left >= 0) return { ...balance, trialLeft: left }
       throw new PaidResourceError('verification_required')
@@ -173,16 +189,17 @@ export class HostedUsageStore {
     env: Record<string, string | undefined> = process.env,
     estimate = HOSTED_CALL_HOLD_MICRO_USD,
   ) {
-    let quota: HostedQuotaLease | undefined
+    if (!this.metered) return { id, workspaceId }
+    // Pin plan authority before reserving an APP connection, matching the
+    // workspace -> APP order used by task and governance writers.
+    const quota = await this.quota?.(workspaceId)
     try { return await this.transaction(async (tx) => {
       // One short platform admission lock; no SQL lock spans provider I/O.
       await tx.query(
         "SELECT pg_advisory_xact_lock(hashtextextended('hosted-free-budget',0))",
       )
       await this.lock(tx, workspaceId)
-      // APP admission locks first, then a short shared plan lease through COMMIT.
       // Product concurrency never grants spending authority or a free allowance.
-      quota = await this.quota?.(workspaceId)
       // Release an abandoned reservation so one stuck call never keeps its hold.
       // A hosted call runs at most HOSTED_CALL_TIMEOUT_MS; a pending row past a
       // wide margin crashed before settling, and an unknown row with no
@@ -194,7 +211,8 @@ export class HostedUsageStore {
       if (prior) throw new PaidResourceError('usage_in_progress') // Never replay a paid provider call.
       const balance = await this.balance(workspaceId, tx)
       // No card and nothing bought: only the first TRIAL_MESSAGES messages' turns, paid by the platform.
-      const trial = await this.trialLeft(workspaceId, balance, tx)
+      if (!this.allowTrial && !balance.verified && balance.purchased <= 0) throw new PaidResourceError('verification_required')
+      const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance, tx) : null
       if (trial !== null && trial < 0)
         throw new PaidResourceError('verification_required')
       const available = balance.free + balance.purchased
@@ -226,6 +244,7 @@ export class HostedUsageStore {
   }
   /** Persist the upstream lookup identity before exposing its first content. */
   async recordGeneration(id: string, generationId: string) {
+    if (!this.metered) return
     if (!generationId || generationId.length > 200) throw new Error('invalid_usage_generation')
     const result = await this.pool.query(
       `UPDATE hosted_usage SET "generationId"=COALESCE("generationId",$2)
@@ -242,6 +261,7 @@ export class HostedUsageStore {
     outputTokens = 0,
     generationId?: string,
   ) {
+    if (!this.metered) return
     return this.transaction(async (tx) => {
       await tx.query(
         "SELECT pg_advisory_xact_lock(hashtextextended('hosted-free-budget',0))",
@@ -319,6 +339,7 @@ export class HostedUsageStore {
     env: Record<string, string | undefined> = process.env,
   ) {
     const balance = await this.balance(workspaceId)
+    if (!this.metered) return { state: 'ready', balance, trialLeft: null }
     const flight = await this.inFlight(this.pool, workspaceId)
     const spent = Number(
       (
@@ -329,9 +350,9 @@ export class HostedUsageStore {
     )
     // Whether the next call would be admitted, by the same rules as reserve().
     const available = balance.free + balance.purchased
-    const trial = await this.trialLeft(workspaceId, balance)
-    // Read APP data before acquiring a workspace plan lease. reserve() takes
-    // APP first; reversing the pool order here can deadlock both bounded pools.
+    const trial = this.allowTrial ? await this.trialLeft(workspaceId, balance) : null
+    // These pool reads retain no APP connection. Once the plan is pinned,
+    // status computes the response without acquiring another APP connection.
     const quota = await this.quota?.(workspaceId)
     try {
     const state = trial !== null
@@ -351,6 +372,7 @@ export class HostedUsageStore {
     } finally { await quota?.close() }
   }
   async recent(workspaceId: string) {
+    if (!this.metered) return []
     return (
       await this.pool.query(
         `SELECT id,model,state,"costMicroUsd","freeMicroUsd","purchasedMicroUsd","inputTokens","outputTokens","createdAt" FROM hosted_usage WHERE "workspaceId"=$1 ORDER BY "createdAt" DESC LIMIT 50`,

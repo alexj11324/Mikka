@@ -1781,6 +1781,10 @@
       },
       "billing": {
         "title": "计费"
+      },
+      "cloud": {
+        "title": "Mikka 云服务",
+        "keywords": "cloud Mikka 云服务 自托管 self-hosted"
       }
     },
     "appearance": {
@@ -2015,6 +2019,8 @@
       "githubLinkReady": "浏览器已登录 App 里的账号",
       "githubContinueLink": "继续关联 GitHub",
       "githubLinkExpired": "这次关联已过期，GitHub 未关联。",
+      "githubCloudConnection": "Mikka 云服务",
+      "githubManageCloud": "管理连接",
       "githubDisconnectFailed": "无法断开 GitHub",
       "githubDescription": "Agent 在你授权的仓库里读代码、推送分支、开 Pull Request，并读取 Issue 和 CI 检查。",
       "githubConnectionHeading": "连接",
@@ -2095,7 +2101,15 @@
       "readTools": "读取 {count}",
       "info": "信息",
       "category": "类别",
-      "version": "版本"
+      "version": "版本",
+      "githubApp": "服务器 GitHub App",
+      "githubAppCreate": "创建 GitHub App",
+      "githubAppCreated": "GitHub App 已创建",
+      "githubAppConfigured": "已配置",
+      "githubAppOwner": "归属",
+      "githubAppPersonal": "个人账号",
+      "githubAppOrganization": "组织",
+      "githubAppOrganizationName": "组织名"
     },
     "telegram": {
       "title": "Telegram",
@@ -2637,7 +2651,16 @@
       "noComputers": "没有连接电脑",
       "cloudNoKey": "没填 E2B Key",
       "cloudUnavailable": "不可用",
-      "stage": {"ready": "可用", "off": "未参与调度", "offline": "离线", "offlineSince": "离线 · {time}", "notInstalled": "没装 {agent}", "modelNotReported": "没有列表里的模型", "needsUpdate": "需要更新 Mikka", "subscriptionRuntimeUnavailable": "订阅不可用"},
+      "stage": {
+        "ready": "可用",
+        "off": "未参与调度",
+        "offline": "离线",
+        "offlineSince": "离线 · {time}",
+        "notInstalled": "没装 {agent}",
+        "modelNotReported": "没有列表里的模型",
+        "needsUpdate": "需要更新 Mikka",
+        "subscriptionRuntimeUnavailable": "订阅不可用"
+      },
       "title": "优先使用的模型",
       "loading": "正在读取优先使用的模型…",
       "location": "运行位置",
@@ -2855,6 +2878,43 @@
         "systematic-debugging": "复现故障、定位根因，再验证修复。"
       },
       "numberedSource": "{source} {number}"
+    },
+    "cloud": {
+      "title": "Mikka 云服务",
+      "account": "个人账号",
+      "server": "服务器",
+      "team": "团队",
+      "connected": "已连接",
+      "disconnected": "未连接",
+      "revoked": "授权已撤销",
+      "billing": "额度来源",
+      "personalBilling": "我的 Mikka 额度",
+      "defaultModel": "Mikka 默认（Mikka Cloud 额度）",
+      "topUp": "去 Mikka Cloud 充值",
+      "teamBilling": "团队 Mikka 额度",
+      "services": "服务",
+      "scopes": {
+        "github": "GitHub",
+        "push": "iOS 推送",
+        "models": "托管模型"
+      },
+      "disconnect": "断开连接",
+      "connectAccount": "连接 Mikka 账号",
+      "administratorRequired": "等待管理员连接",
+      "name": "服务器名称",
+      "connect": "连接",
+      "serverKey": "服务器密钥",
+      "save": "保存",
+      "revokeKey": "撤销密钥",
+      "connectedServers": "已连接的服务器",
+      "manage": "管理",
+      "loading": "正在加载",
+      "confirmRevokeKey": "撤销团队服务器密钥？",
+      "confirmDisconnectServer": "断开此服务器的所有 Mikka 云服务连接？",
+      "cancel": "取消",
+      "pushContent": "推送内容",
+      "pushFull": "完整",
+      "pushReminder": "只提醒"
     }
   },
   "TelegramBot": {
@@ -3309,6 +3369,8 @@
       "labelUnavailable": "模型：{name}，不可用",
       "hosted": "Mikka 默认",
       "credits": "点数",
+      "cloudCredits": "Mikka Cloud 额度",
+      "ownProvider": "自带服务商",
       "points": "{points} 点",
       "trialLeft": "剩 {count} 条免费",
       "hostedUnavailable": "Mikka 默认在这个工作区不可用",
@@ -3480,7 +3542,19 @@
       "separator": "，",
       "expandAll": "全部展开",
       "collapseAll": "全部收起",
-      "card": {"thinkingDone": "思考完毕", "finished": "{tool}完成", "failed": "失败", "args": "参数", "result": "结果", "waiting": "等待结果…", "empty": "没有参数或结果", "usedTools": "用了 {count} 个工具", "usingTools": "正在使用工具…", "showAll": "展开全部", "showLess": "收起"},
+      "card": {
+        "thinkingDone": "思考完毕",
+        "finished": "{tool}完成",
+        "failed": "失败",
+        "args": "参数",
+        "result": "结果",
+        "waiting": "等待结果…",
+        "empty": "没有参数或结果",
+        "usedTools": "用了 {count} 个工具",
+        "usingTools": "正在使用工具…",
+        "showAll": "展开全部",
+        "showLess": "收起"
+      },
       "detail": {
         "handedTo": "交给",
         "query": "查询",
@@ -3871,7 +3945,12 @@
       "e2bKey": "{owner} E2B key",
       "shared": "工作区分享",
       "runsOn": "运行在",
-      "roles": {"requester": "发起", "botOwner": "Bot 所有者", "executionPrincipal": "执行", "outputOwner": "归属"},
+      "roles": {
+        "requester": "发起",
+        "botOwner": "Bot 所有者",
+        "executionPrincipal": "执行",
+        "outputOwner": "归属"
+      },
       "rolesTogether": "{first}与{last}",
       "roleSeparator": "、",
       "costModelSubscription": "模型费用由{owner} {provider} 订阅承担",
@@ -5069,6 +5148,18 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "run_subscription_expired": { "default": "模型订阅需要重新连接。" },
+    "run_api_key_invalid": { "default": "服务商拒绝了 API 密钥，请在模型设置中检查密钥。" },
+    "run_quota_exceeded": { "default": "服务商用量额度或余额已用尽，请查看用量。" },
+    "run_rate_limited": { "default": "服务商正在限制请求频率，请稍后重试。" },
+    "run_invalid_request": { "default": "服务商无法接受这次请求，请查看错误详情。" },
+    "run_access_denied": { "default": "服务商拒绝访问，请检查账号权限。" },
+    "run_model_unavailable": { "default": "此模型当前不可用或已退役，请选择其他模型。" },
+    "run_context_length_exceeded": { "default": "请求超出了模型的上下文长度限制，请缩短输入或选择其他模型。" },
+    "run_timeout": { "default": "服务商响应超时，请重试。" },
+    "run_network_error": { "default": "无法连接模型服务商，请检查连接后重试。" },
+    "run_provider_error": { "default": "模型服务商未能完成这次请求，请重试。" },
+    "run_failed": { "default": "任务未能完成，请查看错误详情或重试。" },
     "governance_denied": {
       "plan_changed": "套餐已变更，请重新核对当前权益后再应用。",
       "default": "治理操作未完成，请重试。",
@@ -5082,6 +5173,33 @@
       "template_limit": "审批模板数量已达到当前套餐上限。",
       "not_found": "此组织、工作区或模板不可用。"
     },
+    "web_auth_invalid_request": { "default": "登录请求无效，请重新连接。" },
+    "web_auth_forbidden": { "default": "服务器拒绝了这个登录来源。" },
+    "web_auth_state_unavailable": { "default": "这个登录请求已被使用，请重新连接。" },
+    "web_auth_exchange_rejected": { "default": "登录交接被拒绝或已过期，请重新连接。" },
+    "web_auth_session_expired": { "default": "登录会话已失效，请重新登录服务器。" },
+    "web_connection_account_conflict": { "default": "这个账号 ID 已属于另一个服务器，请使用独立账号。" },
+    "web_connection_app_invalid": { "default": "官方应用地址无效。" },
+    "web_connection_auth_unavailable": { "default": "服务器暂时无法验证登录，请重试。" },
+    "web_connection_cloud_selected": { "default": "请切换回云端账号。" },
+    "web_connection_disabled": { "default": "管理员已关闭官方网页连接。" },
+    "web_connection_download_failed": { "default": "无法读取服务器文件，请重试。" },
+    "web_connection_handoff_expired": { "default": "登录交接已过期，请重新连接。" },
+    "web_connection_handoff_rejected": { "default": "服务器拒绝了登录交接，请重新连接。" },
+    "web_connection_https_required": { "default": "连接服务器需要 HTTPS 地址。" },
+    "web_connection_method_refused": { "default": "服务器不允许这种请求方式。" },
+    "web_connection_origin_refused": { "default": "请求地址不属于当前服务器。" },
+    "web_connection_popup_blocked": { "default": "请允许登录弹窗后重试。" },
+    "web_connection_preflight_refused": { "default": "服务器拒绝了跨域请求，请检查应用版本。" },
+    "web_connection_probe_required": { "default": "请先重新检查服务器地址。" },
+    "web_connection_revoke_unconfirmed": { "default": "浏览器已清除凭据，但无法确认服务器撤销。请在该服务器的会话设置中检查。" },
+    "web_connection_route_refused": { "default": "当前连接不允许访问这个接口。" },
+    "web_connection_server_limit": { "default": "已保存 20 个服务器，请先断开一个。" },
+    "web_connection_session_changed": { "default": "服务器或账号已切换，请重试。" },
+    "web_connection_session_expired": { "default": "服务器登录已失效，请重新登录。" },
+    "web_connection_session_invalid": { "default": "服务器返回的账号信息无效，请重新连接。" },
+    "web_connection_session_unavailable": { "default": "无法读取服务器会话，请重试。" },
+    "web_connection_sign_in_required": { "default": "请先登录这个服务器。" },
     "installer_failed": {
       "default": "Mikka 未能安装，请查看本机安装日志。",
       "node_required": "请安装 Node.js 22 或更新版本，然后重试。",
@@ -5094,19 +5212,45 @@
       "connection_failed": "设备未能连接到当前登录账号，请检查连接后重试。",
       "command_failed": "安装命令失败，请查看安装日志中的完整错误。"
     },
-    "model_tool_unavailable": { "default": "回复未完成，请重试" },
-    "desktop_client_update_required": { "default": "请更新 Mikka 后继续" },
-    "desktop_session_expired": { "default": "请重新登录 Mikka" },
-    "desktop_session_changed": { "default": "账号或工作区已切换，请重试" },
-    "desktop_account_limit_reached": { "default": "已登录五个账号" },
-    "desktop_request_failed": { "default": "桌面请求失败，请重试" },
-    "desktop_backend_unreachable": { "default": "无法连接 Mikka" },
-    "desktop_rpc_request_invalid": { "default": "请检查填写的内容后重试" },
-    "desktop_rpc_action_unknown": { "default": "当前版本的 Mikka 不支持此操作" },
-    "desktop_rpc_failed": { "default": "操作未能完成" },
-    "desktop_rpc_request_rejected": { "default": "Mikka 无法接受此请求" },
-    "desktop_rpc_response_invalid": { "default": "无法读取 Mikka 返回的数据" },
-    "desktop_rpc_value_invalid": { "default": "无法发送此内容" },
+    "model_tool_unavailable": {
+      "default": "回复未完成，请重试"
+    },
+    "desktop_client_update_required": {
+      "default": "请更新 Mikka 后继续"
+    },
+    "desktop_session_expired": {
+      "default": "请重新登录 Mikka"
+    },
+    "desktop_session_changed": {
+      "default": "账号或工作区已切换，请重试"
+    },
+    "desktop_account_limit_reached": {
+      "default": "已登录五个账号"
+    },
+    "desktop_request_failed": {
+      "default": "桌面请求失败，请重试"
+    },
+    "desktop_backend_unreachable": {
+      "default": "无法连接 Mikka"
+    },
+    "desktop_rpc_request_invalid": {
+      "default": "请检查填写的内容后重试"
+    },
+    "desktop_rpc_action_unknown": {
+      "default": "当前版本的 Mikka 不支持此操作"
+    },
+    "desktop_rpc_failed": {
+      "default": "操作未能完成"
+    },
+    "desktop_rpc_request_rejected": {
+      "default": "Mikka 无法接受此请求"
+    },
+    "desktop_rpc_response_invalid": {
+      "default": "无法读取 Mikka 返回的数据"
+    },
+    "desktop_rpc_value_invalid": {
+      "default": "无法发送此内容"
+    },
     "subscription_local_runtime_unavailable": {
       "default": "本机订阅运行无法启动",
       "assignment_invalid": "线程的订阅设置已失效，请重新选择模型",
@@ -5174,6 +5318,52 @@
     },
     "factory_spec_approval_required": {
       "default": "请先审阅并批准方案，再开始实现。"
+    },
+    "cloud_not_connected": {
+      "default": "尚未连接 Mikka 云服务。"
+    },
+    "cloud_scope_missing": {
+      "default": "Mikka 云服务授权不包含此服务。"
+    },
+    "cloud_server_revoked": {
+      "default": "Mikka 云服务授权已撤销，请重新连接。"
+    },
+    "cloud_invalid_request": {
+      "default": "Mikka 云服务连接配置或授权请求无效。",
+      "configuration": "Mikka 云服务连接配置或授权请求无效。",
+      "protocol": "Mikka 云服务连接配置或授权请求无效。",
+      "state": "Mikka 云服务连接配置或授权请求无效。"
+    },
+    "cloud_rate_limited": {
+      "default": "Mikka 云服务请求过于频繁，请稍后再试。"
+    },
+    "cloud_access_denied": {
+      "default": "没有权限执行此 Mikka 云服务操作。",
+      "origin": "没有权限执行此 Mikka 云服务操作。",
+      "administrator": "没有权限执行此 Mikka 云服务操作。"
+    },
+    "cloud_unavailable": {
+      "default": "Mikka 云服务暂时不可用。",
+      "network": "Mikka 云服务暂时不可用。",
+      "response": "Mikka 云服务暂时不可用。",
+      "protocol": "Mikka 云服务暂时不可用。",
+      "storage": "Mikka 云服务暂时不可用。",
+      "refresh_uncertain": "Mikka 云服务暂时不可用。"
+    },
+    "cloud_quota_exhausted": {
+      "default": "Mikka 云服务额度不足或已达到团队上限。"
+    },
+    "github_app_setup_failed": {
+      "default": "GitHub App 未创建，请重试。",
+      "admin": "只有服务器管理员可以创建 GitHub App。请使用原账号重新登录。",
+      "origin": "服务器地址与当前页面不一致，请从配置的服务器地址打开。",
+      "state": "这次创建已过期或会话已改变，请重新创建。",
+      "encryption": "服务器无法加密保存凭证，请联系管理员检查加密密钥。",
+      "storage": "服务器无法保存 GitHub App，请稍后重试。",
+      "configured": "此服务器已配置 GitHub App。",
+      "request": "GitHub App 创建未完成，请重试。",
+      "response": "GitHub 未返回完整的 App 凭证，请重新创建。",
+      "template": "此版本暂时无法创建 GitHub App，请更新服务器后重试。"
     }
   },
   "FactoryFlow": {
@@ -5396,6 +5586,66 @@
       "loading": "正在读取模板…"
     }
   },
+  "MobileServer": {
+    "title": "选择服务器",
+    "server": "服务器",
+    "cloud": "Mikka Cloud",
+    "selfHosted": "自托管服务器",
+    "address": "服务器地址",
+    "connect": "连接",
+    "connecting": "正在连接…",
+    "continue": "继续",
+    "cancel": "取消",
+    "change": "更改",
+    "accounts": "账号与服务器",
+    "addAccount": "添加账号",
+    "savedAccounts": "已登录的账号",
+    "retry": "重试",
+    "saving": "正在保存",
+    "readFailed": "账号读取失败",
+    "saveFailed": "账号保存失败",
+    "switchFailed": "账号切换失败",
+    "version": "版本 {version}",
+    "errors": {
+      "invalid_address": "地址无效",
+      "https_required": "地址要以 https:// 开头",
+      "unreachable": "连不上这台服务器",
+      "not_mikka": "这个地址不是 Mikka 服务器",
+      "serverUpdate": "服务器版本 {version} 过旧，请把服务器升级到最新版本",
+      "serverUpdateUnknown": "服务器版本过旧，请把服务器升级到最新版本",
+      "appUpdate": "请把 Mikka 升级到 {version} 或更新版本",
+      "appUpdateUnknown": "请把 Mikka 升级到最新版本",
+      "mobile_not_ready": "请在服务器上允许 Mikka iOS"
+    }
+  },
+  "DesktopServer": {
+    "title": "选择服务器",
+    "server": "服务器",
+    "cloud": "Mikka Cloud",
+    "selfHosted": "自托管服务器",
+    "address": "服务器地址",
+    "connect": "连接",
+    "connecting": "正在连接…",
+    "continue": "继续",
+    "cancel": "取消",
+    "change": "更改",
+    "switch": "切换",
+    "disconnect": "断开",
+    "disconnecting": "正在断开…",
+    "disconnectTitle": "断开 {name}，并退出这台服务器上的账号？",
+    "version": "版本 {version}",
+    "errors": {
+      "invalidAddress": "地址无效",
+      "httpsRequired": "地址要以 https:// 开头",
+      "unreachable": "连不上这台服务器",
+      "notMikka": "这个地址不是 Mikka 服务器",
+      "serverUpdate": "服务器版本 {version} 过旧，请把服务器升级到最新版本",
+      "serverUpdateUnknown": "服务器版本过旧，请把服务器升级到最新版本",
+      "appUpdate": "请把 Mikka 升级到 {version} 或更新版本",
+      "appUpdateUnknown": "请把 Mikka 升级到最新版本",
+      "failed": "操作失败，请重试"
+    }
+  },
   "HostedSettings": {
     "back": "返回",
     "general": {
@@ -5443,34 +5693,6 @@
       "providerOn": "{on}/{total} 个可用",
       "firstModel": "任务先用",
       "keyProvider": "服务商"
-    }
-  },
-  "DesktopServer": {
-    "title": "选择服务器",
-    "server": "服务器",
-    "cloud": "Mikka Cloud",
-    "selfHosted": "自托管服务器",
-    "address": "服务器地址",
-    "connect": "连接",
-    "connecting": "正在连接…",
-    "continue": "继续",
-    "cancel": "取消",
-    "change": "更改",
-    "switch": "切换",
-    "disconnect": "断开",
-    "disconnecting": "正在断开…",
-    "disconnectTitle": "断开 {name}，并退出这台服务器上的账号？",
-    "version": "版本 {version}",
-    "errors": {
-      "invalidAddress": "地址无效",
-      "httpsRequired": "地址要以 https:// 开头",
-      "unreachable": "连不上这台服务器",
-      "notMikka": "这个地址不是 Mikka 服务器",
-      "serverUpdate": "服务器版本 {version} 过旧，请把服务器升级到最新版本",
-      "serverUpdateUnknown": "服务器版本过旧，请把服务器升级到最新版本",
-      "appUpdate": "请把 Mikka 升级到 {version} 或更新版本",
-      "appUpdateUnknown": "请把 Mikka 升级到最新版本",
-      "failed": "操作失败，请重试"
     }
   }
 }

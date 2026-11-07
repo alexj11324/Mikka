@@ -297,7 +297,7 @@ async function handleTelegramMessage(input: {
     }
     if (!detail) return t('coordinatorMessageRequired')
     if (detail.length > 10_000) return t('coordinatorMessageTooLong')
-    if (!coordinatorEnabled()) return t('coordinatorUnavailable')
+    if (!await coordinatorEnabled(link.userId, coordinator.botId)) return t('coordinatorUnavailable')
     if (input.messageId === null) return t('messageUnavailable')
     await recordCoordinatorEvent(tx, userMessageEvent(link.userId, detail, {
       botId: coordinator.botId,

@@ -17,7 +17,7 @@ let imageGET: typeof import('../app/api/agent/images/route').GET
 let historyGET: typeof import('../app/api/agent/sessions/route').GET
 
 before(async () => {
-  mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => user ? { user: { id: user } } : null } } } })
+  mock.module(new URL('../lib/auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async () => user ? { user: { id: user }, session: { id: 'legacy-fixture-session' } } : null } } } })
   mock.module(new URL('../lib/agent-images-server.ts', import.meta.url).href, { namedExports: {
     findCachedAgentImage: async (query: string, signal?: AbortSignal) => {
       images.push({ query, signal })

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { NativeCoordinatorStore } from './native-store'
+import { captureRunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const url = process.env.NATIVE_COORDINATOR_TEST_DATABASE_URL ?? (process.env.REQUIRE_DB === '1' ? process.env.E2E_DATABASE_URL : undefined)
@@ -23,6 +24,7 @@ before(async () => {
   await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean DEFAULT true,"removedAt" timestamptz,"lastSeenAt" timestamptz DEFAULT now(),harnesses jsonb);
     CREATE TABLE coordinator_sessions ("userId" text PRIMARY KEY,"leaseHolder" text,"leaseUntil" timestamptz);`)
   await pool.query(await readFile(new URL('../../drizzle/20261026170000_native_coordinator.sql',import.meta.url),'utf8'))
+  await pool.query('ALTER TABLE native_coordinator_turns ADD COLUMN "failureDetails" jsonb')
 })
 after(async () => { await pool?.end(); await admin?.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await admin?.end() })
 
@@ -50,6 +52,9 @@ check('parallel claims start only one native execution; another owner cannot cla
   const claims = await Promise.all(Array.from({length:8},()=>store!.claim(p.userId,p.deviceId)))
   assert.equal(claims.filter(Boolean).length,1)
   assert.equal(claims.find(Boolean)?.context,p.input.context)
+  assert.equal(claims.find(Boolean)?.failureDetailsVersion,1)
+  const { rows } = await pool!.query('SELECT payload FROM native_coordinator_turns WHERE id=$1',[p.id])
+  assert.equal('failureDetailsVersion' in rows[0].payload,false,'capability belongs to the claim response, not the durable job')
 })
 check('tool roundtrip is fenced, idempotent, validated by the workflow and preserves OpenUI', async () => {
   const p = await person(); await store!.claim(p.userId,p.deviceId)
@@ -133,3 +138,29 @@ for (const revoked of ['device','owner','holder','released','lease','deadline','
     assert.equal(rows[0].status,'pending')
   })
 }
+
+check('a legacy daemon can still complete a claimed turn without diagnostic fields', async () => {
+  const p = await person()
+  const claimed = await store!.claim(p.userId,p.deviceId)
+  assert.equal(claimed?.failureDetailsVersion,1)
+  await store!.submit(p.userId,p.deviceId,p.id,{ type:'failed' })
+  const state = await store!.poll(p.userId,p.holder,p.id)
+  assert.equal(state.status,'failed')
+  assert.equal(state.failureDetails?.runId,p.id)
+  assert.equal(state.failureDetails?.code,'run_failed')
+})
+
+check('safe native failure survives a separate reader and first terminal completion owns the record', async () => {
+  const p = await person(); await store!.claim(p.userId, p.deviceId)
+  const failureDetails = captureRunFailure({ statusCode: 400, responseBody: JSON.stringify({ error: { type: 'invalid_request_error', message: 'The selected request format is unsupported.' } }) }, { provider: 'codex', credential: 'subscription' })
+  await store!.submit(p.userId, p.deviceId, p.id, { type: 'failed', failureDetails })
+  const first = await new NativeCoordinatorStore(pool!).poll(p.userId, p.holder, p.id)
+  assert.equal(first.status, 'failed')
+  assert.equal(first.failureDetails?.category, 'invalid_request')
+  assert.equal(first.failureDetails?.runId, p.id)
+  assert.equal(first.failureDetails?.providerMessage, 'The selected request format is unsupported.')
+  await store!.submit(p.userId, p.deviceId, p.id, { type: 'failed', failureDetails: captureRunFailure({ statusCode: 429 }) })
+  assert.deepEqual((await store!.poll(p.userId, p.holder, p.id)).failureDetails, first.failureDetails)
+  await assert.rejects(store!.submit(randomUUID(), p.deviceId, p.id, { type: 'failed', failureDetails }), /Unavailable/)
+  await assert.rejects(store!.poll(p.userId, 'old-holder', p.id), /LeaseLost/)
+})

@@ -8,6 +8,8 @@ import dynamic from '../../apps/desktop/src/renderer/dynamic'
 import { useViewState } from '@/lib/hooks/view-state'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import type { ComputerThread } from '@/components/computer/computer-agents'
+import type { SettingsFrameProps } from '@/components/slots/settings-frame-contract'
 
 const nothing = () => {}
 const empty = () => null
@@ -79,18 +81,31 @@ mock.module('@/components/nav/icon-rail', { namedExports: { IconRail: ({ onSetti
 let useBrowserNotes: typeof import('../browser/browser-notes')['useBrowserNotes']
 let useBrowserNotesComposer: typeof import('../browser/browser-notes')['useBrowserNotesComposer']
 let notes: ReturnType<typeof useBrowserNotes>
+let ComputerConversation: typeof import('../computer/computer-agents')['ComputerConversation']
+let useConversationThread: typeof import('../computer/computer-agents')['useConversationThread']
+let useRegisterComputerThread: typeof import('../computer/computer-agents')['useRegisterComputerThread']
+const conversationId = 'fixture-conversation'
+const registeredComputerThread: ComputerThread = { botId: bot.id, botName: bot.name, runId: 'fixture-computer-run', name: 'Fixture computer thread' }
+let registerComputer = false
+let computerThread: ComputerThread | null = null
+function RegisterComputerThread() {
+  useRegisterComputerThread(registeredComputerThread)
+  return null
+}
 let editDraft: (value: string) => void
 let composerMounts = 0, composerUnmounts = 0
 function Conversation({ bot: activeBot }: { bot?: { id: string; name: string } }) {
   notes = useBrowserNotesComposer(true)
+  computerThread = useConversationThread(conversationId)
   const [draft, setDraft] = useViewState(`settings-fixture:${activeBot?.id ?? 'coordinator'}:draft`, '')
   editDraft = setDraft
   useEffect(() => { composerMounts++; return () => { composerUnmounts++ } }, [])
-  return <Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} />
+  return <>{registerComputer && <ComputerConversation id={conversationId}><RegisterComputerThread /></ComputerConversation>}<Textarea aria-label="composer" data-chat={activeBot?.name ?? 'Coordinator'} value={draft} onChange={event => setDraft(event.target.value)} /></>
 }
 mock.module('./workspace-overview', { namedExports: { WorkspaceOverview: Conversation } })
 mock.module('@/components/settings/settings-view', { namedExports: { SettingsView: ({ activeSection, initialSection, selectedTeamId, children, onRail }: { activeSection?: string; initialSection?: string; selectedTeamId?: string; children?: ReactNode; onRail: (destination: 'chats') => void }) => {
   notes = useBrowserNotes()
+  computerThread = useConversationThread(conversationId)
   return <main data-settings-section={activeSection ?? initialSection} data-team={selectedTeamId}><Button onClick={() => onRail('chats')}>leave settings</Button>{children}</main>
 } } })
 mock.module('@/components/teams/team-directory', { namedExports: { TeamDirectory: ({ workspaceId: id }: { workspaceId: string }) => <div data-team-workspace={id} /> } })
@@ -99,6 +114,7 @@ mock.module('@/components/workspace/members-settings', { namedExports: { Members
 let container: HTMLDivElement, root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
 let IssueWorkspace: typeof import('./issue-workspace')['IssueWorkspace']
+let HostedIssueWorkspace: typeof IssueWorkspace
 let SettingsShell: typeof import('../settings/settings-shell')['SettingsShell']
 before(async () => {
   for (const key of ['window', 'document', 'HTMLElement', 'Element', 'Node', 'MutationObserver', 'ResizeObserver', 'navigator'] as const) Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? browser : browser[key] })
@@ -108,8 +124,17 @@ before(async () => {
   Object.assign(globalThis, { React, IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
   ;({ useBrowserNotes, useBrowserNotesComposer } = await import('../browser/browser-notes'))
+  ;({ ComputerConversation, useConversationThread, useRegisterComputerThread } = await import('../computer/computer-agents'))
   ;({ IssueWorkspace } = await import('./issue-workspace'))
   ;({ SettingsShell } = await import('../settings/settings-shell'))
+  // Exercise the hosted contract without importing private UI. The original
+  // module keeps the default slot; the second module gets a distinct frame.
+  mock.module(new URL('../slots/settings-frame.tsx', import.meta.url).href, { namedExports: {
+    OWN_SETTINGS_FRAME: true,
+    SettingsFrame: ({ children, onRail }: SettingsFrameProps) => <section data-hosted-settings-frame=""><Button onClick={() => onRail('chats')}>hosted chats</Button>{children}</section>,
+  } })
+  const hostedModule = new URL('./issue-workspace.tsx?hosted-provider-test', import.meta.url).href
+  ;({ IssueWorkspace: HostedIssueWorkspace } = await import(hostedModule))
 })
 beforeEach(() => {
   user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
@@ -117,6 +142,7 @@ beforeEach(() => {
   browser.history.replaceState({}, '', '/?workspace=workspace-one')
   browser.localStorage.clear(); browser.sessionStorage.clear()
   notes = null; railMounts = 0; composerMounts = 0; composerUnmounts = 0
+  registerComputer = false; computerThread = null
   chunkReady = new Promise(resolve => { releaseChunk = resolve })
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container); root = createRoot(container)
@@ -125,6 +151,7 @@ afterEach(async () => { releaseChunk(); await act(async () => root.unmount()); c
 after(() => browser.happyDOM.close())
 
 const render = async (props: Partial<Parameters<typeof IssueWorkspace>[0]> = {}) => { await act(async () => root.render(<IssueWorkspace user={user} {...props} />)) }
+const renderHosted = async () => { await act(async () => root.render(<HostedIssueWorkspace user={user} />)) }
 const frame = () => container.querySelector('[data-slot="app-frame-content"]')
 const bar = () => container.querySelector('[data-slot="window-bar"]')
 const rail = () => container.querySelector('[role="navigation"][aria-label="Main navigation"]')
@@ -193,6 +220,63 @@ test('legacy Settings also loads inside the frame and keeps it when returning to
   assert.ok(bar() === original.bar, 'the window bar DOM node must survive Settings navigation')
   assert.ok(rail() === original.rail, 'the rail DOM node must survive Settings navigation')
   assert.equal(railMounts, 1)
+})
+
+test('hosted Settings preserves pending browser notes and the computer registry across its distinct frame', async t => {
+  registerComputer = true
+  await renderHosted()
+  assert.deepEqual(computerThread, registeredComputerThread)
+  // The registering card is gone before navigation. A remount cannot silently
+  // recreate its historical registry entry and hide the provider state loss.
+  registerComputer = false
+  await renderHosted()
+  await pin('keep hosted annotation')
+  await act(async () => editDraft('hosted unsent draft'))
+  const workspaceFrame = frame()
+
+  await act(async () => button('settings').click())
+  await renderHosted()
+  assert.equal(browser.location.pathname, '/settings')
+  const hostedFrame = container.querySelector('[data-hosted-settings-frame]')
+  assert.ok(hostedFrame, 'the hosted slot keeps its own settings appearance')
+  assert.ok(!workspaceFrame?.isConnected, 'the distinct visual frame is intentional')
+  assert.ok(hostedFrame.querySelector('[data-loading-placeholder]'), 'the cold chunk loads inside the hosted frame')
+  await act(async () => { releaseChunk(); await chunkReady })
+  const duringSettings = { notes: notes?.notes.length ?? null, hasComposer: notes?.hasComposer ?? null, computerRun: computerThread?.runId ?? null }
+
+  await act(async () => button('hosted chats').click())
+  await renderHosted()
+  const after = { draft: container.querySelector('textarea')?.value, notes: notes?.notes.map(note => [note.n, note.note]), computerRun: computerThread?.runId ?? null }
+  t.diagnostic(JSON.stringify({ duringSettings, after }))
+  assert.deepEqual(after, { draft: 'hosted unsent draft', notes: [[1, 'keep hosted annotation']], computerRun: registeredComputerThread.runId })
+  assert.deepEqual(duringSettings, { notes: 1, hasComposer: false, computerRun: registeredComputerThread.runId })
+  assert.equal(notes?.hasComposer, true)
+  await pin('next hosted annotation')
+  assert.deepEqual(notes?.notes.map(note => note.n), [1, 2])
+})
+
+test('hosted Settings providers still retire state when the owner or workspace changes', async () => {
+  releaseChunk()
+  registerComputer = true
+  await renderHosted()
+  registerComputer = false
+  await renderHosted()
+  await pin('owner one private annotation')
+  await act(async () => button('settings').click())
+  await renderHosted()
+
+  user = { ...user, id: 'owner-two', email: 'second@example.com' }
+  await renderHosted()
+  assert.equal(notes?.notes.length, 0)
+  assert.equal(computerThread, null)
+  await pin('workspace one private annotation')
+  workspaceId = 'workspace-two'
+  browser.history.pushState({}, '', '/settings?workspace=workspace-two')
+  await renderHosted()
+  assert.equal(notes?.notes.length, 0)
+  assert.equal(computerThread, null)
+  await pin('workspace two annotation')
+  assert.deepEqual(notes?.notes.map(note => [note.n, note.note]), [[1, 'workspace two annotation']])
 })
 
 for (const legacy of [false, true]) test(`${legacy ? 'legacy' : 'routed'} Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive`, async () => {

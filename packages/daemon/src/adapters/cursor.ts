@@ -30,6 +30,7 @@ import {
 import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
+import { daemonTracer } from '../tracing'
 import type {
   AgentAdapter,
   AgentSession,
@@ -312,10 +313,19 @@ export class CursorAdapter implements AgentAdapter {
       prompting = true
       let response: acp.PromptResponse
       try {
-        response = await conn.prompt({
-          sessionId,
-          prompt: [{ type: "text", text: message }],
-        })
+        response = await daemonTracer.span('daemon.ai.turn', { 'mikka.harness': 'cursor', 'mikka.ai.operation': 'agent' }, async span => {
+          const result = await conn.prompt({
+            sessionId,
+            prompt: [{ type: "text", text: message }],
+          })
+          // ACP only reports the whole prompt's usage; never mislabel that as
+          // one provider generation or duplicate it in AI Analytics.
+          if (result.usage) {
+            span.set('mikka.ai.input_tokens', result.usage.inputTokens)
+            span.set('mikka.ai.output_tokens', result.usage.outputTokens)
+          }
+          return result
+        }, { traceContext: options.traceContext })
       } catch (error) {
         prompting = false
         if (ending) return

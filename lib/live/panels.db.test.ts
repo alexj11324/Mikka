@@ -11,6 +11,7 @@ import { observePoolCommits, databaseCommitScope, captureDatabaseQuery } from '.
 import { documentLiveTargets, runLiveTargets, runChanged, threadLiveReferences } from './panels'
 import type { LiveInvalidation } from './events'
 import { liveChannelId, type LiveScope } from './scope'
+import { isolateCoordinatorWakes } from '../../tests/support/coordinator-wake'
 
 const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQL')
@@ -23,18 +24,29 @@ test('panel notifications follow actual committed writes and persisted owner/wor
   const scheduler = mock.module('next/server', { namedExports: { ...nextServer,
     after: (work: () => Promise<void>) => { pending.push(work) },
   } })
+  const coordinator = await isolateCoordinatorWakes(t)
   // The same writers also refresh owner/workspace lists; lists.db.test.ts covers
   // those keys. Here count task/thread panel keys only.
   const lists = await import('./lists')
   const listMock = mock.module(new URL('./lists.ts', import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(lists).map(([name, value]) =>
     [name, name.endsWith('ScopesBeforeChange') ? async () => [] : name.endsWith('Changed') ? async () => {} : value])) })
   const channelScopes = new Map<string, LiveScope>(), unexpectedPaths: string[] = []
+  const devicePaths = new Set<string>(), deviceWakes: string[] = []
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'
   process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-panel-test-secret'
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, options?: RequestInit) => {
     const target = new URL(String(input))
     assert.equal(target.hostname, 'gateway.example.invalid', 'no provider or production request is allowed')
+    // Queuing the fixture's local run also wakes its own device. This is the
+    // device protocol (no body), separate from the live panel keys below.
+    if (devicePaths.has(target.pathname)) {
+      assert.equal(options?.method, 'POST')
+      assert.equal(options?.body, undefined)
+      assert.equal(new Headers(options?.headers).get('authorization'), 'Bearer isolated-panel-test-secret')
+      deviceWakes.push(target.pathname)
+      return new Response(null, { status: 204 })
+    }
     const scope = channelScopes.get(target.pathname)
     if (!scope) unexpectedPaths.push(target.pathname)
     sent.push({ scope: scope ?? { ownerId: 'unexpected', workspaceId: target.pathname }, events: wireKeys(JSON.parse(String(options?.body))) })
@@ -65,7 +77,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
     for (const [id, owner, kind] of [[personal, 'owner', 'personal'], [a, 'owner', 'team'], [b, 'owner', 'team'], [foreignPersonal, 'foreign', 'personal']]) {
       await databasePool.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES ($1,$2,'Fixture',$3)`, [id, owner, kind])
     }
-    for (const [workspace, userId, status] of [[personal, 'owner', 'active'], [personal, 'peer', 'active'], [a, 'owner', 'active'], [a, 'peer', 'active'], [a, 'suspended', 'suspended'], [b, 'owner', 'active'], [foreignPersonal, 'foreign', 'active']]) {
+    for (const [workspace, userId, status] of [[personal, 'owner', 'active'], [personal, 'peer', 'active'], [personal, 'foreign', 'active'], [a, 'owner', 'active'], [a, 'peer', 'active'], [a, 'suspended', 'suspended'], [b, 'owner', 'active'], [foreignPersonal, 'foreign', 'active']]) {
       await databasePool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,\'member\',$3)', [workspace, userId, status])
     }
     const agentIds = new Map<string, string>()
@@ -75,24 +87,27 @@ test('panel notifications follow actual committed writes and persisted owner/wor
     }
     async function issue(owner = 'owner', workspace: string | null = null) {
       const id = randomUUID()
-      await databasePool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Fixture','{"type":"doc","content":[]}','todo','normal',$3)`, [id, owner, workspace ? 'workspace' : 'personal'])
+      const workspaceId = workspace ?? (owner === 'foreign' ? foreignPersonal : personal)
+      await databasePool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES ($1,$2,$3,'bound','Fixture','{"type":"doc","content":[]}','todo','normal',$4)`, [id, owner, workspaceId, workspace ? 'workspace' : 'personal'])
       if (workspace) await databasePool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [id, randomUUID(), workspace, owner])
       return id
     }
     async function run(issueId: string | null, owner = 'owner', botId: string | null = null) {
       const id = randomUUID()
-      await databasePool.query('INSERT INTO agent_runs(id,"userId","issueId","agentId","botId",status,prompt) VALUES($1,$2,$3,$4,$5,\'running\',\'Fixture\')', [id, owner, issueId, agentIds.get(owner), botId])
+      const workspaceId = issueId ? (await databasePool.query('SELECT "workspaceId" FROM issues WHERE id=$1', [issueId])).rows[0].workspaceId
+        : botId ? (await databasePool.query('SELECT "workspaceId" FROM bots WHERE id=$1', [botId])).rows[0].workspaceId : null
+      await databasePool.query('INSERT INTO agent_runs(id,"userId","workspaceId","issueId","agentId","botId",status,prompt) VALUES($1,$2,$3,$4,$5,$6,\'running\',\'Fixture\')', [id, owner, workspaceId, issueId, agentIds.get(owner), botId])
       return id
     }
     const personalIssue = await issue(), teamIssue = await issue('owner', a), otherIssue = await issue()
     const privateRun = await run(personalIssue), teamRun = await run(teamIssue)
-    const foreignRun = await run(teamIssue, 'foreign'), wrongIssueRun = await run(otherIssue)
+    const foreignRun = await run(teamIssue, 'foreign'), wrongIssueRun = await run(otherIssue), wrongPersonalRun = await run(personalIssue, 'foreign')
     const bot = randomUUID()
     await databasePool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,\'owner\',$2,\'Fixture\')', [bot, b])
     const taskFree = await run(null, 'owner', bot)
     const legacyTaskFree = await run(null)
     await databasePool.query('INSERT INTO computer_run_bindings("runId","botId","ownerId","workspaceId") VALUES($1,$2,\'owner\',$3)', [legacyTaskFree, bot, b])
-    const drain = async () => { await Promise.all(pending.splice(0).map(work => work())) }
+    const drain = async () => { await coordinator.flush(); await Promise.all(pending.splice(0).map(work => work())) }
 
     await t.test('private document content has one owner; workspace documents notify only active authorized members', async () => {
       assert.deepEqual(await documentLiveTargets(databasePool, databasePool, personalIssue), [{
@@ -108,10 +123,15 @@ test('panel notifications follow actual committed writes and persisted owner/wor
 
     await t.test('run keys stay private to their owner and actual scope; continuation edges cannot cross owner or issue', async () => {
       assert.deepEqual(await threadLiveReferences(databasePool, databasePool, [privateRun, teamRun, taskFree, legacyTaskFree, foreignRun], 'owner'), [
-        { id: privateRun, workspaceId: personal }, { id: teamRun, workspaceId: a }, { id: taskFree, workspaceId: b }, { id: legacyTaskFree, workspaceId: b }, { id: foreignRun, workspaceId: null },
+        { id: privateRun, workspaceId: personal }, { id: teamRun, workspaceId: a }, { id: taskFree, workspaceId: b }, { id: legacyTaskFree, workspaceId: null }, { id: foreignRun, workspaceId: null },
       ])
+      assert.deepEqual(await runLiveTargets(databasePool, databasePool, legacyTaskFree, 'run'), [], 'an unresolved legacy run cannot gain a tenant from a later computer binding')
+      assert.deepEqual(await threadLiveReferences(databasePool, databasePool, [wrongPersonalRun], 'foreign'), [{ id: wrongPersonalRun, workspaceId: null }], 'accidental membership cannot authorize another account\'s personal run channel')
+      assert.deepEqual(await runLiveTargets(databasePool, databasePool, wrongPersonalRun, 'run'), [])
       const child = await run(personalIssue)
-      await databasePool.query('UPDATE agent_runs SET "retryOf"=$2,"continuesRunId"=$3,"questionContinuation"=$4 WHERE id=$1', [child, privateRun, foreignRun, JSON.stringify({ originRunId: wrongIssueRun })])
+      await assert.rejects(databasePool.query('UPDATE agent_runs SET "retryOf"=$2,"continuesRunId"=$3,"questionContinuation"=$4 WHERE id=$1', [child, privateRun, foreignRun, JSON.stringify({ originRunId: wrongIssueRun })]), { code: '23514' }, 'a new cross-owner or cross-workspace lineage is refused atomically')
+      assert.deepEqual((await databasePool.query('SELECT "retryOf","continuesRunId","questionContinuation" FROM agent_runs WHERE id=$1', [child])).rows[0], { retryOf: null, continuesRunId: null, questionContinuation: null })
+      await databasePool.query('UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1', [child, privateRun])
       const targets = await runLiveTargets(databasePool, databasePool, child, 'run')
       assert.deepEqual(targets, [{ scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'run', id: child }, { kind: 'run', id: privateRun }] }])
       assert.deepEqual((await runLiveTargets(databasePool, databasePool, child, 'thread'))[0].events, [{ kind: 'thread', id: child }])
@@ -221,48 +241,58 @@ test('panel notifications follow actual committed writes and persisted owner/wor
 
     await t.test('the actual document exchange notifies after a committed body change, never for unchanged versions or rollback', async () => {
       const { actAs } = await import('../acting-user')
+      const { tokenWorkspace } = await import('../tokens/principal')
       const { exchangeDocument } = await import('../../app/actions/collaboration')
       const { createDocumentSeed } = await import('../../components/workspace/issue-editor-schema')
       const docId = await issue()
       const seed = createDocumentSeed({ type: 'doc', content: [] }, docId)!
       await scope.run(async () => {
         await assert.rejects(db.transaction(outer => withDatabaseTransaction(outer, async () => {
-          await actAs('owner', () => exchangeDocument({ id: docId, seed: Buffer.from(seed).toString('base64') }))
+          await actAs({ id: 'owner', [tokenWorkspace]: personal }, () => exchangeDocument({ id: docId, seed: Buffer.from(seed).toString('base64') }))
           assert.equal(pending.length, 0)
           throw new Error('document rollback')
         })), /document rollback/)
         assert.equal(pending.length, 0)
         assert.equal((await databasePool.query('SELECT "issueId" FROM issue_documents WHERE "issueId"=$1', [docId])).rowCount, 0)
-        const first = await actAs('owner', () => exchangeDocument({ id: docId, seed: Buffer.from(seed).toString('base64') }))
+        const first = await actAs({ id: 'owner', [tokenWorkspace]: personal }, () => exchangeDocument({ id: docId, seed: Buffer.from(seed).toString('base64') }))
         assert.equal(first.workspaceId, personal)
         assert.equal(pending.length, 1)
-        assert.deepEqual(await actAs('owner', () => exchangeDocument({ id: docId, known: first.version })), { version: first.version, workspaceId: personal })
+        assert.deepEqual(await actAs({ id: 'owner', [tokenWorkspace]: personal }, () => exchangeDocument({ id: docId, known: first.version })), { version: first.version, workspaceId: personal })
         assert.equal(pending.length, 1)
-        await assert.rejects(actAs('foreign', () => exchangeDocument({ id: docId, known: first.version })), { code: 'issueNotFound' })
+        await assert.rejects(actAs({ id: 'foreign', [tokenWorkspace]: foreignPersonal }, () => exchangeDocument({ id: docId, known: first.version })), { code: 'issueNotFound' })
         await drain()
         assert.deepEqual(sent.splice(0), [{ scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'issue_document', id: docId }] }])
       })
     })
-    await t.test('scope changes wake old authorized subscriptions and the new scope, rechecking membership after commit', async () => {
+    await t.test('disabling sync preserves the tenant; a committed document change rechecks members and never publishes in the personal workspace', async () => {
       const { changeIssueScopeLocally } = await import('../issue-scope-store')
       const { actAs } = await import('../acting-user')
+      const { tokenWorkspace } = await import('../tokens/principal')
       const { exchangeDocument } = await import('../../app/actions/collaboration')
+      const { createDocumentSeed } = await import('../../components/workspace/issue-editor-schema')
       const id = await issue('owner', a)
+      await databasePool.query(`UPDATE issues SET "linearSyncPolicy"='explicit',"linearSyncBlocked"=false WHERE id=$1`, [id])
       const before = (await databasePool.query('SELECT revision FROM issues WHERE id=$1', [id])).rows[0].revision
+      const seed = createDocumentSeed({ type: 'doc', content: [] }, id)!
       await scope.run(async () => {
         await db.transaction(outer => withDatabaseTransaction(outer, async () => {
           const result = await changeIssueScopeLocally('owner', { id, revision: before, scope: 'personal' }, { allowLinkedPersonal: true })
-          assert.ok('issue' in result)
+          assert.ok('issue' in result && result.issue)
+          assert.equal(result.issue.workspaceId, a)
+          assert.equal(result.issue.scope, 'workspace')
+          assert.equal(result.issue.linearSyncPolicy, 'disabled')
+          assert.equal(pending.length, 0)
+          await actAs({ id: 'owner', [tokenWorkspace]: a }, () => exchangeDocument({ id, seed: Buffer.from(seed).toString('base64') }))
           assert.equal(pending.length, 0)
           await databasePool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='peer'`, [a])
         }))
         assert.equal(pending.length, 1)
         await drain()
         assert.deepEqual(new Set(sent.map(target => JSON.stringify(target.scope))), new Set([
-          JSON.stringify({ ownerId: 'owner', workspaceId: a }), JSON.stringify({ ownerId: 'owner', workspaceId: personal }),
+          JSON.stringify({ ownerId: 'owner', workspaceId: a }),
         ]))
         assert.ok(sent.every(target => target.events.every(event => event.id === id && Object.keys(event).length === 2)))
-        await assert.rejects(actAs('peer', () => exchangeDocument({ id, known: 'a'.repeat(32) })), { code: 'issueNotFound' })
+        await assert.rejects(actAs({ id: 'peer', [tokenWorkspace]: a }, () => exchangeDocument({ id, known: 'a'.repeat(32) })), { code: 'issueNotFound' })
         sent.length = 0
       })
       await databasePool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='peer'`, [a])
@@ -274,6 +304,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
       const { factoryCheckIndependent } = await import('../factory/check-independence')
       const { createFactoryQuestions } = await import('../factory/questions/store')
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = agentIds.get('owner')!
+      devicePaths.add(`/v1/devices/${deviceId}/push`)
       await databasePool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
       await databasePool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
       await databasePool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/fixture/repo')`, [repoId, deviceId])
@@ -295,7 +326,10 @@ test('panel notifications follow actual committed writes and persisted owner/wor
           const { runId } = await dispatch('owner', { binding: factoryBinding(routed.task), agentId, deviceRepoId: repoId })
           await databasePool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"='session:'||id,"startedAt"=now(),"finishedAt"=now(),report=$2 WHERE id=$1`, [runId, JSON.stringify({ summary: 'Fixture hand-in', openQuestions: ['Which context?'], question: { questionId, kind: 'context', question: 'Which context?', options: [] } })])
           await questions.record('owner', runId)
-          pending.length = 0; sent.length = 0
+          // Finish the preparation commit, including its asynchronously
+          // registered inbox wake, before observing the escalation commit.
+          await drain()
+          sent.length = 0; coordinator.calls.length = 0
           return { issueId, questionId, runId }
         }
         const first = await asked()
@@ -307,11 +341,14 @@ test('panel notifications follow actual committed writes and persisted owner/wor
         const reference = (await questions.read('owner', first.questionId)).reference
         const escalation = { reference, eventId: randomUUID(), reason: 'Context requires the owner' }
         assert.equal((await questions.escalate('owner', escalation)).status, 'waiting_user')
-        assert.equal(pending.length, 2, 'question escalation schedules Factory and project-map readers after commit')
+        await coordinator.flush()
+        assert.equal(pending.length, 2, 'only Factory/project-map live notifications enter the delivery queue')
         await questions.read('owner', first.questionId)
         await questions.escalate('owner', escalation)
+        await coordinator.flush()
         assert.equal(pending.length, 2, 'reads and an idempotent replay add nothing')
         await drain()
+        assert.deepEqual(coordinator.calls.splice(0), ['owner'], 'the committed question wakes its owner once')
         assert.ok(sent.some(target => target.events.some(event => event.kind === 'factory_issue' && event.id === first.issueId)))
         sent.length = 0
         await databasePool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 minute' WHERE id=$1`, [first.questionId])
@@ -354,5 +391,6 @@ test('panel notifications follow actual committed writes and persisted owner/wor
     await dropTestDatabase(admin, database, databasePool)
     await admin.end()
     assert.deepEqual(unexpectedPaths, [], 'the real notifier can address only the fixture scopes')
+    assert.deepEqual(new Set(deviceWakes), devicePaths, 'queued work wakes only the fixture device without sending panel data')
   }
 })

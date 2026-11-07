@@ -158,7 +158,7 @@ test('an empty private registry cannot authorize evidence publication', async ()
 async function reauthenticationUnit(scenario, moduleURL) {
   const assert = (await import('node:assert/strict')).default
   const { mock } = await import('node:test')
-  const { mkdtemp, mkdir, writeFile, readFile, rm } = await import('node:fs/promises')
+  const { mkdtemp, mkdir, writeFile, readFile, lstat, rm } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const { randomBytes, randomUUID } = await import('node:crypto')
@@ -261,6 +261,7 @@ async function reauthenticationUnit(scenario, moduleURL) {
     assert.equal(typeof scope.owner.reauthenticate, 'function')
     assert.equal(scope.owner.reauthenticate.length, 0)
     assert.equal(resources.length, 2)
+    const initialStorageState = await readFile(scope.owner.storageStatePath, 'utf8')
     const startCalls = calls.length, writesBefore = databaseWrites
     if (scenario === 'success' || scenario === 'release-pending') {
       await scope.pool.revokeSessions(scope.lease)
@@ -292,6 +293,12 @@ async function reauthenticationUnit(scenario, moduleURL) {
       assert.equal(resources[2].type, 'session')
       assert.equal(resources[2].ownerId, scope.owner.userId)
       assert.ok(typeof resources[2].id === 'string' && resources[2].id !== resources[0].id)
+      const refreshedStorageState = await readFile(scope.owner.storageStatePath, 'utf8')
+      assert.ok(refreshedStorageState !== initialStorageState, 'normal reauthentication must refresh the existing private browser state')
+      const state = JSON.parse(refreshedStorageState)
+      assert.ok(state.cookies.find(cookie => cookie.name === 'unit.session')?.value === lastCookie, 'the private file must contain the newly verified session cookie')
+      assert.deepEqual(state.origins, [])
+      assert.equal((await lstat(scope.owner.storageStatePath)).mode & 0o777, 0o600)
       const publicShape = JSON.stringify(scope.owner)
       assert.ok(!publicShape.includes(lastToken) && !publicShape.includes(lastCookie))
       assert.ok(accounts.every(account => !publicShape.includes(account.password)))
@@ -319,6 +326,7 @@ async function reauthenticationUnit(scenario, moduleURL) {
         : scenario === 'login-rejected' ? 'ACCOUNT_LOGIN_FAILED' : 'ACCOUNT_SESSION_INVALID'
       await assert.rejects(scope.owner.reauthenticate(), error => error.code === expected && error.message === expected)
       assert.equal(resources.length, 2, 'an unverified session is never registered under the leased owner')
+      assert.ok(await readFile(scope.owner.storageStatePath, 'utf8') === initialStorageState, 'failed identity verification must preserve the previous private state')
       await assert.rejects(scope.release({ outcome: 'clean' }), { code: 'ACCOUNT_DIRTY' }); released = true
       assert.deepEqual(releases, ['dirty'])
     }

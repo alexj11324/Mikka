@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { lifecycleCases } from "./lifecycle.db-cases";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -44,6 +45,7 @@ test(
       await pool.query(
         `INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','route@example.invalid',true,now(),now()),('other','Other','other@example.invalid',true,now(),now())`,
       );
+      const workspaceId = await seedFixtureWorkspace(pool, 'owner');
       const authorize = async (
         user: string,
         issue: string,
@@ -67,8 +69,8 @@ test(
       async function fixture(missing = false) {
         const issueId = randomUUID();
         await pool.query(
-          `INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{}','todo','normal')`,
-          [issueId],
+          `INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{}','todo','normal',$2,'bound')`,
+          [issueId, workspaceId],
         );
         return {
           issueId,
@@ -170,7 +172,7 @@ test(
           const botId = randomUUID();
           await pool.query(
             `INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES ($1,$2,'owner','Fixture Bot')`,
-            [botId, randomUUID()],
+            [botId, workspaceId],
           );
           const input = {
             ...(await fixture()),

@@ -12,7 +12,7 @@ if (process.env.MIKKA_BUILD_BYOS_WORKER === '1') {
   const root = fileURLToPath(new URL('../', import.meta.url))
   const worker = join(root, 'packages/subscription-worker')
   const scratch = mkdtempSync(join(tmpdir(), 'mikka-byos-build-'))
-  const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', CGO_ENABLED: '0', GOTOOLCHAIN: 'local', GOCACHE: join(scratch, 'build-cache'), GOPATH: join(scratch, 'gopath') }
+  const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', CGO_ENABLED: '0', GOTOOLCHAIN: 'local', GOMAXPROCS: '2', GOCACHE: join(scratch, 'build-cache'), GOPATH: join(scratch, 'gopath') }
   for (const key of ['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'NO_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) if (process.env[key]) env[key] = process.env[key]
   try {
     const response = await fetch('https://go.dev/dl/go1.26.10.linux-amd64.tar.gz', { signal: AbortSignal.timeout(120_000) })
@@ -25,7 +25,7 @@ if (process.env.MIKKA_BUILD_BYOS_WORKER === '1') {
     execFileSync(process.execPath, ['packages/subscription-worker/bootstrap.mjs'], { cwd: root, env, stdio: 'inherit' })
     mkdirSync(join(worker, 'bin'), { recursive: true })
     for (const name of ['mikka-subscription-worker', 'mikka-subscription-enrollment']) {
-      execFileSync(join(scratch, 'go/bin/go'), ['build', '-mod=readonly', '-trimpath', '-o', `bin/${name}`, `./cmd/${name}`], { cwd: worker, env, stdio: 'inherit' })
+      execFileSync(join(scratch, 'go/bin/go'), ['build', '-p', '2', '-mod=readonly', '-trimpath', '-o', `bin/${name}`, `./cmd/${name}`], { cwd: worker, env, stdio: 'inherit' })
     }
   } finally {
     // Preserve the compiler archive, caches and build evidence for inspection.

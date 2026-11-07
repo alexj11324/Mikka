@@ -4,7 +4,7 @@ import type { StopCondition, ToolSet } from 'ai'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
 import type { HostedRuntimeSnapshot } from './subscription-model-snapshot'
 import { getWorkflowMetadata } from 'workflow'
-import { generationFailureDetails } from './subscription-generation-diagnostics'
+import { GENERATION_FAILURES, generationFailureDetails } from './subscription-generation-diagnostics'
 import { CodedError } from '@mikka/protocol/coded-error'
 import { invalidToolCalls, invalidToolCounts, invalidToolStepCount, markInvalidToolMessages, MAX_INVALID_TOOL_STEPS } from './coordinator/invalid-tool-call'
 
@@ -58,8 +58,12 @@ export async function runHostedWorkflowTurn(runtime: HostedRuntimeSnapshot, tool
   if ('error' in result) {
     let workflowRunId: string | null = null
     try { workflowRunId = getWorkflowMetadata().workflowRunId } catch { /* outside a Workflow in unit tests */ }
-    try { console.warn(JSON.stringify({ level: 'warn', msg: 'subscription_generation_failed', stage: 'workflow_result', ...generationFailureDetails(result.error), workflowRunId })) } catch { /* diagnostics cannot mask the refusal */ }
-    throw new Error('subscription_generation_failed', { cause: result.error })
+    const diagnostics = generationFailureDetails(result.error)
+    try { console.warn(JSON.stringify({ level: 'warn', msg: 'subscription_generation_failed', stage: 'workflow_result', ...diagnostics, workflowRunId })) } catch { /* diagnostics cannot mask the refusal */ }
+    // The first fixed code in the cause chain rides along as the detail (`code (detail)`), so the
+    // chat's 详情 can name it (decision 2026-11-05-0330). Never a message: it can carry provider text.
+    const detail = [diagnostics, ...diagnostics.causes].find(node => node.errorCode && GENERATION_FAILURES.has(node.errorCode))?.errorCode
+    throw new Error(detail ? `subscription_generation_failed (${detail})` : 'subscription_generation_failed', { cause: result.error })
   }
   const invalidSteps = invalidToolStepCount(result.steps)
   // Some providers emit a blank tool name which their parser drops. A

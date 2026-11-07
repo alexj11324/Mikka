@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -6,6 +7,7 @@ import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { measured, readMetrics } from '../../tests/helpers/read-metrics'
 import { persistentReadData } from '../swr/cache-policy'
 import type { ChatView } from './store'
+import type { PoolClient } from 'pg'
 
 // Database regressions execute only in CI against ephemeral Postgres 17.
 // Local pure runs skip them; REQUIRE_DB=1 makes a missing database fail.
@@ -18,8 +20,127 @@ try {
 if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
 const dbTest = databaseUrl ? test : test.skip
 
+// Keep cold loading of the application graph outside these cases' 30-second
+// database deadline. A timed-out parent runs cleanup while its nested cases
+// are still starting; their later FK/pool errors obscure the original timeout.
+const snapshotRuntime = databaseUrl ? await Promise.all([
+  import('../db'), import('../db/schema'), import('./store'), import('../coordinator-events'), import('../chat-failure'), import('drizzle-orm'),
+]) : null
+
+/** Commit the real inbox claim after PostgreSQL has answered the first state
+ * statement, before the reader can issue another. No sleeps or fake SQL rows. */
+async function claimBetweenChatReads<T>(reader: PoolClient, claim: () => Promise<void>, read: () => Promise<T>) {
+  const original = reader.query
+  let claimed = false
+  reader.query = new Proxy(original, { apply(target, client, args) {
+    const statement = typeof args[0] === 'string' ? args[0] : args[0]?.text
+    const pending = Reflect.apply(target, client, args)
+    if (!claimed && typeof statement === 'string' && /^\s*(select|with)\b/i.test(statement) && statement.includes('coordinator_sessions')) {
+      claimed = true
+      assert.ok(pending instanceof Promise, 'the real PostgreSQL read uses its Promise result')
+      return pending.then(async result => { await claim(); return result })
+    }
+    return pending
+  } })
+  try {
+    const value = await read()
+    assert.equal(claimed, true, 'the claim interleaved after the first session snapshot')
+    return value
+  } finally { reader.query = original }
+}
+
+dbTest('full and compact chat reads use one snapshot across a concurrent inbox claim', { timeout: 30_000 }, async t => {
+  const [{ createRequestDatabaseScope, db, pool, withDatabaseClient }, schema, store, { userMessageEvent }, { chatFailure }, { eq, sql }] = snapshotRuntime!
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-chat-snapshot-${randomUUID()}`
+  t.after(async () => {
+    await scope.run(async () => {
+      await db.delete(schema.bots).where(eq(schema.bots.ownerId, owner))
+      await db.execute(sql`delete from "user" where id = ${owner}`)
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Snapshot fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
+    const reader = await pool.connect(), writer = await pool.connect()
+    try {
+      for (const kind of ['full', 'compact'] as const) await t.test(kind, async () => {
+        const botId = randomUUID(), holder = `wrun_snapshot_${kind}`
+        await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Snapshot bot' })
+        // Insert only a durable pending event. The test owns the actual claim;
+        // no unrelated background Workflow competes with this interleaving.
+        await db.insert(schema.coordinatorEvents).values({ id: randomUUID(), ...userMessageEvent(owner, 'Snapshot request', { botId }) })
+        const observed = await claimBetweenChatReads(reader,
+          () => withDatabaseClient(writer, async () => {
+            const taken = await store.takeInbox(owner, holder, botId)
+            assert.deepEqual([taken.held, taken.added], [true, 1])
+          }),
+          () => withDatabaseClient(reader, async () => kind === 'full' ? await store.chatView(owner, 200, botId) : await store.chatVersion(owner, 200, botId)))
+        assert.equal(observed.working, true, 'a pending request cannot appear failed while its claimed turn is running')
+        assert.equal(observed.error, null)
+        assert.equal(observed.cursor, 0, 'the state statement preceded the claim, so its messages and inbox share that snapshot')
+        if ('items' in observed) {
+          assert.equal(observed.items.at(-1)?.pending, true)
+          assert.equal(chatFailure(observed), null, 'the mobile failure projection cannot invent an ended turn')
+        }
+        const current = await store.chatView(owner, 200, botId)
+        assert.equal(current.cursor, 1)
+        assert.equal(current.streamRunId, holder)
+        assert.equal(current.working, true)
+        assert.equal(chatFailure(current), null)
+        await store.failTurn(owner, holder, 'model_tool_unavailable', botId)
+        const failedFull = await store.chatView(owner, 200, botId), failedCompact = await store.chatVersion(owner, 200, botId)
+        assert.deepEqual([failedFull.working, failedFull.error, failedCompact.working, failedCompact.error],
+          [false, 'model_tool_unavailable', false, 'model_tool_unavailable'], 'a released lease must not nullify its session error in either snapshot reader')
+        assert.equal(failedFull.streamRunId, undefined)
+        assert.deepEqual(chatFailure(failedFull), { kind: 'failed', reason: 'tools', raw: 'model_tool_unavailable', failureDetails: failedFull.failureDetails })
+        assert.equal(failedFull.failureDetails?.code, 'model_tool_unavailable')
+      })
+    } finally { reader.release(); writer.release() }
+  })
+})
+
+dbTest('a continuation keeps the tail snapshot state after an earlier version read', { timeout: 30_000 }, async t => {
+  const [{ createRequestDatabaseScope, db, pool, withDatabaseClient }, schema, store, { userMessageEvent }, { chatFailure }, { eq, sql }] = snapshotRuntime!
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-chat-tail-snapshot-${randomUUID()}`, botId = randomUUID(), holder = 'wrun_tail_snapshot'
+  t.after(async () => {
+    await scope.run(async () => {
+      await db.delete(schema.bots).where(eq(schema.bots.ownerId, owner))
+      await db.execute(sql`delete from "user" where id = ${owner}`)
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Tail snapshot fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Tail snapshot bot' })
+    await db.insert(schema.coordinatorMessages).values([
+      { id: randomUUID(), userId: owner, botId, position: 1, message: { role: 'user', content: 'Earlier request' } },
+      { id: randomUUID(), userId: owner, botId, position: 2, message: { role: 'assistant', content: 'Earlier reply' } },
+    ])
+    const previous = await store.chatView(owner, 200, botId)
+    assert.equal(previous.working, false)
+    const reader = await pool.connect(), writer = await pool.connect()
+    try {
+      const update = await claimBetweenChatReads(reader,
+        () => withDatabaseClient(writer, async () => {
+          await db.insert(schema.coordinatorEvents).values({ id: randomUUID(), ...userMessageEvent(owner, 'Next request', { botId }) })
+          const taken = await store.takeInbox(owner, holder, botId)
+          assert.deepEqual([taken.held, taken.added], [true, 1])
+        }),
+        () => withDatabaseClient(reader, () => store.chatUpdate(owner, botId, previous.continuation)))
+      assert.ok('after' in update, 'the bounded continuation still uses a tail')
+      assert.equal(update.items.at(-1)?.from, 'person')
+      assert.equal(update.cursor, 3)
+      assert.equal(update.working, true, 'an earlier idle version must not overwrite the newer claimed tail')
+      assert.equal(update.streamRunId, holder)
+      assert.equal(chatFailure(update), null)
+    } finally { reader.release(); writer.release() }
+  })
+})
+
 dbTest('the chat version changes exactly when the conversation or its inbox does, and costs a few bytes', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, sql }] = await Promise.all([
+  const [{ createRequestDatabaseScope, db, pool }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { and, eq, sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
@@ -35,7 +156,7 @@ dbTest('the chat version changes exactly when the conversation or its inbox does
   })
   await scope.run(async () => {
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Version fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values([{ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Version bot' }, { id: otherBot, ownerId: owner, workspaceId: randomUUID(), name: 'Other bot' }])
+    await db.insert(schema.bots).values([{ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Version bot' }, { id: otherBot, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Other bot' }])
     const empty = await store.chatVersion(owner, 200, botId)
     assert.deepEqual({ ...empty, version: undefined }, { version: undefined, cursor: 0, working: false, error: null })
 
@@ -142,7 +263,7 @@ dbTest('the chat version changes exactly when the conversation or its inbox does
 })
 
 dbTest('a disk-restored tool chat repairs its proven prefix without returning cached bodies from PostgreSQL', async t => {
-  const [{ createRequestDatabaseScope, db }, schema, store, { and, eq, sql }] = await Promise.all([
+  const [{ createRequestDatabaseScope, db, pool }, schema, store, { and, eq, sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('drizzle-orm'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
@@ -159,7 +280,7 @@ dbTest('a disk-restored tool chat repairs its proven prefix without returning ca
   await scope.run(async () => {
     // Disposable setup is outside measured reads. No model work is started.
     await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Metadata fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
-    await db.insert(schema.bots).values([{ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Metadata bot' }, { id: otherBot, ownerId: owner, workspaceId: randomUUID(), name: 'Other bot' }])
+    await db.insert(schema.bots).values([{ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Metadata bot' }, { id: otherBot, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Other bot' }])
     const body = 'BODY_MUST_NOT_REPLAY_FROM_PREFIX '.repeat(150)
     const messages: Record<string, unknown>[] = Array.from({ length: 40 }, (_, index) => index % 2
       ? { role: 'assistant', content: body + index } : { role: 'user', content: `Question ${index}` })

@@ -16,6 +16,7 @@ import { groupReplySystemPrompt } from './group-reply-prompt'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import type { UserModelMessage } from 'ai'
 import { groupBotCatalog } from './group-member-catalog'
+import { withAiMetadata } from '@/lib/tracing/ai'
 
 const judgment = createGroupJudgment(invokeDecision)
 
@@ -87,8 +88,8 @@ export const groupRuntime: GroupRuntime = {
     // Existing subscription transports are streaming-only. Never switch the
     // selected Bot to the generic Coordinator's paid model on refusal.
     try {
-      if (agent.memberType === 'bot') return await streamText(options).output
-      return (await generateText(options)).output
+      if (agent.memberType === 'bot') return await withAiMetadata({ operation: 'bot' }, () => streamText(options).output)
+      return (await withAiMetadata({ operation: 'coordinator' }, () => generateText(options))).output
     } catch (error) {
       // The SDK's final NoOutput error can hide the actual stream failure or timeout.
       if (signal.aborted) throw new Error('group_generation_interrupted', { cause: signal.reason })

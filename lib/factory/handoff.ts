@@ -1,3 +1,4 @@
+import { withFactoryBackgroundWorkspace } from './background-workspace'
 import { createHash } from 'node:crypto'
 import { deploymentSwitch } from '../deployment-switches'
 import { escapeLiteral, type Pool, type PoolClient, type QueryResult } from 'pg'
@@ -122,6 +123,7 @@ export function factoryHandoffPrompt(handoff: Awaited<ReturnType<typeof persistF
  * before it creates the child; claim still rechecks the current task/attempt. */
 export async function factoryRecoveryHandoff(pool: Pool, run: { id: string; userId: string }, prompt: string, existing?: PoolClient): Promise<{ prompt: string; briefing: string; blocked?: string }> {
   if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return { prompt, briefing: '' }
+  return withFactoryBackgroundWorkspace(pool, run.userId, { kind: 'run', id: run.id }, async () => {
   const tx = existing ?? await pool.connect()
   try {
     if (!existing) await tx.query('BEGIN')
@@ -141,4 +143,5 @@ export async function factoryRecoveryHandoff(pool: Pool, run: { id: string; user
     return { prompt: currentRequest + prompt.slice(0, 100000 - currentRequest.length - suffix.length) + suffix, briefing: currentRequest + suffix,
       ...(uncertain ? { blocked: 'An external action may already have happened. Reconcile its existing receipt before resuming on another machine.' } : {}) }
   } catch (error) { if (!existing) await tx.query('ROLLBACK'); throw error } finally { if (!existing) tx.release() }
+  }, existing)
 }

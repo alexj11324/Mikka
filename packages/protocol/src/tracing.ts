@@ -1,4 +1,4 @@
-import { causeFields } from "./coded-error"
+import { causeFields } from "./coded-error.ts"
 
 // Span privacy rules shared by the web server (lib/tracing/sanitize.ts) and
 // the daemon (packages/daemon/src/tracing.ts). docs/operations/tracing.md, "Privacy".
@@ -28,7 +28,7 @@ export function scrubLocalString(value: string): string {
 /** Only identifiers become codes: a message, path or token never matches. */
 const CODE = /^[a-z][a-z0-9_]{0,63}$/i
 
-export type ErrorAttributes = { "error.type": string; "mikka.error.code"?: string; "mikka.error.detail"?: string }
+export type ErrorAttributes = { "error.type": string; "mikka.error.code"?: string; "mikka.error.detail"?: string; "mikka.error.causes"?: string }
 
 /**
  * A failed operation's error by name and code only, read from the error and
@@ -36,11 +36,19 @@ export type ErrorAttributes = { "error.type": string; "mikka.error.code"?: strin
  * can echo user input, stderr or a credential.
  */
 export function safeErrorAttributes(error: unknown): ErrorAttributes {
-  const chain = causeFields(error)
+  let chain: ReturnType<typeof causeFields>
+  try {
+    chain = causeFields(error)
+  } catch {
+    // Provider errors can expose throwing getters. Diagnostics must preserve
+    // the original failure, never export or throw a new inspection error.
+    return { "error.type": "unknown" }
+  }
   const coded = chain.find(field => typeof field.code === "string" && CODE.test(field.code))
   return {
     "error.type": chain[0]?.name ?? "unknown",
     ...(coded ? { "mikka.error.code": String(coded.code) } : {}),
     ...(coded?.detail ? { "mikka.error.detail": coded.detail } : {}),
+    ...(chain.length > 1 ? { "mikka.error.causes": chain.map(field => [field.name, field.code, field.detail].filter(value => value !== undefined).join(':')).join(' > ').slice(0, STRING_LIMIT) } : {}),
   }
 }

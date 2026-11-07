@@ -7,13 +7,20 @@ import { spawn } from 'node:child_process'
 import { availableParallelism } from 'node:os'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { posix, resolve } from 'node:path'
+import { createInterface } from 'node:readline'
 import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/factory/background-workspace.ts', file: 'tests/factory-background-workspace.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/factory/workspace-reader.ts', file: 'tests/factory-workspace-admission.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/mobile-push.ts', file: 'tests/mobile-push-workspace.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/governance/templates.ts', file: 'tests/team-governance-api.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/governance/entitlements.ts', file: 'tests/governance-seats.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/task-workspace.ts', file: 'tests/task-workspace-governance.db.test.ts', script: 'test:visibility-db' },
+  { marker: 'lib/cloud-services/store.ts', file: 'lib/cloud-services/client.db.test.ts', script: 'test:cloud-services-db' },
+  { marker: 'app/api/web/exchange/route.ts', file: 'tests/web-auth-handoff.db.test.ts', script: 'test:web-auth-db' },
+  { marker: 'lib/workspace-selection.ts', file: 'tests/web-workspace-selection.db.test.ts', script: 'test:web-auth-db' },
   { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },
   { marker: 'lib/chat-attachments/store.ts', file: 'lib/chat-attachments/store.db.test.ts', script: 'test:chat-attachments-db' },
   { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
@@ -71,6 +78,8 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/computer/store.ts', file: 'lib/computer/store.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/computer/reconcile.ts', file: 'lib/computer/reconcile.db.test.ts', script: 'test:computer-db' },
   { marker: 'lib/computer/event-log.ts', file: 'lib/computer/event-log.db.test.ts', script: 'test:live-db' },
+  { marker: 'lib/builtin-gateway/postgres.ts', file: 'lib/builtin-gateway/postgres.db.test.ts', script: 'test:live-db' },
+  { marker: 'lib/live/session-ticket.ts', file: 'lib/builtin-gateway/session-revocation.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/cloud-computer/subagents.ts', file: 'lib/computer/event-writers.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/computer/event-page.ts', file: 'lib/computer/event-session.db.test.ts', script: 'test:live-db' },
   { marker: 'lib/credentials/broker.ts', file: 'lib/computer/event-broker.db.test.ts', script: 'test:live-db' },
@@ -333,17 +342,40 @@ export async function createClones(template, names, ready = () => {}) {
   } finally { await client.end() }
 }
 
-/** Runs one package script; its output is buffered and returned, not streamed. */
+// Progress is a bounded preview, never a second TAP summary or Actions command.
+// Preserve the original bytes separately for the summary and final log group.
+function progressText(value, limit = 512) {
+  const safe = value.slice(0, limit)
+    .replace(/\p{Cc}/gu, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`)
+    .replace(/:{2,}/g, run => [...run].join(' ')).replaceAll('##[', '# #[')
+  const suffix = ' [truncated]'
+  return value.length > limit || safe.length > limit ? safe.slice(0, limit - suffix.length) + suffix : safe
+}
+
+/** Streams attributed previews while retaining the complete output and status. */
 export function runScript(command, args, options) {
   return new Promise(resolvePromise => {
     const stdout = [], stderr = []
+    const script = progressText(options.script ?? command, 120)
+    const progress = (stream, line) => {
+      const prefix = `[db-runner ${script} ${stream}] `
+      process.stdout.write(prefix + progressText(line, 512 - prefix.length) + '\n')
+    }
     let settled = false
     const done = result => { if (!settled) { settled = true; resolvePromise(result) } }
+    progress('lifecycle', 'start')
     const child = spawn(command, args, { cwd: options.cwd, env: options.env, stdio: ['ignore', 'pipe', 'pipe'] })
-    child.stdout.on('data', chunk => stdout.push(chunk))
-    child.stderr.on('data', chunk => stderr.push(chunk))
+    for (const [name, stream, buffer] of [['stdout', child.stdout, stdout], ['stderr', child.stderr, stderr]]) {
+      stream.on('data', chunk => buffer.push(chunk))
+      // readline decodes split UTF-8 and emits the final unterminated line too.
+      createInterface({ input: stream, crlfDelay: Infinity, terminal: false }).on('line', line => progress(name, line))
+    }
     child.on('error', error => done({ status: null, stdout: Buffer.concat(stdout).toString('utf8'), stderr: `${Buffer.concat(stderr).toString('utf8')}\n${error.message}` }))
-    child.on('close', status => done({ status, stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8') }))
+    child.on('exit', (status, signal) => progress('lifecycle', `exit code=${status} signal=${signal ?? 'none'}`))
+    child.on('close', (status, signal) => {
+      progress('lifecycle', `close code=${status} signal=${signal ?? 'none'}`)
+      done({ status, stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8') })
+    })
   })
 }
 
@@ -390,7 +422,7 @@ export async function main({ root = '.', env = process.env, run = runScript, clo
     const timings = []
     const execute = async ({ script, database }) => {
       const started = now()
-      const result = await run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: suiteEnv(env, database), maxBuffer: 64 << 20 })
+      const result = await run('pnpm', ['-s', script], { cwd: root, encoding: 'utf8', env: suiteEnv(env, database), maxBuffer: 64 << 20, script })
       const seconds = Math.round((now() - started) / 100) / 10
       timings.push({ script, seconds })
       console.log(`::group::pnpm ${script} (${database ?? 'template database'}, ${seconds}s)`)

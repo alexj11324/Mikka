@@ -66,7 +66,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
       const issueId = randomUUID(), sourceEventId = randomUUID(), botId = randomUUID()
       for (const [index, pool] of pools.entries()) {
         await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)', [botId, owner, index ? intended : wrong, `Context fixture ${botId}`])
-        await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Context fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId, owner])
+        await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority) VALUES($1,$2,$3,'bound',$4,'Context fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId, owner, index ? intended : wrong, index ? 'personal' : 'workspace'])
         await pool.query('INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,\'user_message\',$4,\'{"text":"Isolated fixture"}\')', [sourceEventId, owner, botId, sourceEventId])
       }
       const store = createFactoryStore(requestPool, async (user, issue, client) => (await client.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1, botId)
@@ -74,11 +74,13 @@ test('real Factory notifications retain their database across COMMIT and delayed
         issueId, sourceEventId, eventId: randomUUID(), rationale: 'Context fixture', missingInformation: [], missingPermissions: [], needsSpec: false,
       }, tx)))
       // The default database deliberately has the same task, issue, Bot and
-      // owner IDs. Only the Bot's workspace differs, so using it leaks a key.
+      // owner IDs. Its persisted task/issue/Bot tenant differs, so falling back
+      // to it would still address a valid but unauthorized notification key.
       const clone = await defaultPool.connect()
       try {
         await clone.query('BEGIN')
         const task = (await tx.query('SELECT to_jsonb(t) AS value FROM factory_tasks t WHERE id=$1', [result.task.id])).rows[0].value
+        task.workspaceId = wrong
         await clone.query('INSERT INTO factory_tasks SELECT * FROM jsonb_populate_record(NULL::factory_tasks,$1)', [task])
         const attempts = (await tx.query('SELECT to_jsonb(a) AS value FROM factory_attempts a WHERE "taskId"=$1', [result.task.id])).rows
         for (const attempt of attempts) await clone.query('INSERT INTO factory_attempts SELECT * FROM jsonb_populate_record(NULL::factory_attempts,$1)', [attempt.value])

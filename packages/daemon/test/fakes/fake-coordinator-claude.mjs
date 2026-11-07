@@ -37,6 +37,10 @@ createInterface({ input: process.stdin }).on('line', line => {
   }
   if (prompt === 'HANG') return
   if (prompt === 'EXIT') { process.exit(1) }
+  if (prompt.startsWith('STRUCTURED_ERROR')) {
+    out({ type: 'result', subtype: 'error_during_execution', is_error: true, errors: [`API Error: 401 ${JSON.stringify({ error: { type: 'authentication_error', message: prompt.includes("ECHO") ? `Subscription session expired. Request: ${prompt}` : "Subscription session expired." } })}`], session_id })
+    return
+  }
   if (prompt === 'ERROR') {
     out({ type: 'result', subtype: 'error_during_execution', is_error: true, errors: ['fixture failure'], session_id })
     return

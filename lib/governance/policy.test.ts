@@ -3,13 +3,15 @@ import test from 'node:test'
 import { deploymentMode } from './edition'
 import { csvCell, resolveEntitlements, seatAdmissionAllowed } from './policy'
 
-test('deployment identity has an explicit community override, independent of billing', () => {
+test('governance follows the canonical deployment edition, independent of hosting and billing', () => {
   assert.equal(deploymentMode({}), 'selfhost')
-  assert.equal(deploymentMode({ VERCEL_ENV: 'production' }), 'cloud')
-  assert.equal(deploymentMode({ VERCEL_ENV: 'preview' }), 'cloud')
+  assert.equal(deploymentMode({ VERCEL_ENV: 'production' }), 'selfhost')
+  assert.equal(deploymentMode({ VERCEL_ENV: 'preview' }), 'selfhost')
   assert.equal(deploymentMode({ VERCEL_ENV: 'production', MIKKA_EDITION: 'community', STRIPE_SECRET_KEY: 'configured' }), 'selfhost')
   assert.equal(deploymentMode({ MIKKA_EDITION: 'cloud' }), 'cloud')
-  assert.throws(() => deploymentMode({ MIKKA_EDITION: 'other' }), /governance_invalid_edition/)
+  assert.equal(deploymentMode({ MIKKA_EDITION: ' cloud ' }), 'cloud')
+  assert.equal(deploymentMode({ MIKKA_EDITION: '   ', VERCEL_ENV: 'production' }), 'selfhost')
+  assert.throws(() => deploymentMode({ MIKKA_EDITION: 'other' }), /MIKKA_EDITION_INVALID/)
 })
 
 test('Cloud Free limits only active human seats; community has no five-member cap', () => {

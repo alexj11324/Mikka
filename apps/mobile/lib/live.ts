@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { AppState, Platform } from 'react-native'
-import { authHeaders } from '@/lib/api'
-import { API_URL } from '@/lib/config'
+import { apiConnection, authHeaders } from '@/lib/api'
+import { onServerChange } from '@/lib/config'
 import { createLiveClient, type LiveRef, type LiveSpecOptions } from './live-client'
 import { presenceScope } from './presence-scope'
 import type { PresenceProof } from '../../../lib/live/presence'
@@ -13,15 +13,17 @@ const TICKET_TIMEOUT_MS = 15_000
 
 /** The live ticket for one owner/workspace channel, as the signed-in person (the same session cookie `api` sends). */
 async function ticket(workspaceId: string, signal: AbortSignal): Promise<unknown> {
+  const connection = apiConnection()
   const request = presenceScope.begin()
   const controller = new AbortController()
   const abort = () => controller.abort()
   const timer = setTimeout(abort, TICKET_TIMEOUT_MS)
   signal.addEventListener('abort', abort)
   try {
-    const response = await fetch(`${API_URL}/api/live/ticket?workspace=${encodeURIComponent(workspaceId)}`, {
-      headers: { accept: 'application/json', ...await authHeaders() },
+    const response = await fetch(`${connection.account.server.url}/api/live/ticket?workspace=${encodeURIComponent(workspaceId)}`, {
+      headers: { accept: 'application/json', ...await authHeaders(connection) },
       credentials: Platform.OS === 'web' ? 'include' : 'omit',
+      redirect: 'error',
       signal: controller.signal,
     })
     const value = response.ok ? await response.json() : null
@@ -39,6 +41,7 @@ export const live = createLiveClient({
   socket: (url, protocol) => new WebSocket(url, protocol),
   monotonicNow: typeof performance !== 'undefined' && typeof performance.now === 'function' ? () => performance.now() : undefined,
 })
+onServerChange(() => { presenceScope.clear(); live.reset() })
 
 /** A deadline as the server observed it, for a read that started at `requestedAt` (performance clock). */
 export type LiveDeadline = { at: string; afterMs: number } | null | undefined

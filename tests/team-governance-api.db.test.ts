@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
-import { dbUrl, seedAgent, seedBot, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { provisionWorkspacePlan } from '../lib/governance/provisioning'
 
 let principal: { id: string; workspaceId?: string } | null = null
@@ -20,6 +20,10 @@ test('Team governance HTTP handlers enforce actual entitlements and workspace bo
     import('../lib/db'), import('../lib/workspace-db'),
     import('../app/api/workspaces/[workspaceId]/governance/route'), import('../app/api/workspaces/[workspaceId]/governance/usage/route'),
   ])
+  // This test process owns both real pools. One connection each proves that
+  // pinned workspace reads compose without a hidden secondary checkout.
+  pool.options.max = 1
+  workspacePool.options.max = 1
   const owner = await seedUser(pool, 'team-owner'), member = await seedUser(pool, 'team-member'), stranger = await seedUser(pool, 'team-stranger')
   const first = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
   const second = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
@@ -113,6 +117,57 @@ test('Team governance HTTP handlers enforce actual entitlements and workspace bo
     assert.equal((await report('?from=2025-01-01&to=2026-11-07')).status, 400)
     await pool.query('delete from agent_runs where id=$1', [runId])
     await pool.query('delete from agents where id=$1', [agentId])
+  })
+
+  await t.test('usage and template HTTP requests do not invert a real task writer with one connection per pool', async () => {
+    const { withTaskWorkspace } = await import('../lib/task-workspace')
+    const { writeTransaction } = await import('../lib/operations/write-transaction')
+    principal = { id: owner }
+    const task = await seedIssue(pool, owner, first.id)
+    const saved = await post({ action: 'save', template: { name: 'Pool ordering', rules: { approvalMode: 'read_only' } } })
+    assert.equal(saved.status, 200)
+    const { id: templateId } = await saved.json()
+    try {
+      for (const action of ['usage', 'apply'] as const) {
+        let entered!: () => void, resume!: () => void
+        const ownsWorkspace = new Promise<void>(resolve => { entered = resolve })
+        const continueWriter = new Promise<void>(resolve => { resume = resolve })
+        const abort = new AbortController()
+        const writing = withTaskWorkspace(owner, first.id, async () => {
+          entered()
+          await continueWriter
+          return writeTransaction(pool, async tx => {
+            await tx.query('update issues set title=$2 where id=$1', [task, `Committed before ${action}`])
+          }, { signal: abort.signal })
+        })
+        void writing.catch(() => {})
+        let pending: Promise<Response> | undefined
+        let timer: ReturnType<typeof setTimeout> | undefined
+        try {
+          await ownsWorkspace
+          pending = action === 'usage' ? report() : post({ action: 'apply', templateId })
+          void pending.catch(() => {})
+          for (let attempt = 0; attempt < 500 && workspacePool.waitingCount === 0; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 10))
+          }
+          assert.equal(workspacePool.waitingCount, 1, 'the real governance request must wait for the writer workspace checkout')
+          resume()
+          const [, response] = await Promise.race([
+            Promise.all([writing, pending]),
+            new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('APP/WS pool ordering deadlocked')), 5000) }),
+          ])
+          assert.equal(response.status, 200)
+          assert.equal((await pool.query('select title from issues where id=$1', [task])).rows[0].title, `Committed before ${action}`)
+        } finally {
+          if (timer) clearTimeout(timer)
+          abort.abort(); resume()
+          await Promise.allSettled([writing, pending])
+        }
+      }
+    } finally {
+      await pool.query('delete from issues where id=$1', [task])
+      assert.equal((await post({ action: 'delete', templateId })).status, 200)
+    }
   })
 
   await t.test('paid features never grant member, stranger, suspended or token cross-workspace authority', async () => {

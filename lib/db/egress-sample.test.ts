@@ -43,9 +43,11 @@ test('unsampled queries and a gate that is off pass straight through', async () 
   assert.equal(describeSample('BEGIN', { command: 'BEGIN', rows: [] } as never, 'r').bytes, 0)
 })
 
-test('the gate is off without PostHog', async () => {
+test('community diagnostics use the deployed default and retain an explicit local switch', async () => {
   const { deploymentSwitch } = await import('../deployment-switches')
-  assert.equal(deploymentSwitch('dbEgressSample', {}), false)
+  assert.equal(deploymentSwitch('dbEgressSample', {}), true)
+  assert.equal(deploymentSwitch('dbEgressSample', { MIKKA_DB_EGRESS_SAMPLE: '0' }), false)
+  assert.equal(deploymentSwitch('dbEgressSample', { MIKKA_EDITION: 'cloud' }), false)
 })
 
 test('large reads outside the random sample are recorded exactly once with their actual inclusion rate', async () => {

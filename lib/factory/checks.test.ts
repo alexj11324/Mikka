@@ -1,4 +1,5 @@
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { reconcileFactoryCheck } from "./reconcile-check";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -72,8 +73,8 @@ test(
         deviceId = randomUUID(),
         repoId = randomUUID();
       await pool.query(
-        `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Independent check fixture','{}','todo','normal')`,
-        [issueId],
+        `INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Independent check fixture','{}','todo','normal',$2,'bound')`,
+        [issueId, await seedFixtureWorkspace(pool, 'owner')],
       );
       await pool.query(
         `INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Isolated PG fixture',now(),'[{"harness":"codex","installed":true,"version":"fixture"}]')`,

@@ -70,9 +70,11 @@ func run() error {
 	if decoder.Decode(&config) != nil {
 		return worker.ErrUnsupported
 	}
+	configStarted := time.Now()
 	if config.DatabaseURL == "" {
 		return worker.ErrDatabase
 	}
+	dbStarted := time.Now()
 	db, err := sql.Open("pgx", config.DatabaseURL)
 	if err != nil {
 		return worker.ErrDatabase
@@ -81,9 +83,14 @@ func run() error {
 	db.SetMaxOpenConns(3)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if db.PingContext(ctx) != nil {
+	connection, err := db.Conn(ctx)
+	if err != nil {
 		return worker.ErrDatabase
 	}
+	if connection.Close() != nil {
+		return worker.ErrDatabase
+	}
+	dbInit := time.Since(dbStarted)
 	var grants worker.SecretStore
 	if config.ExecutionOnly {
 		if config.Token != "" || config.Path != "" || config.EnableCodexOAuth || config.EnableClaudeOAuth || config.EnrollmentAttemptPath != "" || config.EnrollmentClaimPath != "" || config.EnrollmentGrantPath != "" {
@@ -189,5 +196,6 @@ func run() error {
 	}
 	runtimeCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
+	runtimeCtx = worker.WithStartupTiming(runtimeCtx, configStarted, dbInit)
 	return w.Serve(runtimeCtx, input, os.Stdout)
 }

@@ -26,16 +26,15 @@ export function createFactoryClaim(store: ReturnType<typeof createFactoryStore>,
     if(task.status!=='running'||!attempt||attempt.status!=='running'||attempt.runId!==runId||attempt.candidateId!==task.candidateId) throw new FactoryError('factoryClaimStale');
     const {rows:[run]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[runId]);
     if(!run||run.userId!==userId||run.issueId!==task.issueId||!(await factoryRunBotMatches(tx, task, run))||run.deviceId!==deviceId||run.status!=='queued'||run.stopRequestedAt) throw new FactoryError('factoryRunMismatch');
-    const authorized = await tx.query(`SELECT a.id FROM agents a
+    const projection = task.stage === 'execute' ? 'a.id,repo."remoteUrl",repo."repoPath"' : 'a.id';
+    const authorized = await tx.query<{ id: string; remoteUrl?: string | null; repoPath?: string | null }>(`SELECT ${projection} FROM agents a
       JOIN device_repos repo ON repo.id=$2 AND repo."deviceId"=$3 AND repo."userId"=$4
       JOIN devices d ON d.id=$3 AND d."ownerId"=$4 AND d.enabled=true
       WHERE a.id=$1 AND a."userId"=$4 FOR SHARE OF a,repo,d`,[run.agentId,run.deviceRepoId,deviceId,userId]);
     if (!authorized.rowCount) throw new FactoryError('factoryRunMismatch');
     // A question resumes its original session and still needs the host's
     // execution purpose, including retention of a no-repository delivery.
-    const { rows: [repo] } = task.stage === 'execute'
-      ? await tx.query('SELECT "remoteUrl","repoPath" FROM device_repos WHERE id=$1 AND "userId"=$2', [run.deviceRepoId, userId])
-      : { rows: [] };
+    const repo = authorized.rows[0];
     const execution = task.stage === 'execute' ? { factoryExecuteKind: factoryExecutionKind(repo, run.agentDefinition?.readOnly) } : {};
     if(run.questionContinuation) return {...await questions.claimContinuation(userId,deviceId,runId,leaseExpiresAt,tx),...execution,preserveQuestionWorktree:true};
     if(['review','verify','monitor'].includes(task.stage)) {

@@ -299,15 +299,88 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     await assert.rejects(service.check(use(peerBot, peerBinding)), { code: 'account_unavailable' }, 'un-sharing stops it at once')
     await service.check(use(ownBot, ownBinding))
 
-    // The menu and the resolver read one readiness: a route that does not answer chats is never offered.
+    // Without a PostHog project, shipped subscription routes are available.
+    // The real connection state still fences both the menu and saved choices.
     const settings = new ExecutionSettings(appPool)
-    const before = process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
-    t.after(() => { process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = before })
-    process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'codex_cpa'
-    assert.deepEqual(await settings.chatModels({ ownerId: owner, workspaceId: team.id }), [])
-    assert.equal(await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding), undefined)
+    const savedRoutes = process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+    try {
+      delete process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+      assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+      assert.equal((await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding))?.connectionId, connection)
+      await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [connection])
+      assert.deepEqual(await settings.chatModels({ ownerId: owner, workspaceId: team.id }), [])
+      assert.equal(await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding), undefined)
+      await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [connection])
+      assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+    } finally {
+      if (savedRoutes === undefined) delete process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+      else process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = savedRoutes
+    }
+  })
+
+  await t.test('community bot chats use only their available chosen credential without a server model or Decision key', async t => {
+    const names = ['MIKKA_EDITION', 'MIKKA_DEFAULT_MODEL_BASE_URL', 'MIKKA_DEFAULT_MODEL_API_KEY', 'MIKKA_DEFAULT_MODEL_ID', 'AI_GATEWAY_API_KEY', 'VERCEL_OIDC_TOKEN', 'ZEROCAT_API_KEY', 'ZEROCAT_BASE_URL', 'DECISIONS_API_KEY', 'MIKKA_MVP_E2E', 'MIKKA_BYOS_VALIDATED_MODEL_ROUTES']
+    const before = Object.fromEntries(names.map(name => [name, process.env[name]]))
+    t.after(() => { for (const name of names) { if (before[name] === undefined) delete process.env[name]; else process.env[name] = before[name] } })
+    for (const name of names) delete process.env[name]
+    process.env.MIKKA_EDITION = 'community'
     process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
-    assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+    const { coordinatorEnabled, triageInbox } = await import('../lib/coordinator/wake')
+    const { defaultModelConfigured } = await import('../lib/default-model-config')
+    const { defaultModelAvailable } = await import('../lib/default-model')
+    const { ExecutionSettings } = await import('../lib/execution-settings')
+    const { HOSTED_CHOICE } = await import('../lib/bot-model-menu-view')
+    const { seedBot } = await import('./support/workspace-admin-db')
+    const owner = await seedUser(pool, 'community-chat'), other = await seedUser(pool, 'community-other')
+    const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    const bot = await seedBot(pool, workspace.id, owner), settings = new ExecutionSettings(appPool)
+    assert.equal(defaultModelConfigured(), false)
+    assert.equal(await defaultModelAvailable(owner), false)
+    assert.equal(await coordinatorEnabled(owner, bot), false, 'a bot with no credential remains disabled')
+    const connection = randomUUID(), binding = randomUUID()
+    const quota = (used: number, age = 0) => ({ vendor: 'claude_code', source: 'official', status: 'ok', plan: null,
+      observedAt: new Date(Date.now() - age).toISOString(), windows: [{ kind: 'five_hour', used, resetsAt: '2099-01-01T00:00:00.000Z' }] })
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject",quota)
+      VALUES ($1,$2,$3,'claude','connected',1,$4,$5,'synthetic-readiness-subject',$6)`,
+      [connection, owner, workspace.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify(quota(0.2))])
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
+      VALUES ($1,$2,$3,$4,$5,1,'claude_cpa','claude-readiness-fixture')`, [binding, owner, workspace.id, bot, connection])
+    await settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, binding)
+    const saved = (await pool.query('SELECT * FROM bot_model_choices WHERE "ownerId"=$1', [owner])).rows
+    assert.equal(await coordinatorEnabled(owner, bot), true)
+    assert.deepEqual((await pool.query('SELECT * FROM bot_model_choices WHERE "ownerId"=$1', [owner])).rows, saved, 'checking readiness never changes the saved choice')
+    assert.equal(await coordinatorEnabled(other, bot), false, 'another owner cannot enable this bot')
+
+    // No Decision provider is configured. Actual user input still reaches the
+    // attention tier; no classification result or provider call is invented.
+    const eventId = randomUUID()
+    await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload)
+      VALUES ($1,$2,$3,'user_message',$4,$5)`, [eventId, owner, bot, `readiness:${eventId}`, JSON.stringify({ text: 'Synthetic readiness input.' })])
+    await triageInbox(owner, bot)
+    assert.equal((await pool.query('SELECT tier FROM coordinator_events WHERE id=$1', [eventId])).rows[0].tier, 'attention')
+
+    for (const state of ['paused=true', "state='disconnected'", 'epoch=2']) {
+      await pool.query(`UPDATE byos_connections SET ${state} WHERE id=$1`, [connection])
+      assert.equal(await coordinatorEnabled(owner, bot), false, 'paused, disconnected and obsolete bindings never enable chat')
+      await pool.query(`UPDATE byos_connections SET paused=false,state='connected',epoch=1 WHERE id=$1`, [connection])
+    }
+    // This native route is valid in the stored binding CHECK, but is excluded
+    // by executionModelOptions from the bot-chat catalogue.
+    await pool.query(`UPDATE byos_bindings SET route='claude_code_cli' WHERE "connectionId"=$1`, [connection])
+    assert.equal(await coordinatorEnabled(owner, bot), false, 'a native-only binding cannot enable a bot chat')
+    await pool.query(`UPDATE byos_bindings SET route='claude_cpa' WHERE "connectionId"=$1`, [connection])
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [connection, JSON.stringify(quota(1))])
+    assert.equal(await coordinatorEnabled(owner, bot), false, 'a known exhausted selected model remains unavailable')
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [connection, JSON.stringify(quota(0.2, 120_000))])
+    assert.equal(await coordinatorEnabled(owner, bot), true, 'a stale official allowance can queue its normal authoritative execution check')
+    await settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, HOSTED_CHOICE)
+    assert.equal(await coordinatorEnabled(owner, bot), false, 'explicit Mikka default does not silently spend an available subscription')
+    await settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, binding)
+    await pool.query('UPDATE bots SET "archivedAt"=now() WHERE id=$1', [bot])
+    assert.equal(await coordinatorEnabled(owner, bot), false, 'an archived bot remains disabled')
+    await pool.query('UPDATE bots SET "archivedAt"=NULL WHERE id=$1', [bot])
+    await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, owner])
+    assert.equal(await coordinatorEnabled(owner, bot), false, 'a suspended member cannot enable this bot')
   })
 
   await t.test('由我的卡支付这个团队: one member\'s card per team; leaving releases it with a 7-day grace that admins see', async () => {

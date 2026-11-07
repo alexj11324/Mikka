@@ -9,5 +9,6 @@ export default definePlugin(application => {
     origin: resolveAppOrigin(process.env),
     deploymentHost: process.env.VERCEL_URL,
     productionHost: process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    legacyHost: process.env.MIKKA_LEGACY_APP_HOST,
   })
 })

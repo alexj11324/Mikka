@@ -1,3 +1,4 @@
+import type { FactoryWorkspaceBoundary } from './background-workspace';
 import { randomUUID } from "node:crypto";
 import { wakeCoordinatorAfterCommit } from "../coordinator/wake-after-commit";
 import { factoryCheckIndependent } from "./check-independence";
@@ -203,6 +204,7 @@ export function createFactoryMonitor(
   ) => Promise<void> = async () => {},
   probes: MonitorProbeAdapter[] = [],
   botId: string | null = null,
+  withWorkspace?: FactoryWorkspaceBoundary,
 ) {
   async function consume(
     userId: string,
@@ -212,6 +214,7 @@ export function createFactoryMonitor(
     const parsed = inputSchema.safeParse(raw);
     if (!parsed.success) fail("factoryInvalid");
     const input = parsed.data;
+    const transact = async () => {
     const tx = existing ?? await pool.connect();
     try {
       if (!existing) await tx.query("BEGIN");
@@ -562,6 +565,8 @@ export function createFactoryMonitor(
     } finally {
       if (!existing) tx.release();
     }
+    };
+    return withWorkspace ? withWorkspace(userId, input.binding.taskId, transact, existing) : transact();
   }
   return {
     consume,

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { LiveChannel, type LiveSocket } from '../live/channel'
+import { readBoundary } from '../swr/read-observer'
 import { ComputerEventFeed, type ComputerEventRuntime } from './event-stream'
 import { computerEventCursor, computerEventPage, type ComputerEventPage } from './event-page'
 
@@ -140,4 +142,228 @@ test('a required page refresh aborts data reads and visibility or new subscriber
   assert.equal(f.calls.length, 1)
   assert.equal(f.timers.size, 0)
   second(); stop()
+})
+
+class FeedSocket implements LiveSocket {
+  onopen: LiveSocket['onopen'] = null
+  onmessage: LiveSocket['onmessage'] = null
+  onclose: LiveSocket['onclose'] = null
+  onerror: LiveSocket['onerror'] = null
+  readyState: 0 | 1 | 2 | 3 = 0
+  open() {
+    this.readyState = 1
+    if (this.onopen) Reflect.apply(this.onopen, this, [new Event('open')])
+    this.message(JSON.stringify({ type: 'live_ready', version: 1, kinds: ['factory_task', 'subagent_events'] }))
+  }
+  message(data: string) { if (this.onmessage) Reflect.apply(this.onmessage, this, [{ data }]) }
+  send(data: string | ArrayBufferLike | Blob | ArrayBufferView) { if (data === 'ping') this.message('pong') }
+  close() { this.readyState = 3; if (this.onclose) Reflect.apply(this.onclose, this, [{}]) }
+}
+
+/** The real Channel produces and queues the boundary consumed by the real Feed. */
+function coupledFixture() {
+  let now = 1_800_000_000_000, nextTimer = 0
+  const timers = new Map<number, { at: number; callback: () => void }>()
+  const later = (callback: () => void, milliseconds: number) => {
+    const id = ++nextTimer; timers.set(id, { at: now + milliseconds, callback }); return id
+  }
+  const cancel = (id: unknown) => { timers.delete(id as number) }
+  const sockets: FeedSocket[] = []
+  const channel = new LiveChannel({
+    ticket: async () => ({ url: 'wss://fixture.invalid/socket', protocol: 'fixture', expiresAt: now + 600_000 }),
+    socket: () => { const socket = new FeedSocket(); sockets.push(socket); return socket },
+    visible: () => true, watchVisibility: () => () => {}, now: () => now, monotonicNow: () => now,
+    later, cancel,
+  })
+  const calls: Array<{ began: number; cursor: string }> = []
+  const catchups: number[] = []
+  const stopped = new AbortController()
+  let handler: ComputerEventRuntime['page'] = async () => page(String(calls.length), `accepted-${calls.length}`)
+  const feed = new ComputerEventFeed({
+    page: async (cursor, signal) => {
+      calls.push({ began: readBoundary(), cursor })
+      return handler(cursor, signal)
+    },
+    visible: () => true, watchVisibility: () => () => {}, stopped: stopped.signal, later, cancel,
+    invalidations: refresh => channel.subscribe('subagent_events', botId, [`computer-events:${botId}`], (_key, _required, _reuse, after) => {
+      assert.equal(typeof after, 'number', 'the actual Channel supplies its catch-up boundary')
+      catchups.push(after!)
+      return refresh(after)
+    }),
+  })
+  const stops: Array<() => void> = []
+  return {
+    feed, calls, catchups, sockets,
+    handle(value: ComputerEventRuntime['page']) { handler = value },
+    keepConnection() { stops.push(channel.subscribe('factory_task', botId, ['fixture-keepalive'], () => {})) },
+    subscribe() { stops.push(feed.subscribe(() => {})) },
+    async open() { await tick(); assert.equal(sockets.length, 1); sockets[0].open(); await tick() },
+    async advance(milliseconds: number) {
+      const until = now + milliseconds
+      for (;;) {
+        const entry = [...timers].sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0]
+        if (!entry || entry[1].at > until) break
+        now = entry[1].at; timers.delete(entry[0]); entry[1].callback(); await tick()
+      }
+      now = until; await tick()
+    },
+    dispose() { for (const stop of stops.reverse()) stop(); stopped.abort(); channel.dispose(); assert.equal(timers.size, 0) },
+  }
+}
+
+test('a late feed read committed after the actual channel boundary covers its queued catch-up', async t => {
+  const f = coupledFixture(); t.after(() => f.dispose())
+  f.keepConnection(); await f.open(); await f.advance(100)
+  f.subscribe(); await tick()
+  assert.equal(f.calls.length, 1)
+  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'accepted-1')
+  await f.advance(100)
+  assert.equal(f.catchups.length, 1)
+  assert.ok(f.calls[0].began > f.catchups[0])
+  assert.equal(f.calls.length, 1, 'the older queued catch-up must not repeat the committed post-boundary read')
+})
+
+test('the actual channel still catches up a feed read begun before socket open', async t => {
+  const f = coupledFixture(); t.after(() => f.dispose())
+  f.subscribe(); await tick()
+  assert.equal(f.calls.length, 1)
+  await f.open(); await f.advance(100)
+  assert.equal(f.catchups.length, 1)
+  assert.ok(f.calls[0].began < f.catchups[0])
+  assert.equal(f.calls.length, 2)
+  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'accepted-2')
+})
+
+test('a newer actual live push is not covered by an earlier completed feed read', async t => {
+  const f = coupledFixture(); t.after(() => f.dispose())
+  f.keepConnection(); await f.open(); await f.advance(100)
+  f.subscribe(); await tick(); await f.advance(100)
+  const before = f.calls.length, began = f.calls.at(-1)!.began
+  f.sockets[0].message(JSON.stringify({ kind: 'subagent_events', id: botId }))
+  await f.advance(100)
+  assert.ok(f.catchups.at(-1)! > began)
+  assert.equal(f.calls.length, before + 1)
+  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, `accepted-${before + 1}`)
+})
+
+test('a partially accepted pagination wave cannot cover a boundary until the final page succeeds', async t => {
+  const f = fixture(), after = readBoundary()
+  f.handle(async cursor => {
+    if (cursor === '0') return page('1', 'partial', true)
+    throw new Error('continuation unavailable')
+  })
+  const stop = f.feed.subscribe(() => {}); t.after(stop)
+  await tick()
+  assert.equal(f.calls.length, 2)
+  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'partial')
+  assert.equal(f.timers.size, 1)
+  f.handle(async () => page('2', 'complete'))
+  await f.feed.refresh(after)
+  assert.equal(f.calls.length, 3, 'the accepted first page alone provides no completed-wave proof')
+  assert.equal(f.calls[2].cursor, '1')
+  assert.equal(f.timers.size, 0)
+  await f.feed.refresh(after)
+  assert.equal(f.calls.length, 3, 'the fully accepted recovery now covers the same boundary')
+})
+
+test('reusing an older boundary cannot erase a newer pending wave or cancel a failed-read retry', async t => {
+  const f = fixture(), oldAfter = readBoundary()
+  f.handle(async () => page('1', 'first'))
+  const stop = f.feed.subscribe(() => {}); t.after(stop)
+  await tick()
+  let resolveSecond!: (value: unknown) => void
+  f.handle(async cursor => cursor === '1' ? new Promise(resolve => { resolveSecond = resolve }) : page('3', 'newer obligation'))
+  const running = f.feed.refresh()
+  const newerAfter = readBoundary()
+  const pending = f.feed.refresh(newerAfter)
+  const covered = f.feed.refresh(oldAfter)
+  assert.equal(f.calls.length, 2)
+  resolveSecond(page('2', 'second'))
+  await Promise.all([running, pending, covered])
+  assert.deepEqual(f.calls.map(call => call.cursor), ['0', '1', '2'])
+  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'newer obligation')
+  f.handle(async () => { throw new Error('temporary outage') })
+  await f.feed.refresh()
+  assert.equal(f.timers.size, 1)
+  await f.feed.refresh(oldAfter)
+  assert.equal(f.calls.length, 4)
+  assert.equal(f.timers.size, 1, 'a stale covered notification cannot cancel a newer failed-read retry')
+  f.handle(async () => page('4', 'retried'))
+  f.retry(); await tick()
+  assert.equal(f.calls.length, 5)
+  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'retried')
+})
+
+test('a remounted generation cannot use a previous generation successful read as proof', async t => {
+  const f = fixture(), after = readBoundary()
+  f.handle(async () => page('1', 'old generation'))
+  const stop = f.feed.subscribe(() => {})
+  await tick(); stop()
+  f.handle(async () => { throw new Error('new generation unavailable') })
+  const remount = f.feed.subscribe(() => {}); t.after(remount)
+  await tick()
+  assert.equal(f.calls.length, 2)
+  assert.equal(f.timers.size, 1)
+  f.handle(async () => page('2', 'new generation'))
+  await f.feed.refresh(after)
+  assert.equal(f.calls.length, 3)
+  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'new generation')
+  assert.equal(f.timers.size, 0)
+})
+
+
+test('a slow late initial read covers the actual catch-up queued while its response was pending', async t => {
+  const f = coupledFixture(); t.after(() => f.dispose())
+  f.keepConnection(); await f.open(); await f.advance(100)
+  let resolveFirst!: (value: unknown) => void
+  f.handle(async cursor => cursor === '0' ? new Promise(resolve => { resolveFirst = resolve }) : page('2', 'unneeded read'))
+  f.subscribe(); await tick(); await f.advance(100)
+  assert.equal(f.calls.length, 1)
+  assert.equal(f.feed.getSnapshot().size, 0, 'an in-flight start alone cannot establish accepted coverage')
+  assert.equal(f.catchups.length, 1)
+  assert.ok(f.calls[0].began > f.catchups[0])
+  resolveFirst(page('1', 'completed slow read'))
+  await tick()
+  assert.equal(f.calls.length, 1, 'full acceptance covers the older pending obligation without a second request')
+  assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'completed slow read')
+})
+
+test('pending boundaries retain the newest obligation and any forced read dominates older after values', async t => {
+  for (const obligation of ['newer', 'forced'] as const) {
+    const f = fixture(), oldAfter = readBoundary()
+    let resolveFirst!: (value: unknown) => void
+    f.handle(async cursor => cursor === '0' ? new Promise(resolve => { resolveFirst = resolve }) : page('2', 'required follow-up'))
+    const stop = f.feed.subscribe(() => {}); t.after(stop)
+    const old = f.feed.refresh(oldAfter)
+    const required = f.feed.refresh(obligation === 'newer' ? readBoundary() : undefined)
+    const olderAgain = f.feed.refresh(oldAfter)
+    assert.equal(f.calls.length, 1)
+    resolveFirst(page('1', 'first'))
+    await Promise.all([old, required, olderAgain])
+    assert.equal(f.calls.length, 2, `${obligation} obligation must survive an older pending boundary`)
+    assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'required follow-up')
+    stop()
+  }
+})
+
+test('pending catch-up remains unsatisfied when a partial page wave fails or returns an invalid final page', async t => {
+  for (const outcome of ['failure', 'invalid'] as const) {
+    const f = fixture(), after = readBoundary()
+    let finish!: (value: unknown) => void, fail!: (error: Error) => void
+    f.handle(async cursor => cursor === '0' ? page('1', 'partial', true) : new Promise((resolve, reject) => { finish = resolve; fail = reject }))
+    const stop = f.feed.subscribe(() => {}); t.after(stop)
+    await tick()
+    const pending = f.feed.refresh(after)
+    assert.equal(f.calls.length, 2)
+    if (outcome === 'failure') fail(new Error('continuation unavailable'))
+    else finish({ events: [], cursor: '0', hasMore: false })
+    await pending
+    assert.equal(f.timers.size, 1, `${outcome} preserves the failed-read retry`)
+    f.handle(async () => page('2', 'recovered'))
+    await f.feed.refresh(after)
+    assert.equal(f.calls.length, 3, `${outcome} cannot turn a partially accepted wave into proof`)
+    assert.equal(f.feed.getSnapshot().get(subagentId)?.step, 'recovered')
+    assert.equal(f.timers.size, 0)
+    stop()
+  }
 })

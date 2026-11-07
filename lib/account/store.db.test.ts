@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -166,8 +167,9 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     await pool.query(`insert into bot_subagents (id, "workspaceId", "ownerId", "botId", task, status) values ($1, $2, $3, $4, 'look', 'done')`, [randomUUID(), shared, alice, bot])
     await pool.query(`insert into devices (id, "ownerId", name) values ($1, $2, 'Laptop')`, [device, alice])
     await pool.query(`insert into agents (id, "userId", harness, name, "deviceId") values ($1, $2, 'codex', 'Agent', $3)`, [agent, alice, device])
-    const issue = (iid: string, owner: string, scope: string) => pool.query(`insert into issues (id, "userId", title, content, status, priority, scope) values ($1, $2, 'T', '{}'::jsonb, 'todo', 'normal', $3)`, [iid, owner, scope])
-    await issue(personalIssue, alice, 'personal'); await issue(teamIssue, alice, 'workspace'); await issue(bobIssue, bob, 'personal')
+    const bobHome = await seedFixtureWorkspace(pool, bob)
+    const issue = (iid: string, owner: string, scope: string, workspaceId: string) => pool.query(`insert into issues (id, "userId", "workspaceId", title, content, status, priority, scope) values ($1, $2, $4, 'T', '{}'::jsonb, 'todo', 'normal', $3)`, [iid, owner, scope, workspaceId])
+    await issue(personalIssue, alice, 'personal', solo); await issue(teamIssue, alice, 'workspace', shared); await issue(bobIssue, bob, 'personal', bobHome)
     for (const iid of [personalIssue, teamIssue]) await pool.query(`insert into issue_documents ("issueId", "userId", state) values ($1, $2, 'doc')`, [iid, alice])
     await pool.query(`insert into issue_members ("issueId", "userId", "memberId") values ($1, $2, $3)`, [bobIssue, bob, alice])
     await pool.query(`insert into mikka_team_issues ("issueId", "teamId", "workspaceId", "userId") values ($1, $2, $3, $4)`, [teamIssue, team, shared, alice])
@@ -301,7 +303,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from workspace_deletions where id = $1', [shared])).rowCount, 0)
     assert.equal((await pool.query('select 1 from bots where id = $1', [formerBot])).rowCount, 0)
     // The shared workspace keeps its own rows, and her team bot stays there without an owner (「待接管」).
-    assert.deepEqual(await keyedBy(shared), ['bots', 'conversations', 'hosted_allowances', 'workspace_e2b_keys', 'workspace_secrets', 'workspace_settings'])
+    assert.deepEqual(await keyedBy(shared), ['agent_runs', 'artifacts', 'bots', 'conversations', 'hosted_allowances', 'issues', 'workspace_e2b_keys', 'workspace_secrets', 'workspace_settings'])
     // Bob's own things are untouched.
     assert.equal((await pool.query('select 1 from issues where id = $1', [bobIssue])).rowCount, 1)
     assert.equal((await pool.query('select 1 from "user" where id = $1', [bob])).rowCount, 1)
