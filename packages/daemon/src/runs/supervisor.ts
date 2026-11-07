@@ -1564,7 +1564,7 @@ export class RunSupervisor {
       // In memory only: the adapter hands it to the run's CLI environment.
       credential: assignment.modelCredential,
     }
-    const prewarm = this.deps.prepareSubscription && assignment.harness === 'claude_code'
+    const prewarm = this.deps.prepareSubscription && ['claude_code', 'codex'].includes(assignment.harness)
       && assignment.subscriptionBinding && assignment.subscriptionLease && !assignment.modelCredential
       && !entry.sessionId && !entry.worktree && !assignment.continuesRunId && !assignment.resumeSessionId
       && !assignment.requireSessionResume && !assignment.resumeFrom

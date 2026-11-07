@@ -493,3 +493,30 @@ bootstrap sidecar，因此不能证明新的匿名采用及环境 OAuth 来源�
 本轮各切片、合成检查和预算边界见
 [候选证据索引](../research/2026-11-07-e2b-startup-overlap-candidate.json)。
 这些实现与本地结果均未被记作五秒达标；生产未通过前 #1505 保持打开。
+
+### 0479675 后继本地候选：Codex 初始化与凭据批次
+
+本候选以已合并的 `0479675e188efeac341b207d8616c4d7b9d4ee23` 为基底，
+合成尚未发布的 Codex 匿名初始化与凭据准备五写批次。基底已合并不代表线上已包含
+这些后继改动。原版 Claude、Codex、desktop 文件保全、fresh receipt、双真实订阅
+及同源发布元组门槛全部保留，没有新的模板快照内 native session 或已分配 VM 池。
+
+新建、从未领取任务的 Codex 实例只在接受 bootstrap 后创建独立原版进程，
+匿名阶段发送 `initialize` / `initialized`，不登录、不建 thread、不发送用户输入。
+随后必须经过原 fresh claim、lease、policy、真实 checkout 与完整配置资格检查，
+才允许一次采用并执行原有 login 和任务流程。正常 HOME 和真实 Git worktree 不变；
+项目配置、版本或绑定不适用时先排空，再走原启动路径。详细边界见
+[1800 决策](2026-11-06-1800-machine-is-the-execution-boundary.md#bootstrap-time-anonymous-codex-initialization)。
+
+凭据准备只把同一事务内原五条 DML 的传输合为一条 PostgreSQL simple-query
+消息，仍执行五条有序语句及后续 fresh rebind；不把一次往返写成一次 SQL。
+精确新凭据时钟仍来自最后 INSERT 的 `clock_timestamp()`。本地协议量正常样本
+从 1788 B 降为 1466 B（−322 B，不含 TCP/TLS/建连）；高膨胀值保留原参数绑定
+路径。早期 SQL 失败可能多发送尚未执行的后续文本，首错截断与整笔回滚保持，
+实际错误前缀账单独保留。
+
+[本候选紧凑证据索引](../research/2026-11-07-codex-initialize-five-write-candidate.json)
+区分原固定提交的验证、合成后的交叉验证和未完成的生产证明。既有 0.166.0
+匿名协议控制没有账号、thread 或 turn 请求；它与本地数据库/类型结果都不能
+替代新候选的真实订阅采用或 dispatch→ACK 五秒成绩。本候选没有新增生产样本，
+没有把协议字节节省计作 ready-pool 已获预算。

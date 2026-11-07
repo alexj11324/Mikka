@@ -506,12 +506,13 @@ test('startup intervals retain only closed fields and reject foreign run data or
   }
 })
 
-for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(source + ' keeps its actual earlier origin and requires both real initialization boundaries', () => {
-  const runId = id(98), late = { ...startupTiming(runId, 'claude_code'), phases: [] }
+for (const source of ['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize']) test(source + ' keeps its actual earlier origin and requires both real initialization boundaries', () => {
+  const harness = source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code'
+  const runId = id(98), late = { ...startupTiming(runId, harness), phases: [] }
   const early = { ...late, source, ...(source === 'bootstrap_claude_start' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}), startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
     phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
       { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
-  const record = { runIdHash: late.runIdHash, harness: 'claude_code' }, item = stage('agent_start', 3500)
+  const record = { runIdHash: late.runIdHash, harness }, item = stage('agent_start', 3500)
   item.chunk.data.startupTiming = late
   item.chunk.data.preparationTiming = { ...early, cwd: 'PRIVATE', phases: early.phases.map(phase => ({ ...phase, token: 'PRIVATE' })) }
   observeChunks(record, { chunks: [item] }, epoch + 4000)
@@ -523,26 +524,27 @@ for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(so
   for (const preparation of [...(source === 'bootstrap_claude_start' ? [{ ...early, claimAuthentication: 'unverified' }, { ...early, claimAuthentication: undefined }, { ...early, observedAuthSource: 'unknown' }, { ...early, observedAuthSource: undefined }] : []), { ...early, truncated: true }, { ...early, outcome: 'error' },
     { ...early, phases: [early.phases[0]] }, { ...early, phases: [early.phases[1]] },
     { ...early, phases: [{ ...early.phases[0], outcome: 'error' }, early.phases[1]] }]) {
-    const failed = { runIdHash: late.runIdHash, harness: 'claude_code' }
+    const failed = { runIdHash: late.runIdHash, harness }
     item.chunk.data.preparationTiming = preparation
     observeChunks(failed, { chunks: [item] }, epoch + 4000)
     assert.equal(hasStartupInitialization(failed), false)
   }
 })
 
-for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(source + ' invalid evidence cannot hide behind an otherwise valid ordinary initialization', () => {
-  const late = startupTiming(id(97), 'claude_code')
+for (const source of ['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize']) test(source + ' invalid evidence cannot hide behind an otherwise valid ordinary initialization', () => {
+  const harness = source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code'
+  const late = startupTiming(id(97), harness)
   const early = { ...late, source, ...(source === 'bootstrap_claude_start' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}), startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
     phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
       { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
-  const invalid = [{ ...early, source: 'unknown' }, { ...early, runIdHash: '0'.repeat(16) }, { ...early, harness: 'codex' },
+  const invalid = [{ ...early, source: 'unknown' }, { ...early, runIdHash: '0'.repeat(16) }, { ...early, harness: harness === 'codex' ? 'claude_code' : 'codex' },
     { ...early, startedAt: late.startedAt + 1 }, { ...early, endedAt: late.endedAt + 1 },
     { ...early, phases: [{ ...early.phases[0], startMs: -1 }] },
     { ...early, phases: [{ ...early.phases[0], endMs: early.ms + 1 }] },
     { ...early, phases: [{ ...early.phases[0], name: 'daemon.adapter.PRIVATE' }] },
     { ...early, phases: Array.from({ length: 65 }, () => early.phases[0]) }]
   for (const value of invalid) {
-    const record = { runIdHash: late.runIdHash, harness: 'claude_code' }, item = stage('agent_start', 3500)
+    const record = { runIdHash: late.runIdHash, harness }, item = stage('agent_start', 3500)
     item.chunk.data.startupTiming = late; item.chunk.data.preparationTiming = value
     observeChunks(record, { chunks: [item] }, epoch + 4000)
     assert.equal(record.startupTimingStatus, 'complete')

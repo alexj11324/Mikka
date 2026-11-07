@@ -1,3 +1,4 @@
+import type { AnonymousCodexCandidate } from './anonymous-codex-spare'
 import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
 import { captureRunFailure } from "@mikka/protocol/run-failure"
 import { coordinatorCapable } from "./coordinator/runner"
@@ -159,7 +160,7 @@ export interface DaemonOptions {
   /** One-use control-plane locator; the existing registered claim still authorizes it. */
   initialRunId?: string
   /** Trusted one-use bootstrap optimization; fresh claim still grants authority. */
-  anonymousClaudeCandidate?: AnonymousClaudeCandidate
+  anonymousClaudeCandidate?: AnonymousClaudeCandidate; anonymousCodexCandidate?: AnonymousCodexCandidate
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
   /** Trusted acceptance launcher only; opt in to persisted run/CLI diagnostics. */
@@ -447,7 +448,7 @@ export class Daemon {
           journal: this.journal,
           binaries: this.options.harnessBinaries,
           collectCliTiming: this.options.collectCliTiming,
-          anonymousClaudeCandidate: this.options.anonymousClaudeCandidate,
+          anonymousClaudeCandidate: this.options.anonymousClaudeCandidate, anonymousCodexCandidate: this.options.anonymousCodexCandidate,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
           computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
           // The cloud machine's own probe decides which subscription models a run may use here.
@@ -1914,7 +1915,7 @@ export class Daemon {
 
   private async stopInternal() {
     this.stopped = true
-    const anonymousClosing = this.options.anonymousClaudeCandidate?.close()
+    const anonymousClosing = Promise.all([this.options.anonymousClaudeCandidate?.close(), this.options.anonymousCodexCandidate?.close()])
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
     await this.maintenance

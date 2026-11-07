@@ -377,7 +377,8 @@ function readStartupTiming(value, record, names = STARTUP_PHASES) {
 }
 
 function readPreparationTiming(value, record, stage) {
-  if (!['prepared_agent_start', 'bootstrap_claude_start'].includes(value?.source) || value.harness !== 'claude_code' || !stage) return null
+  if (!['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize'].includes(value?.source) ||
+    value.harness !== (value.source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code') || !stage) return null
   const timing = readStartupTiming(value, record, PREPARATION_PHASES)
   // The task-owned Promise starts before the stage joins it and settles before
   // that join returns. Never rebase its earlier intervals onto the stage root.
