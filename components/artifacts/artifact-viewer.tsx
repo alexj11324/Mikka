@@ -128,7 +128,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   const readFailedMessage = t('loadError'), retryLabel = t('retry')
   useEffect(() => {
     const id = `artifact-read-error:${artifactId}:${version}`
-    if (backgroundFailed) toast.error(readFailedMessage, { id, duration: Infinity, action: { label: retryLabel, onClick: retry } })
+    if (backgroundFailed) toast.error(readFailedMessage, { id, duration: Infinity, action: { label: retryLabel, onClick: event => { event.preventDefault(); retry() } } })
     else toast.dismiss(id)
     return () => { toast.dismiss(id) }
   }, [backgroundFailed, artifactId, version, readFailedMessage, retryLabel, retry])

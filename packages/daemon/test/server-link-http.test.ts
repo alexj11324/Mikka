@@ -88,6 +88,40 @@ const assignment = (runId: string) => ({
 })
 
 describe("HttpServerLink", () => {
+  it('returns the authoritative checkpoint receipt through the authenticated upload', async () => {
+    const checkpoint = { baseCommit: 'a'.repeat(40), patch: 'H4sIAAAAAAAAAwMAAAAAAAAAAAA=', files: 0, takenAt: '2099-01-01T00:00:00.000Z' }
+    const receipt = { runId: 'run-1', takenAt: '2026-01-02T03:04:05.678Z' }
+    const { fetch, calls } = scripted(call => call.path.endsWith('/register')
+      ? json({ deviceId: 'dev-1', workspaceId: crypto.randomUUID() }, 201)
+      : json(receipt))
+    const link = new HttpServerLink('http://server.test', fetch)
+    await link.registerDevice('fixture-checkpoint-device', INFO)
+    expect(await link.checkpointRun('run-1', checkpoint)).toEqual(receipt)
+    expect(calls[1]).toMatchObject({ method: 'POST', path: '/v1/runs/run-1/checkpoint',
+      auth: 'Bearer fixture-checkpoint-device', body: checkpoint })
+    expect(checkpoint.takenAt).toBe('2099-01-01T00:00:00.000Z')
+  })
+
+  it('keeps a legacy checkpoint 204 compatible without inventing a snapshot receipt', async () => {
+    const checkpoint = { baseCommit: 'a'.repeat(40), patch: '', files: 0, takenAt: '2099-01-01T00:00:00.000Z' }
+    const { fetch, calls } = scripted(() => new Response(null, { status: 204 }))
+    expect(await new HttpServerLink('http://server.test', fetch).checkpointRun('run-1', checkpoint)).toBeUndefined()
+    expect(calls).toHaveLength(1)
+  })
+
+  it.each([
+    ['another run', { runId: 'other-run', takenAt: '2026-01-02T03:04:05.678Z' }],
+    ['missing server time', { runId: 'run-1' }],
+    ['invalid server time', { runId: 'run-1', takenAt: 'not-a-time' }],
+    ['noncanonical server time', { runId: 'run-1', takenAt: '2026-01-02T03:04:05.678+00:00' }],
+    ['unknown fields', { runId: 'run-1', takenAt: '2026-01-02T03:04:05.678Z', unverified: true }],
+  ] as const)('rejects a checkpoint response with %s', async (_reason, receipt) => {
+    const checkpoint = { baseCommit: 'a'.repeat(40), patch: '', files: 0, takenAt: '2099-01-01T00:00:00.000Z' }
+    const { fetch, calls } = scripted(() => json(receipt))
+    await expect(new HttpServerLink('http://server.test', fetch).checkpointRun('run-1', checkpoint)).rejects.toThrow()
+    expect(calls).toHaveLength(1)
+  })
+
   it('advertises strict local-worktree continuation and preserves the required assignment', async () => {
     const fetcher = (async (_url, init) => {
       expect(new Headers(init?.headers).get(RECOVERY_WORKTREE_HEADER)).toBe('1')

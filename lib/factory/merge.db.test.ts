@@ -385,6 +385,146 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       assert.equal(x.github.calls.length, 0);
     });
 
+    await t.test('a pending PR parks its terminal producer; merged delivery completes and refreshes it without waking compute', async () => {
+      // Real PG, lifecycle/park and merge writers; only provider I/O and live
+      // transport are fixtures. Signature admission has its own route tests.
+      await pool.query(`
+        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid;
+        ALTER TABLE run_publications ADD COLUMN "issueId" uuid, ADD COLUMN "updatedAt" timestamptz DEFAULT now();
+        CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
+        CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"revokedAt" timestamptz);
+        CREATE TABLE suggestion_executions ("runId" uuid,status text,"endedAt" timestamptz);
+        CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"issueId" uuid,
+          "sandboxId" text,state text,"deviceId" uuid,epoch integer NOT NULL DEFAULT 1,"operationId" uuid,
+          "workerLeaseId" uuid,"workerLeaseUntil" timestamptz,"lastActiveAt" timestamptz NOT NULL DEFAULT now(),
+          "runningSince" timestamptz,"computeSeconds" bigint NOT NULL DEFAULT 0,
+          "lifecycleAt" timestamptz DEFAULT now(),lifecycle jsonb NOT NULL DEFAULT '{}');
+        CREATE TABLE IF NOT EXISTS mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
+        CREATE TABLE IF NOT EXISTS mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
+        CREATE TABLE IF NOT EXISTS mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
+        CREATE TABLE IF NOT EXISTS workspace_projects (id uuid PRIMARY KEY,"userId" text,"issueIds" jsonb NOT NULL DEFAULT '[]');
+        CREATE TABLE IF NOT EXISTS mikka_team_projects ("projectId" uuid,"workspaceId" uuid,PRIMARY KEY("projectId","workspaceId"));
+      `);
+      for (const name of ['20261025013400_run_checkpoints.sql', '20261031002607_checkpoint_recovery_availability.sql'])
+        await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'));
+      const x = await prepared();
+      const { rows: [producer] } = await pool.query('SELECT "runId" FROM factory_attempts WHERE "taskId"=$1 AND stage=\'execute\'', [x.task.id]);
+      const runId = producer.runId as string, deviceId = randomUUID(), tokenId = randomUUID(), sandboxId = `fixture-pr-${runId}`;
+      const { rows: [home] } = await pool.query('SELECT id FROM mikka_workspaces WHERE "userId"=$1 AND kind=\'personal\' LIMIT 1', [actor.userId]);
+      const workspaceId = home?.id ?? randomUUID(), machineActor = { userId: actor.userId, workspaceId };
+      if (!home) {
+        await pool.query('INSERT INTO mikka_workspaces VALUES ($1,$2,\'personal\')', [workspaceId, actor.userId]);
+        await pool.query('INSERT INTO mikka_workspace_members VALUES ($1,$2,\'active\')', [workspaceId, actor.userId]);
+      }
+      await pool.query('UPDATE issues SET status=\'review\' WHERE id=$1', [x.task.issueId]);
+      await pool.query('UPDATE factory_candidates SET "runId"=$2 WHERE id=$1', [x.task.candidateId, runId]);
+      await pool.query('UPDATE run_publications SET "runId"=$2,"issueId"=$3 WHERE "pullRequest"->>\'url\'=$1', [x.pr, runId, x.task.issueId]);
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2,report=report||'{"safePoint":{"session":"exited","checkpoint":"unavailable"}}' WHERE id=$1`, [runId, deviceId]);
+      await pool.query('INSERT INTO device_tokens VALUES ($1,$2,NULL)', [tokenId, deviceId]);
+      await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId","issueId","sandboxId",state,"deviceId","runningSince")
+        VALUES ($1,$2,$3,$4,$5,'running',$6,now()-interval '1 minute')`, [runId, actor.userId, workspaceId, x.task.issueId, sandboxId, deviceId]);
+      const runs = async () => (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [x.task.issueId])).rows;
+      const machine = async () => (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+      const beforeRuns = await runs(), pending: (() => Promise<void>)[] = [];
+      const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = [];
+      const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET };
+      const { reconcileThreadMachine } = await import('../cloud-computer/thread-lifecycle');
+      const { parkThreadMachine, threadMachineProvider } = await import('../cloud-computer/thread-machines');
+      const { factoryAutomaticRuntime } = await import('./automatic-dispatch');
+      const notify = await import('../live/notify'), requestScope = await import('../db/request-scope'), workspace = await import('../workspace-db');
+      const calls = { pause: 0, connect: 0, create: 0, start: 0, enqueue: 0, kill: 0, keepAlive: 0 };
+      const forbidden = (kind: Exclude<keyof typeof calls, 'pause'>) => async () => { calls[kind]++; assert.fail(`unexpected ${kind} during PR wait`); };
+      const methods = [
+        mock.method(threadMachineProvider, 'connect', forbidden('connect')),
+        mock.method(threadMachineProvider, 'create', forbidden('create')),
+        mock.method(threadMachineProvider, 'kill', forbidden('kill')),
+        mock.method(factoryAutomaticRuntime, 'start', forbidden('start')),
+        mock.method(factoryAutomaticRuntime, 'enqueue', forbidden('enqueue')),
+      ];
+      const mocks = [
+        mock.module(new URL('../live/notify.ts', import.meta.url).href, { namedExports: { ...notify,
+          scheduleLive: (work: () => Promise<void>) => { pending.push(work); },
+          sendLiveInvalidations: async (scope: LiveScope, events: LiveInvalidation[]) => { sent.push({ scope, events }); },
+        } }),
+        mock.module(new URL('../db/request-scope.ts', import.meta.url).href, { namedExports: { ...requestScope, pool } }),
+        mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { ...workspace, workspacePool: pool } }),
+      ];
+      observePoolCommits(pool);
+      let providerState: 'running' | 'paused' = 'running';
+      const dependencies: NonNullable<Parameters<typeof reconcileThreadMachine>[3]> = {
+        provider: { info: async id => { assert.equal(id, sandboxId); return { state: providerState, endAt: null }; }, keepAlive: forbidden('keepAlive') },
+        park: (database, owner, id, fence) => parkThreadMachine(database, owner, id,
+          async vm => { assert.equal(vm, sandboxId); calls.pause++; providerState = 'paused'; }, async () => null, undefined, fence),
+        end: forbidden('kill'), stop: async () => { assert.fail('terminal PR wait cannot request a new stop'); },
+        recover: async () => { assert.fail('terminal PR wait cannot recover a run'); },
+      };
+      const reconcile = () => reconcileThreadMachine(pool, machineActor, runId, dependencies);
+      const drain = async () => { await Promise.all(pending.splice(0).map(work => work())); };
+      try {
+        delete process.env.DEVICE_GATEWAY_URL; delete process.env.DEVICE_GATEWAY_PUSH_SECRET;
+        assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'pending' });
+        assert.equal(typeof await reconcile(), 'number');
+        const parked = await machine();
+        assert.equal(parked.state, 'paused'); assert.equal(providerState, 'paused');
+        assert.equal(parked.sandboxId, sandboxId); assert.equal(parked.lifecycle.reason, 'run_ended');
+        const assertPaused = async () => {
+          const current = await machine();
+          assert.deepEqual([current.sandboxId, current.deviceId, current.epoch, current.state],
+            [sandboxId, deviceId, parked.epoch, 'paused']);
+          assert.equal(current.runningSince, null);
+          assert.equal(current.lifecycle.owner, 'run-recovery');
+          assert.ok(current.lifecycleAt && new Date(current.lifecycleAt).getTime() > Date.now());
+        };
+        assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [tokenId])).rows[0].revokedAt);
+        assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'pending' });
+        assert.deepEqual(await runs(), beforeRuns);
+
+        process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid';
+        process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-pr-lifecycle-fixture';
+        const { refreshPublishedPullRequest } = await import('../github/publication-webhook');
+        const event = { url: x.pr, headSha: x.candidate.sha, mergeCommitSha: 'e'.repeat(40) };
+        const publication = { action: 'closed', repository: { full_name: 'alexj11324/Mikka' }, pull_request: {
+          number: Number(x.pr.split('/').at(-1)), html_url: x.pr, title: 'Controlled external PR', state: 'closed',
+          draft: false, merged_at: new Date().toISOString(),
+        } };
+        // The verified webhook uses this order: committed publication, then
+        // the locked Factory completion; no GitHub request or CLI is needed.
+        await refreshPublishedPullRequest('pull_request', publication, pool);
+        assert.equal((await pool.query('SELECT "pullRequest"->>\'state\' AS state FROM run_publications WHERE "runId"=$1', [runId])).rows[0].state, 'merged');
+        assert.deepEqual(await x.taskState(), { stage: 'approval', status: 'pending' });
+        await drain();
+        assert.ok(sent.some(value => value.events.some(event => event.kind === 'pull_request_status' && event.id === x.task.issueId)));
+        sent.length = 0;
+        assert.deepEqual(await x.merges.pullRequestMerged(event), { completed: 1 });
+        assert.deepEqual(await x.taskState(), { stage: 'publish', status: 'passed' });
+        assert.equal(sent.length, 0, 'the committed result precedes deferred live transport');
+        await drain();
+        assert.ok(sent.some(value => value.events.some(event => event.kind === 'factory_task' && event.id === x.task.id)));
+        assert.ok(sent.every(value => value.scope.ownerId === actor.userId && value.scope.workspaceId === workspaceId));
+        await reconcile();
+        // Recovery may advance closure observations and its deadline without
+        // waking compute or replacing this task's retained VM.
+        await assertPaused();
+        const factoryEvents = () => sent.flatMap(value => value.events).filter(event => event.kind === 'factory_task').length;
+        const delivered = factoryEvents(), receipts = await x.rows();
+        await refreshPublishedPullRequest('pull_request', publication, pool);
+        assert.deepEqual(await x.merges.pullRequestMerged(event), { completed: 0 });
+        await drain(); await reconcile();
+        // A repeated PR badge invalidation is harmless; no Factory completion,
+        // worker, native run or physical provider action is repeated.
+        assert.equal(factoryEvents(), delivered); assert.deepEqual(await x.rows(), receipts);
+        assert.deepEqual(await runs(), beforeRuns); await assertPaused();
+        assert.deepEqual(calls, { pause: 1, connect: 0, create: 0, start: 0, enqueue: 0, kill: 0, keepAlive: 0 });
+        assert.equal(x.github.calls.length, 0);
+      } finally {
+        pending.splice(0);
+        for (const method of methods.reverse()) method.mock.restore();
+        for (const mocked of mocks.reverse()) mocked.restore();
+        if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url;
+        if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret;
+      }
+    });
+
     await t.test("a code candidate cannot be approved into an unpublished state; HTTP refusals carry the PR", async () => {
       const x = await prepared();
       await assert.rejects(() => createFactoryApprovals(pool, f.authorize, f.store, [], { codeCandidatesMerge: true }).approve(actor, x.approval), (e) => e instanceof FactoryError && e.code === "factoryAcceptanceIsMerge");
