@@ -6,6 +6,11 @@ on:
     - cron: '*/15 * * * *'
   deployment_status:
   workflow_dispatch:
+    inputs:
+      audit_auth_sha:
+        description: Optional exact deployed main SHA for issue 1597/1600 safe authorization acceptance
+        required: false
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -18,6 +23,51 @@ env:
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
 
 jobs:
+  auth-audit:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.audit_auth_sha != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Check safe authorization probes and exact main driver before credentials
+        run: |
+          node --test scripts/acceptance/auth-audit-production.test.mjs
+          node --input-type=module -e "import { auditTarget } from './scripts/acceptance/auth-audit-production.mjs'; auditTarget(process.env)"
+        env:
+          APPLICATION_SHA: ${{ inputs.audit_auth_sha }}
+      - name: Read only the existing shared account through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          recursive: false
+          include-imports: false
+      - name: Check human sessions and read-only PAT workspace refusal
+        run: node scripts/acceptance/auth-audit-production.mjs
+        env:
+          APPLICATION_SHA: ${{ inputs.audit_auth_sha }}
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: production-auth-audit-${{ github.run_id }}
+          path: production-auth-audit-report/report.json
+          retention-days: 14
+
   smoke:
     # Only finished production deployments, plus the schedule and manual runs.
     if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
