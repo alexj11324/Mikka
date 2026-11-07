@@ -44,6 +44,21 @@ test('database failures do not silently use a different App and retain their cau
   assert.deepEqual(await readGitHubAppConfig({ query: absent, env }), githubAppEnvironmentConfig(env))
 })
 
+test('the official cloud App uses its deployment configuration without a self-hosted credential lookup', async () => {
+  let reads = 0
+  const query = { query: async () => { reads++; throw new Error('official App must not read self-hosted credentials') } } as unknown as GitHubAppQuery
+  assert.deepEqual(await readGitHubAppConfig({ query, env: { ...env, MIKKA_EDITION: 'cloud' } }), githubAppEnvironmentConfig(env))
+  assert.equal(reads, 0)
+})
+
+test('community still reads and selects its stored App ahead of environment credentials', async () => {
+  let reads = 0
+  const stored = sealGitHubAppConfig(credentials, env)
+  const query = { query: async () => { reads++; return { rows: [stored] } } } as unknown as GitHubAppQuery
+  assert.deepEqual(await readGitHubAppConfig({ query, env: { ...env, MIKKA_EDITION: 'community' } }), { source: 'database', ...credentials })
+  assert.equal(reads, 1)
+})
+
 test('sign-in uses the original OAuth client unless App sign-in is explicitly selected', async () => {
   assert.deepEqual(await githubSignInClient(env), { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET, enabled: true })
   assert.deepEqual(await githubSignInClient({}), { clientId: '', clientSecret: '', enabled: false })

@@ -215,10 +215,15 @@ def verify(manifest, e2b_finalization=None):
     if manifest.get('version') != 1 or not manifest.get('entries'):
         raise ValueError('official_manifest_invalid')
     before = manifest['entries']
-    try:
-        after = [entry(Path(row['path'])) for row in before]
-    except (FileNotFoundError, NotADirectoryError) as error:
-        raise RuntimeError('official_files_removed') from error
+    after = []
+    for row in before:
+        try:
+            after.append(entry(Path(row['path'])))
+        except (FileNotFoundError, NotADirectoryError) as error:
+            # Identify the protected entry, not arbitrary exception text or a
+            # symlink target outside the original manifest. Refusal is unchanged.
+            detail = json.dumps({'path': row['path']}, separators=(',', ':'))
+            raise RuntimeError('official_files_removed ' + detail) from error
     changed = [{'path': original['path'], 'kind': original['kind'], 'before': {key: original.get(key) for key in set(original) | set(current) if original.get(key) != current.get(key)},
                 'after': {key: current.get(key) for key in set(original) | set(current) if original.get(key) != current.get(key)}}
                for original, current in zip(before, after) if original != current]

@@ -36,7 +36,7 @@ dictionaries. No polling, focus refresh or background token-refresh timer.
 
 ## Copy
 
-Mikka 云 / Mikka Cloud; 个人账号 / Personal account; 服务器 / Server;
+Mikka 云服务 / Mikka Cloud; 个人账号 / Personal account; 服务器 / Server;
 已连接 / Connected; 未连接 / Not connected; 授权已撤销 / Authorization revoked;
 连接 Mikka 账号 / Connect Mikka account; 服务器密钥 / Server key;
 我的 Mikka 额度 / My Mikka credits; 团队 Mikka 额度 / Team Mikka credits.

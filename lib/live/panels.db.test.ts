@@ -268,11 +268,19 @@ test('panel notifications follow actual committed writes and persisted owner/wor
       await databasePool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='peer'`, [a])
     })
 
-    await t.test('Factory question-only writes notify once after commit, and a rolled-back settlement stays silent', async () => {
+    await t.test('Factory question-only writes notify once after commit, and a rolled-back settlement stays silent', async st => {
       const { createFactoryStore } = await import('../factory/store')
       const { createFactoryDispatch, factoryBinding } = await import('../factory/dispatch')
       const { factoryCheckIndependent } = await import('../factory/check-independence')
       const { createFactoryQuestions } = await import('../factory/questions/store')
+      const { coordinatorWakeTransport } = await import('../coordinator/wake-after-commit')
+      const previousWake = coordinatorWakeTransport.wake
+      const wakes: string[] = []
+      coordinatorWakeTransport.wake = async ownerId => { wakes.push(ownerId) }
+      st.after(() => {
+        if (previousWake === undefined) delete coordinatorWakeTransport.wake
+        else coordinatorWakeTransport.wake = previousWake
+      })
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = agentIds.get('owner')!
       await databasePool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
       await databasePool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
@@ -307,11 +315,12 @@ test('panel notifications follow actual committed writes and persisted owner/wor
         const reference = (await questions.read('owner', first.questionId)).reference
         const escalation = { reference, eventId: randomUUID(), reason: 'Context requires the owner' }
         assert.equal((await questions.escalate('owner', escalation)).status, 'waiting_user')
-        assert.equal(pending.length, 2, 'question escalation schedules Factory and project-map readers after commit')
+        assert.equal(pending.length, 3, 'question escalation schedules its inbox wake and Factory/project-map readers after commit')
         await questions.read('owner', first.questionId)
         await questions.escalate('owner', escalation)
-        assert.equal(pending.length, 2, 'reads and an idempotent replay add nothing')
+        assert.equal(pending.length, 3, 'reads and an idempotent replay add nothing')
         await drain()
+        assert.deepEqual(wakes.splice(0), ['owner'], 'the committed question wakes its owner once')
         assert.ok(sent.some(target => target.events.some(event => event.kind === 'factory_issue' && event.id === first.issueId)))
         sent.length = 0
         await databasePool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 minute' WHERE id=$1`, [first.questionId])

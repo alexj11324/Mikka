@@ -15,6 +15,9 @@ jobs:
   image:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      COMPOSE_FILE: docker-compose.yml:tests/self-hosted/compose.services.yml
+      COMPOSE_PROJECT_NAME: mikka-selfhost-ci
     permissions:
       contents: read
       packages: write
@@ -23,18 +26,45 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
+      - name: Verify disposable acceptance target guards and model fixture
+        run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
       - name: Build the public standalone application
         run: docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --tag mikka-self-hosted:check .
       - name: Start with an empty database and no Mikka credentials
         run: |
-          echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          echo "MIKKA_IMAGE=mikka-self-hosted:check" >> "$GITHUB_ENV"
+          node --input-type=module <<'JS'
+          import { randomBytes } from 'node:crypto'
+          import { appendFileSync } from 'node:fs'
+          for (const [name, value] of Object.entries({ POSTGRES_PASSWORD: randomBytes(24).toString('hex'), SELF_HOSTED_FIXTURE_KEY: randomBytes(32).toString('base64') })) {
+            console.log(`::add-mask::${value}`)
+            appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`)
+          }
+          appendFileSync(process.env.GITHUB_ENV, 'MIKKA_IMAGE=mikka-self-hosted:check\n')
+          JS
+      - name: Build the pinned upstream MinIO fixture
+        run: docker compose build minio
       - name: Apply migrations and wait for health
         run: docker compose up --detach --wait --wait-timeout 240
       - name: Verify runtime edition, sign-in document, API and compiled assets
         run: node scripts/self-hosted-smoke.mjs
         env:
           MIKKA_EXPECTED_REVISION: ${{ github.sha }}
+      - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
+        timeout-minutes: 10
+        run: docker compose exec -T app node scripts/acceptance/self-hosted-services.mjs
+      - name: Retain secret-free application acceptance evidence
+        if: always()
+        run: |
+          mkdir -p .artifacts/self-hosted
+          docker compose cp app:/data/self-hosted-services-evidence.json .artifacts/self-hosted/evidence.json || true
+      - name: Upload isolated acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: self-hosted-services-${{ github.sha }}
+          path: .artifacts/self-hosted/evidence.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Verify the same persistent installation restarts
         run: |
           docker compose restart app

@@ -61,7 +61,7 @@ export function CloudSettings({ personal = false, userKey, workspaceId }: { pers
     </SettingRow>
     {personal ? <>
       {connected && <SettingRow title={t('billing')}><span>{t('personalBilling')}</span></SettingRow>}
-      {!connected && data.team.connected && <SettingRow title={t('billing')}><span>{t('teamBilling')}</span></SettingRow>}
+      {!connected && !data.personal.revoked && data.team.connected && <SettingRow title={t('billing')}><span>{t('teamBilling')}</span></SettingRow>}
       {!connected && data.registered && <SettingRow title={t('services')}><div className="flex flex-wrap gap-4">
         {AVAILABLE_CLOUD_SCOPES.map(scope => <Label key={scope} className="flex items-center gap-2">
           <Checkbox checked={scopes.includes(scope)} disabled={pending} onCheckedChange={checked => setScopes(current => checked ? [...current, scope] : current.filter(item => item !== scope))} />
@@ -69,8 +69,8 @@ export function CloudSettings({ personal = false, userKey, workspaceId }: { pers
         </Label>)}
       </div></SettingRow>}
       <SettingRow title={t('account')}>
-        {connected ? <Button variant="outline" size="sm" disabled={pending} onClick={() => void write('disconnect', { action: 'personal' })}>{t('disconnect')}</Button>
-          : <Button size="sm" disabled={pending || !data.registered || !scopes.length} onClick={() => void write('connect', { action: 'bind', scopes })}>{t('connectAccount')}</Button>}
+        {(connected || data.personal.revoked) && <Button variant="outline" size="sm" disabled={pending} onClick={() => void write('disconnect', { action: 'personal' })}>{t('disconnect')}</Button>}
+        {!connected && <Button size="sm" disabled={pending || !data.registered || !scopes.length} onClick={() => void write('connect', { action: 'bind', scopes })}>{t('connectAccount')}</Button>}
       </SettingRow>
       {!data.registered && <SettingRow title={t('server')}><span>{t('administratorRequired')}</span></SettingRow>}
     </> : <>

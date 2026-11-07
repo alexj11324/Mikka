@@ -51,6 +51,8 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 
 未配置该三项时，可以继续使用自己的 `AI_GATEWAY_API_KEY` 或原有 `ZEROCAT_BASE_URL` / `ZEROCAT_API_KEY` 路径。Coordinator 不再以运行在 Vercel 上作为社区版启用条件。云版继续保留固定 ZeroCat 路由、首 token 超时回退和现有计费。
 
+只连接个人 Claude / ChatGPT 订阅，或为 Bot 选择自己的 API Key，也可以聊天，不需要服务器默认模型和云连接。聊天启用、消息唤醒和原有后台重试都检查这个 Bot 的真实选项、工作区权限及当前连接状态。暂停、断开、旧版本绑定或已知耗尽的订阅不会启用聊天；过期的额度读数可提交下一次正式检查，执行前仍会重新验证。明确选择「Mikka 默认」时，不会因管理员未配置它就悄悄改用个人订阅。
+
 ## Decisions
 
 | 变量 | 默认值 / 用途 |
@@ -60,6 +62,8 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 | `DECISIONS_API_KEY` | 可选的专用 Bearer Key；自配地址未设置时使用自己的 `AI_GATEWAY_API_KEY`。 |
 
 默认 Gateway 地址仍支持现有 `AI_GATEWAY_API_KEY` 或 Vercel OIDC。自配地址不会收到 Vercel OIDC 令牌。没有可用凭据时 `decide()` 返回 `null`，保留既有降级行为。
+
+用户发来的消息仍直接投递到所选 Bot，原任务的正式完成结果也沿用原订阅处理，不要求先调用 Decisions。其他需要语义判断的后台事件会保持待处理，不会编造分类或额外要求用户批准。
 
 ## PostHog 与功能缺省值
 

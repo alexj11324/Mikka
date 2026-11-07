@@ -2,12 +2,14 @@ import 'server-only'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { secretsKey } from '@/lib/secrets/crypto'
+import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { GitHubAppSetupError, validateGitHubAppCredentials, type GitHubAppCredentials, type GitHubAppQuery } from './app-config'
 
 export const GITHUB_MANIFEST_COOKIE = 'mikka-github-app-manifest'
 export const GITHUB_MANIFEST_TTL_MS = 60 * 60_000
 export const GITHUB_MANIFEST_CALLBACK = withBasePath('/api/github/manifest/callback')
-export const GITHUB_MANIFEST_SETTINGS = withBasePath('/?section=plugins&app=github')
+const githubSettings = `${workspaceLink({ section: 'plugins' })}&app=github`
+export const GITHUB_MANIFEST_SETTINGS = withBasePath(githubSettings)
 const STATE = /^ghm_[A-Za-z0-9_-]{43}$/
 const ORG = /^[a-z\d](?:[a-z\d-]{0,37}[a-z\d])?$/i
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -23,7 +25,7 @@ export function githubAppManifest({ origin, serverName, template, basePath = BAS
     name: `Mikka (${name})`, url: url('/'),
     redirect_url: url('/api/github/manifest/callback'),
     hook_attributes: { url: url('/api/webhooks/github'), active: true },
-    setup_url: url('/?section=plugins&app=github'),
+    setup_url: url(githubSettings),
     callback_urls: [url('/api/auth/callback/github')],
     public: false, default_permissions: { ...template.permissions }, default_events: [...template.events],
     request_oauth_on_install: false, setup_on_update: true,

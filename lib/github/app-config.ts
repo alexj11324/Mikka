@@ -2,6 +2,7 @@ import 'server-only'
 import { createPrivateKey } from 'node:crypto'
 import type { Pool } from 'pg'
 import { CodedError } from '@mikka/protocol/coded-error'
+import { isCloudEdition } from '@/lib/edition'
 import { openSecret, sealSecret, type Sealed } from '@/lib/secrets/crypto'
 import { githubAppEnvironmentConfig, type GitHubAppConfig, type GitHubAppCredentials } from './app-env'
 export type { GitHubAppConfig, GitHubAppCredentials } from './app-env'
@@ -45,6 +46,9 @@ export function sealGitHubAppConfig(credentials: GitHubAppCredentials, env: Read
 }
 
 export async function readGitHubAppConfig({ query, env = process.env }: Options = {}): Promise<GitHubAppConfig> {
+  // The official App keeps its deployment-owned credentials and zero-read
+  // webhook path. Community installations resolve their own stored App below.
+  if (isCloudEdition(env)) return githubAppEnvironmentConfig(env)
   const connection = query ?? (await import('@/lib/db')).pool
   let stored: Sealed | null
   try {

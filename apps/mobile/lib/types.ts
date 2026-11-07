@@ -88,7 +88,7 @@ export type ChatFailure =
   | { kind: 'hosted'; code: string }
   | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
   | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
-  | { kind: 'failed'; reason?: 'balance'; cloudCode?: CloudErrorCode }
+  | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
 
 /** Reactions on a message, by emoji (lib/reactions.ts on the server). */
 export interface Reaction { emoji: string; count: number; mine: boolean }

@@ -9,6 +9,7 @@ import * as deviceProtocol from '@mikka/protocol/device'
 import * as harnessProtocol from '@mikka/protocol/harness'
 import * as policySnapshotProtocol from '@mikka/protocol/policy-snapshot'
 import * as repositoryProtocol from '@mikka/protocol/repository'
+import * as subscriptionProtocol from '@mikka/protocol/subscription'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignment-policy'
 import { ModelAdmissionError } from '../model-admission/contract'
@@ -20,6 +21,7 @@ const fixtureEnv={MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA
 // Execute the actual route in memory, with its database/auth boundaries replaced.
 async function routeFixture(unavailable=false,stopped=false,modelDenied=false,issueDenied=false) {
   const calls:string[]=[]
+  const credentialChecks:string[]=[]
   const admissionScopes:string[]=[]
   const workspaceIds=['bot-workspace','task-workspace']
   const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',deviceTokenId:null as string|null,status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1,agentDefinition:undefined as {agentProfile?:unknown}|undefined}
@@ -52,6 +54,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@mikka/protocol/harness':harnessProtocol,
     '@mikka/protocol/daemon':daemonProtocol,
     '@mikka/protocol/repository':repositoryProtocol,
+    '@mikka/protocol/subscription':subscriptionProtocol,
     '@mikka/protocol/policy-snapshot':policySnapshotProtocol,
     '@/messages/zh-CN.json':{default:messages},
     // This legacy-capability fixture has no managed organization policy.
@@ -76,7 +79,10 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{assert.equal(issueDenied,true);calls.push('rejectPublication')}},
     '@/lib/run-publication-result':{PublicationError:class extends Error {}},
     // No linked GitHub account in this fixture: the claim attaches no GitHub credential endpoint.
-    '@/lib/github/repository-installation':{linkedGitHubAccountId:async()=>null},
+    '@/lib/github/machine-credential':{
+      githubMachineConfigured:async(userId:string)=>{assert.equal(userId,'owner');credentialChecks.push('configured');return false},
+      githubMachineCredential:async()=>{credentialChecks.push('credential');throw new Error('This benchmark fixture must not open GitHub credentials')},
+    },
     '@/lib/db':{db,pool:{},withDatabaseClient:async(_tx:unknown,fn:()=>Promise<unknown>)=>fn()},'@/lib/db/schema':{agentRuns:{},agents:{},deviceRepos:{}},
     '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]}),ownedDeviceWithReport:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
@@ -121,13 +127,13 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const exports:Record<string,unknown>={}
   runInNewContext(transpileModule(source,{compilerOptions:{module:ModuleKind.CommonJS}}).outputText,
     {exports,require:(name:string)=>{if(!Object.hasOwn(modules,name))throw Error(`Unexpected import ${name}`);return modules[name]},Response,URL,Date,process:{env:fixtureEnv}})
-  return {calls,admissionScopes,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
+  return {calls,credentialChecks,admissionScopes,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
 }
 
 const claimRequest=()=>new Request('https://fixture.invalid/v1/claim',{headers:{[deviceProtocol.REPO_ORIGIN_HEADER]:'1','x-mikka-skill-artifacts':'1'}})
 
 test('actual claim route resolves frozen benchmark exactly once after claim and receipt and overrides mutable config',async()=>{
-  const {post,calls,admissionScopes,benchmark,run}=await routeFixture()
+  const {post,calls,credentialChecks,admissionScopes,benchmark,run}=await routeFixture()
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,200)
   const assignment=await response.json()
@@ -141,42 +147,48 @@ test('actual claim route resolves frozen benchmark exactly once after claim and 
   assert.deepEqual(assignment.benchmark,benchmark.benchmark)
   assert.deepEqual(assignment.policy,benchmark.policy)
   assert.equal(run.deviceTokenId,'synthetic-device-token')
+  assert.deepEqual(credentialChecks,['configured'])
+  assert.equal(assignment.github,undefined)
 })
 
 test('actual claim route withholds all assignment bytes when frozen configuration becomes unavailable after claim',async()=>{
-  const {post,calls,run}=await routeFixture(true)
+  const {post,calls,credentialChecks,run}=await routeFixture(true)
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'runUnavailable'})
   assert.deepEqual(calls,['preflight','guard','claim','token','receipt','benchmark','block','listChanged','runEnded'])
   assert.equal(run.status,'failed')
+  assert.deepEqual(credentialChecks,[])
 })
 
 
 test('actual claim route refuses a stopped Factory before receipt, benchmark or token issuance',async()=>{
-  const {post,calls,run}=await routeFixture(false,true)
+  const {post,calls,credentialChecks,run}=await routeFixture(false,true)
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'Run is no longer queued for this device.'})
   assert.deepEqual(calls,['preflight','guard'])
   assert.equal(run.status,'queued')
+  assert.deepEqual(credentialChecks,[])
 })
 
 test('benchmark claim cannot bypass its task workspace model rule through the Bot namespace',async()=>{
-  const {post,calls,admissionScopes,run}=await routeFixture(false,false,true)
+  const {post,calls,credentialChecks,admissionScopes,run}=await routeFixture(false,false,true)
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(await response.json(),{error:'modelRouteDenied'})
   assert.deepEqual(admissionScopes,['bot-workspace','task-workspace'])
   assert.deepEqual(calls,['preflight'])
   assert.equal(run.status,'queued')
+  assert.deepEqual(credentialChecks,[])
 })
 
 
 test('task access denial withholds assignment and credentials before claim preparation',async()=>{
-  const {post,calls,run}=await routeFixture(false,false,false,true)
+  const {post,calls,credentialChecks,run}=await routeFixture(false,false,false,true)
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
   assert.deepEqual(calls,['rejectPublication','wakeScheduled'])
   assert.equal(run.status,'queued')
+  assert.deepEqual(credentialChecks,[])
 })

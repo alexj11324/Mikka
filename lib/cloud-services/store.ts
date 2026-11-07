@@ -94,9 +94,11 @@ export class CloudClientStore {
   }
 
   private async saveBinding(owner: string, userId: string | null, serverId: string, secret: BindingSecret, database: Database) {
+    const sealed = this.seal(secret, 'binding', `${serverId}:${owner}`)
     await database.query(`INSERT INTO cloud_service_bindings (owner,user_id,server_id,secret,scopes) VALUES ($1,$2,$3,$4,$5)
       ON CONFLICT (owner) DO UPDATE SET server_id=EXCLUDED.server_id,secret=EXCLUDED.secret,scopes=EXCLUDED.scopes,revoked=false,updated_at=now()`,
-    [owner, userId, serverId, this.seal(secret, 'binding', `${serverId}:${owner}`), secret.token?.scopes ?? []])
+    [owner, userId, serverId, sealed, secret.token?.scopes ?? []])
+    return sealed
   }
 
   async connectTeamKey(key: string) {
@@ -108,7 +110,7 @@ export class CloudClientStore {
     await this.saveBinding('server', null, registration.serverId, { serverKey: key, token }, this.pool)
   }
 
-  async access(userId: string, scope: CloudScope): Promise<{ token: CloudToken; registration: CloudRegistration; actor: string }> {
+  async access(userId: string, scope: CloudScope): Promise<{ token: CloudToken; registration: CloudRegistration; actor: string; binding: Pick<BindingRow, 'owner' | 'secret'> }> {
     return this.transaction(async client => {
       const registration = await this.registration(client); if (!registration) throw new CloudServiceError('cloud_not_connected')
       const { rows: [row] } = await client.query<BindingRow>(`SELECT owner,server_id,secret,scopes,revoked FROM cloud_service_bindings WHERE owner=ANY($1::text[]) ORDER BY CASE WHEN owner='server' THEN 1 ELSE 0 END LIMIT 1 FOR UPDATE`, [[`user:${userId}`, 'server']])
@@ -116,7 +118,7 @@ export class CloudClientStore {
       if (row.revoked || row.server_id !== registration.serverId) throw new CloudServiceError('cloud_server_revoked')
       if (!row.scopes.includes(scope)) throw new CloudServiceError('cloud_scope_missing')
       const secret = this.open<BindingSecret>(row.secret, 'binding', `${row.server_id}:${row.owner}`)
-      let token = secret.token
+      let token = secret.token, bindingSecret = row.secret
       if (!token || token.expiresAt <= Date.now() + 60_000) {
         const form = row.owner === 'server'
           ? new URLSearchParams({ grant_type: 'client_credentials', client_id: registration.serverId, client_secret: secret.serverKey ?? '' })
@@ -124,7 +126,7 @@ export class CloudClientStore {
         try {
           token = parseCloudToken(await cloudJson(registration.serviceUrl, '/oauth/token', form, this.send), registration.serverId)
           if (token.grantType !== (row.owner === 'server' ? 'server_key' : 'user') || token.scopes.some(item => !row.scopes.includes(item))) throw new CloudServiceError('cloud_unavailable', 'protocol')
-          await this.saveBinding(row.owner, row.owner === 'server' ? null : userId, registration.serverId, { ...secret, token }, client)
+          bindingSecret = await this.saveBinding(row.owner, row.owner === 'server' ? null : userId, registration.serverId, { ...secret, token }, client)
         } catch (error) {
           // A lost rotating-refresh response cannot safely be replayed. Keep
           // the row to prevent silently switching this person's billing to a team.
@@ -135,12 +137,12 @@ export class CloudClientStore {
         }
       }
       if (!token.scopes.includes(scope)) throw new CloudServiceError('cloud_scope_missing')
-      return { token, registration, actor: createHmac('sha256', registration.serverSecret).update(userId).digest('hex') }
+      return { token, registration, actor: createHmac('sha256', registration.serverSecret).update(userId).digest('hex'), binding: { owner: row.owner, secret: bindingSecret } }
     })
   }
 
   async request(userId: string, scope: CloudScope, path: string, init: RequestInit = {}): Promise<Response> {
-    const { token, registration, actor } = await this.access(userId, scope)
+    const { token, registration, actor, binding } = await this.access(userId, scope)
     const headers = new Headers(init.headers)
     headers.set('authorization', `Bearer ${token.accessToken}`); headers.set('X-Mikka-Actor', actor)
     let response: Response
@@ -149,7 +151,10 @@ export class CloudClientStore {
     if (!response.ok) {
       try { await readCloudJson(response) }
       catch (error) {
-        if (error instanceof CloudServiceError && error.code === 'cloud_server_revoked') await this.pool.query('UPDATE cloud_service_bindings SET revoked=true WHERE owner=$1', [token.grantType === 'user' ? `user:${userId}` : 'server'])
+        // A previous token's late response must not revoke a newer binding.
+        // Compare the exact encrypted snapshot used for this request, including
+        // any refresh committed by access(). No extra read or network request.
+        if (error instanceof CloudServiceError && error.code === 'cloud_server_revoked') await this.pool.query('UPDATE cloud_service_bindings SET revoked=true,updated_at=now() WHERE owner=$1 AND server_id=$2 AND secret=$3::jsonb', [binding.owner, registration.serverId, binding.secret])
         throw error
       }
       throw new CloudServiceError('cloud_unavailable', 'response')

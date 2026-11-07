@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { openPathInBrowser } from '@/lib/platform/open-settings'
 import { AppTile } from '@/components/plugins/connected-apps'
+import { dropQueryKeys, workspaceLink } from '@/components/workspace/workspace-navigation'
 
 const PATH = withBasePath('/api/github/manifest')
 const details = ['admin', 'origin', 'state', 'encryption', 'storage', 'configured', 'request', 'response', 'template'] as const
@@ -54,15 +55,13 @@ export function GitHubAppSettings({ userId }: { userId: string }) {
     const url = new URL(window.location.href)
     if (url.searchParams.get('create-github-app') === '1') {
       if (!data.configured && !data.error) setOpen(true)
-      url.searchParams.delete('create-github-app')
-      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+      dropQueryKeys('create-github-app')
     }
     const result = url.searchParams.get('github-app')
     if (!result) return
     if (result === 'created') toast.success(t('githubAppCreated'))
     else setProblem(detailOf(result))
-    url.searchParams.delete('github-app')
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    dropQueryKeys('github-app')
   }, [data, error, t, userId])
 
   async function create() {
@@ -88,7 +87,7 @@ export function GitHubAppSettings({ userId }: { userId: string }) {
   const begin = async () => {
     setProblem(null)
     try {
-      const handoff = await openPathInBrowser(withBasePath('/?section=plugins&app=github&create-github-app=1'))
+      const handoff = await openPathInBrowser(withBasePath(`${workspaceLink({ section: 'plugins' })}&app=github&create-github-app=1`))
       if (handoff === 'unsupported') setProblem('default')
       if (handoff === 'browser') setOpen(true)
     } catch { setProblem('default') }

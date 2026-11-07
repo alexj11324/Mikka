@@ -209,6 +209,8 @@ interface ActiveRun {
   /** The run's trace span; its outcome is the stop reason. */
   span?: SpanHandle
   mailbox?: RunMailbox
+  mailboxPreparing?: Promise<RunMailbox | undefined>
+  mailboxAbort?: AbortController
   mailboxClosing?: Promise<void>
   session: AgentSession | null
   /** The CLI has exited; its cancellation grace cannot cover host publication. */
@@ -391,10 +393,17 @@ export class RunSupervisor {
   }
 
   private closeMailbox(run: ActiveRun): Promise<void> {
-    if (!run.mailbox) return Promise.resolve()
+    if (!run.mailbox && !run.mailboxPreparing) return Promise.resolve()
     if (!run.mailboxClosing) {
-      try { run.mailboxClosing = run.mailbox.close() }
-      catch (error) { run.mailboxClosing = Promise.reject(error) }
+      if (run.mailboxPreparing) {
+        // Own a late handoff before closing it. Publish the drain before
+        // abort callbacks can re-enter; a failed preparation has no mailbox.
+        run.mailboxClosing = run.mailboxPreparing.then(() => run.mailbox?.close(), () => undefined)
+        run.mailboxAbort?.abort()
+      } else {
+        try { run.mailboxClosing = run.mailbox!.close() }
+        catch (error) { run.mailboxClosing = Promise.reject(error) }
+      }
     }
     return run.mailboxClosing
   }
@@ -1370,6 +1379,23 @@ export class RunSupervisor {
     }
 
     const preparationSignal = AbortSignal.any([this.stopController.signal, run.abort.signal])
+    const checkMailbox = () => {
+      const lease = this.leases.get(runId)
+      const current = this.deps.journal.get(runId)
+      assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
+    }
+    if (assignment.mcp?.mailbox === true && this.deps.prepareRunMailbox) {
+      const abort = run.mailboxAbort = new AbortController()
+      const signal = AbortSignal.any([preparationSignal, abort.signal])
+      // The authorized handshake does not use the checkout. Keep its tools
+      // behind the existing join below, while clone/setup runs concurrently.
+      run.mailboxPreparing = Promise.resolve()
+        .then(() => this.deps.prepareRunMailbox!(assignment, signal, checkMailbox))
+        .then(mailbox => { run.mailbox = mailbox; return mailbox })
+      // Clone may still be pending when the handshake fails. Its join keeps
+      // the original rejection; observe it now without an unhandled rejection.
+      void run.mailboxPreparing.catch(() => undefined)
+    }
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
     if (this.stopping || run.cancelRequested) {
@@ -1448,12 +1474,7 @@ export class RunSupervisor {
         throw new Error("Check assignment is missing its read-only policy")
       await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
     }
-    const checkMailbox = () => {
-      const lease = this.leases.get(runId)
-      const current = this.deps.journal.get(runId)
-      assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
-    }
-    let mailbox = await this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox)
+    let mailbox = await (run.mailboxPreparing ?? this.deps.prepareRunMailbox?.(assignment, run.abort.signal, checkMailbox))
     run.mailbox = mailbox
     // A STOP/lease transition may win the handshake's final Promise handoff.
     // Own the returned callback before refusing; never start a CLI first.

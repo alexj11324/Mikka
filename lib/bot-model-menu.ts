@@ -5,7 +5,7 @@ import { ActionFailureError } from "./action-error";
 import type { ExecutionSettings, ExecutionSettingsScope } from "./execution-settings";
 import { apiKeyChatBaseUrl } from "./model-api-key-providers";
 import { subscriptionAvailability } from "./subscription-quota";
-import { resolveBotModelChoice } from "./bot-model-choice";
+import { botModelPreference, resolveBotModelChoice } from "./bot-model-choice";
 import { isCloudEdition } from "./edition";
 import { defaultModelTarget } from "./default-model";
 
@@ -66,7 +66,7 @@ export async function botModelMenu(
     group.options.push({ id: row.bindingId, modelId: row.modelId, provider: row.provider });
   }
   // API keys and custom providers that reach bot chats (C22): the person's own, then teammates' shared ones.
-  const { usableApiKeys, botApiKeyChoice } = await import("./model-api-keys");
+  const { usableApiKeys } = await import("./model-api-keys");
   const keys = (await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).filter((key) => apiKeyChatBaseUrl(key) && key.models.length);
   const keyOptions = (key: (typeof keys)[number]) =>
     key.models.map((model) => ({ id: apiKeyOptionId(key.id, model), modelId: model, provider: key.provider }));
@@ -90,19 +90,8 @@ export async function botModelMenu(
       kind: "shared" as const, owner: ownerNames.get(key.ownerId)!, credentialLabel: keyLabel(key), options: keyOptions(key),
     })),
   ];
-  const keyChoice = await botApiKeyChoice(pool, scope, botId);
-
-  const row = (
-    await pool.query<{ bindingId: string | null }>(
-      'SELECT "bindingId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
-      [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
-    )
-  ).rows[0];
-  // A saved key has a null binding too; only a row without either is an
-  // explicit Mikka 默认 preference.
-  const selected = keyChoice ? undefined : row ? (row.bindingId ?? HOSTED_CHOICE) : undefined;
   const choice = await resolveBotModelChoice(pool, settings, scope, botId,
-    { selected, key: keyChoice }, { rows, keys, now });
+    await botModelPreference(pool, scope, botId), { rows, keys, now });
   const state = { chosen: choice.chosen, ...(choice.fallback ? { fallback: choice.fallback } : {}) };
   let current: BotModelCurrent;
   if (choice.kind === "hosted") {

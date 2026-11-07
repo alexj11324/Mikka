@@ -25,7 +25,7 @@ async function handleGET(request: Request) {
     .safeParse({ after: params.get('after'), cursor: params.get('cursor'), prefix: params.get('prefix') })
   if (params.has('after') && !cursor.success) return NextResponse.json({ error: 'validationGeneric' }, { status: 400 })
   const current = await chatStore.chatVersion(session.user.id, 200, botId)
-  const enabled = await coordinatorEnabled(session.user.id)
+  const enabled = await coordinatorEnabled(session.user.id, botId)
   const state = { ...current, working: enabled && current.working, enabled, botId }
   const etag = `"${createHash('sha256').update(JSON.stringify([session.user.id, botId, state])).digest('hex')}"`
   const headers = { 'Cache-Control': 'private, no-store', ETag: etag, Vary: 'Cookie, Authorization' }
@@ -58,7 +58,7 @@ async function handlePOST(request: Request) {
     throw error
   }
   afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
-  return NextResponse.json({ queued: true, enabled: await coordinatorEnabled(userId) }, { status: 202 })
+  return NextResponse.json({ queued: true, enabled: await coordinatorEnabled(userId, botId) }, { status: 202 })
 }
 
 export const GET = withRequestLog('/api/coordinator/messages', handleGET)

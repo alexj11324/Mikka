@@ -19,7 +19,7 @@ export type ChatFailure =
   | { kind: 'subscription'; notice: NonNullable<ReturnType<typeof subscriptionRefusal>> }
   | { kind: 'wake'; code: WakeCode }
   // Keep the existing discriminator readable by already-installed mobile clients.
-  | { kind: 'failed'; reason?: 'balance'; cloudCode?: CloudErrorCode }
+  | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
 
 export function chatFailure(chat: { working: boolean; error: string | null; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
   if (chat.working) return null
@@ -33,6 +33,7 @@ export function chatFailure(chat: { working: boolean; error: string | null; item
   if (notice) return { kind: 'subscription', notice }
   if (chat.error === 'wake_failed' || chat.error === 'wake_start_unconfirmed' || chat.error === 'wake_exhausted') return { kind: 'wake', code: chat.error }
   if (chatBalanceRefusal(chat.error)) return { kind: 'failed', reason: 'balance' }
+  if (chat.error === 'model_tool_unavailable') return { kind: 'failed', reason: 'tools' }
   return { kind: 'failed' }
 }
 
@@ -41,7 +42,7 @@ const TRANSIENT_HOSTED = new Set(['usage_in_progress', 'usage_concurrency_limit'
 /** Where a failure's words live in messages/*.json: the web line, Telegram and the phone all read this one key. */
 export type FailureMessageKey =
   | { namespace: 'Billing.refusal'; key: 'unavailable' | 'verificationRequiredPlain' | 'free_allowance_used' | 'points_exhausted' | 'platform_paused' }
-  | { namespace: 'Coordinator'; key: `subscriptionRefusal.${SubscriptionRefusalNotice}` | `wakeErrors.${WakeCode}` | 'failedTitle' | 'apiBalance' }
+  | { namespace: 'Coordinator'; key: `subscriptionRefusal.${SubscriptionRefusalNotice}` | `wakeErrors.${WakeCode}` | 'failedTitle' | 'apiBalance' | 'replyToolUnavailable' }
   | { namespace: 'RunErrors'; key: `${CloudErrorCode}.default` }
 
 export function failureMessageKey(failure: ChatFailure): FailureMessageKey {
@@ -50,6 +51,6 @@ export function failureMessageKey(failure: ChatFailure): FailureMessageKey {
       return { namespace: 'Billing.refusal', key: TRANSIENT_HOSTED.has(failure.code) ? 'unavailable' : failure.code === 'verification_required' ? 'verificationRequiredPlain' : failure.code as 'free_allowance_used' | 'points_exhausted' | 'platform_paused' }
     case 'subscription': return { namespace: 'Coordinator', key: `subscriptionRefusal.${failure.notice}` }
     case 'wake': return { namespace: 'Coordinator', key: `wakeErrors.${failure.code}` }
-    default: return failure.cloudCode ? { namespace: 'RunErrors', key: `${failure.cloudCode}.default` } : { namespace: 'Coordinator', key: failure.reason === 'balance' ? 'apiBalance' : 'failedTitle' }
+    default: return failure.cloudCode ? { namespace: 'RunErrors', key: `${failure.cloudCode}.default` } : { namespace: 'Coordinator', key: failure.reason === 'balance' ? 'apiBalance' : failure.reason === 'tools' ? 'replyToolUnavailable' : 'failedTitle' }
   }
 }

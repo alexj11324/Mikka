@@ -20,7 +20,7 @@ import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
-import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
+import { nativeBrokerContextSchema, nativeLeaseSchema, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
 import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCaptureResponse, type CaptureUploadRequest, type CaptureUploadResponse, type ScreenCaptureRequest } from '@mikka/protocol/capture'
 
@@ -295,6 +295,7 @@ export class HttpServerLink implements ServerLink {
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
           [RUN_CREDENTIALS_HEADER]: '1',
+          [SUBSCRIPTION_MODEL_CATALOGUE_HEADER]: '1',
           [MAILBOX_NOTICE_HEADER]: '1',
           ...daemonTracer.headers(),
           ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -431,8 +432,8 @@ export class HttpServerLink implements ServerLink {
       schema: runAssignmentSchema.shape.localComputer.unwrap(),
     })
   }
-  async nativeContext(deviceId:string,runId:string,signal?:AbortSignal) {
-    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context'},schema:nativeBrokerContextSchema,signal})
+  async nativeContext(deviceId:string,runId:string,signal?:AbortSignal,requireModelCatalogue?:boolean) {
+    return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription`, {body:{action:'context',...(requireModelCatalogue ? {requireModelCatalogue:true} : {})},schema:nativeBrokerContextSchema,signal})
   }
   async nativeLease(deviceId:string,runId:string,signal?:AbortSignal) {
     return this.call('POST', `${devicePaths.claim(checkId(deviceId),checkId(runId)).replace(/\/claim$/, '')}/subscription-lease`, {schema:nativeLeaseSchema,signal})

@@ -76,6 +76,23 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     return { id, agents }
   }
 
+  await t.test('local Claude uses the exact account catalogue only with a capable daemon and current epoch', async () => {
+    const scope = await person('order-account-catalogue')
+    const own = await subscribe(scope, 'claude', ['claude-sonnet-5-5', 'claude-sonnet-5'])
+    const other = await person('order-other-catalogue')
+    const foreign = await subscribe(other, 'claude', ['claude-sonnet-5'])
+    const local = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, models: ['sonnet'], subscriptionModelCatalogue: true }])
+    const { deviceSupport } = await import('../lib/model-order-plan')
+    const entry = { id: 'historical', harness: 'claude_code' as const, model: 'claude-sonnet-5', source: { kind: 'subscription' as const, connectionId: own } }
+    let report = (await order.poolDevices(pool, scope.ownerId)).find(row => row.id === local.id)!
+    assert.equal(deviceSupport(report, entry), 'ready')
+    assert.equal(deviceSupport(report, { ...entry, source: { kind: 'subscription', connectionId: foreign } }), 'modelNotReported')
+    assert.equal(deviceSupport({ ...report, harnesses: report.harnesses.map(info => ({ ...info, subscriptionModelCatalogue: undefined })) }, entry), 'needsUpdate')
+    await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [own])
+    report = (await order.poolDevices(pool, scope.ownerId)).find(row => row.id === local.id)!
+    assert.equal(deviceSupport(report, entry), 'modelNotReported', 'stale catalogue evidence grants nothing')
+  })
+
   await t.test('a new binding can dispatch before Settings is opened: probe null/stale quota once, and keep paid keys out after a failed check', async () => {
     const scope = await person('order-first-dispatch')
     const ctx = { ...scope, botId: null }
@@ -367,7 +384,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await device(scope.ownerId, [{ harness: 'codex', installed: true }], true, { name: 'Linux box' })
     assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'notInstalled', device: 'Linux box', count: 1 } })
     const old = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, subscriptionBroker: false }], true, { name: 'Old Mac' })
-    assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'needsUpdate', device: 'Old Mac', count: 1 } })
+    assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'needsUpdate', device: 'Old Mac', count: 1, modelEvidence: 'unknown' } })
     const card = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([card.kind === 'none' && card.reason, card.kind === 'none' && card.card.description], ['noDevice', 'Old Mac 的 Mikka 需要更新'])
     // Claude Code reporting other models, and one from before the model probe: neither runs it.
