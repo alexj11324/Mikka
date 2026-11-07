@@ -40,7 +40,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   const stranger = { ...alice, workspaceId: randomUUID() }
   try {
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY);INSERT INTO "user" VALUES('alice'),('bob');
-      CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,"botId" uuid,"agentDefinition" jsonb,status text,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
+      CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,"botId" uuid,"agentDefinition" jsonb,status text,report jsonb,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
       CREATE TABLE agents(id uuid PRIMARY KEY,"userId" text NOT NULL,harness text NOT NULL);
       CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text,kind text,enabled boolean DEFAULT true,"removedAt" timestamptz);
       CREATE TABLE device_tokens("boundDeviceId" uuid,"revokedAt" timestamptz);
@@ -59,6 +59,8 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await pool.query(migration); await pool.query(migration)
     const computeMigration = await readFile(new URL('../../drizzle/20261029213935_thread_machine_compute_seconds.sql', import.meta.url), 'utf8')
     await pool.query(computeMigration); await pool.query(computeMigration)
+    const lifecycleMigration = await readFile(new URL('../../drizzle/20261107120000_thread_machine_lifecycle.sql', import.meta.url), 'utf8')
+    await pool.query(lifecycleMigration); await pool.query(lifecycleMigration)
     await pool.query(`ALTER TABLE suggestions ADD COLUMN "userId" text, ADD COLUMN shown boolean DEFAULT true, ADD COLUMN "dismissedAt" timestamptz, ADD COLUMN source text, ADD COLUMN actor text, ADD COLUMN url text, ADD COLUMN title text, ADD COLUMN action text, ADD COLUMN "actionTitle" text;
       CREATE TABLE coordinator_messages(id uuid PRIMARY KEY,"userId" text,"botId" uuid,position integer,message jsonb,UNIQUE NULLS NOT DISTINCT("userId","botId",position));
       CREATE TABLE coordinator_events(id uuid PRIMARY KEY,"userId" text,"botId" uuid,kind text,"dedupeKey" text UNIQUE,payload jsonb);
