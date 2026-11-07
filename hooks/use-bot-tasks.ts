@@ -4,16 +4,49 @@ import { useMemo } from 'react'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
 import { mobileTaskGroup, type MobileTaskGroup as TaskGroup } from '@/lib/mobile-task-view'
+import { threadIsActive, type GroupIssue } from '@/lib/thread-groups'
 
 export type { TaskGroup }
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
-/** 待处理 · 进行中 · 待办 · 已完成, in this order everywhere (decision 2026-11-07-2045). */
+/** 等待你 · 进行中 · 待办 · 已完成, in this order everywhere (decisions 2026-11-07-2045 and 2230). */
 export const TASK_GROUPS: readonly TaskGroup[] = ['pending', 'running', 'todo', 'done']
 
 /** A row in a task list: the task, its current thread (the newest), and how many threads it has had. */
-export type TaskRow = { issue: Issue; current: Thread; attempts: number; group: TaskGroup }
+export type TaskRow = { issue: Issue; current: Thread; attempts: number; group: TaskGroup; state: TaskState; reason: TaskReason | null }
+
+/**
+ * One state per task, one icon per state (decision 2026-11-07-2230): 等你处理 (the only hand) and 失败 in 等待你;
+ * 运行中 and 排队中 in 进行中; the board's open and closed statuses in 待办 and 已完成.
+ */
+export type TaskState = 'waiting' | 'failed' | 'running' | 'queued' | 'todo' | 'idle' | 'done' | 'canceled' | 'duplicate'
+/** Why a task waits for the person, in its grey line. */
+export type TaskReason = 'needsReply' | 'confirm' | 'review' | 'blocked' | 'quota'
+
+type RunState = { status: string; outcome?: string | null }
+
+/**
+ * A task's state and reason from its board status and current attempt, in threadGroup's order (R-52). A local
+ * derivation until the shared taskStateOf() lands (coordinator, #1681); it agrees with mobileTaskGroup's groups.
+ */
+export function localTaskState(issue: GroupIssue, run?: RunState | null): { state: TaskState; reason: TaskReason | null } {
+  if (issue.status === 'canceled' || issue.status === 'duplicate') return { state: issue.status, reason: null }
+  if (issue.status === 'done') return { state: 'done', reason: null }
+  if (!run) return { state: issue.status === 'backlog' ? 'idle' : 'todo', reason: null }
+  if (threadIsActive(run)) return { state: run.status === 'queued' ? 'queued' : 'running', reason: null }
+  if (run.status === 'waiting_input') return { state: 'waiting', reason: 'needsReply' }
+  if (run.status === 'paused') return { state: 'waiting', reason: 'quota' }
+  if (issue.metadata.pullRequests.some(pr => pr.state === 'merged')) return { state: 'done', reason: null }
+  if (run.outcome === 'failed') return { state: 'failed', reason: null }
+  if (run.outcome === 'blocked') return { state: 'waiting', reason: 'blocked' }
+  if (issue.status === 'review' || issue.metadata.pullRequests.some(pr => pr.state === 'open' || pr.state === 'draft')) return { state: 'waiting', reason: 'review' }
+  if (run.outcome === 'done') return { state: 'done', reason: null }
+  if (run.outcome === 'idle') return { state: 'idle', reason: null }
+  if (run.outcome === 'needs_input') return { state: 'waiting', reason: 'needsReply' }
+  if (run.status === 'failed') return { state: 'failed', reason: null }
+  return { state: 'waiting', reason: 'confirm' }
+}
 
 /**
  * Lists show tasks; a thread is reached from inside its task (decision
@@ -40,7 +73,7 @@ export function tasksOf(threads: readonly Thread[], issues: readonly Issue[]): R
     const issue = byId.get(thread.issueId)!
     // The one task mapping (#1673): threadGroup() collapsed to four groups, a closed task always 已完成.
     const group = mobileTaskGroup(issue, { runId: thread.id, status: thread.status, outcome: thread.outcome ?? null })
-    groups[group].push({ issue, current: thread, attempts: attempts.get(thread.issueId)!, group })
+    groups[group].push({ issue, current: thread, attempts: attempts.get(thread.issueId)!, group, ...localTaskState(issue, thread) })
   }
   return groups
 }
@@ -50,7 +83,7 @@ export function useTasksOf(threads: readonly Thread[], issues: readonly Issue[])
   return useMemo(() => tasksOf(threads, issues), [threads, issues])
 }
 
-/** How many tasks wait on the person (待处理), for 全部任务's count. */
+/** How many tasks wait for the person (等你处理: the hand, not 失败), for 全部任务's count (decision 2026-11-07-2230). */
 export function pendingTaskCount(threads: readonly Thread[], issues: readonly Issue[]) {
-  return tasksOf(threads, issues).pending.length
+  return tasksOf(threads, issues).pending.filter(row => row.state === 'waiting').length
 }

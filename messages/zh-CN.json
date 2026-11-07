@@ -4247,11 +4247,11 @@
       "tasks": "任务",
       "back": "返回",
       "allTasks": "全部任务",
-      "allTasksPending": "全部任务，{count} 个待处理",
+      "allTasksPending": "全部任务，{count} 个等你处理",
       "closeAllTasks": "关闭全部任务",
       "noTasks": "还没有任务",
       "taskGroup": {
-        "pending": "待处理",
+        "pending": "等待你",
         "running": "进行中",
         "todo": "待办",
         "done": "已完成"
@@ -4267,6 +4267,7 @@
         "activity": "活动",
         "attempt": "第 {n} 次尝试",
         "created": "创建了任务",
+        "createdBy": "{name} 创建了任务",
         "replaced": "换了新线程",
         "openPage": "打开任务页",
         "more": "更多",
@@ -4275,6 +4276,17 @@
         "loadFailed": "任务加载失败",
         "retry": "重试",
         "notFound": "这个任务不在你的列表里",
+        "state": {
+          "waiting": "等你处理",
+          "failed": "失败",
+          "running": "运行中",
+          "queued": "排队中",
+          "todo": "待办",
+          "idle": "暂不处理",
+          "done": "完成",
+          "canceled": "已取消",
+          "duplicate": "重复"
+        },
         "reason": {
           "needsReply": "等你回复",
           "running": "运行中",
@@ -4282,6 +4294,7 @@
           "review": "待审阅",
           "failed": "失败",
           "blocked": "受阻",
+          "quota": "额度用完",
           "paused": "已暂停",
           "notStarted": "还没开始",
           "idle": "暂不处理",
