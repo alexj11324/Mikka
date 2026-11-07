@@ -40,3 +40,14 @@ test('cloud device attachment reads require its own run and explicit file identi
   assert.equal(await cloudDeviceScopeAllows(req(`/mikka/v1/devices/${own}/runs/${run}/attachments/${other}`), own, belongs), true)
   for (const path of [`/v1/devices/${other}/runs/${run}/attachments/${other}`, `/v1/devices/${own}/runs/${other}/attachments/${other}`, `/v1/devices/${own}/runs/${run}/attachments/anything`, `/v1/devices/${own}/runs/${run}/attachments/${other}/extra`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
 })
+
+test('cloud subscription renewal is an explicit POST on its own bound run', async () => {
+  const path = `/mikka/v1/devices/${own}/runs/${run}/subscription-lease`
+  assert.equal(await cloudDeviceScopeAllows(req(path, { method: 'POST' }), own, belongs), true)
+  for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) assert.equal(await cloudDeviceScopeAllows(req(path, { method }), own, belongs), false)
+  for (const forbidden of [
+    `/v1/devices/${other}/runs/${run}/subscription-lease`,
+    `/v1/devices/${own}/runs/${other}/subscription-lease`,
+    `${path}/extra`, `/v1/devices/${own}/runs/${run}/future-lease`,
+  ]) assert.equal(await cloudDeviceScopeAllows(req(forbidden, { method: 'POST' }), own, belongs), false)
+})
