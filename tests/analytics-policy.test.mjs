@@ -42,13 +42,25 @@ test('automatic top-level person mutations are stripped without losing ingestion
   })
 })
 
-test('unknown events, replay and raw exception events never pass the allowlist', () => {
-  for (const event of ['$snapshot', '$exception', '$autocapture', 'unknown']) {
+test('unknown events and raw exception events never pass the allowlist', () => {
+  for (const event of ['$exception', '$autocapture', 'unknown']) {
     assert.equal(sanitizeAnalyticsEvent({ event, properties: {} }), null)
   }
   assert.equal(sanitizeAnalyticsEvent(null), null)
   assert.deepEqual(sanitizeAnalyticsEvent({ event: '$pageview', properties: { $current_url: 'not a url' } }).properties, {})
   assert.deepEqual(sanitizeAnalyticsEvent({ event: 'mikka_team_created', properties: { name: 'private' } }).properties, {})
+})
+
+test('masked replay keeps only its transport payload and cannot mutate a person', () => {
+  const payload = [{ type: 2, data: { node: { textContent: '***' } } }]
+  const event = sanitizeAnalyticsEvent({ event: '$snapshot', properties: { $snapshot_data: payload, $snapshot_bytes: 10, $session_id: 'session', distinct_id: 'person', prompt: 'private', $current_url: 'https://example.com/?token=private' } })
+  assert.deepEqual(event.properties, { $snapshot_data: payload, $snapshot_bytes: 10, $session_id: 'session', distinct_id: 'person' })
+  const source = readFileSync(new URL('../instrumentation-client.ts', import.meta.url), 'utf8')
+  assert.match(source, /maskAllInputs: true/)
+  assert.match(source, /maskTextSelector: '\*'/)
+  assert.match(source, /maskAllElementAttributes: true/)
+  assert.match(source, /recordHeaders: false/)
+  assert.match(source, /recordBody: false/)
 })
 
 test('all upcoming features fail closed, even if the remote switch is accidentally enabled', () => {

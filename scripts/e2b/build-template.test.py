@@ -5,6 +5,10 @@ import copy
 from contextlib import redirect_stderr
 import hashlib
 import json
+import shlex
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -174,13 +178,19 @@ class Publish(unittest.TestCase):
         self.assertIn('verify /opt/mikka/official-files-before.json --e2b-finalization codex', calls[2][1])
 
     def test_build_name_must_be_absent_and_never_an_official_alias(self):
-        with patch.object(bt, '_request', return_value={'templateID': 'previous-version', 'public': False}) as request:
+        def existing_alias(method, path, api_key):
+            if path == '/templates/aliases/mikka-old-claude':
+                return {'templateID': 'previous-version', 'public': False}
+            raise HTTPError(path, 404, 'Not found', {}, None)
+        with patch.object(bt, '_request', side_effect=existing_alias) as request:
             with self.assertRaisesRegex(ValueError, 'template_name_already_exists'):
                 bt.assert_new_template('mikka-old-claude', 'fixture-key')
             request.assert_called_once_with('GET', '/templates/aliases/mikka-old-claude', 'fixture-key')
         for name in ('claude', 'codex', 'desktop', '../other'):
-            with self.assertRaisesRegex(ValueError, 'template_name_invalid'):
-                bt.assert_new_template(name, 'fixture-key')
+            with patch.object(bt, '_request') as request:
+                with self.assertRaisesRegex(ValueError, 'template_name_invalid'):
+                    bt.assert_new_template(name, 'fixture-key')
+                request.assert_not_called()
         with patch.object(bt, '_request', side_effect=HTTPError('https://api.e2b.app/templates/aliases/new', 404, 'Not found', {}, None)) as request:
             bt.assert_new_template('mikka-new-claude', 'fixture-key')
             request.assert_called_once_with('GET', '/templates/aliases/mikka-new-claude', 'fixture-key')
@@ -388,6 +398,93 @@ class Publish(unittest.TestCase):
                 bt.probe_models('private-template', 'codex', 'private-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: Probe(receipt))
         self.assertIs(raised.exception, failure)
         self.assertEqual(log.getvalue(), '')
+
+    def test_standalone_instance_probe_does_not_start_cli_after_verification_failure(self):
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            fixture_path = Path(__file__).with_name('official-files.test.py')
+            fixture_spec = importlib.util.spec_from_file_location('cli_verification_fixture', fixture_path)
+            fixture = importlib.util.module_from_spec(fixture_spec)
+            fixture_spec.loader.exec_module(fixture)
+            private, manifest, _, added = fixture.CliVerification().inventory(directory)
+            manifest_bytes, original_byte = manifest.read_bytes(), added.read_bytes()[:1]
+            guard, probe, started = directory / 'guard.py', directory / 'probe.sh', directory / 'probe-started'
+            # Exercise the real CLI and hashing. Only root metadata is modelled
+            # so the same filesystem/command test works on unprivileged CI.
+            guard.write_text(f'''import importlib.util
+from pathlib import Path
+spec = importlib.util.spec_from_file_location('cli_verification_fixture', {str(fixture_path)!r})
+fixture = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fixture)
+fixture.files.PRIVATE = Path({str(private)!r})
+with fixture.root_file_metadata():
+    fixture.files.main()
+''')
+            probe.write_text(f'#!/bin/sh\nprintf started > {shlex.quote(str(started))}\nprintf "[]\\n"\n')
+            command = bt.MODEL_PROBE_COMMAND.format(kind='desktop').replace(
+                'python3 /opt/mikka/worker/scripts/e2b/official-files.py', f'{shlex.quote(sys.executable)} {shlex.quote(str(guard))}').replace(
+                '/opt/mikka/worker/.mikka-original-cli.json', shlex.quote(str(manifest))).replace(
+                '/opt/mikka/runtime/node/bin/node', f'sh {shlex.quote(str(probe))}')
+            with added.open('r+b') as handle: handle.write(b'!')
+            result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=5)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('runtime_cli_changed', result.stderr)
+            self.assertFalse(started.exists())
+            self.assertEqual(manifest.read_bytes(), manifest_bytes)
+            with added.open('r+b') as handle: handle.write(original_byte)
+            result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0)
+            self.assertTrue(started.exists())
+            self.assertEqual(json.loads(result.stdout), [])
+            receipt = json.loads(result.stderr.removeprefix('mikka-cli-verification '))
+            self.assertTrue(all(row['matched'] is True for row in receipt['files']))
+
+    def test_failed_or_timed_out_receipt_ready_check_still_kills_its_sandbox(self):
+        for failure in (False, True):
+            calls = []
+            class Probe:
+                def __init__(self): self.commands = self
+                def run(self, command, **options):
+                    calls.append((command, options))
+                    if failure: raise TimeoutError('fixture command deadline')
+                    return SimpleNamespace(exit_code=1, stdout='')
+                def kill(self): calls.append('killed')
+            receipt = model_receipt()
+            with patch.object(bt.sys, 'stderr', io.StringIO()), self.assertRaises(TimeoutError if failure else RuntimeError):
+                bt.probe_models('tpl1', 'desktop', 'fixture-key', receipt['sourceCommit'], receipt['workerSha'], lambda *_, **__: Probe())
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[0][1], {'user': 'user', 'timeout': 45})
+            self.assertNotIn('node ', calls[0][0])
+            self.assertNotIn('cli-verify', calls[0][0])
+            self.assertEqual(calls[-1], 'killed')
+
+    def test_official_instance_validation_uses_the_same_standalone_probe(self):
+        module_spec = importlib.util.spec_from_file_location('validate_official', Path(__file__).with_name('validate-official-instances.py'))
+        validator = importlib.util.module_from_spec(module_spec)
+        module_spec.loader.exec_module(validator)
+        calls, killed = [], []
+        class Probe:
+            def __init__(self, kind):
+                self.kind, self.sandbox_id, self.commands = kind, 'fixture-instance', self
+            def run(self, command, **options):
+                calls.append((command, options))
+                harnesses = ['claude_code', 'codex'] if self.kind == 'desktop' else ['claude_code' if self.kind == 'claude' else 'codex']
+                data = [{'harness': harness, 'installed': True, 'models': ['fixture-model']} for harness in harnesses]
+                return SimpleNamespace(exit_code=0, stdout=json.dumps(data if 'cloud-model-probe.js' in command else {'entries': 1, 'sha256': 'f' * 64}))
+            def kill(self): killed.append(self.kind)
+        sdk = SimpleNamespace(Sandbox=SimpleNamespace(create=lambda kind, **_: Probe(kind)))
+        with patch.dict('sys.modules', {'e2b': sdk}), patch.dict(validator.os.environ, {'E2B_API_KEY': 'fixture-key'}), \
+                patch.object(validator.digest, 'commit', return_value='a' * 40), \
+                patch.object(validator.digest, 'worker_hash', return_value='b' * 40), \
+                patch.object(validator.subprocess, 'check_output', return_value='# fixture bootstrap'):
+            validator.validate()
+        probes = [(command, options) for command, options in calls if 'cloud-model-probe.js' in command]
+        self.assertEqual(len(probes), 3)
+        for kind, (command, options) in zip(['desktop', 'claude', 'codex'], probes):
+            self.assertEqual(command, bt.MODEL_PROBE_COMMAND.format(kind=kind))
+            self.assertNotIn('cloud-worker.js', command)
+            self.assertEqual(options, {'user': 'user', 'timeout': 100})
+        self.assertEqual(killed, ['desktop', 'claude', 'codex'])
 
     def test_capability_manifest_matches_template_kinds_and_task_environment(self):
         manifest = json.loads((bt.ROOT / 'scripts/e2b/template-capabilities.json').read_text())

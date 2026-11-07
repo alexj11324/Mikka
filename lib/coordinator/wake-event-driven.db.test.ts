@@ -141,7 +141,12 @@ dbTest('event-driven Coordinator wakes need no minute sweep', async t => {
 
     await t.test('a failed start is claimed again exactly at its backoff, with no sweep', async () => {
       await recordCoordinatorEvent(db, userMessageEvent(owner, 'Third request', { botId }))
-      let now = new Date()
+      // PostgreSQL's default nextWakeAt has microseconds. A frozen JS clock
+      // sampled in that same millisecond can precede this committed row's due
+      // time, correctly refusing the initial claim before backoff is tested.
+      const { rows: [instant] } = await pool.query<{ ms: string }>(
+        'SELECT ceil(extract(epoch FROM clock_timestamp())*1000)::bigint::text AS ms')
+      let now = new Date(Number(instant.ms))
       const recovery = recoveryModule.createWakeRecovery(pool, () => now)
       // The producer's own wake after COMMIT (wakeCoordinator) claims at once.
       const claim = await recovery.claim({ userId: owner, botId })

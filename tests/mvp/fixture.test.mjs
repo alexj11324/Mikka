@@ -1,20 +1,190 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { writeFile } from 'node:fs/promises'
+import { Server } from 'node:http'
+import { chmod, link, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { createGateway, generateText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
 import { assertMvpEnvironment, REPOSITORY } from './isolated-env.mjs'
 import { answerModel } from './model.mjs'
+import { fixtureFailure, fixtureModelError, recordPeerFailure, readPeerFailures, observeTraceMcpFetch, observeTraceHttpParser } from './diagnostics.mjs'
+import { decisionRequestInput } from '../../lib/coordinator/decision.ts'
+import { triageInput, triageQuestions } from '../../lib/coordinator/triage.ts'
+import { artifactSubmittedEvent } from '../../lib/coordinator-events.ts'
 import { startMvpServices } from './services.mjs'
+import { traceGitHubEnvironment } from './trace-codex.mjs'
 import { hasBoundMvpTransport, installMvpTransport, MVP_DECISION_KEY, verifyMvpTransport } from './transport.mjs'
 import { createDedupeFetch } from 'next/dist/server/lib/dedupe-fetch.js'
 import { createPatchedFetcher } from 'next/dist/server/lib/patch-fetch.js'
 
 const database = 'postgresql://ci:fixture@127.0.0.1:5432/mikka_e2e'
 const isolated = { CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1', E2E_DATABASE_URL: database, MIKKA_DATABASE_URL: database, DATABASE_URL: database }
+
+test('trace GitHub accepts only bounded private native config inside its owned daemon directory', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-trace-github-'))
+  const parent = join(directory, 'adapters', 'github')
+  await mkdir(parent, { recursive: true, mode: 0o700 })
+  const config = await mkdtemp(join(parent, 'github-')), file = join(config, 'hosts.yml')
+  const contents = 'github.com:\n    oauth_token: "mvp-synthetic-installation-run"\n    git_protocol: https\n'
+  const env = { GH_CONFIG_DIR: config, GH_TOKEN: '', GITHUB_TOKEN: '' }
+  const refused = (values = env) => assert.throws(() => traceGitHubEnvironment(directory, values), { message: 'SYNTHETIC_GITHUB_CONFIG_REQUIRED' })
+  try {
+    await writeFile(file, contents, { mode: 0o600 })
+    assert.equal(traceGitHubEnvironment(directory, env).GH_TOKEN, 'mvp-synthetic-installation-run')
+    assert.equal(traceGitHubEnvironment(directory, { GH_TOKEN: 'mikka-local-synthetic-user-token' }).GH_TOKEN, 'mikka-local-synthetic-user-token')
+    refused({ ...env, GH_CONFIG_DIR: directory })
+    refused({ ...env, GH_TOKEN: 'private-host-token' })
+    refused({ ...env, GITHUB_TOKEN: 'private-host-token' })
+    await chmod(file, 0o644); refused(); await chmod(file, 0o600)
+    await writeFile(file, contents.replace('mvp-synthetic-installation-run', 'private-host-token')); refused()
+    await writeFile(file, 'x'.repeat(4097)); refused()
+    await writeFile(file, contents)
+    const alias = join(config, 'alias.yml')
+    await link(file, alias); refused(); await rm(alias)
+    await rm(file); await writeFile(alias, contents, { mode: 0o600 })
+    await symlink(alias, file); refused(); await rm(file); await rm(alias)
+    // Parent path aliases cannot turn an owned filename into a host login.
+    await rm(config, { recursive: true }); await symlink(directory, config); refused()
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test('parser diagnostics preserve original emit arguments, receiver, return and default error handling', () => {
+  const original = Server.prototype.emit, observed = [], server = new Server(), socket = {}
+  const error = Object.assign(new Error('private-message'), { code: 'HPE_INVALID_METHOD', bytesParsed: 71, rawPacket: Buffer.from('private-wire-body') })
+  let calls = 0
+  server.on('clientError', function (actual, connection) { calls++; assert.equal(this, server); assert.equal(actual, error); assert.equal(connection, socket) })
+  const restore = observeTraceHttpParser(value => observed.push(value))
+  try {
+    assert.equal(server.emit('clientError', error, socket), true)
+    assert.equal(calls, 1); assert.equal(server.listenerCount('clientError'), 1)
+    const unhandled = new Server()
+    assert.equal(unhandled.emit('clientError', error, socket), false)
+    assert.equal(unhandled.listenerCount('clientError'), 0)
+    assert.deepEqual(observed, [{ code: 'HPE_INVALID_METHOD', bytesParsed: 71 }, { code: 'HPE_INVALID_METHOD', bytesParsed: 71 }])
+    assert.ok(!JSON.stringify(observed).includes('private'))
+    assert.equal(server.emit('unrelated', 'private-event'), false); assert.equal(observed.length, 2)
+  } finally { restore() }
+  assert.equal(Server.prototype.emit, original)
+  const quiet = observeTraceHttpParser(() => { throw new Error('private-sink-error') })
+  try { assert.equal(server.emit('clientError', error, socket), true); assert.equal(calls, 2) }
+  finally { quiet() }
+})
+
+test('diagnostics retain closed source provenance without messages, private paths or assertion values', () => {
+  const own = fileURLToPath(new URL('./model.mjs', import.meta.url))
+  const error = Object.assign(new Error('private-response-token'), { name: 'AssertionError', code: 'ERR_ASSERTION',
+    actual: 'private-token', expected: 'private-cookie', cause: new Error('private-cause') })
+  error.stack = `AssertionError: private-response-token\n    at privateFunction (${own}:21:3)\n    at unsafe (/other/tests/mvp/model.mjs:4:2)\n    at leak (${own}?token=private-token:2:3)`
+  assert.deepEqual(fixtureFailure(error, 'subscription_answer', 'POST'), {
+    handler: 'subscription_answer', method: 'POST', name: 'AssertionError', code: 'ERR_ASSERTION',
+    source: [{ file: 'tests/mvp/model.mjs', line: 21, column: 3 }],
+  })
+  const unknown = Object.assign(new Error('private-message'), { name: 'private-name', code: 'private-code' })
+  const projected = fixtureFailure(unknown, 'private-handler', 'private-method')
+  assert.equal(projected.handler, 'route'); assert.equal(projected.method, 'OTHER'); assert.equal(projected.name, 'Error')
+  assert.ok(!JSON.stringify(projected).includes('private'))
+})
+
+test('diagnostics preserve enumerated model tool refusals and discard arbitrary tool arguments', () => {
+  const failed = fixtureModelError('MODEL_RESULT_REFUSED', 'dispatch_run', { error: 'executionAccountUnavailable', reason: 'noModels', token: 'private-token', args: { prompt: 'private prompt' } })
+  const safe = fixtureFailure(failed, 'subscription_answer', 'POST')
+  assert.equal(safe.code, 'MODEL_RESULT_REFUSED'); assert.equal(safe.operation, 'dispatch_run')
+  assert.equal(safe.sourceCode, 'executionAccountUnavailable'); assert.equal(safe.sourceReason, 'noModels')
+  assert.ok(!JSON.stringify(safe).includes('private'))
+  const unexpected = fixtureFailure(fixtureModelError('private-code', 'private-operation', { error: 'private-result', reason: 'private-reason' }))
+  assert.equal(unexpected.code, 'MODEL_RESULT_REFUSED')
+  assert.ok(!Object.hasOwn(unexpected, 'sourceCode') && !Object.hasOwn(unexpected, 'sourceReason') && !Object.hasOwn(unexpected, 'operation'))
+})
+
+test('diagnostics preserve only closed peer failure codes and fixture source locations on disk', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-peer-diagnostics-'))
+  try {
+    const error = Object.assign(new Error('SYNTHETIC_GIT_ORIGIN_REQUIRED\nprivate-command-stderr'), { code: 'ERR_ASSERTION' })
+    error.stack = `AssertionError: private detail\n    at validate (${fileURLToPath(new URL('./trace-codex.mjs', import.meta.url))}:61:4)`
+    recordPeerFailure(directory, error, 'git_validate')
+    const file = join(directory, 'trace-peer-failures.jsonl')
+    assert.equal((await stat(file)).mode & 0o777, 0o600)
+    assert.ok(!(await readFile(file, 'utf8')).includes('private'))
+    assert.deepEqual(readPeerFailures(directory), [{ handler: 'synthetic_codex', method: 'RPC', name: 'Error',
+      code: 'SYNTHETIC_GIT_ORIGIN_REQUIRED', operation: 'git_validate', source: [{ file: 'tests/mvp/trace-codex.mjs', line: 61, column: 4 }] }])
+    await writeFile(file, JSON.stringify({ handler: 'private-route', method: 'private-method', name: 'private-name', code: 'private-code',
+      source: [{ file: '/private/path', line: 1, column: 1 }], command: 'private-command' }) + '\n')
+    assert.deepEqual(readPeerFailures(directory), [{ handler: 'route', method: 'OTHER', name: 'Error', source: [] }])
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test('diagnostics observe only the real loopback MCP headers response and preserve transport arguments and errors', async () => {
+  const observed = [], calls = []
+  const request = new Request('http://localhost:3100/mikka/api/mcp', { method: 'POST', body: 'private prompt', headers: { authorization: 'Bearer private-token' } })
+  const options = { signal: new AbortController().signal }, response = new Response('private response', { status: 401 })
+  const wrapped = observeTraceMcpFetch(async (input, init) => { calls.push([input, init]); return response }, value => observed.push(value))
+  assert.equal(await wrapped(request, options), response)
+  assert.equal(calls[0][0], request); assert.equal(calls[0][1], options)
+  assert.equal(request.bodyUsed, false); assert.equal(response.bodyUsed, false)
+  assert.equal(observed[0].route, 'mcp'); assert.equal(observed[0].method, 'POST'); assert.equal(observed[0].status, 401)
+  assert.ok(Number.isFinite(observed[0].durationMs) && observed[0].durationMs >= 0)
+  assert.ok(!JSON.stringify(observed).includes('private'))
+  await wrapped('http://localhost:3100/mikka/api/version', options)
+  assert.equal(observed.length, 1)
+  const error = Object.assign(new Error('private socket detail'), { name: 'TimeoutError', code: 'ETIMEDOUT' })
+  const rejected = observeTraceMcpFetch(async () => { throw error }, value => observed.push(value))
+  await assert.rejects(rejected(request, options), actual => actual === error)
+  assert.equal(observed[1].errorName, 'TimeoutError'); assert.equal(observed[1].code, 'ETIMEDOUT')
+  assert.ok(!JSON.stringify(observed).includes('private'))
+  assert.equal(await observeTraceMcpFetch(async () => response, () => { throw new Error('sink unavailable') })(request, options), response)
+})
+
+test('MCP failure diagnostics project only an enumerated method, protocol code and fixed category from a clone', async () => {
+  const evidence = Promise.withResolvers()
+  const packet = { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Bad Request: Mcp-Session-Id header is required', data: { token: 'private-token' } } }
+  const response = Response.json(packet, { status: 400 })
+  const options = { method: 'POST', signal: new AbortController().signal, body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized', params: { private: 'private-body' } }) }
+  const wrapped = observeTraceMcpFetch(async (_input, actual) => { assert.equal(actual, options); return response }, evidence.resolve)
+  assert.equal(await wrapped('http://localhost:3100/mikka/api/mcp?private=private-query', options), response)
+  const value = await evidence.promise
+  assert.equal(value.rpcMethod, 'notifications/initialized')
+  assert.equal(value.responseType, 'application/json'); assert.equal(value.rpcErrorCode, -32000); assert.equal(value.rpcErrorClass, 'session_missing')
+  assert.ok(!JSON.stringify(value).includes('private') && !JSON.stringify(value).includes(packet.error.message))
+  assert.equal(response.bodyUsed, false)
+  assert.deepEqual(await response.json(), packet)
+
+  const unknown = Promise.withResolvers(), arbitrary = Response.json({ jsonrpc: '2.0', error: { code: 'private-code', message: 'private-message' } }, { status: 400 })
+  const observeUnknown = observeTraceMcpFetch(async () => arbitrary, unknown.resolve)
+  await observeUnknown('http://localhost:3100/mikka/api/mcp', { method: 'POST', body: JSON.stringify({ method: 'private-method' }) })
+  const closed = await unknown.promise
+  assert.equal(closed.rpcMethod, 'OTHER'); assert.equal(closed.rpcErrorClass, 'other'); assert.ok(!Object.hasOwn(closed, 'rpcErrorCode'))
+  assert.ok(!JSON.stringify(closed).includes('private'))
+  await arbitrary.body.cancel()
+})
+
+test('MCP diagnostics bound failed JSON reads and cancel a stalled clone without delaying the original response', { timeout: 5000 }, async () => {
+  const large = Promise.withResolvers(), largeResponse = Response.json({ private: 'private-body'.repeat(1000) }, { status: 400 })
+  assert.equal(await observeTraceMcpFetch(async () => largeResponse, large.resolve)('http://localhost:3100/mikka/api/mcp'), largeResponse)
+  assert.equal((await large.promise).rpcErrorClass, 'body_limit')
+  assert.equal(largeResponse.bodyUsed, false)
+  await largeResponse.body.cancel()
+
+  let cancelled = false
+  const stalled = Promise.withResolvers(), response = new Response(new ReadableStream({ cancel() { cancelled = true } }), { status: 400, headers: { 'content-type': 'application/json' } })
+  const returned = await observeTraceMcpFetch(async () => response, stalled.resolve)('http://localhost:3100/mikka/api/mcp')
+  assert.equal(returned, response); assert.equal(response.bodyUsed, false)
+  assert.equal((await stalled.promise).rpcErrorClass, 'body_deadline')
+  await response.body.cancel()
+  assert.equal(cancelled, true)
+})
+
+test('MCP success diagnostics never clone or consume the response body', async () => {
+  const observed = [], response = Response.json({ private: 'private-success' })
+  response.clone = () => { throw new Error('Success response must not be inspected') }
+  assert.equal(await observeTraceMcpFetch(async () => response, value => observed.push(value))('http://localhost:3100/mikka/api/mcp', { method: 'POST', body: JSON.stringify({ method: 'initialize' }) }), response)
+  assert.equal(response.bodyUsed, false)
+  assert.equal(observed[0].rpcMethod, 'initialize'); assert.ok(!Object.hasOwn(observed[0], 'rpcErrorClass'))
+  assert.ok(!JSON.stringify(observed).includes('private'))
+})
 
 test('GitHub fixture human merge preserves exact Git bytes and rejects unauthorized or stale heads', async () => {
   const services = await startMvpServices(0)
@@ -139,7 +309,7 @@ test('synthetic MVP transport binds the active fetch path, preserves requests an
 
 test('scripted model fails when the UI destination was not carried into trusted model context', () => {
   const scenario = { marker: `mvp-${randomUUID()}`, deviceId: randomUUID(), title: 'task', repo: REPOSITORY }
-  assert.throws(() => answerModel({ prompt: [{ role: 'user', content: [{ type: 'text', text: scenario.marker }] }] }, scenario), /task destination/)
+  assert.throws(() => answerModel({ prompt: [{ role: 'user', content: [{ type: 'text', text: scenario.marker }] }] }, scenario), { code: 'MODEL_DESTINATION_MISMATCH' })
 })
 
 test('scripted model uses only the real tool results for dispatch, including exact device and issue IDs', async () => {
@@ -218,21 +388,45 @@ test('scripted Decisions accepts only the runtime triage contract and identifies
   } finally { await services.close() }
 })
 
+test('scripted Decisions accepts the real artifact notice contract without requiring an ended run', async () => {
+  const services = await startMvpServices(0)
+  try {
+    const artifact = { artifactId: randomUUID(), version: 1, title: 'Synthetic acceptance report', kind: 'markdown' }
+    const submitter = { userId: randomUUID(), botId: randomUUID(), issueId: randomUUID(), runId: randomUUID(), authorName: 'Synthetic Agent' }
+    const event = (source = submitter, value = artifact) => ({ ...artifactSubmittedEvent(source, value), id: randomUUID(), observedRun: null })
+    const request = value => ({ model: 'openai/gpt-6-luna-decisions', input: decisionRequestInput(triageInput(value)), questions: triageQuestions(value) })
+    const post = body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
+    // Both a run artifact and a Factory/agent report without a run use this
+    // producer. Neither receipt supplies the independent PR publication gate.
+    for (const value of [event(), event({ ...submitter, runId: null }), event({ ...submitter, runId: null, issueId: null }, { ...artifact, kind: 'html' })]) {
+      const response = await post(request(value))
+      assert.equal(response.status, 200)
+      assert.deepEqual((await response.json()).answers, [{ type: 'choice', name: 'tier', choice: 'result' }])
+    }
+    for (const invalid of [event(submitter, { ...artifact, version: 0 }), event(submitter, { ...artifact, kind: 'private-invalid-kind' }),
+      event(submitter, { ...artifact, artifactId: 'invalid' }), { ...event(), kind: 'private-invalid-event' },
+      { ...event(), observedRun: { id: randomUUID(), status: 'running' } }]) assert.equal((await post(request(invalid))).status, 500)
+    const evidence = await (await fetch(`${services.origin}/observations`)).json()
+    assert.deepEqual(evidence.observations.filter(item => item.kind === 'decision-request').map(item => item.eventKind), ['artifact_submitted', 'artifact_submitted', 'artifact_submitted'])
+    assert.equal(evidence.errors.length, 5)
+  } finally { await services.close() }
+})
+
 test('scripted Decisions answers an ended run\'s outcome only from the run outcome contract', async () => {
   const services = await startMvpServices(0)
   try {
     const OUTCOME_QUESTIONS = [{ type: 'choice', name: 'outcome', choices: ['done', 'blocked', 'needs_input', 'failed', 'idle'].map(value => ({ value })) }]
     const facts = (status) => ['status: ' + status, 'stop reason: none', 'attempts on this task: 1', 'task: in_review — "Add README"', 'pull requests: open', 'summary (quoted): "Opened the PR"', 'last reply (quoted): "Done"'].join('\n')
-    const request = (text, questions = OUTCOME_QUESTIONS) => ({ model: 'openai/gpt-6-luna-decisions', input: [{ role: 'user', content: [{ type: 'input_text', text }] }], questions })
+    const request = (text, questions = OUTCOME_QUESTIONS) => ({ model: 'openai/gpt-6-luna-decisions', input: decisionRequestInput(text), questions })
     const post = async body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
     assert.deepEqual((await (await post(request(facts('succeeded')))).json()).answers, [{ type: 'choice', name: 'outcome', choice: 'done' }])
     assert.deepEqual((await (await post(request(facts('cancelled')))).json()).answers, [{ type: 'choice', name: 'outcome', choice: 'idle' }])
-    for (const invalid of [request('status: succeeded'), request(facts('running')), request(facts('succeeded'), [{ ...OUTCOME_QUESTIONS[0], choices: OUTCOME_QUESTIONS[0].choices.slice(1) }])]) {
+    for (const invalid of [request('status: succeeded'), request(facts('running')), request(facts('succeeded'), [{ ...OUTCOME_QUESTIONS[0], choices: OUTCOME_QUESTIONS[0].choices.slice(1) }]), request({ text: facts('succeeded') })]) {
       assert.equal((await post(invalid)).status, 500)
     }
     const evidence = await (await fetch(`${services.origin}/observations`)).json()
     assert.deepEqual(evidence.observations.filter(item => item.kind === 'outcome-request').map(item => item.status), ['succeeded', 'cancelled'])
-    assert.equal(evidence.errors.length, 3)
+    assert.equal(evidence.errors.length, 4)
   } finally { await services.close() }
 })
 

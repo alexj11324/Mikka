@@ -64,3 +64,22 @@ test('expiry and rejected home renewals remove the proof without adding a timer 
     assert.equal(proofs.token(), null)
   }
 })
+
+test('the raw owner is verified within its server identity and a same-user server switch fences tickets', () => {
+  const { cache, proofs } = fixture()
+  cache.setIdentity('server-a:owner', 'owner')
+  proofs.remember(home, receipt(), proofs.begin())
+  assert.equal(proofs.token(), token, 'the server signs its user id without the mobile account namespace')
+  const pendingA = proofs.begin()
+  cache.setIdentity('server-b:owner', 'owner')
+  assert.equal(proofs.token(), null, 'the same user id at another server cannot reuse this proof')
+  proofs.remember(home, receipt(), pendingA)
+  assert.equal(proofs.token(), null, 'a late ticket cannot cross servers')
+  const tokenB = `other.${'b'.repeat(64)}`
+  proofs.remember(home, { ...receipt(), homeScope: { ...receipt().homeScope, token: tokenB } }, proofs.begin())
+  assert.equal(proofs.token(), tokenB)
+  cache.setIdentity('server-a:owner', 'owner')
+  assert.equal(proofs.token(), null)
+  proofs.remember(home, receipt(), pendingA)
+  assert.equal(proofs.token(), null, 'A to B to A cannot revive the earlier server context')
+})

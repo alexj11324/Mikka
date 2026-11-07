@@ -12,6 +12,7 @@ import { authOAuthProxyOptions, authEffectiveTrustedOrigins, authSignInMethods }
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { afterJob } from '@/lib/background'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
+import { githubSignInClient } from '@/lib/github/app-config'
 import { beforeSignup, localSignUpRateRules } from '@/lib/abuse/signup'
 import { newUserAvatar } from '@/lib/default-avatar'
 import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
@@ -24,10 +25,6 @@ import { desktopSessionCacheAfter, withDesktopSessionCache } from '@/lib/desktop
 export { MOBILE_APP_ORIGIN } from '@/lib/auth-config'
 
 export const { github: githubEnabled, google: googleEnabled } = authSignInMethods(process.env)
-/** Includes the explicitly opted-in deployment GitHub App OAuth client. */
-export async function githubSignInEnabled(): Promise<boolean> {
-  return (await auth.$context).socialProviders.some(provider => provider.id === 'github')
-}
 export const authBaseURL = appOrigin
 const proxyOptions = authOAuthProxyOptions(process.env)
 export const oauthCallbackBaseURL = proxyOptions?.productionURL ?? authBaseURL
@@ -67,12 +64,11 @@ export const auth = betterAuth({
     },
   },
   socialProviders: {
-    ...(githubEnabled ? { github: {
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+    github: async () => ({
+      ...await githubSignInClient(),
       getUserInfo: githubVerifiedProfile(),
       requireEmailVerification: true,
-    } } : {}),
+    }),
     ...(googleEnabled ? { google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
@@ -169,6 +165,11 @@ export const auth = betterAuth({
     } : {}),
   },
 })
+
+/** The provider Better Auth actually initialized, including the explicitly opted-in server App. */
+export async function githubSignInEnabled(): Promise<boolean> {
+  return (await auth.$context).socialProviders.some(provider => provider.id === 'github')
+}
 
 // Inside withFreshSession (money, permissions, credentials, deletion) a session read skips the cookie cache.
 readFreshSessionsInScope(auth.api, { cookieName: async () => (await auth.$context).authCookies.sessionData.name })

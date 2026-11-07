@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { stepIdentity } from '@/lib/model-call-timing'
+import { withRunSpan } from './tracing/context'
 
 /**
  * How long each part of one dispatch_run took, as one log line (`dispatch_timing`):
@@ -30,9 +31,9 @@ const current = new AsyncLocalStorage<Recording>()
 /** Times one part of a dispatch; outside a timed dispatch it only runs it. */
 export async function timedPhase<T>(phase: string, run: () => Promise<T>, now: () => number = Date.now): Promise<T> {
   const recording = current.getStore()
-  if (!recording) return run()
+  if (!recording) return withRunSpan(`dispatch.${phase}`, {}, run)
   const started = now()
-  try { return await run() } finally { recording.phases.push({ phase, ms: now() - started }) }
+  try { return await withRunSpan(`dispatch.${phase}`, {}, run) } finally { recording.phases.push({ phase, ms: now() - started }) }
 }
 
 /** Counts one GitHub request made during a timed dispatch. */
@@ -51,7 +52,7 @@ export async function withDispatchTiming<T>(run: () => Promise<T>, now: () => nu
   const started = now()
   let failed = true
   try {
-    const result = await current.run(recording, run)
+    const result = await withRunSpan('dispatch_run', {}, () => current.run(recording, run))
     failed = false
     return result
   } finally {

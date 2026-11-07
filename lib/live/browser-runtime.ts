@@ -1,5 +1,6 @@
 import { withBasePath } from '@/lib/base-path'
 import type { LiveRuntime, LiveTicket } from './channel'
+import { observeLiveTelemetry } from './telemetry'
 import { selectedLiveURLAllowed, selectedWebServer, webSelectionVersion } from '../web-connection/selection'
 
 // The desktop build replaces this transport only. Shared live invalidation,
@@ -39,6 +40,7 @@ export function browserRuntime(workspaceId: string | null): LiveRuntime {
     monotonicNow: () => performance.now(),
     later: (callback, milliseconds) => setTimeout(callback, milliseconds),
     cancel: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
+    observe: observeLiveTelemetry,
   }
 }
 

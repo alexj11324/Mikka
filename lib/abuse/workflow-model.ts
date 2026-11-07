@@ -39,6 +39,7 @@ export class HostedWorkflowModel implements Model {
         this.modelId,
         undefined,
         this.ownerId,
+        { operation: this.botId ? 'bot' : 'coordinator' },
       )
     ).doGenerate(options), { runId: identity.workflowRunId, appVersion: APP_BUILD, credential: 'api_key', requestBodyValues: { prompt: options.prompt, tools: options.tools, providerOptions: options.providerOptions, headers: options.headers } })
   }
@@ -55,7 +56,7 @@ export class HostedWorkflowModel implements Model {
     const { APP_BUILD } = await import('../app-build')
     const identity = await stepIdentity()
     const result = await workflowFailureStream(async () => {
-      const model = await hostedModel(await executionWorkspace(this.ownerId, this.botId), this.modelId, undefined, this.ownerId)
+      const model = await hostedModel(await executionWorkspace(this.ownerId, this.botId), this.modelId, undefined, this.ownerId, { operation: this.botId ? 'bot' : 'coordinator' })
       requestedAt = Date.now()
       return model.doStream({ ...options, prompt: withCacheBreakpoints(options.prompt, 'anthropic') })
     }, { runId: identity.workflowRunId, appVersion: APP_BUILD, credential: 'api_key', requestBodyValues: { prompt: options.prompt, tools: options.tools, providerOptions: options.providerOptions, headers: options.headers } })

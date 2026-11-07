@@ -1,4 +1,4 @@
-import { defaultModelConfigured } from '@/lib/default-model-config'
+import { defaultModelAvailable } from '@/lib/default-model'
 import 'server-only'
 import { start } from 'workflow/api'
 import { releaseAttention } from '@/lib/attention/store'
@@ -25,7 +25,7 @@ const recovery = createWakeRecovery(pool)
  * credential. Elsewhere, events still collect in the inbox and wait.
  */
 export async function coordinatorEnabled(ownerId?: string, botId: string | null = null): Promise<boolean> {
-  if (runTestFixture('mock') !== undefined || defaultModelConfigured()) return true
+  if (runTestFixture('mock') !== undefined || await defaultModelAvailable(ownerId)) return true
   return ownerId ? (await import('./model-ready')).botModelReady(ownerId, botId) : false
 }
 

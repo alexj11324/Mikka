@@ -1,6 +1,7 @@
 import { Platform } from 'react-native'
 import { authClient } from '@/lib/auth'
 import { apiCache } from './api-cache'
+import { currentAccount, servers } from './config'
 
 let ending: Promise<void> | null = null
 let expired = false
@@ -13,12 +14,14 @@ let expired = false
  */
 export function endLostSession(): Promise<void> {
   if (ending) return ending
+  const client = authClient, account = currentAccount()
   expired = true
   apiCache.clear()
   ending = (async () => {
-    if (Platform.OS !== 'web') await (await import('@/lib/push')).forgetPushToken().catch(() => undefined)
-    await authClient.signOut().catch(() => undefined)
-    authClient.$store.notify('$sessionSignal')
+    if (Platform.OS !== 'web') await (await import('@/lib/push')).forgetPushToken(account.id).catch(() => undefined)
+    await client.signOut().catch(() => undefined)
+    client.$store.notify('$sessionSignal')
+    await servers.signedOut(account.id).catch(() => undefined)
   })().finally(() => { ending = null })
   return ending
 }

@@ -36,7 +36,7 @@ export function wakeCoordinatorAfterCommit(executor: object, userId: string, eve
 
 /** wakeCoordinatorAfterCommit after the current request, for a write that has already committed. */
 export function wakeCoordinatorSoon(userId: string) {
-  // The selected bot model is checked by wakeCoordinator after the write,
+  // The selected bot model and the person's cloud binding are checked after the write,
   // when the committed binding can be read; never query inside this callback.
   void import('../background').then(({ afterJob }) => afterJob('after:coordinator-wake', () => wake(userId), { orRun: true })).catch(() => {})
 }

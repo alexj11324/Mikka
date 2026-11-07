@@ -1,12 +1,26 @@
 import { readFile } from 'node:fs/promises'
+import { Agent } from 'node:http'
 import { join } from 'node:path'
 import { isMachinePath, pageResponse } from '../runtime/http-policy.mjs'
 
-export function apiProxyOptions(target) {
+export function apiProxyOptions(target, agent) {
   const url = new URL(target)
   if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
     || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('API_DEV_PROXY_TARGET_INVALID')
-  return { '^/': { target: url.origin, changeOrigin: false, ws: false,
+  if (!(agent instanceof Agent) || !agent.keepAlive) throw new Error('API_DEV_PROXY_AGENT_INVALID')
+  // Vite's default no-Agent path forces Connection: close. Forwarding that
+  // into Nitro's pooled worker proxy rejects the next MCP POST at Node's
+  // parser. This HTTP hop owns its connection policy, including when the
+  // incoming client asks to close its separate connection.
+  return { '^/': { target: url.origin, changeOrigin: false, ws: false, agent, headers: { connection: 'keep-alive' },
+    configure(proxy) {
+      proxy.on('proxyRes', response => {
+        // Let Vite reconstruct the downstream connection policy from its
+        // client. The upstream pool must not keep a closing client alive.
+        delete response.headers.connection
+        delete response.headers['keep-alive']
+      })
+    },
     bypass: request => isMachinePath(new URL(request.url, 'http://local.invalid').pathname) ? undefined : request.url } }
 }
 

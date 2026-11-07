@@ -1,4 +1,5 @@
 import { captureRunFailure } from '@mikka/protocol/run-failure'
+import { CloudServiceError } from './cloud-services/errors'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { chatFailure, failureMessageKey } from './chat-failure'
@@ -93,4 +94,15 @@ test('structured details accompany existing failure discriminators and malformed
   assert.equal(chatFailure({ working: true, error: 'wake_exhausted', failureDetails }), null)
   assert.equal(chatFailure({ working: false, error: null, failureDetails }), null, 'cached details cannot revive a cleared failure')
   assert.deepEqual(chatFailure({ working: false, error: 'some_new_failure_code', failureDetails: { providerMessage: 'untrusted' } }), { kind: 'failed', raw: 'some_new_failure_code' })
+})
+
+test('optional cloud recovery and main structured failure details survive the combined chat contract', () => {
+  const failureDetails = captureRunFailure(new CloudServiceError('cloud_quota_exhausted'), { runId: 'wrun_cloud_quota' })
+  const failure = chatFailure({ working: false, error: 'cloud_quota_exhausted', failureDetails })
+  assert.equal(failure?.kind, 'failed')
+  assert.equal(failure?.kind === 'failed' && failure.cloudCode, 'cloud_quota_exhausted')
+  assert.deepEqual(failure?.failureDetails, failureDetails)
+  assert.deepEqual(failureMessageKey(failure!), { namespace: 'RunErrors', key: 'cloud_quota_exhausted.default' })
+  assert.equal(failureLine(failure!).recovery, 'cloudBilling')
+  assert.equal(chatFailure({ working: true, error: 'cloud_quota_exhausted', failureDetails }), null)
 })

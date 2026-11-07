@@ -13,7 +13,7 @@ const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(at(path), { namedExports })
 const Pass = ({ children }: { children?: ReactNode }) => <>{children}</>
 const Empty = () => null
-const platform = 'data:text/javascript,' + encodeURIComponent('export const platform="web",AuthForm=()=>null,BrowserRoute=()=>null,setSession=()=>{},onSessionChanged=()=>()=>{},authenticatedReturn=()=>null,PlatformExtras=()=>null,requireUpdate=()=>{}')
+const platform = 'data:text/javascript,' + encodeURIComponent('export const platform="web",AuthForm=()=>null,BrowserRoute=()=>null,setSession=()=>{},onSessionChanged=()=>()=>{},authenticatedReturn=()=>null,bootstrapScope=()=>"workspace",PlatformExtras=()=>null,requireUpdate=()=>{}')
 registerHooks({ resolve(specifier, context, next) {
   return specifier === 'mikka:platform' ? { url: platform, shortCircuit: true } : next(specifier, context)
 } })
@@ -78,7 +78,10 @@ stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Emp
 stub('components/workspace/message-reactions.tsx', { MessageReactions: Empty, useMessageReactions: () => ({}) })
 
 const Workspace = () => <main data-fixture-workspace="">Retained workspace</main>
-stub('apps/desktop/src/renderer/bootstrap.ts', { readBootstrap: () => read('bootstrap', { user: { id: 'owner', name: 'Fixture' }, session: { id: 'session' }, cacheWorkspace: null, googleEnabled: false, githubEnabled: false, emailEnabled: false }) })
+stub('apps/desktop/src/renderer/bootstrap.ts', {
+  readBootstrap: () => read('bootstrap', { user: { id: 'owner', name: 'Fixture' }, session: { id: 'session' }, cacheWorkspace: null, googleEnabled: false, githubEnabled: false, emailEnabled: false }),
+  readAuthentication: async () => { throw new Error('Unexpected authentication-only read in workspace recovery test') },
+})
 stub('apps/desktop/src/renderer/workspace-loader.ts', { loadWorkspace: async () => ({ default: Workspace }), preloadWorkspace: async () => {} })
 stub('apps/desktop/src/renderer/installed-workspace.tsx', { InstalledWorkspace: Empty })
 stub('apps/desktop/src/renderer/offline.tsx', { Offline: Empty })

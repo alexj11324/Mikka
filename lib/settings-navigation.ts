@@ -76,3 +76,9 @@ export function takeShellSearchRequest() {
 export function requestShellBrowser() {
   try { window.localStorage.setItem('mikka:browser', '1') } catch { /* storage unavailable */ }
 }
+
+let appHref: string | null = null
+/** The app page last shown outside Settings, for Settings' way back. Kept outside the
+ *  workspace component: a Settings link that names the workspace remounts it. */
+export function rememberAppHref(href: string) { appHref = href }
+export function appHrefBeforeSettings() { return appHref }

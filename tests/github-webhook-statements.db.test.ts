@@ -6,7 +6,7 @@
 // notification costs after a model answers is the model path's own budget.
 import assert from 'node:assert/strict'
 import { createHmac, randomUUID } from 'node:crypto'
-import { before, mock, test } from 'node:test'
+import { after, before, mock, test } from 'node:test'
 import pg from 'pg'
 import { isE2eTarget } from './helpers/e2e-target.mjs'
 
@@ -15,6 +15,8 @@ const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL &
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('GitHub webhook statement tests require matching isolated loopback _e2e URLs')
 
 const secret = 'statement-count-webhook-secret'
+const originalEdition = process.env.MIKKA_EDITION
+after(() => { if (originalEdition === undefined) delete process.env.MIKKA_EDITION; else process.env.MIKKA_EDITION = originalEdition })
 const callbacks: Array<() => unknown> = []
 mock.module('next/server', { namedExports: { after: (callback: () => unknown) => { callbacks.push(callback) } } })
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: {
@@ -49,6 +51,9 @@ let POST: typeof import('../app/api/webhooks/github/route')['POST']
 let pool: pg.Pool
 before(async () => {
   if (!valid) return
+  // This suite measures the official App's existing webhook path. Community
+  // installations load their own encrypted App in the manifest DB suite.
+  process.env.MIKKA_EDITION = 'cloud'
   process.env.GITHUB_WEBHOOK_SECRET = secret
   ;({ POST } = await import('../app/api/webhooks/github/route'))
   ;({ pool } = await import('../lib/db'))

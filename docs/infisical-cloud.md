@@ -162,3 +162,20 @@ the retained data key. No new keys were created on this repeated run.
 The private `core.yml` release also authenticated with the same existing OIDC
 identity and applied the actual production cloud migrations on 2026-11-07;
 publication and business acceptance have their own source-bound PR receipts.
+
+### Existing Apple release names
+
+The same `prod:/platform` inventory contains the existing Developer ID
+certificate (`APPLE_DEVELOPER_ID_P12_BASE64`,
+`APPLE_DEVELOPER_ID_P12_PASSWORD`, `APPLE_TEAM_ID`) and App Store Connect
+credentials under **`ASC_API_KEY_P8`, `ASC_API_KEY_ID`,
+`ASC_API_ISSUER_ID`**. Looking only for the older `APPLE_API_*` input names
+misses the existing source; it is not evidence that Alex must create a key.
+
+Desktop release and native iOS use their existing workflows and OIDC identity
+to read these exact names. `scripts/release/apple-credentials.mjs` validates
+the existing EC key and maps names to `CSC_*` / `APPLE_API_*` only inside the
+trusted main runner, masking derived encodings before environment delivery.
+It accepts the existing PEM or base64 representation; it does not generate,
+rotate or copy a key into GitHub. OTA uses the existing `EXPO_TOKEN` in this
+same folder. Temporary Apple key files stay runner-local and are removed.
