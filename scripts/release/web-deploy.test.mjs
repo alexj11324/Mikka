@@ -423,9 +423,15 @@ test('desktop release accepts a deployed descendant while preserving its own sou
     'an unrelated later main commit does not invalidate an already deployed descendant')
 })
 
-test('desktop releases supersede only the same ref and documentation does not cancel a release', () => {
+test('desktop replaces obsolete preflights while preserving active signing and documentation does not trigger a release', () => {
   const desktop = readFileSync(new URL('../../.github/workflows/desktop-release.yml', import.meta.url), 'utf8')
-  assert.ok(desktop.includes("\nconcurrency:\n  group: ${{ github.ref == 'refs/heads/main' && 'desktop-release' || format('desktop-release-{0}', github.ref) }}\n  cancel-in-progress: true\n"))
+  assert.doesNotMatch(desktop, /^concurrency:/m, 'a new workflow must not cancel a running signing job')
+  const preflight = desktop.slice(desktop.indexOf('\n  preflight:'), desktop.indexOf('\n  macos:'))
+  const signing = desktop.slice(desktop.indexOf('\n  macos:'))
+  assert.match(preflight, /group: .*'desktop-release-preflight'.*\n      cancel-in-progress: true/)
+  assert.match(signing, /group: .*'desktop-release'.*\n      cancel-in-progress: false/)
+  assert.doesNotMatch(signing, /queue: max|cancel-in-progress: true/, 'keep one active signer and only the latest pending candidate')
+  assert.match(signing, /Reject an installer whose production UI overlay changed\n        run: node scripts\/release\/hosted-ui\.mjs production\n      - name: Require the matching production Web deployment/)
   assert.match(desktop, /run: node scripts\/release\/web-deploy\.mjs await-desktop-web/)
   assert.doesNotMatch(desktop, /run: node scripts\/release\/web-deploy\.mjs await-web(?:\s|$)/)
   const paths = [...desktop.slice(desktop.indexOf('\n  push:'), desktop.indexOf('\n  workflow_dispatch:'))

@@ -107,6 +107,23 @@ sign-out on the origin being tested; unrelated origins must remain rejected.
 Record the provider-specific result and remaining evidence separately from
 ordinary functional acceptance.
 
+## Shared production acceptance workspace
+
+验收工作区：**Acme Inc.**。**验收在这个工作区里做**。
+
+Use the existing shared smoke test account for subsequent production acceptance
+in this workspace. Alex's account was authorized only for the one-time invitation
+and subscription-sharing setup in
+[issue #1515](https://github.com/alexj11324/Mikka/issues/1515#issuecomment-6694934529).
+Ordinary acceptance must not sign in as Alex. For production checks described
+below, use this shared-account team scope rather than an isolated account-pool
+lease. Keep the normal identity, membership and cleanup checks.
+
+The one-time setup and the subsequent fixed-deployment production verification
+are recorded in [issue #1415 acceptance report](acceptance/issue-1415/final-report.md).
+The setup made the existing Claude and Codex subscription sources visible; it
+created no API key and is not a model-prompt result.
+
 ## Production acceptance after a merge
 
 Local acceptance comes first; it does not replace production acceptance. After
