@@ -13,3 +13,5 @@ test('untrusted execution cannot start a release',()=>{assert.throws(()=>assertE
 // Only the exact closed PR316 Preview sync can be reused; production syncs are not retargeted.
 
 // Installation inventory uses the documented account view.
+
+// Legacy Neon storage inventory is read using existing project ownership.

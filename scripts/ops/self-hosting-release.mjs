@@ -3,7 +3,7 @@ import { readFile, appendFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 import { login } from './infisical-cloud-capabilities.mjs'
-export const TARGET = { base: 'ac7b93ddfb8f17f38ca9fd1deed39e525b2d5438', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
+export const TARGET = { base: '355c066c451d079dfb11c25793f2bbeb4c2e4691', repo: 'alexj11324/Mikka', ref: 'refs/heads/ops/infisical-cloud-capabilities', project:'89850d6a-f020-4936-863e-df77380dfe40', connection:'d5107d5c-fc41-4f42-a5b1-b77858811bdf', team:'team_C7lwxVVvnUicFli6112mvxpv', app:'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', publicApp:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH', path:'/mikka-cloud-production' }
 const owned=['.github/workflows/infisical-cloud-capabilities.yml','scripts/ops/self-hosting-release.mjs','scripts/ops/self-hosting-release.test.mjs']
 export function assertExecution(env,event,head,parent,changed) {
  if(env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!==TARGET.repo||env.GITHUB_REPOSITORY_ID!=='1427517699'||env.GITHUB_REPOSITORY_OWNER_ID!=='183887963'||env.GITHUB_ACTOR!=='alexj11324'||env.GITHUB_EVENT_NAME!=='push'||env.GITHUB_REF!==TARGET.ref||event.repository?.full_name!==TARGET.repo||event.ref!==TARGET.ref||event.after!==head||env.GITHUB_SHA!==head||event.forced||parent!==TARGET.base||changed.length!==owned.length||changed.some(p=>!owned.includes(p))) throw Error('EXECUTION_SCOPE')
@@ -39,7 +39,7 @@ export async function prepare({env=process.env,fetcher=fetch,report}) {
  const p=await ver('/v9/projects/'+TARGET.app+'?teamId='+TARGET.team);demand(p.id===TARGET.app&&p.accountId===TARGET.team&&p.name==='mikka-cloud','VERCEL_TARGET')
  const available=await inf('/api/v1/app-connections/vercel/available?projectId='+TARGET.project);demand(available.appConnections?.some(c=>c.id===TARGET.connection&&c.name==='mikka-team-vercel-native-sync'),'CONNECTION_NOT_AVAILABLE')
  const inventory=await inf('/api/v4/secrets?'+new URLSearchParams({projectId:TARGET.project,environment:'prod',secretPath:'/',recursive:'true',viewSecretValue:'false',expandSecretReferences:'false',includeImports:'false'}));const rows=inventory.secrets
- const plan=secretPlan(rows)
+ report.platformCredentialNames=rows.filter(r=>r.secretPath==='/platform').map(r=>r.secretKey);report.databaseSourceMetadata=rows.filter(r=>['DATABASE_URL','DATABASE_URL_UNPOOLED','EXPO_ACCESS_TOKEN'].includes(r.secretKey)).map(r=>({name:r.secretKey,path:r.secretPath}));const plan=secretPlan(rows)
  const syncs=await inf('/api/v1/secret-syncs/vercel?projectId='+TARGET.project);demand(Array.isArray(syncs.secretSyncs),'SYNC_SCHEMA')
  for(const s of syncs.secretSyncs){const source=s.folder?.path;if(s.environment?.slug==='prod'&&s.syncOptions?.includeAllSubFolders&&source==='/'&&s.destinationConfig?.app!==TARGET.app)throw Error('PRIVATE_SOURCE_WOULD_LEAK')}
  const folders=await inf('/api/v2/folders?'+new URLSearchParams({projectId:TARGET.project,environment:'prod',path:'/',recursive:'true'}));demand(Array.isArray(folders.folders),'FOLDER_SCHEMA')
@@ -67,7 +67,7 @@ export async function prepare({env=process.env,fetcher=fetch,report}) {
  report.privateVariableNames=(await ver('/v10/projects/'+TARGET.app+'/env?teamId='+TARGET.team+'&decrypt=false')).envs.filter(x=>x.target?.includes('production')).map(x=>x.key)
  const installations=await ver('/v1/integrations/configurations?view=account&teamId='+TARGET.team)
  report.integrationMetadata=(installations.configurations??installations.installations??[]).map(x=>({id:x.id,slug:x.slug??x.integration?.slug,projectIds:x.projects,resources:(x.resources??[]).map(r=>({id:r.id,name:r.name}))}))
- const cfg=report.neonVariables[0]?.configurationId;if(cfg){const resources=await ver('/v1/integrations/installations/'+cfg+'/resources?teamId='+TARGET.team);report.neonResources=(resources.resources??resources.items??[]).map(r=>({id:r.id,externalResourceId:r.externalResourceId,name:r.name,productId:r.productId}))}
+ const cfg=report.neonVariables[0]?.configurationId;if(cfg){const stores=await ver('/v1/storage/stores?projectId='+TARGET.publicApp+'&teamId='+TARGET.team);report.storeMetadataKeys=Object.keys(stores);report.neonResources=(stores.stores??stores.items??[]).map(r=>({id:r.id,name:r.name,type:r.type,projectIds:r.projects?.map(p=>p.projectId??p.id)}))}
 }
 async function main(){const report={phase:'prepare-private-cloud',result:'blocked',requests:[],applicationSecretValuesRequested:false,credentialsWrittenToGitHub:false,newIdentityCreated:false};try{
  const git=(...a)=>execFileSync('git',a,{encoding:'utf8'}).trim();const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));assertExecution(process.env,event,git('rev-parse','HEAD'),git('rev-parse','HEAD^'),git('diff','--name-only','HEAD^','HEAD').split('\n'))
