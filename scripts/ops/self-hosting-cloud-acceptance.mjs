@@ -201,3 +201,5 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
     if (!report.failure) check(report.cleanup.ownServerRevoked && report.cleanup.ownSessionSignedOut && report.cleanup.privateSourceUnchanged && report.cleanup.publicSourceUnchanged, 'CLEANUP')
   }
 }
+
+// Full community setup inspects ordinary protocol redirects rather than following them.

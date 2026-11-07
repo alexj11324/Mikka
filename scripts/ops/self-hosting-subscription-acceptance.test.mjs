@@ -31,3 +31,5 @@ test('independent cleanup can remove only this run exact dev folder and at most 
   assert.equal(cleanupScope(value, run), value)
   for (const patch of [{ environment: 'prod' }, { path: '/byos-access' }, { run: '42385723294' }, { vms: ['one-vm-id', 'two-vm-id', 'third-vm-id'] }, { folder: '../arbitrary' }]) assert.throws(() => cleanupScope({ ...value, ...patch }, run), /CLEANUP_SCOPE/)
 })
+
+// Real core image D75 additionally passed the ordinary auth/MCP contract with zero model calls.

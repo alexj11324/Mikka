@@ -237,3 +237,5 @@ jobs:
           path: .artifacts/self-hosting/community-subscriptions.json
           if-no-files-found: warn
           retention-days: 14
+
+# Community preparation redirects were verified on the exact published core image.

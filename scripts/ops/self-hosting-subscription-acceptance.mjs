@@ -19,6 +19,9 @@ const check = (v, code) => { if (!v) throw Error('COMMUNITY_' + code) }
 const sha = v => createHash('sha256').update(v).digest('hex')
 const post = body => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
+// Protocol redirects are inspected and origin/state checked by this driver.
+// Never follow one automatically or turn an expected 302/303 into fetch error.
+const manualRedirect = (url, init) => fetch(url, { ...init, redirect: 'manual' })
 
 // Metadata only, kept outside artifacts so an independent always() step can
 // remove exactly this run's access leaves and VMs after a driver timeout.
@@ -115,7 +118,7 @@ export async function runCommunity(env = process.env) {
       secret('/vercel', 'MIKKA_BYOS_CUSTODY_CLIENT_ID'), secret('/vercel', 'MIKKA_BYOS_CUSTODY_CLIENT_SECRET'), secret('/vercel', 'E2B_API_KEY'),
     ])
     smokeAccount({ SMOKE_OWNER_EMAIL: email, SMOKE_OWNER_PASSWORD: password })
-    cloud = createSessionClient(PUBLIC)
+    cloud = createSessionClient(PUBLIC, manualRedirect)
     await cloud.json('/api/auth/sign-in/email', post({ email, password })); sessions.push(cloud)
     const identity = await cloud.json('/api/auth/get-session')
     check(identity.user?.email === email && identity.user.emailVerified === true, 'ACCOUNT')
@@ -192,7 +195,7 @@ export async function runCommunity(env = process.env) {
       if (!ready) await new Promise(resolveReady => setTimeout(resolveReady, 2000))
     }
     check(ready, 'STARTUP')
-    community = createSessionClient(origin)
+    community = createSessionClient(origin, manualRedirect)
     // Same authorized shared account, independently registered on this empty
     // community installation. Verification mail is delivered to local Mailpit.
     const mailbox = new WebSocket('ws://127.0.0.1:58025/api/events'); await once(mailbox, 'open', { signal: AbortSignal.timeout(15000) })
@@ -240,6 +243,11 @@ export async function runCommunity(env = process.env) {
     check(setup.status === 302, 'GITHUB_SETUP')
     check((await community.json('/api/integrations/github')).repositories?.some(r => r.fullName === 'alexj11324/Mikka'), 'COMMUNITY_GITHUB')
     report.githubPreparation = true
+    // This read-only task has a real, bounded verification command. Without
+    // one, a normal submitted run may correctly remain stopped/unverified.
+    const verifyCommand = `node -e "if(!require('node:fs').readFileSync('README.md','utf8').trim())process.exit(1)" && git diff --exit-code && git diff --cached --exit-code`
+    const verification = await community.json('/api/integrations/github/repositories/verification', { ...post({ repository: 'alexj11324/Mikka', verifyCommand }), method: 'PATCH' })
+    check(verification.verifyCommand === verifyCommand, 'VERIFICATION_COMMAND')
     report.stage = 'subscription-fixtures'
     for (const s of sources) {
       const connectionId = randomUUID(), secretName = 'mikka-byos-' + randomUUID()
