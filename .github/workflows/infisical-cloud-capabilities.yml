@@ -1,4 +1,4 @@
-name: Existing Infisical OIDC URL shape
+name: Existing Infisical cloud capabilities
 
 on:
   push:
@@ -34,5 +34,5 @@ jobs:
         run: node --test scripts/ops/infisical-cloud-capabilities.test.mjs
       - name: Verify the reviewed branch and three-file change before authentication
         run: node scripts/ops/infisical-cloud-capabilities.mjs --preflight
-      - name: Inspect only the runner URL structure without requests or token access
-        run: node scripts/ops/infisical-cloud-capabilities.mjs --url-shape
+      - name: Inspect six fixed metadata routes with the existing OIDC identity
+        run: node scripts/ops/infisical-cloud-capabilities.mjs --inspect

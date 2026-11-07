@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka', repositoryId: 1427517699, ownerId: 183887963,
   ref: 'refs/heads/ops/infisical-cloud-capabilities',
-  base: '891c98c74fe6cfc97ca430197985900bb4bd4efc',
+  base: 'a9635b9c9fd441f8e390c37073d6f87bd20bd35b',
   identity: '2cf9fa19-b9db-4c08-8ca0-b31859f2cbac', audience: 'mikka-infisical',
   project: '89850d6a-f020-4936-863e-df77380dfe40',
   connection: 'mikka-team-vercel-native-sync',
@@ -54,9 +54,10 @@ export function validateExecution({ env, event, head, parent, changed }) {
 export function githubOidcUrl(value) {
   let url
   try { url = new URL(value) } catch { throw new GuardError('OIDC_URL') }
+  // The runner supplies an opaque request path; @actions/core does not require
+  // an /idtoken suffix. Keep the reviewed GitHub host and transport boundary.
   requireThat(url.protocol === 'https:' && url.hostname.endsWith('.actions.githubusercontent.com')
-    && url.port === '' && url.username === '' && url.password === '' && url.hash === ''
-    && /\/idtoken$/i.test(url.pathname), 'OIDC_URL')
+    && url.port === '' && url.username === '' && url.password === '' && url.hash === '', 'OIDC_URL')
   url.searchParams.set('audience', TARGET.audience)
   return url.href
 }
@@ -226,14 +227,17 @@ async function main() {
     result: 'blocked', requests: [], applicationSecretsRequested: false, providerCredentialsRequested: false,
     configurationWrites: 0, identityOrTrustChanges: false }
   try {
-    // This diagnostic revision cannot authenticate or call the metadata API from the CLI.
-    requireThat(process.argv.length === 3 && ['--preflight', '--url-shape'].includes(process.argv[2]), 'MODE')
+    requireThat(process.argv.length === 3 && ['--preflight', '--url-shape', '--inspect'].includes(process.argv[2]), 'MODE')
     report.execution = validateExecution({ env: process.env, event: JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8')),
       head: git('rev-parse', 'HEAD'), parent: git('rev-parse', 'HEAD^'), changed: git('diff', '--name-only', 'HEAD^', 'HEAD').split('\n').filter(Boolean) })
     if (process.argv[2] === '--preflight') report.result = 'source_verified'
-    else {
+    else if (process.argv[2] === '--url-shape') {
       report.urlShape = oidcUrlShape(process.env.ACTIONS_ID_TOKEN_REQUEST_URL)
       report.result = 'url_shape_inspected'
+    } else {
+      const accessToken = await login(process.env, report.requests)
+      report.results = await inspect(metadataClient(accessToken, report.requests))
+      report.result = 'inspected'
     }
   } catch (error) { report.error = error instanceof GuardError ? error.code : 'INSPECTION_FAILED'; process.exitCode = 1 }
   const safe = JSON.stringify(report)

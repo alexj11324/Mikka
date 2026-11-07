@@ -18,7 +18,7 @@ const execution = () => ({
   head, parent: TARGET.base, changed: ['.github/workflows/infisical-cloud-capabilities.yml',
     'scripts/ops/infisical-cloud-capabilities.mjs', 'scripts/ops/infisical-cloud-capabilities.test.mjs'],
 })
-const oidcEnv = () => ({ ACTIONS_ID_TOKEN_REQUEST_URL: 'https://pipelines.actions.githubusercontent.com/fixed/jobs/fixed/idtoken?api-version=2.0',
+const oidcEnv = () => ({ ACTIONS_ID_TOKEN_REQUEST_URL: 'https://pipelines.actions.githubusercontent.com/fixed/jobs/opaque-runner-path?api-version=2.0',
   ACTIONS_ID_TOKEN_REQUEST_TOKEN: fixtureCredential })
 const connection = () => ({ id: connectionId, name: TARGET.connection, app: 'vercel', method: 'api-token',
   projectId: null, orgId, credentials: {}, description: 'untrusted-provider-text' })
@@ -59,10 +59,22 @@ test('OIDC token request uses only the runner endpoint and the existing audience
   assert.equal(url.searchParams.get('api-version'), '2.0')
   for (const value of ['http://pipelines.actions.githubusercontent.com/idtoken',
     'https://pipelines.actions.githubusercontent.com.invalid/idtoken', 'https://example.invalid/idtoken',
-    'https://user@pipelines.actions.githubusercontent.com/idtoken', 'https://pipelines.actions.githubusercontent.com/other',
+    'https://user@pipelines.actions.githubusercontent.com/idtoken', 'https://pipelines.actions.githubusercontent.com:8443/idtoken',
+    'https://githubapp.com/idtoken', 'https://actions.githubusercontent.com.invalid/idtoken',
     'https://pipelines.actions.githubusercontent.com/idtoken#fragment']) {
     assert.throws(() => githubOidcUrl(value), code('OIDC_URL'))
   }
+})
+
+test('the trusted runner URL keeps its opaque path and query while fixing only the requested audience', () => {
+  const supplied = 'https://pipelines.actions.githubusercontent.com/fixed/jobs/opaque-runner-path?api-version=2.0&audience=synthetic'
+  assert.equal(oidcUrlShape(supplied).pathClass, 'OTHER')
+  const url = new URL(githubOidcUrl(supplied))
+  assert.equal(url.origin, 'https://pipelines.actions.githubusercontent.com')
+  assert.equal(url.pathname, '/fixed/jobs/opaque-runner-path')
+  assert.equal(url.searchParams.get('api-version'), '2.0')
+  assert.deepEqual(url.searchParams.getAll('audience'), [TARGET.audience])
+  assert.throws(() => githubOidcUrl(supplied.replace('pipelines.actions.githubusercontent.com', 'runner.invalid')), code('OIDC_URL'))
 })
 
 test('normal login exchanges only GitHub OIDC for the fixed existing identity, with no token in receipts', async () => {
@@ -173,7 +185,7 @@ test('no CLI mode can perform a configuration write', () => {
   assert.deepEqual(receipt.requests, [])
 })
 
-test('URL-shape diagnostics use only closed categories and do not change the original URL guard', () => {
+test('URL-shape diagnostics use only closed categories and do not permit untrusted runner origins', () => {
   const valid = oidcUrlShape('https://pipelines.actions.githubusercontent.com/fixed/idtoken?api-version=2.0')
   assert.equal(valid.scheme, 'https')
   assert.equal(valid.hostActionsGithubusercontent, true)
@@ -198,10 +210,4 @@ test('URL-shape diagnostics use only closed categories and do not change the ori
     assert.equal(JSON.stringify(result).includes('synthetic'), false)
   }
   assert.throws(() => githubOidcUrl(alternate), code('OIDC_URL'))
-  const child = spawnSync(process.execPath, [new URL('./infisical-cloud-capabilities.mjs', import.meta.url).pathname, '--inspect'], {
-    encoding: 'utf8', env: { PATH: process.env.PATH },
-  })
-  assert.equal(child.status, 1)
-  assert.equal(JSON.parse(child.stdout.trim()).error, 'MODE')
-  assert.deepEqual(JSON.parse(child.stdout.trim()).requests, [])
 })
