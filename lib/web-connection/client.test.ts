@@ -140,3 +140,13 @@ test('account switching invalidates pending login proofs before any exchange req
   await assert.rejects(f.directory.finishSignIn({ state: begin.state, code }), /web_connection_handoff_expired/)
   assert.equal(f.calls.length, count)
 })
+
+test('official renderer version checks stay anonymous and cloud-bound when a self-hosted backend is active', async () => {
+  const f = fixture(); await f.signIn()
+  await f.directory.fetch('/mikka/api/version', { headers: { authorization: 'Bearer must-not-cross', 'x-deployment-id': 'pinned' } })
+  const request = f.calls.at(-1)!
+  assert.equal(request.url, 'https://app.aspectlylabs.com/mikka/api/version')
+  assert.equal(request.headers.has('authorization'), false)
+  assert.equal(request.headers.has('x-deployment-id'), false)
+  assert.equal(request.credentials, 'omit')
+})

@@ -4,7 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { digest } from '@/lib/agent-kit/definition'
 import { bindAgentToConnection, resolveModelDispatch, type ModelDispatch } from '@/lib/model-dispatch'
-import { credentialStates, orderCandidates, readOrder, poolDevices } from '@/lib/model-order'
+import { credentialStates, orderCandidates, selectedOrderCandidates, readOrder, poolDevices } from '@/lib/model-order'
 import { entryKey, planDispatch, type OrderEntry, type OrderHarness, type RunLocation } from '@/lib/model-order-plan'
 import { cloudModelSupport } from '@/lib/cloud-template-models'
 import { cloudReady } from '@/lib/rule-dispatch'
@@ -194,14 +194,19 @@ export async function assertProfileTarget(query: ProfileQuery, scope: AgentProfi
   if (selection.scope?.ownerId !== scope.ownerId || selection.scope?.workspaceId !== scope.workspaceId) throw new AgentProfileError('agentProfileScopeNotFound', 404)
   const definition = selection.definition, entry = selection.targetEntry
   if (!entry || (definition.harness !== 'auto' && definition.harness !== entry.harness) || (definition.model.mode === 'fixed' && entryKey(definition.model) !== entryKey(entry))) throw new AgentProfileError('agentProfilePinConflict')
-  await assertFrozenModelTarget(query, scope, entry)
+  if (selection.profileId !== BUILTIN_AGENT_PROFILE_ID && (selection.source === 'explicit' || selection.source === 'decision') && definition.model.mode === 'fixed') {
+    await assertFrozenModelCandidates(query, scope, entry, await selectedOrderCandidates(query, scope, entry))
+  } else await assertFrozenModelTarget(query, scope, entry)
 }
 
 /** The same source fence also serves historical runs that predate Profiles.
  * This validates one frozen entry; it never selects another role or model. */
 export async function assertFrozenModelTarget(query: ProfileQuery, scope: AgentProfileScope, entry: OrderEntry): Promise<void> {
   validateProfileScope(scope)
-  const candidates = await orderCandidates(query, scope)
+  await assertFrozenModelCandidates(query, scope, entry, await orderCandidates(query, scope))
+}
+
+async function assertFrozenModelCandidates(query: ProfileQuery, scope: AgentProfileScope, entry: OrderEntry, candidates: Awaited<ReturnType<typeof orderCandidates>>): Promise<void> {
   if (!candidates.some(candidate => entryKey(candidate) === entryKey(entry))) throw new AgentProfileError('agentProfileModelUnavailable')
   // Pin the source's current authorization row against a concurrent disconnect/delete.
   if (entry.source.kind === 'subscription') await query.query('SELECT id FROM byos_connections WHERE id=$1 FOR SHARE', [entry.source.connectionId])

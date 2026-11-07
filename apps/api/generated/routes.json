@@ -1142,7 +1142,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "d59155ecaec99895f9195e558f921a6235b092d0de553309376b3aa657fa9250"
+      "sourceHash": "846569d41cb1ade9f9449fb2cb2e500eb3389c8a0a3b5f14b57880ffa1dd0880"
     },
     {
       "path": "/mikka/api/mcp",

@@ -203,6 +203,14 @@ export class WebServerDirectory {
     const url = new URL(raw, this.app)
     const localBase = this.app.pathname.replace(/\/$/, '')
     const localApi = url.origin === this.app.origin && url.pathname.startsWith(`${localBase}/api/`)
+    // This checks the installed official renderer, not the selected backend's
+    // independently released revision. Otherwise any self-hosted build would
+    // permanently trigger the cloud page's required-refresh guard.
+    if (localApi && url.pathname === `${localBase}/api/version`) {
+      const source = new Request(input instanceof Request ? input : url, init), headers = new Headers(source.headers)
+      for (const name of ['authorization', 'cookie', 'x-mikka-session-cache', 'x-mikka-session-token', 'x-deployment-id']) headers.delete(name)
+      return this.options.fetch(new Request(source, { headers, credentials: 'omit', redirect: 'error' }))
+    }
     if (!account) {
       if (!localApi || url.pathname.startsWith(`${localBase}/api/auth/`)) return this.options.fetch(input, init)
       const source = new Request(input instanceof Request ? input : url, init), version = this.generation

@@ -14,6 +14,7 @@ export function createGatewayHandler(getRuntime: () => { hub: GatewayHub; bus: {
     if (!runtime) throw new Response(null, { status: 404 })
     try { await runtime.bus.ready() }
     catch { throw new Response(null, { status: 503 }) }
+    if (!await runtime.hub.authorize(authorization.socket)) throw new Response(null, { status: 401 })
     return { protocol: authorization.protocol, context: { socket: authorization.socket } }
   },
   async open(peer) {
