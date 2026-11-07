@@ -335,3 +335,5 @@ jobs:
 # Community run awaits exact a23 Web/E2B/image readiness; includes native authentication fix1668.
 
 # Source projection read uses the live configured access project and existing custody identity.
+
+# Production Secret selector values stay in Infisical; Vercel supplies only named variable metadata.

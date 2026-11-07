@@ -25,7 +25,7 @@ const manualRedirect = (url, init) => fetch(url, { ...init, redirect: 'manual' }
 
 // Production keeps these non-secret location selectors in its live deployment.
 // Their effective access project and the normal custody identity decide the read.
-export async function readProductionAccessLocation(read) {
+export async function readProductionAccessLocation(read, readSource, report = {}) {
   const project = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
   const { envs } = await read('/v10/projects/' + project + '/env')
   check(Array.isArray(envs), 'SOURCE_CONFIG_METADATA')
@@ -34,12 +34,15 @@ export async function readProductionAccessLocation(read) {
   for (const key of keys) {
     const rows = envs.filter(row => row.key === key && row.target?.includes('production') && !row.gitBranch)
     check(rows.length <= 1 && (rows.length === 1 || key === 'MIKKA_BYOS_ACCESS_INFISICAL_PROJECT'), 'SOURCE_CONFIG_' + key)
-    if (rows.length) values[key] = (await read('/v1/projects/' + project + '/env/' + encodeURIComponent(rows[0].id))).value
+    if (rows.length) {
+      ;(report.sourceSelectorTypes ??= {})[key] = ['sensitive','secret','encrypted','plain','system'].includes(rows[0].type) ? rows[0].type : 'OTHER'
+      values[key] = await readSource(key)
+    }
   }
   const location = { project: values.MIKKA_BYOS_ACCESS_INFISICAL_PROJECT || values.MIKKA_BYOS_INFISICAL_PROJECT,
     environment: values.MIKKA_BYOS_INFISICAL_ENVIRONMENT, path: values.MIKKA_BYOS_ACCESS_INFISICAL_PATH }
-  check(UUID.test(location.project) && /^[a-zA-Z0-9_-]{1,32}$/.test(location.environment ?? '')
-    && /^\/[a-zA-Z0-9/_-]{1,200}$/.test(location.path ?? ''), 'SOURCE_CONFIG_SCOPE')
+  report.sourceLocationShape = { projectIsUuid: UUID.test(location.project), environmentIsSlug: /^[a-zA-Z0-9_-]{1,32}$/.test(location.environment ?? ''), pathIsAbsolute: /^\/[a-zA-Z0-9/_-]{1,200}$/.test(location.path ?? ''), source: 'Infisical_prod_vercel_native_sync_source' }
+  check(Object.entries(report.sourceLocationShape).every(([key, value]) => key === 'source' || value === true), 'SOURCE_CONFIG_SCOPE')
   return location
 }
 
@@ -196,7 +199,7 @@ export async function runCommunity(env = process.env) {
     const choices = (await cloud.json('/api/workspace')).choices
     check(Array.isArray(choices), 'WORKSPACES')
     const { api: vercelApi } = await import(pathToFileURL(source + '/scripts/e2b/publish-template-env.mjs'))
-    const productionLocation = await readProductionAccessLocation(path => vercelApi(path, { token: env.VERCEL_TEAM_TOKEN }))
+    const productionLocation = await readProductionAccessLocation(path => vercelApi(path, { token: env.VERCEL_TEAM_TOKEN }), key => secret('/vercel', key), report)
     const [legacyPath, legacyEnvironment] = await Promise.all([secret('/vercel', 'MIKKA_BYOS_ACCESS_INFISICAL_PATH'), secret('/vercel', 'MIKKA_BYOS_INFISICAL_ENVIRONMENT')])
     report.sourceConfiguration = { origin: 'existing_vercel_production', accessProjectMatchesLegacy: productionLocation.project === PROJECT,
       accessPathMatchesLegacy: productionLocation.path === legacyPath, environmentMatchesLegacy: productionLocation.environment === legacyEnvironment }

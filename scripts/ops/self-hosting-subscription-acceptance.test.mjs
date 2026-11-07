@@ -72,17 +72,17 @@ test('a failed provider source or fixture preserves the independent bound model 
 test('access source uses the actual production configuration and its distinct access project without reading unrelated values', async () => {
   const publicProject = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
   const values = { MIKKA_BYOS_INFISICAL_PROJECT: '11111111-1111-4111-8111-111111111111', MIKKA_BYOS_ACCESS_INFISICAL_PROJECT: '22222222-2222-4222-8222-222222222222', MIKKA_BYOS_INFISICAL_ENVIRONMENT: 'prod', MIKKA_BYOS_ACCESS_INFISICAL_PATH: '/actual-access' }
-  const calls = [], rows = Object.keys(values).map((key, i) => ({ id: 'config'+i, key, target: ['production'] }))
+  const calls = [], rows = Object.keys(values).map((key, i) => ({ id: 'config'+i, key, type: 'sensitive', target: ['production'] }))
   rows.push({ id: 'never-read-private', key: 'PRIVATE_APPLICATION_SECRET', target: ['production'] })
+  const sourceCalls = [], report = {}
   const location = await readProductionAccessLocation(async path => {
     calls.push(path)
-    if (path === '/v10/projects/'+publicProject+'/env') return { envs: rows }
-    const row = rows.find(r => path === '/v1/projects/'+publicProject+'/env/'+r.id)
-    assert.ok(row && row.key in values)
-    return { value: values[row.key] }
-  })
+    assert.equal(path, '/v10/projects/'+publicProject+'/env')
+    return { envs: rows }
+  }, async key => { sourceCalls.push(key); assert.ok(key in values); return values[key] }, report)
   assert.deepEqual(location, { project: values.MIKKA_BYOS_ACCESS_INFISICAL_PROJECT, environment: 'prod', path: '/actual-access' })
-  assert.equal(calls.length, 5); assert.ok(calls.every(path => !path.includes('never-read-private')))
+  assert.equal(calls.length, 1); assert.equal(sourceCalls.length, 4); assert.ok(sourceCalls.every(key => key in values))
+  assert.ok(Object.values(report.sourceSelectorTypes).every(type => type === 'sensitive')); assert.equal(report.sourceLocationShape.projectIsUuid, true)
 })
 
 test('source projection reuses the normal custody identity for exactly one immutable access leaf and never exports its bearer', async () => {

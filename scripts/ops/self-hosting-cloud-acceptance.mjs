@@ -232,3 +232,5 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
 // Community release pin contains native-auth fix1668; production writers must complete before activation.
 
 // Source access follows live production project/identity configuration; no new credentials or roles.
+
+// Secret environment values are read from their existing Infisical sync source, never Vercel write-only values.
