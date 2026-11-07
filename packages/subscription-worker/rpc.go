@@ -98,6 +98,8 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 				result, err = w.Models(callCtx, request.Revision)
 			case "usage":
 				result, err = w.Usage(callCtx, request.Revision)
+			case "allowance":
+				result, err = w.Allowance(callCtx, request.Revision)
 			case "cleanup":
 				result, err = w.Cleanup(callCtx)
 			case "oauthStart":

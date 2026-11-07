@@ -192,12 +192,17 @@ export async function startCliTimingCollector({ runId, harness, remoteMcpServerC
   // Only the Mikka MCP child's private environment receives this URL. It is
   // not an authorization token and is never placed in the task or CLI env.
   return { env, args, unsetEnv, mcpHttpObservationUrl: `${origin}${mcpPath}`,
-    close: ({ cliExitObserved = false }: { cliExitObserved?: boolean } = {}) => closed ??= (async () => {
+    close: ({ cliExitObserved = false, publish = true }: { cliExitObserved?: boolean; publish?: boolean } = {}) => closed ??= (async () => {
     await new Promise<void>(resolve => {
       const timer = setTimeout(() => { collector.truncate(); mcpCollector.truncate(); server.closeAllConnections() }, 1000)
       server.close(() => { clearTimeout(timer); resolve() })
     })
-    runRuntimeTimings.attachOfficialCliTiming(runId, collector.finish(cliExitObserved))
-    runRuntimeTimings.attachMcpHttpTiming(runId, mcpCollector.finish())
+    const official = collector.finish(cliExitObserved), mcp = mcpCollector.finish()
+    // A bootstrap-only candidate has no fresh assignment yet. Discard its
+    // receipts unless ownership was explicitly transferred by the claimed run.
+    if (publish) {
+      runRuntimeTimings.attachOfficialCliTiming(runId, official)
+      runRuntimeTimings.attachMcpHttpTiming(runId, mcp)
+    }
   })() }
 }

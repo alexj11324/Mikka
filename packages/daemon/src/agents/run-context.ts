@@ -269,6 +269,25 @@ function runMcpServer(options: RunContextOptions, files: Pick<RunContext, 'workt
     }
 }
 
+/** Identical backend inputs for the stdio and late-bound SDK transports. */
+export function runMcpBackendContext(options: RunContextOptions, files: Pick<RunContext, 'worktree' | 'handoffFile' | 'capturesDir' | 'tmpDir'>,
+  env: Record<string, string | undefined>) {
+  const repositoryExecution = !options.factoryCheck && ['implement', 'fix'].includes(options.kind ?? '')
+  const readOnlyInspection = !options.factoryCheck && ['implement', 'fix', 'plan'].includes(options.kind ?? '') && runPolicy(options.policy).readOnly === true
+  return {
+    handoffFile: files.handoffFile, capturesDir: files.capturesDir, captureRoots: [files.worktree, files.tmpDir],
+    ...(repositoryExecution ? { repositoryRoot: files.worktree } : {}),
+    ...(options.factoryCheck?.reportOnly || readOnlyInspection ? { artifactRoot: files.worktree } : {}),
+    ...(options.factoryCheck && (!options.factoryCheck.reportOnly || options.factoryCheck.inferCommand) ? {
+      factoryVerify: { cwd: files.worktree, command: options.verifyCommand ?? null, infer: options.factoryCheck.inferCommand },
+    } : {}),
+    ...(options.mcp ? { decisionUrl: options.mcp.url, decisionToken: options.mcp.token,
+      ...(options.mcp.decisionCatalogue ? { decisionCatalogue: JSON.stringify(options.mcp.decisionCatalogue) } : {}) } : {}),
+    ...(options.mcpHttpObservationUrl ? { observationUrl: options.mcpHttpObservationUrl } : {}),
+    env,
+  }
+}
+
 export class RunContext {
   private githubEnv: Record<string, string> = {}
   /** Real path of the worktree (macOS: `/tmp` is `/private/tmp`). */
