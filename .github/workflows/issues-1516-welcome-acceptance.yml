@@ -28,7 +28,7 @@ jobs:
           const sha = process.env.APPLICATION_SHA
           if (!/^[a-f0-9]{40}$/.test(sha ?? '')) throw new Error('application_sha_required')
           execFileSync('git', ['merge-base', '--is-ancestor', sha, 'HEAD'], { stdio: 'ignore' })
-          execFileSync('git', ['diff', '--quiet', sha, '--', 'lib/subscription-workflow-turn.ts', 'lib/subscription-workflow-model.ts', 'lib/coordinator/invalid-tool-call.ts', 'lib/agent-kit/core-entry.ts', 'lib/agent-welcome.ts'], { stdio: 'ignore' })
+          execFileSync('git', ['diff', '--quiet', sha, '--', 'lib/subscription-workflow-turn.ts', 'lib/subscription-workflow-model.ts', 'lib/coordinator/invalid-tool-call.ts', 'workflows/coordinator/workflow.ts', 'workflows/coordinator/round-preparation.ts', 'workflows/coordinator/agent-kit-steps.ts', 'lib/agent-welcome.ts'], { stdio: 'ignore' })
           JS
       - name: Prove unknown/none/empty recovery budget and dedicated failure outcome with the real SDK
         run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/subscription-workflow-turn.test.ts lib/agent-rounds.test.ts lib/agent-kit/core-entry.test.ts
