@@ -102,9 +102,10 @@ export function AcceptanceReport({ artifactId, issueId, runId, detail, flow, res
       </div>
     </header>
     <section aria-label={t('pullRequest')} className="flex flex-col gap-1 rounded-xl bg-muted px-4 py-3">
-      {delivery?.branch && <Row label={t('branch')} end={pr && <Button variant="ghost" size="xs" className="text-muted-foreground" nativeButton={false} render={<a href={pr.url} target="_blank" rel="noopener noreferrer" />}>GitHub<ExternalLink data-icon="inline-end" /></Button>}>
+      {delivery?.branch && <Row label={t('branch')} end={pr && <Button variant="ghost" size="xs" className="text-muted-foreground" nativeButton={false} render={<a href={pr.url} target="_blank" rel="noopener noreferrer" />}><span className="max-sm:sr-only">GitHub</span><ExternalLink data-icon="inline-end" /></Button>}>
+        {/* The source branch gives way first; the target (main) stays whole, and on a phone GitHub keeps only its icon (UI audit task-23). */}
         <code className="truncate font-mono text-xs">{delivery.branch.head}</code>
-        {delivery.branch.base && <><ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" /><code className="truncate font-mono text-xs">{delivery.branch.base}</code></>}
+        {delivery.branch.base && <><ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" /><code className="shrink-0 font-mono text-xs">{delivery.branch.base}</code></>}
       </Row>}
       {(results.length > 0 || sha) && <Row label={t('checks')} end={sha && <ShortSha sha={sha} />}>
         {results.length > 0 && <>
