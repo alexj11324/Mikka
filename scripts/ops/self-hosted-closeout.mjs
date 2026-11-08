@@ -307,7 +307,9 @@ async function run(env) {
         const known = ['cloud_quota_exhausted', 'cloud_access_denied', 'cloud_server_revoked', 'cloud_unavailable',
           'cloud_invalid_request', 'cloud_not_connected', 'cloud_rate_limited']
         if (known.includes(chat.failure?.cloudCode)) observation.cloudCode = chat.failure.cloudCode
-        report.coordinatorObservations ??= []; report.coordinatorObservations.push(observation)
+        report.coordinatorObservations ??= []
+        if (report.coordinatorObservations.length < 8) report.coordinatorObservations.push(observation)
+        else report.coordinatorObservations[7] = observation
       }
       observeChat(await localApi(`/api/mobile/chat?bot=${bot.id}`), 'before-message')
       await localApi('/api/mobile/chat', { botId: bot.id, text: 'Reply only CLOUD_CLOSEOUT_OK. Do not call any tools.', submissionId: randomUUID() }, [202])
@@ -476,7 +478,7 @@ async function run(env) {
     if (['ERR_MODULE_NOT_FOUND', 'ENOENT', 'ECONNREFUSED', 'ENOTFOUND', 'TimeoutError'].includes(error?.code ?? error?.name)) {
       report.failureDetail = error.code ?? error.name
     }
-    const frame = String(error?.stack ?? '').match(/self-hosted-closeout\.mjs:(\d+):(\d+)/)
+    const frame = [...String(error?.stack ?? '').matchAll(/self-hosted-closeout\.mjs:(\d+):(\d+)/g)].find(match => Number(match[1]) > 20)
     if (frame) report.failureFrame = { line: Number(frame[1]), column: Number(frame[2]) }
     if (/strict mode violation/.test(error?.message ?? '')) report.failureDetail = 'locator_ambiguous'
     if (modelBotId) {
@@ -484,7 +486,10 @@ async function run(env) {
         const messages = JSON.parse(await readFile(resolve('messages/en.json'), 'utf8'))
         const logs = compose('logs', '--no-color', 'app')
         report.appLogCodes = Object.keys(messages.RunErrors).filter(code => code.length > 5 && logs.includes(code))
-        report.appLogErrorNames = ['ModelAdmissionError', 'AI_APICallError', 'APICallError', 'CodedError', 'TypeError', 'ReferenceError']
+        const sdkErrors = Object.keys(await import('ai')).filter(name => name.endsWith('Error'))
+        report.appLogErrorNames = ['ModelAdmissionError', 'CloudServiceError', 'CodedError', 'TypeError', 'ReferenceError',
+          'SerializationError', 'WorkflowRuntimeError', 'WorkflowError', 'FatalError', 'RetryableError',
+          ...sdkErrors, ...sdkErrors.map(name => `AI_${name}`)]
           .filter(name => logs.includes(name))
       } catch { report.appLogDiagnosticsUnavailable = true }
     }
