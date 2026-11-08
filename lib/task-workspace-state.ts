@@ -46,9 +46,3 @@ export function taskWorkspaceState({ data, error, target, confirmed }: {
   const known = data.accounts?.[0]?.choices.find(choice => (selectedWorkspaceId(choice.id) ?? choice.id) === targetId)
   return { status: 'mismatch', current, target: { id: targetId, name: known?.name ?? null } }
 }
-
-/** The workspace a create action captured, once, from what the dialog showed. */
-export function capturedTaskWorkspace(state: TaskWorkspaceState, target?: string | null): string | null {
-  if (state.status === 'ready') return state.workspace.id
-  return target ? selectedWorkspaceId(target) : null
-}

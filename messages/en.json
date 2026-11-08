@@ -4389,6 +4389,7 @@
     },
     "newTaskDialog": {
       "workspaceChanged": "The workspace changed after this dialog opened. Nothing was created; reopen New task to create it in the workspace shown now.",
+      "workspaceUnconfirmed": "Couldn't confirm the workspace, so nothing was created. Your text is kept.",
       "title": "New task",
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",

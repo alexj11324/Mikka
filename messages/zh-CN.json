@@ -4389,6 +4389,7 @@
     },
     "newTaskDialog": {
       "workspaceChanged": "打开此对话框后工作区已切换，任务没有创建。请重新打开新建任务，在当前显示的工作区创建。",
+      "workspaceUnconfirmed": "无法确认工作区，任务没有创建。已保留你输入的内容。",
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",

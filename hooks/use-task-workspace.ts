@@ -17,16 +17,19 @@ const SWITCHER_KEY = '/api/workspace/switcher'
  *
  * `retry` reads it again after an error. `confirm` is the create action's last
  * check: one fresh read right before it submits, so a switch made in another
- * tab shows up as a mismatch instead of a task created elsewhere.
+ * tab shows up as a mismatch instead of a task created elsewhere; a failed
+ * read is `error`, never the cached value.
  */
 export function useTaskWorkspace(target?: string | null) {
   const { data, error, mutate } = useSWR(SWITCHER_KEY, fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
   const state = taskWorkspaceState({ data, error, target, confirmed: selectedWebWorkspace() })
   const retry = useCallback(() => { void mutate() }, [mutate])
   const confirm = useCallback(async (captured: string): Promise<TaskWorkspaceState> => {
-    let fresh: WorkspaceSwitcher | undefined
-    try { fresh = await mutate() } catch (cause) { return taskWorkspaceState({ error: cause }) }
-    return taskWorkspaceState({ data: fresh, error: fresh ? undefined : true, target: captured, confirmed: selectedWebWorkspace() })
+    // Read directly: a failed SWR revalidation resolves with the cached value, which is no confirmation.
+    let fresh: WorkspaceSwitcher
+    try { fresh = await fetchSettingsData<WorkspaceSwitcher>(SWITCHER_KEY) } catch (cause) { return taskWorkspaceState({ error: cause }) }
+    void mutate(fresh, { revalidate: false })
+    return taskWorkspaceState({ data: fresh, target: captured, confirmed: selectedWebWorkspace() })
   }, [mutate])
   return { state, retry, confirm }
 }

@@ -31,10 +31,23 @@ let refreshes = 0
 const mutate = async () => { refreshes++ }
 // The account menu's read: what the server shows as the current workspace, and how often the create action re-read it.
 type Shown = { id: string; name: string; kind: string } | null
-let shown: Shown = null, nextShown: Shown = null, switcherReads = 0
+let shown: Shown = null, nextShown: Shown = null, switcherReads = 0, readFails = false, switcherError: Error | undefined
+// After the fresh read answers: another tab switches before the create request is sent.
+let afterRead: (() => void) | null = null
 const switcher = (workspace: Shown) => workspace ? { workspace, accounts: [{ choices: [workspace] }] } : undefined
+mock.module(new URL('../../lib/settings-data.ts', import.meta.url).href, { namedExports: {
+  fetchSettingsData: async (url: string) => {
+    assert.equal(url, '/api/workspace/switcher')
+    switcherReads++
+    if (readFails) throw new Error('fixture switcher read failure')
+    shown = nextShown ?? shown
+    const answer = switcher(shown)
+    afterRead?.()
+    return answer
+  },
+} })
 mock.module('swr', { defaultExport: (key: unknown) => {
-  if (key === '/api/workspace/switcher') return { data: switcher(shown), mutate: async () => { switcherReads++; shown = nextShown ?? shown; return switcher(shown) } }
+  if (key === '/api/workspace/switcher') return { data: switcher(shown), error: switcherError, mutate: async () => switcher(shown) }
   if (Array.isArray(key) && key[0] === 'factory-agent-profiles') return { data, error: readError, mutate }
   if (Array.isArray(key) && key[0] === 'settings:model-order') return { data: { location: 'cloud', first: { kind: 'cloud' }, entries: [], readyDeviceIds: [] }, mutate }
   return { data: key === 'issue-creation-available' ? true : [], mutate }
@@ -84,7 +97,7 @@ before(async () => {
 })
 beforeEach(() => {
   submitted.length = 0; refreshes = 0; readError = undefined
-  shown = { id: workspaceId, name: 'Fixture workspace', kind: 'team' }; nextShown = null; switcherReads = 0
+  shown = { id: workspaceId, name: 'Fixture workspace', kind: 'team' }; nextShown = null; switcherReads = 0; readFails = false; switcherError = undefined; afterRead = null
   data = { profiles: [{
     id: customId, name: 'Fixture role', description: '', roles: ['review'], enabled: true, harness: 'claude_code',
     model: { mode: 'inherit' }, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64),
@@ -186,11 +199,12 @@ test('an enabled custom Profile submits only its structured reference while allo
 const otherWorkspace = { id: '12250000-0000-4000-8000-000000000003', name: 'Other workspace', kind: 'personal' }
 const slotState = () => container.querySelector('[data-task-workspace]')?.getAttribute('data-task-workspace')
 
-test('the create action confirms the captured workspace once and submits while it is still the one shown', async () => {
+test('the create action confirms the captured workspace once and sends that id with the create request', async () => {
   await render(dialog())
   assert.equal(slotState(), 'ready')
   await act(async () => create().click())
   assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].context?.workspaceId, workspaceId, 'the captured id goes to the request header (use-coordinator-submit)')
   assert.equal(switcherReads, 1, 'one fresh read right before submitting, no polling')
 })
 
@@ -204,9 +218,37 @@ test('a switch in another tab between opening and submitting is a mismatch, and 
   assert.equal(create().disabled, true)
 })
 
-test('loading and a failed workspace read are their own states and keep the existing create behaviour', async () => {
+test('a switch after the check does not change the target the create request carries', async () => {
+  await render(dialog())
+  afterRead = () => { shown = otherWorkspace }
+  await act(async () => create().click())
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].context?.workspaceId, workspaceId, 'still the captured workspace; the server validates it, not the newer selection')
+})
+
+test('loading, a failed read and no workspace refuse to create', async () => {
   shown = null
   await render(dialog())
   assert.equal(slotState(), 'loading')
-  assert.equal(create().disabled, false)
+  assert.equal(create().disabled, true)
+  await act(async () => create().click())
+  switcherError = new Error('fixture read failure')
+  await render(dialog())
+  assert.equal(slotState(), 'error')
+  assert.equal(create().disabled, true)
+  await act(async () => create().click())
+  assert.equal(submitted.length, 0)
+  assert.equal(switcherReads, 0, 'nothing is captured without a workspace')
+})
+
+test('a failed confirmation sends nothing and keeps the text for 重试', async () => {
+  await render(dialog())
+  readFails = true
+  await act(async () => create().click())
+  assert.equal(submitted.length, 0)
+  assert.equal(container.querySelector('textarea')?.value, 'Perform this one fixture task.')
+  readFails = false
+  await act(async () => create().click())
+  assert.equal(submitted.length, 1, 'retrying the same request after a successful read creates it')
+  assert.equal(submitted[0].context?.workspaceId, workspaceId)
 })

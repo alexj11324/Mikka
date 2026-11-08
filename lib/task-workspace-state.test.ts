@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { capturedTaskWorkspace, taskWorkspaceState } from './task-workspace-state'
+import { taskWorkspaceState } from './task-workspace-state'
 
 const alpha = { id: '16610000-0000-4000-8000-00000000000a', name: 'Alpha', kind: 'team' }
 const beta = { id: '16610000-0000-4000-8000-00000000000b', name: 'Beta', kind: 'personal' }
@@ -28,10 +28,4 @@ test('a read older than the confirmed web selection is not shown as current', ()
   assert.deepEqual(taskWorkspaceState({ data: read(alpha), confirmed: beta.id }), { status: 'loading' })
   assert.deepEqual(taskWorkspaceState({ data: read(alpha), confirmed: beta.id, error: true }), { status: 'error' })
   assert.equal(taskWorkspaceState({ data: read(beta), confirmed: beta.id.toUpperCase(), target: beta.id }).status, 'ready')
-})
-
-test('a create action captures the shown workspace, or its own target while that is unknown', () => {
-  assert.equal(capturedTaskWorkspace(taskWorkspaceState({ data: read() })), alpha.id)
-  assert.equal(capturedTaskWorkspace({ status: 'loading' }, beta.id.toUpperCase()), beta.id)
-  assert.equal(capturedTaskWorkspace({ status: 'error' }), null)
 })

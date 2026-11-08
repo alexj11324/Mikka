@@ -61,8 +61,12 @@ test('a confirmed remote Workspace selection reaches every RPC/REST and survives
   assert.equal(f.directory.getVersion(), ownerVersion, 'the selection acknowledgement does not invent an account change')
   f.respond(() => Response.json({ ok: true }))
   for (const path of ['/api/rpc', '/api/workspace', '/api/factory/tasks/task', '/api/live/ticket']) {
-    await f.directory.fetch(`/mikka${path}`, { headers: { [WORKSPACE_SELECTION_HEADER]: workspaceB } })
-    assert.equal(f.calls.at(-1)!.headers.get(WORKSPACE_SELECTION_HEADER), workspaceA, 'callers cannot replace the selected account preference')
+    const calls = f.calls.length
+    await assert.rejects(f.directory.fetch(`/mikka${path}`, { headers: { [WORKSPACE_SELECTION_HEADER]: workspaceB } }), /web_connection_workspace_changed/,
+      'callers cannot replace the selected account preference: a different pin is refused, not retargeted')
+    assert.equal(f.calls.length, calls, 'nothing is sent')
+    await f.directory.fetch(`/mikka${path}`)
+    assert.equal(f.calls.at(-1)!.headers.get(WORKSPACE_SELECTION_HEADER), workspaceA)
     assert.equal(f.calls.at(-1)!.headers.has('cookie'), false)
   }
   const restored = new WebServerDirectory({ appUrl: 'https://app.aspectlylabs.com/mikka', fetch: f.fetch, storage: f.storage, sessionStorage: f.sessionStorage })
@@ -71,6 +75,23 @@ test('a confirmed remote Workspace selection reaches every RPC/REST and survives
   assert.equal(JSON.stringify([...f.storage.values]).includes(workspaceA), false, 'selection does not enter the persistent server directory')
   await f.directory.fetch('/mikka/api/version')
   assert.equal(f.calls.at(-1)!.headers.has(WORKSPACE_SELECTION_HEADER), false)
+})
+
+test('a per-request Workspace pin (#1661) reaches the server only as the header contract allows', async () => {
+  const f = fixture(); await f.signIn()
+  f.respond(() => Response.json({ ok: true }))
+  // No confirmed choice yet: the pin is sent as the request's selection; the server checks membership.
+  await f.directory.fetch('/mikka/api/rpc', { method: 'POST', headers: { [WORKSPACE_SELECTION_HEADER]: workspaceB.toUpperCase() }, body: '{}' })
+  assert.equal(f.calls.at(-1)!.headers.get(WORKSPACE_SELECTION_HEADER), workspaceB)
+  await assert.rejects(f.directory.fetch('/mikka/api/rpc', { method: 'POST', headers: { [WORKSPACE_SELECTION_HEADER]: 'not-a-uuid' }, body: '{}' }), /web_connection_workspace_changed/)
+  // A switch confirmed between the check and the submit: the pinned create is refused instead of landing in the new Workspace.
+  f.respond(() => selected(workspaceA)); await f.directory.fetch('/mikka/api/rpc', switching(workspaceA))
+  f.respond(() => Response.json({ ok: true }))
+  const calls = f.calls.length
+  await assert.rejects(f.directory.fetch('/mikka/api/rpc', { method: 'POST', headers: { [WORKSPACE_SELECTION_HEADER]: workspaceB }, body: '{}' }), /web_connection_workspace_changed/)
+  assert.equal(f.calls.length, calls)
+  await f.directory.fetch('/mikka/api/rpc', { method: 'POST', headers: { [WORKSPACE_SELECTION_HEADER]: workspaceA }, body: '{}' })
+  assert.equal(f.calls.at(-1)!.headers.get(WORKSPACE_SELECTION_HEADER), workspaceA, 'a pin equal to the confirmed choice is sent')
 })
 
 test('server/account/logout transitions clear Workspace selection instead of inheriting another session preference', async () => {

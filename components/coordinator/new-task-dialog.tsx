@@ -15,7 +15,6 @@ import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useTaskWorkspace } from '@/hooks/use-task-workspace'
-import { capturedTaskWorkspace } from '@/lib/task-workspace-state'
 import { TaskWorkspace } from '@ui-slot/task-workspace'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -95,13 +94,14 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
   const tCoordinator = useTranslations('Coordinator')
   const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable())
   const fileRef = useRef<HTMLInputElement>(null)
-  const composed = useRef<{ key: string; message: string; taskDestination?: TaskDestination; workspaceId: string | null } | null>(null)
+  const composed = useRef<{ key: string; message: string; taskDestination?: TaskDestination; workspaceId: string } | null>(null)
   const fileId = useId()
   // The task is created in the workspace the Coordinator runs in: the one shown now. A dialog
   // opened for another workspace (another tab switched) is a mismatch, never a silent retarget.
   const target = useTaskWorkspace(workspaceId)
   const workspace = target.state.status === 'ready' ? target.state.workspace : null
-  const mismatch = target.state.status === 'mismatch'
+  // Creating needs a workspace read and confirmed: never while it loads, after a read error, or on a mismatch.
+  const workspaceReady = workspace !== null
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
   const { data: placement } = useSWR(open ? ['settings:model-order', 'current'] : null, () => settingsRead<Awaited<ReturnType<typeof getModelOrder>>>('model-order'))
@@ -150,7 +150,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
 
   async function submit() {
     const text = draft.trim()
-    if (!text || sending || attachments.locked || !available || !profileAllowed || mismatch) return
+    if (!text || sending || attachments.locked || !available || !profileAllowed || !workspace) return
     setSending(true)
     setCoordinatorUnavailable(false)
     try {
@@ -160,12 +160,15 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
         const context = [destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
         // Captured once per composed request; a retry of the same request keeps the same workspace.
         composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }),
-          ...(destination ? { taskDestination: destination } : {}), workspaceId: capturedTaskWorkspace(target.state, workspaceId) }
+          ...(destination ? { taskDestination: destination } : {}), workspaceId: workspace.id }
       }
       const captured = composed.current.workspaceId
-      // The server creates in the workspace selected when it receives the request: confirm it is still the captured one.
-      if (captured && (await target.confirm(captured)).status === 'mismatch') { composed.current = null; toast.error(t('workspaceChanged')); return }
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId })
+      // One fresh read must confirm the captured workspace is still the one shown before anything is sent.
+      const confirmed = await target.confirm(captured)
+      if (confirmed.status === 'mismatch') { composed.current = null; toast.error(t('workspaceChanged')); return }
+      if (confirmed.status !== 'ready') { toast.error(t('workspaceUnconfirmed'), { action: { label: tCommon('retry'), onClick: () => { void submit() } } }); return }
+      // The captured id rides the create request as the server-validated workspace selection header.
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, workspaceId: captured })
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
@@ -227,7 +230,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
       {coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Paperclip data-icon="inline-start" /></Button>
-        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !profileAllowed || !draft.trim() || sending || attachments.locked || mismatch} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
+        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !profileAllowed || !draft.trim() || sending || attachments.locked || !workspaceReady} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
       </div>
       {keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />}
     </DialogContent>
