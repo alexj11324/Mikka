@@ -285,7 +285,7 @@ async function run(env) {
         'BOUND_PAYER_NOT_READY')
       const priorUsage = new Set(before.recent.map(r => r.id))
       const workspace = await localApi('/api/workspace')
-      const { socketEvents } = await import('../acceptance/self-hosted-services.mjs')
+      const { socketEvents, chatObservation } = await import('../acceptance/self-hosted-services.mjs')
       const ticket = await localApi(`/api/live/ticket?workspace=${workspace.workspace.id}`)
       const liveURL = new URL(ticket.url)
       check(liveURL.origin === localOrigin.replace('https:', 'wss:') && liveURL.pathname.startsWith('/mikka/v1/live/'), 'LOCAL_LIVE_TARGET')
@@ -302,10 +302,19 @@ async function run(env) {
       const pick = await local.request.put(`${localOrigin}/mikka/api/mobile/model`, {
         data: { bot: bot.id, id: hostedId }, headers: { Origin: localOrigin } })
       check(pick.ok() && (await pick.json()).current?.id === hostedId, 'CLOUD_DEFAULT_MODEL_PICK')
+      const observeChat = (chat, phase) => {
+        const observation = { phase, ...chatObservation(chat, 'CLOUD_CLOSEOUT_OK') }
+        const known = ['cloud_quota_exhausted', 'cloud_access_denied', 'cloud_server_revoked', 'cloud_unavailable',
+          'cloud_invalid_request', 'cloud_not_connected', 'cloud_rate_limited']
+        if (known.includes(chat.failure?.cloudCode)) observation.cloudCode = chat.failure.cloudCode
+        report.coordinatorObservations ??= []; report.coordinatorObservations.push(observation)
+      }
+      observeChat(await localApi(`/api/mobile/chat?bot=${bot.id}`), 'before-message')
       await localApi('/api/mobile/chat', { botId: bot.id, text: 'Reply only CLOUD_CLOSEOUT_OK. Do not call any tools.', submissionId: randomUUID() }, [202])
       const deadline = Date.now() + 120_000
       for (;;) {
         const chat = await localApi(`/api/mobile/chat?bot=${bot.id}`)
+        observeChat(chat, 'after-message')
         check(chat.enabled === true && !chat.error && !chat.failure, 'CLOUD_COORDINATOR_REFUSED')
         if (!chat.working && chat.items?.some(item => item.from === 'coordinator' && item.text?.trim() === 'CLOUD_CLOSEOUT_OK')) break
         check(Date.now() < deadline, 'CLOUD_COORDINATOR_TIMEOUT')
@@ -326,7 +335,7 @@ async function run(env) {
         inputTokens: fresh.reduce((sum, row) => sum + Number(row.inputTokens), 0),
         outputTokens: fresh.reduce((sum, row) => sum + Number(row.outputTokens), 0) }
       await both(page, `${localOrigin}/mikka/en/?bot=${bot.id}`, 'hosted-reply',
-        p => p.getByText('CLOUD_CLOSEOUT_OK', { exact: true }).waitFor())
+        p => p.getByRole('region', { name: bot.name, exact: true }).getByText('CLOUD_CLOSEOUT_OK', { exact: true }).waitFor())
       const billing = await localApi('/api/cloud/models/billing')
       const billingURL = new URL(billing.url)
       check(billingURL.origin === plan.publicOrigin && billingURL.searchParams.get('workspace') === cloudWorkspaceId
@@ -470,6 +479,15 @@ async function run(env) {
     const frame = String(error?.stack ?? '').match(/self-hosted-closeout\.mjs:(\d+):(\d+)/)
     if (frame) report.failureFrame = { line: Number(frame[1]), column: Number(frame[2]) }
     if (/strict mode violation/.test(error?.message ?? '')) report.failureDetail = 'locator_ambiguous'
+    if (modelBotId) {
+      try {
+        const messages = JSON.parse(await readFile(resolve('messages/en.json'), 'utf8'))
+        const logs = compose('logs', '--no-color', 'app')
+        report.appLogCodes = Object.keys(messages.RunErrors).filter(code => code.length > 5 && logs.includes(code))
+        report.appLogErrorNames = ['ModelAdmissionError', 'AI_APICallError', 'APICallError', 'CodedError', 'TypeError', 'ReferenceError']
+          .filter(name => logs.includes(name))
+      } catch { report.appLogDiagnosticsUnavailable = true }
+    }
     process.exitCode = 1
   } finally {
     cleaning = true
@@ -500,6 +518,7 @@ async function run(env) {
     await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
     console.log(JSON.stringify({ stage: report.stage, failure: report.failure, failureDetail: report.failureDetail,
       failureFrame: report.failureFrame,
+      coordinatorObservations: report.coordinatorObservations, appLogCodes: report.appLogCodes, appLogErrorNames: report.appLogErrorNames,
       consentPosts: report.consentPosts, consentStatuses: report.consentStatuses, checks: report.checks, cleanup: report.cleanup }))
   }
 }
