@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { count, dbUrl, seedAgent, seedBot, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedPersonalWorkspace, seedWorkspace } from './support/workspace-admin-db'
+import { count, dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedPersonalWorkspace, seedWorkspace } from './support/workspace-admin-db'
 
 test('workspace settings backend', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
@@ -208,6 +208,48 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     assert.equal(await count(pool, 'workspace_deletions where id=$1 and "deletedAt" > now() - interval \'1 minute\'', [ws.id]), 1)
     assert.equal(await count(pool, 'workspace_deletions where id=$1', [keep.id]), 0)
     assert.equal(await count(pool, 'model_api_keys where "ownerId"=$1', [member]), 2, 'the API keys themselves are the member\'s')
+  })
+
+
+  await t.test('workspace deletion counts persisted tenant tasks without Team links and never follows a foreign link', async () => {
+    const admin = await seedUser(pool, 'ungrouped-admin'), member = await seedUser(pool, 'ungrouped-member')
+    const workspace = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }], 'Ungrouped tenant')
+    const other = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }], 'Other tenant')
+    const first = await seedIssue(pool, admin, workspace.id), second = await seedIssue(pool, member, workspace.id)
+    const foreign = await seedIssue(pool, admin, other.id), personal = await seedIssue(pool, admin)
+    const pending = randomUUID()
+    await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,\'Unresolved\',\'{"type":"doc"}\',\'todo\',\'normal\')', [pending, admin])
+    const team = await seedTeam(pool, workspace.id, admin)
+    // A historical cross-database link cannot change the task's persisted tenant.
+    await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [foreign, team.id, workspace.id, admin])
+    const ids = [first, second, foreign, personal, pending]
+    for (const issueId of ids) {
+      await pool.query('INSERT INTO issue_documents("issueId","userId",state) SELECT id,"userId",$2 FROM issues WHERE id=$1', [issueId, `document-${issueId}`])
+      await pool.query('INSERT INTO issue_members("issueId","userId","memberId") SELECT id,"userId",$2 FROM issues WHERE id=$1', [issueId, admin])
+      await pool.query(`INSERT INTO issue_versions(id,"issueId","userId",revision,title,content,status,priority)
+        SELECT $1,id,"userId",revision,title,content,status,priority FROM issues WHERE id=$2`, [randomUUID(), issueId])
+    }
+    assert.equal(await count(pool, 'mikka_team_issues WHERE "issueId"=ANY($1::uuid[])', [[first, second]]), 0)
+    assert.deepEqual(await general.workspaceDeletionImpact(admin, workspace.id), { bots: 0, tasks: 2, teams: 1, purchasedPoints: 0 })
+    await rejects(general.workspaceDeletionImpact(member, workspace.id), 'workspaceAccessDenied')
+    await rejects(general.deleteWorkspaceData(member, workspace.id, workspace.name), 'workspaceAccessDenied')
+    await rejects(general.deleteWorkspaceData(admin, workspace.id, 'wrong name'), 'workspaceDeleteNameMismatch')
+    assert.equal(await count(pool, 'issues WHERE id=ANY($1::uuid[])', [ids]), 5, 'refused deletion changes no task')
+    assert.equal(await count(pool, 'issue_documents WHERE "issueId"=ANY($1::uuid[])', [ids]), 5)
+
+    const deleted = await general.deleteWorkspaceData(admin, workspace.id, workspace.name)
+    assert.deepEqual(deleted.deleted, { bots: 0, threads: 0, tasks: 2, projects: 0, teams: 1, invitations: 0, members: 2 })
+    for (const table of ['issues', 'issue_documents', 'issue_versions', 'issue_members']) {
+      const column = table === 'issues' ? 'id' : '"issueId"'
+      assert.equal(await count(pool, `${table} WHERE ${column}=ANY($1::uuid[])`, [[first, second]]), 0, 'all ungrouped tenant tasks and history are removed')
+      assert.equal(await count(pool, `${table} WHERE ${column}=ANY($1::uuid[])`, [[foreign, personal, pending]]), 3, 'other and unresolved tenants are untouched')
+    }
+    assert.equal(await count(pool, 'issues WHERE "workspaceId"=$1', [workspace.id]), 0)
+    assert.equal(await count(pool, 'issues WHERE id=$1 AND "workspaceId"=$2 AND "ownershipState"=\'bound\'', [foreign, other.id]), 1)
+    assert.equal(await count(pool, 'issues WHERE id=$1 AND "workspaceId" IS NULL AND "ownershipState"=\'pending\'', [pending]), 1)
+    assert.equal(await count(pool, 'mikka_workspaces WHERE id=$1', [other.id]), 1)
+    assert.equal(await count(pool, 'mikka_team_issues WHERE "workspaceId"=$1', [workspace.id]), 0)
+    assert.equal(await count(pool, 'workspace_deletions WHERE id=$1', [workspace.id]), 1)
   })
 
   await t.test('removeMember: guards, immediate access loss, bot transfer', async () => {

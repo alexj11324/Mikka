@@ -1,6 +1,6 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, ne, isNull, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { organizationAuditEvents, organizationEntitlements, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
 import { requireWorkspace, type WorkspaceTransaction } from '@/lib/workspace-access'
@@ -8,6 +8,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { enqueueOrganizationAudit } from './audit'
 import { activeHumanSeats, lockWorkspaceEntitlements } from './entitlements'
 import { GovernanceError } from './errors'
+import { assertOrganizationAccountWritable, assertOtherActiveOrganizationOwner } from './organization-ownership'
 import { pool } from '@/lib/db'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
 import { enqueueMemberLifecycle, drainMemberLifecycleOutbox } from './member-outbox'
@@ -36,6 +37,7 @@ export async function listOrganizations(userId: string) {
 export async function createOrganization(user: { id: string; name: string; email: string }, input: unknown) {
   const { name } = z.object({ name: z.string().trim().min(1).max(120) }).strict().parse(input)
   return workspaceDb.transaction(async tx => {
+    await assertOrganizationAccountWritable(tx, user.id)
     const id = randomUUID()
     await tx.insert(organizations).values({ id, name, createdBy: user.id })
     await tx.insert(organizationMembers).values({ organizationId: id, userId: user.id, role: 'owner', name: user.name, email: user.email.toLowerCase() })
@@ -91,13 +93,13 @@ export async function detachOrganizationWorkspace(organizationId: string, worksp
 export async function updateOrganizationMember(organizationId: string, actorId: string, input: unknown) {
   const { userId, role } = z.object({ userId: z.string().min(1).max(200), role: z.enum(['owner', 'admin', 'member']) }).strict().parse(input)
   await workspaceDb.transaction(async tx => {
+    await assertOrganizationAccountWritable(tx, userId)
     const actor = await requireOrganizationAdmin(tx, organizationId, actorId)
     const [member] = await tx.select().from(organizationMembers).where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId))).limit(1)
     if (!member) throw new GovernanceError('not_found')
     if ((member.role === 'owner' || role === 'owner') && actor.membership.role !== 'owner') throw new GovernanceError('access_denied')
     if (member.role === 'owner' && member.status === 'active' && role !== 'owner') {
-      const owners = await tx.select({ userId: organizationMembers.userId }).from(organizationMembers).where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.role, 'owner'), eq(organizationMembers.status, 'active'), ne(organizationMembers.userId, userId))).limit(1)
-      if (!owners.length) throw new GovernanceError('last_owner')
+      await assertOtherActiveOrganizationOwner(tx, organizationId, userId)
     }
     await tx.update(organizationMembers).set({ role, updatedAt: new Date() }).where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
     await enqueueOrganizationAudit(tx, { organizationId, actorId, action: 'organization.member_changed', targetId: userId, metadata: { role } })
@@ -118,6 +120,7 @@ export async function renameOrganization(organizationId: string, actorId: string
 export async function addOrganizationMember(organizationId: string, actorId: string, input: unknown) {
   const { userId, role } = z.object({ userId: z.string().min(1).max(200), role: z.enum(['owner', 'admin', 'member']).default('member') }).strict().parse(input)
   return workspaceDb.transaction(async tx => {
+    await assertOrganizationAccountWritable(tx, userId)
     const actor = await requireOrganizationAdmin(tx, organizationId, actorId)
     if (role === 'owner' && actor.membership.role !== 'owner') throw new GovernanceError('access_denied')
     const { rows: [user] } = await pool.query<{ name: string; email: string }>('select name,email from "user" where id=$1', [userId])
@@ -140,8 +143,7 @@ export async function removeOrganizationMember(organizationId: string, actorId: 
     if (!member) throw new GovernanceError('not_found')
     if (member.role === 'owner') {
       if (actor.membership.role !== 'owner') throw new GovernanceError('access_denied')
-      const others = await tx.select({ id: organizationMembers.userId }).from(organizationMembers).where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.role, 'owner'), eq(organizationMembers.status, 'active'), ne(organizationMembers.userId, userId))).limit(1)
-      if (!others.length) throw new GovernanceError('last_owner')
+      await assertOtherActiveOrganizationOwner(tx, organizationId, userId)
     }
     await tx.delete(organizationMembers).where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
     if (ids.length) await tx.update(workspaceMembers).set({ status: 'suspended' }).where(and(inArray(workspaceMembers.workspaceId, ids), eq(workspaceMembers.userId, userId)))

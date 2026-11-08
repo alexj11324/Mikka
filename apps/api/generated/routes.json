@@ -40,7 +40,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "00301128afaddfc9d6fe6c48f6566ffdeb16d4a7eff074bdb284804cea9b17d7"
+      "sourceHash": "3dfe69c342ef74ab646a1e9d307d8649ab4bcfbf9be52cefb621f9d148bf9cac"
     },
     {
       "path": "/mikka/api/account/export/[token]",
@@ -861,6 +861,15 @@
         "POST"
       ],
       "sourceHash": "81fb5e614f4ae9cab6f7528e316252c90d44f6be53dc8c8629fa7f35bf27f9b3"
+    },
+    {
+      "path": "/mikka/api/enterprise/logout-target",
+      "template": "/api/enterprise/logout-target",
+      "source": "app/api/enterprise/logout-target/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "8db131f5874878e3db9a41ee223bc83b5c65f8c90c2f08296a36381e03213f37"
     },
     {
       "path": "/mikka/api/factory/agent-profiles",

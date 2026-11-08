@@ -242,4 +242,136 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     assert.equal((await pool.query('select count(*) from mikka_workspaces where id=any($1::uuid[])', [[wsA, wsB]])).rows[0].count, '2')
     assert.ok((await createOrganizationAuditExport(organizationId, owner.id, {})).events.some(event => event.action === 'organization.archived'))
   })
+
+  const deletionUser = async () => {
+    const user = { id: randomUUID(), name: 'Deletion owner fixture', email: `${randomUUID()}@delete-org.example.invalid` }
+    await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$2,$3,true,now(),now())', [user.id, user.name, user.email])
+    return user
+  }
+  await t.test('the last Organization owner cannot start account cleanup or leave durable guards behind', async () => {
+    const subject = await deletionUser(), successor = await deletionUser()
+    const created = await org.createOrganization(subject, { name: 'Last owner deletion fixture' })
+    const sessionId = randomUUID(), token = randomUUID()
+    await pool.query(`insert into session(id,token,"userId","expiresAt","createdAt","updatedAt") values($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, token, subject.id])
+    const beforeAudit = (await pool.query('select * from mikka_organization_audit_events where "organizationId"=$1 order by id', [created.id])).rows
+    const { deleteAccount } = await import('../account/delete')
+    const { requestAccountDeletion, cancelAccountDeletion } = await import('../account/deletion-jobs')
+    let external = 0
+    const options = { mainPool: pool, workspacePool, externalCleanup: async () => { external++; return [] as string[] } }
+    await assert.rejects(deleteAccount(subject.id, subject.email, options), error => (error as { detail?: string }).detail === 'last_owner')
+    assert.equal(external, 0)
+    assert.equal((await pool.query('select count(*) from "user" where id=$1', [subject.id])).rows[0].count, '1')
+    assert.equal((await pool.query('select count(*) from session where id=$1 and token=$2', [sessionId, token])).rows[0].count, '1')
+    assert.equal((await pool.query('select count(*) from account_deletion_guards where "subjectId"=$1', [subject.id])).rows[0].count, '0')
+    assert.equal((await workspacePool.query('select count(*) from account_deletion_guards where "subjectId"=$1', [subject.id])).rows[0].count, '0')
+    assert.deepEqual((await pool.query('select * from mikka_organization_audit_events where "organizationId"=$1 order by id', [created.id])).rows, beforeAudit)
+    assert.equal((await pool.query('select stage from account_deletion_jobs where "subjectUserId"=$1', [subject.id])).rows[0].stage, 'cancelled')
+    await org.renameOrganization(created.id, subject.id, { name: 'Still manageable after refusal' })
+    await org.addOrganizationMember(created.id, subject.id, { userId: successor.id, role: 'owner' })
+    const requested = await requestAccountDeletion(subject.id, subject.email, randomUUID(), options)
+    assert.ok(requested.ok)
+    await assert.rejects(org.createOrganization(subject, { name: 'Cannot acquire a new Org during deletion' }), error => /account_deletion_pending/.test(String((error as { cause?: unknown }).cause ?? error)))
+    await assert.rejects(org.updateOrganizationMember(created.id, successor.id, { userId: successor.id, role: 'member' }), error => (error as { detail?: string }).detail === 'last_owner')
+    await assert.rejects(org.removeOrganizationMember(created.id, successor.id, successor.id), error => (error as { detail?: string }).detail === 'last_owner')
+    assert.equal(await cancelAccountDeletion(subject.id, requested.id, options), true)
+    await org.updateOrganizationMember(created.id, successor.id, { userId: successor.id, role: 'member' })
+    assert.equal(external, 0)
+  })
+  await t.test('canonical split-store ownership survives concurrent account requests and cleans only the departing membership', async t => {
+    const { readFile } = await import('node:fs/promises')
+    const { requestAccountDeletion, resumeAccountDeletion, cancelAccountDeletion } = await import('../account/deletion-jobs')
+    const scope = `enterprise_account_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`create schema "${scope}"`)
+    const canonical = new Pool({ connectionString: target, options: `-c search_path=${scope},public -c lock_timeout=5000 -c statement_timeout=15000`, application_name: scope, max: 4 })
+    t.after(async () => { await canonical.end(); await pool.query(`drop schema "${scope}" cascade`) })
+    const tables = ['mikka_workspaces', 'mikka_workspace_members', 'mikka_workspace_invitations', 'mikka_teams', 'mikka_team_members',
+      'mikka_team_issues', 'mikka_team_projects', 'team_issue_create_receipts', 'team_issue_promotion_receipts', 'workspace_projects', 'workspace_project_events',
+      'mikka_organizations', 'mikka_organization_members', 'mikka_organization_audit_events']
+    for (const table of tables) await canonical.query(`create table "${scope}"."${table}" (like public."${table}" including defaults including constraints including indexes)`)
+    await canonical.query(await readFile(new URL('../../drizzle/20261031050732_workspace_deletion_guards.sql', import.meta.url), 'utf8'))
+    const a = await deletionUser(), b = await deletionUser(), id = randomUUID()
+    for (const database of [pool, canonical]) await database.query('insert into mikka_organizations(id,name,"createdBy") values($1,$2,$3)', [id, 'Authoritative store fixture', a.id])
+    const member = (database: Pool, user: typeof a) => database.query(`insert into mikka_organization_members("organizationId","userId",role,status,name,email) values($1,$2,'owner','active',$3,$4)`, [id, user.id, user.name, user.email])
+    await member(pool, a); await member(pool, b); await member(canonical, a)
+    let external = 0
+    const options = { mainPool: pool, workspacePool: canonical, externalCleanup: async () => { external++; return [] as string[] }, deleteObject: async () => { throw new Error('Unexpected object cleanup') } }
+    await assert.rejects(requestAccountDeletion(a.id, a.email, randomUUID(), options), error => (error as { detail?: string }).detail === 'last_owner')
+    assert.equal(external, 0, 'APP same-name memberships cannot authorize deleting the only canonical owner')
+    assert.equal((await canonical.query('select count(*) from account_deletion_guards where "subjectId"=$1', [a.id])).rows[0].count, '0')
+    assert.equal((await pool.query('select count(*) from account_deletion_guards where "subjectId"=$1', [a.id])).rows[0].count, '0')
+    await member(canonical, b)
+    const blocker = await canonical.connect()
+    const blockerPid = (await blocker.query('select pg_backend_pid() as pid')).rows[0].pid
+    const requests: Promise<Awaited<ReturnType<typeof requestAccountDeletion>>>[] = []
+    let settled = 0
+    try {
+      await blocker.query('begin')
+      await blocker.query('select id from mikka_organizations where id=$1 for update', [id])
+      for (const user of [a, b]) {
+        const pending = requestAccountDeletion(user.id, user.email, randomUUID(), options)
+        void pending.then(() => { settled++ }, () => { settled++ })
+        requests.push(pending)
+      }
+      const deadline = Date.now() + 3000
+      while (Number((await pool.query(`select count(*) from pg_stat_activity where application_name=$1 and $2=any(pg_blocking_pids(pid))`, [scope, blockerPid])).rows[0].count) < 2) {
+        assert.equal(settled, 0, 'both requests reach the real canonical Organization row lock')
+        assert.ok(Date.now() < deadline, 'the two database waits become observable')
+        await delay(10)
+      }
+    } finally { await blocker.query('rollback'); blocker.release() }
+    const outcomes = await Promise.allSettled(requests)
+    const accepted = outcomes.flatMap((result, index) => result.status === 'fulfilled' && result.value.ok ? [{ id: result.value.id, user: [a, b][index] }] : [])
+    assert.ok(accepted.length <= 1, 'two owners cannot both commit an irreversible deletion plan')
+    for (const result of outcomes) if (result.status === 'rejected') assert.equal((result.reason as { detail?: string }).detail, 'last_owner')
+    const available = (await canonical.query(`select m."userId" from mikka_organization_members m
+      where m."organizationId"=$1 and m.role='owner' and m.status='active'
+      and not exists(select 1 from account_deletion_guards g where g."subjectId"=m."userId")`, [id])).rows as { userId: string }[]
+    assert.ok(available.length >= 1)
+    const survivor = [a, b].find(user => user.id === available[0].userId)!
+    // Exercise actual writes in both stores; a row count alone would miss a
+    // stranded account-write barrier after the refused request.
+    await canonical.query('select mikka_account_assert_writable($1)', [survivor.id])
+    const writableOrg = randomUUID()
+    await canonical.query('insert into mikka_organizations(id,name,"createdBy") values($1,$2,$3)', [writableOrg, 'Still writable', survivor.id])
+    await canonical.query(`insert into mikka_organization_members("organizationId","userId",role,status,name,email) values($1,$2,'owner','active',$3,$4)`, [writableOrg, survivor.id, survivor.name, survivor.email])
+    await pool.query(`insert into session(id,token,"userId","expiresAt","createdAt","updatedAt") values($1,$2,$3,now()+interval '1 hour',now(),now())`, [randomUUID(), randomUUID(), survivor.id])
+    if (!accepted.length) {
+      const departing = [a, b].find(user => user.id !== survivor.id)!
+      const requested = await requestAccountDeletion(departing.id, departing.email, randomUUID(), options)
+      assert.ok(requested.ok); accepted.push({ id: requested.id, user: departing })
+    }
+    const departed = accepted[0]
+    assert.notEqual(departed.user.id, survivor.id)
+    const failAudit = `account_audit_${randomUUID().replaceAll('-', '')}`
+    await canonical.query(`alter table mikka_organization_audit_events add constraint "${failAudit}" check ("organizationId"<>'${id}'::uuid or action<>'organization.member_removed') not valid`)
+    try {
+      await assert.rejects(resumeAccountDeletion(departed.id, options), error => {
+        const failure = error as { code?: string; cause?: { code?: string } }
+        return (failure.cause?.code ?? failure.code) === '23514'
+      })
+      assert.equal((await pool.query('select stage from account_deletion_jobs where id=$1', [departed.id])).rows[0].stage, 'main_deleted')
+      assert.equal((await canonical.query('select count(*) from mikka_organization_members where "organizationId"=$1 and "userId"=$2', [id, departed.user.id])).rows[0].count, '1', 'member deletion and its audit roll back together')
+      assert.equal((await canonical.query('select count(*) from mikka_organization_audit_events where "organizationId"=$1', [id])).rows[0].count, '0')
+    } finally { await canonical.query(`alter table mikka_organization_audit_events drop constraint "${failAudit}"`) }
+    assert.equal((await resumeAccountDeletion(departed.id, options)).stage, 'completed')
+    const removedAudit = (await canonical.query('select action,"targetId",metadata from mikka_organization_audit_events where "organizationId"=$1', [id])).rows
+    assert.deepEqual(removedAudit, [{ action: 'organization.member_removed', targetId: departed.user.id, metadata: { reason: 'account_deletion' } }])
+    assert.equal((await resumeAccountDeletion(departed.id, options)).stage, 'completed')
+    assert.deepEqual((await canonical.query('select action,"targetId",metadata from mikka_organization_audit_events where "organizationId"=$1', [id])).rows, removedAudit)
+    assert.equal(external, 1)
+    assert.equal((await pool.query('select count(*) from "user" where id=$1', [departed.user.id])).rows[0].count, '0')
+    assert.deepEqual((await canonical.query('select "userId" from mikka_organization_members where "organizationId"=$1', [id])).rows, [{ userId: survivor.id }])
+    assert.equal((await canonical.query('select count(*) from mikka_organizations where id=$1', [id])).rows[0].count, '1')
+    assert.equal((await pool.query('select count(*) from mikka_organization_members where "organizationId"=$1', [id])).rows[0].count, '2', 'the APP mirror is not swept as authoritative membership')
+    await canonical.query('select mikka_account_assert_writable($1)', [survivor.id])
+    // The last remaining canonical owner still cannot delete itself after the
+    // first owner's APP and Workspace stages have both completed.
+    await assert.rejects(requestAccountDeletion(survivor.id, survivor.email, randomUUID(), options), error => (error as { detail?: string }).detail === 'last_owner')
+    assert.equal(external, 1)
+    await pool.query('select mikka_account_assert_writable($1)', [survivor.id])
+    const liveJobs = (await pool.query(`select id,"subjectUserId" from account_deletion_jobs where "subjectUserId"=any($1::text[]) and stage in ('preparing','requested')`, [[a.id, b.id]])).rows
+    for (const job of liveJobs) assert.equal(await cancelAccountDeletion(job.subjectUserId, job.id, options), true)
+    await pool.query('delete from mikka_organization_members where "organizationId"=$1', [id])
+    await pool.query('delete from mikka_organizations where id=$1', [id])
+  })
 })
