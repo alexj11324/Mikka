@@ -297,6 +297,14 @@ async function run(env) {
       const bot = await localApi('/api/bots', { name: `Cloud reply ${env.GITHUB_RUN_ID}` }, [201])
       modelBotId = bot.id
       check(bot.workspaceId === workspace.workspace.id, 'MODEL_BOT_WORKSPACE')
+      if (env.CLOSEOUT_TEXT_ONLY_PROFILE === '1') {
+        const active = await localApi(`/api/bots/${bot.id}/definition`)
+        check(Number.isSafeInteger(active.version) && active.version > 0 && Array.isArray(active.definition?.tools), 'FIXTURE_PROFILE_READ')
+        const saved = await localApi(`/api/bots/${bot.id}/definition`, { action: 'save', expectedVersion: active.version,
+          requestId: randomUUID(), definition: { ...active.definition, tools: [], skills: [], hooks: ['audit'] } })
+        check(saved.source === 'user' && saved.definition?.tools?.length === 0 && saved.definition?.hooks?.includes('audit'), 'FIXTURE_PROFILE_SAVED')
+        report.checks.modelFixture = { ownerConfigured: true, declaredTools: 0, auditRetained: true, general66ToolCasePassed: false }
+      }
       const hostedId = '00000000-0000-0000-0000-000000000000'
       const menu = await localApi(`/api/mobile/model?bot=${bot.id}`)
       check(menu.groups.some(group => group.options?.some(option => option.id === hostedId && option.hostedSource === 'cloud')),
@@ -309,6 +317,16 @@ async function run(env) {
         const known = ['cloud_quota_exhausted', 'cloud_access_denied', 'cloud_server_revoked', 'cloud_unavailable',
           'cloud_invalid_request', 'cloud_not_connected', 'cloud_rate_limited']
         if (known.includes(chat.failure?.cloudCode)) observation.cloudCode = chat.failure.cloudCode
+        for (const code of known) {
+          const plain = chat.error === code || chat.error === `${code} (response)`
+          const fatal = chat.error === `FatalError: ${code}` || chat.error === `FatalError: ${code} (response)`
+          const error = chat.error === `Error: ${code}` || chat.error === `Error: ${code} (response)`
+          const raw = chat.failure?.raw === code || chat.failure?.raw === `${code} (response)`
+          if (plain || fatal || error || raw) {
+            observation.storedCloudCode = code
+            observation.storedCloudWrapper = fatal ? 'FatalError' : error ? 'Error' : plain ? 'none' : 'raw-only'
+          }
+        }
         report.coordinatorObservations ??= []
         if (report.coordinatorObservations.length < 8) report.coordinatorObservations.push(observation)
         else report.coordinatorObservations[7] = observation
@@ -423,7 +441,29 @@ async function run(env) {
       check(!teamUsage.error && teamUsage.workspaceId === billingTeam && teamUsage.personal === false, 'TEAM_BILLING_SCOPE')
       const balance = Number(teamUsage.balance?.free) + Number(teamUsage.balance?.purchased)
       if (balance === 0) {
+        const workspace = await localApi('/api/workspace')
+        const { socketEvents } = await import('../acceptance/self-hosted-services.mjs')
+        const ticket = await localApi(`/api/live/ticket?workspace=${workspace.workspace.id}`)
+        const url = new URL(ticket.url); url.searchParams.set('revisions', '1')
+        check(url.origin === localOrigin.replace('https:', 'wss:') && url.pathname.startsWith('/mikka/v1/live/'), 'QUOTA_LIVE_TARGET')
+        modelLive = socketEvents(url.href, ticket.protocol); await modelLive.ready
+        await modelLive.next(event => event.type === 'live_ready' && event.version === 2)
         await localApi('/api/mobile/chat', { botId: modelBotId, text: 'Reply only QUOTA_PROBE_OK. Do not use tools.', submissionId: randomUUID() }, [202])
+        let refused
+        const deadline = Date.now() + 90_000
+        for (;;) {
+          const chat = await localApi(`/api/mobile/chat?bot=${modelBotId}`)
+          if (!chat.working && chat.failure) { refused = chat; break }
+          check(Date.now() < deadline, 'QUOTA_REFUSAL_TIMEOUT')
+          await modelLive.next(event => event.kind === 'bot_chat' && event.id === modelBotId, deadline - Date.now())
+        }
+        await modelLive.close(); modelLive = null
+        const raw = refused.failure?.raw
+        report.quotaObservation = { working: refused.working, failureKind: refused.failure?.kind,
+          cloudCodePresent: refused.failure?.cloudCode === 'cloud_quota_exhausted',
+          safeRawQuotaCodePresent: raw === 'cloud_quota_exhausted' || raw === 'cloud_quota_exhausted (response)',
+          exactStoredCode: refused.error === 'cloud_quota_exhausted' || refused.error === 'cloud_quota_exhausted (response)',
+          fatalWrapper: refused.error === 'FatalError: cloud_quota_exhausted' || refused.error === 'FatalError: cloud_quota_exhausted (response)' }
         for (const [locale, route] of [['en', 'en/'], ['zh-CN', '']]) {
           const messages = JSON.parse(await readFile(resolve('messages', `${locale}.json`), 'utf8'))
           const text = messages.RunErrors.cloud_quota_exhausted.default
@@ -532,6 +572,7 @@ async function run(env) {
       failureFrame: report.failureFrame,
       coordinatorObservations: report.coordinatorObservations, appLogCodes: report.appLogCodes, appLogErrorNames: report.appLogErrorNames,
       modelWireShapes: report.modelWireShapes,
+      quotaObservation: report.quotaObservation,
       consentPosts: report.consentPosts, consentStatuses: report.consentStatuses, checks: report.checks, cleanup: report.cleanup }))
   }
 }
