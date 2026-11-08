@@ -328,6 +328,31 @@ existing Alert and guarded RetryReplyButton for retryable errors. The new
 current/historical quota rendering cases reproduced RED/GREEN; all 34 DOM
 cases pass. No new copy, requests, polling or model fallback is introduced.
 
+The completed local production-build replay is bound to
+`cfd0d8ea7132dc25c55094a23d0dd9a12440f17e`, 05:27:13–05:27:48 UTC.
+It uses isolated real PG17, actual SMTP email verification/sign-in, normal
+server registration/key binding and the real HTTP/Workflow/chat projection.
+Only the cloud HTTP service is an explicit local 402 fixture; no external
+model or production credentials are used. English/Chinese and light/dark
+copy plus billing links pass; the 390x844 viewport has no horizontal overflow.
+There are zero page errors, one probe request and one independent background
+welcome request, both refused by the fixture before provider work. The
+navigation controls retain link semantics, the mounted billing href and
+noreferrer. Cleanup of the Coordinator, binding, session, browser, app,
+SMTP and database passed. This proves rendered behavior, not actual cloud
+account exhaustion or a production end-to-end purchase.
+
+The requested screenshots and closed receipt are included together in this
+same PR under [cloud-quota-cfd0d8ea](cloud-quota-cfd0d8ea/report.json). The
+owning agent viewed the actual English/light, Chinese/dark and narrow images;
+the existing Alert/Button layout is readable, unclipped and has no framework
+overlay. No identity, password, key or token is visible. Report SHA256:
+`0f2edf16c56f97a5898958f6205ca64d2b2bf100d804ac269c3d880caf54599c`.
+
+![English quota recovery](cloud-quota-cfd0d8ea/quota-en-light.png)
+![Chinese quota recovery](cloud-quota-cfd0d8ea/quota-zh-CN-dark.png)
+![Narrow quota recovery](cloud-quota-cfd0d8ea/quota-en-mobile.png)
+
 All owned servers in those completed binding runs were revoked; Coordinator,
 local/cloud/OAuth sessions, browsers, isolated database volumes and tunnels
 were cleaned up. There is no new polling, identity or production Expo change.
