@@ -202,7 +202,7 @@ if mode=='success':
     sys.stdout.write('safe-result')
 elif mode=='failure':
     sys.stdout.write(private)
-    sys.stderr.write(private+' revision 7 not supported; missing kernel module; could not load match; operation not supported; permission denied; invalid argument')
+    sys.stderr.write(private+' Warning: Extension owner revision 1 not supported, missing kernel module? could not load match; operation not supported; permission denied; invalid argument')
     sys.exit(23)
 elif mode=='oversized':
     sys.stderr.write(private*3000)
@@ -220,7 +220,9 @@ elif mode=='timeout':
                          {'family': 'ipv6', 'operation': 'provider_rule', 'failureKind': 'exit', 'returnCode': 23})
         flags = {'unsupportedRevision', 'missingKernelModule', 'missingExtension',
                  'operationNotSupported', 'permissionDenied', 'invalidArgument'}
-        self.assertEqual(set(command), flags | {'family', 'operation', 'failureKind', 'returnCode'})
+        self.assertEqual(set(command), flags | {'family', 'operation', 'failureKind', 'returnCode', 'extension', 'revision', 'unsupportedExtensions'})
+        self.assertEqual((command['extension'], command['revision']), ('owner', 1))
+        self.assertEqual(command['unsupportedExtensions'], [{'extension': 'owner', 'revision': 1}])
         self.assertTrue(all(command[key] is True for key in flags))
         self.assertNotIn(self.private, json.dumps(value))
         self.assertNotIn(str(self.program), json.dumps(value))
@@ -258,6 +260,26 @@ elif mode=='timeout':
         for code in (self.private, True, 256, -256):
             failure = guard.IngressCommandError('ipv4', 'new_chain', 'exit', code)
             self.assertIsNone(guard.failure_receipt(failure)['command']['returnCode'])
+        for extension in ('owner', 'multiport', 'conntrack', 'mark', 'tcp'):
+            stderr = f'Warning: Extension {extension} revision 255 not supported, missing kernel module?'.encode()
+            value = guard.IngressCommandError('ipv4', 'provider_rule', 'exit', 4, stderr).diagnostic
+            self.assertEqual((value['extension'], value['revision']), (extension, 255))
+            self.assertEqual(value['unsupportedExtensions'], [{'extension': extension, 'revision': 255}])
+        for warning, extension, revision in (
+                (f'Extension {self.private} revision 1 not supported', 'unknown', None),
+                ('Extension owner revision 256 not supported', 'owner', None),
+                ('Extension owner revision -1 not supported', 'unknown', None),
+                ('Extension owner revision 1 not supported; Extension owner revision 2 not supported', 'owner', None),
+                ('Extension owner revision 1 not supported; Extension mark revision 1 not supported', 'unknown', None),
+                ('Extension owner revision 0 not supported; Extension owner revision 0 not supported', 'owner', 0)):
+            value = guard.IngressCommandError('ipv4', 'provider_rule', 'exit', 4, warning.encode()).diagnostic
+            self.assertEqual((value['extension'], value['revision']), (extension, revision))
+            self.assertNotIn(self.private, json.dumps(value))
+        warnings = '; '.join(f'Warning: Extension owner revision {value} not supported' for value in range(8))
+        warnings += '; Warning: Extension multiport revision 1 not supported; Warning: Extension owner revision 0 not supported'
+        value = guard.IngressCommandError('ipv4', 'provider_rule', 'exit', 4, warnings.encode()).diagnostic
+        self.assertEqual(value['unsupportedExtensions'], [{'extension': 'multiport', 'revision': 1}]
+                         + [{'extension': 'owner', 'revision': revision} for revision in range(5)])
 
 
 class ProviderAndWorkerProof(unittest.TestCase):

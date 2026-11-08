@@ -289,14 +289,16 @@ class Candidates(unittest.TestCase):
         guard = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(guard)
         error = guard.IngressCommandError('ipv6', 'provider_rule', 'exit', 2,
-                                         (PRIVATE + ' operation not permitted').encode())
+                                         (PRIVATE + ' Warning: Extension multiport revision 1 not supported; operation not permitted').encode())
         receipt = guard.failure_receipt(error)
         expected = deepcopy(receipt['command'])
         receipt['command'].update(argv=[PRIVATE], stderr=PRIVATE, path=PRIVATE)
+        receipt['command']['unsupportedExtensions'][0]['stderr'] = PRIVATE
         log = candidates.BuildDiagnostics({}, self.output, 'claude')
         log(SimpleNamespace(level='error', message='[start] [stderr]: ' + json.dumps(receipt)))
         self.assertEqual(log.value['events'], [{'phase': 'ingress', 'detail': 'command', 'command': expected}])
         self.assertTrue(expected['permissionDenied'])
+        self.assertEqual((expected['extension'], expected['revision']), ('multiport', 1))
         self.assertNotIn(PRIVATE, json.dumps(log.value))
         for kind, code in (('timeout', None), ('output_limit', 0), ('execution', None)):
             receipt['command'].update(failureKind=kind, returnCode=code)
@@ -319,6 +321,22 @@ class Candidates(unittest.TestCase):
         for key in command:
             incomplete = {name: value for name, value in command.items() if name != key}
             self.assertIsNone(candidates.ingress_command(incomplete))
+        legacy = candidates.ingress_command(command)
+        self.assertEqual((legacy['extension'], legacy['revision']), ('unknown', None))
+        self.assertEqual(legacy['unsupportedExtensions'], [])
+        for extension, revision, expected in ((PRIVATE, 1, ('unknown', None)), ('owner', PRIVATE, ('owner', None)),
+                                             ('owner', True, ('owner', None)), ('owner', 256, ('owner', None))):
+            value = candidates.ingress_command({**command, 'extension': extension, 'revision': revision})
+            self.assertEqual((value['extension'], value['revision']), expected)
+            self.assertEqual(value['operation'], 'new_chain')
+            self.assertNotIn(PRIVATE, json.dumps(value))
+        warnings = [{'extension': 'owner', 'revision': 1, 'stderr': PRIVATE}, {'extension': 'multiport', 'revision': 1},
+                    {'extension': 'owner', 'revision': 1}, {'extension': PRIVATE, 'revision': 1},
+                    {'extension': 'mark', 'revision': PRIVATE}, {'extension': 'conntrack', 'revision': 256}]
+        value = candidates.ingress_command({**command, 'unsupportedExtensions': warnings + [{'extension': 'tcp', 'revision': 0}] * 20})
+        self.assertEqual(value['unsupportedExtensions'], [{'extension': 'conntrack', 'revision': None}, {'extension': 'mark', 'revision': None},
+                                                        {'extension': 'multiport', 'revision': 1}, {'extension': 'owner', 'revision': 1}])
+        self.assertNotIn(PRIVATE, json.dumps(value))
         before = len(log.value['events'])
         log(SimpleNamespace(level='error', message=json.dumps({'ok': True, 'detail': 'command', 'command': command})))
         self.assertEqual(len(log.value['events']), before, 'success output cannot manufacture a failed command')

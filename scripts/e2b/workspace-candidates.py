@@ -122,7 +122,17 @@ def ingress_command(value):
             or not (value['returnCode'] is None or type(value['returnCode']) is int and -255 <= value['returnCode'] <= 255)
             or any(type(value.get(flag)) is not bool for flag in INGRESS_COMMAND_FLAGS)):
         return None
-    return {key: value[key] for key in ('family', 'operation', 'failureKind', 'returnCode', *INGRESS_COMMAND_FLAGS)}
+    result = {key: value[key] for key in ('family', 'operation', 'failureKind', 'returnCode', *INGRESS_COMMAND_FLAGS)}
+    extension, revision = value.get('extension'), value.get('revision')
+    result['extension'] = extension if extension in ('owner', 'multiport', 'conntrack', 'mark', 'tcp') else 'unknown'
+    result['revision'] = revision if result['extension'] != 'unknown' and type(revision) is int and 0 <= revision <= 255 else None
+    warnings = value.get('unsupportedExtensions')
+    observed = {(row['extension'], row.get('revision') if type(row.get('revision')) is int and 0 <= row['revision'] <= 255 else None)
+                for row in (warnings[:6] if isinstance(warnings, list) else []) if isinstance(row, dict)
+                and row.get('extension') in ('owner', 'multiport', 'conntrack', 'mark', 'tcp')}
+    result['unsupportedExtensions'] = [{'extension': name, 'revision': number} for name, number in sorted(observed,
+                                      key=lambda item: (item[0], -1 if item[1] is None else item[1]))]
+    return result
 
 
 class BuildDiagnostics:

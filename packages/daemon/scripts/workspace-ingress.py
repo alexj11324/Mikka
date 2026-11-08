@@ -47,9 +47,19 @@ class IngressCommandError(IngressError):
             raise IngressError('runtime')
         super().__init__('command')
         text = stderr[:16384].lower() if isinstance(stderr, bytes) else b''
+        warnings = re.findall(rb'\bextension (owner|multiport|conntrack|mark|tcp) revision ([0-9]{1,3}) not supported\b', text)
+        extensions = {name.decode('ascii') for name, _revision in warnings}
+        extension = next(iter(extensions)) if len(extensions) == 1 else 'unknown'
+        revisions = {int(revision) for _name, revision in warnings}
+        revision = next(iter(revisions)) if extension != 'unknown' and len(revisions) == 1 and max(revisions) <= 255 else None
+        observed = {(name.decode('ascii'), int(value) if int(value) <= 255 else None) for name, value in warnings}
+        unsupported = [{'extension': name, 'revision': value} for name, value in sorted(observed,
+                       key=lambda item: (item[0], -1 if item[1] is None else item[1]))[:6]]
         self.diagnostic = {
             'family': family, 'operation': operation, 'failureKind': failure_kind,
             'returnCode': returncode if type(returncode) is int and -255 <= returncode <= 255 else None,
+            'extension': extension, 'revision': revision,
+            'unsupportedExtensions': unsupported,
             'unsupportedRevision': bool(re.search(rb'revision [0-9]+ not supported', text)),
             'missingKernelModule': b'missing kernel module' in text,
             'missingExtension': b"couldn't load match" in text or b'could not load match' in text,
