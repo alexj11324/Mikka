@@ -25,7 +25,7 @@ import type { CitationSource } from '@/lib/coordinator/citations'
 import { reasoningText } from '@/lib/coordinator/stream-response'
 import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
 import { and, eq, sql } from 'drizzle-orm'
-import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
+import { chatBotId, type openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
 import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
 import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
@@ -57,19 +57,24 @@ async function getUserId(): Promise<string> {
 export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string; after?: number; baseCursor?: number; metadataRefresh?: boolean; live?: ListLiveRead }
 
 const botIdSchema = z.uuid().nullable()
+const expectedWorkspaceIdSchema = z.uuid().transform(value => value.toLowerCase()).optional()
 
 /**
  * The bot whose chat this is: `botId` if it is one of the person's, or their
  * Coordinator's bot row when the caller names none (the Coordinator's entry
  * in the bot list).
  */
-async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string | null | undefined): Promise<{ id: string; name: string; coordinator: boolean; workspaceId: string }> {
+async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string | null | undefined, expectedWorkspaceId?: string): Promise<{ id: string; name: string; coordinator: boolean; workspaceId: string }> {
   const userId = user.id
   const parsed = botIdSchema.safeParse(botId ?? null)
-  if (!parsed.success) throw new ActionFailureError('validationGeneric')
+  const expected = expectedWorkspaceIdSchema.safeParse(expectedWorkspaceId)
+  if (!parsed.success || !expected.success) throw new ActionFailureError('validationGeneric')
   // No bot named: the Coordinator of the workspace the person has open.
   const context = await loadWorkspaceContext(undefined, user)
-  const id = await openChatBotId(user, parsed.data)
+  // A captured expectation cannot select or authorize a workspace. Refuse it
+  // before ensuring a Coordinator, then resolve in this same trusted context.
+  if (expected.data !== undefined && expected.data !== context.workspace.id) throw new ActionFailureError('workspaceAccessDenied')
+  const id = await chatBotId(userId, parsed.data, context.workspace.id)
   const [bot] = await db.select({ id: bots.id, name: bots.name, workspaceId: bots.workspaceId, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
     .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId), eq(bots.workspaceId, context.workspace.id))).limit(1)
   if (!bot) throw new ActionFailureError('botNotFound')
@@ -229,7 +234,7 @@ async function readBotChatSummaries() {
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
     const session=await auth.api.getSession({headers:requestHeaders})
@@ -241,7 +246,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
         if(['http:','https:'].includes(origin.protocol)&&origin.host===host)humanSessionId=session.session.id
       }catch{/* Missing/malformed origin is no approval provenance. */}
     }
-    const bot = await ownBot(session.user, botId)
+    const bot = await ownBot(session.user, botId, expectedWorkspaceId)
     const parsed = personalSubmissionInput.safeParse({ text, submissionId, ...(images?.length ? { images } : {}) })
     if (!parsed.success) throw new ActionFailureError('messageRequired')
     const quoted = quote ? quoteSchema.safeParse(quote) : null
