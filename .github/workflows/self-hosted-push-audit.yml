@@ -77,3 +77,7 @@ jobs:
         run: node scripts/ops/self-hosted-push-project-audit.mjs
         env:
           PUSH_SENDER_SOURCE: public-reference
+      - name: Verify sender deployment barriers without changing provider settings
+        run: |
+          node --test scripts/ops/self-hosted-push-security.test.mjs
+          node scripts/ops/self-hosted-push-security.mjs --check
