@@ -32,7 +32,7 @@ export default function SuggestionsScreen() {
 
   return (
     <View style={styles.screen}>
-      <NavBar title="建议" large
+      <NavBar title="建议" topTitle
         right={{ icon: 'puzzlepiece.extension', label: '插件', web: <Puzzle size={20} color={colors.ink} strokeWidth={2} />, onPress: () => router.push('/suggestions/plugins') }} />
       <FlatList
         data={items}

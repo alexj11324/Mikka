@@ -60,7 +60,7 @@ export default function SettingsScreen() {
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
-      <NavBar title="设置" large />
+      <NavBar title="设置" topTitle />
       {!data && error ? (
         <View style={{ paddingTop: 40, alignItems: 'center', gap: 10 }}>
           <Text style={{ color: colors.danger, fontSize: 13 }}>设置加载失败。</Text>
