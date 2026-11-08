@@ -9,16 +9,16 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '4ec74d5caae87d20358409b41906091cca33b46f',
-  tree: '6ec1f97897c2db3300286977e041acb43b81a686',
-  workerSha: '3efaf3e00956f2833b9447315404a2e814541c87',
+  source: '1f7c6bddb2e83cc6885b5ec7cb4ec016f91f0a91',
+  tree: '2c74ffbc245d89bb8de654a33dde55247217d2a0',
+  workerSha: '6803421917141e7dbaed613b7c75964bc88b1cb1',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
     'package.json': '0f17119e190637a88295d7b5d50e9b73433c0c3737fc30b8f8ddf766b6d2ee7a',
     'pnpm-lock.yaml': '345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054',
     'pnpm-workspace.yaml': '8977ce9916b92a015e0f4dad1d45bcf51c9427637a5988fcdc585a1a21a0301e',
-    'scripts/e2b/workspace-candidates.py': '86021b50c45109d6319b7fcf2e97b3f58e22074596547e728ba338a4023e139b',
-    'scripts/e2b/workspace-candidates.test.py': '7a2443e410b8f03a25ef3dc77f4c8d3bb574c9adc518066c1f393ea0bb153dbf',
+    'scripts/e2b/workspace-candidates.py': 'c34c40bc489165b96f1bff0b7eddeb0d31ea1e279bc1c214d060c93ab046468d',
+    'scripts/e2b/workspace-candidates.test.py': '4908989fe9e2833bba465ed8258cac9e1d2395555b259be8c089e906a4dcff64',
     'scripts/e2b/build-template.py': 'efe0a20a73749a06b4e2f20fb4b1c8a1bd99a7b7a4fdae961fee9d410b424d85',
     'scripts/e2b/build-template.test.py': '78e367541f0e6441c60944b107b179b78a75ea754bee0d729df0aa9f5bd4749e',
     'scripts/e2b/official-files.py': '6191212b14205c7cb8043efcfb85eaff05670f8cb65c4c801052cf9d3a28babe',
@@ -32,7 +32,7 @@ export const P0 = Object.freeze({
     'scripts/e2b/workspace-terminal-acceptance.test.mjs': '971003d90739338112ae83838abc218811818600dcebe7fdbdd46b5e2214dce3',
     'scripts/e2b/fixtures/preview-frameworks/package.json': 'e0cf3ad9d36941898385fc4e149c65be9a1081d8685b4d0b03e92e547cae964d',
     'scripts/e2b/fixtures/preview-frameworks/package-lock.json': '9c123244b4ea44b3a59b92615e25b9780463135eab9f573b7342ad4df7468ef6',
-    'packages/daemon/scripts/workspace-ingress.py': 'be7d5f302cc10fc25e7d3d1159bbb822f0ceca0df36516696af2392902925801',
+    'packages/daemon/scripts/workspace-ingress.py': '38b51c4bc878e5224b5f0a7aa6d727a67a27e7ec0ac98bee8ba957094cb06d6a',
   },
 })
 const SOURCE_DIRECTORY = 'workspace-acceptance-source'
@@ -70,6 +70,10 @@ const BUILDER_ERROR_TYPES = ['CandidateError', 'Exception', 'RuntimeError', 'Val
 const BOOTSTRAP_PHASES = ['validation', 'source', 'node', 'gh', 'dependencies', 'build', 'cli', 'journal', 'desktop', 'finalize']
 const INGRESS_DETAILS = ['listener', 'boot', 'identity', 'state', 'receipt', 'provider', 'command', 'tool', 'backend',
   'rule_order', 'late_install', 'worker', 'worker_order', 'operation', 'runtime']
+const INGRESS_COMMAND_OPERATIONS = ['new_chain', 'provider_rule', 'reply_rule', 'output_jump', 'check_output',
+  'check_provider', 'check_reply', 'list_output', 'list_chain']
+const INGRESS_COMMAND_FLAGS = ['unsupportedRevision', 'missingKernelModule', 'missingExtension',
+  'operationNotSupported', 'permissionDenied', 'invalidArgument']
 const BUILD_HOST_ERRORS = ['official_cli_kind_invalid', 'official_cli_path_invalid', 'official_cli_baseline_mismatch',
   'official_cli_missing', 'official_cli_manifest_invalid', 'runtime_cli_missing', 'cli_relocation_invalid',
   'added_cli_paths_invalid', 'official_cli_changed', 'added_cli_path_invalid', 'official_cli_manifest_untrusted',
@@ -111,13 +115,24 @@ function buildStatusLookup(value) {
     failure: value.failure ? diagnosticException(value.failure) : null }
 }
 
+function ingressCommand(value) {
+  if (!value || !['ipv4', 'ipv6'].includes(value.family) || !INGRESS_COMMAND_OPERATIONS.includes(value.operation)
+    || !['exit', 'timeout', 'output_limit', 'execution'].includes(value.failureKind)
+    || !(value.returnCode === null || exitCode(value.returnCode) !== null)
+    || INGRESS_COMMAND_FLAGS.some(key => typeof value[key] !== 'boolean')) return null
+  return Object.fromEntries(['family', 'operation', 'failureKind', 'returnCode', ...INGRESS_COMMAND_FLAGS].map(key => [key, value[key]]))
+}
+
 function buildDiagnostic(value) {
   if (!value || typeof value !== 'object') return null
   const events = rows => (Array.isArray(rows) ? rows.slice(0, 64) : []).flatMap(row => {
     switch (row?.phase) {
       case 'template_created': return [{ phase: row.phase }]
       case 'bootstrap': return [{ phase: row.phase, detail: one(row.detail, BOOTSTRAP_PHASES), elapsedMs: count(row.elapsedMs) }]
-      case 'ingress': return [{ phase: row.phase, detail: one(row.detail, INGRESS_DETAILS) }]
+      case 'ingress': {
+        const command = row.detail === 'command' ? ingressCommand(row.command) : null
+        return [{ phase: row.phase, detail: one(row.detail, INGRESS_DETAILS), ...(command ? { command } : {}) }]
+      }
       case 'host_failure': return [{ phase: row.phase, detail: one(row.detail, BUILD_HOST_ERRORS) }]
       case 'official_capture': return [{ phase: row.phase, entries: count(row.entries) }]
       default: return []

@@ -190,6 +190,39 @@ test('build diagnostics retain bounded type/status/host phase evidence without c
   assert.equal(JSON.stringify(result).includes(privateText), false)
 })
 
+test('ingress command diagnostics retain only known observations without copying private process data', () => {
+  const value = fixtureReceipts(), privateText = 'synthetic-private-netfilter-argument'
+  const command = { family: 'ipv6', operation: 'provider_rule', failureKind: 'exit', returnCode: 2,
+    unsupportedRevision: false, missingKernelModule: false, missingExtension: true,
+    operationNotSupported: false, permissionDenied: false, invalidArgument: false }
+  const event = { phase: 'ingress', detail: 'command', command: { ...command,
+    stderr: privateText, argv: [privateText], path: privateText } }
+  value.buildReport = { identity, status: 'failed', stage: 'build_claude', code: 'template_build_failed',
+    diagnostic: { buildLogs: { claude: { events: [event] } } } }
+  let result = summarizeAcceptance(context, value)
+  assert.equal(result.passed, false)
+  assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0], { phase: 'ingress', detail: 'command', command })
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+  for (const [failureKind, returnCode] of [['timeout', null], ['output_limit', 0], ['execution', null]]) {
+    event.command = { ...command, failureKind, returnCode, stderr: privateText }
+    result = summarizeAcceptance(context, value)
+    assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0].command, { ...command, failureKind, returnCode })
+    assert.equal(JSON.stringify(result).includes(privateText), false)
+  }
+  for (const change of [{ family: privateText }, { operation: privateText }, { failureKind: privateText },
+    { returnCode: privateText }, { returnCode: true }, { returnCode: 256 }, { returnCode: -256 }, { permissionDenied: privateText }]) {
+    event.command = { ...command, ...change }
+    result = summarizeAcceptance(context, value)
+    assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0], { phase: 'ingress', detail: 'command' })
+    assert.equal(JSON.stringify(result).includes(privateText), false)
+  }
+  for (const key of Object.keys(command)) {
+    event.command = Object.fromEntries(Object.entries(command).filter(([name]) => name !== key))
+    result = summarizeAcceptance(context, value)
+    assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0], { phase: 'ingress', detail: 'command' })
+  }
+})
+
 test('a failed status lookup preserves the original failure and only exact-identity status metadata', () => {
   const value = fixtureReceipts(), privateText = 'private-provider-reason-command'
   value.buildReport = { identity, status: 'failed', stage: 'build_claude', code: 'template_build_failed', diagnostic: {
