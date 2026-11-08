@@ -72,6 +72,15 @@ export async function readAuthorizedProjection({ location, name, clientId, clien
   return secret.secretValue
 }
 
+// Use the ordinary shared-account action before taking the immutable snapshot.
+// Near expiry, only the production custody service renews the provider grant.
+export async function readCheckedSourceMetadata(client, connectionId, workspaceId, readMetadata, receipt = {}) {
+  check(UUID.test(connectionId) && UUID.test(workspaceId), 'CHECKED_SOURCE_SCOPE')
+  await client.rpc('model-order.checkModelOrderQuota', [connectionId, workspaceId])
+  receipt.normalSourceCheck = true
+  return readMetadata()
+}
+
 export async function configureBoundSubscription(client, workspaceId, selected, receipt = {}) {
   const change = async (step, value) => { receipt.modelSelectionStep = step; return client.rpc('model-order.changeModelOrder', [value, workspaceId]) }
   await change('location', { kind: 'location', location: 'local' })
@@ -216,7 +225,7 @@ export async function runCommunity(env = process.env) {
   const { executionIdentitySchema, freezeExecutionIdentity, revalidateExecutionIdentity } = await import(pathToFileURL(source + '/lib/execution-identity.ts'))
   const revision = (await execute('git', ['rev-parse', 'HEAD'], { cwd: source })).stdout.trim()
   check(/^[a-f0-9]{40}$/.test(revision) && revision === env.MIKKA_COMMUNITY_REVISION, 'REVISION')
-  const report = { kind: 'real-community-subscriptions', revision, candidate: env.MIKKA_COMMUNITY_CANDIDATE === '1', cases: [], cleanup: {}, stage: 'source', status: 'failed',
+  const report = { kind: 'real-community-subscriptions', revision, candidate: env.MIKKA_COMMUNITY_CANDIDATE === '1', providerScope: env.MIKKA_COMMUNITY_PROVIDER ?? 'both', cases: [], cleanup: {}, stage: 'source', status: 'failed',
     sourceRequests: [], credentialFixture: 'existing_authorized_access_projection', freshProviderOAuth: false, refreshGrantCopied: false, canonicalGrantPresent: false }
   const publicErrors = (await execute('git', ['grep', '-n', '-E', '(Error|Refusal)\\(|error:|summary:|msg:|reason:', '--', 'lib', 'app', 'packages/daemon/src', 'packages/protocol/src'], { cwd: source, maxBuffer: 8 * 1024 * 1024 })).stdout
   const signatures = publicErrors.split('\n').flatMap(line => {
@@ -265,7 +274,7 @@ export async function runCommunity(env = process.env) {
     report.publicBuild = (await cloud.json('/api/version')).build
     const sharedBuilds = [revision, env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION, '4221d9c06da079321d4fe2803879ba82043d7a1f', '0479675e188efeac341b207d8616c4d7b9d4ee23', 'ad7f0d0434e7d4a2527d868c4830d009b28a9d7f', '78c3c13d35c2c664113a140bccb3db4ae9606021']
     check(env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION === '9ea7b2cd61deb724f20330906f86df6df2cd9828' && sharedBuilds.includes(report.publicBuild), 'PUBLIC_VERSION')
-    report.sharedControlPlaneCompatibility = 'A23_fixed_selfhost_live047_auth_cloud_github_unchanged_reviewed_quota_read_optimization'
+    report.sharedControlPlaneCompatibility = env.MIKKA_COMMUNITY_CANDIDATE === '1' ? 'candidate18199_shared047_mobile_docs_only' : 'exact_release_image_and_served_control_plane'
     privatePool = new Pool({ connectionString: database, max: 1, ssl: { rejectUnauthorized: true } })
     await privatePool.query('BEGIN READ ONLY')
     // The normal account API must expose the source before its exact metadata
@@ -278,7 +287,8 @@ export async function runCommunity(env = process.env) {
     report.sourceConfiguration = { origin: 'existing_vercel_production', accessProjectMatchesLegacy: productionLocation.project === PROJECT,
       accessPathMatchesLegacy: productionLocation.path === legacyPath, environmentMatchesLegacy: productionLocation.environment === legacyEnvironment }
     const sources = []
-    const providers = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']].map(([provider, harness, model]) => {
+    check(env.MIKKA_COMMUNITY_PROVIDER === 'claude' && env.MIKKA_COMMUNITY_CANDIDATE === '1' || !env.MIKKA_COMMUNITY_PROVIDER || env.MIKKA_COMMUNITY_PROVIDER === 'both', 'PROVIDER_SCOPE')
+    const providers = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']].filter(([provider]) => !env.MIKKA_COMMUNITY_PROVIDER || env.MIKKA_COMMUNITY_PROVIDER === 'both' || provider === env.MIKKA_COMMUNITY_PROVIDER).map(([provider, harness, model]) => {
       const receipt = { harness, model, status: 'failed', cleanup: {} }; report.cases.push(receipt)
       return { provider, harness, model, receipt }
     })
@@ -286,12 +296,13 @@ export async function runCommunity(env = process.env) {
       const { provider, harness, model } = source
       let chosen, selectedWorkspace
       for (const workspace of choices.filter(w => w.kind === 'team')) {
+        await cloud.rpc('workspace.switchWorkspace', [workspace.id])
         const view = await cloud.rpc('model-order.getModelOrder', [workspace.id])
         const candidates = (view.candidates ?? []).filter(c => c.harness === harness && c.model === model && c.source?.kind === 'subscription')
         if (candidates.length === 1) { chosen = candidates[0]; selectedWorkspace = workspace.id; break }
       }
       check(chosen, 'AUTHORIZED_' + provider.toUpperCase())
-      const result = await privatePool.query(`SELECT id::text,"ownerId","workspaceId",provider,state,epoch,"credentialVersion","providerSubject","accessSecretName","accessDigest","modelCatalog",quota FROM byos_connections WHERE id=$1 AND provider=$2 AND state='connected'`, [chosen.source.connectionId, provider])
+      const result = await readCheckedSourceMetadata(cloud, chosen.source.connectionId, selectedWorkspace, () => privatePool.query(`SELECT id::text,"ownerId","workspaceId",provider,state,epoch,"credentialVersion","providerSubject","accessSecretName","accessDigest","modelCatalog",quota FROM byos_connections WHERE id=$1 AND provider=$2 AND state='connected'`, [chosen.source.connectionId, provider]), source.receipt)
       check(result.rows.length === 1, 'CONNECTION')
       const row = result.rows[0]
       check(UUID.test(row.id) && /^mikka-byos-[a-f0-9-]{36}$/.test(row.accessSecretName) && /^[a-f0-9]{64}$/.test(row.accessDigest), 'CONNECTION_METADATA')
@@ -574,7 +585,7 @@ export async function runCommunity(env = process.env) {
             } }
             const run = (await tx.query('SELECT "userId","botId","deviceId","agentDefinition",status,"stopRequestedAt","leaseExpiresAt" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3', [runId, own.id, deviceId])).rows[0]
             check(run, 'OWN_AUTHORITY_DIAGNOSIS')
-            const item = { status: run.status, stopRequested: Boolean(run.stopRequestedAt), leaseExpired: new Date(run.leaseExpiresAt).getTime() <= Date.now(), reads }
+            const item = { status: run.status, stopRequested: Boolean(run.stopRequestedAt), leaseExpired: Boolean(run.leaseExpiresAt) && new Date(run.leaseExpiresAt).getTime() <= Date.now(), reads }
             row.authorityReads.push(item)
             const subscription = run.agentDefinition?.subscription
             if (subscription) {
@@ -681,7 +692,7 @@ export async function runCommunity(env = process.env) {
         if (sandbox) { try { await sandbox.kill(); row.cleanup.vmStopped = true; journal.vms = journal.vms.filter(id => id !== sandbox.sandboxId); await saveJournal() } catch { row.cleanup.vmStopped = false } }
       }
     }
-    check(report.cases.length === 2 && report.cases.every(c => c.status === 'passed' && c.cleanup.vmStopped && c.cleanup.deviceRemoved), 'BOTH_THREADS')
+    check(report.cases.length === providers.length && report.cases.every(c => c.status === 'passed' && c.cleanup.vmStopped && c.cleanup.deviceRemoved), 'BOTH_THREADS')
     check(report.githubManifest?.status === 'passed', 'MANIFEST_PREPARATION')
     report.publicFinalBuild = (await cloud.json('/api/version')).build
     check(sharedBuilds.includes(report.publicFinalBuild), 'PUBLIC_CHANGED')

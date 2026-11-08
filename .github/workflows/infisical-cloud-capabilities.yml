@@ -234,6 +234,7 @@ jobs:
       # Exact green PR1692 candidate, built only on this disposable runner before credentials.
       MIKKA_COMMUNITY_REVISION: 18199a04f86cf0d04e0776feca3af64957a4c472
       MIKKA_COMMUNITY_CANDIDATE: '1'
+      MIKKA_COMMUNITY_PROVIDER: claude
       MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION: 9ea7b2cd61deb724f20330906f86df6df2cd9828
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -266,7 +267,7 @@ jobs:
             return response.json()
           }
           const [pr, runs, parentRuntime] = await Promise.all([get('pulls/1692'), get('actions/runs?head_sha=' + sha + '&per_page=100'), get('actions/runs/42423534091')])
-          if (pr.head?.sha !== sha || parentRuntime.head_sha !== '0479675e188efeac341b207d8616c4d7b9d4ee23' || parentRuntime.conclusion !== 'success') throw Error('COMMUNITY_CANDIDATE_SOURCE_CHANGED')
+          if (pr.head?.sha !== '93165f4ad0cc5b375e1e49ecafa267209729fb0e' || parentRuntime.head_sha !== '0479675e188efeac341b207d8616c4d7b9d4ee23' || parentRuntime.conclusion !== 'success') throw Error('COMMUNITY_CANDIDATE_SOURCE_CHANGED')
           const live = await fetch('https://app.aspectlylabs.com/mikka/api/version', { redirect: 'error', headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(20000) })
           if (!live.ok) throw Error('COMMUNITY_PUBLIC_BUILD_UNAVAILABLE')
           const served = (await live.json()).build
@@ -285,7 +286,7 @@ jobs:
             if (!run) throw Error('COMMUNITY_CANDIDATE_NOT_READY_' + name.replaceAll(' ', '_').toUpperCase())
             return { workflow: name, run: run.id }
           })
-          console.log(JSON.stringify({ kind:'community-candidate-gate', revision:sha, pr:1692, sharedServedBuild:served, status:'passed', workflows:receipt, publishedImage:false, credentialsDelivered:false }))
+          console.log(JSON.stringify({ kind:'community-candidate-gate', revision:sha, pr:1692, currentPrHead:pr.head.sha, historicalCandidate:true, sharedServedBuild:served, status:'passed', workflows:receipt, publishedImage:false, credentialsDelivered:false }))
           JS
       - name: Build only the fixed candidate image on this disposable runner before credentials
         env:
@@ -317,7 +318,7 @@ jobs:
           secret-name: VERCEL_TEAM_TOKEN
           recursive: false
           include-imports: false
-      - name: Complete the two independent official subscription threads on the community installation
+      - name: Complete only the previously blocked Claude candidate thread
         timeout-minutes: 18
         run: node scripts/ops/self-hosting-subscription-acceptance.mjs
       - name: Independently reclaim only this run's access folder and machines

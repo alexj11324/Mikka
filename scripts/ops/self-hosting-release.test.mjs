@@ -166,3 +166,5 @@ test('Apple API denial preserves action/status without exposing raw provider err
 // Fixed A23 image and approved ce67 templates remain independent of the reviewed live047 quota-read optimization.
 
 // PR1692 candidate is identified separately; it cannot claim a published main image.
+
+// Retry only the blocked Claude candidate after the normal authorized source check; final release still requires both.

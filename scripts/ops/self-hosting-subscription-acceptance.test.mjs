@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, safeThreadFailure, safeRepositoryFailure, safeSourceFailures } from './self-hosting-subscription-acceptance.mjs'
+import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, readCheckedSourceMetadata, safeThreadFailure, safeRepositoryFailure, safeSourceFailures } from './self-hosting-subscription-acceptance.mjs'
 const target = { ownerId: 'owned-local-user', workspaceId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222' }
 const row = { id: '33333333-3333-4333-8333-333333333333', ownerId: 'authorized-owner', workspaceId: '44444444-4444-4444-8444-444444444444', provider: 'codex' }
 const bundle = () => ({ schema: 1, connectionId: row.id, ownerId: row.ownerId, workspaceId: row.workspaceId, provider: row.provider,
@@ -168,3 +168,19 @@ test('frozen-source failure matching projects locations only and never runtime t
 // Fixed A23 image and approved ce67 templates remain independent of the reviewed live047 quota-read optimization.
 
 // PR1692 candidate is identified separately; it cannot claim a published main image.
+
+test('the authorized normal source check precedes the immutable credential snapshot and a refusal cannot read a source', async () => {
+  const connectionId = row.id, workspaceId = target.workspaceId, calls = [], receipt = {}
+  let version = 1
+  const client = { rpc: async (action,args) => {
+    calls.push('ordinary-check')
+    assert.equal(action,'model-order.checkModelOrderQuota')
+    assert.deepEqual(args,[connectionId,workspaceId])
+    version = 2 // normal production custody publishes its refreshed projection
+  } }
+  const result = await readCheckedSourceMetadata(client,connectionId,workspaceId,async()=>{calls.push('metadata');return {version}},receipt)
+  assert.deepEqual(calls,['ordinary-check','metadata'])
+  assert.equal(result.version,2);assert.equal(receipt.normalSourceCheck,true)
+  await assert.rejects(readCheckedSourceMetadata({rpc:async()=>{throw Error('refused')}},connectionId,workspaceId,()=>assert.fail('no snapshot after refusal')),/refused/)
+  await assert.rejects(readCheckedSourceMetadata({rpc:()=>assert.fail('invalid scope')},'invalid',workspaceId,()=>assert.fail('invalid scope')),/CHECKED_SOURCE_SCOPE/)
+})
