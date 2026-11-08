@@ -22,7 +22,6 @@ interface CardContext {
   /** What the person wrote next, if anything: a choice card marks the option it names. */
   reply?: string
   answer: (text: string) => Promise<boolean>
-  webPath: string | null
   sources: Record<string, CitationSource>
   onOpen: (source: CitationSource) => void
 }
@@ -43,7 +42,7 @@ export function OpenUIReply({ text, ...context }: CardContext & { text: string }
     <Context.Provider value={context}>
       <View style={styles.reply}>
         {prose ? <Words text={prose} /> : null}
-        {root === null ? <WebOnly text={looseText(text)} /> : <Node value={root} />}
+        {root === null ? <PlainCard text={looseText(text)} /> : <Node value={root} />}
       </View>
     </Context.Provider>
   )
@@ -73,7 +72,7 @@ function Node({ value }: { value: Value | undefined }) {
     case 'BeCardGrid': return <View style={styles.stack}><Node value={value.props.children} /></View>
     case 'BeImageCard': return <ImageCard value={value} />
     case 'BeImage': return <Figure value={value} />
-    default: return <WebOnly text={openUIText(value)} />
+    default: return <PlainCard text={openUIText(value)} />
   }
 }
 
@@ -356,18 +355,11 @@ function Figure({ value }: { value: Component }) {
   )
 }
 
-/** A card the app cannot draw: its words, and the same chat on the web, signed in. */
-function WebOnly({ text }: { text: string }) {
-  const { webPath, sources, onOpen } = useCard()
-  return (
-    <ChatCard>
-      {text.trim() ? <Markdown text={text} sources={sources} onOpen={onOpen} /> : null}
-      {webPath ? <Pressable accessibilityRole="link" onPress={() => void openOnWeb(webPath)} style={styles.webLink} hitSlop={6}>
-        <Text style={{ color: colors.accent, fontSize: 15 }}>在网页上打开</Text>
-        <ArrowUpRight size={16} color={colors.accent} strokeWidth={2} />
-      </Pressable> : null}
-    </ChatCard>
-  )
+/** A card the app has no native drawing for: its words, in full, in the card. Nothing in a chat card opens the web
+ * (Alex 2026-11-08: the 「在网页上打开」 link opened an empty file and a raw sign-in page). */
+function PlainCard({ text }: { text: string }) {
+  const { sources, onOpen } = useCard()
+  return <ChatCard>{text.trim() ? <Markdown text={text} sources={sources} onOpen={onOpen} /> : null}</ChatCard>
 }
 
 const styles = StyleSheet.create({
@@ -383,5 +375,4 @@ const styles = StyleSheet.create({
   picture: { width: '100%', aspectRatio: 16 / 9, borderRadius: 10, backgroundColor: colors.bubble },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tag: { fontSize: 12, lineHeight: 16, color: colors.secondary, backgroundColor: colors.bubble, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, overflow: 'hidden' },
-  webLink: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
 })

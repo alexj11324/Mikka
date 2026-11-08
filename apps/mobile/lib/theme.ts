@@ -20,12 +20,29 @@ function resolve(name: Name, token: Token): string {
 }
 
 /**
- * Side margins (Alex 2026-11-06; HIG layout margins): a plain list's content starts 16 pt in from each edge, an inset
- * grouped list's cards 20 pt. A row's pressed surface sits 6 pt in and its content 10 pt further, so text lands on 16.
+ * Spacing, in one place (Alex 2026-11-08 「把间距放大」, matching OpenBot / Comma; decisions/2026-11-08-0200).
+ * Every page's content starts 20 pt in from each edge, a plain list's and an inset grouped list's alike. A row's
+ * pressed surface sits 6 pt in and its content 14 pt further, so text lands on 20.
  */
-export const LIST_INSET = 16
+export const LIST_INSET = 20
 export const GROUP_INSET = 20
 export const ROW_SURFACE_INSET = 6
+export const SPACE = {
+  /** A list row's vertical padding: a Bot row comes to 78 pt with its 48 pt avatar. */
+  rowY: 15,
+  /** Between a row's title line and its grey line. */
+  lineGap: 4,
+  /** Between groups and sections. */
+  section: 30,
+  /** Below a group bar, before its first row. */
+  barBelow: 12,
+  /** Between a detail page's blocks (title, properties, description, 活动). */
+  block: 20,
+  /** Between items of 活动. */
+  item: 16,
+} as const
+/** Avatar sizes: a chat row's, and a pinned tile's. */
+export const AVATAR = { row: 48, pin: 86 } as const
 
 export const colors = Object.fromEntries(Object.entries(TOKENS).map(([name, token]) => [name, resolve(name as Name, token)])) as Record<Name, string>
 

@@ -15,7 +15,7 @@ import { tasksLive } from '@/lib/live-keys'
 import type { TaskActivity, TaskDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
-import { colors, LIST_INSET } from '@/lib/theme'
+import { colors, LIST_INSET, SPACE } from '@/lib/theme'
 import { AttemptIcon, BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
 import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
 
@@ -136,16 +136,17 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: LIST_INSET, paddingTop: 8, gap: 0 },
   center: { paddingTop: 40, alignItems: 'center' },
   key: { fontSize: 15, color: colors.secondary, fontVariant: ['tabular-nums'] },
-  title: { fontSize: 26, lineHeight: 32, fontWeight: '700', color: colors.text, marginTop: 4, marginBottom: 14 },
+  title: { fontSize: 26, lineHeight: 32, fontWeight: '700', color: colors.text, marginTop: 4, marginBottom: SPACE.block },
   properties: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 10, borderRadius: 14, borderCurve: 'continuous', backgroundColor: colors.bubble },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%', minHeight: 30, paddingHorizontal: 10, borderRadius: 8, borderCurve: 'continuous', backgroundColor: colors.chip },
   chipText: { flexShrink: 1, fontSize: 14, color: colors.text },
-  description: { marginTop: 16 },
-  section: { marginTop: 28, marginBottom: 6, fontSize: 14, fontWeight: '600', color: colors.secondary },
-  activity: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 58, marginHorizontal: -8, paddingHorizontal: 8, borderRadius: 10, borderCurve: 'continuous' },
+  description: { marginTop: SPACE.block },
+  section: { marginTop: SPACE.block + 8, marginBottom: 4, fontSize: 14, fontWeight: '600', color: colors.secondary },
+  activity: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 58, marginHorizontal: -8, paddingHorizontal: 8, paddingVertical: SPACE.item / 2, borderRadius: 10, borderCurve: 'continuous' },
   rail: { width: 10, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
   node: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.tertiary },
-  line: { position: 'absolute', top: '50%', bottom: -29, width: 1.5, backgroundColor: colors.separator },
+  /** From this item's node to the next one's: items share a height, so the line spans one item. */
+  line: { position: 'absolute', top: '50%', bottom: '-50%', width: 1.5, backgroundColor: colors.separator },
   noBot: { width: 20 },
   activityText: { flex: 1, minWidth: 0, gap: 2 },
   activityTitle: { fontSize: 16, fontWeight: '500', color: colors.text },
