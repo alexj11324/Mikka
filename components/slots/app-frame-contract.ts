@@ -1,0 +1,20 @@
+// What 外框 receives (docs/ui-overlay.md): the app window around every page —
+// the gray frame, the window bar across the top, the icon rail on the left and
+// the rounded card that holds the page. The window bar's content (search, the
+// panel and 全部任务 buttons) arrives as `bar` and is drawn as given; the
+// right-hand panel lives inside the page, not here.
+import type { ReactNode } from 'react'
+import type { RailProps } from '@/components/nav/rail-items'
+
+export type AppFrameProps = {
+  /** The window bar (WindowBar), drawn as given. */
+  bar: ReactNode
+  /** The icon rail (IconRail). */
+  rail: ReactNode
+  children: ReactNode
+  /** Settings drawn inside this frame: its own palette applies (SETTINGS_COLORS in app-frame-view.tsx). */
+  settings?: boolean
+}
+
+/** The icon rail: RAIL_ITEMS, the update button and the account menu (WorkspaceMenu, compact). */
+export type IconRailProps = RailProps

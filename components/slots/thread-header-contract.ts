@@ -33,6 +33,17 @@ export type ThreadHeaderProps = {
   tabs: ReactNode
   /** The header wraps on a phone (a Factory candidate's tabs). */
   wraps: boolean
+  /**
+   * ⤢: widen the right column the thread sits in, or put back the width it had (useRightColumnWiden);
+   * absent outside the right column. Optional: the default header has no widen button.
+   */
+  widen?: { wide: boolean; onToggle: () => void }
+  /** The run its live work goes to (a continuation's), for a layer that opens the execution identity itself. */
+  liveRunId?: string
+  /** The thread's status, for a layer that lists its Artifacts itself (useArtifactReview). */
+  status?: string
+  /** The acceptance task this thread produced, when the panel knows it. */
+  acceptanceTaskId?: string | null
 }
 
 export type ThreadStatusLineProps = {
@@ -46,6 +57,11 @@ export type ThreadStatusLineProps = {
   startedAt: string
   /** The Bot that dispatched it; null when unknown. */
   dispatchedBy: string | null
+  /** For a layer that names where it runs in the status line (the thread-machine read ThreadRunPlace shares). */
+  issueId?: string | null
+  runId?: string
+  /** Its Agent (harnessLabel); null before the thread is read. */
+  harness?: string | null
   /**
    * Its place in its task's one conversation (task-conversation slot): the attempt's number and Agent, whether it is
    * the first (which carries the dispatch: the Bot's instruction, its prompt), and the task's title. Absent alone.
