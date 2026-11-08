@@ -172,3 +172,5 @@ test('Apple API denial preserves action/status without exposing raw provider err
 // Final receipt uses both original subscriptions on the exact formally released main image and served control plane.
 
 // Formal-source pin follows the verified no-credential final-controller preflight.
+
+// Final-source checkpoint after the shared-team selector stage.

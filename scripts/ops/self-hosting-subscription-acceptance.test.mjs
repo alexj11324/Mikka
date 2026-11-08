@@ -218,3 +218,5 @@ test('a claimed team proof without its verified callback or policy identity cann
     }), /COMMUNITY_TEAM_SCOPE/)
   }
 })
+
+// Final-source checkpoint after the shared-team selector stage.

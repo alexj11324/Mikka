@@ -759,3 +759,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
 // Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.
 
 // Formal-source pin follows the verified no-credential final-controller preflight.
+
+// Final-source checkpoint after the shared-team selector stage.

@@ -233,10 +233,11 @@ jobs:
     permissions:
       contents: read
       actions: read
+      pull-requests: read
       id-token: write
     env:
       # Exact formally released main containing1692; verify all four gates before credentials.
-      MIKKA_COMMUNITY_REVISION: __FINAL_MAIN_SHA__
+      MIKKA_COMMUNITY_REVISION: 7e34d869aa80266494cb2e2eefeee5d8e7ff7d4d
       MIKKA_COMMUNITY_CANDIDATE: '0'
       MIKKA_COMMUNITY_PROVIDER: both
       MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION: 9ea7b2cd61deb724f20330906f86df6df2cd9828
@@ -351,4 +352,4 @@ jobs:
 
 # Compare only owner-event provenance booleans; verify enabled Manifest preparation without creating an App.
 
-# Shared-team policy rehearsal remains stage-only with an invalid release placeholder.
+# Reuse the reviewed shared-team policy for exact formal-source acceptance.
