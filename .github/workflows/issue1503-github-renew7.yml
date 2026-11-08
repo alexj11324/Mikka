@@ -1,7 +1,7 @@
-name: Issue 1503 GitHub source refresh and child rotation 7
+name: Issue 1503 GitHub source refresh and child rotation 8
 on:
   push:
-    branches: [ops/issue-1503-github-renew7-20261108]
+    branches: [ops/1505-github-renew8-20261108]
     paths:
       - .github/workflows/issue1503-github-renew7.yml
       - scripts/ops/issue1503/**
