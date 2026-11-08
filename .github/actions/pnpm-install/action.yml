@@ -1,9 +1,14 @@
 name: Install dependencies with pnpm
 description: >-
-  pnpm, Node 24 and a frozen-lockfile install. The pnpm store cache is
-  read-only everywhere except pushes to main: pull requests and branches
-  restore main's entry and never save their own, so cache entries stop
-  multiplying per branch.
+  Exact installed-dependency reuse, with a pnpm-store fallback on misses.
+  Only main pushes and manual main runs save caches; PRs only restore.
+inputs:
+  profile:
+    description: full, or desktop (all workspaces except the independent mobile app)
+    default: full
+  skip-electron:
+    description: Leave runtime installation to the checksum-verifying desktop installer
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -13,20 +18,66 @@ runs:
     - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: 24
+    - id: modules-key
+      shell: bash
+      env:
+        INSTALL_PROFILE: ${{ inputs.profile }}
+        ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ inputs.skip-electron == 'true' && '1' || '' }}
+      run: node scripts/ci/dependency-cache.mjs
+    - name: Restore exact installed dependencies
+      id: modules
+      if: steps.modules-key.outputs.reusable == 'true'
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+        key: ${{ steps.modules-key.outputs.key }}
     - id: store
+      if: steps.modules.outputs.cache-hit != 'true'
       shell: bash
       run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
     - id: restore
+      if: steps.modules.outputs.cache-hit != 'true'
       uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ${{ steps.store.outputs.path }}
         key: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
           pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-
-    - shell: bash
-      run: pnpm install --frozen-lockfile
+    - name: Install dependencies on a cache miss
+      id: install
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        INSTALL_PROFILE: ${{ inputs.profile }}
+        ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ inputs.skip-electron == 'true' && '1' || '' }}
+      run: |
+        case "$INSTALL_PROFILE" in
+          full) pnpm install --frozen-lockfile ;;
+          desktop) pnpm --filter '!@mikka/mobile' install --frozen-lockfile ;;
+          *) echo '::error::Unknown dependency installation profile'; exit 1 ;;
+        esac
+    # Save immediately after installation, before tests/builds/credentials can
+    # mutate node_modules. No fuzzy module restore and no PR cache writers.
+    - name: Save exact installed dependencies (main only)
+      if: >-
+        github.ref == 'refs/heads/main' &&
+        (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+        steps.modules-key.outputs.reusable == 'true' && steps.install.outcome == 'success'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+        key: ${{ steps.modules-key.outputs.key }}
     - name: Save the pnpm store (main only)
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'
+      if: >-
+        github.ref == 'refs/heads/main' &&
+        (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+        steps.install.outcome == 'success' && steps.restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ${{ steps.store.outputs.path }}

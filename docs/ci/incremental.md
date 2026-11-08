@@ -3,7 +3,9 @@
 Mikka uses pinned Nx Core 24.0.5, Node 24 and pnpm 10.34.3. Nx Cloud and remote
 caching are disabled. The initial implementation does not cache test results:
 real PostgreSQL, credentials, subscriptions, migrations and release acceptance
-must execute. Existing main-only pnpm-store writes are unchanged.
+must execute. Installed dependencies use exact, platform-bound caches with a
+pnpm-store fallback; only main pushes and manual main runs write them. See
+[dependency reuse and scheduling](1765-optimizations.md).
 
 ## Projects and dependencies
 
@@ -50,8 +52,10 @@ claim.
 
 ## Trust and database boundaries
 
-All four consumers (`ui-policy`, `desktop`, `analytics-ssr`, `self-hosted-image`)
-call `ci-selection.yml`. It fetches main and loads `bootstrap.sh` from there.
+CI calls `ci-selection.yml` once, then passes `selected: true` to each selected
+Desktop, Analytics or Image reusable workflow. Those calls skip their duplicate
+selector job. Independent dispatches and Image pushes still call the selector.
+It fetches main and loads `bootstrap.sh` from there.
 The bootstrap archives the immutable PR base (or merge-group base / previous main
 commit) only after proving it belongs to main history; otherwise it uses current
 main policy and forces full validation. An unmerged target branch cannot provide

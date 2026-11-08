@@ -1,6 +1,11 @@
 name: Self-hosted image
 on:
   workflow_call:
+    inputs:
+      selected:
+        description: The parent CI already selected Image using the trusted policy
+        type: boolean
+        default: false
   push:
     branches: [main]
     tags: ['v*']
@@ -12,10 +17,11 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
   changes:
+    if: ${{ !inputs.selected }}
     uses: ./.github/workflows/ci-selection.yml
   image:
     needs: changes
-    if: needs.changes.outputs.image == 'true'
+    if: always() && !cancelled() && (inputs.selected || (needs.changes.result == 'success' && needs.changes.outputs.image == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
