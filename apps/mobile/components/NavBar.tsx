@@ -1,5 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, usePathname, useRouter } from 'expo-router'
 import { BackButton, Header, RoundButton } from '@/components/ui'
 import { Text } from '@/components/Text'
@@ -19,7 +20,7 @@ type BarItem = BarButton | BarMenu | BarView
 const list = (items?: BarItem | BarItem[]) => items === undefined ? [] : Array.isArray(items) ? items : [items]
 
 const ios = Platform.OS === 'ios'
-const TAB_ROOTS = new Set(['/', '/threads', '/suggestions', '/settings', '/search'])
+const TAB_ROOTS = new Set(['/', '/tasks', '/suggestions', '/settings', '/search'])
 
 // A plain function, not a component: the toolbar keeps only children whose type is Stack.Toolbar.Button or
 // Stack.Toolbar.Menu itself, and silently drops anything wrapped in another component.
@@ -61,8 +62,9 @@ const webItem = (item: BarItem) => 'view' in item
  * The screen's top bar. On iOS it is the system navigation bar: transparent
  * over the content with the system's scroll-edge effect, its buttons and menus
  * UIKit bar items (Liquid Glass on iOS 26), the system back button and swipe
- * on pushed pages, a large title where `large`, and the system search field
- * where `search`. The web build, used for screenshot checks, draws the same
+ * on pushed pages, a large title where `large`, the title in the top row
+ * beside the buttons where `topTitle` (a tab's root, 2026-11-07), and the
+ * system search field where `search`. The web build, used for screenshot checks, draws the same
  * bar in React Native (`Header`).
  *
  * A screen's scroll view sets `contentInsetAdjustmentBehavior="automatic"` so
@@ -70,8 +72,12 @@ const webItem = (item: BarItem) => 'view' in item
  * bar the system chrome material and a hairline, so long text scrolled under it
  * never shows through on any iOS version (Figma 843:2 #4; chats).
  */
-export function NavBar({ title, titleView, left, right, back, large, search, material }: {
+export function NavBar({ title, titleView, left, right, back, large, topTitle, search, material }: {
   title?: string
+  /** A tab's root (Bot, 任务, 建议, 设置, 搜索): the title sits in the bar's own row on the left, the buttons on the
+   * right, and stays there on scroll on the `material` bar (Alex 2026-11-07, decisions/2026-11-07-2045). Not iOS's
+   * large title, which puts the title on a second row under the buttons. */
+  topTitle?: boolean
   titleView?: ReactNode
   left?: BarItem | BarItem[]
   right?: BarItem | BarItem[]
@@ -92,6 +98,16 @@ export function NavBar({ title, titleView, left, right, back, large, search, mat
     })
     // The Web router's history availability is not reactive. Keep an exit on pushed/deep-linked pages.
     const showBack = Platform.OS === 'web' || back !== undefined || router.canGoBack()
+    if (topTitle) return (
+      <>
+        <TopRow title={title ?? ''} right={rights.map(webItem)} />
+        {search ? <View style={styles.search}>
+          <TextInput accessibilityLabel={search.placeholder} role="searchbox" placeholder={search.placeholder}
+            placeholderTextColor={colors.secondary} onChangeText={search.onChange} autoCapitalize="none" autoCorrect={false}
+            returnKeyType="search" clearButtonMode="while-editing" style={styles.searchInput} />
+        </View> : null}
+      </>
+    )
     return (
       <>
         <Header
@@ -112,14 +128,34 @@ export function NavBar({ title, titleView, left, right, back, large, search, mat
     <>
       <Stack.Screen options={{
         title: title ?? '',
-        headerTitle: titleView ? () => titleView : undefined,
-        headerLargeTitle: large,
-        ...(material ? { headerBlurEffect: 'systemChromeMaterial' as const, headerShadowVisible: true, scrollEdgeEffects: { top: 'hidden' as const, bottom: 'soft' as const } } : {}),
+        // A top-row title is the leading bar item below, so the centre stays empty.
+        headerTitle: topTitle ? () => null : titleView ? () => titleView : undefined,
+        headerLargeTitle: large && !topTitle,
+        // A tab's root keeps its row over the list on the same chrome material as the tab bar, so rows scrolled under it
+        // never show through the title or its buttons (Alex 2026-11-07, TestFlight: rows ran into 对话 and the + button).
+        ...(material || topTitle ? { headerBlurEffect: 'systemChromeMaterial' as const, headerShadowVisible: true, scrollEdgeEffects: { top: 'hidden' as const, bottom: 'soft' as const } } : {}),
         ...(search ? { headerSearchBarOptions: { placeholder: search.placeholder, hideWhenScrolling: false, onChangeText: event => search.onChange(event.nativeEvent.text), onCancelButtonPress: () => search.onChange('') } } : {}),
       }} />
-      {lefts.length ? <Stack.Toolbar placement="left">{lefts.map(nativeItem)}</Stack.Toolbar> : null}
+      {topTitle ? (
+        <Stack.Toolbar placement="left">
+          <Stack.Toolbar.View hidesSharedBackground>
+            <Text accessibilityRole="header" numberOfLines={1} style={styles.topTitle}>{title}</Text>
+          </Stack.Toolbar.View>
+        </Stack.Toolbar>
+      ) : lefts.length ? <Stack.Toolbar placement="left">{lefts.map(nativeItem)}</Stack.Toolbar> : null}
       {rights.length ? <Stack.Toolbar placement="right">{rights.map(nativeItem)}</Stack.Toolbar> : null}
     </>
+  )
+}
+
+/** The web build's top row for a tab's root: the title on the left, the buttons on the right, under the safe area. */
+function TopRow({ title, right }: { title: string; right: ReactNode[] }) {
+  const insets = useSafeAreaInsets()
+  return (
+    <View style={[styles.topRow, { paddingTop: insets.top + 8 }]}>
+      <Text accessibilityRole="header" numberOfLines={1} style={[styles.topTitle, { flex: 1 }]}>{title}</Text>
+      <View style={styles.topButtons}>{right}</View>
+    </View>
   )
 }
 
@@ -129,6 +165,10 @@ export const underBar = ios ? { contentInsetAdjustmentBehavior: 'automatic' as c
 const styles = StyleSheet.create({
   largeTitle: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 8, fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: 0.4, color: colors.text },
   viewButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  /** The top-row title: as big as fits the bar's 44 pt row beside its buttons. */
+  topTitle: { fontSize: 30, lineHeight: 36, fontWeight: '700', letterSpacing: 0.3, color: colors.text },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 8, minHeight: 44 },
+  topButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   search: { paddingHorizontal: 16, paddingBottom: 12 },
   searchInput: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.bubble, color: colors.text, fontFamily: font, fontSize: 16 },
 })
