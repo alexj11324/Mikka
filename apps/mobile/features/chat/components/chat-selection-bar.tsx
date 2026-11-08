@@ -4,15 +4,15 @@ import Reanimated, { cubicBezier } from 'react-native-reanimated'
 import { Text } from '@/components/Text'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { colors } from '@/lib/theme'
-import { SELECTION_ACTIONS, type SelectionAction } from '@/features/chat/model/chat-selection'
+import { SELECTION_BAR, type SelectionAction } from '@/features/chat/model/chat-selection'
 import { ChatGlassCapsule } from './chat-glass-capsule'
 
 const EASE = cubicBezier(0.23, 1, 0.32, 1)
 const DURATION = 200
 
 /**
- * Text selected in a message (选择文本): a row of glass capsules just above the composer, each one an instruction
- * that is sent at once as a reply quoting the selection. The capsules rise in from the left, 30 ms apart; under
+ * Text selected in a message (选择文本): a row of glass capsules just above the composer. 添加到对话 puts the
+ * selection into the composer as its quote; each of the others is an instruction sent at once as a reply quoting it. The capsules rise in from the left, 30 ms apart; under
  * Reduce Motion only the glass fades. It stays mounted for the exit, then leaves.
  */
 export function ChatSelectionBar({ visible, disabled, onAction }: { visible: boolean; disabled: boolean; onAction: (action: SelectionAction) => void }) {
@@ -35,7 +35,7 @@ export function ChatSelectionBar({ visible, disabled, onAction }: { visible: boo
     <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" accessibilityLabel="选中文字的操作"
       accessibilityElementsHidden={!shown} importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'}
       contentContainerStyle={styles.row} style={styles.bar}>
-      {SELECTION_ACTIONS.map((action, index) => (
+      {SELECTION_BAR.map((action, index) => (
         <Reanimated.View key={action.key} style={[
           { transform: [{ translateY: shown || reduceMotion ? 0 : 8 }, { scale: shown || reduceMotion ? 1 : 0.97 }] },
           { transitionProperty: 'transform', transitionDuration: reduceMotion ? 0 : DURATION, transitionDelay: shown && !reduceMotion ? index * 30 : 0, transitionTimingFunction: EASE },
