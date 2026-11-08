@@ -1720,7 +1720,7 @@
     }
   },
   "Settings": {
-    "teamOnlyNotice": "Members, Teams, Team permissions and Audit log are in team workspaces",
+    "teamOnlyNotice": "Members, Teams, Team permissions and Audit log are in shared workspaces",
     "title": "Settings",
     "searchLabel": "Search settings",
     "searchPlaceholder": "Search settings…",

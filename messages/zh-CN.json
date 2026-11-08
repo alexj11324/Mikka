@@ -1720,7 +1720,7 @@
     }
   },
   "Settings": {
-    "teamOnlyNotice": "成员、团队、团队权限和审计日志只在团队工作区中",
+    "teamOnlyNotice": "成员、团队、团队权限和审计日志只在共享工作区中",
     "title": "设置",
     "searchLabel": "搜索设置",
     "searchPlaceholder": "搜索设置…",
