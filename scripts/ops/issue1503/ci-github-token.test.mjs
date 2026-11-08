@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
-import { ciAuthErrorCode, ciCredentialSelect, loadCiGithubToken } from './ci-github-token.mjs'
+import { ciAuthErrorCode, ciCredentialSelect, loadCiGithubToken, protectCiCredentialPools } from './ci-github-token.mjs'
 import { runDeliveryWithCiToken } from './delivery-with-ci-token.mjs'
 
 const actualFixture = {"issue":1503,"workspaceId":"93f38d33-9447-4eaf-8a46-0d8889165bcd","ownerUserId":"XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ","smokeUserId":"cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3","shareBefore":{"shared":false,"allowOthers":false,"allowed":true},"e2bChanged":true,"e2bSetup":{"userId":"cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3","updatedAt":"2026-11-06T18:21:51.895Z"},"githubSetup":{"version":1,"issue":1503,"userId":"cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3","ownerUserId":"XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ","githubAccountId":"183887963","githubLogin":"alexj11324","repository":"alexj11324/Mikka-handoff","appId":"4840908","repositoryId":"1436202099","installationId":"173164679","listedRepositoryCount":53,"otherRepositoryMetadataCount":52,"checkTokenScopeConfirmed":false,"providerExpiresAt":"2026-11-08T17:15:43.000Z","connectionExpiresAt":"2026-11-08T16:05:40.679Z","connectionUpdatedAt":"2026-11-08T12:05:50.680Z","tokenSha256":"968e6d51eb0b964835649170317090e038f2a67361a975e06302029d8773698b"}}
@@ -107,4 +107,126 @@ test('a rejected credential never starts the delivery task and child errors reta
   await assert.rejects(runDeliveryWithCiToken({ readFixture: async () => fixture(), loadToken: async () => token,
     spawnChild: () => { const child = new EventEmitter(); queueMicrotask(() => child.emit('error', cause)); return child } }),
     e => e.message === 'issue1503_ci_auth_spawn_failed' && e.cause === cause)
+})
+
+function pristinePool() {
+  return Object.assign(new EventEmitter(), { options: {}, totalCount: 0, idleCount: 0, waitingCount: 0 })
+}
+function guardedClient(query) {
+  return Object.assign(new EventEmitter(), {
+    connection: new EventEmitter(), status: 'T', query,
+    getTransactionStatus() { return this.status },
+  })
+}
+function checkout(pool, client) {
+  return new Promise((resolve, reject) => pool.options.verify(client, cause => cause ? reject(cause) : resolve(client)))
+}
+
+test('both pools must be pristine and have no old setup hook before either is changed', () => {
+  for (const change of [
+    p => { p.totalCount = 1 }, p => { p.idleCount = 1 }, p => { p.waitingCount = 1 },
+    p => { p.options.verify = () => {} }, p => { p.options.onConnect = () => {} },
+    p => { Object.preventExtensions(p.options) },
+  ]) {
+    const first = pristinePool(), second = pristinePool()
+    change(second)
+    assert.throws(() => protectCiCredentialPools(first, second), /^Error: issue1503_ci_auth_runtime_failed$/)
+    assert.equal(Object.hasOwn(first.options, 'verify'), false)
+    assert.equal(first.listenerCount('release'), 0)
+  }
+  const same = pristinePool()
+  assert.throws(() => protectCiCredentialPools(same, same), /^Error: issue1503_ci_auth_runtime_failed$/)
+})
+
+test('new-client verification waits for both commands before permitting checkout', async () => {
+  const app = pristinePool(), workspace = pristinePool()
+  const healthy = protectCiCredentialPools(app, workspace)
+  let begin, show, borrowed = false, calls = 0
+  const client = guardedClient(() => {
+    calls += 1
+    return new Promise(resolve => { if (calls === 1) begin = resolve; else show = resolve })
+  })
+  const pending = checkout(app, client).then(value => { borrowed = true; return value })
+  assert.equal(borrowed, false); assert.equal(calls, 1)
+  begin({ rows: [] }); await Promise.resolve()
+  assert.equal(borrowed, false); assert.equal(calls, 2)
+  show({ rows: [{ transaction_read_only: 'on' }] })
+  assert.equal(await pending, client); assert.equal(borrowed, true)
+  healthy()
+  assert.equal(calls, 2)
+})
+
+test('BEGIN or SHOW failures preserve the first cause and never borrow the client', async () => {
+  for (const failingCommand of [1, 2]) {
+    const app = pristinePool(), workspace = pristinePool()
+    const healthy = protectCiCredentialPools(app, workspace)
+    const cause = new Error('private-pg-command-error')
+    let calls = 0, borrowed = false
+    const client = guardedClient(async () => {
+      calls += 1
+      if (calls === failingCommand) throw cause
+      return { rows: [] }
+    })
+    await assert.rejects(checkout(app, client).then(() => { borrowed = true }),
+      e => e.message === 'issue1503_ci_auth_runtime_failed' && e.cause === cause
+        && ciAuthErrorCode(e) === 'issue1503_ci_auth_runtime_failed')
+    assert.equal(borrowed, false); assert.equal(calls, failingCommand)
+    assert.throws(healthy, e => e.message === 'issue1503_ci_auth_runtime_failed' && e.cause === cause)
+  }
+})
+
+test('SHOW must prove one read-only row and an active transaction', async () => {
+  for (const input of [
+    { rows: [], status: 'T' },
+    { rows: [{ transaction_read_only: 'off' }], status: 'T' },
+    { rows: [{ transaction_read_only: 'on' }, { transaction_read_only: 'on' }], status: 'T' },
+    { rows: [{ transaction_read_only: 'on' }], status: 'I' },
+  ]) {
+    const app = pristinePool(), workspace = pristinePool()
+    protectCiCredentialPools(app, workspace)
+    let calls = 0, borrowed = false
+    const client = guardedClient(async () => (++calls === 1 ? { rows: [] } : { rows: input.rows }))
+    client.status = input.status
+    await assert.rejects(checkout(app, client).then(() => { borrowed = true }), /^Error: issue1503_ci_auth_runtime_failed$/)
+    assert.equal(borrowed, false)
+  }
+})
+
+test('post-unseal health rejects an ended or aborted transaction without another query', async () => {
+  const app = pristinePool(), workspace = pristinePool()
+  const healthy = protectCiCredentialPools(app, workspace)
+  let calls = 0
+  const client = guardedClient(async () => { calls += 1; return { rows: [{ transaction_read_only: 'on' }] } })
+  await checkout(app, client); healthy()
+  for (const status of ['I', 'E', null]) {
+    client.status = status
+    assert.throws(healthy, /^Error: issue1503_ci_auth_runtime_failed$/)
+  }
+  assert.equal(calls, 2)
+})
+
+test('sticky ErrorResponse closes the old-T and Kysely no-error release race', async () => {
+  const app = pristinePool(), workspace = pristinePool()
+  const healthy = protectCiCredentialPools(app, workspace)
+  const client = guardedClient(async () => ({ rows: [{ transaction_read_only: 'on' }] }))
+  await checkout(app, client); healthy()
+  const first = new Error('private-first-server-error')
+  client.connection.emit('errorMessage', first)
+  app.emit('release', undefined, client)
+  assert.equal(client.getTransactionStatus(), 'T')
+  client.emit('error', new Error('private-later-client-error'))
+  assert.throws(healthy, e => e.message === 'issue1503_ci_auth_runtime_failed' && e.cause === first)
+})
+
+test('client and pool release errors also close the runtime without leaking their text', async () => {
+  for (const signal of ['client', 'release']) {
+    const app = pristinePool(), workspace = pristinePool()
+    const healthy = protectCiCredentialPools(app, workspace)
+    const client = guardedClient(async () => ({ rows: [{ transaction_read_only: 'on' }] }))
+    await checkout(app, client)
+    const cause = new Error('private-connection-error')
+    if (signal === 'client') client.emit('error', cause)
+    else app.emit('release', cause, client)
+    assert.throws(healthy, e => e.cause === cause && ciAuthErrorCode(e) === 'issue1503_ci_auth_runtime_failed')
+  }
 })

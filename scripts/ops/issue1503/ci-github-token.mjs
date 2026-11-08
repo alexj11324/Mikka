@@ -39,13 +39,61 @@ export const ciCredentialSelect = `SELECT "userId","githubAccountId","githubLogi
   WHERE "userId"=$1 AND "updatedAt"=$2::timestamptz AND "accessTokenExpiresAt"=$3::timestamptz
   LIMIT 1`
 
+// This is an issue-specific fence for the locked pg 8.23.1/pg-pool 3.14.0
+// initialization path. Keep each new client in one read-only transaction until
+// pool.end() closes it; no environment or connection-string changes are made.
+export function protectCiCredentialPools(pool, workspacePool) {
+  const pools = [pool, workspacePool]
+  check(pool !== workspacePool, 'runtime_failed')
+  for (const current of pools) {
+    check(current?.options && typeof current.options === 'object'
+      && Object.isExtensible(current.options) && typeof current.on === 'function'
+      && current.totalCount === 0 && current.idleCount === 0 && current.waitingCount === 0
+      && !('verify' in current.options) && !('onConnect' in current.options), 'runtime_failed')
+  }
+  const clients = new Set()
+  let failure
+  const rememberFailure = cause => { failure ??= cause }
+  for (const current of pools) {
+    current.on('release', cause => { if (cause) rememberFailure(cause) })
+    current.options.verify = (client, callback) => {
+      ;(async () => {
+        check(typeof client?.query === 'function' && typeof client.getTransactionStatus === 'function'
+          && typeof client.on === 'function' && typeof client.connection?.on === 'function', 'runtime_failed')
+        // ErrorResponse rejects a query before ReadyForQuery updates its status.
+        // Kysely can release without passing that error, so preserve it directly.
+        client.connection.on('errorMessage', rememberFailure)
+        client.on('error', rememberFailure)
+        await client.query({ text: 'BEGIN READ ONLY', query_timeout: 10_000 })
+        const shown = await client.query({ text: 'SHOW transaction_read_only', query_timeout: 10_000 })
+        check(shown?.rows?.length === 1 && shown.rows[0].transaction_read_only === 'on'
+          && client.getTransactionStatus() === 'T', 'runtime_failed')
+        clients.add(client)
+      })().then(() => callback(), cause => {
+        rememberFailure(cause)
+        callback(error('runtime_failed', cause))
+      })
+    }
+  }
+  return () => {
+    if (failure) throw error('runtime_failed', failure)
+    check(clients.size > 0 && [...clients].every(client => client.getTransactionStatus() === 'T'), 'runtime_failed')
+  }
+}
+
 async function defaultRuntime() {
   let pool, workspacePool
   try {
     pool = (await import('../../../lib/db/index.ts')).pool
     workspacePool = (await import('../../../lib/workspace-db.ts')).workspacePool
+    const assertReadOnly = protectCiCredentialPools(pool, workspacePool)
     const { unsealGitHubSecret } = await import('../../../lib/github/connection.ts')
-    return { query: (sql, params) => pool.query(sql, params), unseal: unsealGitHubSecret,
+    return { query: (sql, params) => pool.query(sql, params),
+      unseal: async value => {
+        const token = await unsealGitHubSecret(value)
+        assertReadOnly()
+        return token
+      },
       close: () => Promise.all([pool.end(), workspacePool.end()]) }
   } catch (cause) {
     await Promise.allSettled([pool?.end(), workspacePool?.end()])

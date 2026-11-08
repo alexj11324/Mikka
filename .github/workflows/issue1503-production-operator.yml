@@ -71,9 +71,22 @@ jobs:
           secret-name: MIKKA_DATABASE_URL
           recursive: false
           include-imports: false
+      - name: Import the production auth key for the CI token adapter
+        id: ci_auth_secret
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: BETTER_AUTH_SECRET
+          recursive: false
+          include-imports: false
       - name: Require the exact fixture idle and R5 lifetime after acquiring both queues
         id: start_guard
-        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_database.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_database.outcome == 'success' && steps.ci_auth_secret.outcome == 'success' }}
         timeout-minutes: 2
         run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/start-guard.mjs
         env:
@@ -83,7 +96,7 @@ jobs:
           MIKKA_1503_START_FIXTURE_SHA256: 53a81ba92415a69b2ae59779f5dbd7580e7ee197a1d03391aa6f044617742786
       - name: Exercise explicit cloud task creation and full delivery on Claude Code
         id: claude_delivery
-        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_guard.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.ci_auth_secret.outcome == 'success' && steps.start_guard.outcome == 'success' }}
         run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/delivery-with-ci-token.mjs
         env:
           NODE_ENV: production
@@ -103,7 +116,7 @@ jobs:
           retention-days: 3
       - name: Exercise explicit cloud task creation and full delivery on Codex
         id: codex_delivery
-        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_guard.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.ci_auth_secret.outcome == 'success' && steps.start_guard.outcome == 'success' }}
         run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/delivery-with-ci-token.mjs
         env:
           NODE_ENV: production
