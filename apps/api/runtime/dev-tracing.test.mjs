@@ -94,7 +94,9 @@ export default defineHandler(async () => {
     finally {
       collector.closeAllConnections(); await new Promise(resolve => collector.close(resolve))
       for (const [key, value] of Object.entries(previous)) if (value === undefined) delete process.env[key]; else process.env[key] = value
-      await rm(directory, { recursive: true, force: true })
+      // Nitro's Rolldown close hook starts watcher shutdown without awaiting it.
+      // Retry only transient removal conflicts in this test's owned directory.
+      await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
     }
   }
 })
