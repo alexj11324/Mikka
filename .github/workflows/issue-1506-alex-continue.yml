@@ -44,7 +44,7 @@ jobs:
         if: steps.control.outputs.enabled == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 3c1fc27cbfdad438cd16a4f635af80d6224f9788
+          ref: 9bcdefc5fe0c047393d581eea867ffa801f53dbe
           path: live-source
           persist-credentials: false
       - name: Verify the continuation and actual-source live harness offline

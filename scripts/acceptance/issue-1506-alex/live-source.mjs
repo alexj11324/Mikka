@@ -8,10 +8,10 @@ import { dirname, join, resolve, posix } from 'node:path'
 import { stripTypeScriptTypes } from 'node:module'
 
 // Local content review base, not a claim that this commit has been published.
-export const LIVE_SOURCE_CONTENT_BASE = '3c1fc27cbfdad438cd16a4f635af80d6224f9788'
+export const LIVE_SOURCE_CONTENT_BASE = '9bcdefc5fe0c047393d581eea867ffa801f53dbe'
 // Exact explicitly supplied application source; no deployment claim. The future workflow/control remain disabled
 // until the separately verified production application SHA is supplied.
-export const LIVE_SOURCE_COMMIT = '3c1fc27cbfdad438cd16a4f635af80d6224f9788'
+export const LIVE_SOURCE_COMMIT = '9bcdefc5fe0c047393d581eea867ffa801f53dbe'
 export const LIVE_SOURCE_HASHES = Object.freeze({
   'lib/live/channel.ts': '7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede',
   'lib/live/tab-share.ts': '38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f',

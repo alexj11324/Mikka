@@ -27,8 +27,8 @@ jobs:
       queue: max
       cancel-in-progress: false
     env:
-      ACCEPTANCE_SHA: 'd1fce45e149ba2cfb5f950b4cd5b6e90492092c6' # Bind the exact prepared source commit after offline review.
-      APP_SHA: '3c1fc27cbfdad438cd16a4f635af80d6224f9788' # Root binds once; never resolve a moving branch during this job.
+      ACCEPTANCE_SHA: '' # Bind the exact prepared source commit after offline review.
+      APP_SHA: '9bcdefc5fe0c047393d581eea867ffa801f53dbe' # Root binds once; never resolve a moving branch during this job.
       MIKKA_LIVE_SOURCE_ROOT: ${{ github.workspace }}/live-source
     steps:
       - name: Initialize all ten case receipts before prerequisites
