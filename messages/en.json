@@ -885,6 +885,8 @@
     "sandboxUsernsSpec": "Ubuntu's description of this setting",
     "sandboxDetail": "Error: {detail}",
     "sandboxFix": "How to fix",
+    "noAgentYet": "No agent yet",
+    "howToInstall": "How to install",
     "installAgent": "How to install",
     "copyInstall": "Copy {command}",
     "commands": {
@@ -2522,6 +2524,8 @@
       "byBot": "By bot",
       "byMember": "By member",
       "exportCsv": "Export CSV",
+      "runs": "Runs",
+      "runsPerDay": "Runs per day",
       "threads": "New threads",
       "runTime": "Run time",
       "runSeconds": "Run seconds",
@@ -2555,6 +2559,7 @@
     },
     "billing": {
       "loading": "Loading billing",
+      "loadFailed": "Couldn’t load billing",
       "plan": "Plan",
       "team": "Team",
       "free": "Free",
@@ -5618,6 +5623,20 @@
       "appUpdate": "Update Mikka to {version} or later",
       "appUpdateUnknown": "Update Mikka to the latest version",
       "failed": "That didn't work"
+    }
+  },
+  "HostedConnections": {
+    "appsTitle": "Apps",
+    "appsNote": "Apps you've connected. Bots can use them only while they're on.",
+    "addMore": "Add in Plugins",
+    "emptyNote": "Apps you connect in Plugins, such as GitHub, Linear or Slack, appear here.",
+    "state": {
+      "on": "On",
+      "off": "Turned off",
+      "expired": "Needs reconnecting",
+      "connected": "Connected",
+      "paused": "Paused",
+      "pending": "Loading"
     }
   },
   "HostedSettings": {
