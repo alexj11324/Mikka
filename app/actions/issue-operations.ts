@@ -69,7 +69,7 @@ async function issueConnections(id: string, reach: 'linked' | 'all') {
     ? new Map<string, { key: string; number: number }>() : undefined
   // The private whole-owner copy consumes structure only; labels belong to the public linked view.
   const identifiers = reach === 'linked'
-    ? await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), db, knownTeams)
+    ? await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), tx, knownTeams)
     : new Map<string, string | null>()
   return live.map(({ content, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
   })
