@@ -55,7 +55,7 @@ export function ChatRowContent({ row, badge }: { row: ChatRow; badge?: ReactNode
   const dot = badge === undefined && group && Number(group.unreadCount) > 0
   return (
     <View style={styles.row}>
-      {bot ? <BotAvatar color={bot.color} shape={bot.shape} size={44} />
+      {bot ? <BotAvatar id={bot.id} coordinator={bot.coordinator} color={bot.color} shape={bot.shape} size={44} />
         : <View style={styles.groupIcon}><Symbol name="person.2.fill" size={18} color={colors.secondary} web={<Text style={styles.groupGlyph}>群</Text>} /></View>}
       <View style={styles.body}>
         <View style={styles.top}>

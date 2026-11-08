@@ -65,7 +65,7 @@ export default function NewGroup() {
             return (
               <Pressable key={bot.id} accessibilityRole="checkbox" accessibilityLabel={bot.name} accessibilityState={{ checked: on, disabled: busy }} aria-checked={Platform.OS === 'web' ? on : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} disabled={busy} onPress={() => toggle(bot.id)}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-                <BotAvatar color={bot.color} shape={bot.shape} size={30} />
+                <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size={30} />
                 <Text style={styles.name} numberOfLines={1}>{bot.name}</Text>
                 {on ? <Symbol name="checkmark" size={19} color={colors.accent} web={<Check size={22} color={colors.accent} strokeWidth={2.2} />} /> : null}
               </Pressable>
