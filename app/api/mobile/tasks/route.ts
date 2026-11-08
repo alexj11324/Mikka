@@ -21,10 +21,8 @@ async function handleGET(request: Request) {
   const { issues, workspaceId } = tokenWorkspaceId
     ? { issues: await actAs(user, () => listWorkspaceIssues(tokenWorkspaceId)), workspaceId: tokenWorkspaceId }
     : await pollIssues().then(snapshot => ({ issues: snapshot.items!, workspaceId: snapshot.live.selectedWorkspaceId }))
-  const [snapshots, reviews] = await Promise.all([
-    newestTaskRuns(user.id, issues.map(issue => issue.id), workspaceId, await taskScheduleLabels()),
-    taskReviewSummaries(user, issues.map(issue => issue.id), workspaceId),
-  ])
+  const snapshots = await newestTaskRuns(user.id, issues.map(issue => issue.id), workspaceId, await taskScheduleLabels())
+  const reviews = await taskReviewSummaries(user, snapshots.filter(row => row.codingReview).map(row => row.issueId), workspaceId)
   const runs = snapshots.flatMap(row => row.runId && row.status ? [{ ...row, runId: row.runId, status: row.status }] : [])
   const byIssue = new Map(snapshots.map(row => [row.issueId, row]))
   const runByIssue = new Map(runs.map(row => [row.issueId, row]))

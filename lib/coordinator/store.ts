@@ -7,7 +7,6 @@ import { visibleRuns } from '@/lib/agent-runs'
 import { threadNamePrompt } from '@/lib/run-bot-name'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
-import { issuesForUser } from '@/lib/issues-for-user'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
@@ -43,7 +42,8 @@ import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
 import { botChatChanged } from '../live/chats'
-import { taskReviewSummaries } from '../coding-workspace/task-review/summaries'
+import type { TaskReviewSummary } from '../coding-workspace/task-review/projection'
+import { taskReviewSourceHint } from '../coding-workspace/task-review/summary-selection'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -507,41 +507,49 @@ export async function citationSources(userId: string, texts: readonly string[], 
   // Runs reuse one membership read. A direct task-only citation folds its
   // membership check into the bounded identifier visibility query.
   const teams = runIds.length ? await (await import('@/lib/team-access')).accessibleTeamScopes(userId) : undefined
-  const visibility = issueIds.length
-    ? await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams, withIdentifierTeams: true }) : null
-  const identifierTeams = new Map<string, { key: string; number: number }>(visibility?.taskTeams)
-  const issueRows = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
-    .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
   const runs = runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length, brief: true, teams }) : []
   // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
   const ownIds = runs.filter(row => row.agentId).map(row => row.id)
-  const runIssueIds = [...new Set(runs.flatMap(row => row.issueId ? [row.issueId] : []))]
-  const [prompts, steps, tasks] = await Promise.all([
+  const allIssueIds = [...new Set([...issueIds, ...runs.flatMap(row => row.issueId ? [row.issueId] : [])])]
+  const visibility = allIssueIds.length
+    ? await issueVisibility(userId, false, undefined, db, { onlyIssueIds: allIssueIds, teams, withIdentifierTeams: true }) : null
+  const [prompts, steps, taskRows] = await Promise.all([
     ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt }).from(agentRuns)
       .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))).then(rows => new Map(rows.map(row => [row.id, row.prompt]))) : new Map<string, string>(),
     ownIds.length ? db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
       .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId)
       .then(rows => new Map(rows.map(row => [row.runId, Number(row.count)]))) : new Map<string, number>(),
-    issuesForUser(userId, runIssueIds, false, db, { withoutBody: true, teams, identifierTeams }),
+    allIssueIds.length ? db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status,
+      priority: issues.priority, content: issueAttrsContent, codingReview: taskReviewSourceHint,
+      shortTitle: sql<string | null>`case when ${issues.shortTitleFrom}=${issues.title} then ${issues.shortTitle} end`,
+    }).from(issues).where(and(inArray(issues.id, allIssueIds), visibility!.predicate)) : [],
   ])
-  // Every cited and run task's display identifier in one lookup.
-  const identifiers = await taskIdentifiers([
-    ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })),
-    ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number })),
-  ], db, identifierTeams)
-  const reviews = await taskReviewSummaries(userId, [...issueRows.map(row => row.id), ...tasks.keys()])
-  for (const { content, ownerId: _owner, scope: _scope, ...row } of issueRows) {
+  // The same bounded Task read supplies direct and embedded citations. The
+  // private source hint skips the full Review loader only when no source exists.
+  const tasks = new Map(taskRows.map(row => [row.id, row]))
+  const identifiers = await taskIdentifiers(taskRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope,
+    number: readIssueMetadata(row.content).number })), db, visibility?.taskTeams)
+  const reviewIds = taskRows.filter(row => row.codingReview).map(row => row.id)
+  // Other chat reads and writes do not need the Review database/provider graph.
+  const reviews = reviewIds.length
+    ? await (await import('../coding-workspace/task-review/summaries')).taskReviewSummaries(userId, reviewIds)
+    : new Map<string, TaskReviewSummary>()
+  const directIds = new Set(issueIds)
+  for (const { id, title, status, priority, content } of taskRows) {
+    if (!directIds.has(id)) continue
     const metadata = readIssueMetadata(content)
-    if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null, review: reviews.get(row.id) ?? null }
+    const review = reviews.get(id)
+    if (!metadata.deletedAt) sources[id] = { kind: 'issue', id, title, status, priority, number: metadata.number ?? null,
+      identifier: identifiers.get(id) ?? null, ...(review ? { review } : {}) }
   }
   for (const row of runs) {
     const task = row.issueId ? tasks.get(row.issueId) ?? null : null
     // The short title travels only when there is one, so a citation carries nothing new otherwise.
-    const shortTitle = task && task.shortTitleFrom === task.title ? task.shortTitle : null
+    const shortTitle = task?.shortTitle
+    const review = task ? reviews.get(task.id) : undefined
     const issue = task ? { id: task.id, title: task.title, ...(shortTitle ? { shortTitle } : {}), number: readIssueMetadata(task.content).number ?? null,
-      identifier: identifiers.get(task.id) ?? null, review: reviews.get(task.id) ?? null } : null
+      identifier: identifiers.get(task.id) ?? null, ...(review ? { review } : {}) } : null
     const pullRequests = task ? readIssueMetadata(task.content).pullRequests : []
     const group = threadGroup({ id: row.id, status: row.status, issueId: task?.id ?? null, createdAt: row.createdAt.toISOString(), outcome: (row.outcome ?? null) as ThreadOutcome | null }, task ? { status: task.status, metadata: { pullRequests } } : undefined)
     sources[row.id] = { kind: 'run', id: row.id, agentName: row.agentName, harness: row.harness, status: row.status, outcome: row.outcome ?? null, group, issue,

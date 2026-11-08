@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { Pool } from 'pg'
+import { and, inArray } from 'drizzle-orm'
 import { runAssignmentSchema } from '@mikka/protocol'
 import { remoteKey } from '@mikka/protocol/repository'
 import { workspaceReadReceipt, type WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
@@ -57,6 +58,9 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
     mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const { taskReviewSummaries } = await import('./summaries')
+    const { taskReviewSourceHint } = await import('./summary-selection')
+    const { issueVisibility } = await import('../../issue-visibility')
+    const { issues } = await import('../../db/schema')
     const { resolveRunWorktree } = await import('../identity')
     const { resolveReviewScope, withReviewTransaction } = await import('../diff/authority')
     const { prepareCheckpointReview, retainCheckpointReview } = await import('../diff/checkpoint')
@@ -65,7 +69,8 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
     const { secretMaskerFor } = await import('../../secrets/runtime')
     const { tokenWorkspace } = await import('../../tokens/principal')
     const { actingContext } = await import('../../activity-actor')
-    appPool = (await import('../../db')).pool; workspacePool = (await import('../../workspace-db')).workspacePool
+    const storage = await import('../../db'), db = storage.db
+    appPool = storage.pool; workspacePool = (await import('../../workspace-db')).workspacePool
     const git = async (cwd: string, ...args: string[]) => (await execute('git', ['-C', cwd,
       '-c', 'user.name=Task summary fixture', '-c', 'user.email=task-summary@example.invalid',
       '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', ...args])).stdout.trim()
@@ -187,6 +192,12 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
       return runId
     }
     const read = (f: Fixture, userId = owner.id, workspaceId = f.where.id) => taskReviewSummaries(userId, [f.taskId], workspaceId)
+    async function sourceHints(ids: string[], userId = owner.id) {
+      const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds: ids, withIdentifierTeams: true })
+      const rows = await db.select({ id: issues.id, codingReview: taskReviewSourceHint }).from(issues)
+        .where(and(inArray(issues.id, ids), visibility.predicate))
+      return new Map(rows.map(row => [row.id, row.codingReview]))
+    }
 
     await t.test('one bulk read returns each same-owner Task with its own immutable reference and shared viewer permissions', async () => {
       const where = await workspace(), fixtures: Fixture[] = [], snapshots: DiffSnapshot[] = []
@@ -219,11 +230,48 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
       for (const userId of [owner.id, member.id]) assert.deepEqual((await read(f, userId)).get(f.taskId)?.reviewRef, reference(snapshot))
     })
 
+    await t.test('private source hints keep an old Task-owner repository visible through shared mobile and citation reads', async () => {
+      const f = await fixture(), snapshot = await checkpoint(f); await stop(f)
+      await pool.query('UPDATE agent_runs SET "createdAt"=now()-interval \'45 days\' WHERE id=$1', [f.runId])
+      const viewerRunId = await extraRun(f, member, 0)
+      const plainTaskId = await task(f.where)
+      await extraRun({ where: f.where, taskId: plainTaskId }, owner, 0)
+      const hints = await sourceHints([f.taskId, plainTaskId], member.id)
+      assert.equal(hints.get(f.taskId), true, 'the owner repository is older than the viewer list window')
+      assert.equal(hints.get(plainTaskId), false, 'another Task repository cannot satisfy the correlated SELECT')
+
+      const { newestTaskRuns } = await import('../../task-block-runs')
+      const decorations = await newestTaskRuns(member.id, [f.taskId, plainTaskId], f.where.id)
+      const selected = decorations.find(row => row.issueId === f.taskId)
+      assert.equal(selected?.runId, viewerRunId, 'the existing list decoration still follows its own viewer window')
+      assert.equal(selected?.codingReview, true, 'the independent Task-owner hint does not follow the viewer Run')
+      assert.equal(decorations.find(row => row.issueId === plainTaskId)?.codingReview, false)
+
+      const { mobileTask } = await import('../../mobile-tasks')
+      const detail = await mobileTask({ id: member.id }, { id: f.where.id, kind: 'team' }, f.taskId)
+      assert.ok(detail)
+      assert.deepEqual(detail.task.review?.reviewRef, reference(snapshot))
+      assert.doesNotMatch(JSON.stringify(detail), /"codingReview"|"repositoryKey"|"worktreePath"/)
+
+      const { citationSources } = await import('../../coordinator/store')
+      const direct = await citationSources(member.id, [`[[issue:${f.taskId}]]`, `[[issue:${plainTaskId}]]`])
+      const coding = direct[f.taskId], plain = direct[plainTaskId]
+      assert.ok(coding?.kind === 'issue' && plain?.kind === 'issue')
+      assert.deepEqual(coding.review?.reviewRef, reference(snapshot))
+      assert.equal(Object.hasOwn(plain, 'review'), false, 'noncoding citations keep their prior public shape')
+      const runOnly = await citationSources(member.id, [`[[run:${f.runId}]]`])
+      assert.deepEqual(Object.keys(runOnly), [f.runId], 'a run-only citation does not add a direct Task source')
+      const run = runOnly[f.runId]; assert.ok(run?.kind === 'run')
+      assert.deepEqual(run.issue?.review?.reviewRef, reference(snapshot))
+      assert.doesNotMatch(JSON.stringify([direct, runOnly]), /"codingReview"|"ownerId"|"repositoryKey"|"worktreePath"/)
+    })
+
     await t.test('a first coding Run without retained binding or snapshot still exposes an honest empty summary entry', async () => {
       const f = await fixture()
       const retained = async () => (await pool.query('SELECT (SELECT count(*)::int FROM coding_workspace_bindings WHERE "runId"=$1) AS bindings,' +
         '(SELECT count(*)::int FROM coding_workspace_snapshots WHERE "runId"=$1) AS snapshots', [f.runId])).rows[0]
       assert.deepEqual(await retained(), { bindings: 0, snapshots: 0 })
+      assert.equal((await sourceHints([f.taskId])).get(f.taskId), true, 'an unretained first repository Run remains a candidate')
       const value = (await read(f)).get(f.taskId); assert.ok(value)
       assert.equal(value.taskId, f.taskId); assert.equal(value.reviewRef, null); assert.equal(value.running, true)
       assert.equal(value.files, null); assert.equal(value.additions, null); assert.equal(value.deletions, null)
@@ -249,6 +297,7 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
       const run = (await pool.query('SELECT "deviceId","deviceRepoId" FROM agent_runs WHERE id=$1', [f.runId])).rows[0]
       assert.deepEqual(run, { deviceId: null, deviceRepoId: null })
       for (const userId of [owner.id, member.id]) {
+        assert.equal((await sourceHints([f.taskId], userId)).get(f.taskId), true, 'retained binding survives device/repository removal')
         const value = (await read(f, userId)).get(f.taskId); assert.ok(value)
         assert.deepEqual(value.reviewRef, reference(snapshot)); assert.equal(value.files, 2); assert.equal(value.running, false)
       }
@@ -295,6 +344,11 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
         () => taskReviewSummaries(owner.id, ids, a.where.id))
       assert.equal(unrelatedActor.size, 1); assert.equal(unrelatedActor.has(a.taskId), true)
       assert.equal(unrelatedActor.get(a.taskId)?.permissions.canTerminal, true, 'another identity cannot attach its ambient PAT scope')
+      const { citationSources } = await import('../../coordinator/store')
+      const citations = await actingContext.run({ userId: owner.id, tokenWorkspaceId: a.where.id }, () => citationSources(owner.id,
+        [`[[issue:${a.taskId}]]`, `[[issue:${b.taskId}]]`, `[[run:${b.runId}]]`]))
+      assert.deepEqual(Object.keys(citations), [a.taskId], 'the combined direct/run Task read retains the ambient PAT workspace pin')
+      assert.doesNotMatch(JSON.stringify(citations), /"codingReview"/)
     })
 
     await t.test('no Run, noncoding current Run and group-only Tasks have no Review entry or old-source fallback', async () => {
@@ -303,6 +357,9 @@ test('Task review summaries preserve current source and tenant boundaries on Pos
       await extraRun({ where, taskId: groupOnly }, owner, 0, 'group_chat')
       const previous = await fixture(where); await checkpoint(previous); await stop(previous)
       await extraRun(previous, owner, 10)
+      const hints = await sourceHints([noRun, plain, groupOnly, previous.taskId])
+      for (const id of [noRun, plain, groupOnly]) assert.equal(hints.get(id), false)
+      assert.equal(hints.get(previous.taskId), true, 'the conservative prefilter is not current-source authority')
       const result = await taskReviewSummaries(owner.id, [noRun, plain, groupOnly, previous.taskId], where.id)
       assert.equal(result.size, 0)
       for (const id of [noRun, plain, groupOnly, previous.taskId]) assert.equal(result.get(id) ?? null, null)

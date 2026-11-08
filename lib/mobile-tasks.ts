@@ -15,6 +15,7 @@ import { mobileTaskActivity, mobileTaskGroup } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskBlock } from '@/lib/task-blocked'
 import { taskReviewSummaries } from '@/lib/coding-workspace/task-review/summaries'
+import { taskReviewSourceHint } from '@/lib/coding-workspace/task-review/summary-selection'
 
 /** A fresh workspace context is required; task visibility still uses the existing task ACL. */
 export async function mobileTask(user: Exclude<IssueReader, string>, workspace: { id: string; kind: string }, id: string) {
@@ -25,7 +26,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, workspace: 
   const metadata = readIssueMetadata(issue.content)
   const blockerIds = metadata.blockedByIds ?? []
   const visibleBlockers = blockerIds.length ? await issueVisibility(user, false, workspace.id, db, { onlyIssueIds: blockerIds }) : null
-  const [identifiers, runs, [decoration], versions, labels, blockers, reviews] = await Promise.all([
+  const [identifiers, runs, [decoration], versions, labels, blockers] = await Promise.all([
     taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number }], db, access.linked === false ? new Map() : undefined),
     db.select({ runId: agentRuns.id, status: agentRuns.status, outcome: agentRuns.outcome,
       createdAt: agentRuns.createdAt, threadReplacedBy: agentRuns.threadReplacedBy,
@@ -39,7 +40,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, workspace: 
       .leftJoin(devices, and(eq(devices.id, agentRuns.deviceId), eq(devices.ownerId, user.id)))
       .where(and(eq(agentRuns.issueId, id), eq(agentRuns.userId, user.id)))
       .orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)),
-    db.select({ schedule: taskSchedule(issues.id, user.id, workspace.id), owner: users.name }).from(issues)
+    db.select({ schedule: taskSchedule(issues.id, user.id, workspace.id), owner: users.name, codingReview: taskReviewSourceHint }).from(issues)
       .leftJoin(users, eq(users.id, issues.userId)).where(eq(issues.id, id)),
     db.select({ actorType: issueVersions.actorType, actorId: issueVersions.actorId }).from(issueVersions)
       .where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, issue.userId)))
@@ -47,8 +48,8 @@ export async function mobileTask(user: Exclude<IssueReader, string>, workspace: 
     taskScheduleLabels(),
     visibleBlockers ? db.select({ id: issues.id, status: issues.status }).from(issues)
       .where(and(inArray(issues.id, blockerIds), visibleBlockers.predicate)) : [],
-    taskReviewSummaries(user, [id], workspace.id),
   ])
+  const reviews = await taskReviewSummaries(user, decoration?.codingReview ? [id] : [], workspace.id)
   const [creation] = await enrichActivityActors(versions, issue.userId)
   const task = { ...issue, metadata }
   const newest = runs[0]

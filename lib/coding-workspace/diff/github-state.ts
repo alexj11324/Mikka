@@ -13,6 +13,11 @@ const response = z.object({ repository: z.object({ pullRequest: z.object({ numbe
 export const observedPullState = z.strictObject({ repositoryId: id, number: z.number().int().positive(), headSha: sha, baseSha: sha,
   state: z.enum(['open', 'approved', 'changes_requested', 'closed', 'merged']), observedAt: z.iso.datetime() })
 export type ObservedPullState = z.infer<typeof observedPullState>
+export function matchingPullState(raw: unknown, snapshot: DiffSnapshot): ObservedPullState | null {
+  const state = observedPullState.safeParse(raw)
+  return state.success && state.data.repositoryId === snapshot.sourceAccess?.repositoryId && state.data.number === snapshot.pullRequest?.number
+    && state.data.headSha === snapshot.revision.headSha && state.data.baseSha === snapshot.pullRequest?.baseSha ? state.data : null
+}
 const document = `query WorkspaceReviewState($owner:String!,$name:String!,$number:Int!) {
   repository(owner:$owner,name:$name) { pullRequest(number:$number) {
     number headRefOid baseRefOid state reviewDecision repository { fullDatabaseId nameWithOwner }

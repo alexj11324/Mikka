@@ -12,9 +12,10 @@ import { tokenWorkspace } from '../../tokens/principal'
 import { UNFINISHED_RUN_STATUSES } from '../../agent-run-statuses'
 import { secretMaskerFor } from '../../secrets/runtime'
 import { maskDeep, type Masker } from '../../secrets/mask'
-import { reviewBoardId, type ReviewActor, type ReviewScope } from '../diff/authority'
+import type { ReviewActor, ReviewScope } from '../diff/authority'
+import { reviewBoardId } from '../diff/board-id'
 import { observedReviewChecks } from './github-checks'
-import { projectTaskReviewSummary, type TaskReviewSummary, type TaskSummaryChecks, type TaskSummaryFacts } from './read'
+import { projectTaskReviewSummary, type TaskReviewSummary, type TaskSummaryChecks, type TaskSummaryFacts } from './projection'
 
 type Candidate = { taskId: string; candidateId: string; producerRunId: string; sha: string | null; kind: string; repository: string; skill: boolean }
 type SourceRow = { taskId: string; ownerId: string; runId: string; status: string; stopped: boolean; repoId: string | null;

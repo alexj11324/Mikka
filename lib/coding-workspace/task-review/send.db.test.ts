@@ -80,6 +80,7 @@ test('Task review send composes real transactional deliveries on PostgreSQL 17',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     mock.module(new URL('../../github/user-access.ts', import.meta.url).href, { namedExports: {
       GitHubAccessError,
+      readAuthorizedIssue: async () => { assert.fail('Task review send must not fetch external issue content') },
       githubTokenForUser: async (userId: string, options: { minValidityMs?: number; budget?: RequestBudget } = {}) => {
         const token = tokens.get(userId)
         assert.ok(token, 'native review requests the actual fixture owner credential')

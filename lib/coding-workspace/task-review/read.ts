@@ -12,9 +12,11 @@ import { latestDiffSnapshot, readDiffFilePage, readDiffSnapshot, readStoredDiffF
 import type { ReviewActor, ReviewScope } from '../diff/authority'
 import { assertCurrentTaskReview, currentTaskReview, selectedTaskReview } from './context'
 import type { TaskReviewHttpInput, TaskReviewHttpResult } from './http'
-import { reviewReference, taskReviewDiff, taskReviewFile } from './projection'
+import { projectTaskReviewSummary, reviewReference, taskReviewDiff, taskReviewFile, type TaskSummaryFacts } from './projection'
 import { latestTaskReviewChecks } from './checks'
-import { matchingPullState, retainTaskPullState } from './pull-state'
+import { retainTaskPullState } from './pull-state'
+
+export type { TaskReviewSummary, TaskSummaryChecks, TaskSummaryFacts } from './projection'
 
 const sha = z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/)
 const referenceQuery = { snapshotId: z.uuid().optional(), sourceVersion: z.string().regex(/^[a-f0-9]{64}$/).optional() }
@@ -32,31 +34,6 @@ function decode<T>(schema: z.ZodType<T>, value: string): T {
 }
 const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
 const running = (scope: ReviewScope) => !scope.stopped && UNFINISHED_RUN_STATUSES.some(status => status === scope.status)
-export type TaskSummaryFacts = { branch: string | null; reclaimed: boolean; canMerge: boolean; merging: boolean; mergeBinding: unknown; pullObservation?: unknown }
-export type TaskSummaryChecks = Awaited<ReturnType<typeof latestTaskReviewChecks>>
-
-export function projectTaskReviewSummary(actor: Pick<ReviewActor, 'userId' | 'workspaceId' | 'credential'>, scope: ReviewScope,
-  snapshot: DiffSnapshot | null, facts: TaskSummaryFacts | undefined, checks: TaskSummaryChecks) {
-  const own = actor.userId === scope.identity.ownerId && actor.credential.kind === 'session'
-  const available = snapshot && snapshot.availability !== 'unavailable'
-  const pull = snapshot ? matchingPullState(facts?.pullObservation, snapshot) : null
-  const state = pull?.state ?? snapshot?.pullRequest?.state
-  const canSend = Boolean(own && available && !facts?.merging), canMerge = Boolean(own && state && !['closed', 'merged'].includes(state) && facts?.canMerge)
-  const countsKnown = Boolean(available && snapshot.counts.complete)
-  return { taskId: scope.taskId!, reviewRef: available ? reviewReference(snapshot) : null, pr: snapshot?.pullRequest ? {
-    number: snapshot.pullRequest.number, url: snapshot.pullRequest.url, state: state!, observedAt: pull?.observedAt ?? snapshot.observedAt,
-  } : null, files: available ? snapshot.counts.files : null, additions: countsKnown ? snapshot!.counts.additions : null,
-  deletions: countsKnown ? snapshot!.counts.deletions : null, countsKnown, checks,
-  mergeTarget: canMerge ? { reviewRef: reviewReference(snapshot!), binding: facts!.mergeBinding, expectedHeadSha: snapshot!.revision.headSha } : null,
-  running: running(scope), ...(facts?.branch ? { branch: facts.branch } : {}),
-  permissions: { canMerge, canSend, canTerminal: own, reasons: {
-    ...(!canMerge ? { merge: own ? 'review_unavailable' : 'not_owner_merge' } : {}),
-    ...(!canSend ? { send: own ? 'review_unavailable' : 'not_owner_send' } : {}),
-    ...(!own ? { terminal: 'not_owner_terminal' } : {}),
-  } }, live: { workspaceId: actor.workspaceId }, reclaimed: facts?.reclaimed ?? false }
-}
-export type TaskReviewSummary = ReturnType<typeof projectTaskReviewSummary>
-
 export async function taskReviewSummary(tx: Pick<PoolClient, 'query'>, actor: ReviewActor, scope: ReviewScope, snapshot: DiffSnapshot | null) {
   const { rows: [facts] } = await tx.query<TaskSummaryFacts>(`SELECT p.branch,ps.observation AS "pullObservation",
     coalesce(m.state='ended' AND m."sandboxId" IS NULL,false) AS reclaimed,

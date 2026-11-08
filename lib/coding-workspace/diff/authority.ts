@@ -8,15 +8,13 @@ import { issueForUser } from '../../issue-access'
 import { tokenWorkspace } from '../../tokens/principal'
 import { withWorkspaceAuthority, type WorkspaceAuthorizedActor, type WorkspaceAuthorityLease, type WorkspaceAuthorityOptions } from '../authority'
 import { resolveRunWorktree, type WorkspaceActor, type WorkspaceQuery } from '../identity'
-import { diffDigest } from './patch'
+import { reviewBoardId } from './board-id'
+
+export { reviewBoardId } from './board-id'
 
 export type ReviewActor = WorkspaceAuthorizedActor
 export type ReviewScope = { identity: RunRepositoryIdentity; taskId: string | null; boardId: string; status: string; stopped: boolean }
 const denied = () => new CodingWorkspaceError('workspace_not_found')
-
-export function reviewBoardId(identity: RunRepositoryIdentity, taskId: string | null) {
-  return diffDigest(JSON.stringify([identity.workspaceId, taskId ? 'task' : 'run', taskId ?? identity.runId, identity.repositoryKey]))
-}
 
 /** Historical access grants only retained artifacts. It never establishes
  * device access, and never changes the existing private thread-detail ACL. */

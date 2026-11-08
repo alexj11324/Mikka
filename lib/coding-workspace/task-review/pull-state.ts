@@ -3,13 +3,7 @@ import type { PoolClient } from 'pg'
 import { WorkspaceReviewError, type DiffSnapshot } from '@mikka/protocol/coding-workspace-review'
 import { runChanged } from '../../live/panels'
 import type { ReviewActor, ReviewScope } from '../diff/authority'
-import { observedPullState, type ObservedPullState } from '../diff/github-state'
-
-export function matchingPullState(raw: unknown, snapshot: DiffSnapshot): ObservedPullState | null {
-  const state = observedPullState.safeParse(raw)
-  return state.success && state.data.repositoryId === snapshot.sourceAccess?.repositoryId && state.data.number === snapshot.pullRequest?.number
-    && state.data.headSha === snapshot.revision.headSha && state.data.baseSha === snapshot.pullRequest?.baseSha ? state.data : null
-}
+import { matchingPullState, type ObservedPullState } from '../diff/github-state'
 
 export async function retainTaskPullState(tx: Pick<PoolClient, 'query'>, actor: ReviewActor, scope: ReviewScope,
   snapshot: DiffSnapshot, observation: ObservedPullState | undefined) {
