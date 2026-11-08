@@ -1879,7 +1879,7 @@
       "heading": "Computer use",
       "label": "Bot computer use",
       "allow": "Allow",
-      "deny": "Deny",
+      "deny": "Block",
       "error": "Could not update or load the computer setting.",
       "loading": "Loading computer setting…"
     },
@@ -2502,7 +2502,7 @@
       "loading": "Loading sharing settings",
       "heading": "Subscriptions and API keys",
       "label": "Members share their own subscriptions and API keys with teammates",
-      "detail": "Deny stops only what is shared with others; everyone keeps using their own"
+      "detail": "Block stops only what is shared with others; everyone keeps using their own"
     },
     "appPolicy": {
       "loading": "Loading app permissions",
@@ -4113,6 +4113,7 @@
       "failed": "Not delivered. Try again."
     },
     "addE2BKey": "Add E2B API Key",
+    "e2bKeyNeeded": "Mikka Cloud runs on your own E2B key",
     "loading": "Connecting to the computer"
   },
   "Shell": {

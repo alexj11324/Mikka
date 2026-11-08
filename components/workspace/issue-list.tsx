@@ -65,8 +65,11 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
                 {properties.has('priority') && <PriorityIcon priority={issue.priority} label={priorityLabel(issue.priority)} />}
                 <status.icon className={cn('size-3.5 shrink-0', indicatorClassName)} />
                 {showIdentifier && <span className="hidden w-20 shrink-0 text-xs text-muted-foreground tabular-nums sm:block">{issue.identifier}</span>}
-                <span className="min-w-0 flex-1 truncate font-medium" title={issue.title}>{displayTaskTitle(issue)}</span>
-                {column.value === BLOCKED_COLUMN && blocks?.get(issue.id) && <span className="hidden shrink-0 text-xs text-destructive-foreground sm:block">{blockLabel(tCard, blocks.get(issue.id)!)}</span>}
+                {/* What blocks it stays at every width: under the title on a phone, beside it otherwise. */}
+                <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
+                  <span className="min-w-0 flex-1 truncate font-medium" title={issue.title}>{displayTaskTitle(issue)}</span>
+                  {column.value === BLOCKED_COLUMN && blocks?.get(issue.id) && <span className="truncate text-xs text-destructive-foreground sm:shrink-0">{blockLabel(tCard, blocks.get(issue.id)!)}</span>}
+                </span>
                 {/* The card's avatar group (R-25): the Bot on top, then the person; empty when nobody owns the task. The rings take the row's colour instead of the card's. */}
                 {properties.has('assignee') && <span data-slot="list-assignee" className="flex min-w-[18px] shrink-0 justify-end [&_[data-avatar]]:ring-background" title={issue.metadata.assignee?.name}>{assigneeGroupOf({ assignee: issue.metadata.assignee, owner: owners?.get(issue.id) })}{issue.metadata.assignee && <span className="sr-only">{issue.metadata.assignee.name}</span>}</span>}
                 <time suppressHydrationWarning dateTime={new Date(issue.updatedAt).toISOString()} className="hidden w-16 shrink-0 text-right text-xs text-muted-foreground md:block">{format.dateTime(new Date(issue.updatedAt), { month: 'numeric', day: 'numeric' })}</time>

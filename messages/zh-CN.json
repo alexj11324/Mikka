@@ -4113,6 +4113,7 @@
       "failed": "未送达，请重试。"
     },
     "addE2BKey": "添加 E2B API Key",
+    "e2bKeyNeeded": "Mikka Cloud 使用你自己的 E2B Key 运行",
     "loading": "正在连接电脑"
   },
   "Shell": {
