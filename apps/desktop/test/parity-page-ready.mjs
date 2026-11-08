@@ -4,16 +4,19 @@ import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
 
-export async function selectParityWorkspace(page, { menuName, workspaceName, basePath }) {
-  await page.getByRole('button', { name: menuName, exact: true }).first().click()
-  const item = page.getByRole('menuitem', { name: workspaceName, exact: false })
-  // A switch assigns the same /en URL after its action finishes. The old URL
+export async function selectWorkspaceMenuItem(page, item) {
+  // A switch assigns the locale home URL after its action finishes. The old URL
   // and ready DOM are not proof that the new document has loaded. An already
   // selected item is a product no-op and only closes its menu.
   const moved = await item.getAttribute('aria-current') === 'true' ? undefined : page.waitForEvent('domcontentloaded')
   void moved?.catch(() => {})
   await item.click()
   await moved
+}
+
+export async function selectParityWorkspace(page, { menuName, workspaceName, basePath }) {
+  await page.getByRole('button', { name: menuName, exact: true }).first().click()
+  await selectWorkspaceMenuItem(page, page.getByRole('menuitem', { name: workspaceName, exact: false }))
   await page.waitForURL(url => url.pathname === `${basePath}/en` || url.pathname === `${basePath}/en/`)
   await page.getByRole('button', { name: menuName, exact: true }).first().waitFor()
 }

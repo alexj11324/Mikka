@@ -544,6 +544,12 @@ compaction, title/profile and daemon agent calls use the same convention.
 See PostHog's [APM/AI linkage](https://posthog.com/docs/distributed-tracing/link-ai-observability)
 and [AI traces](https://posthog.com/docs/ai-observability/traces).
 
+An official Claude SDK `assistant` frame with `aborted: true` closes one error
+generation, even without a final `stop_reason`. The response ID deduplicates
+repeated terminal frames and later adapter cleanup. Known input/cache counts
+and SDK timing remain available; the interrupted frame's non-final output-token
+placeholder is omitted. Ordinary partial assistant frames do not close a generation.
+
 #### Native Codex request measurements
 
 When daemon tracing and AI capture are enabled on Linux, each Codex child gets
@@ -588,6 +594,11 @@ budget. Reordered batches and repeated exports are reconciled before emission.
 Each successfully reconstructed native request consumes at most one matching
 app-server usage receipt, matching conversation, model and all four numeric
 token/cache fields as a multiset. Missing values remain distinct from zero.
+An official completed response with all four usage attributes absent still
+produces one generation from its proven request ancestry and native timing,
+with token and cost fields absent. It does not consume a numeric app-server
+receipt. A complete tuple takes precedence over an empty replay of the same
+completion; partial or invalid tuples are not treated as absent usage.
 Unmatched app-server receipts still produce generations with
 `mikka.ai.timing_basis=app_server_usage`, without invented latency or TTFT.
 The `daemon.ai.collection` span records native/fallback/matched counts,
@@ -815,14 +826,16 @@ remain intact, and the previous accepted release remains available for rollback.
 The driver checks the public
 version during its run; that check alone does not prove the worker release.
 
-Start with `mode=preflight`. For an actual task, `mode=execute` uses the existing
-Infisical production acceptance account and its own official Claude Haiku 5.5
-or Codex GPT-6 Luna subscription. The retained
+Start with `mode=preflight`. For an actual task, `mode=execute` uses the
+`ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD` entries at Infisical `prod:/`, as
+explicitly authorized by [issue #1512](https://github.com/alexj11324/Mikka/issues/1512),
+and that account's own official Claude Haiku 5.5 or Codex GPT-6 Luna subscription. The
 `scripts/acceptance/run-observability.mjs` driver selects the account's unique
 personal workspace through the normal API and switches its own new session
-when required. That is a driver limitation against the shared **Acme Inc.**
-acceptance requirement in [acceptance.md](../acceptance.md). A personal-workspace
-result cannot establish shared-team acceptance. Each model
+when required. This issue-specific authorization does not replace the shared
+**Acme Inc.** acceptance requirement for other work in
+[acceptance.md](../acceptance.md). A personal-workspace result cannot establish
+shared-team acceptance. Each model
 case is independent and submits once per revision. The driver verifies native execution identity, the current
 Factory flow's independent checks, exact Artifact bytes and the formal
 deliverable acceptance receipt. Factory v2 uses execute/review; historical
@@ -831,14 +844,21 @@ flows still require verify. It never accepts a repository publication.
 `prepare=true` requires all visible owner-wide runs to be terminal, using the
 existing readers' 200-row, 30-day windows, and also checks the current workspace's
 complete Factory inventory. It temporarily prepares the account through existing
-settings APIs and restores unchanged settings afterward. For actual Replay
-evidence, run a single model case with `browser-submit=true`, refresh the
-already-signed-in production browser after deployment, and follow the generated
-ready comment in #1512 to submit the exact fixture once through New task. Confirm
-that the browser has selected the official Cloud backend before selecting the
-reported workspace: `/api/version` identifies the official browser shell even
-when business requests are routed to a selected self-hosted backend.
-The API-only case does not prove browser Replay. The driver also does not prove
+settings APIs and restores unchanged settings afterward. For a browser case,
+select `mode=execute`, `prepare=true`, `browser-submit=true`, and exactly one
+`model-case` (`claude` or `codex`). The workflow starts its own fresh Chromium
+context, signs in through the normal email form, verifies the exact workspace
+and official Cloud backend, and submits the generated fixture once through
+**New task**. Its progress comment says that submission is automatic; do not
+submit a second copy manually. Run the other model case separately.
+
+Before clicking, the browser requires the active PostHog session to have
+started recording and observed a sanitized snapshot. This is client readiness,
+not proof of upload or playback. The helper closes its page, signs out, verifies
+an anonymous session, and closes the context and browser when the driver ends;
+cleanup failure fails the workflow. The separate CLI manual-browser path is
+described in the driver contract. The API-only case does not prove browser
+Replay. The driver also does not prove
 PostHog ingestion; correlate its recorded IDs with the actual APM, AI, Logs and
 Replay records afterward. See the full
 [driver contract](../../scripts/acceptance/run-observability.md).
