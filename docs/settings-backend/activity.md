@@ -33,6 +33,18 @@ interface SavedLogin {
 - “成功使用”指 `decision <> 'denied_or_failed'` 的事件。
 - 错误码：`authRequired`。副作用：无。
 
+### `saveSavedLogin(input)` 和 `replaceSavedLoginPassword(id, password)`
+
+```ts
+saveSavedLogin(input: { site: string; account: string; password: string }): Promise<ActionResult<{ id: string; site: string }>>
+replaceSavedLoginPassword(id: string, password: string): Promise<ActionResult<{ id: string; site: string }>>
+```
+
+- 两个接口只操作当前账户的登录。添加时允许裸域名，服务端补 `https://` 后按密码箱规则规范化 origin。同站点、同账户再次保存会替换原登录。
+- `account` 和 `password` 走 `secretText` 校验。修改密码通过 ID 和拥有者一起匹配，并使旧会话失效。返回 ID 和规范化站点，不返回密码。
+- 使用 `credentialKms('app')` 选择云版 KMS 或社区版主密钥。关闭密码箱或后端不可用返回 `savedLoginsUnavailable`。
+- 其他预期错误为 `savedLoginSiteInvalid`、`savedLoginInvalid`、`savedLoginNotFound` 和 `authRequired`。
+
 ### `deleteSavedLogin(id): ActionResult<{ id: string }>`
 
 - 先按 `id + 当前用户 + 未撤销` 找到这条登录，再调用现有的 `CredentialStore.remove`（和 `DELETE /api/credentials` 同一段逻辑）。

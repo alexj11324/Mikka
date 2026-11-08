@@ -1,5 +1,11 @@
 # Issue #1372: local read cache and incremental reads
 
+This preserves the #1372 implementation plan, measurements and handoffs for
+the revisions recorded here. The current application uses the
+[shared Vite/Hono/Nitro runtime](operations/web-runtime.md). Earlier Next/Flight
+and account-pool descriptions remain part of that evidence. New acceptance
+uses [the current acceptance rules](acceptance.md).
+
 Status: implementation and measurement plan. Execution results, CI links and the deployed commit must be recorded below before production acceptance is claimed.
 
 Implementation started from main `29f0d915a2ee10748aed6938a578cc6d539b90df`. This document describes the read protocol; it is not evidence that a build, test or deployment has passed.
@@ -139,12 +145,15 @@ The first draft CI run on `5eb7babda486a1c9b83b13ec73dc28cf8241b7cc` found TypeS
 
 ### Isolated API acceptance
 
-The `Read cache API acceptance` workflow uses a disposable loopback PostgreSQL service, the existing environment/database attestation and normal owner/peer account leases. It builds this checkout with `pnpm exec next build`, then owns one `next start` process exposing the same Server Actions used by the application. The driver discovers their references from public client chunks and restricts business requests to five named read actions and bounded GET paths. It exercises cold, warm, restored cursor, changed row, deletion and foreign-account cases without sending a message, dispatching a run or invoking a model. Synthetic fixture edits are restricted to registered resources in the isolated database. No browser test runner is involved.
+The `Read cache API acceptance` workflow uses a disposable loopback PostgreSQL service, the existing environment/database attestation and normal owner/peer account leases. It builds this checkout with `pnpm build:app`, then owns the compiled Node API
+process through `productionApplication`. The driver uses the registered
+`/api/rpc` actions and restricts business requests to five named read actions
+and bounded GET paths. It exercises cold, warm, restored cursor, changed row, deletion and foreign-account cases without sending a message, dispatching a run or invoking a model. Synthetic fixture edits are restricted to registered resources in the isolated database. No browser test runner is involved.
 
 Run against the configured, attested isolated environment with:
 
 ```sh
-pnpm exec next build
+pnpm build:app
 node scripts/acceptance/run-read-cache.mjs
 ```
 

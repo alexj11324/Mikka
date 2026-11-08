@@ -17,7 +17,7 @@ The job in one or two sentences, in the user's words.
 ## Where it lives
 
 Which column or page, what opens it, what it replaces. Use the glossary's
-words: bot list, chat, thread list.
+words: bot list, chat, task list, task conversation.
 
 ## Layout and states
 
