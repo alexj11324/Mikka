@@ -151,13 +151,23 @@ class StageTest(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.temp.name);self.runtime=self.root/'runtime'
         self.bin=self.root/'bin';self.bin.mkdir();self.repo=self.root/'repository';self.repo.mkdir()
         (self.repo/'scripts/e2b').mkdir(parents=True);(self.repo/'scripts/e2b/build-template.py').write_text("print('c'*40)\n")
+        # Stage runs the real CLI conservation check as well as the build. Give
+        # it disposable original CLIs and the actual checker, without reading
+        # host installations or replacing the check with a successful stub.
+        checker=pathlib.Path(__file__).parents[3]/'scripts/e2b/official-files.py'
+        (self.repo/'scripts/e2b/official-files.py').write_text(checker.read_text().replace("PRIVATE = Path('/opt/mikka')",'PRIVATE = Path('+repr(str(self.runtime))+')').replace('before.st_uid != 0','before.st_uid != '+str(os.getuid())))
+        for name in ['claude','codex']:self.executable(self.bin/name,'#!/bin/sh\nexit 0\n')
         subprocess.run(['git','init','-q',str(self.repo)],check=True)
         subprocess.run(['git','-C',str(self.repo),'add','.'],check=True)
         subprocess.run(['git','-C',str(self.repo),'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','fixture'],check=True)
         self.source=subprocess.check_output(['git','-C',str(self.repo),'rev-parse','HEAD'],text=True).strip()
         self.destination=self.runtime/'releases'/self.source
         self.node=self.runtime/'runtime/node/bin';self.node.mkdir(parents=True)
-        self.executable(self.node/'node','#!/bin/sh\nexit 0\n')
+        self.executable(self.node/'node','#!/bin/sh\nif test "$1" = --input-type=module; then printf "{}\\n"; fi\n')
+        # The package/build commands below are local fixtures. In particular,
+        # staging must never try to download preview dependencies in this test.
+        preview=self.runtime/'runtime/preview-python-3.14.0/aiohttp';preview.mkdir(parents=True)
+        (preview/'__init__.py').write_text("__version__='3.14.0'\n")
         self.executable(self.bin/'corepack','#!/bin/sh\ntest ! -e "$STAGE_FAIL_INSTALL"\n')
         self.executable(self.bin/'git',"""#!/usr/bin/env python3
 import os,sys

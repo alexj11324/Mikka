@@ -4,7 +4,8 @@ The expand migration adds `user.lastIssueNumber`, backfills unnumbered historica
 
 A temporary trigger advances the counter when an old allocator inserts or renumbers an issue. New allocators use an atomic update of the same owner row. This allows both app versions to coexist without allocating the same number; rolling back a failed creation rolls back the counter update too.
 
-The allocator now reserves one number with an atomic `UPDATE … RETURNING` on the owner's counter in the same transaction as creation. Ordinary creates no longer scan or lock existing issues. Page-load backfill examines only unnumbered rows, and reading a fully numbered owner's issues does not consume numbers.
+The allocator now reserves one number with an atomic `UPDATE … RETURNING` on the owner's counter in the same transaction as creation. Ordinary creates no longer scan or lock existing issues. List and detail reads perform no number backfill. The expand migration fills
+historical missing numbers once; see [issue numbering](backend/issue-numbering.md).
 
 The following standalone concurrent migration adds the unique index `(userId, number)`. Existing numbers are preserved: duplicates make the index build fail rather than silently renumber tasks. The migration runner handles an invalid index left by an interrupted concurrent build before retrying. Fixtures must likewise use distinct numbers within each owner.
 

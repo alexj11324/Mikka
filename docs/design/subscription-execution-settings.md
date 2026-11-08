@@ -72,8 +72,10 @@ already configured key.
 Deterministic source and DOM tests cover choice, finite recovery states,
 read failures and model-specific quota. Real isolated PostgreSQL tests cover
 credential freezing, workspace scopes, dispatch, claims and thread counts.
-The subscription worker and pinned native Agents require separate live
-provider acceptance; a mocked stream or successful candidate list is not
-evidence of provider acceptance. Production-build screenshots and their
+The subscription worker and pinned native Agents require live provider
+acceptance on both official subscription paths, Claude Code (`claude-haiku-5-5`)
+and Codex (`gpt-6-luna`). A blocked path is recorded independently while the
+other continues. API-key execution does not gate acceptance. A mocked stream
+or successful candidate list does not establish provider acceptance. Production-build screenshots and their
 review remain distinct from API/CLI verification. See the PR's immutable
 revision and evidence for what was actually run.

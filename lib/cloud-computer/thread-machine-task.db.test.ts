@@ -1627,7 +1627,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         assert.equal(await readReviewSession(f.authority, { kind, id: f.lease.id }, pool), null);
         await refused();
         let acknowledge = false;
-        const close = mock.method(reviewSessionTransport, 'close', async (target, ids, expiresAt, closingKind) => {
+        const close = mock.method(reviewSessionTransport, 'close', async (...[target, ids, expiresAt, closingKind]: Parameters<typeof reviewSessionTransport.close>) => {
           assert.deepEqual(target, { runId: f.before.runId, ownerId: owner, workspaceId, sandboxId: f.before.sandboxId });
           assert.deepEqual(ids, [f.lease.id]); assert.equal(expiresAt, f.lease.expiresAt); assert.equal(closingKind, kind);
           assert.ok((await lease()).revokedAt, 'the durable fence exists before provider IO');

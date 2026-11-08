@@ -135,6 +135,9 @@ export async function resolveTaskReviewAuthority<T>(database: Pool, membership: 
   try {
     await workspace.query('BEGIN'); workspaceOpen = true
     await workspace.query("SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='5s'; SET LOCAL idle_in_transaction_session_timeout='20s'")
+    // Relation writers take the same exclusive lock before workspace rows.
+    // The shared lock also fences insertion when this task has no Team link.
+    await workspace.query("SELECT pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations',0))")
     const home = await workspace.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR SHARE', [workspaceId])
     const member = await workspace.query(`SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`, [workspaceId, session.user.id])
     if (!home.rowCount || !member.rowCount) throw denied()

@@ -32,10 +32,19 @@ Vendored on 2026-10-29, unmodified, from these pinned commits:
 | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62` | MIT (declared in the skill's frontmatter; the repository ships no `LICENSE` file) | `react-native-skills` (`skills/react-native-skills/`), vendored 2026-11-05 at Alex's request, unmodified |
 | [warpdotdev/common-skills](https://github.com/warpdotdev/common-skills) | `8792394ff1b655e0af451b8fabb68ef0cfcbd208` | MIT, (c) 2026 Denver Technologies, Inc. | `merge-risk` (vendored 2026-11-06 from `.agents/skills/merge-risk/SKILL.md`, unmodified; five-dimensional PR merge-risk review, no scripts) |
 | [avdlee/swiftui-agent-skill](https://github.com/avdlee/swiftui-agent-skill) | `62bd760f005093d1e2e4de5db156e456a5f96400` | MIT, (c) 2026 Antoine van der Lee | `swiftui-expert-skill` (vendored 2026-11-08 at Alex's request, from `skills/swiftui-expert-skill/`). Changed: `scripts/` (the Instruments `record_trace.py` / `analyze_trace.py` helpers and `instruments_parser/`) left out under the no-scripts rule, so the trace recording and analysis steps in `SKILL.md` do not run here; every other file is unmodified |
+| [gannonh/skills](https://github.com/gannonh/skills) | `2ef000341d4e60af00e8934ba1d4cfef82b63b13` | MIT, (c) 2026 Gannon Hall | `update-docs` (`skills/update-docs/`, vendored 2026-11-08), unmodified. The optional `documentation-and-adrs` reference uses an available installed skill when relevant |
+| [wondelai/skills](https://github.com/wondelai/skills) | `6621b1f32cca2b9b17d7a18c076bf6e7da83f8a6` | MIT, (c) 2025 Wondel.ai sp. z o.o. Google guide attribution is retained in `SKILL.md` | `technical-documentation` (vendored 2026-11-08), unmodified, including all seven reference pages |
 
-Full license texts are in [`../skill-licenses/`](../skill-licenses/).
+Full license texts are in [`../skill-licenses/`](../skill-licenses/). The
+`update-docs` license is retained in [`update-docs/LICENSE.md`](update-docs/LICENSE.md).
 
 ## Which skill to use
+
+- **Documentation updates** use `update-docs` to discover affected pages and
+  `technical-documentation` to check facts, structure and writing. Use the
+  existing `writing-for-agents` for Agent instructions. Start with
+  `docs/README.md` and preserve Mikka's document ownership. `AGENTS.md` routes
+  Codex and other coding agents to the same vendored files.
 
 - **UI design and review**: `interface-design`, with
   `/interface-design:design-review` (craft review with a pass bar) and

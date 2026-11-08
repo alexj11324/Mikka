@@ -1,5 +1,9 @@
 # Hosted-model abuse controls (#523, #525, #526, #527)
 
+This guide describes hosted billing in the cloud edition. Community model
+calls use their own provider configuration and bypass hosted credit accounting,
+as [self-hosted services](../self-hosting-byok.md) describes.
+
 The corrections in the issue comments are authoritative: cloud computers are
 BYO E2B only; there is no platform E2B pool or plan bucket to meter. Card
 verification grants exactly USD 1 once, not a periodically renewed credit.
@@ -77,10 +81,10 @@ verification grants exactly USD 1 once, not a periodically renewed credit.
   normalized uniqueness claim is enforced by a database trigger, including
   concurrent signup and email changes. Existing aliases are not removed.
 
-No React components, checkout screens, widgets, or state UI are implemented
-in this PR. Those remain with Claude. Production email signup/resend needs
-Claude's token-sending frontend; enabling the backend intentionally refuses
-requests without that proof.
+The original backend delivery excluded frontend work. The application now
+includes the billing adapter described next and the Turnstile component in
+`components/auth-form.tsx`. Signup and resend still require their configured
+verification proof.
 
 ### Frontend integration (#563)
 
@@ -253,7 +257,8 @@ uniqueness/rate limits. It is registered in the required DB inventory.
 DB tests, including replayed events, refunds, tenant isolation, spent/reserved
 balances, and the one-time gift.
 Tests never use a production database, create a live Stripe charge or start an
-E2B sandbox. Functional acceptance runs locally ([dev workflow](../dev-workflow.md));
+E2B sandbox. Functional acceptance runs against the isolated cloud Linux application
+([dev workflow](../dev-workflow.md));
 CI runs the source and database checks as the final gate.
 
 ## Hosted verification
