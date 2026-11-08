@@ -176,10 +176,22 @@ export const reviewBatchReceipt = z.strictObject({
   sourceVersion: digest, revision: z.number().int().nonnegative(),
   reason: z.enum(['source_changed', 'authorization_changed', 'target_unavailable', 'limit_exceeded', 'delivery_uncertain']).optional(),
   delivery: z.strictObject({ kind: z.enum(['run_message', 'run_continuation', 'factory_repair', 'github_review', 'github_reply']),
-    id: z.string().min(1).max(1024), url: z.url().max(2048).optional(), runId: z.uuid().optional(),
+    id: z.string().min(1).max(1024), url: z.url().max(2048).optional(), runId: z.uuid().optional(), messageId: z.uuid().optional(),
     headSha: sha.optional(), commitSha: sha.optional(), outdated: z.boolean().optional() }).nullable(),
 })
 export type ReviewBatchReceipt = z.infer<typeof reviewBatchReceipt>
+
+/** Task review is a projection of an immutable Run snapshot. The reference
+ * must travel with a draft; a Task id, path or HEAD alone is not a version. */
+export const taskReviewRef = z.strictObject({ snapshotId: z.uuid(), sourceVersion: digest })
+export type TaskReviewRef = z.infer<typeof taskReviewRef>
+export const taskReviewLineComment = z.strictObject({ path, line: z.number().int().positive().max(1_000_000),
+  side: z.enum(['old', 'new']), body: z.string().trim().min(1).max(4000) })
+export const taskReviewSubmission = z.strictObject({ reviewRef: taskReviewRef,
+  comments: z.array(taskReviewLineComment).max(50), note: z.string().max(4000).optional(),
+  attachedChecks: z.array(z.string().min(1).max(2000)).max(100), idempotencyKey: z.string().min(1).max(200) })
+  .refine(value => value.comments.length > 0 || Boolean(value.note?.trim()) || value.attachedChecks.length > 0)
+export type TaskReviewSubmission = z.infer<typeof taskReviewSubmission>
 
 export const WORKSPACE_REVIEW_ERROR_CODES = [
   'workspace_snapshot_unavailable', 'workspace_snapshot_outdated', 'workspace_review_conflict',

@@ -1964,11 +1964,11 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   // a successful fake dispatcher or starts a cloud machine.
   const [{ deliverAgentReview }, { reviewBatchFollowUp }, { prepareCheckpointReview, retainCheckpointReview },
     { ensureReviewScope, captureDiffSnapshot, diffFile }, { withReviewTransaction }, { mutateReview },
-    { manifestRevision }, { diffFileVersion }, { secretMaskerFor }] = await Promise.all([
+    { manifestRevision }, { diffFileVersion }, { secretMaskerFor }, { factoryEventId }] = await Promise.all([
     import('../coding-workspace/diff/agent-delivery'), import('../coding-workspace/diff/feedback-brief'),
     import('../coding-workspace/diff/checkpoint'), import('../coding-workspace/diff/service'),
     import('../coding-workspace/diff/authority'), import('../coding-workspace/diff/review'),
-    import('../coding-workspace/diff/store'), import('../coding-workspace/diff/patch'), import('../secrets/runtime'),
+    import('../coding-workspace/diff/store'), import('../coding-workspace/diff/patch'), import('../secrets/runtime'), import('./event-id'),
   ])
   const reviewDirectory = await mkdtemp(join(tmpdir(), 'factory-review-proof-'))
   t.after(() => rm(reviewDirectory, { recursive: true, force: true }))
@@ -2029,7 +2029,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       try {
         await tx.query('BEGIN')
         const eventId = randomUUID()
-        await tx.query('INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,$4,\'user_message\',$1::text,$5)',
+        await tx.query('INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1::uuid,$2,$3,$4,\'user_message\',$1::text,$5)',
           [eventId, f.ownerId, f.botId, issueId, { text: 'Original legacy thread request.' }])
         runId = (await queue(tx, eventId, 'legacy-review:' + issueId)).runId
         await tx.query('COMMIT')
@@ -2100,6 +2100,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     attempts: (await pool.query('SELECT a.* FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE t."userId"=$1 AND t."issueId"=$2 ORDER BY a.id', [f.ownerId, f.issueId])).rows,
     events: (await pool.query('SELECT e.* FROM factory_events e JOIN factory_tasks t ON t.id=e."taskId" WHERE t."userId"=$1 AND t."issueId"=$2 ORDER BY e."eventId"', [f.ownerId, f.issueId])).rows,
     continuations: (await pool.query('SELECT id,payload FROM coordinator_events WHERE "userId"=$1 AND "issueId"=$2 AND payload->>\'source\'=\'thread_continuation\' ORDER BY id', [f.ownerId, f.issueId])).rows,
+    messages: (await pool.query('SELECT m.* FROM run_messages m JOIN agent_runs r ON r.id=m."runId" WHERE m."userId"=$1 AND r."userId"=$1 AND r."issueId"=$2 ORDER BY m.id', [f.ownerId, f.issueId])).rows,
   })
   const assertCompleteFeedback = async (f: FeedbackFixture, childId: string) => {
     const batch = (await pool.query('SELECT * FROM coding_workspace_review_batches WHERE id=$1', [f.input.batchId])).rows[0]
@@ -2127,8 +2128,17 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       assert.equal(comment.anchor.sourceVersion, f.snapshot.revision.version)
     }
     assert.deepEqual(data.failedCheckRefs, ['run-report:' + f.runId])
+    const messageId = factoryEventId('workspace-review-message', f.input.batchId)
+    const messages = (await feedbackState(f)).messages
+    assert.equal(messages.length, 1, 'the original Task thread displays exactly one owner turn across the source and child Runs')
+    assert.equal(messages[0].id, messageId)
+    assert.equal(messages[0].runId, childId); assert.equal(messages[0].userId, f.ownerId)
+    assert.equal(messages[0].text, batch.input.agent.text, 'the displayed turn retains the complete accepted feedback, including every inline finding')
+    assert.equal(messages[0].origin, 'owner'); assert.equal(messages[0].mailboxWakeDepth, -1)
+    assert.ok(messages[0].deliveredAt instanceof Date, 'feedback already present in the child prompt is display-only and is not delivered again')
+    assert.equal(batch.receipt.delivery.messageId, messageId, 'the accepted receipt and display row share the stable batch-derived message identity')
     assert.equal((await pool.query('SELECT 1 FROM coding_workspace_review_comments WHERE "boardId"=$1 AND draft', [f.scope.boardId])).rowCount, 0)
-    return { child, batch }
+    return { child, batch, messageId }
   }
 
   await t.test('Review repairs the exact Factory candidate once in the same epoch and keeps the complete native follow-up', async () => {
@@ -2137,7 +2147,8 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const receipt = await deliverFeedback(f)
     assert.equal(receipt.state, 'accepted', receipt.reason); assert.equal(receipt.delivery?.kind, 'factory_repair')
     assert.ok(receipt.delivery?.runId)
-    const { child, batch } = await assertCompleteFeedback(f, receipt.delivery.runId)
+    const { child, batch, messageId } = await assertCompleteFeedback(f, receipt.delivery.runId)
+    assert.equal(receipt.delivery.messageId, messageId)
     const task = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
     assert.equal(task.stage, 'execute'); assert.equal(task.status, 'running'); assert.equal(task.sourceEventId, f.sourceEventId)
     assert.notEqual(task.attemptId, f.current.attemptId); assert.equal(task.candidateId, null)
@@ -2164,7 +2175,8 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const receipt = await deliverFeedback(f)
     assert.equal(receipt.state, 'accepted', receipt.reason); assert.equal(receipt.delivery?.kind, 'run_continuation')
     assert.ok(receipt.delivery?.runId)
-    const { child, batch } = await assertCompleteFeedback(f, receipt.delivery.runId)
+    const { child, batch, messageId } = await assertCompleteFeedback(f, receipt.delivery.runId)
+    assert.equal(receipt.delivery.messageId, messageId)
     assert.equal(batch.input.agent.factory, undefined)
     const state = await feedbackState(f)
     assert.equal(state.runs.length, 2); assert.equal(state.tasks.length, 1); assert.equal(state.attempts.length, 1)
@@ -2214,6 +2226,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
 
   for (const mode of ['factory', 'ordinary'] as const) await t.test('Review ' + mode + ' delivery rolls back queue and acceptance together before retry', async () => {
     const f = await feedbackFixture(mode), before = await feedbackState(f), beforeHandoffs = handoffs.length
+    assert.deepEqual(before.messages, [])
     const functionName = 'profile_review_failure_' + randomUUID().replaceAll('-', '')
     const triggerName = functionName + '_trigger'
     const table = mode === 'factory' ? 'coding_workspace_review_batches' : 'agent_runs'
@@ -2235,7 +2248,9 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
         assert.equal(failure.cause?.message, mode === 'factory' ? 'fixture acceptance failure' : 'fixture queue commit failure')
         return true
       })
-      assert.deepEqual(await feedbackState(f), before, 'the child, attempt, epoch event and Factory receipt all roll back')
+      assert.deepEqual(await feedbackState(f), before, 'the child, display message, attempt, epoch event and Factory receipt all roll back')
+      assert.equal((await pool.query('SELECT 1 FROM run_messages WHERE id=$1', [factoryEventId('workspace-review-message', f.input.batchId)])).rowCount, 0,
+        'a rejected COMMIT leaves no displayed turn on either the original or continuation Run')
       const batch = (await pool.query('SELECT state,receipt FROM coding_workspace_review_batches WHERE id=$1', [f.input.batchId])).rows[0]
       assert.equal(batch.state, 'prepared'); assert.equal(batch.receipt, null)
       assert.equal(handoffs.length, beforeHandoffs, 'no provider wake precedes a successful COMMIT')
@@ -2246,7 +2261,8 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     }
     const accepted = await deliverFeedback(f)
     assert.equal(accepted.state, 'accepted', accepted.reason); assert.ok(accepted.delivery?.runId)
-    await assertCompleteFeedback(f, accepted.delivery.runId)
+    const { messageId } = await assertCompleteFeedback(f, accepted.delivery.runId)
+    assert.equal(accepted.delivery.messageId, messageId)
     assert.equal((await feedbackRuns(f)).length, 2); assert.equal(handoffs.length, beforeHandoffs + 1)
   })
 })

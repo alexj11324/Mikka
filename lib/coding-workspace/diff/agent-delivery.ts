@@ -8,6 +8,7 @@ import { UNFINISHED_RUN_STATUSES } from '../../agent-run-statuses'
 import { readRunChain } from '../../run-chain'
 import { sendOwnedRunMessageInTransaction } from '../../run-control'
 import { notifyDeviceWork } from '../../device-gateway-notify'
+import { runChanged } from '../../live/panels'
 import { factoryEventId } from '../../factory/event-id'
 import { FactoryError } from '../../factory/contract'
 import { factoryRuntimeForBot } from '../../factory/runtime'
@@ -142,15 +143,15 @@ export async function deliverAgentReview(deps: DiffDependencies, actor: ReviewAc
             || association.factory?.producerRunId !== snapshot.factory.producerRunId || association.factory?.sha !== snapshot.factory.sha))) throw outdated()
       }
       let delivery: NonNullable<ReviewBatchReceipt['delivery']>
+      const messageId = factoryEventId('workspace-review-message', current.id)
       if (live(fresh.status)) {
         if (fresh.stopped || (await readRunChain(tx, actor.userId, runId))?.latestRunId !== runId) throw outdated()
         if (task && (task.stage !== 'execute' || task.status !== 'running'
           || !(await tx.query('SELECT 1 FROM factory_attempts WHERE id=$1 AND "taskId"=$2 AND "runId"=$3 AND status=\'running\'',
             [task.attemptId, task.id, runId])).rowCount)) throw outdated()
-        const id = factoryEventId('workspace-review-message', current.id)
-        const deviceId = await sendOwnedRunMessageInTransaction(drizzle(tx), actor.userId, { runId, text: agent.text, messageId: id })
+        const deviceId = await sendOwnedRunMessageInTransaction(drizzle(tx), actor.userId, { runId, text: agent.text, messageId })
         wake = async () => { notifyDeviceWork(deviceId) }
-        delivery = { kind: 'run_message', id, runId, ...(snapshot.revision.headSha ? { headSha: snapshot.revision.headSha } : {}) }
+        delivery = { kind: 'run_message', id: messageId, runId, ...(snapshot.revision.headSha ? { headSha: snapshot.revision.headSha } : {}) }
       } else if (task) {
         const runtime = factoryRuntimeForBot(task.botId)
         let target = task
@@ -176,6 +177,15 @@ export async function deliverAgentReview(deps: DiffDependencies, actor: ReviewAc
         delivery = { kind: 'run_continuation', id: result.runId, runId: result.runId,
           ...(snapshot.revision.headSha ? { headSha: snapshot.revision.headSha } : {}) }
       }
+      if (delivery.kind !== 'run_message') {
+        // The complete request is already in the child's frozen prompt. This
+        // existing thread row displays the owner's turn and is never sent to
+        // the worker a second time. It commits with queue and batch receipt.
+        await tx.query(`INSERT INTO run_messages (id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
+          VALUES ($1,$2,$3,$4,'owner',-1,clock_timestamp())`, [messageId, delivery.runId, actor.userId, agent.text])
+        await runChanged(tx, delivery.runId!)
+      }
+      delivery.messageId = messageId
       await assertBatchMaskPolicy(actor, fresh, masks)
       await lease.check()
       return settleReviewBatch(tx, fresh, current, 'accepted', delivery)
