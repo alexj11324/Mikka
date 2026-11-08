@@ -31,7 +31,7 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 | Frame | What it fixes | Light | Dark |
 |---|---|---|---|
 | R0 入口 | The chat's task card and the window bar's 等待你 list show one line, 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败」, with 「审阅」. One click opens R1. The list's footer shows ⌘⇧B and ⌘K 「审阅 #1471」. | `1120:2` | `1120:227` |
-| R0b 任务面板 | The task detail keeps its current shape. Its top row holds the title, then 「PR #1471 · ⚠ 1 项检查失败 · 审阅」, then ⋯ ⤢ ✕ on the right; the branch name moves into ⋯. Attempts appear only in 活动: 第 1 次尝试 · 失败 · 换 Codex 再试 → 第 2 次尝试 · 完成 · 开了 PR #1471. | `1120:432` | `1120:664` |
+| R0b 任务面板 | The task detail keeps its current shape. Its top row is #1471 · title · ⋯ ⤢ ✕. The first row under it, above 状态 / Bot / Agent, is 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败」 with 「审阅」. Secondary actions and the branch name are in ⋯. Attempts appear only in 活动: 第 1 次尝试 · 失败 · 换 Codex 再试 → 第 2 次尝试 · 完成 · 开了 PR #1471. | `1120:432` | `1120:664` |
 | R1 审阅页 | One full page, described below. | `1120:869` | `1120:1231` |
 | R1b 检查展开 | The check summary expands in place: the failing check with a log excerpt, 查看完整日志 and 附到评论; the passing checks in one row. | `1120:1542` | `1120:1895` |
 | R2 iPhone 审阅 | Opened in one tap from the chat card's summary line. Under one centred title, the first row is the check summary (tap to expand) with 要求修改 / 批准合并, then the changed files, and the floating 「N 条评论 · 发给 Agent」 bar. | `1121:54` | `1121:169` |
