@@ -5,6 +5,9 @@ on:
     - cron: '17 14 * * *'
     - cron: '*/15 * * * *'
   deployment_status:
+  push:
+    branches: [ops/20261108-audit-actions-dispatch]
+    paths: ['.github/workflows/production-smoke.yml']
   workflow_dispatch:
     inputs:
       audit_auth_sha:
@@ -146,7 +149,7 @@ jobs:
 
   smoke:
     # Only finished production deployments, plus the schedule and manual runs.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
+    if: github.ref == 'refs/heads/main' && (github.repository == 'alexj11324/Mikka' && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -240,3 +243,93 @@ jobs:
             runtime-outcomes-report
             egress-monitor-report
           retention-days: 7
+
+  dispatch-audit:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/ops/20261108-audit-actions-dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    env:
+      REPO_ACTIONS_TOKEN: ${{ github.token }}
+      AUDIT_BRIDGE_CLI: '1'
+      AUDIT_DISPATCH_MODE: check
+      AUDIT_SOURCE_SHA: ''
+      AUDIT_DISPATCH_NOT_AFTER: ''
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Check repository dispatch authority without production operations
+        run: |
+          node --input-type=module <<'JS'
+          const repository = 'alexj11324/Mikka'
+          const branch = 'refs/heads/ops/20261108-audit-actions-dispatch'
+          const driver = '8bceef7e67d251e4e0b59f7a89baf593fee4cbbf'
+          const api = `https://api.github.com/repos/${repository}`
+          const terminal = new Set(['completed'])
+          
+          export async function dispatchAudit(env, { fetchImpl = fetch, now = Date.now } = {}) {
+            const check = (value, code) => { if (!value) throw new Error(code) }
+            check(env.GITHUB_REPOSITORY === repository && env.GITHUB_REF === branch
+              && env.GITHUB_EVENT_NAME === 'push', 'dispatch_bridge_scope_refused')
+            check(['check', 'dispatch'].includes(env.AUDIT_DISPATCH_MODE), 'dispatch_bridge_mode_refused')
+            check(typeof env.REPO_ACTIONS_TOKEN === 'string' && env.REPO_ACTIONS_TOKEN.length > 0, 'dispatch_bridge_token_unavailable')
+            const github = async (path, body) => {
+              const response = await fetchImpl(api + path, { method: body ? 'POST' : 'GET', redirect: 'error',
+                headers: { authorization: `Bearer ${env.REPO_ACTIONS_TOKEN}`, accept: 'application/vnd.github+json',
+                  ...(body ? { 'content-type': 'application/json' } : {}) },
+                ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30000) })
+              check(response.status === (body ? 204 : 200), 'dispatch_bridge_github_request_refused')
+              return body ? undefined : response.json()
+            }
+            const main = await github('/git/ref/heads/main')
+            const source = main.object?.sha
+            check(/^[a-f0-9]{40}$/.test(source ?? ''), 'dispatch_bridge_main_invalid')
+            const workflow = await github('/actions/workflows/production-smoke.yml')
+            check(workflow.path === '.github/workflows/production-smoke.yml' && workflow.state === 'active', 'dispatch_bridge_workflow_unavailable')
+            if (env.AUDIT_DISPATCH_MODE === 'check') return { status: 'check_only', source,
+              workflow: workflow.path, dispatchRequested: false, productionCredentialReads: 0 }
+          
+            check(env.AUDIT_SOURCE_SHA === source, 'dispatch_bridge_main_changed')
+            const deadline = Date.parse(env.AUDIT_DISPATCH_NOT_AFTER ?? '')
+            check(Number.isFinite(deadline) && now() <= deadline && deadline <= now() + 10 * 60_000, 'dispatch_bridge_start_window_refused')
+            const comparison = await github(`/compare/${driver}...${source}`)
+            check(comparison.merge_base_commit?.sha === driver && ['ahead', 'identical'].includes(comparison.status), 'dispatch_bridge_driver_not_merged')
+            const listed = await github('/actions/runs?branch=main&per_page=100')
+            check(Array.isArray(listed.workflow_runs), 'dispatch_bridge_runs_invalid')
+            const writers = listed.workflow_runs.filter(run => ['Web deploy', 'E2B additive runtime release'].includes(run.name))
+            check(writers.every(run => terminal.has(run.status)), 'dispatch_bridge_writer_active')
+            const completed = async name => {
+              const runs = listed.workflow_runs.filter(run => run.head_sha === source && run.head_branch === 'main'
+                && run.event === 'push' && run.name === name).sort((a, b) => b.id - a.id)
+              check(runs.length > 0 && runs[0].status === 'completed' && runs[0].conclusion === 'success', 'dispatch_bridge_release_incomplete')
+              const jobs = await github(`/actions/runs/${runs[0].id}/jobs?per_page=100`)
+              check(Array.isArray(jobs.jobs) && jobs.jobs.length > 0 && jobs.jobs.every(job => job.status === 'completed'
+                && ['success', 'skipped'].includes(job.conclusion)), 'dispatch_bridge_jobs_incomplete')
+              return { run: runs[0], jobs: jobs.jobs }
+            }
+            await completed('CI')
+            await completed('Web deploy')
+            const runtime = await completed('E2B additive runtime release')
+            check(runtime.jobs.length === 7 && runtime.jobs.every(job => job.conclusion === 'success'), 'dispatch_bridge_runtime_incomplete')
+            const version = await fetchImpl('https://app.aspectlylabs.com/mikka/api/version', {
+              redirect: 'error', headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(30000) })
+            check(version.status === 200 && (await version.json()).build === source, 'dispatch_bridge_public_version_mismatch')
+            check((await github('/git/ref/heads/main')).object?.sha === source && now() <= deadline, 'dispatch_bridge_main_or_window_changed')
+            await github('/actions/workflows/production-smoke.yml/dispatches', { ref: 'main', inputs: {
+              audit_auth_sha: source, audit_lease: true, audit_recover_lease_run: 'none' } })
+            return { status: 'dispatched', source, workflow: workflow.path, runtimeRun: runtime.run.id,
+              productionCredentialReads: 0 }
+          }
+          
+          if (process.env.GITHUB_ACTIONS === 'true' && process.env.AUDIT_BRIDGE_CLI === '1') {
+            try { console.log(JSON.stringify(await dispatchAudit(process.env))) }
+            catch (error) {
+              const code = /^dispatch_bridge_[a-z_]+$/.test(error?.message ?? '') ? error.message : 'dispatch_bridge_failed'
+              console.error(JSON.stringify({ status: 'blocked', code }))
+              process.exitCode = 1
+            }
+          }
+          JS
