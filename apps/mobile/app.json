@@ -12,6 +12,7 @@
       "bundleIdentifier": "com.aspectlylabs.mikka",
       "supportsTablet": false,
       "infoPlist": {
+        "CFBundleLocalizations": ["en", "zh-Hans", "zh-Hant"],
         "ITSAppUsesNonExemptEncryption": false
       }
     },

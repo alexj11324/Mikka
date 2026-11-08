@@ -5698,5 +5698,77 @@
       "failed": "⚠ {count} 项检查失败",
       "running": "运行中"
     }
+  },
+  "MobileCore": {
+    "working": "正在工作",
+    "groupChats": "群聊",
+    "groupGlyph": "群",
+    "hiddenChats": "隐藏的聊天",
+    "restartToUpdate": "重启以更新",
+    "chatList": "对话列表",
+    "document": "文档",
+    "message": "发消息",
+    "replySelection": "回复选中的文字",
+    "messageTask": "给这个任务发消息",
+    "noTasks": "没有任务",
+    "noAttempts": "还没有尝试",
+    "allTasks": "全部任务",
+    "info": "资料",
+    "all": "全部",
+    "filter": "筛选",
+    "groups": {
+      "pending": "等待你",
+      "running": "进行中",
+      "todo": "待办",
+      "done": "已完成"
+    },
+    "states": {
+      "waiting": "等你处理",
+      "failed": "失败",
+      "blocked": "受阻",
+      "running": "运行中",
+      "queued": "排队中"
+    },
+    "board": {
+      "backlog": "暂不处理",
+      "todo": "待办",
+      "doing": "进行中",
+      "review": "评审中",
+      "done": "完成",
+      "canceled": "已取消",
+      "duplicate": "重复"
+    },
+    "attempts": {
+      "running": "运行中",
+      "paused": "等你回复",
+      "done": "完成",
+      "failed": "失败",
+      "blocked": "受阻"
+    },
+    "reasons": {
+      "needs_input": "等你回复",
+      "approval": "等你确认",
+      "pr_review": "待审阅",
+      "blocked": "受阻",
+      "quota": "额度用完",
+      "blocked_by": "等 {task}",
+      "otherTask": "等其他任务",
+      "flagged": "已标记受阻"
+    },
+    "priority": "{priority}优先级",
+    "noPriority": "无",
+    "activity": "活动",
+    "comment": "+ 评论",
+    "attemptNumber": "第 {number} 次尝试",
+    "threadReplaced": "换了新线程",
+    "taskCreatedBy": "{name} 创建了任务",
+    "taskCreated": "创建了任务",
+    "openedPullRequest": "开了 PR #{number}",
+    "steps": "{count} 步",
+    "yesterday": "昨天",
+    "tomorrow": "明天",
+    "content": "内容",
+    "readFailed": "{label}加载失败。",
+    "refreshFailed": "{label}更新失败，仍显示上次内容。"
   }
 }
