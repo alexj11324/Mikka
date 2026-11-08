@@ -1,12 +1,13 @@
 // The default bot avatar (docs/ui-overlay.md, 「iOS app」). The official build
 // draws the hosted layer's mobile/slots/bot-avatar.tsx in its place.
+import { memo } from 'react'
 import { useColorScheme, View } from 'react-native'
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg'
 import { BOT_SHAPE_DRAWINGS, botFill } from '@/lib/bot-look'
 import type { BotAvatarProps } from './bot-avatar-contract'
 
 /** A bot's avatar: its blob in its colour and shape, with one bright eye (a still bloub, R-36). The Coordinator is the ink circle; in dark mode ink is drawn crème, as on the web (bot-avatar.tsx). */
-export function BotAvatar({ color = 'encre', shape = 'cercle', size = 24 }: BotAvatarProps) {
+export const BotAvatar = memo(function BotAvatar({ color = 'encre', shape = 'cercle', size = 24 }: BotAvatarProps) {
   const dark = useColorScheme() === 'dark'
   const c = botFill(color, dark)
   const body = (() => {
@@ -43,11 +44,11 @@ export function BotAvatar({ color = 'encre', shape = 'cercle', size = 24 }: BotA
     }
   })()
   return (
-    <View style={{ width: size, height: size }}>
+    <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden style={{ width: size, height: size }}>
       <Svg width={size} height={size} viewBox="0 0 24 24">
         {body}
         <Ellipse cx={15.6} cy={8.6} rx={1.5} ry={2.3} fill="#fff" />
       </Svg>
     </View>
   )
-}
+})

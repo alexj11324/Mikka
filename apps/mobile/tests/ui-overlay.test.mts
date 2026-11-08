@@ -16,7 +16,7 @@ test('without the overlay, each slot is its default in slots/', () => {
   for (const name of MOBILE_SLOTS) {
     assert.equal(slots[name], join(app, 'slots', `${name}.tsx`))
     const source = readFileSync(slots[name], 'utf8')
-    for (const exported of MOBILE_SLOT_EXPORTS[name]) assert.match(source, new RegExp(`export function ${exported}\\b`))
+    for (const exported of MOBILE_SLOT_EXPORTS[name]) assert.match(source, new RegExp(`export (?:function|const) ${exported}\\b`))
   }
 })
 
