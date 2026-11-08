@@ -178,6 +178,10 @@ jobs:
           key: electron-builder-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             electron-builder-${{ runner.os }}-
+      - name: Prepare the pinned native Electron and builder checksum cache
+        run: node apps/desktop/scripts/install-electron.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Read existing APPLE_DEVELOPER_ID_P12_BASE64 through OIDC
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:

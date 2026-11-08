@@ -7,6 +7,8 @@ import { alignServerTimings, cleanupCase, createSessionClient, hasStartupInitial
 import { mcpBusinessEvidence, readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
 import { runSummaryView } from '../../lib/issue-run-conversation.ts'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
+import { rawCliShellAvailable } from '../../packages/daemon/src/permissions.ts'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const workspace = id(1), botId = id(2), deviceId = id(3), agentId = id(4)
@@ -74,7 +76,7 @@ test('v3 requires an exact observed claim catalogue before accepting zero physic
 
 function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false,
   wrongPayer = false, wrongScope = false, wrongProfile = false, wrongSource = false, ambiguousSource = false, withdrawShare = false, checkingMenu = false, remapCurrentId = false, fallbackMenu = false, failRestore = false,
-  workspaceRole = 'member', timingSecret = false } = {}) {
+  workspaceRole = 'member', timingSecret = false, leaseAudit = false } = {}) {
   const calls = [], samples = [], profiles = new Map(), sockets = []
   let current, clock = epoch, profileCount = 0
   let chosenModel
@@ -176,7 +178,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         }
         if (action === 'coordinator.sendCoordinatorMessage') {
           const input = JSON.parse(args[0].match(/参数如下：(.*)。使用/)[1])
-          assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, true)
+          assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, !leaseAudit)
           assert.deepEqual(input.target, candidate ? { deviceId } : 'cloud')
           assert.equal(input.model, undefined)
           assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
@@ -917,7 +919,7 @@ test('trusted candidate timing cannot claim a host without a pinned device and a
 })
 
 test('lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics', async () => {
-  const io = fixture()
+  const io = fixture({ leaseAudit: true })
   io.onDetail = (sample, detail) => {
     if (sample.reads > 1) {
       sample.finished = true
@@ -930,6 +932,18 @@ test('lease audit uses ordinary cloud placement and waits for a terminal reply a
   assert.deepEqual(report.samples.map(sample => sample.harness), ['claude_code', 'codex'])
   assert.ok(report.samples.every(sample => sample.requireTerminal && sample.requireReplyAfterTool
     && sample.replyVerifiedAfterTool && sample.lastStatus === 'stopped' && sample.cleanup.status === 'passed'))
+  const dispatches = io.calls.filter(call => call.path === '/api/rpc' && JSON.parse(call.init.body).action === 'coordinator.sendCoordinatorMessage')
+    .map(call => JSON.parse(JSON.parse(call.init.body).args[0].match(/参数如下：(.*)。使用/)[1]))
+  assert.equal(dispatches.length, 2)
+  for (const dispatch of dispatches) {
+    assert.equal(dispatch.readOnly, false)
+    assert.equal(rawCliShellAvailable({ ...defaultRunPolicy(), readOnly: dispatch.readOnly }), true,
+      'the real CLI permission policy must permit the Python lease probe')
+    assert.equal(rawCliShellAvailable({ ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, install_dependency: 'deny' }, readOnly: dispatch.readOnly }), false,
+      'the audit must retain the workspace shell restriction')
+  }
+  assert.equal(rawCliShellAvailable({ ...defaultRunPolicy(), readOnly: true }), false,
+    'ordinary read-only checks retain their native-shell restriction')
   assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
   assert.ok(io.calls.some(call => /^\/api\/threads\/.*\/machine$/.test(call.path)))
 })
