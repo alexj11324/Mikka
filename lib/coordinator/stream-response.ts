@@ -245,10 +245,15 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
           sent = through
         } else if (id && part.type === 'text-delta') {
           if (timing && timing.firstRawTextMs === null && part.text.length > 0) timing.firstRawTextMs = elapsed()
+          const previousStepLength = stepText.length
           stepText += part.text
+          // Check the raw delta boundary before trimming; saved secrets can include whitespace.
+          assertNoSecret(userId, stepText.slice(Math.max(0, previousStepLength - holdback)), fingerprints)
           // Every model call may decline a handoff. Keep its partial sentinel hidden.
           if (quietEligible && QUIET_REPLY.startsWith(stepText.trim())) return
-          text = text.slice(0, stepStart) + (stepStart ? '\n\n' : '') + stepText
+          // Keep raw stepText: later deltas can make its trailing whitespace internal.
+          // Wire text and tool offsets must use the same projection before finish-step too.
+          text = canonicalStepText()
           publish(controller)
         } else if (id && (part.type === 'tool-call' || part.type === 'tool-result' || part.type === 'tool-error')) {
           if (part.type === 'tool-call' && part.invalid === true) invalidCalls.add(part.toolCallId)

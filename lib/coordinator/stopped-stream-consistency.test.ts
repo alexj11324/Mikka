@@ -7,6 +7,7 @@ import { coordinatorTextStream } from './stream-response'
 import { coordinatorStreamReply, type CoordinatorLiveReply } from '../coordinator-stream-client'
 import { stoppedStepText, stoppedMessages, lastAssistantText } from './stop'
 import { chatItems } from './context'
+import { replySegments } from './reply-segments'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
 
 const id = 'stopped-round:0'
@@ -98,4 +99,83 @@ test('an empty stopped reply retains its own round identity and position without
   ])
   const unstopped = chatItems(rows.map(row => ({ ...row, message: { ...row.message, mikkaStopped: false } as ModelMessage & { mikkaStopped: boolean } })))
   assert.deepEqual(unstopped.map(item => [item.text, item.streamId, item.position]), [['Older reply', 'older:0', 1]])
+})
+
+
+for (const scoped of [false, true]) {
+  test('a tool-call prefix uses the same text coordinates before finish-step (scoped=' + scoped + ')', async () => {
+    const tool = { type: 'tool-call', toolCallId: 'anchor', toolName: 'web_search', input: { query: 'example' } }
+    const raw: CoordinatorWorkflowStreamPart[] = [
+      { type: 'coordinator-turn-start', id, quietEligible: false, ...(scoped ? { modelStream: 'scoped-v1' as const } : {}) },
+      modelPart(scoped, { type: 'text-delta', id: 't', text: ' first \n' }),
+      modelPart(scoped, tool),
+      // The raw whitespace before the call becomes internal when another delta arrives.
+      modelPart(scoped, { type: 'text-delta', id: 't', text: 'next ' }),
+      modelPart(scoped, { type: 'text-delta', id: 't', text: '\t' }),
+      modelPart(scoped, { type: 'finish-step' }),
+      { type: 'coordinator-turn-stopped', id },
+      { type: 'coordinator-turn-committed', id, through: 20, quiet: false },
+    ]
+    const events: CoordinatorStreamEvent[] = []
+    for await (const event of rawStream(raw).pipeThrough(coordinatorTextStream('owner', []))) events.push(event)
+    let live: CoordinatorLiveReply[] = []
+    let checked = false
+    for (const event of events) {
+      live = coordinatorStreamReply(live, event)
+      if (event.type === 'tool' && event.call === 'anchor') {
+        assert.deepEqual(replySegments(live[0].text, live[0].tools ?? []).map(segment =>
+          segment.kind === 'text' ? [segment.kind, segment.text] : [segment.kind, segment.tools.map(entry => entry.call)]),
+        [['text', 'first'], ['tools', ['anchor']]], 'the running tool must not split a word while waiting for finish-step')
+        checked = true
+      }
+    }
+    assert.equal(checked, true)
+    assert.equal(live[0].text, 'first \nnext', 'raw spaces and newlines survive when later deltas make them internal')
+    assert.equal(live[0].tools?.[0].at, 'first'.length)
+  })
+}
+
+test('canonical text still checks a saved secret spanning raw whitespace and delta boundaries', async () => {
+  const previous = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-tool-anchor-fixture'
+  try {
+    const secret = '  saved-value'
+    const seen: CoordinatorStreamEvent[] = []
+    await assert.rejects(async () => {
+      for await (const event of rawStream([
+        { type: 'coordinator-turn-start', id, quietEligible: false },
+        { type: 'text-delta', id: 't', text: secret.slice(0, 7) },
+        { type: 'text-delta', id: 't', text: secret.slice(7) },
+        { type: 'coordinator-turn-committed', id, through: 20, quiet: false },
+      ]).pipeThrough(coordinatorTextStream('owner', [fingerprint('owner', secret)]))) seen.push(event)
+    }, { code: 'credential_secret_detected' })
+    assert.equal(seen.some(event => event.type === 'text' || event.type === 'reset' && event.text), false)
+  } finally {
+    if (previous === undefined) delete process.env.BETTER_AUTH_SECRET
+    else process.env.BETTER_AUTH_SECRET = previous
+  }
+})
+
+test('a canonical tool anchor never releases text held back for a saved secret', async () => {
+  const previous = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-tool-anchor-fixture'
+  try {
+    const events: CoordinatorStreamEvent[] = []
+    for await (const event of rawStream([
+      { type: 'coordinator-turn-start', id, quietEligible: false },
+      { type: 'text-delta', id: 't', text: ' first \n' },
+      { type: 'tool-call', toolCallId: 'held-anchor', toolName: 'web_search', input: { query: 'example' } } as CoordinatorWorkflowStreamPart,
+      { type: 'text-delta', id: 't', text: 'next ' },
+      { type: 'coordinator-turn-stopped', id },
+      { type: 'coordinator-turn-committed', id, through: 20, quiet: false },
+    ]).pipeThrough(coordinatorTextStream('owner', [fingerprint('owner', 'unrelated-saved-value-with-a-long-held-back-tail')])) ) events.push(event)
+    assert.equal(events.find(event => event.type === 'tool')?.at, 'first'.length)
+    assert.equal(events.findIndex(event => event.type === 'text'), events.findIndex(event => event.type === 'committed') - 1)
+    let live: CoordinatorLiveReply[] = []
+    for (const event of events) live = coordinatorStreamReply(live, event)
+    assert.equal(live[0].text, 'first \nnext')
+  } finally {
+    if (previous === undefined) delete process.env.BETTER_AUTH_SECRET
+    else process.env.BETTER_AUTH_SECRET = previous
+  }
 })
