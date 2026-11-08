@@ -32,6 +32,9 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
   const owner = 'phone-workspace-' + randomUUID(), peer = 'phone-peer-' + randomUUID()
   const personal = randomUUID(), alpha = randomUUID(), beta = randomUUID(), organizationId = randomUUID()
   const personalBot = randomUUID(), alphaBot = randomUUID(), betaBot = randomUUID(), foreignBot = randomUUID()
+  const alphaIssue = randomUUID(), otherAlphaIssue = randomUUID(), betaIssue = randomUUID(), pendingIssue = randomUUID()
+  const agent = randomUUID(), peerAgent = randomUUID()
+  const alphaRun = randomUUID(), otherTaskRun = randomUUID(), betaRun = randomUUID(), peerRun = randomUUID()
   const token = 'ExpoPushToken[' + randomUUID().replaceAll('-', '') + ']'
   const peerToken = 'ExpoPushToken[' + randomUUID().replaceAll('-', '') + ']'
   const sent: { userId: string; message: { to: string[]; title: string; body: string; data: Record<string, unknown> } }[] = []
@@ -68,6 +71,9 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     await admin.query('DELETE FROM mobile_push_receipts WHERE user_id=ANY($1::text[])', [[owner, peer]])
     await admin.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])
     await admin.query('DELETE FROM mikka_organizations WHERE id=$1', [organizationId])
+    await admin.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[alphaRun, otherTaskRun, betaRun, peerRun]])
+    await admin.query('DELETE FROM issues WHERE id=ANY($1::uuid[])', [[alphaIssue, otherAlphaIssue, betaIssue, pendingIssue]])
+    await admin.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agent, peerAgent]])
     await admin.query('DELETE FROM bots WHERE id=ANY($1::uuid[])', [[personalBot, alphaBot, betaBot, foreignBot]])
     await admin.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[owner, peer]])
     await admin.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [[personal, alpha, beta]])
@@ -85,6 +91,20 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
   }
   for (const [id, tenant, user] of [[personalBot, personal, owner], [alphaBot, alpha, owner], [betaBot, beta, owner], [foreignBot, alpha, peer]]) {
     await admin.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Phone fixture\')', [id, user, tenant])
+  }
+  await admin.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,\'Phone fixture\',$3,\'member\',\'active\')', [alpha, peer, peer + '@example.invalid'])
+  for (const [id, tenant] of [[alphaIssue, alpha], [otherAlphaIssue, alpha], [betaIssue, beta], [pendingIssue, null]]) {
+    await admin.query('INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,\'Phone task fixture\',$4,\'todo\',\'normal\')',
+      [id, owner, tenant, { type: 'doc' }])
+  }
+  for (const [id, user] of [[agent, owner], [peerAgent, peer]]) {
+    await admin.query('INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,\'codex\',\'Phone task fixture\')', [id, user])
+  }
+  for (const [id, user, agentId, issueId, botId] of [[alphaRun, owner, agent, alphaIssue, alphaBot],
+    [otherTaskRun, owner, agent, otherAlphaIssue, alphaBot], [betaRun, owner, agent, betaIssue, betaBot],
+    [peerRun, peer, peerAgent, alphaIssue, foreignBot]]) {
+    await admin.query('INSERT INTO agent_runs(id,"userId","agentId","issueId","botId",status) VALUES($1,$2,$3,$4,$5,\'succeeded\')',
+      [id, user, agentId, issueId, botId])
   }
   const { auth } = await import('../lib/auth')
   const context = await auth.$context
@@ -105,6 +125,8 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     body: JSON.stringify(body),
   })
   const push = (bot = alphaBot) => pushReply(owner, bot, 'Isolated reply body', ['finished'])
+  const targetPush = (issueId = alphaIssue, runId: string | null = alphaRun, bot = alphaBot) =>
+    pushReply(owner, bot, 'Isolated task reply body', ['review'], { issueId, runId })
   const membership = (status: string) => admin.query('UPDATE mikka_workspace_members SET status=$3 WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner, status])
   const tokenRows = async () => (await admin.query('SELECT token,"userId","sessionId","deviceName" FROM mobile_push_tokens WHERE "userId"=ANY($1::text[]) ORDER BY token', [[owner, peer]])).rows
   const rebind = async () => {
@@ -119,6 +141,72 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     assert.deepEqual(sent.map(row => row.message.data.botId), [personalBot, alphaBot, betaBot])
     assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1); assert.equal(backendIds.size, 1)
     assert.equal((await admin.query('SELECT count(*)::int AS count FROM mobile_push_receipts WHERE user_id=$1', [owner])).rows[0].count, 3)
+  })
+
+  await t.test('current task targets carry their persisted Workspace and only the matching owned attempt', async () => {
+    const before = sent.length
+    const receipts = (await admin.query('SELECT count(*)::int AS count FROM mobile_push_receipts WHERE user_id=$1', [owner])).rows[0].count
+    await targetPush()
+    assert.deepEqual(sent.at(-1)?.message.data, { botId: alphaBot, serverUrl: sent[0].message.data.serverUrl,
+      userId: owner, workspaceId: alpha, issueId: alphaIssue, runId: alphaRun })
+    await targetPush(alphaIssue, null)
+    assert.deepEqual(sent.at(-1)?.message.data, { botId: alphaBot, serverUrl: sent[0].message.data.serverUrl,
+      userId: owner, workspaceId: alpha, issueId: alphaIssue })
+    await targetPush(betaIssue, betaRun, betaBot)
+    assert.equal(sent.length, before + 3)
+    assert.equal(sent.at(-1)?.message.data.workspaceId, beta)
+    assert.equal(sent.at(-1)?.message.data.issueId, betaIssue)
+    assert.equal(sent.at(-1)?.message.data.runId, betaRun)
+    assert.equal((await admin.query('SELECT count(*)::int AS count FROM mobile_push_receipts WHERE user_id=$1', [owner])).rows[0].count, receipts + 3)
+    assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1); assert.equal(backendIds.size, 1)
+    await pushReply(owner, alphaBot, 'Isolated generic body', ['review'], null)
+    assert.deepEqual(Object.keys(sent.at(-1)!.message.data).sort(), ['botId', 'serverUrl', 'userId'])
+    assert.equal(sent.length, before + 4, 'an explicit null target preserves generic notification delivery')
+  })
+
+  await t.test('a member of both Workspaces cannot send a target from the other origin', async () => {
+    const before = sent.length, destinations = await tokenRows(), wakesBefore = starts.length
+    const receipts = (await admin.query('SELECT count(*)::int AS count FROM mobile_push_receipts WHERE user_id=$1', [owner])).rows[0].count
+    await targetPush(betaIssue, betaRun, alphaBot)
+    await targetPush(alphaIssue, alphaRun, betaBot)
+    assert.equal(sent.length, before)
+    assert.equal(starts.length, wakesBefore)
+    assert.equal((await admin.query('SELECT count(*)::int AS count FROM mobile_push_receipts WHERE user_id=$1', [owner])).rows[0].count, receipts)
+    assert.deepEqual(await tokenRows(), destinations)
+  })
+
+  await t.test('pending, missing and deleted task targets are refused without falling back to the task body', async () => {
+    assert.equal((await admin.query('SELECT "ownershipState","workspaceId" FROM issues WHERE id=$1', [pendingIssue])).rows[0].ownershipState, 'pending')
+    const before = sent.length, destinations = await tokenRows()
+    await targetPush(pendingIssue, null)
+    await targetPush(randomUUID(), null)
+    await admin.query('UPDATE issues SET content=$2 WHERE id=$1', [alphaIssue,
+      { type: 'doc', attrs: { mikka: { deletedAt: new Date().toISOString() } } }])
+    try { await targetPush() }
+    finally { await admin.query('UPDATE issues SET content=$2 WHERE id=$1', [alphaIssue, { type: 'doc' }]) }
+    assert.equal(sent.length, before)
+    assert.deepEqual(await tokenRows(), destinations)
+    await targetPush()
+    assert.equal(sent.length, before + 1, 'a restored current task can deliver after a fresh read')
+  })
+
+  await t.test('a task target cannot name another task, tenant or owner attempt', async () => {
+    const before = sent.length
+    for (const runId of [otherTaskRun, betaRun, peerRun, randomUUID()]) {
+      await targetPush(alphaIssue, runId)
+      assert.equal(sent.length, before, 'a mismatched or missing run must not be sent as a generic notification')
+    }
+    await targetPush()
+    assert.equal(sent.length, before + 1)
+  })
+
+  await t.test('a previously valid task target is refused after Workspace membership is revoked', async () => {
+    const before = sent.length
+    await membership('suspended')
+    try { await targetPush(); assert.equal(sent.length, before) }
+    finally { await membership('active') }
+    await targetPush()
+    assert.equal(sent.length, before + 1)
   })
 
   await t.test('removed membership, archived bots and another owner cannot deliver or edit tokens', async () => {
@@ -307,6 +395,20 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     await push(personalBot)
     assert.equal(sent.length, before + 2, 'a policy for Alpha does not revoke the Personal origin')
     await changePolicy(false)
+    // The target reader must keep this phone's explicit principal, even when
+    // an ambient PAT selects Beta. Reuse the real policy and native session.
+    const targetBefore = sent.length
+    await actAs(caller.user, () => targetPush())
+    assert.equal(sent.length, targetBefore + 1)
+    assert.equal(sent.at(-1)?.message.data.workspaceId, alpha)
+    assert.equal(sent.at(-1)?.message.data.issueId, alphaIssue)
+    assert.equal(sent.at(-1)?.message.data.runId, alphaRun)
+    await changePolicy(true)
+    try {
+      await actAs(caller.user, () => targetPush())
+      assert.equal(sent.length, targetBefore + 1, 'a target hint cannot supply missing receiver SSO assurance')
+      assert.deepEqual(await tokenRows(), destinations)
+    } finally { await changePolicy(false) }
   })
 
   await t.test('organization policy and native session revocation wait for an admitted send with both pools at one', async () => {

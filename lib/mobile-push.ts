@@ -9,7 +9,8 @@ import { enterpriseWorkspaceAllowed } from '@/lib/enterprise/access'
 import { lockLiveRegistration } from '@/lib/enterprise/live-store'
 import { organizationWorkspaces } from '@/lib/db/governance-schema'
 import { db, pool, withDatabaseClient } from '@/lib/db'
-import { bots } from '@/lib/db/schema'
+import { agentRuns, bots } from '@/lib/db/schema'
+import { issueForUser } from '@/lib/issue-access'
 import { readPreferences } from '@/lib/preferences'
 import { pushAllowed } from '@/lib/push-allowed'
 import type { PushReason } from '@/lib/push-reasons'
@@ -59,11 +60,12 @@ export function pushBody(text: string): string {
 
 /**
  * Sends a Coordinator (or bot) reply to every phone the person signed in on,
- * when their settings allow it and the chat's 通知 is on. Tapping the push opens that chat. `text` null
+ * when their settings allow it and the chat's 通知 is on. A verified task target includes its
+ * Workspace; without one, tapping opens the chat. `text` null
  * is a reply about a verification code: the push only says one came, the code
  * stays in the app chat. Tokens Expo reports as gone are removed. Never throws.
  */
-export async function pushReply(userId: string, botId: string, text: string | null, reasons: readonly PushReason[]): Promise<void> {
+export async function pushReply(userId: string, botId: string, text: string | null, reasons: readonly PushReason[], task: { issueId: string; runId: string | null } | null = null): Promise<void> {
   try {
     if (!reasons.length || text?.trim() === '') return
     const [origin] = await db.select({ workspaceId: bots.workspaceId }).from(bots)
@@ -107,13 +109,26 @@ export async function pushReply(userId: string, botId: string, text: string | nu
                 if (!destinations.rows.length) return
                 const locale = await personLocale(userId)
                 const body = text === null ? await codePushBody(locale) : pushBody(text)
-                // Expiry is wall-clock time, including any token-lock wait.
+                if (task) {
+                  // Historical event ids are routing hints, not current authority.
+                  // Reuse this phone's explicit session reader and the held clients.
+                  const issue = await issueForUser(reader, task.issueId, false, db, { withoutBody: true })
+                  if (!issue || issue.workspaceId !== origin.workspaceId) return
+                  if (task.runId) {
+                    const [run] = await db.select({ id: agentRuns.id }).from(agentRuns)
+                      .where(and(eq(agentRuns.id, task.runId), eq(agentRuns.userId, userId),
+                        eq(agentRuns.issueId, issue.id), eq(agentRuns.workspaceId, origin.workspaceId))).limit(1)
+                    if (!run) return
+                  }
+                }
+                // Expiry is wall-clock time, including target reads and token-lock waits.
                 const fresh = await client.query(
                   'SELECT id FROM "session" WHERE id=$1 AND "userId"=$2 AND "expiresAt">clock_timestamp()', [sessionId, userId])
                 if (!fresh.rowCount) return
                 try {
                   await deliverPhonePush(userId, { to: destinations.rows.map(row => row.token), title: bot.coordinator ? 'Coordinator' : bot.name, body,
-                    data: { botId: bot.coordinator ? null : botId, serverUrl: appOrigin + BASE_PATH, userId }, collapseId: botId }, locale)
+                    data: { botId: bot.coordinator ? null : botId, serverUrl: appOrigin + BASE_PATH, userId,
+                      ...(task ? { workspaceId: origin.workspaceId, issueId: task.issueId, ...(task.runId ? { runId: task.runId } : {}) } : {}) }, collapseId: botId }, locale)
                 } catch (error) {
                   if (!(error instanceof CloudServiceError)) throw error
                   // Accepted receipts must commit even if another destination
