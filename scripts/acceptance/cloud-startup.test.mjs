@@ -419,6 +419,83 @@ test('a completed tool followed by the task marker proves reply order', () => {
   assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_ordered/)
 })
 
+function submittedReply() {
+  const record = { sampleId: 'submitted', runId: id(901), harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true, requireTerminal: true }
+  const detail = { thread: { id: record.runId, rootRunId: record.runId, latestRunId: record.runId, ownedByCurrentUser: true,
+    status: 'succeeded', error: null, finishedAt: new Date(epoch + 6000).toISOString(), continuation: null,
+    attempts: [{ runId: record.runId, status: 'succeeded' }], detail: { harness: 'codex', summary: 'PRIVATE_REPORT STARTUP_OK_submitted' } },
+    chunks: [stage('agent_start', 20),
+      { at: new Date(epoch + 100).toISOString(), chunk: { type: 'tool-input-available', toolCallId: 'read-file', toolName: 'mcp__mikka__inspect_artifact', input: { path: 'README.md' } } },
+      { at: new Date(epoch + 200).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'read-file', output: 'PRIVATE_README' } },
+      delta('Read the README.'),
+      { at: new Date(epoch + 4500).toISOString(), chunk: { type: 'tool-input-available', toolCallId: 'hand-in', toolName: 'mcp__mikka__submit', input: { summary: 'PRIVATE_REPORT STARTUP_OK_submitted' } } },
+      { at: new Date(epoch + 5000).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'hand-in', output: [] } }] }
+  return { record, detail }
+}
+
+test('a successful same-run canonical submit report proves delivery after the completed read', () => {
+  const { record, detail } = submittedReply()
+  assert.equal(observeChunks(record, detail, epoch + 7000), true)
+  assert.equal(record.replyVerified, true)
+  assert.equal(record.replyVerifiedAfterTool, true)
+  assert.equal(record.replySource, 'submitted_report')
+  assert.equal(observeChunks(record, detail, epoch + 8000), true, 'replaying the same stream preserves the actual order')
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted|Read the README/)
+})
+
+test('canonical delivery cannot borrow another run, a pending or failed result, or an unordered submit', () => {
+  const mutations = [
+    d => { d.thread.id = id(902) }, d => { d.thread.rootRunId = id(902) }, d => { d.thread.latestRunId = id(902) },
+    d => { d.thread.ownedByCurrentUser = false }, d => { d.thread.detail.harness = 'claude_code' },
+    d => { d.thread.detail.summary = 'A different report' }, d => { d.thread.detail = null },
+    d => { d.thread.status = 'running' }, d => { d.thread.status = 'failed' }, d => { d.thread.status = 'stopped' },
+    d => { d.thread.error = 'PRIVATE_ERROR' }, d => { d.thread.finishedAt = null },
+    d => { d.thread.finishedAt = new Date(epoch + 4900).toISOString() },
+    d => { d.thread.attempts.push({ runId: id(902), status: 'succeeded' }) },
+    d => { d.thread.attempts[0].runId = id(902) }, d => { d.thread.attempts[0].status = 'failed' },
+    d => { d.thread.continuation = { id: id(902), status: 'succeeded' } },
+    d => { d.chunks[4].chunk.input.summary = 'No matching receipt' },
+    d => { d.chunks[4].chunk.toolName = 'mcp__other__submit' },
+    d => { d.chunks[5].chunk.type = 'tool-output-error' }, d => { d.chunks[5].chunk.toolCallId = 'other-call' },
+    d => { d.chunks[5].at = 'invalid' }, d => { d.chunks.pop() },
+    d => { d.chunks = [d.chunks[0], ...d.chunks.slice(4), ...d.chunks.slice(1, 4)] },
+    d => { d.chunks[2].chunk.type = 'tool-output-error' },
+  ]
+  for (const mutate of mutations) {
+    const { record, detail } = submittedReply(); mutate(detail)
+    assert.equal(observeChunks(record, detail, epoch + 7000), false, String(mutate))
+    assert.notEqual(record.replyVerified, true, String(mutate))
+    assert.equal(record.replyVerifiedAfterTool, false, String(mutate))
+    assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted/)
+  }
+})
+
+test('the complete candidate driver accepts canonical report delivery with all runtime and cleanup gates intact', async () => {
+  const io = fixture({ candidate: true, runtime: true })
+  io.onDetail = (sample, detail) => {
+    if (sample.reads <= 1) return
+    Object.assign(detail.thread, { status: 'succeeded', rootRunId: sample.runId, ownedByCurrentUser: true, error: null,
+      finishedAt: new Date(epoch + 6000).toISOString(), continuation: null,
+      detail: { harness: sample.harness, summary: `PRIVATE_REPORT STARTUP_OK_${sample.marker}` } })
+    detail.thread.attempts[0].status = 'succeeded'
+    detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta')
+    detail.chunks.splice(4, 0,
+      { at: new Date(epoch + 4500).toISOString(), chunk: { type: 'tool-input-available', toolCallId: 'hand-in', toolName: 'mcp__mikka__submit', input: { summary: `PRIVATE_REPORT STARTUP_OK_${sample.marker}` } } },
+      { at: new Date(epoch + 5000).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'hand-in', output: [] } })
+  }
+  const report = await runCloudStartup({ ...oneCodexCandidate(), minToolCalls: 1 }, { env, ...io })
+  assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+  const sample = report.samples[0]
+  assert.equal(sample.replySource, 'submitted_report')
+  assert.equal(sample.replyVerifiedAfterTool, true)
+  assert.equal(sample.runtimeEvidence.status, 'passed')
+  assert.equal(sample.lastStatus, 'succeeded')
+  assert.equal(sample.cleanup.status, 'passed')
+  assert.ok(io.samples.every(row => row.cancelled && row.deleted))
+  assert.equal(io.calls.some(call => call.path.endsWith('/machine')), false, 'the candidate VM remains the publishing workflow cleanup scope')
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|STARTUP_OK_/)
+})
+
 test('three real-shaped runs use normal cookies, pinned subscriptions, push reads and strictly owned cleanup', async () => {
   const io = fixture(), report = await runCloudStartup(options(), { env, ...io })
   assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
