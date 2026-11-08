@@ -1,6 +1,7 @@
-name: Issue 1506 remaining Stop matrix v2
+name: Issue 1506 remaining Stop matrix v3 — DISABLED DRAFT
 
-# Disabled after cohort 42446233565; preserve its original receipts. No cache cases or MCP are here.
+# Unpublished draft. Root must bind one reviewed APP_SHA and explicitly remove
+# the literal false guard before any execution. No cache cases or MCP are here.
 on:
   push:
     branches: [acceptance/issues-1504-1506]
@@ -26,19 +27,20 @@ jobs:
       queue: max
       cancel-in-progress: false
     env:
-      ACCEPTANCE_SHA: '485d1c9ae6c26598816b17a9cb27cd67da6685d4' # Bind the new prepared acceptance commit, never 668 for the next app.
-      APP_SHA: 'f1324dafa296f76289124bb93538f1938cb1597f' # Root binds once; never resolve a moving branch during this job.
+      ACCEPTANCE_SHA: '' # Bind the exact prepared source commit after offline review.
+      APP_SHA: '263e7ea37013bd22aa197799a26f1d2e0d1abbf1' # Root binds once; never resolve a moving branch during this job.
       MIKKA_LIVE_SOURCE_ROOT: ${{ github.workspace }}/live-source
     steps:
       - name: Initialize all ten case receipts before prerequisites
         run: |
           node --input-type=module <<'NODE'
           import { mkdirSync, writeFileSync } from 'node:fs'
-          const cases = [{"id":"ordinary-haiku","step":"ordinary_haiku","phase":"ordinary-stop","key":"haiku","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/ordinary-haiku","userSendBudget":1,"automaticRetry":false},{"id":"ordinary-luna","step":"ordinary_luna","phase":"ordinary-stop","key":"luna","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/ordinary-luna","userSendBudget":1,"automaticRetry":false},{"id":"before-tool-haiku","step":"before_tool_haiku","phase":"tool","key":"haiku","boundary":"responding_bot","stop":"before_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/before-tool-haiku","userSendBudget":1,"automaticRetry":false},{"id":"before-tool-luna","step":"before_tool_luna","phase":"tool","key":"luna","boundary":"responding_bot","stop":"before_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/before-tool-luna","userSendBudget":1,"automaticRetry":false},{"id":"during-tool-haiku","step":"during_tool_haiku","phase":"tool","key":"haiku","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/during-tool-haiku","userSendBudget":1,"automaticRetry":false},{"id":"during-tool-luna","step":"during_tool_luna","phase":"tool","key":"luna","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/during-tool-luna","userSendBudget":1,"automaticRetry":false},{"id":"group-public-haiku","step":"group_public_haiku","phase":"group-public","key":"haiku","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/group-public-haiku","userSendBudget":1,"automaticRetry":false},{"id":"group-public-luna","step":"group_public_luna","phase":"group-public","key":"luna","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/group-public-luna","userSendBudget":1,"automaticRetry":false},{"id":"group-private-haiku","step":"group_private_haiku","phase":"group-private","key":"haiku","boundary":"private_generation_receipt","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/group-private-haiku","userSendBudget":1,"automaticRetry":false},{"id":"group-private-luna","step":"group_private_luna","phase":"group-private","key":"luna","boundary":"private_generation_receipt","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/group-private-luna","userSendBudget":1,"automaticRetry":false}]
+          const cases = [{"id":"ordinary-haiku","step":"ordinary_haiku","phase":"ordinary-stop","key":"haiku","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/ordinary-haiku","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11},{"id":"ordinary-luna","step":"ordinary_luna","phase":"ordinary-stop","key":"luna","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/ordinary-luna","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11},{"id":"before-tool-haiku","step":"before_tool_haiku","phase":"tool","key":"haiku","boundary":"responding_bot","stop":"before_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/before-tool-haiku","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11},{"id":"before-tool-luna","step":"before_tool_luna","phase":"tool","key":"luna","boundary":"responding_bot","stop":"before_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/before-tool-luna","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11},{"id":"during-tool-haiku","step":"during_tool_haiku","phase":"tool","key":"haiku","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/during-tool-haiku","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11},{"id":"during-tool-luna","step":"during_tool_luna","phase":"tool","key":"luna","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/during-tool-luna","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11},{"id":"group-public-haiku","step":"group_public_haiku","phase":"group-public","key":"haiku","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/group-public-haiku","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11},{"id":"group-public-luna","step":"group_public_luna","phase":"group-public","key":"luna","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/group-public-luna","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11},{"id":"group-private-haiku","step":"group_private_haiku","phase":"group-private","key":"haiku","boundary":"private_generation_receipt","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/group-private-haiku","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11},{"id":"group-private-luna","step":"group_private_luna","phase":"group-private","key":"luna","boundary":"private_generation_receipt","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/group-private-luna","userSendBudget":1,"automaticRetry":false,"loginQuietIntervalSeconds":11}]
           mkdirSync('matrix', { recursive: true })
           writeFileSync('matrix/cases.json', JSON.stringify(cases, null, 2) + '\n')
           writeFileSync('matrix/ledger.json', JSON.stringify({
             schemaVersion: 1, applicationSha: process.env.APP_SHA || null,
+            loginQuietIntervalPolicy: {"seconds":11,"position":"before_each_case_continuation_run","scope":"all_10_predeclared_slots","reason":"verified_auth_signin_limit_3_per_10_seconds","selectedByObservedModelResult":false,"modelTimingOrigin":"unchanged_user_send","duringToolStopDelayMs":600,"otherAcceptanceLoginRunsSerializedBy":"issue-1506-acme-acceptance","guaranteesNoExternalLoginActivity":false},
             acceptanceSourceSha: process.env.ACCEPTANCE_SHA, startedAt: new Date().toISOString(),
             cases: cases.map(c => ({ ...c, status: 'not_executed', cleanup: 'driver_not_started' }))
           }, null, 2) + '\n')
@@ -65,6 +67,10 @@ jobs:
           const root = resolve('acceptance-source')
           if (execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== process.env.ACCEPTANCE_SHA) throw new Error('source_binding_mismatch')
           const rel = 'scripts/acceptance/issue-1506-alex'
+          const reviewedSourceHashes = {"scripts/acceptance/issue-1506-alex/coordinator-ordinary-stop.mjs":"5a1b3958c03248b283d6e17fbf2c852abd420c13d2f960fd90a7d999a7c9f491","scripts/acceptance/issue-1506-alex/coordinator-tool-stop.mjs":"dd1055dd948435fc4b762fd910884fd8b055a39d44fd174b504cb34adec2eb02","scripts/acceptance/issue-1506-alex/group-stop.mjs":"9c169b778724c4168e16920c7c89fc79c91128af7d0ab947543a9c5476a3286b","scripts/acceptance/issue-1506-readonly/alex-session.mjs":"e73cdb1c40ed161c3fc32499f88259a8c84b389a7dfe755702aa2baa4b52162e","scripts/acceptance/issue-1506-alex/coordinator-cache-turns.mjs":"40772570d93f6ba3656ed7346fd610ae2320de61db26764da1a94213ec76e495","scripts/acceptance/issue-1506-alex/live-cache-turns.mjs":"d388809bd5643cc37333fbf79f09ff40fd13dc7352243aa890c61c780f9654f9","scripts/acceptance/issue-1506-alex/continuation.mjs":"9e94d74e30db895edde000fa00ddc0898988ac74feabeffb5c3fbf67ce0853a7"}
+          for (const [path, expected] of Object.entries(reviewedSourceHashes)) {
+            if (createHash('sha256').update(readFileSync(resolve(root, path))).digest('hex') !== expected) throw new Error('reviewed_source_hash_mismatch')
+          }
           const { validateContinuation } = await import(pathToFileURL(resolve(root, rel, 'continuation.mjs')))
           const original = JSON.parse(readFileSync(resolve(root, rel, 'control/continue.json')))
           const receiptRaw = readFileSync(resolve(root, rel, original.fixtureReceipt))
@@ -247,6 +253,7 @@ jobs:
           MIKKA_STOP_CASE: during_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
       - name: Observe ordinary-luna exactly once
         id: ordinary_luna
@@ -257,6 +264,7 @@ jobs:
           MIKKA_STOP_CASE: during_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
       - name: Observe before-tool-haiku exactly once
         id: before_tool_haiku
@@ -267,6 +275,7 @@ jobs:
           MIKKA_STOP_CASE: before_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
       - name: Observe before-tool-luna exactly once
         id: before_tool_luna
@@ -277,6 +286,7 @@ jobs:
           MIKKA_STOP_CASE: before_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
       - name: Observe during-tool-haiku exactly once
         id: during_tool_haiku
@@ -287,6 +297,7 @@ jobs:
           MIKKA_STOP_CASE: during_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
       - name: Observe during-tool-luna exactly once
         id: during_tool_luna
@@ -297,6 +308,7 @@ jobs:
           MIKKA_STOP_CASE: during_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
       - name: Observe group-public-haiku exactly once
         id: group_public_haiku
@@ -307,6 +319,7 @@ jobs:
           MIKKA_STOP_CASE: during_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
       - name: Observe group-public-luna exactly once
         id: group_public_luna
@@ -317,6 +330,7 @@ jobs:
           MIKKA_STOP_CASE: during_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
       - name: Observe group-private-haiku exactly once
         id: group_private_haiku
@@ -327,6 +341,7 @@ jobs:
           MIKKA_STOP_CASE: during_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
       - name: Observe group-private-luna exactly once
         id: group_private_luna
@@ -337,6 +352,7 @@ jobs:
           MIKKA_STOP_CASE: during_tool
         run: |
           node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          sleep 11
           node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
       - name: Preserve outcomes and cleanup evidence for every planned case
         if: always()

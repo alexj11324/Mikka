@@ -1,3 +1,13 @@
+# Disabled next-source preparation
+
+Application source candidate: 263e7ea37013bd22aa197799a26f1d2e0d1abbf1; tree 268afb421c4f547cc9d92ca046408f177706b654. Acceptance baseline: fddf3eda7fe480012c1335393ccbfb1084b49932.
+
+This is an offline source binding only. Production deployment, current alias, deployment ID and main ancestry have not been verified here. The continuation control is disabled; expectedSha remains null. Both prepared business jobs retain literal false guards. After committing this exact prepared tree, use bind mode with that immutable acceptance SHA. Deployment and activation require the root's separate review.
+
+Retained historical notes follow.
+
+---
+
 # #1506：独立 f132 Stop 验收准备（保持禁用）
 
 本稿绑定应用源码 f132，尚未验证它的实际生产部署。Stop 十槽尚未生产执行；本次准备没有生产模型、Stop、SQL 或 cache 成绩，也不表示 #1705 已部署。四路径 overlay 尚未发布，没有正式 acceptance commit SHA。生产 alias、READY、公开版本与执行前后版本一致性均需由执行者最终核实。
