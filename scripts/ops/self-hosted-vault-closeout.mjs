@@ -87,14 +87,15 @@ async function run(env) {
       for await (const chunk of req) { if (body.length + chunk.length > 8192) oversized = true; else body += chunk }
       const valid = !oversized && loginMatches(body, siteUsername, sitePassword); body = ''
       if (valid) {
-        submitted++; submissionResolve()
+        submitted++
         res.writeHead(303, { location: '/success', 'set-cookie': 'vault_acceptance=verified; HttpOnly; Secure; SameSite=Lax; Path=/', 'cache-control': 'no-store' })
         res.end(); return
       }
       rejected++; res.writeHead(403); res.end('refused'); return
     }
     if (req.url === '/success' && /(?:^|; )vault_acceptance=verified(?:;|$)/.test(req.headers.cookie ?? '')) {
-      authenticatedViews++; res.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
+      authenticatedViews++; submissionResolve()
+      res.writeHead(200, { 'content-type': 'text/html', 'cache-control': 'no-store' })
       res.end('<!doctype html><title>Vault acceptance complete</title><h1>Signed in</h1>'); return
     }
     servedLogin++
@@ -120,8 +121,9 @@ async function run(env) {
       postgres: { image: 'postgres:17-alpine', environment: { POSTGRES_DB: 'mikka_e2e', POSTGRES_USER: 'mikka', POSTGRES_PASSWORD: dbPassword },
         ports: ['127.0.0.1:54329:5432'], healthcheck: { test: ['CMD-SHELL', 'pg_isready -U mikka -d mikka_e2e'], interval: '3s', timeout: '3s', retries: 30 } },
       mailpit: { image: 'axllent/mailpit:v1.27.4', ports: ['127.0.0.1:8025:8025'], environment: { MP_DISABLE_VERSION_CHECK: 'true', MP_QUIET: 'true' } },
-      app: { image: `ghcr.io/alexj11324/mikka@${plan.imageDigest}`, init: true, ports: ['127.0.0.1:3000:3000'], volumes: ['data:/data'],
+      app: { image: `ghcr.io/alexj11324/mikka@${plan.imageDigest}`, init: true, ports: ['127.0.0.1:3000:3000'], volumes: ['data:/data', `${resolve('scripts/ops/vault-runtime-diagnostics.mjs')}:/opt/closeout/vault-runtime-diagnostics.mjs:ro`],
         environment: { DATABASE_URL: database, MIKKA_DATABASE_URL: database, BETTER_AUTH_URL: appOrigin,
+          MIKKA_VAULT_DIAGNOSTICS: '1', NODE_OPTIONS: '--import=/opt/closeout/vault-runtime-diagnostics.mjs',
           MIKKA_EDITION: 'community', MIKKA_EXTERNAL_CRON: '1', CREDENTIAL_MASTER_KEY: masterKey, WORKSPACE_SECRETS_KEY: secretsKey,
           SMTP_URL: 'smtp://mailpit:1025', MIKKA_EMAIL_FROM: 'Vault acceptance <login@selfhost.example.test>' },
         depends_on: { postgres: { condition: 'service_healthy' }, mailpit: { condition: 'service_started' } } }
@@ -184,6 +186,18 @@ async function run(env) {
     report.status = 'failed'; process.exitCode = 1
     report.failure = /^[A-Z][A-Z0-9_]{1,64}$/.test(error.message ?? '') ? error.message : 'VAULT_CLOSEOUT_FAILED'
     report.failureName = /^[A-Za-z][A-Za-z0-9]{0,48}$/.test(error.name ?? '') ? error.name : 'unknown'
+    if (pool && actor && subagentId) {
+      try {
+        const row = (await pool.query('SELECT status,step,needs,"lastFailureCode","consecutiveFailures","targetId","activeActionId" FROM bot_subagents WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "botId"=$4', [subagentId, actor.userId, actor.workspaceId, botId])).rows[0]
+        report.agent = row ? { status: ['queued','running','needs_you','done','failed','stopped'].includes(row.status) ? row.status : 'unknown',
+          step: ['running','Login required','Signing in','Observe login outcome','Login outcome unknown; secure page retained','Browser service unavailable after bounded retries; progress retained','Credential approval','Computer use is denied'].includes(row.step) ? row.step : 'other',
+          needs: ['login','approval'].includes(row.needs?.kind) ? row.needs.kind : null,
+          lastFailureCode: ['runtime_unavailable','observation_changed'].includes(row.lastFailureCode) ? row.lastFailureCode : null,
+          failures: Number(row.consecutiveFailures), targetBound: !!row.targetId, activeAction: !!row.activeActionId } : null
+        const events = (await pool.query('SELECT decision,count(*)::int AS count FROM credential_access_events WHERE credential_id=$1 AND user_id=$2 AND subagent_id=$3 GROUP BY decision', [credentialId, actor.userId, subagentId])).rows
+        report.accessEvents = events.filter(e => ['input_inserted_guarded','password_submitted','session_applied','denied_or_failed'].includes(e.decision))
+      } catch { report.agentDiagnostic = 'unavailable' }
+    }
   } finally {
     cleaning = true
     if (context && botId && subagentId) {
@@ -227,6 +241,11 @@ async function run(env) {
     if (fixtureStarted) {
       try {
         const logs = compose('logs', '--no-color')
+        report.runtimeBoundaries = logs.split('\n').flatMap(line => {
+          const at = line.indexOf('{"kind":"vault_runtime_boundary"')
+          if (at < 0) return []
+          try { const value = JSON.parse(line.slice(at)); return value.kind === 'vault_runtime_boundary' ? [value] : [] } catch { return [] }
+        }).slice(-40)
         report.checks.logsContainNoPlaintext = hidden.every(value => !logs.includes(value)) && !logs.includes(siteUsername)
         check(report.checks.logsContainNoPlaintext, 'PLAINTEXT_LOG')
       } catch { report.checks.logsContainNoPlaintext = false; process.exitCode = 1 }
@@ -238,6 +257,7 @@ async function run(env) {
     process.off('SIGTERM', signal); process.off('SIGINT', signal)
     await rm(root, { recursive: true, force: true }); report.cleanup.privateFiles = true
     report.finished = new Date().toISOString()
+    report.site = { servedLogin, submitted, rejected, authenticatedViews }
     if (process.exitCode) report.status = 'failed'
     await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
     console.log(JSON.stringify(report))

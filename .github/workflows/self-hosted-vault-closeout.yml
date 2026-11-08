@@ -27,7 +27,7 @@ jobs:
       - uses: ./.github/actions/pnpm-install
       - name: Verify exact published source and isolated fixture guards before credentials
         run: |
-          node --import tsx --test scripts/ops/self-hosted-vault-closeout.test.mjs
+          node --import tsx --test scripts/ops/self-hosted-vault-closeout.test.mjs scripts/ops/vault-runtime-diagnostics.test.mjs
           node --import tsx scripts/ops/self-hosted-vault-closeout.mjs --check
       - name: Prepare immutable image and disposable infrastructure
         run: |
