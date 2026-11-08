@@ -1,0 +1,55 @@
+name: Read-only core baseline shape probe
+on:
+  push:
+    branches: [ops/core-baseline-probe-20261108]
+permissions:
+  contents: read
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+  queue: max
+jobs:
+  baseline:
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/core-baseline-probe-20261108'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Guard exact production version before credentials
+        run: |
+          python3 - <<'PY'
+          import urllib.request,json
+          r=json.load(urllib.request.urlopen('https://app.aspectlylabs.com/mikka/api/version',timeout=20))
+          assert r['build']=='7e34d869aa80266494cb2e2eefeee5d8e7ff7d4d'
+          PY
+      - name: Read existing shared-account email through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read existing shared-account password through OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read only closed token and device shape counts then sign out
+        run: python3 scripts/ops/core-baseline-probe.py
