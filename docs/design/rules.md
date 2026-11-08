@@ -283,15 +283,15 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 
 - **R-50** The right panel is the right third of the window. Its header has
-  two pills on the left, 「概览」 (selected by default) and 「全部线程」, and
+  two pills on the left, 「概览」 (selected by default) and 「全部任务」, and
   search, widen and close icons on the right. The pills switch only this
   column; the centre chat is never removed or replaced. 概览 is the selected
-  bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
-  lists only the threads this bot dispatched (for the Coordinator, the
-  threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
-  全部线程 lists the threads every bot dispatched; each row carries the small mark of the
-  Agent running it (R-78), the only thread list that shows one, beside a
-  relative time on the right (2 分钟前, 昨天).
+  bot's avatar and name (R-02), then the tabs 详情, 任务, PR, 电脑. 任务
+  lists only the tasks this bot dispatched (for the Coordinator, the
+  tasks it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
+  全部任务 lists the tasks every bot dispatched. No list shows threads: a
+  thread opens only from its task's 活动 (Alex, 2026-11-07,
+  [decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
   让它安排, 新建, 上传 or arrange). Besides navigation (the pills, the tabs, the
   header's search, widen and close, and a list group's collapse chevron), the only
@@ -313,7 +313,14 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   task, the task panel's ⋯ menu also lists the code tools 改动 · 文件 · 终端 ·
   预览, and its PR summary line opens the review page; these only open the
   review page, and the rest of the panel stays read-only.
-- **R-52** Every thread list, web and phone, groups its rows in this order:
+- **R-52** Since 2026-11-07 every list is a task list, grouped 等待你 · 进行中 ·
+  待办 · 已完成 ([decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)), and each row
+  carries its own state's icon, never its group's: the raised hand only for 等你处理, an
+  octagon for 受阻 ([2300](decisions/2026-11-07-2300-one-conversation-per-task.md)), a triangle for 失败, a ring for 运行中, a clock for 排队中, and the board's own icon
+  in 待办 and 已完成 ([states and icons](decisions/2026-11-07-2230-one-icon-per-task-state.md)). 等待你 and 受阻
+  below become 等待你, 空闲 becomes 待办, 已解决 becomes 已完成, and the
+  judgement below decides the state of a task's current thread. Before that,
+  every thread list, web and phone, grouped its rows in this order:
   等待你（N）, 进行中（N）, 受阻（N）, 空闲（N）, 已解决（N）
   (Waiting for you, Running, Blocked, Idle, Resolved;
   [order](decisions/2026-11-02-0300-waiting-for-you-first.md)). A group header is
@@ -414,7 +421,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   only when the board, a list or a project opened it. A notification or an
   admin link to a thread opens it beside its task where the viewer can read
   it. An address with an unknown section or a bot that is not the person's
-  rewrites itself to what is shown, without a new entry. 全部线程, the
+  rewrites itself to what is shown, without a new entry. Since 2026-11-07
+  ([decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)) lists hold tasks only:
+  a chat's task card or a right-panel row opens the task's detail in the right
+  column, an attempt in its 活动 opens that thread in the same column with ←
+  back to the task, and 全部线程 below is 全部任务. Before that, 全部线程, the
   threads every bot dispatched in R-52's groups, each row's second line opening
   with the mark of the Agent running it and 「<Bot> 派出」, opens in the right
   column from the window bar's button beside the globe (on a phone, the page
