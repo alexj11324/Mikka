@@ -29,7 +29,7 @@ jobs:
       - name: Verify the exact current R5 fixture and original mint receipt
         run: |
           sha256sum --check <<'SHA256'
-          2d5418a9aa2d3571040595504bbd279de5d842e08db1dcf7d30b9821b280b312  scripts/ops/issue1503/fixture-state.json
+          c302f246d6e7d89dc8e19d5b288925e856a88572af30d3e493fb3eef584c4fe2  scripts/ops/issue1503/fixture-state.json
           00f7ebdea3a30bc02c4f18db9dccc89ebda9e82037c1ddb1d08a893104a3b3ca  scripts/ops/issue1503/github-token-rotation.json
           SHA256
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
