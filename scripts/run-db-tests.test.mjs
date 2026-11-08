@@ -576,3 +576,20 @@ test('isolated fixture databases create distinct empty databases and close admin
   await assert.rejects(isolatedPostgresURL(target), /no createdb permission/)
   assert.equal(ended, 3)
 })
+
+test('affected execution narrows only after complete inventory and cannot hide missing unselected suites', async t => {
+  const fixture = runnerFixture(t)
+  const ran = []
+  t.mock.method(console, 'log', () => {})
+  t.mock.method(console, 'error', () => {})
+  t.mock.method(process.stdout, 'write', () => true)
+  const selected = fixture.scripts[1]
+  const fullEnv = { ...env, DB_TEST_EXPECTED: fixture.scripts.join(','), DB_TEST_SELECTED: JSON.stringify([selected]), DB_TEST_SHARD: '1/1' }
+  const run = (_command, args) => { ran.push(args[1]); return { status: 0, stdout: '# tests 1\n# pass 1\n', stderr: '' } }
+  assert.equal(await main({ root: fixture.root, env: fullEnv, run, clone: cloneAll }), 0)
+  assert.deepEqual(ran, [selected])
+  rmSync(join(fixture.root,'tests/a.db.test.mjs'))
+  ran.length = 0
+  assert.equal(await main({ root: fixture.root, env: fullEnv, run, clone: cloneAll }), 1)
+  assert.deepEqual(ran, [], 'unselected inventory corruption fails before execution')
+})
