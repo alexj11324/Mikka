@@ -10,6 +10,7 @@ import * as harnessProtocol from '@mikka/protocol/harness'
 import * as policySnapshotProtocol from '@mikka/protocol/policy-snapshot'
 import * as repositoryProtocol from '@mikka/protocol/repository'
 import * as subscriptionProtocol from '@mikka/protocol/subscription'
+import * as taskSecretsProtocol from '@mikka/protocol/task-secrets'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignment-policy'
 import { serverRunFailure } from '../run-failure-details'
@@ -17,6 +18,7 @@ import { ModelAdmissionError } from '../model-admission/contract'
 import * as startupTracing from '../computer/startup-tracing'
 import * as startupDiagnostics from '../computer/startup-diagnostics'
 import * as decisionMcpTool from '../project-map/mcp-tool'
+import { issueTaskSecretAccess } from '../secrets/task-access'
 import { deploymentSwitch, type DeploymentSwitch } from '@/lib/deployment-switches'
 import messages from '@/messages/zh-CN.json'
 const fixtureEnv={MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}
@@ -26,6 +28,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const calls:string[]=[]
   const credentialChecks:string[]=[]
   const admissionScopes:string[]=[]
+  const resourceFenceChecks:boolean[]=[]
   const workspaceIds=['bot-workspace','task-workspace']
   const run={id:'run',userId:'owner',issueId:'issue',agentId:'agent',deviceRepoId:'repo',deviceId:'device',deviceTokenId:null as string|null,status:'queued',kind:'implement',baseBranch:'frozen-sha',prompt:'frozen task',attempt:1,agentDefinition:undefined as {agentProfile?:unknown}|undefined}
   const agent={id:'agent',userId:'owner',harness:'codex'},repo={id:'repo',userId:'owner',deviceId:'device',repoPath:'v2/github.com/mikka-ci/benchmark-claim',remoteUrl:'https://github.com/mikka-ci/benchmark-claim.git',verifyCommand:'mutable-repo-command'}
@@ -60,6 +63,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@mikka/protocol/daemon':daemonProtocol,
     '@mikka/protocol/repository':repositoryProtocol,
     '@mikka/protocol/subscription':subscriptionProtocol,
+    '@mikka/protocol/task-secrets':taskSecretsProtocol,
     '@mikka/protocol/policy-snapshot':policySnapshotProtocol,
     '@/messages/zh-CN.json':{default:messages},
     // This legacy-capability fixture has no managed organization policy.
@@ -81,7 +85,12 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     }},
     '@/lib/run-assignment-policy':{constrainedAssignmentPolicy,intersectRunPolicy},
     '@/lib/run-failure-details':{serverRunFailure},
-    '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response)=>respond(run)},
+    '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response,authorizeResources:(current:typeof run,tx:typeof db)=>Promise<boolean>)=>{
+      assert.equal(typeof authorizeResources,'function','the actual claim must supply its final resource fence')
+      const allowed=await authorizeResources(run,db)
+      resourceFenceChecks.push(allowed)
+      return allowed?respond(run):null
+    }},
     '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{assert.equal(issueDenied,true);calls.push('rejectPublication')}},
     '@/lib/run-publication-result':{PublicationError:class extends Error {}},
     // No linked GitHub account in this fixture: the claim attaches no GitHub credential endpoint.
@@ -122,7 +131,13 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/computer/native-run-binding':{},
     '@/lib/personal-policy':{sharedNativeBinding:async()=>null},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
-    '@/lib/secrets/runtime':{taskSecretInjection:async()=>({env:{},secretNames:[]}),remoteRepositoryRef:()=>null},
+    '@/lib/secrets/runtime':{
+      taskSecretInjection:async()=>({env:{},secretNames:[],protectedSecrets:[],unavailable:[]}),
+      taskSecretSnapshot:async()=>{throw Error('This benchmark fixture has no prepared Secret snapshot to revalidate')},
+      remoteRepositoryRef:()=>null,
+    },
+    '@/lib/secrets/task-access':{issueTaskSecretAccess},
+    '@/lib/execution-identity':{executionMembersActive:async()=>{throw Error('This benchmark fixture has no frozen workspace Secret authority')}},
     '@/lib/personal-mailbox-config':{personalMailboxEnabled:()=>false},
     '@/lib/factory/questions/retry':{},'@mikka/protocol/skill':{SKILL_ARTIFACT_HEADER:'x-mikka-skill-artifacts'},
     '@/lib/self-improvement/contract':{ImprovementError},'@/lib/factory/contract':{FactoryError},
@@ -135,13 +150,13 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const exports:Record<string,unknown>={}
   runInNewContext(transpileModule(source,{compilerOptions:{module:ModuleKind.CommonJS}}).outputText,
     {exports,require:(name:string)=>{if(!Object.hasOwn(modules,name))throw Error(`Unexpected import ${name}`);return modules[name]},Response,URL,Date,process:{env:fixtureEnv}})
-  return {calls,credentialChecks,admissionScopes,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
+  return {calls,credentialChecks,admissionScopes,resourceFenceChecks,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
 }
 
 const claimRequest=()=>new Request('https://fixture.invalid/v1/claim',{headers:{[deviceProtocol.REPO_ORIGIN_HEADER]:'1','x-mikka-skill-artifacts':'1'}})
 
 test('actual claim route resolves frozen benchmark exactly once after claim and receipt and overrides mutable config',async()=>{
-  const {post,calls,credentialChecks,admissionScopes,benchmark,run}=await routeFixture()
+  const {post,calls,credentialChecks,admissionScopes,resourceFenceChecks,benchmark,run}=await routeFixture()
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,200)
   const assignment=await response.json()
@@ -157,7 +172,9 @@ test('actual claim route resolves frozen benchmark exactly once after claim and 
   assert.deepEqual(assignment.policy,benchmark.policy)
   assert.equal(run.deviceTokenId,'synthetic-device-token')
   assert.deepEqual(credentialChecks,['configured'])
+  assert.deepEqual(resourceFenceChecks,[true])
   assert.equal(assignment.github,undefined)
+  assert.equal(assignment.taskSecrets,undefined)
 })
 
 test('actual claim route withholds all assignment bytes when frozen configuration becomes unavailable after claim',async()=>{

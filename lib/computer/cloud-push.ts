@@ -5,7 +5,8 @@ import { db, withDatabaseClient } from '@/lib/db'
 import { issues, runPublications } from '@/lib/db/schema'
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
+import { taskIdentifiers, taskPrefixInput } from '@/lib/task-identifier-server'
 import { publicationBranch } from '@/lib/run-publication-policy'
 import { admitRepositoryTask, type RepositoryAdmission } from '@/lib/repository-admission'
 /**
@@ -21,12 +22,11 @@ export async function admitCloudPush(client: PoolClient, input: {
   if (!repo?.remoteUrl || !repo.repoPath.startsWith('v2/github.com/') || !repositoryBindingMatches(repo.repoPath, repo.remoteUrl)) return null
   return withDatabaseClient(client, async () => {
     const tx = db
-    const [task] = await tx.select().from(issues).where(eq(issues.id, input.issueId)).for('share')
+    const [task] = await tx.select({ id: issues.id, userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion, title: issues.title, content: issueAttrsContent, prefixInput: taskPrefixInput(sql`issues."userId"`) }).from(issues).where(eq(issues.id, input.issueId)).for('share')
     if (!task) return null
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + task.id}, 0))`)
     const [previous] = await tx.select().from(runPublications).where(and(eq(runPublications.issueId, task.id), eq(runPublications.remoteKey, repo.repoPath), sql`${runPublications.branch} is not null`)).orderBy(asc(runPublications.createdAt)).limit(1)
-    const identifiers = await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }], tx)
-    const identifier = previous?.identifier ?? identifiers.get(task.id) ?? null
+    const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, prefixInput: task.prefixInput }], tx)).get(task.id) ?? null
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (!branch) return null
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)

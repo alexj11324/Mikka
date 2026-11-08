@@ -59,11 +59,16 @@ async function issueConnections(id: string, reach: 'linked' | 'all') {
       or(eq(issues.id, id), named.length ? inArray(issues.id, named) : undefined, namesTask('mikka'), namesTask('orvilo'))))).map(row => row.id)
   }
   // Only each row's metadata is used: read the body's attrs, never every task's whole body.
+  const visibility = await issueVisibility(user.id, false, undefined, db, candidates
+    ? { onlyIssueIds: candidates, withIdentifierTeams: true } : {})
   const rows = await tx.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
-    .where(and(eq(issues.userId, issue.userId), candidates ? inArray(issues.id, candidates) : undefined, (await issueVisibility(user.id, false, undefined, db, candidates ? { onlyIssueIds: candidates } : {})).predicate)).orderBy(desc(issues.updatedAt))
+    .where(and(eq(issues.userId, issue.userId), candidates ? inArray(issues.id, candidates) : undefined, visibility.predicate)).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
-  const identifiers = await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
+  // The private whole-owner copy consumes structure only; labels belong to the public linked view.
+  const identifiers = reach === 'linked'
+    ? await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), db, visibility.taskTeams)
+    : new Map<string, string | null>()
   return live.map(({ content, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
   })
 }

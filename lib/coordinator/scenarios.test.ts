@@ -35,7 +35,7 @@ mock.module('@/lib/composio-actions', { namedExports: { createComposioAITools: (
 
 let registry: typeof import('@/workflows/coordinator/tools')
 let instructions: string
-let systemPrompt: (computer?: boolean) => Promise<string>
+let systemPrompt: (computer?: boolean, githubContext?: string) => Promise<string>
 before(async () => {
   registry = await import('@/workflows/coordinator/tools')
   instructions = (await import('./instructions')).COORDINATOR_INSTRUCTIONS
@@ -53,7 +53,7 @@ before(async () => {
     e2b: false,
     hosted: 'points_exhausted',
   })
-  systemPrompt = async () => `${instructions}\n${github}\n${execution}`
+  systemPrompt = async (_computer, githubContext = github) => `${instructions}\n${githubContext}\n${execution}`
 })
 beforeEach(() => { calls.length = 0; for (const key of Object.keys(results)) delete results[key]; overrideDeploymentSwitch('issueTools', true) })
 
@@ -61,9 +61,10 @@ type Recorded = { tool: string; input: Record<string, unknown> } | { text: strin
 const usage = { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } }
 
 /** Replays `turn` one model step at a time, through the real tools; returns what the model was told and the reply. */
-async function play(userText: string, turn: Recorded[], options: { computerEnabled?: boolean } = {}) {
-  const tools: ToolSet = registry.createCoordinatorRegistry(OWNER, COORDINATOR_BOT, undefined, { coordinator: true, ...options })
-  const system = await systemPrompt(options.computerEnabled)
+async function play(userText: string, turn: Recorded[], options: { computerEnabled?: boolean; githubContext?: string } = {}) {
+  const { githubContext, ...runtimeOptions } = options
+  const tools: ToolSet = registry.createCoordinatorRegistry(OWNER, COORDINATOR_BOT, undefined, { coordinator: true, ...runtimeOptions })
+  const system = await systemPrompt(options.computerEnabled, githubContext)
   let index = 0
   const model = new MockLanguageModelV3({ doGenerate: async () => {
     const next = turn[index++]
@@ -260,13 +261,45 @@ test('「Octo 官网的导航栏在手机上错位了」 with the authorized lis
       { fullName: 'octo/octo-api', description: null, homepage: null, pushedAt: null },
     ] }),
   })
-  assert.match(instructions, /The GitHub lines below list the repositories they authorized, each with its description and homepage: look there first/)
+  assert.match(instructions, /When repository facts are supplied below, use them;/)
+  assert.match(instructions, /Choose by the person's own words, each description and homepage and the task, asking which one only when that does not settle it/)
   assert.match(listed, /^- octo\/octo-web · "The public marketing website" · homepage "https:\/\/octo\.example"$/m)
-  const { reply } = await play('Octo 官网的导航栏在手机上错位了，修一下', [
+  const { system, reply } = await play('Octo 官网的导航栏在手机上错位了，修一下', [
     { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'octo/octo-web' } },
     { text: '已经派给 Agent 在 octo/octo-web 上修。' },
-  ])
+  ], { githubContext: listed })
+  assert.ok(system.includes(listed), 'the supplied repository facts reach the actual model system prompt')
   assert.deepEqual(calls.map(call => call.step), ['dispatchRun'], 'the list in the turn makes the lookup unnecessary')
   assert.equal((calls[0].input as { repo: string }).repo, 'octo/octo-web')
+  assert.doesNotMatch(reply, /哪个仓库/)
+})
+
+test('「Octo 官网的导航栏在手机上错位了」 without repository facts: discover before dispatch, never invent a default', async () => {
+  const { githubPromptContext } = await import('./github-context')
+  const eagerReads: string[] = []
+  const context = await githubPromptContext(OWNER, { hosted: true, effectiveTools: ['find_repository'] }, {
+    connection: async () => ({ githubLogin: 'octo-dev' }),
+    list: async () => { eagerReads.push('list'); return { login: 'octo-dev', installationAccounts: ['octo'], repositories: [] } },
+    used: async () => { eagerReads.push('used'); return [] },
+  })
+  assert.deepEqual(eagerReads, [], 'ordinary preparation leaves repository discovery to the tool')
+  assert.doesNotMatch(context, /^- /m)
+  assert.match(context, /call find_repository with the exact name the person used, or without a name to discover all repositories/)
+  results.findRepository = { repositories: [
+    { fullName: 'octo/octo', description: 'The product: app and API clients', homepage: 'https://app.octo.example' },
+    { fullName: 'octo/octo-web', description: 'The public marketing website', homepage: 'https://octo.example' },
+    { fullName: 'octo/octo-api', description: null, homepage: null },
+  ] }
+  const { system, reply } = await play('Octo 官网的导航栏在手机上错位了，修一下', [
+    { tool: 'find_repository', input: {} },
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'octo/octo-web' } },
+    { text: '已经派给 Agent 在 octo/octo-web 上修。' },
+  ], { githubContext: context })
+  assert.ok(system.includes(context), 'the real lazy context reaches the actual model system prompt')
+  assert.match(system, /otherwise call find_repository when the task needs repository facts, with the exact name the person used or without a name to discover all of them/)
+  assert.match(system, /Never invent a default repository/)
+  assert.deepEqual(calls.map(call => call.step), ['findRepository', 'dispatchRun'], 'discover the missing facts before dispatching')
+  assert.deepEqual(calls[0].input, {})
+  assert.equal((calls[1].input as { repo: string }).repo, 'octo/octo-web')
   assert.doesNotMatch(reply, /哪个仓库/)
 })

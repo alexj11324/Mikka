@@ -292,3 +292,26 @@ test('project decisions use the same host-bound step in hosted and native Coordi
     assert.equal(registry.coordinatorTools(owner, bot, nativeScope, { execution: run, readOnly: true }).record_decision, undefined)
   }
 })
+
+test('repository discovery adds workspace facts only for hosted turns that omit the live repository list', async () => {
+  const input = {}
+  calls.length = 0
+  const hosted = registry.coordinatorTools(owner, bot, undefined, {execution: execution(), lazyGitHubContext: true})
+  await invoke(hosted, 'find_repository', input)
+  assert.deepEqual(calls, [{name: 'find-repository', args: [owner, input, undefined, bot]}])
+
+  calls.length = 0
+  const native = registry.coordinatorTools(owner, bot, scope, {execution: execution(), lazyGitHubContext: true})
+  await invoke(native, 'find_repository', input)
+  assert.deepEqual(calls, [{name: 'find-repository', args: [owner, input, scope]}])
+
+  for (const options of [{}, {coordinator: true}, {execution: execution()}]) {
+    calls.length = 0
+    const legacyOrSlack = registry.coordinatorTools(owner, bot, undefined, options)
+    await invoke(legacyOrSlack, 'find_repository', input)
+    assert.deepEqual(calls, [{name: 'find-repository', args: [owner, input, undefined]}])
+  }
+
+  const readOnly = registry.coordinatorTools(owner, bot, undefined, {execution: execution(), readOnly: true, lazyGitHubContext: true})
+  assert.equal(readOnly.find_repository, undefined)
+})

@@ -96,6 +96,7 @@ jobs:
     concurrency:
       group: production-smoke-owner-acceptance
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       actions: read

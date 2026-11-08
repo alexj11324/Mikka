@@ -1,5 +1,6 @@
 import { gunzipSync, gzipSync } from "node:zlib"
 import { describe, expect, it } from "vitest"
+import { TASK_SECRET_CAPABILITY_PREFIX, TASK_SECRET_MAX_TOKEN_BYTES } from '@mikka/protocol/task-secrets'
 
 import type { RunChunk } from "./chunks"
 import { createRunMasker, MASK_MIN_LENGTH } from "./secret-mask"
@@ -30,6 +31,58 @@ function stream(pieces: string[], end: RunChunk | null, m = masker()) {
 }
 
 describe("daemon secret masking (before upload)", () => {
+  it('masks old, new and unregistered capability generations after 100 renewals', () => {
+    const capability = (index: number) => `${TASK_SECRET_CAPABILITY_PREFIX}${Buffer.from(`synthetic-opaque-generation-${index}-${'x'.repeat(60)}`).toString('base64url')}`
+    const m = createRunMasker([{ name: 'EGRESS', value: capability(0) }])!
+    const first = capability(0)
+    const chunks = m.chunk(delta(`before ${first.slice(0, 23)}`))
+    for (let index = 1; index <= 100; index++) m.add([{ name: 'EGRESS', value: capability(index) }])
+    chunks.push(...m.chunk(delta(`${first.slice(23)} after`)), ...m.flush())
+    expect(joined(chunks)).toBe('before [secret:TASK_SECRET_CAPABILITY] after')
+    // The next, unregistered generation proves masking uses the token format;
+    // old generations do not need an indefinitely growing literal list.
+    for (let index = 0; index <= 101; index++) {
+      const token = capability(index)
+      expect(m.text(`raw=${token}; encoded=${b64(token)};`)).toBe('raw=[secret:TASK_SECRET_CAPABILITY]; encoded=[secret:TASK_SECRET_CAPABILITY];')
+    }
+    expect(m.deep({ [first]: { output: capability(100) } })).toEqual({ '[secret:TASK_SECRET_CAPABILITY]': { output: '[secret:TASK_SECRET_CAPABILITY]' } })
+    m.dispose()
+    expect(m.text(first)).toBe(first)
+  })
+
+  it('holds raw and base64 capabilities across every stream split and masks before persistence', () => {
+    const capability = `${TASK_SECRET_CAPABILITY_PREFIX}${Buffer.from('synthetic-opaque-capability-for-stream-tests').toString('base64url')}`
+    for (const form of [capability, b64(capability)]) {
+      const text = `before ${form} after`
+      for (let cut = 1; cut < text.length; cut++) {
+        const m = createRunMasker([{ name: 'EGRESS', value: capability }])!
+        const first = m.chunk(delta(text.slice(0, cut)))
+        if (cut > 7 && cut < 7 + form.length) expect(joined(first)).toBe('before ')
+        const chunks = [...first, ...m.chunk(delta(text.slice(cut))), ...m.flush()]
+        expect(joined(chunks)).toBe('before [secret:TASK_SECRET_CAPABILITY] after')
+        expect(JSON.stringify(chunks)).not.toContain(form.slice(0, 24))
+      }
+    }
+  })
+
+  it('masks a maximum-sized capability in deltas and compressed checkpoints', () => {
+    const capability = TASK_SECRET_CAPABILITY_PREFIX + 'x'.repeat(TASK_SECRET_MAX_TOKEN_BYTES - TASK_SECRET_CAPABILITY_PREFIX.length)
+    const m = createRunMasker([{ name: 'EGRESS', value: capability }])!
+    for (const form of [capability, b64(capability)]) {
+      const chunks: RunChunk[] = []
+      for (let start = 0; start < form.length; start += 4096) {
+        const batch = m.chunk(delta(form.slice(start, start + 4096)))
+        expect(joined(batch)).toBe('')
+        chunks.push(...batch)
+      }
+      chunks.push(...m.flush())
+      expect(joined(chunks)).toBe('[secret:TASK_SECRET_CAPABILITY]')
+    }
+    const patch = `+++ b/capability.txt\n+raw=${capability}\n+encoded=${b64(capability)}\n`
+    const checkpoint = { baseCommit: 'a'.repeat(40), patch: gzipSync(patch).toString('base64'), files: 1, takenAt: new Date().toISOString() }
+    expect(gunzipSync(Buffer.from(m.checkpoint(checkpoint).patch, 'base64')).toString()).toBe('+++ b/capability.txt\n+raw=[secret:TASK_SECRET_CAPABILITY]\n+encoded=[secret:TASK_SECRET_CAPABILITY]\n')
+  })
+
   it('adds a renewed token without losing buffered text or older credential coverage', () => {
     const m = masker(), chunks = m.chunk(delta(`before ${SECRET.slice(0, 10)}`))
     const renewed = 'renewed-access-token-123456789'

@@ -267,6 +267,14 @@ export function shardScripts(scripts, shard) {
   return selected
 }
 
+/** Selection narrows execution only after complete inventory validation. */
+export function selectScripts(scripts, selection) {
+  if (selection === undefined) return scripts
+  const selected = JSON.parse(selection)
+  if (!Array.isArray(selected) || !selected.length || new Set(selected).size !== selected.length || selected.some(s => !scripts.includes(s))) throw Error('DB_TEST_SELECTED must be a nonempty unique subset of the complete inventory')
+  return [...selected].sort()
+}
+
 // Suites that must run on the bootstrapped database itself rather than on a
 // clone of it. They run one at a time, after every clone has been taken (a
 // database can be a template only while nobody is connected to it).
@@ -390,7 +398,7 @@ export async function main({ root = '.', env = process.env, run = runScript, clo
     const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).scripts ?? {}
     const plan = inventory(readTree(root), scripts, (env.DB_TEST_EXPECTED ?? '').split(',').filter(Boolean))
     console.log(`Required DB inventory: ${JSON.stringify(plan)}`)
-    const selected = shardScripts(plan.scripts, env.DB_TEST_SHARD)
+    const selected = shardScripts(selectScripts(plan.scripts, env.DB_TEST_SELECTED), env.DB_TEST_SHARD)
     console.log(`Required DB selection: ${JSON.stringify({ shard: env.DB_TEST_SHARD ?? 'all', total: plan.scripts.length, scripts: selected })}`)
     // Suites share destructive fixtures, so each runs on its own copy of the
     // bootstrapped database; the few bound to that database by name run on it,

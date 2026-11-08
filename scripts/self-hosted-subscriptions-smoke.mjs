@@ -12,6 +12,12 @@ function check(condition, code) {
 const root = process.cwd()
 const manifest = JSON.parse(readFileSync(join(root, 'mikka-build.json'), 'utf8'))
 check(manifest.preset === 'node-server' && Array.isArray(manifest.resources), 'SUBSCRIPTION_BUILD_MANIFEST_INVALID')
+// The standalone image can start a user's official E2B computer without any
+// platform environment. Its public runtime pins must describe this build;
+// no E2B key, subscription identity or task credential belongs in the image.
+check(/^[a-f0-9]{40}$/.test(manifest.revision)
+  && process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT === manifest.revision
+  && /^[a-f0-9]{40}$/.test(process.env.MIKKA_CLOUD_WORKER_SHA ?? ''), 'STANDALONE_WORKER_RELEASE_MISSING')
 const pin = readFileSync(join(root, 'packages/subscription-worker/CPA_COMMIT'), 'utf8').trim()
 check(/^[a-f0-9]{40}$/.test(pin), 'SUBSCRIPTION_CPA_PIN_INVALID')
 // Go uses the Debian system trust bundle; Node's own bundled roots do not
