@@ -1,162 +1,79 @@
-name: Self-hosted real vault closeout
+name: Private Coding Workspace candidate acceptance
 on:
   push:
     branches: [ops/self-hosted-vault-closeout-20261108]
 permissions:
   contents: read
 concurrency:
-  group: production-smoke-owner-acceptance
+  group: coding-workspace-private-candidates
   cancel-in-progress: false
   queue: max
 jobs:
-  ingress_claude:
-    name: Owned official Claude ingress capability
+  private_candidates:
+    name: Exact private Claude and Codex review runtimes
     if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
-    permissions: &workload_permissions
-      contents: read
-      actions: read
-      id-token: write
-    env:
-      PREVIEW_PROBE_TEMPLATE: claude
-    outputs:
-      cleanup_confirmed: ${{ steps.verdict.outputs.cleanup_confirmed }}
-      capability_passed: ${{ steps.verdict.outputs.capability_passed }}
-    steps: &ingress_steps
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        id: probe_source
-        with:
-          repository: alexj11324/Mikka
-          ref: b6fbb3e28102ae3afe7b154d5bad7f67b4186025
-          path: preview-ingress-source
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 24
-      - name: Verify the original Ops subject and frozen probe before credentials
-        run: node scripts/ops/self-hosted-ingress-probe.mjs check preview-ingress-source "$PREVIEW_PROBE_TEMPLATE"
-      - name: Verify the carrier gates and frozen probe cases
-        run: |
-          node --test scripts/ops/self-hosted-ingress-probe.test.mjs
-          node --test preview-ingress-source/scripts/e2b/preview-ingress-acceptance.test.mjs
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('preview-ingress-source/scripts/e2b/preview-ingress-probe.py')
-          compile(path.read_bytes(), str(path), 'exec')
-          PY
-      - name: Install only the reviewed E2B SDK
-        run: |
-          npm install --prefix "$RUNNER_TEMP/preview-ingress-sdk" --ignore-scripts --no-audit --no-fund 'e2b@2.62.1'
-          ln -s "$RUNNER_TEMP/preview-ingress-sdk/node_modules" preview-ingress-source/node_modules
-          node --input-type=module <<'JS'
-          import { readFileSync } from 'node:fs'
-          const sdk = JSON.parse(readFileSync('preview-ingress-source/node_modules/e2b/package.json', 'utf8'))
-          if (sdk.version !== '2.62.1') throw new Error('ingress_sdk_version_refused')
-          JS
-      - name: Recheck both immutable checkouts immediately before the existing key
-        id: source
-        run: node scripts/ops/self-hosted-ingress-probe.mjs check preview-ingress-source "$PREVIEW_PROBE_TEMPLATE"
-      - name: Read only the existing E2B workload credential
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: E2B_API_KEY
-          recursive: false
-          include-imports: false
-      - name: Probe exactly one owned VM with a 180-second provider kill deadline
-        working-directory: preview-ingress-source
-        run: >-
-          node scripts/e2b/preview-ingress-acceptance.mjs
-          --template "$PREVIEW_PROBE_TEMPLATE"
-          --output "$RUNNER_TEMP/preview-ingress-$PREVIEW_PROBE_TEMPLATE/report.json"
-      - name: Always reconcile only the frozen probe's exact creation journal
-        if: always() && steps.source.outcome == 'success'
-        working-directory: preview-ingress-source
-        run: >-
-          node scripts/e2b/preview-ingress-acceptance.mjs
-          --cleanup "$RUNNER_TEMP/preview-ingress-$PREVIEW_PROBE_TEMPLATE/report.json.cleanup.json"
-          --output "$RUNNER_TEMP/preview-ingress-$PREVIEW_PROBE_TEMPLATE/cleanup.json"
-      - name: Preserve capability failure and gate further allocation on real cleanup
-        id: verdict
-        if: always() && steps.source.outcome == 'success'
-        run: node scripts/ops/self-hosted-ingress-probe.mjs verdict preview-ingress-source "$PREVIEW_PROBE_TEMPLATE"
-      - name: Retain only closed capability and cleanup receipts
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: owned-preview-ingress-${{ env.PREVIEW_PROBE_TEMPLATE }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/preview-ingress-${{ env.PREVIEW_PROBE_TEMPLATE }}/report.json
-            ${{ runner.temp }}/preview-ingress-${{ env.PREVIEW_PROBE_TEMPLATE }}/cleanup.json
-            ${{ runner.temp }}/preview-ingress-${{ env.PREVIEW_PROBE_TEMPLATE }}/verdict.json
-          retention-days: 14
-          if-no-files-found: warn
-  ingress_codex:
-    name: Owned official Codex ingress capability
-    needs: ingress_claude
-    if: >-
-      always() && !cancelled() && needs.ingress_claude.outputs.cleanup_confirmed == 'true' &&
-      github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' &&
-      github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108'
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    permissions: *workload_permissions
-    env:
-      PREVIEW_PROBE_TEMPLATE: codex
-    outputs:
-      cleanup_confirmed: ${{ steps.verdict.outputs.cleanup_confirmed }}
-      capability_passed: ${{ steps.verdict.outputs.capability_passed }}
-    steps: *ingress_steps
-  vault:
-    needs: ingress_codex
-    if: >-
-      always() && !cancelled() && needs.ingress_codex.outputs.cleanup_confirmed == 'true' &&
-      github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' &&
-      github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 75
     permissions:
       contents: read
       actions: read
       id-token: write
     env:
+      P0_SOURCE: 968076c89b1cfe27b6f257470ea8aa51116b7e33
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      GITHUB_TOKEN: ${{ github.token }}
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        timeout-minutes: 2
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: ./.github/actions/pnpm-install
-      - name: Verify exact published source and final-image guards before credentials
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        timeout-minutes: 2
+        with:
+          repository: alexj11324/Mikka
+          ref: 968076c89b1cfe27b6f257470ea8aa51116b7e33
+          path: workspace-acceptance-source
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        timeout-minutes: 1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        timeout-minutes: 1
+        with:
+          node-version: 24
+      - name: Verify the real Ops subject and exact public source before installation
+        timeout-minutes: 1
+        run: node scripts/ops/workspace-private-acceptance.mjs check workspace-acceptance-source
+      - name: Install the complete frozen candidate dependencies
+        timeout-minutes: 6
+        working-directory: workspace-acceptance-source
+        run: pnpm install --frozen-lockfile
+      - name: Install the existing release Python SDK
+        timeout-minutes: 2
         run: |
-          node --import tsx --test scripts/ops/self-hosted-vault-closeout.test.mjs scripts/ops/self-hosted-vault-viewer.test.mjs
-          node --import tsx scripts/ops/self-hosted-vault-closeout.mjs --check
-      - name: Prepare immutable image and disposable infrastructure
+          python3 -m venv "$RUNNER_TEMP/e2b-private"
+          "$RUNNER_TEMP/e2b-private/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Check fixed candidate, driver and cleanup boundaries before credentials
+        timeout-minutes: 3
         run: |
-          docker pull ghcr.io/alexj11324/mikka@sha256:f9ca1fa0d09adaac3391181f224c4abfa89ff04a3310e8de0e699e204c4f160d
-          node --import tsx scripts/ops/self-hosted-vault-closeout.mjs --image-check
-          docker pull postgres:17-alpine
-          docker pull axllent/mailpit:v1.27.4
-          curl --fail --silent --show-error --location --max-time 60 https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 --output "$RUNNER_TEMP/cloudflared"
-          node --input-type=module <<'JS'
-          import { readFileSync, chmodSync } from 'node:fs'
-          import { createHash } from 'node:crypto'
-          import assert from 'node:assert/strict'
-          const path = process.env.RUNNER_TEMP + '/cloudflared'
-          assert.equal(createHash('sha256').update(readFileSync(path)).digest('hex'), '1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872')
-          chmodSync(path, 0o700)
-          JS
+          node --test scripts/ops/workspace-private-acceptance.test.mjs
+          cd workspace-acceptance-source
+          node --test scripts/e2b/workspace-ingress-acceptance.test.mjs scripts/e2b/workspace-terminal-acceptance.test.mjs
+          python3 scripts/e2b/workspace-candidates.test.py
+          python3 scripts/e2b/build-template.test.py
+          python3 scripts/e2b/official-files.test.py
+          python3 scripts/e2b/cleanup-template-candidates.test.py
+          bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh
+      - name: Recheck clean source, entry hashes and installed SDK versions
+        id: source
+        timeout-minutes: 1
+        run: node scripts/ops/workspace-private-acceptance.mjs dependencies workspace-acceptance-source
       - name: Read only the existing E2B workload credential
+        id: credential
+        timeout-minutes: 1
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -168,14 +85,58 @@ jobs:
           secret-name: E2B_API_KEY
           recursive: false
           include-imports: false
-      - name: Save a random login with local KMS and let the real owned Agent fill it
+      - name: Build two private 2 CPU 4 GiB candidates with a cleanup reserve
+        id: build
+        timeout-minutes: 32
+        working-directory: workspace-acceptance-source
+        run: >-
+          timeout --signal=TERM --kill-after=1m 30m
+          "$RUNNER_TEMP/e2b-private/bin/python" scripts/e2b/workspace-candidates.py build
+          --source-ref "$P0_SOURCE" --output "$RUNNER_TEMP/workspace-private/candidates"
+      - name: Accept HTTP HMR PTY and full-memory resume on serial owned VMs
+        id: acceptance
         timeout-minutes: 13
-        run: timeout --signal=TERM --kill-after=3m 10m node --import tsx scripts/ops/self-hosted-vault-closeout.mjs
-      - name: Retain only closed evidence
+        working-directory: workspace-acceptance-source
+        run: >-
+          timeout --signal=TERM --kill-after=30s 12m
+          node scripts/e2b/workspace-ingress-acceptance.mjs
+          --candidates "$RUNNER_TEMP/workspace-private/candidates/candidates.json"
+          --output "$RUNNER_TEMP/workspace-private/runtime"
+      - name: Always reconcile only this run's exact runtime VM journals
+        id: vm_cleanup
+        if: always() && steps.source.outcome == 'success' && steps.credential.outcome == 'success' && steps.build.outcome != 'skipped'
+        timeout-minutes: 3
+        working-directory: workspace-acceptance-source
+        run: >-
+          timeout --signal=TERM --kill-after=15s 2m
+          node scripts/e2b/workspace-ingress-acceptance.mjs
+          --cleanup "$RUNNER_TEMP/workspace-private/runtime"
+          --output "$RUNNER_TEMP/workspace-private/runtime/cleanup.json"
+      - name: Always clean this run's private templates and builder VMs
+        id: template_cleanup
+        if: always() && steps.source.outcome == 'success' && steps.credential.outcome == 'success' && steps.build.outcome != 'skipped'
+        timeout-minutes: 5
+        working-directory: workspace-acceptance-source
+        run: >-
+          timeout --signal=TERM --kill-after=15s 4m
+          "$RUNNER_TEMP/e2b-private/bin/python" scripts/e2b/workspace-candidates.py cleanup
+          --source-ref "$P0_SOURCE" --output "$RUNNER_TEMP/workspace-private/candidates"
+      - name: Bind closed evidence to both sources and preserve all failed cases
+        id: verdict
+        if: always() && steps.source.outcome == 'success'
+        timeout-minutes: 1
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          ACCEPTANCE_OUTCOME: ${{ steps.acceptance.outcome }}
+          VM_CLEANUP_OUTCOME: ${{ steps.vm_cleanup.outcome }}
+          TEMPLATE_CLEANUP_OUTCOME: ${{ steps.template_cleanup.outcome }}
+        run: node scripts/ops/workspace-private-acceptance.mjs verdict workspace-acceptance-source
+      - name: Retain only closed source evidence reports and journals
         if: always()
+        timeout-minutes: 1
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: self-hosted-vault-${{ github.run_id }}
-          path: .artifacts/self-hosted-vault/report.json
-          if-no-files-found: warn
+          name: private-workspace-candidates-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/workspace-private/evidence/*.json
           retention-days: 14
+          if-no-files-found: warn
