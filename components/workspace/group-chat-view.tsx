@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { ConversationPill } from '@/components/nav/conversation-pill'
-import { GroupAvatar, groupMembersKey, useGroupMembers } from '@/components/nav/group-avatar'
+import { GroupAvatar, groupMembersKey, memberAvatar, useGroupMembers } from '@/components/nav/group-avatar'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { BotAvatar } from '@/components/nav/bot-avatar'
@@ -166,7 +166,7 @@ export function GroupChatView({ group, userId, people }: {
                       const name = authorName(run.authorType, run.authorId)
                       const bot = run.authorType === 'bot' ? member('bot', run.authorId) : undefined
                       return <li key={run.key} className={cn('flex', mine ? 'flex-col items-end gap-1' : 'items-end gap-2')}>
-                        {!mine && (bot ? <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="message" still /> : <LetterAvatar name={name} size="message" />)}
+                        {!mine && (bot ? <BotAvatar {...memberAvatar(bot)} size="message" still /> : <LetterAvatar name={name} size="message" />)}
                         <div className={cn('flex min-w-0 flex-col gap-1', mine ? 'max-w-[min(26rem,80%)] items-end' : 'max-w-[min(35rem,85%)]')}>
                           {mine ? <span className="sr-only">{name}</span> : <span className="text-xs font-medium text-muted-foreground">{name}</span>}
                           {run.messages.map(message => <Fragment key={message.id}>
