@@ -80,7 +80,7 @@ jobs:
           NODE_ENV: production
           VERCEL_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_1503_START_FIXTURE_SHA256: 2547930643a905c0d1e9c3ec6d918d624d445f2395b34badca396ab47e7db524
+          MIKKA_1503_START_FIXTURE_SHA256: 45369ceaa4c09b6662817eaa72d58f073d1ca3c27d6bcfbc226d06f22b983141
       - name: Exercise explicit cloud task creation and full delivery on Claude Code
         id: claude_delivery
         if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_guard.outcome == 'success' }}
