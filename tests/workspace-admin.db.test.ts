@@ -3,10 +3,11 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { count, dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedPersonalWorkspace, seedWorkspace } from './support/workspace-admin-db'
+import { count, dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('workspace settings backend', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
+  const { seedPersonalWorkspace } = await import('./support/workspace-admin-db')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { WorkspaceError } = await import('../lib/workspace-access')
   const general = await import('../lib/workspace-admin/general')

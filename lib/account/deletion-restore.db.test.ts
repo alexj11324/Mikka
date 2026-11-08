@@ -15,8 +15,9 @@ test('current deletion journal replays only into explicit isolated restore targe
   // A small old-backup fixture, with real PostgreSQL table definitions. The operations acceptance
   // separately owns a real pg_dump/restore drill; this tests the account replay adapter's boundaries.
   const tables = ['user', 'bots', 'coordinator_bots', 'agents', 'agent_runs', 'factory_tasks', 'artifacts', 'artifact_versions', 'run_captures', 'user_avatars', 'issues', 'issue_documents', 'issue_versions', 'issue_members', 'conversations', 'conversation_members', 'user_facts',
-    'mikka_workspaces', 'mikka_workspace_members', 'mikka_workspace_invitations', 'mikka_teams', 'mikka_team_members', 'mikka_team_issues', 'mikka_team_projects', 'team_issue_create_receipts', 'team_issue_promotion_receipts', 'workspace_projects', 'workspace_project_events', 'mikka_organizations', 'mikka_organization_members', 'mikka_organization_audit_events']
-  for (const table of tables) await restored.query(`CREATE TABLE "${scope}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS ${table === 'mikka_organization_audit_events' ? 'INCLUDING INDEXES' : ''})`)
+    'mikka_workspaces', 'mikka_workspace_members', 'mikka_workspace_invitations', 'mikka_teams', 'mikka_team_members', 'mikka_team_issues', 'mikka_team_projects', 'team_issue_create_receipts', 'team_issue_promotion_receipts', 'workspace_projects', 'workspace_project_events']
+  for (const table of tables) await restored.query(`CREATE TABLE "${scope}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS)`)
+  for (const table of ['mikka_organizations', 'mikka_organization_members', 'mikka_organization_audit_events']) await restored.query(`CREATE TABLE "${scope}"."${table}" (LIKE public."${table}" INCLUDING DEFAULTS INCLUDING CONSTRAINTS ${table === 'mikka_organization_audit_events' ? 'INCLUDING INDEXES' : ''})`)
   for (const migration of ['20261031050731_account_deletion_jobs.sql', '20261031050732_workspace_deletion_guards.sql', '20261031050737_account_deletion_warnings.sql']) await restored.query(await readFile(new URL(`../../drizzle/${migration}`, import.meta.url), 'utf8'))
   const user = await seedUser(source, 'restore-deleted'), ws = await seedWorkspace(source, user, [{ userId: user, role: 'admin' }]), untouched = await seedUser(source, 'restore-untouched')
 
@@ -49,6 +50,9 @@ test('current deletion journal replays only into explicit isolated restore targe
   for (const table of ['issue_documents', 'issue_versions', 'issue_members']) await source.query(`DELETE FROM ${table} WHERE "issueId"=$1`, [backupOnlyTask])
   await source.query('DELETE FROM issues WHERE id=$1', [backupOnlyTask])
   await source.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [retainedWorkspace.id, user])
+  const key = `${user}/old-backup-file.png`
+  await restored.query('INSERT INTO account_storage_retirements("userId","storageKey") VALUES($1,$2)', [user, key])
+  const options = { mainPool: source, workspacePool: source, externalCleanup: async () => [] as string[] }
   // These Organization fixtures deliberately differ between the canonical
   // restore target and its ambient source; search_path must not select source rows.
   const sourceOrg = randomUUID(), restoredOrg = randomUUID()
@@ -57,9 +61,6 @@ test('current deletion journal replays only into explicit isolated restore targe
   await restored.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,$2,$3)', [restoredOrg, 'Restored Organization', user])
   for (const member of [user, untouched]) await restored.query(`INSERT INTO mikka_organization_members("organizationId","userId",role,name,email) VALUES($1,$2,'owner',$2,$3)`, [restoredOrg, member, `${member}@example.invalid`])
   const sourceMemberships = (await source.query('SELECT * FROM mikka_organization_members WHERE "organizationId"=$1 ORDER BY "userId"', [sourceOrg])).rows
-  const key = `${user}/old-backup-file.png`
-  await restored.query('INSERT INTO account_storage_retirements("userId","storageKey") VALUES($1,$2)', [user, key])
-  const options = { mainPool: source, workspacePool: source, externalCleanup: async () => [] as string[] }
   const request = await requestAccountDeletion(user, `${user}@example.invalid`, randomUUID(), options)
   assert.ok(request.ok)
   const pending = await exportAccountDeletionManifest(options)
@@ -95,6 +96,8 @@ test('current deletion journal replays only into explicit isolated restore targe
   assert.equal(removalAudit[0].targetId, user)
   assert.deepEqual(removalAudit[0].metadata, { reason: 'account_deletion' })
   assert.equal((await source.query('SELECT count(*)::int n FROM mikka_organization_audit_events WHERE "organizationId"=ANY($1::uuid[])', [[sourceOrg, restoredOrg]])).rows[0].n, 0)
+  assert.deepEqual(await applyAccountDeletionManifest(manifest, { mainPool: restored, workspacePool: restored, deleteObject: async object => { removed.push(object) } }), { applied: 1 })
+  assert.deepEqual((await restored.query('SELECT id,action,"targetId",metadata FROM mikka_organization_audit_events WHERE "organizationId"=$1 ORDER BY id', [restoredOrg])).rows, removalAudit, 'an already-removed member does not emit another event on restore retry')
   await assert.rejects(restored.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, `${user}@example.invalid`]), /account_deletion_pending/)
 
   await t.test('restore replay preserves the frozen ungrouped Shared and pending task contribution set', async () => {
@@ -112,7 +115,6 @@ test('current deletion journal replays only into explicit isolated restore targe
     assert.deepEqual((await restored.query('SELECT plan FROM account_deletion_jobs WHERE id=$1', [request.id])).rows[0].plan.keptIssueIds, restoredKeptTaskIds, 'object failure retry retains the backup-only Task decision')
     assert.deepEqual(await applyAccountDeletionManifest(manifest, { mainPool: restored, workspacePool: restored, deleteObject: async object => { removed.push(object) } }), { applied: 1 })
     assert.deepEqual(removed, [key, key], 'a completed replay does not repeat committed object cleanup')
-    assert.deepEqual((await restored.query('SELECT id,action,"targetId",metadata FROM mikka_organization_audit_events WHERE "organizationId"=$1 ORDER BY id', [restoredOrg])).rows, removalAudit, 'an already-removed member does not emit another event on restore retry')
     assert.deepEqual((await restored.query('SELECT id FROM issues WHERE id=ANY($1::uuid[]) ORDER BY id', [taskIds])).rows.map(row => row.id), restoredKeptTaskIds)
     assert.deepEqual((await restored.query('SELECT plan FROM account_deletion_jobs WHERE id=$1', [request.id])).rows[0].plan.keptIssueIds, restoredKeptTaskIds)
   })
