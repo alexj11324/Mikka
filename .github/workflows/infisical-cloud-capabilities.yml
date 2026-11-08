@@ -2,7 +2,7 @@ name: Existing Infisical cloud capabilities
 
 on:
   push:
-    branches: [ops/infisical-cloud-capabilities]
+    branches: [ops/infisical-cloud-capabilities, ops/production-build-databases-20261108]
 
 permissions:
   contents: read
@@ -353,3 +353,65 @@ jobs:
 # Compare only owner-event provenance booleans; verify enabled Manifest preparation without creating an App.
 
 # Reuse the reviewed shared-team policy for exact formal-source acceptance.
+
+  production-build-databases:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/ops/production-build-databases-20261108' &&
+      github.run_attempt == 1 && startsWith(github.event.head_commit.message, 'ops: diagnose production build databases')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 75930406dda8708a84786475656ae449f5ffda88
+          path: diagnostic-source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - name: Test exact source scope, read-only SQL and closed output before credentials
+        run: node --test scripts/ops/production-build-database-diagnostics.test.mjs
+      - name: Require the exact reviewed source and current main before authentication
+        run: node scripts/ops/production-build-database-diagnostics.mjs --preflight
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Install only the original frozen source dependencies without lifecycle scripts
+        run: pnpm --dir diagnostic-source install --frozen-lockfile --ignore-scripts
+      - name: Read the existing application build database input
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          include-imports: false
+      - name: Read the existing workspace build database input
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: DATABASE_URL
+          include-imports: false
+      - name: Inspect both original connections with read-only five-second statements
+        run: node scripts/ops/production-build-database-diagnostics.mjs --inspect
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
