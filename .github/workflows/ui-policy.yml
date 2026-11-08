@@ -291,6 +291,7 @@ jobs:
           echo 'All selected source/unit/daemon jobs succeeded.' >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: always()
       - name: Record actual completed job timings
         if: always()
         run: node scripts/ci/summary.mjs
@@ -440,6 +441,7 @@ jobs:
           esac
           echo "Database gate: $DB_RESULT; complete inventory validated in Changed files." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: always()
       - name: Record actual completed job timings
         if: always()
         run: node scripts/ci/summary.mjs
