@@ -233,7 +233,34 @@ async function run(env) {
         await page.goto(authorize, { waitUntil: 'networkidle' })
         await page.locator('select[name=workspace_id]').selectOption(cloudWorkspaceId)
         report.stage = 'consent-approve'
+        const submission = page.waitForResponse(response => new URL(response.url()).origin === plan.publicOrigin
+          && new URL(response.url()).pathname === '/mikka/cloud/oauth/authorize' && response.request().method() === 'POST')
         await page.getByRole('button', { name: /^(Allow|允许)$/ }).click()
+        const submitted = await submission
+        if (submitted.status() === 403 && report.consentPosts?.at(-1)?.approve === 'missing'
+          && env.CLOSEOUT_PROTOCOL_PROBE === '1') {
+          // This is a separately labelled authenticated protocol case. It
+          // cannot turn the broken native consent UI into passing acceptance.
+          report.checks.nativeConsentUI = { verified: false, httpStatus: 403, reason: 'submitter_value_missing' }
+          process.exitCode = 1
+          const next = await localApi('/api/cloud/connect', { action: 'bind', scopes })
+          const nextURL = new URL(next.url)
+          check(nextURL.origin === plan.publicOrigin && nextURL.pathname === '/mikka/cloud/oauth/authorize', 'PROTOCOL_AUTHORIZE_TARGET')
+          await page.goto(nextURL.href, { waitUntil: 'networkidle' })
+          await page.locator('select[name=workspace_id]').selectOption(cloudWorkspaceId)
+          const fields = await page.locator('form').evaluate(form => Object.fromEntries(new FormData(form)))
+          check(Object.keys(fields).sort().join(',') === 'csrf_token,request_id,workspace_id'
+            && fields.workspace_id === cloudWorkspaceId && fields.csrf_token && fields.request_id, 'PROTOCOL_CONSENT_FIELDS')
+          const approved = await local.request.post(`${plan.publicOrigin}/mikka/cloud/oauth/authorize`, {
+            form: { ...fields, approve: 'true' }, headers: { Origin: plan.publicOrigin }, maxRedirects: 0 })
+          check(approved.status() === 303 || approved.status() === 302, 'PROTOCOL_CONSENT_RESPONSE')
+          const callback = new URL(approved.headers().location)
+          check(callback.origin === localOrigin && callback.pathname === '/mikka/api/cloud/callback'
+            && !callback.username && !callback.password && !callback.hash && callback.searchParams.getAll('code').length === 1
+            && callback.searchParams.getAll('state').length === 1, 'PROTOCOL_CALLBACK_TARGET')
+          await page.goto(callback.href, { waitUntil: 'networkidle' })
+          report.checks.protocolConsent = { approved: true, browserUIAcceptance: false }
+        } else check(submitted.status() >= 300 && submitted.status() < 400, 'NATIVE_CONSENT_RESPONSE')
         report.stage = 'consent-callback'
         await page.waitForURL(u => u.origin === localOrigin, { timeout: 30_000 })
       }
@@ -395,7 +422,7 @@ async function run(env) {
     check(!privateValues.some(v => typeof v === 'string' && v.length >= 8 && logs.includes(v)), 'APPLICATION_LOG_SECRET_OR_PII')
     report.checks.applicationLogs = { noFixtureCredentialsOrEmails: true, rawLogsPublished: false }
     await sourceGuard(env); await privateGuard(env)
-    report.stage = 'completed'
+    report.stage = report.checks.nativeConsentUI?.verified === false ? 'backend-completed-native-consent-ui-failed' : 'completed'
   } catch (error) {
     // No raw provider, browser, Docker or HTTP response can enter a public log.
     report.failure = /^[A-Z0-9_]+$/.test(error?.message ?? '') ? error.message : 'CLOSEOUT_FAILED'
