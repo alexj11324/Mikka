@@ -146,6 +146,26 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.equal((await store.listApiKeys(pool, 'alice', anotherWorkspace)).keys.some(key => key.id === anthropic.id), true, 'the account key is still manageable in the other workspace')
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [team.id])
 
+    // Empty borrowed-candidate reads can skip sharing policy; a real borrowed
+    // candidate must still observe the current Organization rule and decision.
+    const organization = randomUUID(), approval = randomUUID()
+    await pool.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES ($1,\'Fixture organization\',\'bob\')', [organization])
+    await pool.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES ($1,$2)', [team.id, organization])
+    await pool.query('INSERT INTO mikka_organization_resource_policies("organizationId","modelCredentialSharing") VALUES ($1,\'deny\')', [organization])
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.id, key.mine]), [[anthropic.id, true]], 'Organization deny removes only borrowed keys')
+    assert.deepEqual((await store.usableApiKeys(pool, 'bob', team.id, gateway.id)).map(key => [key.id, key.mine]), [[gateway.id, true]], 'the owner keeps the exact selected own key')
+    await pool.query('UPDATE mikka_organization_resource_policies SET "modelCredentialSharing"=\'approval_required\' WHERE "organizationId"=$1', [organization])
+    assert.deepEqual(await store.usableApiKeys(pool, 'alice', team.id, gateway.id), [], 'an exact selected borrowed key still needs approval')
+    await pool.query('INSERT INTO mikka_organization_resource_approvals(id,"organizationId","workspaceId",kind,"resourceId","ownerId",status) VALUES ($1,$2,$3,\'api_key\',$4,\'bob\',\'approved\')', [approval, organization, team.id, gateway.id])
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id, gateway.id)).map(key => [key.id, key.mine]), [[gateway.id, false]], 'approval never widens selectedKeyId')
+    await pool.query('UPDATE mikka_organization_resource_approvals SET status=\'denied\' WHERE id=$1', [approval])
+    assert.deepEqual(await store.usableApiKeys(pool, 'alice', team.id, gateway.id), [], 'the same caller observes approval revocation immediately')
+    await pool.query('UPDATE mikka_organization_resource_policies SET "modelCredentialSharing"=\'allow\' WHERE "organizationId"=$1', [organization])
+    assert.deepEqual(await store.usableApiKeys(pool, 'alice', team.id, gateway.id), [], 'an explicit denial still wins over allow')
+    await pool.query('DELETE FROM mikka_organization_resource_approvals WHERE id=$1', [approval])
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id, gateway.id)).map(key => [key.id, key.mine]), [[gateway.id, false]], 'a subsequent read observes restored permission')
+    await pool.query('DELETE FROM mikka_organizations WHERE id=$1', [organization])
+
     // A bot's saved model can be an API key's: usable here, reaching bot chats, a model the key lists.
     const scope = { ownerId: 'alice', workspaceId: team.id }
     const aliceBot = randomUUID()

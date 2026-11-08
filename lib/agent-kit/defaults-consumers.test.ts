@@ -15,6 +15,7 @@ stub('./service.ts', {
   agentKitEnabled: () => enabled,
   agentKitDefaults: () => { record('defaults'); return profile },
   agentScope: async (...args: unknown[]) => { record('scope', ...args); if(scopeError)throw scopeError; return {ownerId: owner, botId: args[1], workspaceId: null} },
+  agentScopeWithBotMetadata: async (...args: unknown[]) => { record('scope', ...args); if(scopeError)throw scopeError; return {scope:{ownerId:owner,botId:args[1],workspaceId:null},bot:{name:'synthetic',coordinator:true}} },
   agentKitStore: {
     active: async (...args: unknown[]) => { record('active', ...args); return {definition: args[1], version: 1} },
     beginExecution: async (...args: unknown[]) => { record('begin', ...args); return null },
@@ -25,7 +26,7 @@ stub('./service.ts', {
 stub('../auth.ts', {auth: {api: {getSession: async () => ({user: {id: owner}, session: {id: 'defaults-fixture-session'}})}}})
 stub('./live-eval.ts', {evaluateProposal: forbidden})
 stub('../subscription-runtime.ts', {authorizeSubscriptionWorkspace: forbidden, subscriptionRuntime: forbidden})
-stub('../coordinator/bot-instructions.ts', {botInstructions: async () => 'synthetic host'})
+stub('../coordinator/bot-instructions.ts', {botInstructions: async () => 'synthetic host',formatBotInstructions: () => 'synthetic host'})
 stub('../coordinator/personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base })
 stub('../coordinator/instructions.ts', {COORDINATOR_INSTRUCTIONS: 'synthetic host'})
 stub('../coordinator/native-prompt.ts', {personalCoordinatorInstructions: () => 'synthetic native host'})

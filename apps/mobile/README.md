@@ -89,6 +89,14 @@ work; an in-flight registration finishes cleanup before the next account can
 register the same Expo token. An offline server can still retain a registration,
 so remote revocation and background OS delivery require device acceptance.
 
+The server binds a token to the native session that posts it and reads that
+session itself; the app never sends a session id (#1659). The app registers at
+sign-in, when its session changes (same phone and token, new session) and on
+return to the front. A registration counts as done only once the server has
+confirmed it for the current session, and only for 12 hours, so a token posted
+before the server bound sessions is posted again on the next of those events.
+There is no timer: a phone left in the background posts nothing.
+
 ## Releases
 
 Web/API deployment, an EAS Update, and an installed iOS binary are separate

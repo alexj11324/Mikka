@@ -506,9 +506,9 @@ test('startup intervals retain only closed fields and reject foreign run data or
   }
 })
 
-test('a prepared start keeps its actual earlier origin and requires both real initialization boundaries', () => {
+for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(source + ' keeps its actual earlier origin and requires both real initialization boundaries', () => {
   const runId = id(98), late = { ...startupTiming(runId, 'claude_code'), phases: [] }
-  const early = { ...late, source: 'prepared_agent_start', startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
+  const early = { ...late, source, ...(source === 'bootstrap_claude_start' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}), startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
     phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
       { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
   const record = { runIdHash: late.runIdHash, harness: 'claude_code' }, item = stage('agent_start', 3500)
@@ -520,7 +520,7 @@ test('a prepared start keeps its actual earlier origin and requires both real in
   assert.equal(record.preparationTimingStatus, 'complete')
   assert.equal(hasStartupInitialization(record), true)
   assert.doesNotMatch(JSON.stringify(record), /PRIVATE|"cwd"|"token"/)
-  for (const preparation of [{ ...early, truncated: true }, { ...early, outcome: 'error' },
+  for (const preparation of [...(source === 'bootstrap_claude_start' ? [{ ...early, claimAuthentication: 'unverified' }, { ...early, claimAuthentication: undefined }, { ...early, observedAuthSource: 'unknown' }, { ...early, observedAuthSource: undefined }] : []), { ...early, truncated: true }, { ...early, outcome: 'error' },
     { ...early, phases: [early.phases[0]] }, { ...early, phases: [early.phases[1]] },
     { ...early, phases: [{ ...early.phases[0], outcome: 'error' }, early.phases[1]] }]) {
     const failed = { runIdHash: late.runIdHash, harness: 'claude_code' }
@@ -530,9 +530,9 @@ test('a prepared start keeps its actual earlier origin and requires both real in
   }
 })
 
-test('invalid preparation evidence cannot hide behind an otherwise valid ordinary initialization', () => {
+for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(source + ' invalid evidence cannot hide behind an otherwise valid ordinary initialization', () => {
   const late = startupTiming(id(97), 'claude_code')
-  const early = { ...late, source: 'prepared_agent_start', startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
+  const early = { ...late, source, ...(source === 'bootstrap_claude_start' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}), startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
     phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
       { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
   const invalid = [{ ...early, source: 'unknown' }, { ...early, runIdHash: '0'.repeat(16) }, { ...early, harness: 'codex' },

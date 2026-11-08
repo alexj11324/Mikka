@@ -16,7 +16,7 @@ import { SubscriptionRepository } from './subscription-repository'
 import { SubscriptionService } from './subscription-service'
 import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-worker-client'
 import { infisicalWorkloadToken } from './infisical-workload'
-import { authorizedAccessName, subscriptionAccessSnapshot } from './subscription-access-snapshot'
+import { AccessProjectionMissing, authorizedAccessName, subscriptionAccessSnapshot } from './subscription-access-snapshot'
 import { join } from 'node:path'
 
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string, borrowerId?: string) {
@@ -74,14 +74,25 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
   // adapter uses CPA converters and Claude's required OAuth system prefix,
   // with Mikka's HTTP identity and no synthesized device metadata.
   return new SubscriptionService(new SubscriptionRepository(database), scope => {
+    const snapshot = async (signal: AbortSignal | undefined, use: { bindingId: string; consumerId: string; runId?: string } | undefined, revision: unknown, allowMissingProjection = false) => {
+      if (!use) throw new Error('subscription_access_unavailable')
+      const name = await authorizedAccessName(database, scope, use, revision, authorizeSubscriptionWorkspace, allowMissingProjection)
+      return subscriptionAccessSnapshot({ origin: infisicalOrigin, clientId: custodyId!, clientSecret: custodySecret!, project: accessProject ?? project, environment, path: accessPath, name, signal })
+    }
     const resolve = sharedCustodyIdentity ? async (executionOnly: boolean, signal?: AbortSignal, use?: { bindingId: string; consumerId: string; runId?: string }, revision?: unknown) => {
       if (!executionOnly) return { workloadToken: await infisicalWorkloadToken(infisicalOrigin, custodyId!, custodySecret!, signal) }
-      if (!use) throw new Error('subscription_access_unavailable')
-      const name = await authorizedAccessName(database, scope, use, revision, authorizeSubscriptionWorkspace)
-      return { accessSnapshot: await subscriptionAccessSnapshot({ origin: infisicalOrigin, clientId: custodyId!, clientSecret: custodySecret!, project: accessProject ?? project, environment, path: accessPath, name, signal }) }
+      return { accessSnapshot: await snapshot(signal, use, revision) }
     } : resolveIdentity
+    const streamIdentity = sharedCustodyIdentity ? async (signal?: AbortSignal, use?: { bindingId: string; consumerId: string; runId?: string }, revision?: unknown) => {
+      try {
+        return { accessSnapshot: await snapshot(signal, use, revision, true) }
+      } catch (error) {
+        if (error instanceof AccessProjectionMissing) return null
+        throw error
+      }
+    } : undefined
     return new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken: sharedCustodyIdentity ? '' : workloadToken ?? '', accessPath, accessProject, accessToken: custodyOnly || sharedCustodyIdentity ? undefined : accessToken, retainEnrollmentSources: retainEnrollmentSourcesForAcceptance(), enrollmentAttemptPath: process.env.MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH, enrollmentClaimPath: process.env.MIKKA_BYOS_ENROLLMENT_CLAIM_PATH, enrollmentGrantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH, enableRuntime: !custodyOnly, // Plain model calls run only after access() found the route ready for this owner (subscriptionRouteReady).
-      enablePlainModels: !custodyOnly, enableCodexOAuth: deploymentSwitch('byosCodexOAuth'), enableClaudeOAuth: deploymentSwitch('byosClaudeOAuth'), ...(options.exportAccessLease && !custodyOnly ? { exportAccessLease: true } : {}) }, resolve)
+      enablePlainModels: !custodyOnly, enableCodexOAuth: deploymentSwitch('byosCodexOAuth'), enableClaudeOAuth: deploymentSwitch('byosClaudeOAuth'), ...(options.exportAccessLease && !custodyOnly ? { exportAccessLease: true } : {}) }, resolve, streamIdentity)
   }, {
     ready: async (route: SubscriptionRoute, ownerId: string) => !custodyOnly && await subscriptionRouteReady(route, ownerId),
     oauth: { codex: deploymentSwitch('byosCodexOAuth'), claude: deploymentSwitch('byosClaudeOAuth') },

@@ -81,6 +81,7 @@ test('the polled routes read with a fixed number of queries, whatever the number
     await as(() => getModelOrder(workspaceId))
     const order = await counted(() => as(() => getModelOrder(workspaceId)))
     assert.ok(!order.value.error && order.value.entries.length > 0, JSON.stringify(order.value).slice(0, 200))
+    if (order.queries > 15) t.diagnostic(JSON.stringify({ read: 'model-order', queryShapes: order.queryShapes }))
     assert.ok(order.queries <= 15, `model-order: ${order.queries} queries`)
 
     const store = new AgentProfileStore(pool)

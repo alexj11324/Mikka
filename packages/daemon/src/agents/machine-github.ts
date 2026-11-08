@@ -106,13 +106,16 @@ export function prepareMachineGitHub(github: RunGitHub, host: {
   if (host.signal.aborted) close()
   else schedule()
   return {
-    env: {
+    env: { ...MACHINE_GITHUB_ENV },
+    close,
+  }
+}
+
+/** Non-secret native Git configuration; credentials stay in the ordinary HOME file. */
+export const MACHINE_GITHUB_ENV = {
       GH_HOST: 'github.com', GH_TOKEN: '', GITHUB_TOKEN: '', GIT_TERMINAL_PROMPT: '0',
       // These normal git overrides contain no token and use the normal gh
       // login file. The real provider credential is read locally by gh.
       GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '',
       GIT_CONFIG_KEY_1: 'credential.https://github.com.helper', GIT_CONFIG_VALUE_1: '!gh auth git-credential',
-    },
-    close,
-  }
-}
+    }

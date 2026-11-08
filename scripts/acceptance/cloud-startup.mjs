@@ -377,12 +377,14 @@ function readStartupTiming(value, record, names = STARTUP_PHASES) {
 }
 
 function readPreparationTiming(value, record, stage) {
-  if (value?.source !== 'prepared_agent_start' || value.harness !== 'claude_code' || !stage) return null
+  if (!['prepared_agent_start', 'bootstrap_claude_start'].includes(value?.source) || value.harness !== 'claude_code' || !stage) return null
   const timing = readStartupTiming(value, record, PREPARATION_PHASES)
   // The task-owned Promise starts before the stage joins it and settles before
   // that join returns. Never rebase its earlier intervals onto the stage root.
   if (!timing || timing.startedAt > stage.startedAt || timing.endedAt > stage.endedAt) return null
-  return { ...timing, source: 'prepared_agent_start' }
+  if (value.source === 'bootstrap_claude_start' && !['oauth_environment', 'ordinary_path', 'unverified'].includes(value.claimAuthentication)) return null
+  if (value.source === 'bootstrap_claude_start' && !['oauth_environment', 'oauth_descriptor', 'non_api_key_unspecified', 'unknown'].includes(value.observedAuthSource)) return null
+  return { ...timing, source: value.source, ...(value.source === 'bootstrap_claude_start' ? { claimAuthentication: value.claimAuthentication, observedAuthSource: value.observedAuthSource } : {}) }
 }
 
 /** Both start paths require actual successful CLI initialization. A provided
@@ -395,6 +397,7 @@ export function hasStartupInitialization(record) {
     return record.daemonPreparationTiming === undefined && has(stage, 'daemon.adapter.cli_init')
   const prepared = record.preparationTimingStatus === 'complete' && readPreparationTiming(record.daemonPreparationTiming, record, stage)
   return Boolean(prepared && !prepared.truncated && prepared.outcome === 'ok'
+    && (prepared.source !== 'bootstrap_claude_start' || (prepared.claimAuthentication === 'ordinary_path' || prepared.claimAuthentication === 'oauth_environment' && prepared.observedAuthSource === 'oauth_environment'))
     && has(prepared, 'daemon.adapter.cli_init.prewarm') && has(prepared, 'daemon.adapter.cli_init'))
 }
 
