@@ -1,6 +1,7 @@
 import 'server-only'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, asc, eq, or } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
@@ -13,6 +14,11 @@ import { filterEnterpriseWorkspaceLinks, filterEnterpriseWorkspaces } from '@/li
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 
 const { workspaceDb } = workspaceDatabase
+// Short aliases keep the repeated fresh membership/Org SELECT bounded on the
+// wire. Locking readers retain their original table references and predicates.
+const readerWorkspace = alias(workspaces, 'w')
+const readerMember = alias(workspaceMembers, 'm')
+const readerOrganization = alias(organizationWorkspaces, 'o')
 
 type Reader = string | { id: string; [tokenWorkspace]?: string; [enterprisePrincipal]?: EnterprisePrincipal }
 type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
@@ -77,12 +83,13 @@ export function taskReaderScope(reader: Reader) {
   return { userId, workspaceId: pinned ?? (acting?.userId === userId ? acting.tokenWorkspaceId : undefined) }
 }
 
-function membership(userId: string, workspaceId?: string) {
+function membership(userId: string, workspaceId?: string,
+  workspace: typeof workspaces | typeof readerWorkspace = workspaces, member: typeof workspaceMembers | typeof readerMember = workspaceMembers) {
   return and(
-    eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'),
-    workspaceId ? eq(workspaces.id, workspaceId) : undefined,
+    eq(member.userId, userId), eq(member.status, 'active'),
+    workspaceId ? eq(workspace.id, workspaceId) : undefined,
     // Even a corrupt membership row cannot turn a personal tenant into a team.
-    or(eq(workspaces.kind, 'team'), and(eq(workspaces.kind, 'personal'), eq(workspaces.userId, userId))),
+    or(eq(workspace.kind, 'team'), and(eq(workspace.kind, 'personal'), eq(workspace.userId, userId))),
   )
 }
 
@@ -103,10 +110,10 @@ export async function activeTaskWorkspaces(reader: Reader, requestedId?: string)
     const rows = await filterEnterpriseWorkspaceLinks(reader, [{ id: lease.workspaceId, kind: lease.kind, organizationId: lease.organizationId }])
     return rows.map(({ id, kind }) => ({ id, kind }))
   }
-  const rows = await workspaceDb.select({ id: workspaces.id, kind: workspaces.kind, organizationId: organizationWorkspaces.organizationId }).from(workspaces)
-    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
-    .leftJoin(organizationWorkspaces, eq(organizationWorkspaces.workspaceId, workspaces.id))
-    .where(membership(scope.userId, selectedId)).orderBy(asc(workspaces.createdAt))
+  const rows = await workspaceDb.select({ id: readerWorkspace.id, kind: readerWorkspace.kind, organizationId: readerOrganization.organizationId }).from(readerWorkspace)
+    .innerJoin(readerMember, eq(readerMember.workspaceId, readerWorkspace.id))
+    .leftJoin(readerOrganization, eq(readerOrganization.workspaceId, readerWorkspace.id))
+    .where(membership(scope.userId, selectedId, readerWorkspace, readerMember)).orderBy(asc(readerWorkspace.createdAt))
   return (await filterEnterpriseWorkspaceLinks(reader, rows)).map(({ id, kind }) => ({ id, kind }))
 }
 
