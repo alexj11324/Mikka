@@ -143,25 +143,33 @@ test('detail and activity revalidate current access while returning only changed
     await t.test('unlinked workspace details reuse current negative ACL reads and refresh their identifier after relinking', async t => {
       const { listIssueConnections } = await import('../app/actions/issue-operations')
       const { citationSources } = await import('../lib/coordinator/store')
+      const { runAction } = await import('../lib/action-error')
+      // Team links only name this already-bound shared task. The Personal task
+      // above remains a separate control; unlinking never transfers ownership.
+      const id = sharedId
+      const readWorkspace = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), workspaceId) as Promise<T>
+      const sharedNumber = successful(await readWorkspace(() => getIssue(id))).issue.metadata.number
+      assert.equal(sharedNumber, 2, 'the shared task keeps its owner-allocated number')
       const citationAgent = randomUUID(), citationRun = randomUUID()
       await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4)', [citationAgent, owner, 'Citation control', 'codex'])
-      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,"agentDefinition") values($1,$2,$3,$4,$5,$6,$7)',
-        [citationRun, owner, id, citationAgent, 'succeeded', 'Citation control', JSON.stringify({ harness: 'codex', executionIdentity: { requester: owner, executionPrincipal: owner, outputOwner: owner } })])
+      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,"agentDefinition","workspaceId") values($1,$2,$3,$4,$5,$6,$7,$8)',
+        [citationRun, owner, id, citationAgent, 'succeeded', 'Citation control', JSON.stringify({ harness: 'codex', executionIdentity: { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId } }), workspaceId])
       const issueCite = `[[issue:${id}]]`, runCite = `[[run:${citationRun}]]`
-      await read(() => listIssueConnections(id))
+      await readWorkspace(() => listIssueConnections(id))
       // Initialize both exact read shapes before recording their steady-state
       // budgets. Keep the warm-up socket costs visible, including any new
       // connections opened by concurrent run and team reads.
-      const linkedDirectWarm = await measured(() => read(() => citationSources(owner, [issueCite])))
-      const linkedRunWarm = await measured(() => read(() => citationSources(owner, [runCite])))
+      const linkedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const linkedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'linked',
         scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(linkedDirectWarm),
         runOnlyCitation: readMetrics(linkedRunWarm) }))
-      const linkedConnections = await measured(() => read(() => listIssueConnections(id)))
-      const linkedCitation = await measured(() => read(() => citationSources(owner, [issueCite])))
-      const linkedRunCitation = await measured(() => read(() => citationSources(owner, [runCite])))
+      const linkedConnections = await measured(() => readWorkspace(() => listIssueConnections(id)))
+      const linkedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const linkedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       const removed = await withActivitySession(owner, () => setIssueTeam({ issueId: id, teamId: null, expectedTeamId: teamId }), workspaceId)
       assert.equal(removed.ok, true)
+      assert.equal((await pool.query('select "workspaceId" from issues where id=$1', [id])).rows[0].workspaceId, workspaceId, 'removing the team link preserves the task tenant')
       await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2),($3,$4)', [owner, 'READ', stranger, 'OTHR'])
       const personal = successful(await read(() => saveIssue({ title: 'Personal read control', content: { type: 'doc' }, status: 'todo', priority: 'normal' }))).issue
       const otherPersonal = successful(await actAs(stranger, () => saveIssue({ title: 'Other prefix control', content: { type: 'doc' }, status: 'todo', priority: 'normal' }))).issue
@@ -170,35 +178,35 @@ test('detail and activity revalidate current access while returning only changed
       // Warm both paths before measuring; both use the same owner and have no
       // team link. The workspace detail retains its existing Linear check.
       await read(() => getIssue(personal.id))
-      const ownerView = successful(await read(() => getIssue(id))).issue
+      const ownerView = successful(await readWorkspace(() => getIssue(id))).issue
       assert.equal(ownerView.scope, 'workspace')
-      assert.equal(ownerView.identifier, 'READ-1')
+      assert.equal(ownerView.identifier, `READ-${sharedNumber}`)
       // The write response also calls issueView without a known team map.
       // Compare the same-owner, no-link controls through the real save action.
       const personalSave = await measured(() => read(async () => successful(await saveIssue({
         id: personal.id, revision: personal.revision, title: personal.title, content: personal.content,
         status: personal.status, priority: personal.priority,
       }))))
-      const unlinkedSave = await measured(() => read(async () => successful(await saveIssue({
+      const unlinkedSave = await measured(() => readWorkspace(async () => successful(await saveIssue({
         id, revision: ownerView.revision, title: ownerView.title, content: ownerView.content,
         status: ownerView.status, priority: ownerView.priority,
       }))))
       await t.test('default issueView in saveIssue reuses the verification read for owner prefix', () => {
-        assert.equal(unlinkedSave.value.issue?.identifier, 'READ-1')
+        assert.equal(unlinkedSave.value.issue?.identifier, `READ-${sharedNumber}`)
         assert.equal(unlinkedSave.value.issue?.scope, 'workspace')
         assert.equal(unlinkedSave.value.issue?.linearTargetVerified, false)
         assert.deepEqual(unlinkedSave.value.issue?.content, ownerView.content, 'identifier resolution does not rewrite the task body')
         assert.ok(unlinkedSave.statements <= personalSave.statements + 1,
           `default issueView statements ${unlinkedSave.statements} vs personal ${personalSave.statements} plus one team read`)
       })
-      const unlinkedDirectWarm = await measured(() => read(() => citationSources(owner, [issueCite])))
-      const unlinkedRunWarm = await measured(() => read(() => citationSources(owner, [runCite])))
+      const unlinkedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const unlinkedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'unlinked',
         scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(unlinkedDirectWarm),
         runOnlyCitation: readMetrics(unlinkedRunWarm) }))
-      const unlinkedConnections = await measured(() => read(() => listIssueConnections(id)))
-      const unlinkedCitation = await measured(() => read(() => citationSources(owner, [issueCite])))
-      const unlinkedRunCitation = await measured(() => read(() => citationSources(owner, [runCite])))
+      const unlinkedConnections = await measured(() => readWorkspace(() => listIssueConnections(id)))
+      const unlinkedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const unlinkedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
 
       // Frozen same-fixture measurements on main 3c32675c: a changed linked
       // control cannot make an upstream SQL/payload regression pass.
@@ -234,7 +242,7 @@ test('detail and activity revalidate current access while returning only changed
       await t.test('connection identifiers reuse one owner input in the existing metadata query', () => {
         const connection = unlinkedConnections.value.find(row => row.id === id)
         assert.ok(connection)
-        assert.equal(connection.identifier, 'READ-1')
+        assert.equal(connection.identifier, `READ-${sharedNumber}`)
         assert.ok(connection.createdAt instanceof Date, 'connection timestamps retain their Date shape')
         assert.deepEqual(connection.metadata, unlinkedSave.value.issue?.metadata, 'connection metadata retains every original field')
         assert.equal(connection.scopeVersion, unlinkedSave.value.issue?.scopeVersion)
@@ -243,8 +251,8 @@ test('detail and activity revalidate current access while returning only changed
         const citation = unlinkedCitation.value[id], run = unlinkedRunCitation.value[citationRun]
         assert.ok(citation?.kind === 'issue')
         assert.ok(run?.kind === 'run')
-        assert.equal(citation.identifier, 'READ-1')
-        assert.equal(run.issue?.identifier, 'READ-1')
+        assert.equal(citation.identifier, `READ-${sharedNumber}`)
+        assert.equal(run.issue?.identifier, `READ-${sharedNumber}`)
         assert.doesNotMatch(JSON.stringify([unlinkedConnections.value, unlinkedCitation.value, unlinkedRunCitation.value]), /prefixInput|__mikkaIdentifierPrefix|identifierTeams?|@example\.invalid/)
         const { issuesForUser } = await import('../lib/issues-for-user')
         const defaults = await issuesForUser(owner, [id], false, db, { withoutBody: true })
@@ -254,74 +262,71 @@ test('detail and activity revalidate current access while returning only changed
       await t.test('an authorized Linear import verifies its target until the link is removed', async () => {
         const { linearTeamSyncs } = await import('../lib/db/schema')
         const { createAppIssueFromLinear } = await import('../lib/linear-sync/issue-sync')
-        const [sync] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner,
-          linearTeamId: randomUUID(), linearTeamKey: 'ALIS', linearTeamName: 'Verified read fixture', active: false }).returning()
+        const [sync] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner, workspaceId,
+          linearTeamId: randomUUID(), linearTeamKey: 'ALIS', linearTeamName: 'Verified read fixture', active: true }).returning()
         const imported = await createAppIssueFromLinear(sync, { id: randomUUID(), identifier: 'ALIS-1',
           title: 'Verified read fixture', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture',
           updatedAt: new Date().toISOString(), state: null, team: { id: sync.linearTeamId, key: sync.linearTeamKey, name: sync.linearTeamName },
           assignee: null, labels: [] })
         assert.ok(imported)
-        const verified = successful(await read(() => pollIssue(imported.id)))
+        const verified = successful(await readWorkspace(() => pollIssue(imported.id)))
         assert.equal(verified.issue?.linearTargetVerified, true)
         assert.equal(verified.issue?.scope, 'workspace')
         assert.match(verified.issue?.identifier ?? '', /^READ-\d+$/)
         await pool.query('delete from linear_issue_links where "issueId"=$1 and "ownerId"=$2', [imported.id, owner])
-        const removed = successful(await read(() => pollIssue(imported.id, verified.version)))
+        const removed = successful(await readWorkspace(() => pollIssue(imported.id, verified.version)))
         assert.equal(removed.issue?.linearTargetVerified, false)
         assert.equal(removed.issue?.identifier, verified.issue?.identifier)
         assert.notEqual(removed.version, verified.version)
       })
       const personalGet = await measured(() => read(() => getIssue(personal.id)))
-      const unlinkedGet = await measured(() => read(() => getIssue(id)))
-      assert.equal(successful(unlinkedGet.value).issue.identifier, 'READ-1')
+      const unlinkedGet = await measured(() => readWorkspace(() => getIssue(id)))
+      assert.equal(successful(unlinkedGet.value).issue.identifier, `READ-${sharedNumber}`)
       await t.test('unlinked getIssue keeps its existing verification-read budget', () => {
         assert.ok(unlinkedGet.statements <= personalGet.statements + 1,
           'an unlinked workspace detail adds at most its existing Linear check, not a repeated empty team read')
       })
       const personalCold = await measured(() => read(async () => successful(await pollIssue(personal.id))))
-      const unlinkedCold = await measured(() => read(async () => successful(await pollIssue(id))))
-      assert.equal(unlinkedCold.value.issue?.identifier, 'READ-1')
+      const unlinkedCold = await measured(() => readWorkspace(async () => successful(await pollIssue(id))))
+      assert.equal(unlinkedCold.value.issue?.identifier, `READ-${sharedNumber}`)
       await t.test('unlinked cold poll keeps its existing verification-read budget', () => {
         assert.ok(unlinkedCold.statements <= personalCold.statements + 1)
       })
       const personalWarm = await measured(() => read(async () => successful(await pollIssue(personal.id, personalCold.value.version))))
-      const unlinkedWarm = await measured(() => read(async () => successful(await pollIssue(id, unlinkedCold.value.version))))
+      const unlinkedWarm = await measured(() => readWorkspace(async () => successful(await pollIssue(id, unlinkedCold.value.version))))
       assert.equal(personalWarm.value.unchanged, true)
       assert.equal(unlinkedWarm.value.unchanged, true)
       await t.test('unlinked warm poll keeps its existing verification-read budget', () => {
         assert.ok(unlinkedWarm.statements <= personalWarm.statements + 1)
       })
       await pool.query('update issue_prefixes set prefix=$2 where "userId"=$1', [owner, 'NEXT'])
-      const renamed = successful(await read(() => pollIssue(id, unlinkedCold.value.version)))
-      assert.equal(renamed.issue?.identifier, 'NEXT-1')
+      const renamed = successful(await readWorkspace(() => pollIssue(id, unlinkedCold.value.version)))
+      assert.equal(renamed.issue?.identifier, `NEXT-${sharedNumber}`)
       assert.notEqual(renamed.version, unlinkedCold.value.version)
       assert.equal((await actAs(stranger, () => getIssue(id))).error, 'issueNotFound')
       assert.equal((await actAs(stranger, () => pollIssue(id, renamed.version))).error, 'issueNotFound')
       const linked = await withActivitySession(owner, () => setIssueTeam({ issueId: id, teamId, expectedTeamId: null }), workspaceId)
       assert.equal(linked.ok, true)
-      const relinked = successful(await read(() => pollIssue(id, renamed.version)))
+      const relinked = successful(await readWorkspace(() => pollIssue(id, renamed.version)))
       assert.match(relinked.issue?.identifier ?? '', /^CACHE-\d+$/)
       assert.notEqual(relinked.version, renamed.version, 'a negative team result is never kept across operations')
-      // The owner keeps task access after their membership is revoked. An
-      // empty allowed-team list is not evidence that the task has no link.
+      // A creator loses this shared task with their current membership. The
+      // saved team label and cached detail/citation cursors grant no authority.
       await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, owner, 'suspended'])
-      const revokedOwner = successful(await read(() => getIssue(id)))
-      assert.match(revokedOwner.issue.identifier ?? '', /^CACHE-\d+$/)
-      const revokedConnections = await measured(() => read(() => listIssueConnections(id)))
-      const revokedCitation = await measured(() => read(() => citationSources(owner, [issueCite])))
-      const revokedRunCitation = await measured(() => read(() => citationSources(owner, [runCite])))
-      await t.test('revoked owners retain linked identifiers in connections and both citation readers', () => {
+      assert.equal((await readWorkspace(() => getIssue(id))).error, 'issueNotFound')
+      assert.equal((await readWorkspace(() => pollIssue(id, relinked.version))).error, 'issueNotFound')
+      const revokedConnections = await measured(() => readWorkspace(() => runAction(() => listIssueConnections(id))))
+      const revokedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const revokedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
+      await t.test('revoked owners lose connections and both citation readers despite cached identifiers', () => {
         t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'revoked-owner-identifier-readers',
           scope: 'data-read-path_not_page_http', connections: readMetrics(revokedConnections),
           directCitation: readMetrics(revokedCitation), runOnlyCitation: readMetrics(revokedRunCitation) }))
-        assert.equal(revokedConnections.value.find(row => row.id === id)?.identifier, revokedOwner.issue.identifier)
-        const citation = revokedCitation.value[id], run = revokedRunCitation.value[citationRun]
-        assert.ok(citation?.kind === 'issue')
-        assert.ok(run?.kind === 'run')
-        assert.equal(citation.identifier, revokedOwner.issue.identifier)
-        assert.equal(run.issue?.identifier, revokedOwner.issue.identifier)
+        assert.equal(revokedConnections.value.error, 'issueNotFound')
+        assert.deepEqual(revokedCitation.value, {})
+        assert.deepEqual(revokedRunCitation.value, {})
         assert.doesNotMatch(JSON.stringify([revokedConnections.value, revokedCitation.value, revokedRunCitation.value]),
-          /prefixInput|__mikkaIdentifierPrefix|identifierTeams?|@example\.invalid/)
+          /CACHE-|prefixInput|__mikkaIdentifierPrefix|identifierTeams?|@example\.invalid/)
       })
       // Captured on the same fixture against old main 3c32675c; these are
       // actual revoked-owner measurements, not inferred from the linked case.

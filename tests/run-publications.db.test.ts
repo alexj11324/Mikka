@@ -208,9 +208,7 @@ test('run result publication commits one owner-scoped result through retries and
       const { workspacePool } = await import('../lib/workspace-db')
       const f = await fixture({ approved: true, prefix: 'MINE', number: 12, scope: 'workspace' })
       const linked = await fixture({ approved: true, prefix: 'OTHR', number: 18, scope: 'workspace' })
-      const workspaceId = randomUUID(), teamId = randomUUID()
-      await workspacePool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Publication budget CI\')', [workspaceId, linked.userId])
-      await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [workspaceId, linked.userId, `${linked.userId}@example.invalid`])
+      const workspaceId = linked.workspaceId, teamId = randomUUID()
       await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Publication budget CI\',\'PUBREAD\')', [teamId, workspaceId, linked.userId])
       const { rows: [link] } = await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4) returning number', [linked.issueId, teamId, workspaceId, linked.userId])
       linked.identifier = `PUBREAD-${link.number}`
@@ -267,13 +265,12 @@ test('run result publication commits one owner-scoped result through retries and
       const { workspacePool } = await import('../lib/workspace-db')
       const { searchIssues, parseSearchParams } = await import('../lib/issue-search')
       const { listArtifacts } = await import('../lib/artifacts/store')
+      const { withRunWorkspace } = await import('../lib/run-completion')
       const samples: Array<{ body: string; teamState: string; search: ReturnType<typeof readMetrics>; artifacts: ReturnType<typeof readMetrics>; cloud: ReturnType<typeof readMetrics>; publication: ReturnType<typeof readMetrics>; frozen: ReturnType<typeof readMetrics> }> = []
       for (const body of ['empty', 'short'] as const) for (const teamState of ['linked', 'unlinked', 'revoked-owner'] as const) {
         const f = await fixture({ approved: true, prefix: 'MTRX', number: 12, scope: 'workspace' })
-        const workspaceId = randomUUID(), teamId = randomUUID()
+        const workspaceId = f.workspaceId, teamId = randomUUID()
         await pool.query('update issues set content=$2 where id=$1', [f.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 12 } }, content: body === 'empty' ? [] : [{ type: 'paragraph', content: [{ type: 'text', text: 'Short task body' }] }] })])
-        await workspacePool.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Identifier transport CI\')', [workspaceId, f.userId])
-        await workspacePool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [workspaceId, f.userId, `${f.userId}@example.invalid`])
         if (teamState !== 'unlinked') {
           await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Identifier transport CI\',\'MTRTEAM\')', [teamId, workspaceId, f.userId])
           const { rows: [link] } = await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4) returning number', [f.issueId, teamId, workspaceId, f.userId])
@@ -281,10 +278,15 @@ test('run result publication commits one owner-scoped result through retries and
           f.branch = `mikka/mtrteam-${link.number}`
           await admit(f)
         }
-        if (teamState === 'revoked-owner') await workspacePool.query('update mikka_workspace_members set status=\'revoked\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, f.userId])
         const artifactId = randomUUID()
         await pool.query('insert into artifacts (id,"userId",kind,title,"issueId","latestVersion") values ($1,$2,\'markdown\',\'Transport fixture\',$3,1)', [artifactId, f.userId, f.issueId])
         await pool.query('insert into artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") values ($1,$2,1,$3,\'fixture\',\'fixture\',7,\'CI\')', [randomUUID(), artifactId, `ci/identifier-transport/${artifactId}.md`])
+        if (teamState === 'revoked-owner') {
+          // Freeze an authorized receipt first; it must not authorize later
+          // reads or publication after current workspace membership is lost.
+          await prepareRunPublication(assignment(f), f.remoteUrl)
+          await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, f.userId])
+        }
         const search = () => searchIssues(db, { userId: f.userId, workspaceId, params: parseSearchParams(new URLSearchParams({ q: 'Fix redirect' })) })
         await search()
         await listArtifacts(f.userId)
@@ -293,6 +295,36 @@ test('run result publication commits one owner-scoped result through retries and
         const client = await pool.connect()
         const cloud = () => admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, now: new Date() })
         try {
+          if (teamState === 'revoked-owner') {
+            const savedReceipt = await receipt(f)
+            let helperReached = false
+            // Cloud's naming helper runs only inside a workspace-authorized
+            // queue operation. Exercise that real membership gate as well as
+            // the standalone publication boundary, including a frozen receipt.
+            const gatedCloud = () => withRunWorkspace(f.userId, workspaceId, () => {
+              helperReached = true
+              return cloud()
+            })
+            const admitted = await measured(gatedCloud)
+            const prepared = await measured(async () => {
+              await assert.rejects(() => prepareRunPublication(assignment(f), f.remoteUrl),
+                (error: unknown) => error instanceof PublicationError && error.code === 'issue_unavailable')
+              return { error: 'issue_unavailable' }
+            })
+            const frozen = await measured(gatedCloud)
+            const sample = { body, teamState, search: readMetrics(searched), artifacts: readMetrics(artifacts), cloud: readMetrics(admitted), publication: readMetrics(prepared), frozen: readMetrics(frozen) }
+            samples.push(sample)
+            t.diagnostic(JSON.stringify({ event: 'identifier_transport_matrix', ...sample }))
+            assert.deepEqual(searched.value.items, [])
+            assert.deepEqual(artifacts.value, [])
+            assert.equal(admitted.value, null)
+            assert.equal(frozen.value, null)
+            assert.equal(helperReached, false, 'revoked membership cannot reach cloud admission')
+            assert.deepEqual(await receipt(f), savedReceipt, 'revocation leaves the old receipt unchanged')
+            assert.deepEqual(await counts(f), { versions: 0, events: 0 })
+            assert.doesNotMatch(JSON.stringify([searched.value, artifacts.value]), /MTRTEAM-|prefixInput|__mikkaIdentifierPrefix|@example\.invalid/)
+            continue
+          }
           await client.query('BEGIN')
           const admitted = await measured(cloud)
           await client.query('COMMIT')
