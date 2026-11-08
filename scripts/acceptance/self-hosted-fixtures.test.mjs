@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
 import test from 'node:test'
-import { assertFixtureEnvironment, assertOfficialWebCors, chatObservation, fixtureHttp, handoffCode, mailpitObservation, officialWebFixture } from './self-hosted-services.mjs'
+import { assertFixtureEnvironment, assertOfficialWebCors, chatObservation, fixtureHttp, handoffCode, mailpitObservation, officialWebFixture, socketEvents } from './self-hosted-services.mjs'
 import { createModelFixture } from './self-hosted-model.mjs'
 
 const fixture = {
@@ -14,6 +14,36 @@ const fixture = {
   S3_ACCESS_KEY_ID: 'selfhost-ci', S3_SECRET_ACCESS_KEY: Buffer.alloc(32, 1).toString('base64'), S3_REGION: 'us-east-1',
   MIKKA_DEFAULT_MODEL_BASE_URL: 'http://model:8080/v1', MIKKA_DEFAULT_MODEL_API_KEY: 'synthetic-selfhost-only', MIKKA_DEFAULT_MODEL_ID: 'selfhost-ci',
 }
+
+test('Mailpit notifications coalesced as newline-delimited JSON in one WebSocket frame remain queued', async t => {
+  const original = globalThis.WebSocket
+  let peer
+  class FixtureSocket extends EventTarget {
+    static OPEN = 1
+    readyState = 1
+    constructor() { super(); peer = this; queueMicrotask(() => this.dispatchEvent(new Event('open'))) }
+    close() { this.readyState = 3; this.dispatchEvent(new Event('close')) }
+  }
+  globalThis.WebSocket = FixtureSocket
+  const mailbox = socketEvents('ws://fixture.invalid/api/events', undefined, { jsonLines: true })
+  t.after(() => { mailbox.close(); globalThis.WebSocket = original })
+  await mailbox.ready
+  // Mailpit v1.27.4 writePump explicitly packs its queued JSON notifications
+  // into a single frame with newline separators.
+  const update = { Type: 'update', Data: { Total: 1 } }
+  const arrival = { Type: 'new', Data: { Subject: 'verification', To: [{ Address: 'fixture@example.invalid' }] } }
+  peer.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(update) + '\n' + JSON.stringify(arrival) }))
+  assert.deepEqual(await mailbox.next(value => value.Type === 'new', 50), arrival)
+  assert.deepEqual(await mailbox.next(value => value.Type === 'update', 50), update)
+  assert.equal(mailbox.receivedCount, 2)
+  const live = socketEvents('ws://fixture.invalid/live')
+  t.after(() => live.close())
+  await live.ready
+  const notification = { kind: 'chat', text: 'a\nb' }
+  peer.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(notification, null, 2) }))
+  assert.deepEqual(await live.next(value => value.kind === 'chat', 50), notification)
+  assert.equal(live.receivedCount, 1)
+})
 
 test('SMTP timeout evidence separates absent mail, recipient/subject mismatch and delivered mail without retaining private values', () => {
   const email = 'private-recipient@example.invalid', from = 'private-sender@example.invalid', subject = 'private-subject'

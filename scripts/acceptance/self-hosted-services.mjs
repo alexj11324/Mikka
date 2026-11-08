@@ -83,7 +83,7 @@ export function assertOfficialWebCors(response, officialOrigin) {
 
 /** Event queues retain a notification arriving before its HTTP request returns.
  * Waiting is event-driven and has a deadline; there is no refresh/poll loop. */
-export function socketEvents(url, protocol) {
+export function socketEvents(url, protocol, { jsonLines = false } = {}) {
   const socket = new WebSocket(url, protocol)
   const queue = [], listeners = new Set()
   let received = 0
@@ -94,12 +94,16 @@ export function socketEvents(url, protocol) {
     socket.addEventListener('error', () => { clearTimeout(timer); reject(new Error('SELF_HOSTED_SOCKET_OPEN_FAILED')) }, { once: true })
   })
   socket.addEventListener('message', event => {
-    let value
-    try { value = JSON.parse(String(event.data)) } catch { return }
-    received = Math.min(1_000_000, received + 1)
-    const listener = [...listeners].find(item => item.matches(value))
-    if (listener) listener.done(value)
-    else queue.push(value)
+    // Mailpit batches complete JSON notifications in one frame. Mikka live
+    // keeps its ordinary single-JSON framing, including whitespace/newlines.
+    for (const payload of jsonLines ? String(event.data).split('\n') : [String(event.data)]) {
+      let value
+      try { value = JSON.parse(payload) } catch { continue }
+      received = Math.min(1_000_000, received + 1)
+      const listener = [...listeners].find(item => item.matches(value))
+      if (listener) listener.done(value)
+      else queue.push(value)
+    }
   })
   return {
     ready, closed,
@@ -195,7 +199,7 @@ export async function runAcceptance(env = process.env) {
     await createFixtureBucket(env)
 
     report.stage = 'smtp-and-auth'
-    const mailbox = socketEvents(`${mailpit.replace('http:', 'ws:')}/api/events`)
+    const mailbox = socketEvents(`${mailpit.replace('http:', 'ws:')}/api/events`, undefined, { jsonLines: true })
     sockets.push(mailbox); await mailbox.ready
     const email = `selfhost-${randomUUID()}@selfhost.example.test`
     const password = randomBytes(24).toString('base64url'), replacement = randomBytes(24).toString('base64url')
