@@ -12,7 +12,9 @@ root sources and package contents, package consumers, virtual unit commands and
 DB suite consumers. `scripts/ci/tasks.json` is the reviewed inventory of commands
 previously run by the core/integration jobs. The real `ci-tasks` project exposes
 these as Nx targets so Nx schedules the selected commands with two parallel tasks
-per runner. DB suites remain exclusively with `scripts/run-db-tests.mjs`.
+per runner. Commands retain Actions `bash -e -o pipefail` behavior and set
+`FORCE_COLOR=0`: Nx otherwise colors child numeric PID/CLI output, breaking
+machine parsing in real process-tree regressions. DB suites remain exclusively with `scripts/run-db-tests.mjs`.
 
 TypeScript's parser follows imports/exports, literal dynamic imports and requires,
 relative imports, root `@/`, Mobile's own `@/`, `@ui-slot/` and workspace package
