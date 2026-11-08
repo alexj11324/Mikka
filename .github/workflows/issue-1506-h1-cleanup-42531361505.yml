@@ -1,0 +1,80 @@
+name: Issue 1506 H1 retained idle follow-up
+on:
+  push:
+    branches: [ops/issue1506-h1-cleanup-42531361505]
+    paths:
+      - '.github/workflows/issue-1506-h1-cleanup-42531361505.yml'
+      - 'scripts/acceptance/issue-1506-h1-cleanup-42531361505/**'
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: issue-1506-acme-acceptance
+  queue: max
+  cancel-in-progress: false
+jobs:
+  cleanup_h1:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/ops/issue1506-h1-cleanup-42531361505'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: web-deploy-production
+      queue: max
+      cancel-in-progress: false
+    env:
+      DRIVER_SHA: ab2fc19909a83b16c3276b0b2353f6055572283b
+    steps:
+      - name: Check out this immutable follow-up and exact original C
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check out immutable original auth fixture and RPC helpers
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.DRIVER_SHA }}
+          path: driver-source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify the immutable unmodified helper checkout
+        run: |
+          test "$(git -C driver-source rev-parse HEAD)" = "$DRIVER_SHA"
+          git -C driver-source diff --exit-code HEAD -- scripts/acceptance
+      - name: Read Alex's existing email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read Alex's existing password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read H1 idle once and conditionally stop only that same retained run
+        run: node scripts/acceptance/issue-1506-h1-cleanup-42531361505/run.mjs cleanup-h1
+      - name: Retain actual idle sign-out and any follow-up failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1506-h1-cleanup-${{ github.run_id }}
+          path: |
+            h1-cleanup-report/**
+            scripts/acceptance/issue-1506-h1-cleanup-42531361505/input/coordinator-cache-turns-haiku.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "issue": 1506,
+  "case": "complete-short-turns",
+  "status": "failed",
+  "protocolSourceSha": "c594da2b81aac8ff466a94e5050839513a002b0e",
+  "applicationSha": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+  "startedAt": "2026-11-08T22:41:18.691Z",
+  "messageSendAttempts": 1,
+  "taskCreationRequests": 0,
+  "modelSelectionWrites": 0,
+  "turns": [
+    {
+      "index": 1,
+      "status": "failed",
+      "messageSendAttempted": true,
+      "metrics": {
+        "sendAcknowledgedMs": 71.2,
+        "streamRequestedMs": 71.2,
+        "streamHeadersMs": 989.3,
+        "streamStartedMs": 1243.7,
+        "firstTextMs": 6763.2,
+        "headersToFirstTextMs": 5773.9,
+        "streamClosedMs": 7644.1,
+        "stopRequestedMs": 7682.8
+      },
+      "streamEvents": {
+        "start": 1,
+        "text": 8,
+        "reset": 0,
+        "thinking": 0,
+        "tool": 0,
+        "committed": 0
+      },
+      "replyCharacters": 38,
+      "postTurnChatReads": 0,
+      "cleanupChatReads": 1,
+      "chatReads": [],
+      "committedObserved": false,
+      "confirmedIdle": false,
+      "sentAt": "2026-11-08T22:41:21.860Z",
+      "streamStatus": 200,
+      "workflowRunId": "wrun_41M6YN5JSK20VFXTPE7NPR7SNE",
+      "rounds": [
+        {
+          "id": "wrun_41M6YN5JSK20VFXTPE7NPR7SNE:0",
+          "replyCharacters": 38
+        }
+      ],
+      "firstTextTargetMet": false,
+      "streamClosed": true,
+      "naturalEofObserved": false,
+      "error": "unexpected_tool",
+      "termination": "client_cancel_after_error",
+      "live": {
+        "baselineRevision": 110,
+        "matchingPushes": 3,
+        "versionedPushes": 3,
+        "newerPushes": 3,
+        "firstPushMs": 454,
+        "maxRevision": 113
+      },
+      "durationMs": 7909.7,
+      "stopRequested": true,
+      "stopAcknowledged": true,
+      "afterCleanup": {
+        "working": true,
+        "activeStream": true
+      }
+    }
+  ],
+  "runtimeEvidence": {
+    "confirmed": false,
+    "required": "model_call_timing_for_each_workflowRunId",
+    "cacheReadTokens": "not_observed",
+    "cacheWriteTokens": "not_observed"
+  },
+  "cleanup": {
+    "status": "needs_followup",
+    "stopRequired": true,
+    "stopRequested": true,
+    "liveClosed": true,
+    "stopAcknowledged": true,
+    "idleVerified": false
+  },
+  "requests": [
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 256
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 70
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 31
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 71
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 111
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 320
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 339
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 190
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 79
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 59
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 66
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 123
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 1172
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 44
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 208
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 65
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 99
+    },
+    {
+      "path": "/mikka/api/coordinator/stream",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 918
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 96
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 719
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 659
+    },
+    {
+      "path": "/mikka/api/auth/sign-out",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 124
+    }
+  ],
+  "requestedTurns": 3,
+  "perTurnLimitMs": 60000,
+  "totalLimitMs": 270000,
+  "fixture": {
+    "key": "haiku",
+    "runKey": "acme-1506-20261106",
+    "botId": "9df34d90-6db6-407e-a2d2-bfd4ac616c58"
+  },
+  "workspace": {
+    "ref": "d9367a49ac45",
+    "kind": "team",
+    "switchedThroughProductAction": true
+  },
+  "botRef": "7ea841b539d8",
+  "menu": {
+    "model": "claude-haiku-5-5",
+    "provider": "claude",
+    "kind": "subscription",
+    "chosen": true,
+    "listedAsOwnOption": true,
+    "available": false,
+    "availability": "checking",
+    "admissionPending": true,
+    "fallback": false,
+    "optionId": "93a09ef4-f0b9-4cbf-8005-36fa9badec5c",
+    "runtimeModelConfirmed": false,
+    "runtimeOwnerAccessConfirmed": false
+  },
+  "live": {
+    "ready": true,
+    "revisionCapable": true,
+    "matchingPushes": 3,
+    "versionedPushes": 3,
+    "newerPushes": 3,
+    "unexpectedDisconnect": false,
+    "closed": true
+  },
+  "error": "unexpected_tool",
+  "signedOut": true,
+  "completedTurns": 0,
+  "warmSamples": 0,
+  "warmFirstTextTargetMet": false,
+  "finishedAt": "2026-11-08T22:41:31.059Z"
+}
