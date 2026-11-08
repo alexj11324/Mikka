@@ -34,22 +34,18 @@ test('future, offline, uninstalled and unavailable models have backend reasons a
 test('per-harness supported models come from the same account-aware device support as dispatch', () => {
   const [node] = deviceSchedulingView({ ...input, location: 'local', devices: [device('local', false)] })
   assert.deepEqual(node.harnesses, [{ harness: 'codex', installed: true, models: ['gpt-test'] }])
-  assert.deepEqual(node.models, [{ id: 'gpt-test', harness: 'codex', available: true, reason: 'ready', modelEvidence: 'unknown' }])
+  assert.deepEqual(node.models, [{ id: 'gpt-test', harness: 'codex', available: true, reason: 'ready' }])
 })
 
-test('dispatch nodes carry the same catalogue and limited CLI evidence as model admission', () => {
-  const full: OrderEntry = { id: 'full-id', harness: 'claude_code', model: 'claude-sonnet-5', source: { kind: 'subscription', connectionId: 'own-connection' } }
-  const harness = { harness: 'claude_code' as const, installed: true, subscriptionBroker: true, models: ['opus', 'sonnet', 'haiku'] }
-  const catalogue = { 'own-connection': [full.model] }
+test('dispatch availability never depends on a device model report', () => {
+  const full: OrderEntry = { id: 'historical', harness: 'claude_code', model: 'claude-sonnet-5', source: { kind: 'subscription', connectionId: 'own-connection' } }
   const nodes = deviceSchedulingView({ ...input, location: 'local', entries: [full], devices: [
-    device('current', false, { harnesses: [{ ...harness, subscriptionModelCatalogue: true }], subscriptionModels: catalogue }),
-    device('older', false, { harnesses: [harness], subscriptionModels: catalogue }),
+    device('local', false, { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, models: ['sonnet'] }] }),
   ] })
-  assert.equal(nodes.find(node => node.id === 'current')?.models[0].modelEvidence, 'account_catalogue')
-  assert.equal(nodes.find(node => node.id === 'current')?.models[0].available, true)
-  assert.equal(nodes.find(node => node.id === 'older')?.models[0].modelEvidence, 'only_latest_confirmed')
-  assert.equal(nodes.find(node => node.id === 'older')?.models[0].reason, 'needsUpdate')
-  assert.equal(nodes.find(node => node.id === 'older')?.order, null)
+  assert.equal(nodes[0].models[0].available, true)
+  assert.equal(nodes[0].models[0].reason, 'ready')
+  assert.equal(nodes[0].order, 1)
+  assert.equal('modelEvidence' in nodes[0].models[0], false)
 })
 
 test('an earlier credential check keeps the node checking instead of inventing an install/update failure', () => {

@@ -17,6 +17,9 @@ export const providerSourceKey = (source: EntrySource) => `${source.kind}:${sour
 export function providerFailureBlock(kind: EntrySource['kind'], failure: unknown, observedAt: Date, now = Date.now()): ProviderHealthBlock | null {
   const parsed = providerFailureSchema.safeParse(failure)
   if (!parsed.success || !Number.isFinite(observedAt.getTime())) return null
+  // A native model refusal advances this task's preference only. It does not
+  // disprove the credential catalogue or mark a model/source yellow globally.
+  if (parsed.data.kind === 'model') return null
   if (parsed.data.kind === 'balance') return { usable: false, reason: 'balance' }
   if (parsed.data.kind === 'auth') return { usable: false, reason: kind === 'api_key' ? 'keyRefused' : 'expired' }
   const retryAt = observedAt.getTime() + UNAVAILABLE_RETRY_MS

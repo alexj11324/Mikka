@@ -16,6 +16,8 @@ let settingsError: Error | undefined
 let workspaceCalls = 0
 let botActive = true
 const workspaceBots: (string | null)[] = []
+let hostedEnabled = true
+mock.module('./enabled-models', { namedExports: { hostedModelEnabled: async () => hostedEnabled } })
 const hostedCalls: unknown[][] = []
 const hostedModel = { modelId: 'hosted-fixture' }
 mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { pool: null } })
@@ -306,4 +308,24 @@ test('Mikka 默认 with no points here runs on the next allowed model and says s
   // Points left: Mikka 默认, whatever else could run.
   pointsRefusal = null
   assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+})
+
+ test('a disabled hosted source never starts a new hosted turn', async () => {
+  hostedEnabled = false
+  try {
+    await assert.rejects(freezeBotModel(scope, noSubscription), /executionModelUnknown/)
+  } finally { hostedEnabled = true }
+})
+
+ test('an unavailable saved model follows the preferred source and preserves its old frozen turn', async () => {
+  const botScope = { ...scope, botId: id(1) }
+  keyChoice = { keyId: id(9), model: 'old-model', harness: 'claude_code' }
+  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['old-model', 'next-model'] }]
+  const frozen = await freezeBotModel(botScope, noSubscription)
+  usableKeys[0].models = ['next-model']
+  fallback = { kind: 'api_key', keyId: id(9), model: 'next-model' }
+  const next = await freezeBotModel(botScope, noSubscription)
+  assert.equal(next.model, 'next-model')
+  assert.equal(frozen.model, 'old-model')
+  assert.deepEqual(await resolveFrozenHostedModel(botScope, frozen, noSubscription), { modelId: 'api-key-fixture' })
 })

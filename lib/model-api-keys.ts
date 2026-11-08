@@ -1,3 +1,4 @@
+import { modelEnabled, type ModelSettings } from './enabled-models-policy'
 import 'server-only'
 import { executionMembersActive, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
@@ -109,7 +110,7 @@ export async function probeResponsesApi(baseUrl: string, apiKey: string, fetchIm
   } catch { return null }
 }
 
-interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError']; responsesApi: boolean }
+interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError']; responsesApi: boolean; modelSettings?: ModelSettings | null }
 const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi"'
 const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null, responsesApi: row.responsesApi })
 /** Only a custom OpenAI-protocol provider is probed; the presets' endpoints serve the Responses API. */
@@ -260,10 +261,12 @@ export async function usableApiKeys(query: Query, userId: string, workspaceId: s
   // One after the other: a dispatch reads this on its transaction's client.
   // The person's own keys always (decision 2026-11-01-2240); others' only while the admin allows member credentials.
   const allowed = await memberSubscriptionsAllowed(query, workspaceId)
-  const mine = (await query.query<Row>(`SELECT ${COLUMNS} FROM model_api_keys WHERE "ownerId"=$1${selectedKeyId ? ' AND id=$2' : ''} ORDER BY "createdAt",id`, [userId, ...(selectedKeyId ? [selectedKeyId] : [])])).rows
-  const others = allowed ? (await query.query<Row>(`SELECT ${COLUMNS.split(',').map(column => `k.${column}`).join(',')} FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
+  const mine = (await query.query<Row>(`SELECT ${COLUMNS},to_jsonb(model_api_keys)->'modelSettings' AS "modelSettings" FROM model_api_keys WHERE "ownerId"=$1${selectedKeyId ? ' AND id=$2' : ''} ORDER BY "createdAt",id`, [userId, ...(selectedKeyId ? [selectedKeyId] : [])])).rows
+  const others = allowed ? (await query.query<Row>(`SELECT ${COLUMNS.split(',').map(column => `k.${column}`).join(',')},to_jsonb(k)->'modelSettings' AS "modelSettings" FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
     WHERE s."workspaceId"=$1 AND k."ownerId"<>$2${selectedKeyId ? ' AND k.id=$3' : ''} ORDER BY s."createdAt",k.id`, [workspaceId, userId, ...(selectedKeyId ? [selectedKeyId] : [])])).rows : []
-  return [...mine.map(row => ({ ...view(row), ownerId: row.ownerId, mine: true })), ...others.map(row => ({ ...view(row), ownerId: row.ownerId, mine: false }))]
+  const usable = (row: Row, mine: boolean) => ({ ...view(row), ownerId: row.ownerId, mine,
+    models: row.models.filter(id => modelEnabled(row.modelSettings, id)) })
+  return [...mine.map(row => usable(row, true)), ...others.map(row => usable(row, false))]
 }
 
 /** What the run's Agent gets: environment variables, plus Codex's model provider when it runs on Codex. */
@@ -295,8 +298,7 @@ export async function botApiKeyChoice(query: Query, scope: { ownerId: string; wo
 
 /**
  * Saves a bot's model as one an API key serves. The key must be usable by
- * the bot's owner here and reach bot chats, and the model one it lists (any
- * model when the key lists none). Saving a subscription model later replaces it.
+ * the bot's owner here and reach bot chats, and the model one it lists as enabled. Saving a subscription model later replaces it.
  */
 export async function setBotApiKeyChoice(query: Query, scope: { ownerId: string; workspaceId: string }, botId: string | null, keyId: string, model: string): Promise<BotApiKeyChoice> {
   z.uuid().parse(keyId)
@@ -307,7 +309,7 @@ export async function setBotApiKeyChoice(query: Query, scope: { ownerId: string;
     if (!rowCount) throw new WorkspaceError('botNotFound')
   }
   const key = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).find(item => item.id === keyId)
-  if (!key || !apiKeyChatBaseUrl(key) || (key.models.length && !key.models.includes(modelName))) throw new WorkspaceError('executionModelUnknown')
+  if (!key || !apiKeyChatBaseUrl(key) || !key.models.includes(modelName)) throw new WorkspaceError('executionModelUnknown')
   await query.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel") VALUES ($1,$2,$3,NULL,$4,$5)
     ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel"`,
   [scope.ownerId, scope.workspaceId, botId ?? 'coordinator', keyId, modelName])

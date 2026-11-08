@@ -4,6 +4,11 @@ import { providerFailureBlock, providerHealthStates } from './model-provider-hea
 
 const now = Date.parse('2026-11-04T12:00:00Z')
 
+test('native model rejection never changes global credential or model availability', () => {
+  for (const source of ['api_key', 'subscription'] as const)
+    assert.equal(providerFailureBlock(source, { kind: 'model', retryable: false, status: 404, code: 'model_not_found' }, new Date(now), now), null)
+})
+
 test('runtime balance and authentication failures remain blocked until the credential is handled', () => {
   const failedAt = new Date(now - 86_400_000)
   assert.deepEqual(providerFailureBlock('api_key', { kind: 'balance', retryable: false, status: 402 }, failedAt, now), { usable: false, reason: 'balance' })
