@@ -64,7 +64,7 @@ export type DaemonStartupTiming = {
 }
 /** A task's early start, including its wait for checkout, with its own clock
  * origin. It is not a child interval of the later agent_start stage. */
-export type DaemonPreparationTiming = DaemonStartupTiming & { source: 'prepared_agent_start' }
+export type DaemonPreparationTiming = DaemonStartupTiming & { source: 'prepared_agent_start' | 'bootstrap_claude_start'; claimAuthentication?: 'oauth_environment' | 'ordinary_path' | 'unverified'; observedAuthSource?: 'oauth_environment' | 'oauth_descriptor' | 'non_api_key_unspecified' | 'unknown' }
 type StartupScope = {
   runIdHash: string; harness: Harness; startedAt: number; started: number
   phases: DaemonStartupPhase[]; phaseCount: number; truncated: boolean; closed: boolean
@@ -259,6 +259,33 @@ export class DaemonTracer {
       try { pending = work() } catch (error) { end(true); throw error }
       return pending.then(value => { end(false); return value }, (error: unknown) => { end(true); throw error })
     }, timing => report({ ...timing, source: 'prepared_agent_start' }))
+  }
+
+  /** A task-local measurement begins at an accepted bootstrap and is entered
+   * again only by that same candidate's fresh-claim preparation. Its real
+   * earlier clock is retained; no interval is rebased into agent_start. */
+  beginBootstrapPreparation(identity: { runIdHash: string; harness: 'claude_code' }) {
+    const scope: StartupScope = { ...identity, startedAt: Date.now(), started: performance.now(),
+      phases: [], phaseCount: 0, truncated: false, closed: false }
+    let claimAuthentication: NonNullable<DaemonPreparationTiming['claimAuthentication']> = 'unverified'
+    let observedAuthSource: NonNullable<DaemonPreparationTiming['observedAuthSource']> = 'unknown'
+    let receipt: DaemonPreparationTiming | undefined
+    return {
+      authenticate: (source: NonNullable<DaemonPreparationTiming['claimAuthentication']>, observed: NonNullable<DaemonPreparationTiming['observedAuthSource']>) => {
+        if (!scope.closed) { claimAuthentication = source; observedAuthSource = observed }
+      },
+      run: <T>(work: () => Promise<T>): Promise<T> => scope.closed ? this.startupScope.exit(work) : this.startupScope.run(scope, work),
+      finish: (outcome: 'ok' | 'error') => {
+        if (scope.closed) return
+        scope.closed = true
+        receipt = { version: 1, source: 'bootstrap_claude_start', ...identity, claimAuthentication, observedAuthSource,
+          startedAt: scope.startedAt, endedAt: Date.now(), ms: milliseconds(performance.now() - scope.started), outcome,
+          phases: scope.phases.sort((a, b) => a.startMs - b.startMs),
+          truncated: scope.truncated || scope.phases.length < scope.phaseCount }
+        scope.phases = []
+      },
+      get receipt() { return receipt },
+    }
   }
 
   private collectStartup<T>(identity: { runIdHash: string; harness: Harness },

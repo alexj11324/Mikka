@@ -144,3 +144,55 @@ validation, with an explicit `dispatch_run_entry` boundary in the receipt. The
 end is the later of the server execution stage and the official CLI's exact
 task acknowledgement. Legacy measurements that start inside the dispatch body
 are lower bounds and useful phase evidence, not complete-entry acceptance.
+
+## Bootstrap-time anonymous Claude preparation
+
+A fresh TaskVM may initialize one anonymous Claude process after its strict
+bootstrap is accepted, before device registration and run claim complete.
+The template snapshot never contains this process or its native session UUID.
+The server emits the optional, bounded configuration sidecar only when it
+actually creates a new official Claude instance with no existing sandbox or
+device, for a queued first attempt with no prior start, session, token, retry,
+continuation or question-resume state. Retained/adopted machines and runtime
+refreshes remain on the ordinary path. The sidecar is bound to the exact
+bootstrap bytes and run ID; it contains configuration, never account or task
+authority.
+
+The same fresh assignment, policy hash, model/effort, diagnostic scope, normal
+HOME/environment and complete MCP catalogue must match before one adoption.
+Skills and project/local settings are still prepared and verified at the
+final cwd. An isolated owned child executes the existing Mikka MCP backend;
+unbound tools refuse calls, and cancellation kills and drains its process
+group. The original stdio entry uses that same backend. No tool handlers or
+Git semantics are substituted. Only the SDK's specific
+`project_settings_not_claimable` refusal can drain and retry the ordinary
+path after claim; other permission, identity, account and claim failures
+remain failures.
+
+For explicit diagnostics, the same loopback collector is started before the
+anonymous process and transferred once to the matching fresh run. Its actual
+early timestamps remain intact. `preparationTiming.source =
+bootstrap_claude_start` has its own clock and includes the real prewarm and
+claim initialization; it is never rebased into the later `agent_start` root.
+The closed `observedAuthSource` records the actual native account-info source
+(environment OAuth, descriptor OAuth, unspecified non-API-key, or unknown),
+without exporting an arbitrary native string. The closed `claimAuthentication`
+field distinguishes verified
+`oauth_environment`, the original `ordinary_path` fallback, and
+`unverified`. The formal reader rejects missing or unverified authentication
+for this new source, while retaining the original CLI-initialization, exact
+ACK, dispatch-entry and five-second requirements. Ordinary tasks add no
+detailed timing fields.
+
+Installed SDK 0.3.305 documents fresh OAuth/session additions in
+`ClaimOptions.env`; its `AccountInfo.tokenSource` is a string, not a published
+enum, and this package contains no native `cli.js` implementation. The new
+account guard accepts only `firstParty` and the existing non-API-key checks;
+the additional exact `CLAUDE_CODE_OAUTH_TOKEN` source is allowed only after
+this candidate's successful one-shot claim. Offline real-SDK/IPC fixtures
+prove protocol and refusal boundaries, not what an official native binary
+actually reports. The existing subscription candidate gate uses a personal
+acceptance daemon without a bootstrap sidecar and therefore validates the
+original FD3 route. Its success does not validate anonymous adoption. The
+subsequent real production dispatches must exercise and report the actual
+new source; no native-source value or performance saving is inferred.

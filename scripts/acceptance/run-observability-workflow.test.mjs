@@ -10,6 +10,8 @@ const token = 'PRIVATE_GITHUB_PROGRESS_TOKEN', args = ['--execute', '--prepare',
 const env = { MIKKA_ACCEPTANCE_PROGRESS_TOKEN: token, MIKKA_EXPECTED_DEPLOYMENT_SHA: revision, MIKKA_OBSERVABILITY_MODEL_CASE: 'claude',
   ACME_DEMO_EMAIL: 'PRIVATE_EMAIL', ACME_DEMO_PASSWORD: 'PRIVATE_PASSWORD', PATH: '/usr/bin',
   GITHUB_TOKEN: token, GH_TOKEN: 'PRIVATE_OTHER_TOKEN', ACCIDENTAL_ALIAS: 'Bearer ' + token }
+const runnerArgs = [...args, '--runner-browser']
+const runnerEnv = { ...env, GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: revision }
 const deferred = () => { let resolve; const promise = new Promise(value => { resolve = value }); return { promise, resolve } }
 function ready(item = CASES[0]) {
   const fixture = fixtureTask(revision, item)
@@ -26,6 +28,7 @@ function harness(options = {}) {
   let launch, settled = false
   const result = runObservabilityWorkflow({ args: options.args ?? args, env: options.env ?? env, now: () => now, signals,
     spawnImpl: (command, argv, settings) => { launch = { command, argv, settings }; return child },
+    startBrowserImpl: options.startBrowser ?? (() => { throw new Error('PRIVATE_UNEXPECTED_BROWSER_START') }),
     fetchImpl: async (url, init) => {
       calls.push({ url, init })
       return options.respond ? options.respond(url, init) : Response.json({ body: 'PRIVATE_GITHUB_RESPONSE', id: 123 }, { status: 201 })
@@ -142,4 +145,133 @@ test('ordinary preflight passes safe stdout through without GitHub access and fo
   cancelled.line('Result: blocked'); cancelled.finish(1)
   assert.equal(await cancelled.result, 1); assert.equal(cancelled.calls.length, 0)
   assert.deepEqual(cancelled.kills, ['SIGTERM'])
+})
+
+
+test('runner mode rejects non-main, mismatched revision and incomplete mode flags before starting anything', async () => {
+  for (const patch of [
+    { args: ['--runner-browser'] }, { args: ['--execute', '--runner-browser'] },
+    { args: ['--browser-submit', '--runner-browser'] },
+    { env: { ...runnerEnv, GITHUB_ACTIONS: undefined } },
+    { env: { ...runnerEnv, GITHUB_ACTIONS: 'false' } },
+    { env: { ...runnerEnv, GITHUB_EVENT_NAME: undefined } },
+    { env: { ...runnerEnv, GITHUB_EVENT_NAME: 'push' } },
+    { env: { ...runnerEnv, GITHUB_REPOSITORY: 'foreign/repo' } },
+    { env: { ...runnerEnv, GITHUB_REF: 'refs/heads/ops/1512-git-transport' } },
+    { env: { ...runnerEnv, GITHUB_SHA: 'b'.repeat(40) } },
+    { env: { ...runnerEnv, GITHUB_SHA: undefined } },
+    { env: { ...runnerEnv, MIKKA_OBSERVABILITY_MODEL_CASE: 'all' } },
+  ]) {
+    let spawned = false, fetched = false, acted = false
+    await assert.rejects(runObservabilityWorkflow({ args: runnerArgs, env: runnerEnv, ...patch,
+      spawnImpl: () => { spawned = true }, fetchImpl: () => { fetched = true },
+      startBrowserImpl: () => { acted = true } }), /configuration_required/)
+    assert.deepEqual({ spawned, fetched, acted }, { spawned: false, fetched: false, acted: false })
+  }
+})
+
+test('runner gets only validated readiness and token-free child env, with its flag removed from the driver', async () => {
+  const started = deferred(), closed = deferred(), releaseClose = deferred()
+  let received, starts = 0, closes = 0
+  const data = harness({ args: runnerArgs, env: runnerEnv, startBrowser: async options => {
+    starts++; received = options; started.resolve()
+    return { close: async () => { closes++; closed.resolve(); await releaseClose.promise } }
+  } })
+  data.line(ready())
+  await Promise.race([started.promise, data.result.then(() => { throw new Error('RUNNER_FINISHED_BEFORE_START') })])
+  assert.deepEqual(data.launch.argv.slice(1), args)
+  assert.equal(starts, 1); assert.deepEqual(received.ready, ready())
+  assert.ok(received.signal instanceof AbortSignal)
+  assert.equal(received.env, data.launch.settings.env)
+  assert.equal(received.env.ACME_DEMO_PASSWORD, env.ACME_DEMO_PASSWORD)
+  assert.equal(received.env.MIKKA_ACCEPTANCE_PROGRESS_TOKEN, undefined)
+  assert.equal(received.env.GITHUB_TOKEN, undefined); assert.equal(received.env.GH_TOKEN, undefined)
+  assert.equal(received.env.ACCIDENTAL_ALIAS, undefined)
+  const body = JSON.parse(data.calls[0].init.body).body
+  assert.match(body, /Runner.*自动点击一次 Create task/)
+  assert.match(body, /请勿人工提交/)
+  assert.doesNotMatch(body, /执行器正在等待一次真实浏览器提交|在已有登录的浏览器中|原样粘贴/)
+  data.line('Result: runtime_verified'); data.finish(0)
+  await closed.promise
+  assert.equal(data.settled, false); assert.equal(received.signal.aborted, true)
+  releaseClose.resolve()
+  assert.equal(await data.result, 0); assert.equal(closes, 1)
+  assert.doesNotMatch(data.output.join(''), /PRIVATE_|\{.*"input"/)
+})
+
+test('runner continues consuming readiness while the actor starts and aborts a duplicate without a second actor', async () => {
+  const started = deferred(), aborted = deferred()
+  let starts = 0, closes = 0
+  const data = harness({ args: runnerArgs, env: runnerEnv, startBrowser: async ({ signal }) => {
+    starts++; started.resolve()
+    await new Promise(resolve => signal.addEventListener('abort', () => { aborted.resolve(); resolve() }, { once: true }))
+    return { close: async () => { closes++ } }
+  } })
+  data.line(ready()); await started.promise
+  data.line(ready()); await aborted.promise; await data.stopped
+  assert.equal(starts, 1); assert.equal(data.calls.length, 1)
+  assert.equal(data.settled, false); assert.deepEqual(data.kills, ['SIGTERM'])
+  data.finish(0)
+  assert.equal(await data.result, 1); assert.equal(closes, 1)
+  assert.match(data.output.join(''), /progress_duplicate/)
+})
+
+test('runner startup failure stops the driver, waits for its cleanup and exports no error text', async () => {
+  let starts = 0
+  const data = harness({ args: runnerArgs, env: runnerEnv, startBrowser: async () => {
+    starts++
+    throw new Error('PRIVATE_BROWSER_PAGE_URL_AND_PASSWORD ' + token)
+  } })
+  data.line(ready()); await data.stopped
+  assert.equal(data.settled, false); assert.equal(starts, 1)
+  data.finish(0)
+  assert.equal(await data.result, 1)
+  assert.match(data.output.join(''), /browser_start_failed/)
+  assert.doesNotMatch(data.output.join(''), /PRIVATE_/)
+})
+
+test('runner cleanup failure cannot be hidden by a successful driver return or replace a nonzero exit', async () => {
+  for (const driverCode of [0, 7]) {
+    const started = deferred()
+    let closes = 0
+    const data = harness({ args: runnerArgs, env: runnerEnv, startBrowser: async () => {
+      started.resolve()
+      return { close: async () => { closes++; throw new Error('PRIVATE_SIGN_OUT_RESPONSE') } }
+    } })
+    data.line(ready()); await started.promise; data.finish(driverCode)
+    assert.equal(await data.result, driverCode || 1); assert.equal(closes, 1)
+    assert.match(data.output.join(''), /browser_cleanup_failed/)
+    assert.doesNotMatch(data.output.join(''), /PRIVATE_/)
+  }
+})
+
+test('driver exit aborts pending actor startup and still awaits the late owned browser close', async () => {
+  const started = deferred(), aborted = deferred(), release = deferred()
+  let closes = 0
+  const data = harness({ args: runnerArgs, env: runnerEnv, startBrowser: async ({ signal }) => {
+    signal.addEventListener('abort', () => aborted.resolve(), { once: true })
+    started.resolve(); await release.promise
+    return { close: async () => { closes++ } }
+  } })
+  data.line(ready()); await started.promise; data.finish(9); await aborted.promise
+  assert.equal(data.settled, false)
+  release.resolve()
+  assert.equal(await data.result, 9); assert.equal(closes, 1)
+})
+
+test('runner never starts after invalid readiness or a failed progress POST and cannot pass with missing readiness', async () => {
+  for (const variant of ['invalid', 'progress', 'missing']) {
+    let starts = 0
+    const data = harness({ args: runnerArgs, env: runnerEnv,
+      respond: variant === 'progress' ? async () => new Response(null, { status: 503 }) : undefined,
+      startBrowser: async () => { starts++; return { close: async () => {} } },
+    })
+    if (variant === 'missing') data.finish(0)
+    else {
+      data.line(variant === 'invalid' ? { ...ready(), input: 'PRIVATE_ACCOUNT_TEXT' } : ready())
+      await data.stopped; data.finish(0)
+    }
+    assert.equal(await data.result, 1); assert.equal(starts, 0)
+    assert.doesNotMatch(data.output.join(''), /PRIVATE_/)
+  }
 })

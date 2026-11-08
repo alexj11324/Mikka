@@ -8,6 +8,7 @@ import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { remoteKey } from '@mikka/protocol/repository'
 import { assertE2eTarget } from './helpers/e2e-target.mjs'
+import { createRequestScope, runRequestScope } from '../apps/api/src/context'
 
 const target = process.env.E2E_DATABASE_URL
 if (target) {
@@ -72,7 +73,10 @@ test('Factory task denials preserve public errors before policy and execution si
   }
   const answer = async (f: Awaited<ReturnType<typeof fixture>>, origin = 'http://127.0.0.1') => {
     const id = f.q!.id
-    return questionRoute.POST(new Request(`http://127.0.0.1/api/factory/questions/${id}`, { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify({ reference: questionReference(f.q!), answerId: randomUUID(), text: 'Continue' }) }), { params: Promise.resolve({ questionId: id }) })
+    const request = new Request(`http://127.0.0.1/api/factory/questions/${id}`, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'x-mikka-workspace-id': f.workspaceId }, body: JSON.stringify({ reference: questionReference(f.q!), answerId: randomUUID(), text: 'Continue' }) })
+    // The real HTTP adapter supplies both request context and the selected
+    // workspace; the canonical guard still checks this membership in PG.
+    return runRequestScope(createRequestScope(request), () => questionRoute.POST(request, { params: Promise.resolve({ questionId: id }) }))
   }
   await t.test('deleted questions return factoryNotFound and cannot create a continuation', async () => {
     const f = await fixture(true)

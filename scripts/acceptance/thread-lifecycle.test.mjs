@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { cleanupLifecycleCase, createProviderObserver, isExactNativeCommand, lifecycleHash, MODELS, nativeEvidence, nativeSnapshotCommand,
-  readOptions, runLifecycleCase, runThreadLifecycle, safeError } from './thread-lifecycle.mjs'
+  readOptions, reviewDeliveryValidation, runLifecycleCase, runThreadLifecycle, safeError } from './thread-lifecycle.mjs'
 import { watchRun } from './cloud-startup.mjs'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -33,8 +33,10 @@ const nativePair = (callId, toolName, input, output, offset = 0) => [
   { at: new Date(epoch + offset).toISOString(), chunk: { type: 'tool-input-available', toolCallId: callId, toolName, input } },
   { at: new Date(epoch + offset + 1).toISOString(), chunk: { type: 'tool-output-available', toolCallId: callId, output } },
 ]
-const proofChunks = (record, phase, codex = false) => {
-  const output = 'MIKKA_1593_NATIVE ' + JSON.stringify(markerProof(record, phase))
+const proofChunks = (record, phase, codex = false, reportText) => {
+  const proof = markerProof(record, phase)
+  if (reportText !== undefined) Object.assign(proof, { reportText, reportBytes: Buffer.byteLength(reportText), reportSha256: sha(reportText) })
+  const output = 'MIKKA_1593_NATIVE ' + JSON.stringify(proof)
   return nativePair(`${record.runId}:${phase}`, 'bash', { command: nativeSnapshotCommand(record, phase) }, codex ? { exitCode: 0, output } : output)
 }
 
@@ -138,6 +140,15 @@ test('only the full literal expected native program or a literal shell wrapper i
   const record = fixture(), forged = proofChunks(record, 'before_question')
   forged[0].chunk.input.command = `python3 -c 'print("hashlib.sha256 subprocess.check_output ${record.caseId}")'`
   assert.throws(() => nativeEvidence({ chunks: forged }, record), /native_command_mismatch/)
+
+  // A real Codex case prepended a report heredoc to the complete expected script.
+  // Even authentic-looking marker output cannot make that combined call exact.
+  const combined = proofChunks(record, 'before_question', true)
+  const reportWrite = `cat > issue-1593-${record.caseId}.md <<'REPORT'\n# #1593 fixture report\nREPORT\n`
+  const command = reportWrite + expected
+  combined[0].chunk.input.command = `/bin/bash -lc '${command.replaceAll("'", "'\\''")}'`
+  assert.equal(isExactNativeCommand(combined[0].chunk.input.command, expected), false)
+  assert.throws(() => nativeEvidence({ chunks: combined }, record), /native_command_mismatch/)
 })
 
 test('only real paired native outputs count; Claude strings and Codex command objects both work', () => {
@@ -479,7 +490,7 @@ test('live deadline final read is serialized behind the in-flight async observer
   assert.equal(reads, 2); assert.equal(maximum, 1)
 })
 
-function lifecycleClient({ providerBlocked = false, changedSession = false, driftAtAnswer = false, missRunningSample = false,
+function lifecycleClient({ providerBlocked = false, changedSession = false, driftAtAnswer = false, missRunningSample = false, deliveryReportText,
   finishedAt = { origin: new Date(epoch + 20).toISOString(), continuation: new Date(epoch + 40).toISOString() } } = {}) {
   const fixed = fixture(), actions = [], observations = []
   let phase = 'origin', machineState = 'running', answered = false, cancelled = false, pinCalls = 0
@@ -491,7 +502,7 @@ function lifecycleClient({ providerBlocked = false, changedSession = false, drif
       originRunId: final ? fixed.continuationRunId : fixed.runId, originSessionId: 'PRIVATE_NATIVE_SID' } })
   const detail = (runId, terminal = true) => {
     const final = runId === fixed.continuationRunId, record = { ...fixed, runId }
-    const chunks = final ? [...proofChunks(record, 'after_answer', true), ...proofChunks(record, 'delivery', true)] : proofChunks(record, 'before_question')
+    const chunks = final ? [...proofChunks(record, 'after_answer', true), ...proofChunks(record, 'delivery', true, deliveryReportText)] : proofChunks(record, 'before_question')
     chunks.push(...nativePair(`${runId}:ask`, 'mcp__mikka__ask_human', { kind: 'decision', question: question(final).question }, final ? [{ type: 'text', text: 'Recorded' }] : 'Recorded', 10))
     return { thread: { id: runId, status: terminal ? 'stopped' : 'running', finishedAt: new Date(epoch + 999).toISOString(),
       attempts: [{ runId: fixed.runId, status: final || terminal ? 'stopped' : 'running', finishedAt: final || terminal ? finishedAt.origin : null },
@@ -575,6 +586,22 @@ async function runFixture(f) {
   return runLifecycleCase({ client: f.client, botId, profile, scope, harness: 'claude_code', sourceCommit: SOURCE, source: SOURCE_FILE,
     caseId: f.fixed.caseId, markerValue: f.fixed.markerValue, now, pin: f.pin, wait: f.wait, observeProvider: f.observeProvider, signal: f.signal })
 }
+
+
+test('generated task separates report writes from each exact native snapshot tool call', async () => {
+  const f = lifecycleClient()
+  await runFixture(f)
+  const request = f.actions.find(item => item.action === 'issues.saveIssue')
+  const taskText = request.args[0].content.content[0].content[0].text
+  assert.match(taskText, /三段验证脚本.*各自.*独占一次.*原生 shell 工具调用/)
+  assert.match(taskText, /command 只能是.*脚本全文/)
+  assert.match(taskText, /报告创建\/修改必须使用另外的工具调用/)
+  assert.match(taskText, /不得把 cat\/heredoc.*前后命令.*拼进同一次调用/)
+  const scripts = [...taskText.matchAll(/python3 - <<'MIKKA_1593_PY'\n[\s\S]*?\nMIKKA_1593_PY/g)]
+    .map(match => match[0])
+  assert.deepEqual(scripts, ['before_question', 'after_answer', 'delivery']
+    .map(phase => nativeSnapshotCommand(f.fixed, phase)))
+})
 
 test('normal double decision passes its declared scope while overall issue acceptance remains incomplete', async () => {
   const f = lifecycleClient(), report = await runFixture(f)
@@ -675,4 +702,58 @@ test('abort during an awaited pin prevents a new dispatch or answer while cleanu
   assert.equal(report.cases[0].error, 'lifecycle_interrupted')
   assert.equal(report.cleanup.workspaceRestored, true)
   assert.ok(f.calls.some(call => call.path === '/api/auth/sign-out'))
+})
+
+test('delivery failure records the failed invariant without disclosing report content', () => {
+  const record = fixture(), valid = markerProof(record, 'delivery')
+  assert.ok(Object.values(reviewDeliveryValidation(valid, record)).every(Boolean))
+  for (const [field, token] of [['issue', '#1593'], ['source', SOURCE], ['ownerChoice', 'owner_choice=provider-receipts'],
+    ['evidence', 'Evidence'], ['risks', 'Risks'], ['limits', 'Limits']]) {
+    const text = valid.reportText.replaceAll(token, 'PRIVATE_REPORT')
+    const receipt = reviewDeliveryValidation({ ...valid, reportText: text, reportBytes: Buffer.byteLength(text), reportSha256: sha(text) }, record)
+    assert.equal(receipt[field], false)
+    assert.equal(receipt.bytes, true); assert.equal(receipt.digest, true)
+    assert.doesNotMatch(JSON.stringify(receipt), /PRIVATE_REPORT/)
+  }
+  assert.equal(reviewDeliveryValidation({ ...valid, reportSha256: '0'.repeat(64) }, record).digest, false)
+  assert.equal(reviewDeliveryValidation({ ...valid, reportBytes: 1 }, record).bytes, false)
+  // The historical Claude continuation omitted Limits; keep its refusal and
+  // preserve the specific diagnosis even though nativeEvidence throws.
+  const missing = { ...valid, reportText: valid.reportText.replace('Limits', 'Outstanding checks') }
+  missing.reportBytes = Buffer.byteLength(missing.reportText)
+  missing.reportSha256 = sha(missing.reportText)
+  const chunks = nativePair(`${record.runId}:delivery`, 'bash', { command: nativeSnapshotCommand(record, 'delivery') },
+    'MIKKA_1593_NATIVE ' + JSON.stringify(missing))
+  assert.throws(() => nativeEvidence({ chunks }, record), /review_delivery_invalid/)
+  assert.deepEqual(Object.entries(record.deliveryValidation).filter(([, ok]) => !ok).map(([name]) => name), ['limits'])
+  assert.doesNotMatch(JSON.stringify(record.deliveryValidation), /Outstanding checks|reportText/)
+})
+
+test('continuation report failure retains closed diagnostics on the returned case after cleanup', async () => {
+  const reportText = markerProof(fixture(), 'delivery').reportText.replace('## Limits', '## PRIVATE_UNVERIFIED')
+  const f = lifecycleClient({ deliveryReportText: reportText }), report = await runFixture(f)
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'lifecycle_review_delivery_invalid')
+  assert.equal(report.runId, f.fixed.runId)
+  assert.equal(report.continuationRunId, f.fixed.continuationRunId)
+  assert.equal(report.cleanup.status, 'passed')
+  assert.equal(report.cleanup.provider.state, 'missing')
+  assert.deepEqual(report.cleanup.runIds, [f.fixed.runId, f.fixed.continuationRunId])
+  assert.deepEqual(report.deliveryValidation, {
+    text: true, bytes: true, digest: true, issue: true, source: true,
+    ownerChoice: true, evidence: true, risks: true, limits: false,
+  })
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|reportText|Native CLI exit/)
+})
+
+test('explicit continuation run scope ignores origin and foreign native delivery pairs', () => {
+  const record = fixture(), missingLimits = markerProof(record, 'delivery').reportText.replace('## Limits', '## PRIVATE_OTHER_RUN')
+  const chunks = [...proofChunks(record, 'delivery', false, missingLimits),
+    ...proofChunks({ ...record, runId: record.continuationRunId }, 'delivery'),
+    ...proofChunks({ ...record, runId: id(90) }, 'delivery', false, missingLimits)]
+  const proof = nativeEvidence({ chunks }, record, record.continuationRunId)
+  assert.deepEqual(Object.keys(proof.snapshots), ['delivery'])
+  assert.equal(proof.snapshots.delivery.toolCallHash, sha(`${record.continuationRunId}:delivery`).slice(0, 16))
+  assert.equal(record.runId, id(11))
+  assert.ok(Object.values(record.deliveryValidation).every(Boolean))
 })
