@@ -1,6 +1,6 @@
-# Prepared only. Queue only after root verifies this exact runtime's dual subscription
-# proof, public release tuple, and actual final paired DPL ID/source (BUILDING or READY).
-# All existing production READY checks still precede models. Do not push before root GO.
+# Prepared only. Root must verify the fixed APP source and the exact runtime's
+# dual subscription proof and public tuple. Resolve the production alias once
+# under the held Web lock; all READY/source/tuple checks still precede models.
 name: Issue 1505 strict production startup acceptance
 on:
   push:
@@ -27,8 +27,8 @@ jobs:
     env:
       ACCEPTANCE_SOURCE_COMMIT: e33e3a91d4011efbe768b11b428a5d152ede744a
       ACCEPTANCE_SOURCE_TREE: b2e36d3351654fceec59fe138a55de31cb155df9
-      EXPECTED_APP_COMMIT: 0479675e188efeac341b207d8616c4d7b9d4ee23
-      EXPECTED_DEPLOYMENT_ID: dpl_G1NrxfpoUdzz99BsQQ8UQEqKGW59
+      EXPECTED_APP_COMMIT: 78c3c13d35c2c664113a140bccb3db4ae9606021
+      EXPECTED_DEPLOYMENT_ID: RESOLVE_ONCE_FROM_PRODUCTION_ALIAS
       EXPECTED_WORKER_SHA: fe20477b6b42416f6a53fbbd2a7efc1c9cfb1dea
       EXPECTED_WORKER_SOURCE: 0479675e188efeac341b207d8616c4d7b9d4ee23
       EXPECTED_TEMPLATE_DESKTOP: p2pjujpb74f7fi53ze7y
@@ -36,11 +36,11 @@ jobs:
       EXPECTED_TEMPLATE_CODEX: k34g6jozduq3in302l1j
       ACCEPTANCE_STRATEGY: derived
       EXPECTED_DIAGNOSTIC_BOT_ID: fdeea45f-8cb2-450a-96a4-d9a682f71482
-      EXPECTED_DIAGNOSTIC_ENV_ID: ZLpt0i7CTNlk5XFR
-      EXPECTED_DIAGNOSTIC_VALUE_SHA256: 6242c4c368f5805f6bcb3538559b5b30b851c4ee0622823f16c03bf8044814b3
-      EXPECTED_DIAGNOSTIC_EXPIRES_AT: 2026-11-08T01:25:23.422Z
-      DIAGNOSTIC_HELPER_COMMIT: a9c61594f8294f748cb23130f61779d03f1f2080
-      DIAGNOSTIC_HELPER_SHA256: 266bed08ab45c16f6b7e88c33d7254835e9ba9e51296099be976f3168cb5396c
+      EXPECTED_DIAGNOSTIC_ENV_ID: 5U3cbUROL36c7e4z
+      EXPECTED_DIAGNOSTIC_VALUE_SHA256: 4627f203887af0e2e5904e43afca89ebf6241f55ce998aa5200ef65df6b4ce67
+      EXPECTED_DIAGNOSTIC_EXPIRES_AT: 2026-11-08T02:23:36.365Z
+      DIAGNOSTIC_HELPER_COMMIT: 5958dea38437de20512bbbdf60b940ccc83f00ff
+      DIAGNOSTIC_HELPER_SHA256: 46d8b905518cf480fecdf0a3bce1a3863f4e79c92609b1cd3ec9d4231820898c
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -249,11 +249,12 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
-          import { api, PROJECT, TEAM } from './scripts/ops/deployment-regression.mjs';
+          import { api, activeAlias, PRODUCTION_ALIAS, PROJECT, TEAM } from './scripts/ops/deployment-regression.mjs';
+          import { appendFile, mkdir, writeFile } from 'node:fs/promises';
           import { readProductionWorkerRelease,createSessionClient } from './scripts/acceptance/cloud-startup.mjs';
           const env=process.env,commit=env.EXPECTED_APP_COMMIT;
           for(const key of ['EXPECTED_APP_COMMIT','EXPECTED_WORKER_SHA','EXPECTED_WORKER_SOURCE'])assert.match(env[key]??'',/^[a-f0-9]{40}$/,'unfilled_ready_pin');
-          assert.match(env.EXPECTED_DEPLOYMENT_ID??'',/^dpl_[A-Za-z0-9]+$/,'unfilled_deployment_pin');
+          assert.equal(env.EXPECTED_DEPLOYMENT_ID,'RESOLVE_ONCE_FROM_PRODUCTION_ALIAS','deployment_pin_must_resolve_once');
           assert.ok(['derived','pool','combined'].includes(env.ACCEPTANCE_STRATEGY),'strategy_invalid');
           const templates={desktop:env.EXPECTED_TEMPLATE_DESKTOP,claude:env.EXPECTED_TEMPLATE_CLAUDE,codex:env.EXPECTED_TEMPLATE_CODEX};
           for(const [kind,id] of Object.entries(templates)){
@@ -262,7 +263,10 @@ jobs:
           }
           const release=await readProductionWorkerRelease({token:env.VERCEL_TEAM_TOKEN});
           assert.deepEqual(release,{workerSha:env.EXPECTED_WORKER_SHA,sourceCommit:env.EXPECTED_WORKER_SOURCE,templates},'production_release_mismatch');
-          const deployment=await api(`/v13/deployments/${env.EXPECTED_DEPLOYMENT_ID}`,{token:env.VERCEL_TEAM_TOKEN});
+          const alias=activeAlias(await api(`/v4/aliases/${PRODUCTION_ALIAS}`,{token:env.VERCEL_TEAM_TOKEN}));
+          const aliasReadAt=new Date().toISOString(),expectedDeploymentId=alias.deploymentId;
+          const deployment=await api(`/v13/deployments/${expectedDeploymentId}`,{token:env.VERCEL_TEAM_TOKEN});
+          assert.equal(deployment.id??deployment.uid,expectedDeploymentId,'deployment_id_mismatch');
           assert.equal(deployment.readyState,'READY');assert.equal(deployment.target,'production');
           assert.equal(deployment.gitSource?.sha??deployment.meta?.githubCommitSha,commit,'deployment_source_mismatch');
           // Insert immediately after the existing READY/production/source checks.
@@ -283,9 +287,21 @@ jobs:
           const logs=await api('/v1/observability/events',{token:env.VERCEL_TEAM_TOKEN,
             headers:{'x-vercel-observability-query-reason':'cli/logs-runtime'},body:{event:'vercel.log',scope:{ownerId:TEAM,projectIds:[PROJECT]},
             timeRange:{start:start.toISOString(),end:end.toISOString()},select:['deploymentId','environment','message','truncated'],
-            order:'desc',limit:1,filter:`deploymentId:"${env.EXPECTED_DEPLOYMENT_ID}" AND environment:production AND (dispatch_timing OR cloud_startup_timing OR subscription_native_timing)`}});
+            order:'desc',limit:1,filter:`deploymentId:"${expectedDeploymentId}" AND environment:production AND (dispatch_timing OR cloud_startup_timing OR subscription_native_timing)`}});
           assert.ok(Array.isArray(logs.events)&&typeof logs.pagination?.hasMore==='boolean','logs_contract_invalid');
-          console.log(JSON.stringify({productionReadyTuple:'verified',build:commit,deploymentId:env.EXPECTED_DEPLOYMENT_ID,release,logs:'accepted'}));
+          const pinKeys=['ACCEPTANCE_SOURCE_COMMIT','ACCEPTANCE_SOURCE_TREE','EXPECTED_APP_COMMIT','EXPECTED_DEPLOYMENT_ID',
+            'EXPECTED_WORKER_SHA','EXPECTED_WORKER_SOURCE','EXPECTED_TEMPLATE_DESKTOP','EXPECTED_TEMPLATE_CLAUDE','EXPECTED_TEMPLATE_CODEX',
+            'EXPECTED_DIAGNOSTIC_BOT_ID','EXPECTED_DIAGNOSTIC_ENV_ID','EXPECTED_DIAGNOSTIC_VALUE_SHA256','EXPECTED_DIAGNOSTIC_EXPIRES_AT',
+            'DIAGNOSTIC_HELPER_COMMIT','DIAGNOSTIC_HELPER_SHA256'];
+          const pins=Object.fromEntries(pinKeys.map(key=>[key,key==='EXPECTED_DEPLOYMENT_ID'?expectedDeploymentId:env[key]]));
+          for(const value of Object.values(pins))assert.equal(typeof value,'string','deployment_pin_value_missing');
+          const deploymentPin={version:1,status:'preflight_passed',source:'production_alias_resolve_once',fixedAt:new Date().toISOString(),
+            alias:{hostname:alias.hostname,projectId:PROJECT,deploymentId:alias.deploymentId,updatedAt:alias.updatedAt,readAt:aliasReadAt},
+            deployment:{id:expectedDeploymentId,sourceCommit:commit,readyState:deployment.readyState,target:deployment.target},pins};
+          await mkdir('acceptance-results',{recursive:true});
+          await writeFile('acceptance-results/deployment-pin.json',JSON.stringify(deploymentPin,null,2)+'\n',{mode:0o600,flag:'wx'});
+          await appendFile(env.GITHUB_ENV,`EXPECTED_DEPLOYMENT_ID=${expectedDeploymentId}\n`);
+          console.log(JSON.stringify({productionReadyTuple:'verified',build:commit,deploymentId:expectedDeploymentId,release,logs:'accepted'}));
           JS
       # Insert after the existing exact production preflight and before dispatch.
       # This is supplementary evidence; it never changes formal verdict.
@@ -829,6 +845,7 @@ jobs:
             acceptance-results/cloud-startup-acceptance.json
             acceptance-results/cloud-startup-acceptance.md
             acceptance-results/diagnostic-window-cleanup.json
+            acceptance-results/deployment-pin.json
             acceptance-results/function-regions.json
             ${{ runner.temp }}/issue1505-upstream-release-wait.json
           if-no-files-found: warn
