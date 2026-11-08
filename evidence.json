@@ -1,0 +1,112 @@
+{
+  "kind": "visual-only",
+  "commit": "d9b7fd4d37cb1156640e3765a7f8c25abf93e665",
+  "run": "42481702255",
+  "origins": [
+    "http://127.0.0.1:35817"
+  ],
+  "synthetic": true,
+  "oauthAccepted": false,
+  "runtimeAccepted": false,
+  "reviewed": false,
+  "coverage": "Existing SettingsView after workspace GET: community/cloud admin sidebar with real Preferences in light/dark. Community begins at the existing billing section resolver.",
+  "limitations": "Component composition omits the app rail and window bar. No real session, database, URL redirect, billing, OAuth, save or runtime acceptance. No mobile or full-language matrix.",
+  "evidence": [
+    {
+      "file": "synthetic-zh-CN-light-community-settings.png",
+      "source": "existing SettingsView, SettingsSidebar, Preferences and AppFrame; synthetic GET records",
+      "edition": "community",
+      "requestedSection": "billing",
+      "observed": {
+        "selectedSidebar": "偏好设置",
+        "billingItems": 0,
+        "heading": "偏好设置",
+        "prefix": "DEMO"
+      },
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:35817",
+      "path": "/mikka/settings?edition=community&section=billing",
+      "reads": [
+        "/mikka/api/settings/issue-prefix",
+        "/mikka/api/workspace?workspace=10000000-0000-4000-8000-000000000001"
+      ]
+    },
+    {
+      "file": "synthetic-zh-CN-light-cloud-settings.png",
+      "source": "existing SettingsView, SettingsSidebar, Preferences and AppFrame; synthetic GET records",
+      "edition": "cloud",
+      "requestedSection": "preferences",
+      "observed": {
+        "selectedSidebar": "偏好设置",
+        "billingItems": 1,
+        "heading": "偏好设置",
+        "prefix": "DEMO"
+      },
+      "theme": "light",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:35817",
+      "path": "/mikka/settings?edition=cloud&section=preferences",
+      "reads": [
+        "/mikka/api/settings/issue-prefix",
+        "/mikka/api/workspace?workspace=10000000-0000-4000-8000-000000000001"
+      ]
+    },
+    {
+      "file": "synthetic-zh-CN-dark-community-settings.png",
+      "source": "existing SettingsView, SettingsSidebar, Preferences and AppFrame; synthetic GET records",
+      "edition": "community",
+      "requestedSection": "billing",
+      "observed": {
+        "selectedSidebar": "偏好设置",
+        "billingItems": 0,
+        "heading": "偏好设置",
+        "prefix": "DEMO"
+      },
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:35817",
+      "path": "/mikka/settings?edition=community&section=billing",
+      "reads": [
+        "/mikka/api/settings/issue-prefix",
+        "/mikka/api/workspace?workspace=10000000-0000-4000-8000-000000000001"
+      ]
+    },
+    {
+      "file": "synthetic-zh-CN-dark-cloud-settings.png",
+      "source": "existing SettingsView, SettingsSidebar, Preferences and AppFrame; synthetic GET records",
+      "edition": "cloud",
+      "requestedSection": "preferences",
+      "observed": {
+        "selectedSidebar": "偏好设置",
+        "billingItems": 1,
+        "heading": "偏好设置",
+        "prefix": "DEMO"
+      },
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "origin": "http://127.0.0.1:35817",
+      "path": "/mikka/settings?edition=cloud&section=preferences",
+      "reads": [
+        "/mikka/api/settings/issue-prefix",
+        "/mikka/api/workspace?workspace=10000000-0000-4000-8000-000000000001"
+      ]
+    }
+  ]
+}
