@@ -86,8 +86,8 @@ and [task conversation decision](docs/design/decisions/2026-11-07-2300-one-conve
 - **Runs on your own machines.**
   - The Mikka daemon connects your Mac, Linux machine or server. The desktop
     app can also install it on a server over SSH.
-  - It starts work through the Agents you have already installed and signed
-    in to, so your existing plans and settings apply.
+  - It installs its own pinned Claude Code and Codex when needed and runs
+    work with the selected subscription or model credentials.
 
 - **Recovers from failures.**
   - Runs use leases and repository checkpoints. Eligible runs can retry on
@@ -168,8 +168,7 @@ account. Publication depends on the configured target and deployment switches.
 - **Settings inside the app.** Settings open in the app window, with sections
   for account, security, preferences, notifications, memory, connections,
   models, saved logins, privacy and devices, and for workspace admins general,
-  members, teams, permissions, secrets (including the workspace's own E2B API
-  key), audit log, usage and billing.
+  members, teams, permissions, secrets, audit log, usage and billing.
 - **Billing.** The hosted model (Mikka 默认) includes a capped 20-message trial
   per workspace creator, shared across all workspaces they create. Card
   verification uses Stripe Checkout and grants a one-off $1 allowance to the
@@ -192,9 +191,9 @@ account. Publication depends on the configured target and deployment switches.
 - **iOS app.** Built in [`apps/mobile`](apps/mobile) with native Bot, Tasks,
   Suggestions, Settings and Search tabs, task conversations and push
   notifications. Native release and OTA delivery use the mobile workflows.
-- **Cloud computer.** Each bot gets its own desktop on Mikka Cloud, running on
-  the workspace's own E2B key. Its 电脑 tab lets you watch it live, take
-  control and hand it back. Desktop automation pauses while you hold it, and it sleeps when
+- **Cloud computer.** Each bot gets its own desktop on Mikka Cloud. Direct
+  E2B computers use their owner's personal key. The 电脑 tab lets you watch it
+  live, take control and hand it back. Desktop automation pauses while you hold it, and it sleeps when
   idle and keeps its disk. Bots can start web sub-agents there, each in its own browser, and
   desktop actions follow the applicable authorization policy. Coding tasks
   follow the selected execution location, and each cloud task keeps a separate
@@ -227,7 +226,7 @@ Work in progress is tracked in
 
 | Area | Planned | Tracking |
 | --- | --- | --- |
-| **Cloud computer** | Mikka-billed compute. Its points UI is gated by `mikka-computer-billing`, whose source default is off. The workspace-owned E2B key remains a supported execution path. | [#172](https://github.com/alexj11324/Mikka/issues/172) |
+| **Cloud computer** | Mikka-billed compute. Its points UI is gated by `mikka-computer-billing`, whose source default is off. The direct E2B path uses the run owner's personal key. | [#172](https://github.com/alexj11324/Mikka/issues/172) |
 | **Hybrid execution** | Agents on your computer offload builds, tests and dev servers to Mikka Cloud. | [#572](https://github.com/alexj11324/Mikka/issues/572) |
 | **Plugins** | Further installed-skill and workspace-admin controls. Custom MCP listing and workspace-sharing controls already exist in Settings › Connections. | [#595](https://github.com/alexj11324/Mikka/issues/595) |
 | **Proactive suggestions** | A nightly research run that turns your deadlines and interests into a few suggestion cards a day, which start a task when tapped. | [#350](https://github.com/alexj11324/Mikka/issues/350) |
@@ -252,20 +251,22 @@ Like hosted and self-hosted CI runners, an Agent runs either on a machine Mikka
 manages or on one you bring.
 
 **Mikka managed cloud.** On Mikka Cloud, Mikka starts the machine, sleeps it when idle and
-keeps its disk. The supported BYO path uses the workspace's E2B API key, set in
-Settings › Secrets and environment. The separate cloud-compute points UI is
-gated by `mikka-computer-billing`.
+keeps its disk. Cloud access is configured for the run owner. The direct E2B
+runtime uses that person's own key. Follow the account or cloud connection
+setup offered by your server. The separate cloud-compute points UI is gated by
+`mikka-computer-billing`.
 
 **Your own.** Your computer, through the desktop app or the daemon, or any
 server you reach over SSH. Mikka installs the daemon there and dispatches
-Agents to it. The daemon in [`packages/daemon`](packages/daemon) detects the
-Agents installed on the machine and runs threads through them:
+Agents to it. The daemon in [`packages/daemon`](packages/daemon) reports its
+managed runtimes and installs supported Claude Code and Codex versions on
+first use.
 
-| Agent | CLI it looks for |
+| Agent | Local runtime |
 | --- | --- |
-| Claude Code | `claude` |
-| Codex | `codex` |
-| Cursor | `cursor-agent` or `agent` |
+| Claude Code | Daemon-managed pinned `claude` |
+| Codex | Daemon-managed pinned `codex` |
+| Cursor | `cursor-agent` or `agent`, on runners that report Cursor support |
 
 Parallel coding work uses isolated git worktrees. Continuations can reuse
 the same worktree.
