@@ -5,6 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { dropTestDatabase } from './support/drop-test-database'
+import { measured } from './helpers/read-metrics'
 
 const url = process.env.E2E_DATABASE_URL
 if (url && !disposableDatabase()) throw new Error('Task identity regression requires disposable loopback databases')
@@ -123,6 +124,34 @@ test('task identity: split DB migration, immutable issuance, historical aliases 
       await app.query('UPDATE issue_prefixes SET prefix=\'NEXT\' WHERE "userId"=\'owner\'')
       assert.equal((await ensureTaskIdentifiers([{ id: personal, ownerId: 'owner' }])).get(personal), 'SAME-1')
       await assert.rejects(app.query('UPDATE issues SET "issuedIdentifier"=\'NEW-99\' WHERE id=$1', [grouped]), /immutable/)
+    })
+
+    await t.test('authorized issued projections avoid another read while legacy inputs retain owner checks', async () => {
+      const { taskIdentifiers } = await import('../lib/task-identifier-server')
+      const { db } = await import('../lib/db')
+      // These values come from the current APP rows, after the earlier Team
+      // rename/removal and personal prefix change, never from client metadata.
+      const { rows } = await app.query<{ id: string; ownerId: string; scope: 'personal' | 'workspace'; issuedIdentifier: string }>(
+        'SELECT id,"userId" AS "ownerId",scope,"issuedIdentifier" FROM issues WHERE id=ANY($1::uuid[]) AND "userId"=\'owner\'',
+        [[personal, grouped, publication]])
+      assert.equal(rows.length, 3)
+      assert.ok(rows.every(row => row.issuedIdentifier))
+      const direct = await measured(() => taskIdentifiers(rows, db))
+      assert.deepEqual(direct.value, new Map(rows.map(row => [row.id, row.issuedIdentifier])))
+      assert.equal(direct.statements, 0, 'a fully issued authorized projection requires no second APP/WS read')
+      assert.equal(direct.resultBytes, 0)
+
+      const legacy = await measured(() => taskIdentifiers([
+        { id: grouped, ownerId: 'owner', scope: 'personal', issuedIdentifier: '' },
+        { id: personal, ownerId: 'owner', scope: 'personal', issuedIdentifier: null },
+        { id: publication, ownerId: 'peer', scope: 'workspace' },
+        { id: randomUUID(), ownerId: 'owner', scope: 'workspace' },
+      ], db))
+      assert.equal(legacy.value.get(grouped), 'OLD-12')
+      assert.equal(legacy.value.get(personal), 'SAME-1')
+      assert.equal(legacy.value.has(publication), false, 'missing projections still check the stored creator')
+      assert.equal(legacy.value.size, 2, 'missing UUIDs do not acquire an identifier')
+      assert.equal(legacy.statements, 1, 'already issued legacy inputs retain the bounded APP lookup')
     })
 
     await t.test('responsibility projects only an active human in the exact task Workspace', async () => {

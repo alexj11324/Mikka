@@ -49,7 +49,7 @@ stub('./coordinator-bot.ts',{chatBotId:async(_owner:string,botId:string|null|und
 stub('../agent-runs.ts',{visibleRuns:forbidden,addRunMessage:forbidden,queueRun:forbidden,queueFactoryRun:forbidden,readRun:forbidden,requestRunStop:forbidden})
 stub('../issue-access.ts',{issueForUser:forbidden,requireUser:forbidden})
 stub('../issue-visibility.ts',{issueVisibility:forbidden})
-stub('../task-identifier-server.ts',{taskIdentifiers:forbidden,issueView:forbidden})
+stub('../task-identifier-server.ts',{taskIdentifiers:forbidden,taskPrefixInput:forbidden,issueView:forbidden})
 stub('../artifacts/store.ts',{artifactSummaries:forbidden})
 stub('./bot-instructions.ts',{botInstructions:async(_owner:string,_bot:string|null,base:string)=>base})
 stub('./personal-instructions.ts',{withPersonalInstructions:async(_owner:string,base:string)=>base})

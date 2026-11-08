@@ -54,7 +54,10 @@ import { PublicationError } from '@/lib/run-publication-result'
 import { githubMachineConfigured, githubMachineCredential } from '@/lib/github/machine-credential'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
-import { remoteRepositoryRef, taskSecretInjection, environmentSecretInjection } from '@/lib/secrets/runtime'
+import { remoteRepositoryRef, taskSecretInjection, taskSecretSnapshot, environmentSecretInjection, environmentSecretSnapshot, type TaskSecretInjection } from '@/lib/secrets/runtime'
+import { issueTaskSecretAccess } from '@/lib/secrets/task-access'
+import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
+import { executionMembersActive } from '@/lib/execution-identity'
 import { cloudStartupPhases, cloudStartupRunAttributes, cloudStartupSpan } from '@/lib/computer/startup-tracing'
 import { cloudStartupDiagnosticEnv } from '@/lib/computer/startup-diagnostics'
 import { withRunProjectExecution } from '@/lib/project-resources/run-lease'
@@ -267,22 +270,32 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
   let taskEnv: Record<string, string> = {}
   let taskSecretNames: string[] = []
-  if (projectEnvironment) {
-    if (!run.workspaceId || run.agentDefinition?.projectExecution?.workspaceId !== run.workspaceId) return NextResponse.json({ error: 'Environment workspace unavailable.', code: 'projectEnvironmentUnavailable' }, { status: 409 })
-    try { ({ env: taskEnv, secretNames: taskSecretNames } = await environmentSecretInjection(run.workspaceId, remoteRepositoryRef(repo.remoteUrl), projectEnvironment, process.env, run.userId)) }
-    catch { return NextResponse.json({ error: 'Environment secrets unavailable.', code: 'projectEnvironmentUnavailable' }, { status: 409 }) }
+  const taskWorkspaceId = run.agentDefinition?.executionIdentity
+    ? run.agentDefinition.executionIdentity.workspaceId : projectEnvironment ? run.workspaceId : device.kind === 'cloud' ? caller.scopeWorkspaceId ?? null : null
+  const taskRepository = remoteRepositoryRef(repo.remoteUrl)
+  if (projectEnvironment && (!taskWorkspaceId || taskWorkspaceId !== run.workspaceId
+    || run.agentDefinition?.projectExecution?.workspaceId !== taskWorkspaceId)) return NextResponse.json({ error: 'Environment workspace unavailable.', code: 'projectEnvironmentUnavailable' }, { status: 409 })
+  const cloudDesktop = device.kind === 'cloud' && device.harnesses.some(info => info.harness === harness && info.computerBroker)
+  if (device.kind === 'cloud' && (!cloudComputerTasksEnabled() || !caller.scopeWorkspaceId || caller.scopeDeviceId !== deviceId
+    || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey) || !cloudDesktop && !repo.remoteUrl
+    || taskWorkspaceId && taskWorkspaceId !== caller.scopeWorkspaceId)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
+  let taskInjection: TaskSecretInjection
+  try {
+    taskInjection = projectEnvironment
+      ? await environmentSecretInjection(taskWorkspaceId!, taskRepository, projectEnvironment, process.env, run.userId)
+      : await taskSecretInjection(taskWorkspaceId, taskRepository, process.env, undefined, run.userId)
+    taskEnv = taskInjection.env
+    taskSecretNames = taskInjection.secretNames
+  } catch { return NextResponse.json({ code: 'task_secret_unavailable', detail: 'configuration' }, { status: 409 }) }
+  if ((taskInjection.protectedSecrets.length || taskInjection.unavailable.length)
+    && request.headers.get(TASK_SECRETS_HEADER) !== TASK_SECRETS_VERSION) {
+    await failRunForDaemonUpgrade(runId, deviceId, caller.userId)
+    return NextResponse.json({ error: 'Upgrade the Mikka daemon before using protected task Secrets.', code: 'daemonUpgradeRequired', daemonVersions: await daemonVersions() }, { status: 409 })
   }
   if (device.kind === 'cloud') {
-    if (!cloudComputerTasksEnabled() || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     // A task machine (E2B's claude or codex template, decision 2026-11-01-2335) has no desktop: its
     // worker reports no computer broker. It takes repository tasks only; a computer task stays queued.
-    const desktop = device.harnesses.some(info => info.harness === harness && info.computerBroker)
-    if (!desktop && !repo.remoteUrl) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
-    // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
-    // claim so a decrypt failure leaves the run queued. The injection helper returns an empty
-    // assignment without an encryption key; platform versus BYO billing does not change it.
-    try { if (!projectEnvironment) ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl), process.env, undefined, run.userId)) }
-    catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
+    const desktop = cloudDesktop
     // A cloud run with a task branch gets its publication like a local run,
     // before the lease, so a refusal leaves it queued.
     if (run.agentDefinition?.repositoryAdmission && !run.agentDefinition.readOnly) {
@@ -299,7 +312,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     // interactive desktop. Its policy must not gate their file-only claim.
     const useComputer = desktop && run.agentDefinition?.readOnly !== true
     let claimed: Awaited<ReturnType<typeof claimCloudRun>>
-    try { claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, useComputer) }
+    try { claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId! }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, useComputer) }
     catch (error) { if (error instanceof AgentProfileAdmissionError) return rejectProfile(error); throw error }
     if (!claimed) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
     // Without a desktop the run gets none (the daemon refuses a `computer` it cannot serve).
@@ -460,6 +473,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     : repo.repoPath.startsWith('v2/github.com/') && await githubMachineConfigured(caller.userId)
   timings.next('response_fence')
   const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => {
+    const taskSecrets = issueTaskSecretAccess({ injection: taskInjection,
+      endpoint: new URL(withBasePath(`/v1/task-secrets/${runId}`), request.url).toString(), leaseExpiresAt,
+      binding: { ownerId: current.userId, workspaceId: taskWorkspaceId, repository: taskRepository,
+        runId: current.id, deviceId, deviceTokenId: caller.tokenId, attempt: current.attempt } })
     const assignedEnv = cloudStartupDiagnosticEnv(taskEnv, { deviceKind: device.kind, run: current,
       repository: remoteRepositoryRef(repo.remoteUrl), harness, subscriptionBindingId: subscription?.id })
     return NextResponse.json({
@@ -489,6 +506,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(projectEnvironment ? { projectEnvironment: { id: projectEnvironment.id, revision: projectEnvironment.revision, ...(projectEnvironment.setup ? { setup: projectEnvironment.setup } : {}) } } : {}),
     ...(Object.keys(assignedEnv).length ? { taskEnv: assignedEnv } : {}),
     ...(taskSecretNames.length ? { taskSecretNames } : {}),
+    ...(taskSecrets ? { taskSecrets } : {}),
     ...threadContinuation,
     ...retry,
     ...factoryClaim,
@@ -497,6 +515,27 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     policy: assignmentPolicy,
     ...(distribution ? {policySnapshotRequired:distribution.required,policySnapshot:issuePolicySnapshot(distribution,assignmentPolicy)} : {}),
     }, { headers: { 'cache-control': 'private, no-store' } })
+  }, async (current, tx) => {
+    const currentEnvironment = current.agentDefinition?.projectExecution?.environment
+    const workspaceId = current.agentDefinition?.executionIdentity
+      ? current.agentDefinition.executionIdentity.workspaceId : currentEnvironment ? current.workspaceId : device.kind === 'cloud' ? caller.scopeWorkspaceId ?? null : null
+    if (current.deviceTokenId !== caller.tokenId || current.attempt !== run.attempt || workspaceId !== taskWorkspaceId) return false
+    if (Boolean(currentEnvironment) !== Boolean(projectEnvironment) || currentEnvironment &&
+      (currentEnvironment.id !== projectEnvironment?.id || currentEnvironment.revision !== projectEnvironment?.revision
+        || current.agentDefinition?.projectExecution?.workspaceId !== workspaceId)) return false
+    if (taskInjection.snapshot === undefined) return true
+    if (workspaceId && !current.agentDefinition?.executionIdentity && !await executionMembersActive(workspaceId, [current.userId])) return false
+    const [currentRepo] = await tx.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, repo.id)).limit(1)
+    if (!currentRepo || remoteRepositoryRef(currentRepo.remoteUrl) !== taskRepository) return false
+    try {
+      const snapshot = currentEnvironment && workspaceId
+        ? await environmentSecretSnapshot(workspaceId, taskRepository, currentEnvironment, current.userId, tx)
+        : await taskSecretSnapshot(workspaceId, taskRepository, current.userId, tx)
+      return snapshot === taskInjection.snapshot
+    } catch (error) {
+      if (error instanceof CodedError && error.code === 'task_secret_unavailable') return false
+      throw error
+    }
   })
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
   }

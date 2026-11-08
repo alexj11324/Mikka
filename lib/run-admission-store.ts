@@ -14,6 +14,7 @@ import { localExecutionHarnesses } from './device-agents'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { taskDestinationSchema } from './task-destination'
 import { readIssueMetadata } from './issue-metadata'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { taskIdentifiers } from './task-identifier-server'
 import { publicationBranch } from './run-publication-policy'
 import { admitRepositoryTask, matchesRepositoryAdmission } from './repository-admission'
@@ -81,7 +82,7 @@ export async function acceptLocalRun(input: {
         if (!binding) throw invalid('taskDestinationMismatch')
       }
     }
-    const [task] = await tx.select().from(issues).where(eq(issues.id, input.issueId)).for('update')
+    const [task] = await tx.select({ id: issues.id, userId: issues.userId, workspaceId: issues.workspaceId, ownershipState: issues.ownershipState, scope: issues.scope, scopeVersion: issues.scopeVersion, title: issues.title, issuedIdentifier: issues.issuedIdentifier, content: issueAttrsContent }).from(issues).where(eq(issues.id, input.issueId)).for('update')
     if (!task || !await issueForUser(input.userId, task.id)) throw invalid('issueUnavailable')
     if (JSON.stringify(await lockCliTaskScope(client,input.userId,task.id)) !== JSON.stringify(taskScope)) throw invalid('issueUnavailable')
     const [agent] = await tx.select().from(agents).where(and(eq(agents.id, input.agentId), eq(agents.userId, input.userId))).for('share')
@@ -164,9 +165,8 @@ export async function acceptLocalRun(input: {
     }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + task.id}, 0))`)
     const [previous] = await tx.select().from(runPublications).where(and(eq(runPublications.issueId, task.id), eq(runPublications.remoteKey, repo.repoPath), sql`${runPublications.branch} is not null`)).orderBy(asc(runPublications.createdAt)).limit(1)
-    const identifiers = await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }], tx)
     if (previous && effectiveExecution?.projectId && previous.baseBranch !== effectiveBaseBranch) throw new ActionFailureError('projectRepositoryDenied')
-    const identifier = previous?.identifier ?? identifiers.get(task.id) ?? null
+    const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, issuedIdentifier: task.issuedIdentifier }], tx)).get(task.id) ?? null
     if (definition.traceContext && identifier) definition.traceContext.taskNumber = identifier
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (!branch) throw invalid('taskIdentifierRequired')

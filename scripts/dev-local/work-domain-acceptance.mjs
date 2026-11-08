@@ -262,13 +262,15 @@ export async function verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, ta
 
   for (const [account, issue] of [[accounts.owner, taskA], [accounts.peer, peerTask]]) {
     const view = await rpc(account, 'task-domain.getTaskPresentation', issue.id)
-    assert.deepEqual(view, { version: 1, primaryStatus: 'todo', factoryStage: 'triage', runStatus: null, needsAction: 'question', blockedReason: null, completion: null })
+    assert.deepEqual(view, { version: 1, primaryStatus: 'todo', factoryStage: 'triage', runStatus: null, needsAction: 'question', blockedReason: null, completion: null,
+      state: 'waiting', reason: 'needs_input', blockedBy: null, group: 'pending' })
   }
   const sharedView = await rpc(accounts.peer, 'task-domain.getTaskPresentation', taskA.id)
   assert.equal(sharedView.primaryStatus, 'todo')
   assert.equal(sharedView.factoryStage, null, 'shared Task access cannot reveal another owner’s Factory execution')
   assert.equal(sharedView.runStatus, null)
   assert.equal(sharedView.completion, null)
+  assert.deepEqual([sharedView.state, sharedView.reason, sharedView.blockedBy, sharedView.group], ['todo', null, null, 'todo'])
   await denied(accounts.peer, 'task-domain.getTaskPresentation', [taskB.id], ['issueNotFound', 'workspaceAccessDenied'])
   const wanted = [taskA.id, peerTask.id, taskB.id, personalTask.id, randomUUID(), taskA.id]
   for (const account of [accounts.owner, accounts.peer]) {

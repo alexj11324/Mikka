@@ -9,7 +9,7 @@ import { ensureTaskIdentifiers } from '@/lib/task-identity-store'
 import { projectViewsForTasks } from '@/lib/project-access'
 
 type Executor = Pick<typeof db, 'select' | 'execute'>
-type TaskRef = { id: string; ownerId: string; scope: TaskScope; number?: number | null }
+type TaskRef = { id: string; ownerId: string; scope: TaskScope; number?: number | null; issuedIdentifier?: string | null }
 
 /** Each owner's resolved personal prefix. One query: the owner's email, saved prefix and Linear team keys. */
 export async function personalPrefixes(ownerIds: string[], executor: Executor = db) {
@@ -67,14 +67,24 @@ export async function taskAssignees(tasks: readonly { id: string; workspaceId: s
   return result
 }
 
-/** `taskIdentifier` for many tasks at once, keyed by task id. `knownTeams` may
- * reuse a complete link read made by this same operation, never a held cache. */
+/** Reuse immutable identifiers from this operation's authorized APP projection,
+ * never client input or a cached owner/Team prefix. Legacy rows without an
+ * issued value keep the existing UUID/owner checks and scoped alias import.
+ * The third argument remains a compatibility input; Team links do not name
+ * an already issued Task or grant it access. */
 export async function taskIdentifiers(tasks: TaskRef[], executor: Executor = db, _knownTeams?: ReadonlyMap<string, { key: string; number: number }>) {
-  return ensureTaskIdentifiers(tasks, executor)
+  const result = new Map<string, string | null>()
+  const pending: TaskRef[] = []
+  for (const task of new Map(tasks.map(task => [task.id, task])).values()) {
+    if (typeof task.issuedIdentifier === 'string' && task.issuedIdentifier.length > 0) result.set(task.id, task.issuedIdentifier)
+    else pending.push(task)
+  }
+  for (const [id, identifier] of await ensureTaskIdentifiers(pending, executor)) result.set(id, identifier)
+  return result
 }
 
 /** An issue row as the client sees it: metadata plus its display identifier. */
-export async function issueView<T extends { id: string; userId: string; workspaceId: string | null; scope: TaskScope; content: JSONContent; linearSyncPolicy?: string; issuedIdentifier?: string | null }>(issue: T, executor: Executor = db) {
+export async function issueView<T extends { id: string; userId: string; workspaceId: string | null; scope: TaskScope; content: JSONContent; linearSyncPolicy?: string; issuedIdentifier?: string | null }>(issue: T, executor: Executor = db, _knownTeams?: ReadonlyMap<string, { key: string; number: number }>) {
   const view = issueWithMetadata(issue)
   view.metadata.assignee = (await taskAssignees([{ id: issue.id, workspaceId: issue.workspaceId, assignee: view.metadata.assignee }], executor)).get(issue.id) ?? null
   const identifier = issue.issuedIdentifier ?? (await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: view.metadata.number }], executor)).get(issue.id) ?? null

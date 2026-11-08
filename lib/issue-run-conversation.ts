@@ -29,12 +29,18 @@ export function runStatusKey(status: string) {
 
 /** One line about what a finished run did: the report's summary, else the first line of its error. */
 export function runSummaryText(run: { report: unknown; error: string | null }): string | null {
+  return runSummaryView(run).summary
+}
+
+/** Preserve the display fallback while naming its source for proof consumers. */
+export function runSummaryView(run: { report: unknown; error: string | null }): { summary: string | null; summarySource: 'report' | 'error' | null } {
   const report = run.report
   if (report && typeof report === 'object' && !Array.isArray(report)) {
     const summary = (report as Record<string, unknown>).summary
-    if (typeof summary === 'string' && summary.trim()) return summary.trim()
+    if (typeof summary === 'string' && summary.trim()) return { summary: summary.trim(), summarySource: 'report' }
   }
-  return run.error?.split('\n').find(line => line.trim())?.trim() ?? null
+  const summary = run.error?.split('\n').find(line => line.trim())?.trim() ?? null
+  return { summary, summarySource: summary ? 'error' : null }
 }
 
 /**

@@ -1,5 +1,6 @@
 'use server'
 
+import { runAwaitingApproval } from '@/lib/task-state-query'
 import { singleFlight } from '@/lib/single-flight'
 import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
 
@@ -87,6 +88,10 @@ async function readTaskRuns() {
 
 /** A thread: one run, newest first. Its name comes from its task, else its prompt. */
 export interface Thread {
+  pauseReason?: 'human_control' | 'quota_exhausted' | null
+  stopReason?: string | null
+  awaitingApproval?: boolean
+  threadReplacedBy?: string | null
   id: string
   /** The bot that started it; null when the Coordinator dispatched it to an agent. */
   botId: string | null
@@ -163,6 +168,7 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
       waitingForDevice: waitingForDevice.as('waitingForDevice'),
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
       outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'),
+      pauseReason: agentRuns.pauseReason, stopReason: agentRuns.stopReason, awaitingApproval: runAwaitingApproval.as('awaitingApproval'), threadReplacedBy: agentRuns.threadReplacedBy,
     }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
       .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
       .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt), desc(agentRuns.id)).limit(200)

@@ -60,7 +60,8 @@ export function publicFailure(error) {
 }
 
 export function domainOptions(env = process.env) {
-  check(!env.DOMAIN_OTHER_AUDIT_SHA && (!env.DOMAIN_OTHER_AUDIT_LEASE || env.DOMAIN_OTHER_AUDIT_LEASE === 'false'), 'inputs_conflict')
+  check(!env.DOMAIN_OTHER_AUDIT_SHA && (!env.DOMAIN_OTHER_AUDIT_LEASE || env.DOMAIN_OTHER_AUDIT_LEASE === 'false')
+    && (!env.DOMAIN_OTHER_AUDIT_RECOVERY_RUN || env.DOMAIN_OTHER_AUDIT_RECOVERY_RUN === 'none'), 'inputs_conflict')
   check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === 'alexj11324/Mikka'
     && env.GITHUB_REF === 'refs/heads/main' && env.GITHUB_EVENT_NAME === 'workflow_dispatch'
     && SHA.test(env.DOMAIN_MODEL_SHA ?? '') && env.GITHUB_SHA === env.DOMAIN_MODEL_SHA, 'target_refused')
@@ -597,13 +598,26 @@ async function runCase(client, shared, options, item, deps, pin) {
     ])
     check(settled?.id === record.issueId && settled.userId === shared.ownerId && settled.workspaceId === shared.workspaceId
       && settled.projectId === options.scope.projectId && settled.identifier === record.identifier, 'task_scope_mismatch')
+    const closed = ['done', 'canceled', 'duplicate'].includes(settled.status)
     check(presentation.version === 1 && ['backlog', 'todo', 'doing', 'review', 'done', 'canceled', 'duplicate'].includes(settled.status)
       && presentation.primaryStatus === settled.status
+      && ['waiting', 'blocked', 'failed', 'running', 'queued', 'todo', 'done', 'canceled', 'duplicate'].includes(presentation.state)
+      && [null, 'needs_input', 'approval', 'pr_review', 'blocked', 'quota', 'offline', 'blocked_by', 'flagged'].includes(presentation.reason)
+      && (presentation.blockedBy === null || typeof presentation.blockedBy === 'string')
+      && ['pending', 'running', 'todo', 'done'].includes(presentation.group)
+      && [null, 'question', 'spec_review', 'pr_review', 'blocked', 'failed', 'dependency', 'flagged', 'quota'].includes(presentation.needsAction)
+      && [null, 'question', 'run', 'failed', 'dependency', 'flagged', 'quota', 'factory'].includes(presentation.blockedReason)
+      && (closed ? presentation.state === settled.status && presentation.group === 'done'
+        : !['done', 'canceled', 'duplicate'].includes(presentation.state) && presentation.group !== 'done')
+      && (presentation.reason !== 'approval' || presentation.state === 'waiting' && presentation.group === 'pending'
+        && presentation.needsAction !== 'quota' && presentation.blockedReason !== 'quota')
       && [null, 'queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing', ...TERMINAL].includes(presentation.runStatus)
       && [null, 'triage', 'spec', 'implement', 'review', 'handoff', 'completed', 'cancelled'].includes(presentation.factoryStage)
       && [null, 'accepted', 'merged'].includes(presentation.completion)
       && (presentation.completion === null || presentation.factoryStage === 'completed'), 'response_invalid', 'task_presentation')
     record.taskState = { businessStatus: settled.status, primaryStatus: presentation.primaryStatus,
+      state: presentation.state, reason: presentation.reason, blockedBy: presentation.blockedBy, group: presentation.group,
+      needsAction: presentation.needsAction, blockedReason: presentation.blockedReason,
       runStatus: presentation.runStatus, factoryStage: presentation.factoryStage, completion: presentation.completion }
     await pin()
     record.status = 'execution_observed'

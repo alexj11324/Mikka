@@ -35,11 +35,18 @@ function workspaceQuery() {
 // Keep withRunWorkspace, mayCompleteIssue and their lock order real. Only the
 // workspace database transport is modeled alongside the App transaction below.
 export const claimWorkspaceDatabase = { select: workspaceQuery, transaction: callback => callback({ select: workspaceQuery }) }
-export const claimWorkspacePool = { query() { throw new Error('unexpected raw workspace query in claim fixture') } }
+export const claimWorkspacePool = { async query(sql, args) {
+  const p = globalThis.claimResponseProbe
+  assert.equal(sql.replace(/\s+/g, ' ').trim(), 'SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status=\'active\'')
+  assert.deepEqual(args[1], [p.run.userId])
+  p.membershipReads.push(args)
+  return { rows: p.workspaceMemberAllowed ? args[1].map(userId => ({ userId })) : [] }
+} }
 const nextServer = import.meta.resolve('next/server')
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
 const actionError = new URL('../../lib/action-error.ts', import.meta.url).href
 const mailboxCapability = new URL('../../lib/personal-mailbox-capability.ts', import.meta.url).href
+const repositoryContract = import.meta.resolve('@mikka/protocol/repository')
 const projectExecutionSource = `
 import assert from 'node:assert/strict'
 import {ActionFailureError} from ${JSON.stringify(actionError)}
@@ -64,23 +71,32 @@ export async function withRunProjectExecution(input,frozen,operation){
 `
 const secretSource = `
 import assert from 'node:assert/strict'
-export function remoteRepositoryRef(url){assert.equal(url,globalThis.claimResponseProbe.repo.remoteUrl);return url}
+import {normalizeRepository} from ${JSON.stringify(repositoryContract)}
+export function remoteRepositoryRef(url){if(!url)return null;const repo=normalizeRepository(url);const prefix="v2/github.com/";return repo.key.startsWith(prefix)?repo.key.slice(prefix.length):null}
 export async function taskSecretInjection(...args){
   const p=globalThis.claimResponseProbe
   assert.equal(args.length,5)
-  assert.equal(args[0],p.run.workspaceId);assert.equal(args[1],p.repo.remoteUrl)
+  const workspace=p.run.agentDefinition?.executionIdentity?p.run.agentDefinition.executionIdentity.workspaceId:p.device.kind==='cloud'?p.caller?.scopeWorkspaceId??null:null
+  assert.equal(args[0],workspace);assert.equal(args[1],remoteRepositoryRef(p.repo.remoteUrl))
   assert.ok(args[2]===process.env,'ordinary task secrets use the process environment')
   assert.equal(args[3],undefined);assert.equal(args[4],p.run.userId)
   assert.equal(p.projectAdmission.active,true,'secret preparation requires the live resource lease')
   assert.equal(p.run.agentDefinition?.projectExecution?.environment??null,null,'selected environments cannot fall back to all workspace secrets')
   p.preparation.push('secrets');(p.secretReads??=[]).push(args)
-  return p.secretInjection??{env:{},secretNames:[]}
+  return structuredClone({env:{},secretNames:[],protectedSecrets:[],unavailable:[],...p.secretInjection})
+}
+export async function taskSecretSnapshot(...args){
+  const p=globalThis.claimResponseProbe
+  assert.equal(args[2],p.run.userId);assert.equal(typeof args[3].select,'function')
+  assert.equal(p.appActive,1,'snapshot shares the final APP transaction')
+  p.preparation.push('secret-snapshot');p.secretSnapshotReads.push(args)
+  return p.secretSnapshot??p.secretInjection?.snapshot
 }
 export async function environmentSecretInjection(...args){
   const p=globalThis.claimResponseProbe,configuration=p.run.agentDefinition?.projectExecution?.environment
   assert.ok(configuration,'environment injection requires a frozen selection')
   assert.equal(args.length,5)
-  assert.equal(args[0],p.run.workspaceId);assert.equal(args[1],p.repo.remoteUrl)
+  assert.equal(args[0],p.run.workspaceId);assert.equal(args[1],remoteRepositoryRef(p.repo.remoteUrl))
   assert.deepEqual(args[2],configuration)
   assert.ok(args[3]===process.env,'environment secrets use the process environment')
   assert.equal(args[4],p.run.userId)
@@ -90,6 +106,17 @@ export async function environmentSecretInjection(...args){
   p.environmentReads.push({workspaceId:args[0],repository:args[1],configuration:structuredClone(args[2]),ownerId:args[4]})
   return structuredClone(p.environmentInjection)
 }
+export async function environmentSecretSnapshot(...args){
+  const p=globalThis.claimResponseProbe
+  assert.equal(args.length,5)
+  assert.equal(args[0],p.run.workspaceId);assert.equal(args[1],remoteRepositoryRef(p.repo.remoteUrl))
+  assert.deepEqual(args[2],p.run.agentDefinition.projectExecution.environment)
+  assert.equal(args[3],p.run.userId);assert.equal(typeof args[4].select,'function')
+  assert.equal(p.appActive,1);assert.equal(p.projectAdmission.active,true)
+  p.preparation.push('environment-snapshot');p.environmentSnapshotReads.push(args)
+  if(p.environmentSnapshotError)throw p.environmentSnapshotError
+  return p.environmentSnapshot??p.environmentInjection.snapshot
+}
 `
 const dbSource = `import assert from 'node:assert/strict'
 import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
@@ -97,8 +124,8 @@ import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-cor
 function query(columns){
   let table
   const q={from(value){table=value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')];return q},innerJoin(){return q},where(){return q},
-    async limit(){const p=globalThis.claimResponseProbe;assert.ok(['agent_runs','agents','device_repos'].includes(table),'unexpected claim table');return table==='agent_runs'?[(columns?.sessionId&&p.lost)?p.lost:{...p.run}]:table==='agents'?[p.agent]:[p.repo]},
-    async for(){const p=globalThis.claimResponseProbe;assert.ok(['issues','agent_runs'].includes(table),'unexpected locked claim table');p.locks.push(table);return table==='issues'?[p.issue]:[{run:{...p.run},enabled:true}]}}
+    async limit(){const p=globalThis.claimResponseProbe;assert.ok(['agent_runs','agents','device_repos'].includes(table),'unexpected claim table');return table==='agent_runs'?[(columns?.sessionId&&p.lost)?p.lost:structuredClone(p.run)]:table==='agents'?[p.agent]:[p.repo]},
+    async for(){const p=globalThis.claimResponseProbe;assert.ok(['issues','agent_runs'].includes(table),'unexpected locked claim table');p.locks.push(table);return table==='issues'?[p.issue]:[{run:structuredClone(p.run),enabled:true}]}}
   return q
 }
 function update(value){
@@ -125,7 +152,11 @@ function update(value){
 }
 let checkedOutClient
 export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
-export const pool={query(){throw new Error('unexpected raw APP query in claim fixture')},connect:async()=>{
+export const pool={async query(sql,args){
+  const p=globalThis.claimResponseProbe
+  assert.equal(sql,'SELECT "ownerId",kind,enabled FROM devices WHERE id=$1')
+  assert.deepEqual(args,[p.device.id]);return {rows:[p.device]}
+},connect:async()=>{
   const p=globalThis.claimResponseProbe
   assert.equal(checkedOutClient,undefined,'claim cannot acquire a second APP client')
   assert.equal(p.appActive,0)
@@ -216,7 +247,8 @@ const sources = new Map([
     }`],
   ['/lib/secrets/runtime.ts', secretSource],
   ['/lib/run-completion-effects.ts', 'export async function afterRunEnded(ownerId,runId){const p=globalThis.claimResponseProbe;(p.endedRuns??=[]).push({ownerId,runId})}'],
-  ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(){throw new Error("unexpected daemon upgrade refusal")};export async function failQueuedSubscriptionRuntime(...args){const p=globalThis.claimResponseProbe;p.preparation.push("subscription-preflight");p.runtimeRefusal=args;p.run.status="failed";return true}'],
+  ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(...args){const p=globalThis.claimResponseProbe;p.preparation.push("daemon-upgrade");(p.upgradeRefusals??=[]).push(args);p.run.status="failed";p.run.stopReason="error";return true};export async function failQueuedSubscriptionRuntime(...args){const p=globalThis.claimResponseProbe;p.preparation.push("subscription-preflight");p.runtimeRefusal=args;p.run.status="failed";return true}'],
+  ['/lib/daemon-release.ts', 'export function daemonTooOld(){return false};export async function daemonVersions(){return {min:"0.0.1",latest:"0.0.1"}}'],
   ['/lib/app-tools-server.ts', `import assert from 'node:assert/strict'
     export async function runAppToolkits(owner,botId){
       const p=globalThis.claimResponseProbe

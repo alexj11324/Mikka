@@ -30,6 +30,13 @@ on:
         description: Explicit JSON workspaceId/botId/repositoryKey/models, baseBranch for provision, projectId/environmentId for active
         required: false
         type: string
+      audit_recover_lease_run:
+        description: Recover only the own pre-dispatch CLI interruption in run 42418118236 before the lease audit
+        type: choice
+        options:
+          - none
+          - '42418118236'
+        default: none
 permissions:
   contents: read
 concurrency:
@@ -60,6 +67,7 @@ jobs:
       DOMAIN_MODEL_SCOPE: ${{ inputs.domain_model_scope }}
       DOMAIN_OTHER_AUDIT_SHA: ${{ inputs.audit_auth_sha }}
       DOMAIN_OTHER_AUDIT_LEASE: ${{ inputs.audit_lease }}
+      DOMAIN_OTHER_AUDIT_RECOVERY_RUN: ${{ inputs.audit_recover_lease_run }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -123,7 +131,7 @@ jobs:
           node-version: 24
       - name: Check lease driver and exact main before credentials
         run: |
-          node --test scripts/acceptance/cloud-lease-audit.test.mjs
+          node --test scripts/acceptance/cloud-lease-audit.test.mjs scripts/acceptance/cloud-lease-recovery.test.mjs
           node --input-type=module <<'JS'
           import { auditTarget } from './scripts/acceptance/auth-audit-production.mjs'
           const expected = auditTarget(process.env)
@@ -150,6 +158,7 @@ jobs:
         env:
           APPLICATION_SHA: ${{ inputs.audit_auth_sha }}
           DAEMON_RENEWAL_EVIDENCE: posthog_plugin
+          LEASE_AUDIT_RECOVERY_RUN: ${{ inputs.audit_recover_lease_run }}
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

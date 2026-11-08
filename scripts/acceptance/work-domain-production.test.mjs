@@ -37,6 +37,13 @@ test('workflow-only exact SHA and explicit strict scope fail before credentials'
     assert.throws(() => domainOptions(env('active', selected)), { code: 'scope_invalid' })
 })
 
+test('domain acceptance rejects every non-default lease recovery request before credentials', () => {
+  for (const recovery of [undefined, '', 'none'])
+    assert.equal(domainOptions({ ...env(), DOMAIN_OTHER_AUDIT_RECOVERY_RUN: recovery }).mode, 'preflight')
+  for (const recovery of ['42418118236', 'unexpected', 'false'])
+    assert.throws(() => domainOptions({ ...env(), DOMAIN_OTHER_AUDIT_RECOVERY_RUN: recovery }), { code: 'inputs_conflict' })
+})
+
 test('automatic review permits only fixed selected small subscription sources before payment', () => {
   const state = { keys: { apiKeyAfterQuota: false, keys: [] }, management: { profiles: CASES.map(item => ({ enabled: true, harness: item.harness, model: fixed(item) })) } }
   assert.doesNotThrow(() => reviewGuard(state, scope()))
@@ -63,7 +70,7 @@ function fixture({ badProject = false, badEnvironment = false, unsafeProfile = f
   emptyDomain = false, workspaceRole = 'member', loseEnvironmentResponse = false, uncertainDispatch, keyCatalog, settledBusinessStatus = 'todo',
   missingSource, chatModel = 'claude', foreignRun = false, foreignEpoch = false, changedEpoch = false,
   loseProfileResponse = false, failProfileRecovery = false, dispatchAdvanceMs = 0, foreignProducerProfile = false,
-  missingDispatchReference = false, foreignDispatchEvent = false, requestKeyPreview = false } = {}) {
+  missingDispatchReference = false, foreignDispatchEvent = false, requestKeyPreview = false, presentationOverride = {} } = {}) {
   const calls = [], issues = [], profiles = [], runs = [], factories = [], machineEnds = []
   const projects = emptyDomain ? [] : [{ id: projectId, workspaceId: badProject ? id(99) : workspaceId, revision: 1,
     archivedAt: null, name: 'PRIVATE_PROJECT_NAME', userId: ownerId, leadUserId: ownerId, memberIds: [ownerId], issueIds: [] }]
@@ -245,7 +252,10 @@ function fixture({ badProject = false, badEnvironment = false, unsafeProfile = f
       if (action === 'issues.getIssue') { const issue = issues.find(row => row.id === args[0]); assert.ok(issue); return rpc({ issue }) }
       if (action === 'task-domain.getTaskPresentation') {
         const issue = issues.find(row => row.id === args[0]); assert.ok(issue)
-        return rpc({ version: 1, primaryStatus: issue.status, runStatus: 'succeeded', factoryStage: 'handoff', completion: null })
+        const closed = ['done', 'canceled', 'duplicate'].includes(issue.status)
+        return rpc({ version: 1, primaryStatus: issue.status, runStatus: 'succeeded', factoryStage: 'handoff', completion: null,
+          state: closed ? issue.status : 'waiting', reason: closed ? null : 'pr_review', blockedBy: null,
+          group: closed ? 'done' : 'pending', needsAction: closed ? null : 'pr_review', blockedReason: null, ...presentationOverride })
       }
       if (action === 'coordinator.sendCoordinatorMessage') {
         const issue = issues.find(row => args[0].includes(row.id)); assert.ok(issue)
@@ -396,7 +406,9 @@ test('active runs one useful retained Task per subscription through canonical Pr
   assert.ok(report.cases.every(row => row.status === 'execution_observed' && row.repositoryObserved && row.toolObserved && row.reportObserved))
   assert.ok(report.cases.every(row => row.factory[0].stage === 'approval' && row.factory[0].status === 'waiting'))
   assert.ok(report.cases.every(row => row.taskState.businessStatus === 'todo' && row.taskState.primaryStatus === 'todo'
-    && row.taskState.runStatus === 'succeeded' && row.taskState.factoryStage === 'handoff' && row.taskState.completion === null))
+    && row.taskState.runStatus === 'succeeded' && row.taskState.factoryStage === 'handoff' && row.taskState.completion === null
+    && row.taskState.state === 'waiting' && row.taskState.reason === 'pr_review' && row.taskState.group === 'pending'
+    && row.taskState.blockedBy === null && row.taskState.needsAction === 'pr_review' && row.taskState.blockedReason === null))
   assert.equal(report.coverage.environmentSetup, 'not_exercised_readonly')
   assert.equal(report.coverage.frozenSnapshot, 'requires_separate_authorized_app_read')
   assert.ok(!JSON.stringify(report).includes('PRIVATE_'))
@@ -414,6 +426,30 @@ test('settled state reports the actual business status separately from run succe
     && row.taskState.runStatus === 'succeeded' && row.taskState.completion === null))
   assert.ok(!f.calls.some(call => /approval|accept/i.test(call.path)))
 })
+
+for (const [label, options] of [
+  ['successful Run incorrectly closes an open Task', { presentationOverride: { state: 'done', group: 'done' } }],
+  ['canonical fields are missing', { presentationOverride: { state: undefined, reason: undefined, blockedBy: undefined, group: undefined } }],
+  ['closed Task retains an open display state', { settledBusinessStatus: 'done', presentationOverride: { state: 'waiting', group: 'pending' } }],
+  ['human approval still carries obsolete quota labels', { presentationOverride: { state: 'waiting', reason: 'approval', needsAction: 'quota', blockedReason: 'quota' } }],
+]) {
+  test('state receipt rejects ' + label + ' and still cleans up only its retained execution', async () => {
+    const f = fixture(options), report = await f.run()
+    assert.ok(report.cases.every(row => row.status === 'failed' && row.failure.code === 'response_invalid'
+      && row.failure.detail === 'task_presentation' && row.cleanup.status === 'passed'), JSON.stringify(report))
+    assert.equal(f.issues.length, 2)
+    assert.deepEqual(f.machineEnds, f.runs.map(row => row.id))
+  })
+}
+
+for (const status of ['done', 'canceled', 'duplicate']) {
+  test('state receipt preserves actual business closure ' + status + ' without inferring delivery', async () => {
+    const f = fixture({ settledBusinessStatus: status }), report = await f.run()
+    assert.equal(report.status, 'execution_observed_pending_snapshot_review', JSON.stringify(report))
+    assert.ok(report.cases.every(row => row.taskState.state === status && row.taskState.group === 'done'
+      && row.taskState.reason === null && row.taskState.completion === null))
+  })
+}
 
 test('live receipts accept current lifecycle states without mistaking preparation or input wait for terminal success', async () => {
   const f = fixture(); await f.run()
@@ -612,6 +648,7 @@ test('existing workflow isolates the new manual job, uses only smoke OIDC creden
   assert.match(job, /inputs\.domain_model_sha != ''/)
   assert.match(job, /production-smoke-owner-acceptance/)
   assert.match(job, /--check-target/)
+  assert.match(job, /DOMAIN_OTHER_AUDIT_RECOVERY_RUN: \$\{\{ inputs\.audit_recover_lease_run \}\}/)
   assert.match(job, /secret-name: SMOKE_OWNER_EMAIL/)
   assert.match(job, /secret-name: SMOKE_OWNER_PASSWORD/)
   assert.equal((job.match(/method: oidc/g) ?? []).length, 2)

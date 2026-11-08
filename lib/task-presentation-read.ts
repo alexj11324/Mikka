@@ -7,14 +7,16 @@ import { issues } from '@/lib/db/schema'
 import { teamIssues } from '@/lib/db/team-schema'
 import { readFactoryFlowStates } from '@/lib/factory/public-flow'
 import { factoryScopeAllows } from '@/lib/factory/scope'
+import { FactoryError } from '@/lib/factory/contract'
 import type { FactoryTask } from '@/lib/factory/store'
 import { ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
-import type { BlockRun } from '@/lib/task-blocked'
+import { taskSchedule } from '@/lib/task-block-runs'
 import { taskPresentationsInput, type TaskPresentationsInput } from '@/lib/task-presentation-input'
 import { taskPresentation, type TaskPresentation } from '@/lib/task-presentation'
+import { readTaskStateRuns } from '@/lib/task-state-read'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -40,7 +42,8 @@ async function taskRows(reader: Reader, workspaceId: string, ids: readonly strin
   const visibility = await issueVisibility(reader, false, workspaceId, db, { onlyIssueIds: ids, withTeamLinks: false })
   const rows = await db.select({ id: issues.id, userId: issues.userId, workspaceId: issues.workspaceId,
     ownershipState: issues.ownershipState, scope: issues.scope, scopeVersion: issues.scopeVersion,
-    status: issues.status, content: issueAttrsContent }).from(issues)
+    status: issues.status, identifier: issues.issuedIdentifier, content: issueAttrsContent,
+    schedule: taskSchedule(issues.id, reader.id, workspaceId) }).from(issues)
     .where(and(inArray(issues.id, [...ids]), visibility.predicate))
   // Preserve the legacy JSON-null mikka/orvilo tombstone check as issueForUser.
   return rows.map(row => ({ ...row, metadata: readIssueMetadata(row.content) })).filter(row => !row.metadata.deletedAt)
@@ -51,7 +54,20 @@ type FactoryStateRow = Pick<FactoryTask, 'id' | 'issueId' | 'userId' | 'workspac
 /** One bounded read for a visible list. APP reads share a read-only snapshot;
  * live tenant membership stays locked through its commit in the separate WS DB.
  * Neither full task bodies nor private Run/Factory payloads are selected. */
-export async function readTaskPresentations(user: Reader, input: TaskPresentationsInput): Promise<TaskPresentations> {
+export function readTaskPresentations(user: Reader, input: TaskPresentationsInput): Promise<TaskPresentations> {
+  return readPresentationBatch(user, input, false)
+}
+
+/** Keep the detail endpoint's explicit Factory denial while sharing every
+ * field and authorization predicate with the bounded list projection. */
+export async function readTaskPresentation(user: Reader, workspaceId: string, issueId: string): Promise<TaskPresentation> {
+  const result = await readPresentationBatch(user, { workspaceId, issueIds: [issueId] }, true)
+  const item = result.items[issueId]
+  if (!item) throw new ActionFailureError('issueNotFound')
+  return item
+}
+
+async function readPresentationBatch(user: Reader, input: TaskPresentationsInput, requireFactoryAccess: boolean): Promise<TaskPresentations> {
   const parsed = taskPresentationsInput.parse(input)
   const { workspaceId } = parsed
   const wanted = [...new Set(parsed.issueIds)]
@@ -78,10 +94,8 @@ export async function readTaskPresentations(user: Reader, input: TaskPresentatio
         const ids = visible.map(task => task.id)
         const byId = new Map(visible.map(task => [task.id, task]))
         const status = new Map(rows.filter(readable).map(task => [task.id, task.status]))
-        const { rows: runs } = await client.query<BlockRun & { issueId: string }>(`
-          SELECT DISTINCT ON ("issueId") "issueId",id AS "runId",status,outcome
-          FROM agent_runs WHERE "issueId"=ANY($1::uuid[]) AND "userId"=$2 AND "workspaceId"=$3
-          ORDER BY "issueId","createdAt" DESC,id DESC`, [ids, reader.id, workspaceId])
+        const identifiers = new Map(rows.filter(readable).map(task => [task.id, task.identifier]))
+        const runs = await readTaskStateRuns(reader.id, workspaceId, ids)
         const runByIssue = new Map(runs.map(run => [run.issueId, run]))
         // Select the newest row first; a rejected source must not resurrect an
         // older Factory state. This is the same source/user-message/Bot proof as
@@ -96,12 +110,14 @@ export async function readTaskPresentations(user: Reader, input: TaskPresentatio
           FROM factory_tasks t WHERE t."issueId"=ANY($1::uuid[]) AND t."userId"=$2 AND t."workspaceId"=$3
           ORDER BY t."issueId",t."updatedAt" DESC,t.id DESC`, [ids, reader.id, workspaceId])
         const authorized = factories.filter(task => task.sourceAllowed && factoryScopeAllows(task, byId.get(task.issueId)))
+        if (requireFactoryAccess && authorized.length !== factories.length) throw new FactoryError('factoryNotFound')
         const flows = await readFactoryFlowStates(client, authorized)
         const flowByIssue = new Map(authorized.map(task => [task.issueId, flows.get(task.id)]))
         return Object.fromEntries(visible.map(task => [task.id, taskPresentation({
           status: z.enum(ISSUE_STATUS_CODES).parse(task.status), metadata: task.metadata,
         }, runByIssue.get(task.id), flowByIssue.get(task.id) ?? null,
-        id => !['done', 'canceled', 'duplicate'].includes(status.get(id) ?? 'todo'))]))
+        id => !['done', 'canceled', 'duplicate'].includes(status.get(id) ?? 'todo'),
+        { schedule: task.schedule, blockerIdentifier: id => identifiers.get(id) ?? null })]))
       })
       await client.query('COMMIT')
       return { version: 1, workspaceId, items }

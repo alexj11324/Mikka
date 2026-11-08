@@ -1,22 +1,18 @@
 import { threadGroup, type GroupIssue, type ThreadGroup } from './thread-groups'
-import type { BlockRun } from './task-blocked'
+import { attemptStateOf, taskStateOf, type AttemptState, type TaskGroup, type TaskStateContext, type TaskStateRun } from './task-state'
 
-export type MobileTaskGroup = 'pending' | 'running' | 'todo' | 'done'
+export type MobileTaskGroup = TaskGroup
 export type MobileTaskBot = { id: string; name: string; color: string; shape: string }
 export type MobileTaskSchedule = { label: string; nextAt: string | null }
 
-/** Closed tasks win, then board blocks; remaining thread decisions stay in the web's R-52 threadGroup. */
-export function mobileTaskGroup(issue: GroupIssue, run?: BlockRun | null, blocked = false): MobileTaskGroup {
-  if (['done', 'canceled', 'duplicate'].includes(issue.status)) return 'done'
-  if (blocked) return 'pending'
-  if (!run) return 'todo'
-  const group = threadGroup({ id: run.runId, status: run.status, outcome: run.outcome, issueId: null, createdAt: '' }, issue)
-  return ({ waiting: 'pending', blocked: 'pending', running: 'running', idle: 'todo', resolved: 'done' } as const)[group]
+/** Compatibility entry point; all grouping is derived from the shared task state. */
+export function mobileTaskGroup(issue: GroupIssue, run?: TaskStateRun | null, context: TaskStateContext = {}): MobileTaskGroup {
+  return taskStateOf(issue, run, context).group
 }
 
-export type MobileTaskAttempt = BlockRun & { harness: string; createdAt: Date; threadReplacedBy: string | null }
+export type MobileTaskAttempt = TaskStateRun & { harness: string; createdAt: Date; threadReplacedBy: string | null; pullRequest?: { url: string } | null }
 export type MobileTaskActivity =
-  | { kind: 'attempt'; runId: string; n: number; group: ThreadGroup; harness: string; createdAt: string; failed: boolean }
+  | { kind: 'attempt'; runId: string; n: number; group: ThreadGroup; state: AttemptState; pullRequest: { number: number; url: string } | null; harness: string; createdAt: string; failed: boolean }
   | { kind: 'replaced'; runId: string; createdAt: string }
   | { kind: 'created'; by: string | null; createdAt: string }
 
@@ -27,7 +23,9 @@ export function mobileTaskActivity(issue: GroupIssue, runs: readonly MobileTaskA
   const activity: MobileTaskActivity[] = [{ kind: 'created', by: created.by, createdAt: created.createdAt.toISOString() }]
   ordered.forEach((run, index) => {
     const group = threadGroup({ id: run.runId, status: run.status, outcome: run.outcome, issueId: null, createdAt: run.createdAt.toISOString() }, issue)
-    activity.push({ kind: 'attempt', runId: run.runId, n: index + 1, group, harness: run.harness, createdAt: run.createdAt.toISOString(), failed: run.status === 'failed' || run.outcome === 'failed' })
+    const number = Number(/\/pull\/(\d+)\/?$/.exec(run.pullRequest?.url ?? '')?.[1])
+    const pullRequest = number && run.pullRequest ? { number, url: run.pullRequest.url } : null
+    activity.push({ kind: 'attempt', state: attemptStateOf(run), pullRequest, runId: run.runId, n: index + 1, group, harness: run.harness, createdAt: run.createdAt.toISOString(), failed: run.status === 'failed' || run.outcome === 'failed' })
     const replacement = run.threadReplacedBy && byId.get(run.threadReplacedBy)
     if (replacement) activity.push({ kind: 'replaced', runId: replacement.runId, createdAt: replacement.createdAt.toISOString() })
   })

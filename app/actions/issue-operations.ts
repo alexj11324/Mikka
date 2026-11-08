@@ -60,12 +60,17 @@ async function issueConnections(id: string, reach: 'linked' | 'all') {
       or(eq(issues.id, id), named.length ? inArray(issues.id, named) : undefined, namesTask('mikka'), namesTask('orvilo'))))).map(row => row.id)
   }
   // Only each row's metadata is used: read the body's attrs, never every task's whole body.
-  const rows = await tx.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
+  const rows = await tx.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
     .where(and(eq(issues.userId, issue.userId), candidates ? inArray(issues.id, candidates) : undefined, issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [issue.workspaceId!] }))).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
-  const identifiers = await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
-  return live.map(({ content, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
+  // Whole-tree copying consumes structure only. The public linked view reuses
+  // identifiers from the same authorized rows and transaction.
+  const identifiers = reach === 'linked'
+    ? await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope,
+      number: readIssueMetadata(row.content).number, issuedIdentifier: row.issuedIdentifier })), tx)
+    : new Map<string, string | null>()
+  return live.map(({ content, issuedIdentifier: _issuedIdentifier, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
   })
 }
 

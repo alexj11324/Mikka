@@ -13,6 +13,8 @@ import { sealSecret, secretAad, SecretsKeyMissingError } from './crypto'
 import { secretActionAllowed, type SecretAction, type SecretTarget, type WorkspaceRole } from './permissions'
 import { isReservedEnvName, createSecretInput, deleteSecretInput, importSecretsInput, replaceSecretInput, scopeColumns, WORKSPACE_SECRETS_LIMIT } from './format'
 import { parseDotenv, type DotenvErrorReason } from './dotenv'
+import { approveSecretDelivery, effectiveSecretDelivery, type SecretDelivery } from './delivery'
+import { stopRunsForSecretChanges, type SecretChange } from './run-invalidation'
 
 export type SecretsTx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 export type SecretAuditAction = 'secret.created' | 'secret.replaced' | 'secret.deleted' | 'env.created' | 'env.updated' | 'env.deleted' | 'secret.replace_denied' | 'secret.injection_skipped'
@@ -45,6 +47,8 @@ export interface WorkspaceSecretView {
   /** '' for workspace scope, owner/repo (lowercase) for repository scope. */
   scopeRef: string
   note: string
+  /** Only secrets have a delivery policy. Unconfigured/legacy secrets remain protected. */
+  delivery?: SecretDelivery
   /** The member's name in this workspace, or '' once they are gone. */
   updatedBy: string
   updatedAt: string
@@ -62,7 +66,7 @@ function seal(value: string, row: Parameters<typeof secretAad>[0]) {
 export const logSecretFailure = (code: string, id: string) => console.error(`[secrets] ${code} id=${id}`)
 
 const view = (row: Row, names: ReadonlyMap<string, string>): WorkspaceSecretView => ({ id: row.id, name: row.name, kind: row.kind, scopeType: row.scopeType, scopeRef: row.scopeRef,
-  note: row.note, updatedBy: names.get(row.updatedBy) ?? '', updatedAt: row.updatedAt.toISOString() })
+  note: row.note, ...(row.kind === 'secret' ? { delivery: effectiveSecretDelivery(row.delivery) } : {}), updatedBy: names.get(row.updatedBy) ?? '', updatedAt: row.updatedAt.toISOString() })
 /** Workspace names of the people who last changed these rows (workspace database). */
 async function memberNames(workspaceId: string, userIds: readonly string[]): Promise<Map<string, string>> {
   const ids = [...new Set(userIds)]
@@ -140,7 +144,7 @@ const withWarning = (row: WorkspaceSecretView, value: string | undefined): Saved
 
 export async function createWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit): Promise<SavedSecretView> {
   const role = await requireSecretPermission(userId, workspaceId, 'secret.create')
-  const { name, kind, value, note, scope } = createSecretInput.parse(input)
+  const { name, kind, value, note, scope, delivery } = createSecretInput.parse(input)
   if (isReservedEnvName(name)) throw new WorkspaceError('secretNameReserved')
   const columns = { workspaceId, kind, name, ...scopeColumns(scope) }
   assertSecretPermission(role, 'secret.create', [columns])
@@ -151,8 +155,9 @@ export async function createWorkspaceSecret(userId: string, workspaceId: string,
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`secrets:${workspaceId}`}, 0))`)
       const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(workspaceSecrets).where(eq(workspaceSecrets.workspaceId, workspaceId))
       if (n >= WORKSPACE_SECRETS_LIMIT) throw new WorkspaceError('secretLimitReached')
-      const [saved] = await tx.insert(workspaceSecrets).values({ id, ...columns, note, ...sealed, createdBy: userId, updatedBy: userId }).returning()
-      await audit(tx, { workspaceId, actorId: userId, action: kind === 'secret' ? 'secret.created' : 'env.created', target: { type: kind, id, label: name }, metadata: { scope: saved.scopeType, role, ...(saved.scopeRef ? { repository: saved.scopeRef } : {}) } })
+      const [saved] = await tx.insert(workspaceSecrets).values({ id, ...columns, note, delivery: approveSecretDelivery(delivery, userId), ...sealed, createdBy: userId, updatedBy: userId }).returning()
+      await audit(tx, { workspaceId, actorId: userId, action: kind === 'secret' ? 'secret.created' : 'env.created', target: { type: kind, id, label: name }, metadata: { scope: saved.scopeType, role, ...(kind === 'secret' ? { delivery: saved.delivery.mode } : {}), ...(saved.scopeRef ? { repository: saved.scopeRef } : {}) } })
+      await stopRunsForSecretChanges(tx, [saved])
       return saved
     }), () => new WorkspaceError('secretNameTaken'))
   return withWarning((await views(workspaceId, [row]))[0], value)
@@ -165,7 +170,7 @@ export async function createWorkspaceSecret(userId: string, workspaceId: string,
  */
 export async function replaceWorkspaceSecret(userId: string, workspaceId: string, input: unknown, audit: SecretAuditHook = noAudit, now = new Date()): Promise<SavedSecretView> {
   const role = await requireSecretPermission(userId, workspaceId, 'secret.replace')
-  const { id, value, note, scope } = replaceSecretInput.parse(input)
+  const { id, value, note, scope, delivery } = replaceSecretInput.parse(input)
   const row = await guardSecretsDb(() => db.transaction(async tx => {
     const [current] = await tx.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.id, id), eq(workspaceSecrets.workspaceId, workspaceId))).for('update')
     // A missing id, an id in another workspace and an entry the caller may not edit are indistinguishable:
@@ -177,13 +182,18 @@ export async function replaceWorkspaceSecret(userId: string, workspaceId: string
     }
     const next = { ...current, ...(scope ? scopeColumns(scope) : {}) }
     assertSecretPermission(role, 'secret.replace', [current, next], current.createdBy === userId)
+    if (current.kind === 'env' && delivery !== undefined) throw new WorkspaceError('validationGeneric')
     // TODO(audit): member writes are audited through the same hook as admin writes (recordAudit after #432).
     // The AAD binds scope, so a moved entry is re-sealed; a moved entry without a new value needs it.
     const moved = current.scopeType !== next.scopeType || current.scopeRef !== next.scopeRef
     if (moved && value === undefined) throw new WorkspaceError('validationGeneric')
-    const [saved] = await tx.update(workspaceSecrets).set({ scopeType: next.scopeType, scopeRef: next.scopeRef, ...(value !== undefined ? seal(value, next) : {}), ...(note !== undefined ? { note } : {}), updatedBy: userId, updatedAt: now }).where(eq(workspaceSecrets.id, id)).returning()
+    const [saved] = await tx.update(workspaceSecrets).set({ scopeType: next.scopeType, scopeRef: next.scopeRef, delivery: approveSecretDelivery(delivery, userId, now, current.delivery), ...(value !== undefined ? seal(value, next) : {}), ...(note !== undefined ? { note } : {}), updatedBy: userId, updatedAt: now }).where(eq(workspaceSecrets.id, id)).returning()
     await audit(tx, { workspaceId, actorId: userId, action: current.kind === 'secret' ? 'secret.replaced' : 'env.updated', target: { type: current.kind, id, label: current.name },
-      metadata: { role, ...(value === undefined ? { noteOnly: true } : {}), ...(moved ? { from: [current.scopeType, current.scopeRef], to: [next.scopeType, next.scopeRef] } : {}) } })
+      metadata: { role, ...(value === undefined && delivery === undefined && !moved ? { noteOnly: true } : {}), ...(delivery !== undefined ? { delivery: saved.delivery.mode, previousDelivery: effectiveSecretDelivery(current.delivery).mode } : {}), ...(moved ? { from: [current.scopeType, current.scopeRef], to: [next.scopeType, next.scopeRef] } : {}) } })
+    // JSONB does not preserve object-key order; normalize both stored policies.
+    if (value !== undefined || moved || JSON.stringify(effectiveSecretDelivery(current.delivery)) !== JSON.stringify(effectiveSecretDelivery(saved.delivery))) {
+      await stopRunsForSecretChanges(tx, moved ? [current, saved] : [saved])
+    }
     return saved
   }), () => new WorkspaceError('secretNameTaken'))
   if (!row) throw new WorkspaceError('secretNotFound')
@@ -219,6 +229,7 @@ export async function importWorkspaceSecrets(userId: string, workspaceId: string
     const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(workspaceSecrets).where(eq(workspaceSecrets.workspaceId, workspaceId))
     if (n + fresh.length > WORKSPACE_SECRETS_LIMIT) throw new WorkspaceError('secretLimitReached')
     const result: ImportResult = { created: [], replaced: [], kept: [], errors }
+    const changes: SecretChange[] = []
     for (const entry of entries) {
       const current = byName.get(entry.name)
       if (!current) {
@@ -226,12 +237,15 @@ export async function importWorkspaceSecrets(userId: string, workspaceId: string
         await tx.insert(workspaceSecrets).values({ id, ...columns, note: entry.note, ...seal(entry.value, columns), createdBy: userId, updatedBy: userId })
         await audit(tx, { workspaceId, actorId: userId, action: kind === 'secret' ? 'secret.created' : 'env.created', target: { type: kind, id, label: entry.name }, metadata: { scope: scoped.scopeType, role, bulk: true, ...(scoped.scopeRef ? { repository: scoped.scopeRef } : {}) } })
         result.created.push(entry.name)
+        changes.push({ id, ...columns })
       } else if (onConflict === 'replace' && secretActionAllowed(role, 'secret.replace', [current], current.createdBy === userId)) {
         await tx.update(workspaceSecrets).set({ ...seal(entry.value, current), ...(entry.note ? { note: entry.note } : {}), updatedBy: userId, updatedAt: now }).where(eq(workspaceSecrets.id, current.id))
         await audit(tx, { workspaceId, actorId: userId, action: current.kind === 'secret' ? 'secret.replaced' : 'env.updated', target: { type: current.kind, id: current.id, label: current.name }, metadata: { role, bulk: true } })
         result.replaced.push(entry.name)
+        changes.push(current)
       } else result.kept.push(entry.name)
     }
+    await stopRunsForSecretChanges(tx, changes)
     return result
   }))
 }
@@ -241,9 +255,10 @@ export async function deleteWorkspaceSecret(userId: string, workspaceId: string,
   await requireSecretPermission(userId, workspaceId, 'secret.delete')
   const { id } = deleteSecretInput.parse(input)
   return guardSecretsDb(() => db.transaction(async tx => {
-    const [gone] = await tx.delete(workspaceSecrets).where(and(eq(workspaceSecrets.id, id), eq(workspaceSecrets.workspaceId, workspaceId))).returning({ id: workspaceSecrets.id, kind: workspaceSecrets.kind, name: workspaceSecrets.name })
+    const [gone] = await tx.delete(workspaceSecrets).where(and(eq(workspaceSecrets.id, id), eq(workspaceSecrets.workspaceId, workspaceId))).returning({ id: workspaceSecrets.id, kind: workspaceSecrets.kind, name: workspaceSecrets.name, workspaceId: workspaceSecrets.workspaceId, scopeType: workspaceSecrets.scopeType, scopeRef: workspaceSecrets.scopeRef })
     if (!gone) throw new WorkspaceError('secretNotFound')
     await audit(tx, { workspaceId, actorId: userId, action: gone.kind === 'secret' ? 'secret.deleted' : 'env.deleted', target: { type: gone.kind, id, label: gone.name } })
+    await stopRunsForSecretChanges(tx, [gone])
     return { id }
   }))
 }

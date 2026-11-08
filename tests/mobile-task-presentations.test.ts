@@ -17,7 +17,8 @@ const WORKSPACE = '11111111-1111-4111-8111-111111111111'
 const issueId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const INPUT = { workspaceId: WORKSPACE, issueIds: [issueId(1)] }
 const RESULT = { version: 1, workspaceId: WORKSPACE, items: {
-  [issueId(1)]: { version: 1, primaryStatus: 'todo', factoryStage: null, runStatus: null, needsAction: null, blockedReason: null, completion: null },
+  [issueId(1)]: { version: 1, primaryStatus: 'todo', factoryStage: null, runStatus: null, needsAction: null, blockedReason: null, completion: null,
+    state: 'todo', reason: null, blockedBy: null, group: 'todo' },
 } }
 type User = { id: string; [enterprisePrincipal]?: EnterprisePrincipal; [tokenWorkspace]?: string }
 const proof: EnterprisePrincipal = { kind: 'session', sessionId: 'native-session-fixture' }

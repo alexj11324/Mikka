@@ -16,6 +16,7 @@ permissions:
 concurrency:
   group: production-smoke-owner-acceptance
   cancel-in-progress: false
+  queue: max
 jobs:
   acceptance:
     if: >-

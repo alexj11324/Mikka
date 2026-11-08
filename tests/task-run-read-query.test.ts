@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { before, beforeEach, mock, test } from 'node:test'
+import { and, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import type { Pool } from 'pg'
 import { issueVisibilityPredicate } from '../lib/issue-visibility-policy'
@@ -47,6 +48,9 @@ const client = { query: async (config: { text: string; rowMode?: string }, param
 const database = drizzle(client as unknown as Pool)
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 let actions: typeof import('../app/actions/task-runs')
+let stateQueries: typeof import('../lib/task-state-query')
+let taskQueries: typeof import('../lib/task-block-runs')
+let schema: typeof import('../lib/db/schema')
 before(async () => {
   mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
   stub('../lib/auth.ts', { auth: { api: { getSession: async () => { order.push('auth'); return viewer ? { user: { id: viewer } } : null } } } })
@@ -72,6 +76,9 @@ before(async () => {
   } })
   stub('../lib/live/presence-read.ts', { withDevicePresence: (live: unknown) => live })
   actions = await import('../app/actions/task-runs')
+  stateQueries = await import('../lib/task-state-query')
+  taskQueries = await import('../lib/task-block-runs')
+  schema = await import('../lib/db/schema')
 })
 beforeEach(() => {
   viewer = OWNER; taskRows = true; threadRows = false; expiry = EXPIRY
@@ -162,4 +169,42 @@ test('authentication failures still precede every revision or main-database read
   assert.deepEqual(workspaceReads, [])
   assert.deepEqual(queries, [])
   assert.deepEqual(liveReads, [])
+})
+
+test('shared run facts correlate to the outer Run in both single-table and joined reads', () => {
+  const { agentRuns, agents } = schema
+  for (const joined of [false, true]) {
+    const query = database.select(stateQueries.taskStateRunColumns).from(agentRuns).$dynamic()
+    if (joined) query.innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    const { sql: text, params } = query.where(and(eq(agentRuns.userId, OWNER), eq(agentRuns.workspaceId, WORKSPACE))).toSQL()
+    for (const alias of ['p', 'a', 'v']) {
+      assert.ok(text.includes(`${alias}."runId"="agent_runs"."id"`), `${alias} must not capture its own id (${joined ? 'joined' : 'single-table'})`)
+      assert.ok(text.includes(`${alias}."userId"="agent_runs"."userId"`), `${alias} must retain the outer owner`)
+    }
+    assert.ok(text.includes('"agent_runs"."status" in (\'preparing\',\'running\',\'waiting_input\',\'finishing\')'))
+    assert.ok(text.includes('"agent_runs"."stopRequestedAt" is null'))
+    assert.equal(text.match(/d\.id="agent_runs"\."deviceId"/g)?.length, 2, 'both presence facts use the actual Run device')
+    assert.equal(text.match(/d\."ownerId"="agent_runs"\."userId"/g)?.length, 2, 'both presence facts retain the outer owner')
+    assert.equal(text.match(/"agent_runs"\."status"='queued'/g)?.length, 2)
+    assert.match(text, /where \("agent_runs"\."userId" = \$\d+ and "agent_runs"\."workspaceId" = \$\d+\)/)
+    assert.ok(params.includes(OWNER) && params.includes(WORKSPACE), 'actor and Workspace remain parameterized')
+    assert.ok(!text.includes(OWNER) && !text.includes(WORKSPACE))
+  }
+  assert.equal(queries.length, 0, 'query construction does not execute or add a read')
+})
+
+test('task schedules correlate to the outer Task and Workspace without capturing the schedule id', () => {
+  const { issues, agents } = schema
+  for (const joined of [false, true]) {
+    const query = database.select({ id: issues.id, schedule: taskQueries.taskSchedule(issues.id, OWNER, WORKSPACE) }).from(issues).$dynamic()
+    if (joined) query.leftJoin(agents, eq(agents.userId, issues.userId))
+    const { sql: text, params } = query.where(eq(issues.id, ISSUE)).toSQL()
+    assert.ok(text.includes('s.definition->\'task\'->>\'issueId\'="issues"."id"::text'), `schedule must use the outer Task (${joined ? 'joined' : 'single-table'})`)
+    assert.ok(text.includes('s.workspace_id="issues"."workspaceId"'), 'schedule tenant must match the actual Task')
+    assert.match(text, /s\.owner_id=\$\d+/)
+    assert.match(text, /s\.workspace_id=\$\d+::uuid/)
+    assert.deepEqual(params, [OWNER, WORKSPACE, ISSUE])
+    assert.ok(!text.includes(OWNER) && !text.includes(WORKSPACE) && !text.includes(ISSUE))
+  }
+  assert.equal(queries.length, 0, 'schedule decoration stays in its existing query')
 })

@@ -1,6 +1,6 @@
-import { and, desc, eq, sql, type SQL } from 'drizzle-orm'
+import { and, eq, sql, type SQL } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
-import { issueMembers, issues, users } from '@/lib/db/schema'
+import { issueMembers, issues } from '@/lib/db/schema'
 import { ActionFailureError } from '@/lib/action-error'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 
@@ -59,7 +59,7 @@ export type SearchParams = {
  * skip rows whose updatedAt differs from the last row only below the millisecond.
  */
 const CURSOR_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/
-const cursorKey = sql<string>`to_char(${issues.updatedAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
+const cursorKey = sql<string>`to_char("updatedAt" at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 
 export function encodeCursor(row: { cursorKey: string; id: string }) {
   return Buffer.from(JSON.stringify({ u: row.cursorKey, i: row.id })).toString('base64url')
@@ -167,21 +167,36 @@ export function searchCondition(query: SearchQuery): SQL | undefined {
   return undefined
 }
 
-export type SearchRow = { id: string; ownerId: string; ownerName: string | null; scope: 'personal' | 'workspace'; title: string; status: string; priority: string; revision: number; updatedAt: Date; cursorKey: string; metadata: Metadata }
+export type SearchRow = { id: string; ownerId: string; ownerName: string | null; scope: 'personal' | 'workspace'; title: string; status: string; priority: string; revision: number; updatedAt: Date; cursorKey: string; metadata: Metadata; issuedIdentifier: string | null }
+
+type SearchTransportRow = [string, string, string | null, 'personal' | 'workspace', string, string, string, number, string, Metadata | null, string | null]
 
 /** One page of already-authorized rows; visibility is part of SQL before LIMIT. */
-export async function fetchCandidates(db: Db, input: { userId: string; visibility: SQL; excludedIds: string[]; query: SearchQuery; cursor: { updatedAt: string; id: string } | null; limit: number }) {
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, revision: issues.revision, updatedAt: issues.updatedAt, cursorKey, metadata: sql<Metadata | null>`${meta}` })
-    .from(issues).leftJoin(users, eq(users.id, issues.userId))
+export async function fetchCandidates(db: Db, input: { userId: string; visibility: SQL; excludedIds: string[]; query: SearchQuery; cursor: { updatedAt: string; id: string } | null; limit: number; visibilityExcludesDeleted?: boolean }) {
+  // A single transport row avoids repeating the row/column protocol overhead.
+  // Authorization and the full-precision ordering still happen before LIMIT.
+  // The UTC microsecond cursor also carries the public timestamp; send it once.
+  // A scalar name lookup keeps this page projection on the single issues table.
+  const page = db.select({
+    v: sql<SearchTransportRow>`jsonb_build_array(id,"userId",(select name from "user" where "user".id=issues."userId"),scope,title,status,priority,revision,${cursorKey},${meta},"issuedIdentifier")`.as('v'),
+  }).from(issues)
     .where(and(
       input.visibility,
-      sql`(${meta}->>'deletedAt') is null`,
+      input.visibilityExcludesDeleted ? undefined : sql`(${meta}->>'deletedAt') is null`,
       searchCondition(input.query),
       input.excludedIds.length ? sql`not (${idIn(issues.id, input.excludedIds)})` : undefined,
       input.cursor ? sql`(${issues.updatedAt}, ${issues.id}) < (${input.cursor.updatedAt}::timestamptz, ${input.cursor.id}::uuid)` : undefined,
     ))
-    .orderBy(desc(issues.updatedAt), desc(issues.id)).limit(input.limit)
-  return rows.map(row => ({ ...row, metadata: row.metadata ?? {} })) as SearchRow[]
+    .orderBy(sql`"updatedAt" desc, id desc`).limit(input.limit).as('q')
+  // Keep the already-issued identifier in this authorized page. Team changes
+  // and owner prefix settings are neither naming nor authorization sources.
+  const [packed] = await db.select({
+    data: sql<SearchTransportRow[] | null>`jsonb_agg(q.v order by (q.v->>8)::timestamptz desc,(q.v->>0)::uuid desc)`,
+  }).from(page)
+  return (packed.data ?? []).map(([id, ownerId, ownerName, scope, title, status, priority, revision, cursorKey, metadata, issuedIdentifier]): SearchRow => ({
+    id, ownerId, ownerName, scope, title, status, priority, revision, updatedAt: new Date(cursorKey), cursorKey,
+    metadata: metadata ?? {}, issuedIdentifier,
+  }))
 }
 
 export async function memberIssueIds(db: Db, ownerId: string, userId: string) {
@@ -233,9 +248,9 @@ export async function searchIssues(db: Db, input: { userId: string; params: Sear
     }
   }
   const members = current && current.ownerId !== userId ? await memberIssueIds(db, current.ownerId, userId) : []
-  const rows = await fetchCandidates(db, { userId, visibility: candidatePredicate, excludedIds: [...excluded], query, cursor: params.cursor, limit: params.limit + 1 })
+  const rows = await fetchCandidates(db, { userId, visibility: candidatePredicate, excludedIds: [...excluded], query, cursor: params.cursor, limit: params.limit + 1, visibilityExcludesDeleted: true })
   const page = rows.slice(0, params.limit)
-  const identifiers = await taskIdentifiers(page.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: row.metadata.number })))
+  const identifiers = await taskIdentifiers(page.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: row.metadata.number, issuedIdentifier: row.issuedIdentifier })))
   return {
     items: page.map((row): SearchResultItem => ({
       id: row.id, identifier: identifiers.get(row.id) ?? null,

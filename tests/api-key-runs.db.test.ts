@@ -160,7 +160,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       writeFileSync(join(existingWorktree, 'existing-note.txt'), 'Keep unrelated worktree edits\n')
       const existingStatus = git(existingWorktree, 'status', '--porcelain')
 
-      const selected = await createWorkspaceSecret(p.id, p.workspaceId, { name: 'PROJECT_PASSWORD', kind: 'secret', value: selectedValue, scope: { type: 'repository', repository: repositoryKey.slice('v2/github.com/'.length) } })
+      const selected = await createWorkspaceSecret(p.id, p.workspaceId, { name: 'PROJECT_PASSWORD', kind: 'secret', value: selectedValue, scope: { type: 'repository', repository: repositoryKey.slice('v2/github.com/'.length) }, delivery: { mode: 'direct', exposeToAgent: true } })
       await createWorkspaceSecret(p.id, p.workspaceId, { name: 'UNSELECTED_PASSWORD', kind: 'secret', value: unselectedValue })
       configuration.secretIds = [selected.id]
       const environment = await resources.saveEnvironment(p.id, { workspaceId: p.workspaceId, name: 'Actual claim environment', configuration })

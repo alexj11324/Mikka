@@ -182,6 +182,10 @@ returns the same projection as the batch reader:
 ```ts
 {
   version: 1,
+  state,         // shared taskStateOf(): one display state
+  reason,        // fixed reason code or null, never provider prose
+  blockedBy,     // readable dependency's issued identifier, otherwise null
+  group,         // derived from state only
   primaryStatus, // existing Task business status
   factoryStage,  // current authorized Factory view or null
   runStatus,     // authorized current Run status or null
@@ -190,6 +194,44 @@ returns the same projection as the batch reader:
   completion    // 'merged' | 'accepted' | null
 }
 ```
+
+`state` is `waiting | blocked | failed | running | queued | todo | done |
+canceled | duplicate`. `reason` is `needs_input | approval | pr_review |
+blocked | quota | offline | blocked_by | flagged | null`. The shared
+`lib/task-state.ts::taskStateOf()` introduced by #1696 owns this classification;
+the canonical reader supplies the current authorized Factory context to the
+same function. No client should reconstruct another display state from
+`primaryStatus`, `runStatus`, or the presence of `needsAction`.
+
+| Shared state | Group | Meaning |
+| --- | --- | --- |
+| `waiting` | `pending` | A reply, approval or review is needed; only this state raises the hand count. |
+| `blocked`, `failed` | `pending` | Execution is unavailable or failed; neither state raises a hand. |
+| `running`, `queued` | `running` | An active attempt or a pending scheduled execution. |
+| `todo` | `todo` | An open Task without a more specific current execution state. |
+| `done`, `canceled`, `duplicate` | `done` | The Task's own business status closes it. |
+
+Dependency and manual-flag reasons retain the Task's own display state/group.
+`blocked_by` does not grant access to the dependency: its issued identifier is
+returned only when the same reader can read that dependency in this Workspace.
+An unknown or inaccessible dependency stays unresolved with `blockedBy: null`.
+
+Run facts include the real pause reason, current unexpired approvals, bounded
+failure codes, replacement and device presence, plus the actor's explicitly
+linked schedule. A human-control pause is `waiting/approval`, not quota.
+Current Factory `question`, `spec_review`, `pr_review`, `blocked` and `failed`
+attention supplies the same classification before an old Run reason. Closed
+Tasks take precedence over both. A successful Run, a historical merged PR or
+a Factory receipt does not rewrite Task business status. Current candidate
+receipts remain independently available as `completion: merged | accepted`.
+
+The existing `needsAction` and `blockedReason` fields retain their names and
+value sets. They are compatibility labels from this same classification,
+including dependency/flag annotations and explicit clearing of a board block.
+Generic approval has no old `needsAction` value and therefore leaves it null;
+Factory spec review retains `spec_review`. Clients use `state/reason` to choose
+the main icon and attention count. A stale Run quota label cannot coexist with
+a current Factory request for a reply or approval.
 
 Lists use one `task-domain.getTaskPresentations({ workspaceId, issueIds })`
 read for up to 200 requested Task UUIDs:
@@ -220,6 +262,14 @@ are `private, no-store`; errors are `401 authRequired`, `400 invalidRequest`,
 The existing mobile list/detail fields remain compatible; the UI owner consumes
 this projection in the current list/live lifecycle without rewriting stored
 Task status or adding another timer.
+
+The legacy `GET /api/mobile/tasks` and `GET /api/mobile/tasks/:id` reuse the
+shared state mapper with their existing Run/schedule facts. They do not read
+the current Factory context, so their compatibility state is not guaranteed
+to equal the canonical presentation for a Factory-managed Task. The #1714
+Web/Desktop/iOS integration must consume this bounded batch once per existing
+list/live update to display current Factory handoffs consistently. Supplying
+the backend contract does not complete that UI integration.
 
 The server validates the Workspace against the authenticated principal and
 current membership, including an empty batch. Duplicate IDs are read once.

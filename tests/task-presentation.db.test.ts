@@ -97,7 +97,7 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       const id = randomUUID(); agents.set(userId, id)
       await application.query('INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,\'codex\',\'Synthetic agent\')', [id, userId])
     }
-    const makeBot = async (userId = owner, workspaceId = shared) => {
+    const makeBot = async (userId = owner, workspaceId: string = shared) => {
       const id = randomUUID()
       await application.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)', [id, userId, workspaceId, `Synthetic bot ${id}`])
       return id
@@ -128,7 +128,8 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       finally { client.release() }
       return { id, source, attempt, issueId, userId }
     }
-    const expected = (patch: Record<string, unknown> = {}) => ({ version: 1, primaryStatus: 'doing', factoryStage: null, runStatus: null, needsAction: null, blockedReason: null, completion: null, ...patch })
+    const expected = (patch: Record<string, unknown> = {}) => ({ version: 1, primaryStatus: 'doing', factoryStage: null, runStatus: null, needsAction: null, blockedReason: null, completion: null,
+      state: 'todo', reason: null, blockedBy: null, group: 'todo', ...patch })
 
     await t.test('the action returns current-tenant business status without another actor private Run or Factory', async () => {
       const issue = await makeTask(shared, {}, 'doing', peer)
@@ -136,7 +137,7 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       await makeFactory(issue, { userId: peer })
       assert.deepEqual((await batch([issue])).items[issue], expected())
       const own = await batch([issue], shared, peer)
-      assert.deepEqual(own.items[issue], expected({ factoryStage: 'triage', runStatus: 'waiting_input', needsAction: 'question', blockedReason: 'question' }))
+      assert.deepEqual(own.items[issue], expected({ factoryStage: 'triage', runStatus: 'waiting_input', needsAction: 'question', blockedReason: 'question', state: 'waiting', reason: 'needs_input', group: 'pending' }))
       assert.deepEqual(await as(peer, shared, () => getTaskPresentation(issue)), own.items[issue], 'detail and batch use the same existing Factory state rule')
       assert.doesNotMatch(JSON.stringify(own), /private body|private prompt|private reason/)
     })
@@ -197,11 +198,104 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       await makeRun(success, { outcome: 'done' })
       await makeRun(cancelled, { status: 'waiting_input' })
       const result = await batch([unknown, ready, success, cancelled])
-      assert.deepEqual(result.items[unknown], expected({ needsAction: 'dependency', blockedReason: 'dependency' }))
+      assert.deepEqual(result.items[unknown], expected({ needsAction: 'dependency', blockedReason: 'dependency', reason: 'blocked_by' }))
       assert.deepEqual(result.items[ready], expected())
       assert.deepEqual(result.items[success], expected({ runStatus: 'succeeded' }))
-      assert.deepEqual(result.items[cancelled], expected({ primaryStatus: 'canceled', runStatus: 'waiting_input' }))
+      assert.deepEqual(result.items[cancelled], expected({ primaryStatus: 'canceled', runStatus: 'waiting_input', state: 'canceled', group: 'done' }))
       for (const id of [unknown, ready, success, cancelled]) assert.deepEqual(await as(owner, shared, () => getTaskPresentation(id)), result.items[id])
+    })
+
+    await t.test('real pause, current approval, offline and failure facts agree in detail and batch without private causes', async () => {
+      const issue = await makeTask(), run = await makeRun(issue)
+      const compare = async (patch: Record<string, unknown>) => {
+        const view = (await batch([issue])).items[issue]
+        assert.deepEqual(view, expected(patch))
+        assert.deepEqual(await as(owner, shared, () => getTaskPresentation(issue)), view)
+        assert.deepEqual((await batch([issue], shared, peer)).items[issue], expected(), 'shared Task membership does not disclose the owner execution facts')
+        assert.doesNotMatch(JSON.stringify(view), /PRIVATE_CAUSE|private prompt|failureDetails|digest/)
+      }
+      for (const [pauseReason, state, reason, needsAction, blockedReason] of [
+        ['human_control', 'waiting', 'approval', null, null], ['quota_exhausted', 'blocked', 'quota', 'quota', 'quota'],
+        [null, 'blocked', 'quota', 'quota', 'quota'],
+      ]) {
+        await application.query('UPDATE agent_runs SET status=\'paused\',"pauseReason"=$2 WHERE id=$1', [run, pauseReason])
+        await compare({ runStatus: 'paused', state, reason, needsAction, blockedReason, group: 'pending' })
+      }
+      const device = randomUUID()
+      await application.query('INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt") VALUES($1,$2,\'Presentation device\',\'local\',now())', [device, owner])
+      await application.query('UPDATE agent_runs SET status=\'running\',"pauseReason"=NULL,"deviceId"=$2 WHERE id=$1', [run, device])
+      const approval = randomUUID()
+      await application.query(`INSERT INTO agent_tool_approvals(id,"runId","userId","deviceId","requestId",harness,method,input,digest,status,"expiresAt")
+        VALUES($1,$2,$3,$4,'presentation','codex','fixture','{}','digest','pending',now()+interval '1 hour')`, [approval, run, owner, device])
+      await compare({ runStatus: 'running', state: 'waiting', reason: 'approval', group: 'pending' })
+      await application.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [run])
+      await compare({ runStatus: 'running', state: 'running', group: 'running' })
+      await application.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1', [run])
+      await application.query('UPDATE agent_tool_approvals SET "expiresAt"=now()-interval \'1 hour\' WHERE id=$1', [approval])
+      await compare({ runStatus: 'running', state: 'running', group: 'running' })
+      const computerApproval = randomUUID()
+      await application.query(`INSERT INTO local_computer_reviews(id,"runId","deviceId","userId",target,call,digest,"expiresAt","seenAt")
+        VALUES($1,$2,$3,$4,'fixture','{}','digest',now()+interval '1 hour',now())`, [computerApproval, run, device, owner])
+      await compare({ runStatus: 'running', state: 'waiting', reason: 'approval', group: 'pending' })
+      await application.query('UPDATE local_computer_reviews SET decision=true WHERE id=$1', [computerApproval])
+      await compare({ runStatus: 'running', state: 'running', group: 'running' })
+      await application.query('UPDATE agent_runs SET status=\'queued\' WHERE id=$1', [run])
+      await application.query('UPDATE devices SET "lastSeenAt"=now()-interval \'1 day\' WHERE id=$1', [device])
+      await compare({ runStatus: 'queued', state: 'blocked', reason: 'offline', needsAction: 'blocked', blockedReason: 'run', group: 'pending' })
+      await application.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [device])
+      await compare({ runStatus: 'queued', state: 'queued', group: 'running' })
+      for (const category of ['subscription', 'api_key', 'access_denied', 'quota']) {
+        await application.query('UPDATE agent_runs SET status=\'failed\',"failureDetails"=$2 WHERE id=$1', [run,
+          { schemaVersion: 1, runId: run, code: 'run_failed', category, occurredAt: '2026-11-08T00:00:00Z', appVersion: 'fixture', cause: { message: 'PRIVATE_CAUSE' } }])
+        await compare({ runStatus: 'failed', state: 'blocked', reason: category === 'quota' ? 'quota' : 'blocked',
+          needsAction: category === 'quota' ? 'quota' : 'blocked', blockedReason: category === 'quota' ? 'quota' : 'run', group: 'pending' })
+      }
+      await application.query('UPDATE agent_runs SET status=\'succeeded\',outcome=\'done\',"failureDetails"=NULL WHERE id=$1', [run])
+      await compare({ runStatus: 'succeeded' })
+      await application.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",status)
+        VALUES($1,$2,$3,'https://github.com/example/presentation','github.com/example/presentation','awaiting_approval')`, [run, owner, issue])
+      await compare({ runStatus: 'succeeded', state: 'waiting', reason: 'approval', group: 'pending' })
+      await application.query('UPDATE issues SET status=\'done\' WHERE id=$1', [issue])
+      const closed = (await batch([issue])).items[issue]
+      assert.deepEqual(closed, expected({ primaryStatus: 'done', runStatus: 'succeeded', state: 'done', group: 'done' }))
+    })
+
+    await t.test('actor-owned schedules and readable issued dependency identifiers stay scoped without extra reads', async () => {
+      const task = await makeTask(), blocker = await makeTask(), foreign = await makeTask(other)
+      const blockerIdentifier = (await application.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [blocker])).rows[0].issuedIdentifier
+      assert.equal(typeof blockerIdentifier, 'string')
+      const dependent = await makeTask(shared, { blockedByIds: [blocker] })
+      const hidden = await makeTask(shared, { blockedByIds: [foreign] })
+      for (const [userId, workspaceId, issueId] of [[owner, shared, task], [peer, shared, dependent], [owner, other, hidden]]) {
+        const bot = await makeBot(userId, workspaceId), id = randomUUID()
+        const definition = { title: 'Private schedule title', timezone: 'UTC', timing: { kind: 'daily', time: '09:00', fold: 'earlier', gap: 'skip' },
+          task: { kind: 'issue_snapshot', issueId }, misfire: 'skip', maxLatenessMinutes: 60 }
+        await application.query(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status,next_at)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$7,'active','2030-01-01T09:00:00Z')`, [id, userId, workspaceId, bot, randomUUID(), randomUUID(), definition])
+      }
+      const result = await batch([task, dependent, hidden])
+      assert.deepEqual(result.items[task], expected({ state: 'queued', group: 'running' }))
+      assert.deepEqual(result.items[dependent], expected({ reason: 'blocked_by', blockedBy: blockerIdentifier, needsAction: 'dependency', blockedReason: 'dependency' }))
+      assert.deepEqual(result.items[hidden], expected({ reason: 'blocked_by', needsAction: 'dependency', blockedReason: 'dependency' }))
+      assert.doesNotMatch(JSON.stringify(result), /Private schedule title/)
+      for (const id of [task, dependent, hidden]) assert.deepEqual(await as(owner, shared, () => getTaskPresentation(id)), result.items[id])
+    })
+
+    await t.test('current Factory attention replaces stale Run labels with the same canonical classification', async () => {
+      for (const [stage, status, state, reason, needsAction, blockedReason] of [
+        ['clarify', 'waiting', 'waiting', 'needs_input', 'question', null],
+        ['spec', 'passed', 'waiting', 'approval', 'spec_review', null],
+        ['approval', 'pending', 'waiting', 'pr_review', 'pr_review', null],
+        ['execute', 'blocked', 'blocked', 'blocked', 'blocked', 'factory'],
+        ['execute', 'failed', 'failed', null, 'failed', 'factory'],
+      ] as const) {
+        const issue = await makeTask(), run = await makeRun(issue, { status: 'paused' })
+        await application.query('UPDATE agent_runs SET "pauseReason"=\'quota_exhausted\' WHERE id=$1', [run])
+        await makeFactory(issue, { stage, status })
+        const result = (await batch([issue])).items[issue]
+        assert.deepEqual([result.state, result.reason, result.needsAction, result.blockedReason, result.group], [state, reason, needsAction, blockedReason, 'pending'])
+        assert.deepEqual(await as(owner, shared, () => getTaskPresentation(issue)), result)
+      }
     })
 
     await t.test('equal timestamps use stable UUID ordering for the latest Run and Factory', async () => {
@@ -211,7 +305,7 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       await makeFactory(issue, { id: '00000000-0000-4000-8000-000000000003', stage: 'execute', status: 'running' })
       await makeFactory(issue, { id: '00000000-0000-4000-8000-000000000004' })
       const result = await batch([issue])
-      assert.deepEqual(result.items[issue], expected({ runStatus: 'succeeded', factoryStage: 'triage', needsAction: 'question' }))
+      assert.deepEqual(result.items[issue], expected({ runStatus: 'succeeded', factoryStage: 'triage', needsAction: 'question', state: 'waiting', reason: 'needs_input', group: 'pending' }))
       assert.deepEqual(await as(owner, shared, () => getTaskPresentation(issue)), result.items[issue])
     })
 
@@ -229,7 +323,10 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       const moved = await application.query('UPDATE bots SET "workspaceId"=$2 WHERE id=$1 AND "ownerId"=$3 RETURNING "workspaceId"', [anotherWorkspaceBot, other, owner])
       assert.deepEqual(moved.rows, [{ workspaceId: other }])
       const result = await batch(ids)
-      for (const id of ids) assert.deepEqual(result.items[id], expected())
+      for (const id of ids) {
+        assert.deepEqual(result.items[id], expected())
+        await assert.rejects(as(owner, shared, () => getTaskPresentation(id)), { code: 'factoryNotFound' })
+      }
     })
 
     await t.test('only the current candidate actual merge or deliverable acceptance supplies completion', async () => {
@@ -260,7 +357,7 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       }
       const one = await counted(() => batch(ids.slice(0, 1))), many = await counted(() => batch(ids))
       assert.equal(Object.keys(many.result.items).length, 200)
-      for (const id of ids) assert.deepEqual(many.result.items[id], expected({ runStatus: 'succeeded', factoryStage: 'triage', needsAction: 'question' }))
+      for (const id of ids) assert.deepEqual(many.result.items[id], expected({ runStatus: 'succeeded', factoryStage: 'triage', needsAction: 'question', state: 'waiting', reason: 'needs_input', group: 'pending' }))
       assert.equal(many.statements.length, one.statements.length, 'no per-Task authorization, Factory or dependency queries')
       assert.ok(many.statements.length <= 14, `Task presentation: ${many.statements.length} statements exceed the fixed budget`)
       const appSelects = many.statements.filter(row => row.database === appName && /^\s*select\b/i.test(row.sql))

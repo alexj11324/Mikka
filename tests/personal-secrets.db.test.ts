@@ -1,9 +1,9 @@
 // 设置 › 密钥与登录 › 我的: a person's own secrets against a real PostgreSQL (decision 2026-11-02-2120).
 // Uses a random per-run WORKSPACE_SECRETS_KEY only.
 import assert from 'node:assert/strict'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('personal secrets', { skip: !dbUrl }, async t => {
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
@@ -24,7 +24,8 @@ test('personal secrets', { skip: !dbUrl }, async t => {
   const alex = await seedUser(pool, 'alex'), lin = await seedUser(pool, 'lin')
   const ws = await seedWorkspace(pool, alex, [{ userId: alex, role: 'admin' }, { userId: lin, role: 'member' }])
   const VALUE = 'sk_personal_' + randomBytes(12).toString('hex')
-  const META = ['id', 'kind', 'name', 'note', 'updatedAt']
+  const META = ['delivery', 'id', 'kind', 'name', 'note', 'updatedAt']
+  const DIRECT = { mode: 'direct', exposeToAgent: true } as const
 
   await t.test('owner-only: list, create, replace, delete; ids of others are indistinguishable from missing ones', async () => {
     const saved = await personal.createUserSecret(alex, { name: 'OPENROUTER_API_KEY', kind: 'secret', value: VALUE, note: '测试用' }, { workspaceId: ws.id })
@@ -45,11 +46,11 @@ test('personal secrets', { skip: !dbUrl }, async t => {
   })
 
   await t.test('a personal name a workspace secret already has asks once; confirmed, the personal value wins in the owner\'s runs only', async () => {
-    await store.createWorkspaceSecret(alex, ws.id, { name: 'VERCEL_TOKEN', kind: 'secret', value: 'team-value-1234' })
-    await store.createWorkspaceSecret(alex, ws.id, { name: 'REPO_ONLY', kind: 'secret', value: 'repo-value-1234', scope: { type: 'repository', repository: 'alexj11324/mikka' } })
+    await store.createWorkspaceSecret(alex, ws.id, { name: 'VERCEL_TOKEN', kind: 'secret', value: 'team-value-1234', delivery: DIRECT })
+    await store.createWorkspaceSecret(alex, ws.id, { name: 'REPO_ONLY', kind: 'secret', value: 'repo-value-1234', scope: { type: 'repository', repository: 'alexj11324/mikka' }, delivery: DIRECT })
     await rejects(personal.createUserSecret(alex, { name: 'VERCEL_TOKEN', kind: 'secret', value: 'alex-value-1234' }, { workspaceId: ws.id }), 'secretNameShadowsWorkspace')
     await rejects(personal.createUserSecret(alex, { name: 'REPO_ONLY', kind: 'secret', value: 'alex-repo-1234' }, { workspaceId: ws.id }), 'secretNameShadowsWorkspace')
-    await personal.createUserSecret(alex, { name: 'VERCEL_TOKEN', kind: 'secret', value: 'alex-value-1234', overrideWorkspace: true }, { workspaceId: ws.id })
+    await personal.createUserSecret(alex, { name: 'VERCEL_TOKEN', kind: 'secret', value: 'alex-value-1234', overrideWorkspace: true, delivery: DIRECT }, { workspaceId: ws.id })
     await personal.createUserSecret(alex, { name: 'ALEX_ONLY', kind: 'env', value: 'plain-config' }, { workspaceId: ws.id })
 
     const alexRun = await runtime.taskSecretInjection(ws.id, 'alexj11324/mikka', process.env, undefined, alex)
@@ -79,9 +80,51 @@ test('personal secrets', { skip: !dbUrl }, async t => {
     assert.ok(!JSON.stringify([result, confirmed]).includes('lin-value-0001'))
   })
 
+  await t.test('personal delivery stays protected until its owner explicitly approves one secret; approval cannot be forged or bulk imported', async () => {
+    const row = await personal.createUserSecret(alex, { name: 'PERSONAL_DELIVERY', kind: 'secret', value: VALUE }, {})
+    assert.deepEqual(row.delivery, { mode: 'protected' })
+    await rejects(personal.replaceUserSecret(lin, { id: row.id, delivery: DIRECT }), 'secretNotFound')
+    await assert.rejects(personal.replaceUserSecret(alex, { id: row.id, delivery: { mode: 'direct' } }))
+    await assert.rejects(personal.replaceUserSecret(alex, { id: row.id, delivery: { ...DIRECT, approvedAt: new Date().toISOString() } }))
+    const now = new Date('2026-11-08T12:00:00.000Z')
+    const direct = await personal.replaceUserSecret(alex, { id: row.id, delivery: DIRECT }, now)
+    assert.deepEqual(direct.delivery, { ...DIRECT, approvedBy: alex, approvedAt: now.toISOString() })
+    const http = { origin: 'https://api.example.com', header: 'x-api-key', prefix: '', rules: [{ method: 'POST', path: '/v1/', match: 'prefix' }] }
+    const protectedRow = await personal.replaceUserSecret(alex, { id: row.id, delivery: { mode: 'protected', http } })
+    assert.deepEqual(protectedRow.delivery, { mode: 'protected', http })
+    await assert.rejects(personal.importUserSecrets(alex, { text: 'PERSONAL_DELIVERY=rotated-secret', masked: true, onConflict: 'replace', delivery: DIRECT }, {}))
+    await personal.importUserSecrets(alex, { text: 'PERSONAL_DELIVERY=rotated-secret\nPERSONAL_IMPORT=protected-secret', masked: true, onConflict: 'replace' }, {})
+    const rows = await personal.listUserSecrets(alex)
+    assert.deepEqual(rows.find(entry => entry.id === row.id)?.delivery, protectedRow.delivery)
+    assert.deepEqual(rows.find(entry => entry.name === 'PERSONAL_IMPORT')?.delivery, { mode: 'protected' })
+    const ordinary = await personal.createUserSecret(alex, { name: 'PERSONAL_REGION', kind: 'env', value: 'eu' }, {})
+    assert.equal(ordinary.delivery, undefined)
+    await rejects(personal.replaceUserSecret(alex, { id: ordinary.id, delivery: DIRECT }), 'validationGeneric')
+    await assert.rejects(pool.query('update user_secrets set delivery=$2 where id=$1', [row.id, { mode: 'direct' }]), (error: unknown) => (error as { code?: string }).code === '23514')
+    assert.ok(!JSON.stringify([row, direct, protectedRow, rows]).includes(VALUE), 'only metadata leaves the store')
+    for (const entry of rows.filter(entry => entry.name === 'PERSONAL_DELIVERY' || entry.name === 'PERSONAL_IMPORT')) await personal.deleteUserSecret(alex, { id: entry.id })
+    await personal.deleteUserSecret(alex, { id: ordinary.id })
+  })
+
   await t.test('the shadow check needs membership of the workspace it reads', async () => {
     const other = await seedWorkspace(pool, alex, [{ userId: alex, role: 'admin' }])
     await rejects(personal.createUserSecret(lin, { name: 'ANY_NAME', kind: 'secret', value: 'value-1234' }, { workspaceId: other.id }), 'workspaceAccessDenied')
+  })
+
+  await t.test('a personal protected override blocks lower-scope direct delivery and is usable only by its owner', async () => {
+    const name = 'PERSONAL_PROTECTED_OVERRIDE'
+    await store.createWorkspaceSecret(alex, ws.id, { name, kind: 'secret', value: 'workspace-direct-canary', delivery: DIRECT })
+    const own = await personal.createUserSecret(alex, { name, kind: 'secret', value: VALUE, overrideWorkspace: true }, { workspaceId: ws.id })
+    const mine = await runtime.taskSecretInjection(ws.id, null, process.env, undefined, alex)
+    assert.equal(mine.env[name], undefined, 'protected personal metadata must not expose either value')
+    assert.ok(mine.unavailable.includes(name))
+    const teammate = await runtime.taskSecretInjection(ws.id, null, process.env, undefined, lin)
+    assert.equal(teammate.env[name], 'workspace-direct-canary')
+    assert.ok(!JSON.stringify(teammate).includes(VALUE))
+    const personalOnly = await runtime.taskSecretInjection(null, null, process.env, undefined, alex)
+    assert.equal(personalOnly.env[name], undefined)
+    assert.ok(personalOnly.unavailable.includes(name))
+    await personal.deleteUserSecret(alex, { id: own.id })
   })
 
   await t.test('a moved row fails to open; deleting the account deletes its secrets', async () => {
@@ -93,5 +136,38 @@ test('personal secrets', { skip: !dbUrl }, async t => {
     await personal.createUserSecret(temp, { name: 'TEMP_KEY', kind: 'secret', value: 'temp-value-1234' }, {})
     await pool.query('delete from "user" where id=$1', [temp])
     assert.equal((await pool.query('select count(*)::int as n from user_secrets where "userId"=$1', [temp])).rows[0].n, 0)
+  })
+
+  await t.test('personal create, rotation, policy changes, imports and deletion revoke only the owner\'s admitted runs', async () => {
+    const owner = await seedUser(pool, 'secret-owner'), teammate = await seedUser(pool, 'secret-teammate')
+    const consumer = async (userId: string, status = 'running') => {
+      const runId = randomUUID(), deviceId = randomUUID(), agentId = await seedAgent(pool, userId)
+      await pool.query('insert into devices (id,"ownerId",name,kind) values ($1,$2,$3,\'local\')', [deviceId, userId, 'personal-secret-consumer'])
+      await pool.query('insert into agent_runs (id,"userId","agentId","deviceId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,now()+interval \'10 minutes\')', [runId, userId, agentId, deviceId, status])
+      return runId
+    }
+    const stopped = async (id: string) => (await pool.query('select "stopRequestedAt" is not null as stopped,"leaseExpiresAt"<=now() as expired from agent_runs where id=$1', [id])).rows[0]
+    const foreign = await consumer(teammate), queued = await consumer(owner, 'queued'), first = await consumer(owner)
+    const row = await personal.createUserSecret(owner, { name: 'REVOKE_PERSONAL', kind: 'secret', value: VALUE }, {})
+    assert.deepEqual(await stopped(first), { stopped: true, expired: true })
+    const second = await consumer(owner)
+    await personal.replaceUserSecret(owner, { id: row.id, note: 'metadata only' })
+    assert.equal((await stopped(second)).stopped, false)
+    await personal.replaceUserSecret(owner, { id: row.id, value: VALUE + '-rotated' })
+    assert.deepEqual(await stopped(second), { stopped: true, expired: true })
+    const third = await consumer(owner)
+    const approved = await personal.replaceUserSecret(owner, { id: row.id, delivery: DIRECT })
+    assert.deepEqual(await stopped(third), { stopped: true, expired: true })
+    const fourth = await consumer(owner)
+    const annotated = await personal.replaceUserSecret(owner, { id: row.id, note: 'approved delivery is unchanged' })
+    assert.deepEqual(annotated.delivery, approved.delivery, 'JSONB key ordering does not alter the approval')
+    assert.deepEqual(await stopped(fourth), { stopped: false, expired: false }, 'note-only edits of a stored direct policy do not revoke the run')
+    await personal.importUserSecrets(owner, { text: 'REVOKE_PERSONAL=import-rotation', masked: true, onConflict: 'replace' }, {})
+    assert.deepEqual(await stopped(fourth), { stopped: true, expired: true })
+    const fifth = await consumer(owner)
+    await personal.deleteUserSecret(owner, { id: row.id })
+    assert.deepEqual(await stopped(fifth), { stopped: true, expired: true })
+    assert.equal((await stopped(foreign)).stopped, false)
+    assert.equal((await stopped(queued)).stopped, false)
   })
 })

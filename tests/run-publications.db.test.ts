@@ -7,7 +7,7 @@ import test from 'node:test'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 import { APP_BUILD } from '../lib/app-build'
-import { measured } from './helpers/read-metrics'
+import { measured, readMetrics } from './helpers/read-metrics'
 import type { PublishedPullRequest } from '../lib/run-publication-result'
 import type { OwnerPullRequestOpener } from '../lib/run-publications'
 import { remoteKey as repositoryKey } from '@mikka/protocol/repository'
@@ -47,7 +47,7 @@ function deferred() {
 }
 
 test('run result publication commits one owner-scoped result through retries and races', { skip: !enabled, timeout: 90_000 }, async t => {
-  const { pool } = await import('../lib/db')
+  const { db, pool } = await import('../lib/db')
   const { prepareRunPublication, persistRunCompletion, publishRunResult } = await import('../lib/run-publications')
   const { PublicationError } = await import('../lib/run-publication-result')
   const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
@@ -210,30 +210,157 @@ test('run result publication commits one owner-scoped result through retries and
 
     await t.test('an unlinked workspace task publishes its immutable Workspace identifier without changing scope', async () => {
       const { admitCloudPush } = await import('../lib/computer/cloud-push')
+      const { workspacePool } = await import('../lib/workspace-db')
+      const { seedTeam } = await import('./support/workspace-admin-db')
       const f = await fixture({ approved: true, prefix: 'MINE', number: 12, scope: 'workspace' })
+      const linked = await fixture({ approved: true, prefix: 'OTHR', number: 18, scope: 'workspace' })
+      const workspaceId = linked.workspaceId
+      const { id: teamId } = await seedTeam(workspacePool, workspaceId, linked.userId, 'Publication budget CI')
+      await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [linked.issueId, teamId, workspaceId, linked.userId])
       const client = await pool.connect()
-      const cloudAdmission = () => admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, now: new Date() })
+      // The internal helper is measured after the caller's admission. Grouping
+      // cannot change a previously issued identifier or its repository branch.
+      const cloudAdmission = (row = f) => admitCloudPush(client, { userId: row.userId, issueId: row.issueId, agentId: row.agentId, deviceId: row.deviceId, deviceRepoId: row.repoId, workspaceId: row.workspaceId, now: new Date() })
       try {
         await client.query('BEGIN')
-        const admitted = await cloudAdmission()
-        assert.ok(admitted, 'a task without a local team still gets a publication receipt')
-        assert.equal(admitted.publication.identifier, f.identifier)
-        assert.equal(admitted.publication.branch, f.branch)
-        assert.equal(admitted.publication.remoteUrl, f.remoteUrl)
+        const admitted = await measured(() => cloudAdmission())
+        const linkedCloud = await measured(() => cloudAdmission(linked))
+        assert.ok(admitted.value, 'a task without a local team still gets a publication receipt')
+        assert.equal(admitted.value.publication.identifier, f.identifier)
+        assert.equal(admitted.value.publication.branch, f.branch)
+        assert.equal(admitted.value.publication.remoteUrl, f.remoteUrl)
+        assert.equal(linkedCloud.value?.publication.identifier, linked.identifier)
+        assert.equal(admitted.statements, linkedCloud.statements, 'first cloud admission keeps the linked-task query budget')
         await client.query('COMMIT')
-        assert.equal((await prepareRunPublication(assignment(f), f.remoteUrl)).pushBranch, f.branch)
+        const prepared = await measured(() => prepareRunPublication(assignment(f), f.remoteUrl))
+        const linkedPrepared = await measured(() => prepareRunPublication(assignment(linked), linked.remoteUrl))
+        assert.equal(prepared.value.pushBranch, f.branch)
+        assert.equal(prepared.statements, linkedPrepared.statements, 'first publication keeps the linked-task query budget')
         assert.equal((await receipt(f)).identifier, f.identifier)
         await pool.query('update issue_prefixes set prefix=\'NEXT\' where "userId"=$1', [f.userId])
         await client.query('BEGIN')
-        assert.equal((await cloudAdmission())?.publication.branch, f.branch, 'a later prefix edit does not move the existing PR branch')
+        const frozen = await measured(() => cloudAdmission())
+        assert.equal(frozen.value?.publication.branch, f.branch, 'a later prefix edit does not move the existing PR branch')
+        assert.equal(frozen.value?.publication.identifier, f.identifier)
+        assert.equal(frozen.statements, admitted.statements, 'both paths reuse the selected immutable identifier without a helper query')
         await client.query('COMMIT')
+        await pool.query('update run_publications set identifier=null where "runId"=$1', [f.runId])
+        await client.query('BEGIN')
+        const repaired = await cloudAdmission()
+        assert.equal(repaired?.publication.identifier, f.identifier, 'a null receipt identifier reuses the original issued identity')
+        assert.equal(repaired?.publication.branch, f.branch, 'filling an identifier does not replace the frozen branch')
+        await client.query('COMMIT')
+        await pool.query('update run_publications set identifier=$2 where "runId"=$1', [f.runId, f.identifier])
         assert.equal((await task(f)).scope, 'workspace')
         assert.equal((await task(f)).userId, f.userId)
         assert.equal((await task(f)).issuedIdentifier, f.identifier)
-        assert.equal((await pool.query('select count(*)::int n from mikka_team_issues where "issueId"=$1', [f.issueId])).rows[0].n, 0, 'naming does not assign a team or change access')
+        assert.equal((await task(linked)).issuedIdentifier, linked.identifier)
+        assert.equal((await workspacePool.query('select count(*)::int n from mikka_team_issues where "issueId"=$1', [f.issueId])).rows[0].n, 0, 'naming does not assign a team or change access')
+        console.log('Publication identifier read budget:', JSON.stringify({
+          cloud: { unlinked: admitted.statements, linked: linkedCloud.statements, frozen: frozen.statements, resultBytes: admitted.resultBytes },
+          publication: { unlinked: prepared.statements, linked: linkedPrepared.statements, resultBytes: prepared.resultBytes },
+        }))
       } finally {
         await client.query('ROLLBACK')
         client.release()
+        console.log('Publication read-budget fixture retention:', JSON.stringify({ retention: 'preserve', workspaceId, teamId, linkedIssueId: linked.issueId }))
+      }
+    })
+
+    await t.test('identifier transport stays observable for empty and short tasks across team states', async t => {
+      const { admitCloudPush } = await import('../lib/computer/cloud-push')
+      const { workspacePool } = await import('../lib/workspace-db')
+      const { withTaskWorkspace } = await import('../lib/task-workspace')
+      const { ActionFailureError } = await import('../lib/action-error')
+      const { seedTeam } = await import('./support/workspace-admin-db')
+      const { searchIssues, parseSearchParams } = await import('../lib/issue-search')
+      const { listArtifacts } = await import('../lib/artifacts/store')
+      const samples: Array<{ body: string; teamState: string; search: ReturnType<typeof readMetrics>; artifacts: ReturnType<typeof readMetrics>; cloud: ReturnType<typeof readMetrics>; publication: ReturnType<typeof readMetrics>; frozen: ReturnType<typeof readMetrics> }> = []
+      for (const body of ['empty', 'short'] as const) for (const teamState of ['linked', 'unlinked', 'revoked-owner'] as const) {
+        const f = await fixture({ approved: true, prefix: 'MTRX', number: 12, scope: 'workspace' })
+        const workspaceId = f.workspaceId
+        await pool.query('update issues set content=$2 where id=$1', [f.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 12 } }, content: body === 'empty' ? [] : [{ type: 'paragraph', content: [{ type: 'text', text: 'Short task body' }] }] })])
+        if (teamState !== 'unlinked') {
+          const { id: teamId } = await seedTeam(workspacePool, workspaceId, f.userId, 'Identifier transport CI')
+          await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [f.issueId, teamId, workspaceId, f.userId])
+        }
+        const artifactId = randomUUID()
+        await pool.query('insert into artifacts (id,"userId","workspaceId",kind,title,"issueId","latestVersion") values ($1,$2,$4,\'markdown\',\'Transport fixture\',$3,1)', [artifactId, f.userId, f.issueId, workspaceId])
+        await pool.query('insert into artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") values ($1,$2,1,$3,\'fixture\',\'fixture\',7,\'CI\')', [randomUUID(), artifactId, `ci/identifier-transport/${artifactId}.md`])
+        if (teamState === 'revoked-owner') {
+          // Preserve a real pre-revocation receipt. Neither cached naming nor
+          // authorship authorizes new admission or publication after suspension.
+          await prepareRunPublication(assignment(f), f.remoteUrl)
+          await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, f.userId])
+        }
+        const search = () => searchIssues(db, { userId: f.userId, workspaceId, params: parseSearchParams(new URLSearchParams({ q: 'Fix redirect' })) })
+        await search()
+        await listArtifacts(f.userId)
+        const searched = await measured(search)
+        const artifacts = await measured(() => listArtifacts(f.userId))
+        if (teamState === 'revoked-owner') {
+          const before = { task: await task(f), receipt: await receipt(f), counts: await counts(f) }
+          let admissions = 0
+          const guardedCloud = () => withTaskWorkspace(f.userId, workspaceId, async () => {
+            admissions++
+            const client = await pool.connect()
+            try {
+              await client.query('BEGIN')
+              return await admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, workspaceId, now: new Date() })
+            } finally { await client.query('ROLLBACK'); client.release() }
+          })
+          const deniedCloud = async () => {
+            await assert.rejects(guardedCloud, error => error instanceof ActionFailureError && error.code === 'workspaceAccessDenied')
+            return { error: 'workspaceAccessDenied' }
+          }
+          const admitted = await measured(deniedCloud)
+          const prepared = await measured(async () => {
+            await assert.rejects(() => prepareRunPublication(assignment(f), f.remoteUrl), error => error instanceof PublicationError && error.code === 'issue_unavailable')
+            return { error: 'issue_unavailable' }
+          })
+          const frozen = await measured(deniedCloud)
+          const sample = { body, teamState, search: readMetrics(searched), artifacts: readMetrics(artifacts), cloud: readMetrics(admitted), publication: readMetrics(prepared), frozen: readMetrics(frozen) }
+          samples.push(sample)
+          t.diagnostic(JSON.stringify({ event: 'identifier_transport_matrix', ...sample }))
+          assert.deepEqual(searched.value.items, [])
+          assert.deepEqual(artifacts.value, [])
+          assert.equal(admissions, 0, 'current Workspace denial occurs before the APP admission transaction')
+          assert.deepEqual({ task: await task(f), receipt: await receipt(f), counts: await counts(f) }, before, 'denial does not rewrite the Task, its frozen publication or history')
+          assert.doesNotMatch(JSON.stringify([searched.value, artifacts.value]), /prefixInput|__mikkaIdentifierPrefix|@example\.invalid/)
+          continue
+        }
+        const client = await pool.connect()
+        const cloud = () => admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, workspaceId, now: new Date() })
+        try {
+          await client.query('BEGIN')
+          const admitted = await measured(cloud)
+          await client.query('COMMIT')
+          const prepared = await measured(() => prepareRunPublication(assignment(f), f.remoteUrl))
+          await client.query('BEGIN')
+          const frozen = await measured(cloud)
+          await client.query('COMMIT')
+          const sample = { body, teamState, search: readMetrics(searched), artifacts: readMetrics(artifacts), cloud: readMetrics(admitted), publication: readMetrics(prepared), frozen: readMetrics(frozen) }
+          samples.push(sample)
+          t.diagnostic(JSON.stringify({ event: 'identifier_transport_matrix', ...sample }))
+          assert.equal(searched.value.items.find(row => row.id === f.issueId)?.identifier, f.identifier)
+          assert.equal(artifacts.value.find(row => row.issueId === f.issueId)?.issueKey, f.identifier)
+          assert.equal(admitted.value?.publication.identifier, f.identifier)
+          assert.equal(prepared.value.pushBranch, f.branch)
+          assert.equal(frozen.value?.publication.identifier, f.identifier)
+          assert.doesNotMatch(JSON.stringify([searched.value, artifacts.value]), /prefixInput|__mikkaIdentifierPrefix|@example\.invalid/)
+        } finally {
+          await client.query('ROLLBACK')
+          client.release()
+        }
+      }
+      for (const body of ['empty', 'short']) {
+        const linked = samples.find(row => row.body === body && row.teamState === 'linked')!
+        const unlinked = samples.find(row => row.body === body && row.teamState === 'unlinked')!
+        for (const surface of ['search', 'artifacts', 'cloud', 'publication'] as const) {
+          if (surface === 'search') assert.ok(unlinked[surface].databaseStatements <= linked[surface].databaseStatements, `${body} ${surface} does not exceed the linked statement budget`)
+          else if (surface === 'artifacts') assert.ok(unlinked[surface].databaseStatements <= 4 && linked[surface].databaseStatements <= 5, `${body} ${surface} does not exceed the linked statement budget`)
+          else assert.equal(unlinked[surface].databaseStatements, linked[surface].databaseStatements, `${body} ${surface} keeps the linked statement budget`)
+        }
       }
     })
 

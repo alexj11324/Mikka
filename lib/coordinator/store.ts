@@ -511,12 +511,14 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   const runIds = [...new Set([...cited.runIds, ...threads])]
   const sources: Record<string, CitationSource> = {}
   if (!issueIds.length && !runIds.length) return sources
-  // One membership read for every visibility check of this call (never kept past it).
-  // Loaded here, not at module load: team-access brings in the workspace resolver, which the store's other callers never need.
-  const teams = await (await import('@/lib/team-access')).accessibleTeamScopes(userId)
-  const issueRows = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
+  // Runs reuse one membership read. A direct Task citation obtains its current
+  // tenant predicate and immutable identifier from the existing bounded read.
+  const teams = runIds.length ? await (await import('@/lib/team-access')).accessibleTeamScopes(userId) : undefined
+  const visibility = issueIds.length
+    ? await issueVisibility(reader, false, undefined, db, { onlyIssueIds: issueIds, teams }) : null
+  const issueRows = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, issuedIdentifier: issues.issuedIdentifier })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(inArray(issues.id, issueIds), (await issueVisibility(reader, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate)) : []
+    .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
   const runs = runIds.length ? await visibleRuns(reader, { runIds, limit: runIds.length, brief: true, teams }) : []
   // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
@@ -532,10 +534,10 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   ])
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
-    ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })),
-    ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number })),
+    ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number, issuedIdentifier: row.issuedIdentifier })),
+    ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, issuedIdentifier: task.issuedIdentifier })),
   ])
-  for (const { content, ownerId: _owner, scope: _scope, ...row } of issueRows) {
+  for (const { content, ownerId: _owner, scope: _scope, issuedIdentifier: _issued, ...row } of issueRows) {
     const metadata = readIssueMetadata(content)
     if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null }
   }
