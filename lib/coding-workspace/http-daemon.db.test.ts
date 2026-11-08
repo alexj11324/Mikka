@@ -311,8 +311,8 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
       const getReview = (snapshotId: string, token = ownerToken.token) => fetch(`${endpoint}/diff/${snapshotId}/review?${query}`, {
         headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20_000),
       })
-      const mutateReview = (snapshotId: string, mutation: ReviewMutation) => fetch(`${endpoint}/diff/${snapshotId}/review`, {
-        method: 'POST', headers: { authorization: `Bearer ${ownerToken.token}`, origin, 'content-type': 'application/json' },
+      const mutateReview = (snapshotId: string, mutation: ReviewMutation, token = ownerToken.token) => fetch(`${endpoint}/diff/${snapshotId}/review`, {
+        method: 'POST', headers: { authorization: `Bearer ${token}`, origin, 'content-type': 'application/json' },
         body: JSON.stringify({ workspaceId, repoId: clientIdentity.repoId, mutation }), signal: AbortSignal.timeout(20_000),
       })
       const beforeDenied = deliveries.length
@@ -400,7 +400,39 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
       assert.deepEqual(board.comments.map(comment => comment.id).sort(), [first.commentId, second.commentId].sort())
       assert.ok(board.comments.every(comment => comment.draft && !comment.outdated && comment.anchor.snapshotId === snapshot.id))
       assert.equal(board.permissions.canSendToAgent, false, 'PAT review drafts do not authorize model work')
-      assert.equal((await getReview(snapshot.id, memberToken.token)).status, 404)
+      // This workspace-scoped Task is visible to members through its team link.
+      // Historical board access does not expose another author's private drafts.
+      const memberResponse = await getReview(snapshot.id, memberToken.token)
+      assert.equal(memberResponse.status, 200, await statusDiagnostic(memberResponse))
+      const memberBody = await memberResponse.json(), { ok: memberOK, ...memberValue } = memberBody
+      assert.equal(memberOK, true)
+      const memberBoard = reviewBoard.parse(memberValue)
+      assert.deepEqual(memberBoard.comments, []); assert.equal(memberBoard.nextCursor, null)
+      assert.equal(memberBoard.permissions.canReadLive, false); assert.equal(memberBoard.permissions.canSendToAgent, false)
+      const serializedMember = JSON.stringify(memberBody)
+      for (const comment of board.comments) for (const privateValue of [comment.id, comment.threadId, comment.body])
+        assert.equal(serializedMember.includes(privateValue), false, 'a member response must contain no private draft identifiers or body')
+      assert.equal((await getReview(snapshot.id, otherToken.token)).status, 404)
+
+      for (const comment of board.comments) {
+        const mutations: ReviewMutation[] = [
+          { action: 'reply', requestId: randomUUID(), expectedRevision: board.revision,
+            threadId: comment.threadId, body: 'Member reply to an owner private draft must be refused' },
+          { action: 'edit', requestId: randomUUID(), expectedRevision: board.revision,
+            commentId: comment.id, body: 'Member edit of an owner private draft must be refused' },
+        ]
+        for (const mutation of mutations) {
+          const denied = await mutateReview(snapshot.id, mutation, memberToken.token)
+          assert.equal(denied.status, 409, await statusDiagnostic(denied))
+          assert.deepEqual(await denied.json(), { ok: false, code: 'workspace_review_unavailable' })
+        }
+      }
+      const unchangedResponse = await getReview(snapshot.id)
+      assert.equal(unchangedResponse.status, 200)
+      const { ok: unchangedOK, ...unchangedValue } = await unchangedResponse.json()
+      assert.equal(unchangedOK, true)
+      const unchangedBoard = reviewBoard.parse(unchangedValue)
+      assert.equal(unchangedBoard.revision, board.revision); assert.deepEqual(unchangedBoard.comments, board.comments)
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM coding_workspace_review_receipts WHERE "requestId"=$1', [firstInput.requestId])).rows[0].n, 1)
 
       await writeFile(join(worktree, 'src/example.ts'), changedSource.replace('43', '44'))

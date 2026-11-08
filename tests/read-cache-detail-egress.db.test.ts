@@ -296,6 +296,15 @@ test('detail and activity revalidate current access while returning only changed
       await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, owner, 'suspended'])
       const revokedOwner = successful(await read(() => getIssue(id)))
       assert.match(revokedOwner.issue.identifier ?? '', /^CACHE-\d+$/)
+      // This access state can open another socket: CI recorded 847 extra wire
+      // bytes compared with the same warm read shape. Expose startup costs,
+      // as above, before applying the unchanged steady-state budgets.
+      const revokedConnectionsWarm = await measured(() => read(() => listIssueConnections(id)))
+      const revokedDirectWarm = await measured(() => read(() => citationSources(owner, [issueCite])))
+      const revokedRunWarm = await measured(() => read(() => citationSources(owner, [runCite])))
+      t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'linked-owner-suspended',
+        scope: 'data-read-path_including_connection_startup', connections: readMetrics(revokedConnectionsWarm),
+        directCitation: readMetrics(revokedDirectWarm), runOnlyCitation: readMetrics(revokedRunWarm) }))
       const revokedConnections = await measured(() => read(() => listIssueConnections(id)))
       const revokedCitation = await measured(() => read(() => citationSources(owner, [issueCite])))
       const revokedRunCitation = await measured(() => read(() => citationSources(owner, [runCite])))
