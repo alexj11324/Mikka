@@ -1,7 +1,8 @@
 name: Issue 1212 ACME MCP bounded read acceptance
 
-# Offline draft only. Root enables this exact workflow after verifying the final
-# application deployment, normal migrations and the reader's runtime evidence.
+# Bound to the verified 3c production source for three MCP read/cancel cases.
+# The job holds the Web deploy queue and the driver checks the public version.
+# No automatic retry.
 on:
   push:
     branches: [acceptance/issues-1504-1506]
@@ -13,18 +14,24 @@ permissions:
   id-token: write
 
 concurrency:
-  group: production-smoke-owner-acceptance
+  group: issue-1506-acme-acceptance
   cancel-in-progress: false
+  queue: max
 
 jobs:
   observe:
-    if: ${{ false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506' }}
+    if: ${{ github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506' }}
     runs-on: ubuntu-latest
     # The business deadline is 240s; bounded cleanup remains outside that
     # deadline and must have time to finish after a transport failure.
     timeout-minutes: 12
+    concurrency:
+      group: web-deploy-production
+      cancel-in-progress: false
+      queue: max
     env:
-      MIKKA_ACCEPTANCE_SHA: '' # Only the verified final production application SHA.
+      MIKKA_ACCEPTANCE_SHA: '3c32675c99d32f9c84a9b5e4bc48e59231baa4d8' # Only the verified final production application SHA.
+      MIKKA_ACCEPTANCE_TREE: '22d486bdaf50b2168c8f9291ffd2c5a848a67675' # Exact tree of that application commit.
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -33,8 +40,67 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Verify the exact input and offline request cleanup boundaries
+      - name: Check out the exact final application source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.MIKKA_ACCEPTANCE_SHA }}
+          path: application-source
+          persist-credentials: false
+      - name: Verify immutable source and complete runtime imports before credentials
         run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { createHash } from 'node:crypto'
+          import { execFileSync } from 'node:child_process'
+          import { readFile, mkdir, writeFile } from 'node:fs/promises'
+          import { resolve } from 'node:path'
+          import { pathToFileURL } from 'node:url'
+          
+          const sha = /^[0-9a-f]{40}$/
+          assert.match(process.env.MIKKA_ACCEPTANCE_SHA ?? '', sha)
+          assert.match(process.env.MIKKA_ACCEPTANCE_TREE ?? '', sha)
+          const git = (cwd, ref) => execFileSync('git', ['rev-parse', ref], { cwd, encoding: 'utf8' }).trim()
+          assert.equal(git('.', 'HEAD'), process.env.GITHUB_SHA)
+          assert.equal(git('application-source', 'HEAD'), process.env.MIKKA_ACCEPTANCE_SHA)
+          assert.equal(git('application-source', 'HEAD^{tree}'), process.env.MIKKA_ACCEPTANCE_TREE)
+          const driverHashes = {
+            "scripts/acceptance/issue-1212-mcp/mcp-reply-production.mjs": "65a76df6a9eb39c04df9837d0f548bf3be623331cdfef543607f7f14d6d27e22",
+            "scripts/acceptance/issue-1212-mcp/pkce-session.mjs": "66bda21e04553537d7c9f5b02009ae26a12421079ff10f9dc9d2abc55cb76ad9",
+            "scripts/acceptance/issue-1212-mcp/mcp-reply-production.test.mjs": "6e51ebdf54c97c233dcbf8c32dddaa1e465f96839e983d9e5daac8b4297e1ad8"
+          }
+          const applicationHashes = {
+            "app/api/mcp/route.ts": "870359781ddfee56f9baf7fff232b2573ca3daf9e8c27743e76e0cf475d2a012",
+            "lib/mcp/reply-wait.ts": "23e20f711297b32759831da547f7690b1ba6f536464c6d73b8a40b975f6f5f62",
+            "lib/mcp/reply-completion.ts": "84f31ae9791ac7fd7949b2b8022dc591e62912959b22f820fc2f363d178df12b",
+            "apps/api/build-contract.mjs": "0949d55ff5a14d34fad8f3e5effacb5dbf71f8e7ae097a6d24280233ef604a13",
+            "apps/api/scripts/finalize-build.mjs": "aedf49e2ab1763c86949421a042ff5256def92f1442c1db8b3ecf62b25467822"
+          }
+          for (const [path, expected] of Object.entries(driverHashes)) {
+            assert.equal(createHash('sha256').update(await readFile(path)).digest('hex'), expected, path)
+          }
+          for (const [path, expected] of Object.entries(applicationHashes)) {
+            assert.equal(createHash('sha256').update(await readFile(resolve('application-source', path))).digest('hex'), expected, path)
+          }
+          let networkAttempts = 0
+          const denied = () => { networkAttempts++; throw new Error('offline_network_forbidden') }
+          globalThis.fetch = denied
+          globalThis.WebSocket = class { constructor() { denied() } }
+          const driver = await import(pathToFileURL(resolve('scripts/acceptance/issue-1212-mcp/mcp-reply-production.mjs')).href)
+          const helper = await import(pathToFileURL(resolve('scripts/acceptance/issue-1212-mcp/pkce-session.mjs')).href)
+          assert.equal(typeof helper.authorizeMcpSession, 'function')
+          assert.equal(typeof driver.runMcpReplyProof, 'function')
+          const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
+          const binding = driver.configuration(process.env, event)
+          assert.equal(networkAttempts, 0)
+          await mkdir('issue-1212-mcp-report', { recursive: true, mode: 0o700 })
+          const proof = { schemaVersion: 1, kind: 'mcp-offline-source-preflight', binding,
+            applicationTree: process.env.MIKKA_ACCEPTANCE_TREE,
+            reviewedSourceSha: '1a3ca56d62b8dff6bdb243eb98feca51347185e7',
+            driverHashes, applicationHashes, importedRuntimeFiles: 2, networkAttempts,
+            productionRequests: 0, modelCalls: 0, credentialsLoaded: false, deploymentVerified: false }
+          await writeFile('issue-1212-mcp-report/source-preflight.json', JSON.stringify(proof, null, 2) + '\n', { mode: 0o600, flag: 'wx' })
+          console.log(JSON.stringify({ sourcePreflight: 'passed', importedRuntimeFiles: 2, networkAttempts: 0, productionRequests: 0 }))
+          NODE
           node scripts/acceptance/issue-1212-mcp/mcp-reply-production.mjs --check-config
           node --test scripts/acceptance/issue-1212-mcp/mcp-reply-production.test.mjs
       - name: Read the issue-bound ACME email only
