@@ -41,6 +41,17 @@ Sizes are the visible size of the dot grid, not the `<img>` box.
 Below 16px the ghost dots blur into a grey square, so drop them and draw only
 the solid dots.
 
+## Implementation status
+
+`components/brand/mikka-mark.tsx` implements the cropped, inherited-colour
+mark at 28px and drops ghost dots in its 12px variant. The public
+`components/blocks/auth-19/components/auth-logo.tsx` still renders the two
+padded image assets at 28px, so its visible mark differs from the 24px
+placement above. The implemented onboarding in
+`components/onboarding/onboarding.tsx` uses the new Bot's avatar on its
+welcome step. Check those source paths when changing these placements;
+the measurements above record the brand requirements.
+
 ## Clear space
 
 Keep at least one dot pitch of empty space around the mark: 1/5 of its size,

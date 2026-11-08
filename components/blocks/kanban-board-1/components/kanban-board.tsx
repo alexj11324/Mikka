@@ -28,6 +28,7 @@ import { PriorityIcon } from '@/components/workspace/priority-icon'
 import { BOARD_COLUMNS, type AgentState, type BoardColumn, type BoardColumns, type BoardTask, type CardProperty, type RunOwner } from './data'
 import type { TaskBlock } from '@/lib/task-blocked'
 import { blockLabel } from '@/components/workspace/block-label'
+import { BoardCard, BoardColumnFrame, BoardHiddenLane } from '@ui-slot/board'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
   return <ScrollAreaPrimitive.Root data-slot="scroll-area" className="relative min-h-0 w-full min-w-0 flex-1 pb-3">
@@ -88,6 +89,8 @@ export type CardContext = {
   blocks?: ReadonlyMap<string, TaskBlock>
   /** Cards the person just moved with the status menu (enter) or deleted (leave); others' changes are absent and snap (R-37). */
   motion?: ReadonlyMap<string, 'enter' | 'leave'>
+  /** A personal workspace: every task is the person's, so no card shows the private lock. */
+  personalWorkspace?: boolean
 }
 
 function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: CardHandlers & {
@@ -136,23 +139,14 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     show('dueDate') && metadata.dueDate && <span key="due" className={cn(meta, overdue && 'text-destructive-foreground')}><CalendarDays />{formatDateOnly(format, metadata.dueDate, { month: 'short', day: 'numeric' })}</span>,
   ].filter(Boolean)
 
-  // Figma 看板/任务卡片: filled, no stroke (R-31); radius 8, padding 12, rows 8 apart.
-  const card = <div className={cn('group/card flex flex-col gap-2 rounded-md bg-card p-3 text-card-foreground shadow-xs transition-colors hover:bg-muted/50', isOverlay && 'pointer-events-none rotate-2 shadow-lg')}>
-    <div className="flex h-5 min-w-0 items-center gap-1.5">
-      {/* No placeholder while the task has no number (Linear sync off): the row starts with what is there (R-25, R-40). */}
-      {show('identifier') && task.identifier && <span className="truncate text-xs text-muted-foreground tabular-nums">{task.identifier}</span>}
-      {/* No placeholder circle when nobody owns the task; the control appears on hover and focus. */}
-      {show('assignee') && <div className={cn('ml-auto flex shrink-0 items-center', !assigneeGroup && 'opacity-0 group-hover/card:opacity-100 focus-within:opacity-100')}><CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary></div>}
-    </div>
-    <div className="flex min-w-0 items-start gap-[3px]">
-      <CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>
-      <h3 data-slot="kanban-task-title" className={cn('line-clamp-2 min-w-0 flex-1 text-[13px] leading-5 font-medium break-words', done && 'text-muted-foreground')} title={task.title}>{displayTaskTitle(task)}</h3>
-    </div>
-    {chips.length > 0 && <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-5">{chips}</div>}
-    {show('createdAt') && <div className="pl-5"><CardCreatedAt createdAt={task.createdAt} /></div>}
-    {/* Opened from the context menu: labels, project and PR editors, rendered off-card. */}
-    {!isOverlay && <div hidden><IssueMetadataControls task={task} section="all" compact disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>}
-  </div>
+  const card = <BoardCard id={task.id} title={displayTaskTitle(task)} fullTitle={task.title} identifier={show('identifier') && task.identifier ? task.identifier : null} done={done} overlay={isOverlay}
+    personal={null /* #1636: scope no longer decides who owns a task; the card shows no personal lock (#1659 P0) */}
+    hasAssignee={Boolean(assigneeGroup)}
+    assignee={show('assignee') ? <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary> : null}
+    status={<CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>}
+    chips={chips} runState={show('agentState') && agentState ? agentState : null} block={block ? { reason: block.reason, label: blockLabel(tCard, block) } : null} createdAt={show('createdAt') ? <CardCreatedAt createdAt={task.createdAt} /> : null}
+    // Opened from the context menu: labels, project and PR editors, rendered off-card.
+    editors={isOverlay ? null : <div hidden><IssueMetadataControls task={task} section="all" compact disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>} />
 
   if (isOverlay) return <KanbanItem value={task.id} disabled className="shrink-0">{card}</KanbanItem>
   const cardMotion = context.motion?.get(task.id)
@@ -237,33 +231,24 @@ export function KanbanBoard({ stateKey = 'board', columns, hiddenColumns: hidden
         {shown.map(column => {
           const tasks = props.value[column.value] ?? []
           return <KanbanColumn key={column.value} value={column.value} className="min-h-0 w-75 min-w-75 shrink-0">
-            <section className="group/column flex min-h-0 flex-1 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5" aria-label={t('columnLabel', { status: statusLabel(column.value) })}>
-              <div className="flex h-8 shrink-0 items-center gap-2 pr-0.5 pl-1.5">
-                <column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />
-                <h2 className="truncate text-sm font-medium">{statusLabel(column.value)}</h2>
-                <span className="text-sm text-muted-foreground tabular-nums">{tasks.length}</span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" aria-label={tBoard('columnMenu', { status: statusLabel(column.value) })} />}><Ellipsis /></DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => onHideColumn(column.value)}><EyeOff />{tBoard('hideColumn')}</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+            <BoardColumnFrame status={column.value} label={statusLabel(column.value)} count={tasks.length}
+              icon={<column.icon className={cn('size-3.5 shrink-0', column.indicatorClassName)} aria-hidden="true" />}
+              menu={<DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="ml-auto text-muted-foreground" aria-label={tBoard('columnMenu', { status: statusLabel(column.value) })} />}><Ellipsis /></DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => onHideColumn(column.value)}><EyeOff />{tBoard('hideColumn')}</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>}>
               <RememberedColumn stateKey={`${stateKey}:column:${column.value}`} value={column.value} className="min-h-0 flex-1 gap-1.5 overflow-y-auto overscroll-y-contain p-0.5" aria-label={t('columnContent', { status: statusLabel(column.value) })}>
                 {tasks.map(task => <TaskCard key={task.id} task={task} disabled={pending} context={context} {...handlers} />)}
               </RememberedColumn>
-            </section>
+            </BoardColumnFrame>
           </KanbanColumn>
         })}
-        {hidden.length > 0 && !sidebarOpen && <section aria-label={tBoard('hiddenLane')} className="flex w-52 shrink-0 flex-col gap-1 rounded-xl bg-muted/60 dark:bg-muted/30 p-1.5">
-          <h2 className="flex h-8 items-center px-1.5 text-sm font-medium text-muted-foreground">{tBoard('hiddenLane')}</h2>
-          {hidden.map(({ status, count }) => {
-            const column = BOARD_COLUMNS.find(item => item.value === status)!
-            return <Button key={status} variant="ghost" className="h-9 justify-start gap-2 rounded-lg px-1.5 font-normal" title={tBoard('showColumn', { status: statusLabel(status) })} onClick={() => onShowColumn(status)}>
-              <column.icon data-icon="inline-start" className={column.indicatorClassName} />{statusLabel(status)}<span className="ml-auto text-muted-foreground tabular-nums">{count}</span>
-            </Button>
-          })}
-        </section>}
+        {hidden.length > 0 && !sidebarOpen && <BoardHiddenLane label={tBoard('hiddenLane')} columns={hidden.map(({ status, count }) => {
+          const column = BOARD_COLUMNS.find(item => item.value === status)!
+          return { status, label: statusLabel(status), icon: column.icon, iconClassName: column.indicatorClassName, count, title: tBoard('showColumn', { status: statusLabel(status) }), onShow: () => onShowColumn(status) }
+        })} />}
       </KanbanBoardPrimitive>
     </BoardScrollArea>
     <KanbanOverlay>{({ value }) => {

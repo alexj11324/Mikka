@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Clock, FileText, Maximize2, Minimize2, Search, Trash2, X, type LucideIcon } from 'lucide-react'
+import { Clock, FileText, Search, Trash2, type LucideIcon } from 'lucide-react'
 import useSWR from 'swr'
 import { toast } from 'sonner'
 import type { listIssues } from '@/app/actions/issues'
@@ -27,10 +27,12 @@ import { ThreadList, threadName, TWO_LINE_ROW } from './thread-list'
 import { PullRequestIcon } from '@/components/workspace/pull-request-icon'
 import { useCloudComputer, useComputerTab } from '@/hooks/use-feature-availability'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
+import { usePanelInitialWidth } from '@/hooks/use-panel-width'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { BotTasks } from '@ui-slot/bot-tasks'
 import * as botTasksSlot from '@ui-slot/bot-tasks'
+import { PanelHeader } from '@ui-slot/panel-header'
 import { openTask } from '@/components/workspace/workspace-navigation'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
@@ -181,7 +183,8 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
   // The header's search filters this column's lists in place (R-50); null while it is closed.
   const [query, setQuery] = useViewState<string | null>(`${stateKey}:query`, null)
   const filter = (list: Thread[]) => query ? list.filter(thread => matches(query, threadName(thread, issues, ''), thread.lastReply)) : list
-  const resize = useResizableWidth(PANEL_WIDTH)
+  // A UI layer may size the default from the main area (panel-header slot); a remembered width still wins.
+  const resize = useResizableWidth({ ...PANEL_WIDTH, initial: usePanelInitialWidth(PANEL_WIDTH.initial) })
   const { width, max, dragging, resizeTo } = resize
   // 加宽 remembers the width it replaced, and the button puts it back.
   const [beforeWide, setBeforeWide] = useViewState<number | null>('context:before-wide', null)
@@ -225,13 +228,10 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
     {/* Drag the inner edge or use the arrow keys on it to resize the panel; double-click it to reset. */}
     {!sheet && <ResizeHandle resize={resize} label={t('resize')} edge="start" onDoubleClick={() => setBeforeWide(null)} />}
     <div className={cn('flex min-h-0 flex-1 flex-col', !sheet && 'min-w-[var(--context-panel-width,22.5rem)]')}>
-      <div className="flex h-11 shrink-0 items-center gap-1 px-3">
-        <div className="ml-auto flex items-center">
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('search')} aria-pressed={query !== null} onClick={() => setQuery(query === null ? '' : null)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('search')}</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} className={cn(sheet && 'hidden')} onClick={toggleWide} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
-        </div>
-      </div>
+      {/* Search, ⤢ (not in a sheet, which has no edge to widen) and ✕; the panel-header slot lays them out. */}
+      <PanelHeader variant="context" title={t('overview')} onClose={onClose}
+        actions={[{ id: 'search', label: t('search'), icon: Search, pressed: query !== null, onSelect: () => setQuery(query === null ? '' : null) }]}
+        widen={sheet ? undefined : { wide, onToggle: toggleWide }} />
       {query !== null && <div className="shrink-0 px-3 pb-2">
         <SearchInput autoFocus aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setQuery(null) } }} />
       </div>}

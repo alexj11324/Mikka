@@ -106,7 +106,9 @@ function useStoredFlag(key: string, fallback: boolean) {
  * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string; workspaceId?: string;
+export function BoardPage({ issues, userId, workspaceId, personalWorkspace = false, onOpen, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string; workspaceId?: string;
+  /** In a personal workspace every task is the person's: no 全部 / 工作区 / 个人 segment and no lock on cards (glossary, Known naming debt). */
+  personalWorkspace?: boolean
   issues: Issue[]
   userId: string
   onOpen: (id: string) => boolean | void
@@ -298,7 +300,7 @@ export function BoardPage({ issues, userId, workspaceId, onOpen, onUpdated, onBu
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks, personalWorkspace }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
         : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} blocks={blocks} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || team !== TEAM_ALL} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">

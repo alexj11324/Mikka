@@ -1,5 +1,11 @@
 # 主动推荐（Hark 式 personal agent）
 
+本文同时保留画像的实现约束和后续主动调研方案。画像已在
+`lib/profile/{extract,store,facts,entitlement}.ts`、`app/actions/memory.ts` 和
+`app/api/cron/user-facts/route.ts` 实现。后台调研、推荐反馈学习和位置触发仍为
+方案，不能把下文分期描述当成已上线能力。运行与成本开关以实现和
+`AGENTS.md` 为准。
+
 日期 2026-10-27。Alex：「我觉得我们可以把 hark 这一套补齐到我们的产品」。
 相关规则：R-20（注意力模型）、R-21（建议卡片）、R-40、R-45/R-46（措辞）、R-70（设置先例）、
 R-72（网页分身）。调研来源见文末。
@@ -42,7 +48,7 @@ GitHub、Linear 或 Notion 事件，就判断一次要不要告诉人。Hark 和
 [决定 2026-11-01-1500](decisions/2026-11-01-1500-self-improvement-and-profile-decided-by-decision-api.md)）。
 过了日期的事实由代码作废，用户改过的事实以用户为准。
 
-`user_facts`（新表）：
+`user_facts`（已实现，见 `lib/db/schema.ts`）：
 
 | 字段 | 说明 |
 |---|---|
@@ -56,19 +62,20 @@ GitHub、Linear 或 Notion 事件，就判断一次要不要告诉人。Hark 和
 | `state` | `active`、`dismissed`（用户说不对）、`deleted`（用户在「记忆」里删掉，保留记录以免再学到）、`expired`（过了日期或可信度降到很低；再次看到会恢复） |
 | `userEdited` | 用户在「记忆」里改过的，以用户为准，模型不再覆盖 |
 
-「记忆」设置页（R-70，先例 ChatGPT 的记忆摘要）把这些事实写成 Markdown 摘要给人看，
-可以提问、修改、删除；关掉「记忆」就不提炼、也不用画像做推荐。
+「记忆」设置使用 `app/actions/memory.ts` 读取事实、修改、删除和清空，并写入个人
+`memoryEnabled` 偏好。事实按种类分组显示，可逐条修改或删除。关闭后不提炼画像。
+对记忆提问保留为设计方向。
 
 ### 2.3 生成候选卡片
 
 设计是每个用户每天夜里跑一次**后台调研**，时间在本地 05:00 左右，赶在 08:00 简报之前。
 
-现状（2026-11-03）：**后台调研还没有做**。没有对应的 cron 端点，PostHog 的 `mikka-proactive-research`
-只是预留。Cloudflare Worker `cloudflare/suggestions-cron` 只有一个每分钟触发的 cron（`* * * * *`），
-在 Worker 里按 UTC 时间分发：每 15 分钟调 `/api/cron/briefings` 写简报，每小时整点调
-`/api/cron/suggestions-reconcile` 补漏，每小时 30 分调 `/api/cron/user-facts` 合并画像；
-每分钟还调 Coordinator 唤醒、定时任务等端点（`docs/suggestions-cron.md`）。计划让后台调研也由这个
-Worker 触发。
+实现边界是**后台调研尚未接入**。没有对应的 cron 端点，`lib/feature-flags.ts` 的
+`mikka-proactive-research` 仍为预留。Cloudflare Worker `cloudflare/suggestions-cron`
+只有一个每分钟触发的 cron（`* * * * *`），按 UTC 时间分发简报、建议补漏和画像合并。
+`/api/cron/reconcile` 每 15 分钟作为补漏，Coordinator 唤醒、定时任务和运行恢复的主要入口
+是提交事件和 durable timers。完整时序见 [定时任务说明](../suggestions-cron.md)。
+后台调研的 Worker 接线仍属方案。
 
 计划中有四类来源：
 
@@ -131,11 +138,11 @@ Worker 触发。
    - 后台调研的总开关等第二阶段实现时再加。
 
    自己部署的开源版本两个都默认关，不配就完全不花这部分钱。我们的云服务按需打开。
-2. **谁能用**（名单或套餐）：`proactive_entitlements`，或者复用将来的套餐表，记录每个用户能用哪一部分以及每日上限。
-   第一阶段只开给内部用户，后台调研以后可以做成付费功能。
-3. **用户自己的开关**：设置里「记忆」关掉，画像和后台调研都停；单独关掉「主动推荐」，只停后台调研，画像照常给 Coordinator 用。
-4. **每人每日预算**：调用次数、搜索次数、分身运行分钟数都设上限，超出就跳过当天，第二天再跑。
-   每次运行都记录用量，方便算出每个用户的真实成本。
+2. **谁能用**：画像已经使用个人 PostHog flag `mikka-proactive-profile`，由
+   `lib/profile/entitlement.ts` 在服务端检查。调研的名单或套餐仍属方案。
+3. **用户自己的开关**：已实现的「记忆」开关控制画像。单独的「主动推荐」开关与后台调研一同实现。
+4. **每人每日预算**：画像提炼已按 UTC 日限制 200 次调用（`PROFILE_DAILY_CALLS`），
+   失败调用也计数，并记录 token 用量。搜索次数和分身运行分钟数的预算仍属后台调研方案。
 
 先给内部用户开，量出真实成本再定套餐。ChatGPT Pulse 一开始也只给 Pro 用户，就是因为算力贵。
 
@@ -149,8 +156,7 @@ Worker 触发。
 
 ## 5. 分期
 
-1. **画像**：在现有打分步骤之后加一步提炼，建 `user_facts` 表，夜间合并，接到「记忆」页。
-   这是地基，可以马上开工。
+1. **画像（已实现）**：打分后提炼，写入 `user_facts`，夜间合并，接到「记忆」设置。
 2. **夜间后台调研**：截止日期类和关注类先做（不依赖外部搜索之外的东西），再接兴趣 × 外部新信息
    （依赖 #342 的分身或搜索接口）。
 3. **排序、限量和反馈**：加 `suggestion_feedback`，卡片上加「不感兴趣」「这不对」，并用于调整可信度。
@@ -160,7 +166,7 @@ Worker 触发。
 
 - 外部搜索用什么：直接用网页分身浏览，还是先接一个搜索接口（Brave、Exa、Google Places
   这类），分身只做深入核实。建议先接搜索接口，成本低、结果稳。
-- 提炼和调研用哪个模型，以及每人每天的预算数字。
+- 后台调研使用的模型和预算。画像提炼已使用 `COORDINATOR_MODEL`，并按每人每 UTC 日 200 次调用限额执行。
 - 手机端位置授权的界面（另出 Figma）。
 
 ## 7. 调研来源
