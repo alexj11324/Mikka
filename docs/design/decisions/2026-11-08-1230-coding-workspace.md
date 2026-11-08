@@ -34,6 +34,8 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 | R0b 任务面板 | The task detail keeps its current shape. Its top row is #1471 · title · ⋯ ⤢ ✕. The first row under it, above 状态 / Bot / Agent, is 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败」 with 「审阅」. Secondary actions and the branch name are in ⋯. Attempts appear only in 活动: 第 1 次尝试 · 失败 · 换 Codex 再试 → 第 2 次尝试 · 完成 · 开了 PR #1471. | `1120:432` | `1120:664` |
 | R1 审阅页 | One full page, described below. | `1120:869` | `1120:1231` |
 | R1b 检查展开 | The check summary expands in place: the failing check with a log excerpt, 查看完整日志 and 附到评论; the passing checks in one row. | `1120:1542` | `1120:1895` |
+| R4 全部文件 | The middle column's header switch 「改动 | 全部文件」 (Conductor's Changes / All files). 全部文件 shows the repository tree, with changed files marked, and read-only source on the right. | `1125:22` | `1125:481` |
+| R5 终端抽屉 | The terminal is a bottom drawer on the review page, opened with ⌘J or ⋯ › 终端. The ⋯ menu also holds 预览, the branch name, 已看 and shortcuts. Teammates see it read-only. | `1125:786` | `1125:1163` |
 | R2 iPhone 审阅 | Opened in one tap from the chat card's summary line. Under one centred title, the first row is the check summary (tap to expand) with 要求修改 / 批准合并, then the changed files, and the floating 「N 条评论 · 发给 Agent」 bar. | `1121:54` | `1121:169` |
 | 地球图标移出窗口栏 | Accepted with the rest. The window bar keeps only ⌘K search and the ✋ 等待你 count; the browser opens from ⌘K 「打开浏览器」 or ⌘⇧O. | `1123:78` | `1123:306` |
 | R3 iPhone 文件 diff | A file's diff with inline comments and the floating bar. | `1121:274` | `1121:359` |
@@ -70,23 +72,15 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 
 ## Scope
 
-**P0**
-- The summary line and 「审阅」 on the chat task card, the task panel and the 等待你 list; ⌘⇧B; ⌘K 「审阅 #N」.
-- The review page:
-  - changed files and the diff, unified and split;
-  - inline comments and 「发给 Agent」;
-  - the check summary with in-place expansion and 附到评论;
-  - 要求修改 / 批准合并;
-  - mark as viewed.
-- Changes are always available for every coding task. While the machine runs, they come from the machine's working tree. Afterwards they fall back to the checkpoint diff, then the PR diff. A large change loads per file instead of showing a single 「太大」 notice.
-- iPhone parity (R2, R3).
+Scope and priorities stay as [#1720](https://github.com/alexj11324/Mikka/issues/1720) sets them: everything on the gap list is built, and nothing is dropped. This decision sets the layout and the order of the first deliverable, not the scope. #1720's items land on the review page:
 
-**P1**
-- 按提交筛选 in the diff header.
-- Undo a file or hunk.
+| #1720 item | Where it lives |
+|---|---|
+| Changes, inline comments, feedback to the agent, PR and checks (#1722, #1732, #1502, #1503) | The summary line and 「审阅」 (R0, R0b); the review page (R1, R1b) |
+| Repository file tree, source, ⌘P (#1721, #1731) | The review page's 「改动 | 全部文件」 switch (R4) |
+| Terminal, run actions (#1723, #1727, #1733) | A bottom drawer on the review page, ⌘J or ⋯ › 终端 (R5) |
+| Dev preview, ports (#1724, #1733) | ⋯ › 预览 or ⌘K. It opens in the app's browser column (R-57) or a pop-out window |
+| Git history, undo, commit filter (#1726) | 按提交筛选 in the diff header; file and hunk actions on the review page |
+| iPhone | R2, R3 |
 
-**P2 (optional; how it relates to the wider #1720 Epic is still to be settled)**
-- A repository file tree and read-only source.
-- A terminal (task owner only; teammates read-only; no secret files, [2026-11-08-0240](2026-11-08-0240-credential-exposure-boundary.md)).
-- A dev-server preview.
-- Restore to an earlier turn.
+The rest of #1720 (#1728, #1729, #1730, #1734, #1735) keeps its priorities. When any of it gets a surface, it goes on the review page or into ⋯, never as a new tab on the task panel.
