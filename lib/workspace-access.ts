@@ -65,7 +65,8 @@ const readWorkspaceContext = cache(async (userId: string, email: string, name: s
   if (personal) await ensurePersonalShare(user.id, personal.id)
 
   const savedId = cookieStore.get('mikka-workspace')?.value
-  const workspaceId = requestedId || (choices.find(item => item.id === savedId)?.id ?? choices[0]?.id)
+  // A cookie-less client starts in its own workspace, even if it joined a team first.
+  const workspaceId = requestedId || (choices.find(item => item.id === savedId)?.id ?? personal?.id ?? choices[0]?.id)
   let selected = choices.find(item => item.id === workspaceId)
   if (selected) {
     const nextName = renameGeneratedWorkspace(selected.name, locale, user.name)
