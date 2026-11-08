@@ -66,7 +66,7 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 				timeout = 270 * time.Second
 			}
 			callCtx, cancel := context.WithTimeout(ctx, timeout)
-			if request.Method == "prepare" || request.Method == "executeStream" {
+			if request.Method == "prepare" || request.Method == "prepareStream" || request.Method == "executeStream" {
 				callCtx, timing = withRequestTiming(callCtx)
 			}
 			if w.ExecutionOnly && request.Method != "executeStream" && request.Method != "execute" && request.Method != "quota" && request.Method != "nativeContext" && request.Method != "nativeStream" {
@@ -92,6 +92,15 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 				}
 			case "prepare":
 				result, err = w.PrepareRuntime(callCtx, request.Revision)
+			case "prepareStream":
+				if w.Use != nil && w.Use.RunID != "" {
+					err = ErrUnsupported
+				} else {
+					_, err = w.prepareRuntime(callCtx, request.Revision, false)
+					if err == nil {
+						result = map[string]bool{"ready": true}
+					}
+				}
 			case "quota":
 				result, err = w.Quota(callCtx, request.Revision)
 			case "models":

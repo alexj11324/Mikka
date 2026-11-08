@@ -9,8 +9,18 @@ import { pushState, setPushState as set, type PushState } from '@/lib/push-state
 import { currentAccount, onServerChange } from './config'
 import { accountStorageKey } from './server-store'
 
-/** The token the server already took in this run of the app, so coming back to the front does not post it again. */
-let sent: string | null = null
+/**
+ * The binding the server confirmed: this account's token posted under this session (#1659). The server binds a token
+ * to the native session that posts it and reads that session itself, so a confirmation counts only for the session it
+ * was made under, and only for a while: a POST that predates the server's session binding (a deploy while the app
+ * stayed open) is redone on the next sign-in, session change or return to the front after that, never on a timer.
+ * The session is kept in memory to compare; it is never sent, stored or logged.
+ */
+let confirmed: { key: string; at: number } | null = null
+let session: string | null = null
+export const CONFIRMED_FOR_MS = 12 * 60 * 60 * 1000
+const bindingKey = (accountId: string, token: string) => `${accountId}\u0000${session ?? ''}\u0000${token}`
+const isConfirmed = (key: string) => confirmed?.key === key && Date.now() - confirmed.at < CONFIRMED_FOR_MS
 let generation = 0
 let mutations: Promise<unknown> = Promise.resolve()
 function mutate<T>(work: () => Promise<T>): Promise<T> {
@@ -25,7 +35,7 @@ Notifications.setNotificationHandler({
     return { shouldShowBanner: current, shouldShowList: current, shouldPlaySound: current, shouldSetBadge: false }
   },
 })
-onServerChange(() => { generation++; sent = null; set('unknown') })
+onServerChange(() => { generation++; confirmed = null; set('unknown') })
 
 /** The EAS project id the Expo token is minted for: `extra.eas.projectId` (app.config.ts, from EAS_PROJECT_ID). */
 export function easProjectId(): string | null {
@@ -45,15 +55,15 @@ async function register(connection: ApiConnection, started: number): Promise<Pus
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId })
     return await mutate(async () => {
       if (cancelled()) return 'unknown'
-      const key = `${connection.account.id}:${token}`
-      if (key === sent) return 'registered'
+      const key = bindingKey(connection.account.id, token)
+      if (isConfirmed(key)) return 'registered'
       await api('/api/mobile/push-tokens', { method: 'POST', body: { token, platform: Platform.OS, deviceName: Device.deviceName }, timeoutMs: 5000 }, connection)
       // A switch can begin while the POST is in flight. Finish its cleanup
       // before a new account may register this same device token.
       if (cancelled()) { await remove(connection, token); return 'unknown' }
       try { await SecureStore.setItemAsync(accountStorageKey(connection.account.id, 'push_token'), token) }
       catch (error) { await remove(connection, token); throw error }
-      if (!cancelled()) sent = key
+      if (!cancelled()) confirmed = { key, at: Date.now() }
       return 'registered'
     })
   } catch {
@@ -76,6 +86,18 @@ export async function refreshPush(): Promise<PushState> {
   return pushState()
 }
 
+/**
+ * The signed-in session changed (signed in, or the same phone and token under a new session): registers again, so
+ * the server binds the token to it. The first call only records the session; watchPushes registers right after.
+ */
+export function setPushSession(next: string | null): Promise<PushState> | null {
+  if (next === session) return null
+  const first = session === null
+  session = next
+  if (first || !next) return null
+  return refreshPush()
+}
+
 /** Shows iOS's permission prompt (once; afterwards only iOS Settings can change it), then registers. */
 export async function askForPush(): Promise<PushState> {
   if (Platform.OS === 'web' || !Device.isDevice) { set('unsupported'); return pushState() }
@@ -93,7 +115,7 @@ export async function unregisterPush(): Promise<void> {
     const token = await SecureStore.getItemAsync(key)
     if (token) await remove(connection, token)
     await SecureStore.deleteItemAsync(key)
-    if (currentAccount().id === connection.account.id) sent = null
+    if (currentAccount().id === connection.account.id) confirmed = null
   })
 }
 
@@ -102,7 +124,7 @@ export async function forgetPushToken(accountId = currentAccount().id): Promise<
   if (currentAccount().id === accountId) generation++
   await mutate(async () => {
     if (Platform.OS !== 'web') await SecureStore.deleteItemAsync(accountStorageKey(accountId, 'push_token')).catch(() => undefined)
-    if (currentAccount().id === accountId) { sent = null; set('unknown') }
+    if (currentAccount().id === accountId) { confirmed = null; set('unknown') }
   })
 }
 
