@@ -1,4 +1,7 @@
 import 'server-only'
+import { runAwaitingApproval, runDeviceOffline, runOfflineDevice } from './task-state-query'
+import { withTaskDevicePresence } from './task-state-presence'
+import type { TaskStateRun } from './task-state'
 
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { getTranslations } from 'next-intl/server'
@@ -15,7 +18,7 @@ import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '
  * (lib/task-blocked.ts): the same window and owner as the web's listTaskRuns.
  * One small read beside the task list, which the 任务 list already makes.
  */
-export type TaskRunSnapshot = { issueId: string; runId: string | null; status: string | null; outcome: ThreadOutcome | null; failureDetails: CompactRunFailure | null; bot: MobileTaskBot | null; schedule: MobileTaskSchedule | null }
+export type TaskRunSnapshot = Omit<TaskStateRun, 'runId' | 'status'> & { issueId: string; runId: string | null; status: string | null; outcome: ThreadOutcome | null; failureDetails: CompactRunFailure | null; bot: MobileTaskBot | null; schedule: MobileTaskSchedule | null }
 type ScheduleRow = { title: string; timing: Definition['timing']; nextAt: string | null }
 type ScheduleLabels = { daily: (time: string) => string; interval: (minutes: number) => string }
 
@@ -42,16 +45,16 @@ export function taskSchedule(issueId: typeof issues.id, userId: string, workspac
 
 export async function newestTaskRuns(userId: string, issueIds: readonly string[], workspaceId?: string, labels?: ScheduleLabels): Promise<TaskRunSnapshot[]> {
   if (!issueIds.length) return []
-  const latest = db.selectDistinctOn([agentRuns.issueId], { issueId: agentRuns.issueId, runId: agentRuns.id, status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'), botId: runBotId.as('botId') })
+  const latest = db.selectDistinctOn([agentRuns.issueId], { issueId: agentRuns.issueId, runId: agentRuns.id, status: agentRuns.status, outcome: agentRuns.outcome, failureDetails: runFailureBrief.as('failureDetails'), botId: runBotId.as('botId'), pauseReason: agentRuns.pauseReason, stopReason: agentRuns.stopReason, threadReplacedBy: agentRuns.threadReplacedBy, awaitingApproval: runAwaitingApproval.as('awaitingApproval'), deviceOffline: runDeviceOffline.as('deviceOffline'), offlineDevice: runOfflineDevice.as('offlineDevice') })
     .from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId))
     .where(and(eq(agentRuns.userId, userId), inArray(agentRuns.issueId, [...issueIds]), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
     .orderBy(agentRuns.issueId, desc(agentRuns.createdAt), desc(agentRuns.id)).as('newest_task_runs')
   // Start from the authorized tasks so a scheduled task without a thread is decorated too.
   // Both decorations share the existing read, including closed tasks' Bot avatars.
-  const rows = await db.select({ issueId: issues.id, runId: latest.runId, status: latest.status, outcome: latest.outcome, failureDetails: latest.failureDetails,
+  const rows = await db.select({ issueId: issues.id, runId: latest.runId, status: latest.status, outcome: latest.outcome, failureDetails: latest.failureDetails, pauseReason: latest.pauseReason, stopReason: latest.stopReason, threadReplacedBy: latest.threadReplacedBy, awaitingApproval: latest.awaitingApproval, deviceOffline: sql<boolean>`coalesce(${latest.deviceOffline},false)`, offlineDevice: latest.offlineDevice,
     bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }, schedule: taskSchedule(issues.id, userId, workspaceId),
   }).from(issues).leftJoin(latest, eq(latest.issueId, issues.id))
     .leftJoin(bots, and(eq(bots.id, latest.botId), eq(bots.ownerId, userId), workspaceId ? eq(bots.workspaceId, workspaceId) : undefined))
     .where(inArray(issues.id, [...issueIds]))
-  return rows.map(row => ({ ...row, schedule: taskScheduleView(row.schedule, labels), failureDetails: readCompactRunFailure(row.failureDetails) }))
+  return (await withTaskDevicePresence(rows)).map(row => ({ ...row, schedule: taskScheduleView(row.schedule, labels), failureDetails: readCompactRunFailure(row.failureDetails) }))
 }

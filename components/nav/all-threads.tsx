@@ -12,7 +12,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { RightColumn } from '@/components/workspace/thread-column'
 import { navigate, openThread, toggleAllThreads } from '@/components/workspace/workspace-navigation'
-import { groupThreads } from '@/lib/thread-groups'
+import { pendingTaskCount } from '@/hooks/use-bot-tasks'
 import { cn } from '@/lib/utils'
 import { threadName } from './thread-list'
 import { matches, ThreadResults } from './context-panel'
@@ -21,7 +21,7 @@ type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
 /** How many rows of 全部线程 sit in 等待你 (R-52), counted as the list groups them. */
 export function waitingCount(threads: Thread[], issues: Issue[]) {
-  return groupThreads(threads, id => issues.find(issue => issue.id === id)).waiting.length
+  return pendingTaskCount(threads, issues)
 }
 
 /**

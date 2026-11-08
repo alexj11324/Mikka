@@ -45,11 +45,13 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const noRun = await workspaceTask()
   const schedule = randomUUID()
   await pool.query(`insert into user_schedules (id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status,next_at) values ($1,$2,$3,$4,$5,$6,$7,$7,'active','2030-01-01T09:00:00Z')`, [schedule, owner, teamWorkspace.id, bot, randomUUID(), randomUUID(), { title: 'Daily task', timezone: 'UTC', timing: { kind: 'daily', time: '09:00', fold: 'earlier', gap: 'skip' }, task: { kind: 'issue_snapshot', issueId: noRun }, misfire: 'skip', maxLatenessMinutes: 60 }])
+  await pool.query(`insert into run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") values ($1,$2,$3,'https://github.com/acme/app','github.com/acme/app','published',$4)`, [latest, owner, issueId, { url: 'https://github.com/acme/app/pull/42', state: 'open' }])
   const personalTask = await seedIssue(pool, owner)
   user = { id: owner, name: 'Owner', email: `${owner}@example.invalid` }; selectedWorkspace = teamWorkspace.id
   const request = (id: string) => GET(new Request(`https://app.test/api/mobile/tasks/${id}`), { params: Promise.resolve({ id }) })
   t.after(async () => {
     await pool.query('delete from agent_runs where "userId"=any($1)', [[owner, other]])
+    await pool.query('delete from devices where "ownerId"=any($1)', [[owner, other]])
     await pool.query('delete from issues where "userId"=any($1)', [[owner, other]])
     await pool.query('delete from mikka_workspaces where "userId"=any($1)', [[owner, other]])
     await pool.query('delete from "user" where id=any($1)', [[owner, other]])
@@ -65,6 +67,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(body.task.title, 'Short title')
     assert.equal(body.task.description, 'Description')
     assert.equal(body.task.group, 'pending', 'PR metadata wins over idle')
+    assert.deepEqual([body.task.state, body.task.reason, body.task.blockedBy], ['waiting', 'pr_review', null])
     assert.equal(body.task.bot.id, bot)
     assert.deepEqual(body.task.agent, { harness: 'codex', model: 'fixture-model' })
     assert.deepEqual(body.task.place, { kind: 'cloud', name: 'Cloud' })
@@ -72,6 +75,10 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.deepEqual(body.live, { workspaceId: teamWorkspace.id })
     assert.deepEqual(body.activity.map((row: { kind: string }) => row.kind), ['attempt', 'replaced', 'attempt', 'created'])
     assert.deepEqual(body.activity.filter((row: { kind: string }) => row.kind === 'attempt').map((row: { runId: string; n: number }) => [row.runId, row.n]), [[latest, 2], [first, 1]])
+    assert.equal(body.activity[0].state, 'done')
+    assert.deepEqual(body.activity[0].pullRequest, { number: 42, url: 'https://github.com/acme/app/pull/42' })
+    assert.equal(body.activity[2].state, 'replaced')
+    assert.equal(body.activity[2].pullRequest, null)
     assert.equal(body.activity[0].group, 'waiting', 'attempts retain the five thread groups consumed by iOS')
     assert.equal(body.activity[0].createdAt, body.activity[1].createdAt)
     assert.equal(body.activity.at(-1).by, 'owner')
@@ -86,7 +93,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(row.group, 'pending'); assert.equal(row.bot.id, bot); assert.ok(row.createdAt)
     assert.ok(Object.hasOwn(row, 'blocked'))
     const scheduled = body.tasks.find((item: { id: string }) => item.id === noRun)
-    assert.equal(scheduled.group, 'todo'); assert.equal(scheduled.bot, null)
+    assert.equal(scheduled.group, 'running'); assert.equal(scheduled.state, 'queued'); assert.equal(scheduled.bot, null)
     assert.equal(scheduled.schedule.label, 'Every day at 09:00')
     assert.equal(Date.parse(scheduled.schedule.nextAt), Date.parse('2030-01-01T09:00:00Z'))
     await pool.query(`update issues set status='done' where id=$1`, [issueId])
@@ -94,27 +101,89 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(closed.tasks.find((item: { id: string }) => item.id === issueId).group, 'done')
     assert.equal((await (await request(issueId)).json()).task.group, 'done')
   })
-  await t.test('without a thread, board flags and open dependencies put both list and detail in pending', async () => {
+  await t.test('without a thread, flags and dependencies preserve todo with matching reasons and visible identifiers', async () => {
+    await pool.query(`update user_schedules set status='cancelled',next_at=null where id=$1`, [schedule])
     const groups = async () => {
       const listBody = await (await list(new Request('https://app.test/api/mobile/tasks'))).json()
       const row = listBody.tasks.find((item: { id: string }) => item.id === noRun)
       const detail = await (await request(noRun)).json()
-      return [row.group, detail.task.group]
+      for (const field of ['state', 'reason', 'blockedBy', 'group']) assert.equal(row[field], detail.task[field], `list/detail ${field}`)
+      return [row.group, detail.task.group, row.reason, row.blockedBy]
     }
     const metadata = async (value: unknown) => pool.query('update issues set content=$2 where id=$1', [noRun, { type: 'doc', attrs: { mikka: value } }])
     await metadata({ block: { blocked: true, runId: null } })
-    assert.deepEqual(await groups(), ['pending', 'pending'])
+    assert.deepEqual(await groups(), ['todo', 'todo', 'flagged', null])
     await pool.query(`update issues set status='done' where id=$1`, [noRun])
-    assert.deepEqual(await groups(), ['done', 'done'])
+    assert.deepEqual(await groups(), ['done', 'done', null, null])
     await pool.query(`update issues set status='todo' where id=$1`, [noRun])
     const blocker = await workspaceTask()
     await metadata({ blockedByIds: [blocker] })
-    assert.deepEqual(await groups(), ['pending', 'pending'])
+    const identifier = (await (await request(blocker)).json()).task.identifier
+    assert.ok(identifier)
+    assert.deepEqual(await groups(), ['todo', 'todo', 'blocked_by', identifier])
     await pool.query(`update issues set status='done' where id=$1`, [blocker])
-    assert.deepEqual(await groups(), ['todo', 'todo'])
+    assert.deepEqual(await groups(), ['todo', 'todo', null, null])
     await pool.query(`update issues set status='todo' where id=$1`, [blocker])
     await metadata({ blockedByIds: [blocker], block: { blocked: false, runId: null } })
-    assert.deepEqual(await groups(), ['todo', 'todo'], 'an explicitly cleared board block stays clear')
+    assert.deepEqual(await groups(), ['todo', 'todo', null, null], 'an explicitly cleared board block stays clear')
+  })
+  await t.test('all task states/reasons are projected identically by real GET routes', async () => {
+    const id = await workspaceTask()
+    const runId = await seedRun(pool, { userId: owner, agentId: agent, issueId: id })
+    const scenarios = [
+      ['todo', 'waiting_input', null, null, null, 'waiting', 'needs_input', 'pending'],
+      ['todo', 'paused', null, 'human_control', null, 'waiting', 'approval', 'pending'],
+      ['review', 'succeeded', 'done', null, null, 'waiting', 'pr_review', 'pending'],
+      ['todo', 'succeeded', 'blocked', null, null, 'blocked', 'blocked', 'pending'],
+      ['todo', 'paused', null, 'quota_exhausted', null, 'blocked', 'quota', 'pending'],
+      ['todo', 'failed', null, null, 'device_lost', 'blocked', 'offline', 'pending'],
+      ['todo', 'failed', null, null, null, 'failed', null, 'pending'],
+      ['todo', 'preparing', null, null, null, 'running', null, 'running'],
+      ['todo', 'running', null, null, null, 'running', null, 'running'],
+      ['todo', 'finishing', null, null, null, 'running', null, 'running'],
+      ['todo', 'queued', null, null, null, 'queued', null, 'running'],
+      ['todo', 'succeeded', 'done', null, null, 'todo', null, 'todo'],
+      ['done', 'running', null, null, null, 'done', null, 'done'],
+      ['canceled', 'running', null, null, null, 'canceled', null, 'done'],
+      ['duplicate', 'running', null, null, null, 'duplicate', null, 'done'],
+    ]
+    for (const [taskStatus, status, outcome, pauseReason, stopReason, state, reason, group] of scenarios) {
+      await pool.query('update issues set status=$2 where id=$1', [id, taskStatus])
+      await pool.query('update agent_runs set status=$2,outcome=$3,"pauseReason"=$4,"stopReason"=$5 where id=$1', [runId, status, outcome, pauseReason, stopReason])
+      const detail = (await (await request(id)).json()).task
+      const body = await (await list(new Request('https://app.test/api/mobile/tasks'))).json()
+      const row = body.tasks.find((item: { id: string }) => item.id === id)
+      for (const task of [detail, row]) assert.deepEqual([task.state, task.reason, task.blockedBy, task.group], [state, reason, null, group], `${taskStatus}/${status}/${outcome}`)
+    }
+    // Queued local devices use presence, while completed attempts ignore later device loss.
+    const device = randomUUID()
+    await pool.query(`insert into devices (id,"ownerId",name,kind,"lastSeenAt") values ($1,$2,'Test device','local',now()-interval '1 day')`, [device, owner])
+    await pool.query(`update issues set status='todo' where id=$1`, [id])
+    await pool.query(`update agent_runs set status='queued',outcome=null,"stopReason"=null,"deviceId"=$2 where id=$1`, [runId, device])
+    const compare = async (state: string, reason: string | null) => {
+      const task = (await (await request(id)).json()).task
+      const row = (await (await list(new Request('https://app.test/api/mobile/tasks'))).json()).tasks.find((item: { id: string }) => item.id === id)
+      for (const value of [task, row]) assert.deepEqual([value.state, value.reason], [state, reason])
+    }
+    await compare('blocked', 'offline')
+    await pool.query('update devices set "lastSeenAt"=now() where id=$1', [device])
+    await compare('queued', null)
+    await pool.query('update devices set enabled=false where id=$1', [device])
+    await compare('blocked', 'offline')
+    await pool.query(`update agent_runs set status='succeeded',outcome='done' where id=$1`, [runId])
+    await compare('todo', null)
+    // Pending CLI approval is run-scoped and expires instead of remaining waiting forever.
+    await pool.query(`update agent_runs set status='running',outcome=null where id=$1`, [runId])
+    await pool.query(`insert into agent_tool_approvals (id,"runId","userId","deviceId","requestId",harness,method,input,digest,status,"expiresAt") values ($1,$2,$3,$4,'request','codex','fixture','{}','digest','pending',now()+interval '1 hour')`, [randomUUID(), runId, owner, device])
+    await compare('waiting', 'approval')
+    await pool.query(`update agent_tool_approvals set "expiresAt"=now()-interval '1 hour' where "runId"=$1`, [runId])
+    await compare('running', null)
+    await pool.query(`update issues set status='todo' where id=$1`, [id])
+    await pool.query(`update agent_runs set status='succeeded',outcome='done',"stopReason"=null where id=$1`, [runId])
+    await pool.query(`insert into run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status) values ($1,$2,$3,'https://github.com/acme/app','github.com/acme/app','awaiting_approval')`, [runId, owner, id])
+    for (const task of [(await (await request(id)).json()).task, (await (await list(new Request('https://app.test/api/mobile/tasks'))).json()).tasks.find((item: { id: string }) => item.id === id)]) {
+      assert.deepEqual([task.state, task.reason], ['waiting', 'approval'])
+    }
   })
   await t.test('cross-workspace reads return 404 even for the same owner, and workspace tokens stay scoped', async () => {
     selectedWorkspace = own.id
