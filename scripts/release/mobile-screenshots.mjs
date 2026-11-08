@@ -22,6 +22,18 @@ export function screenshotIdentity(env) {
   return identity
 }
 
+export async function backendVersion(expected, fetchImpl = fetch) {
+  const response = await fetchImpl(`${ORIGIN}/api/version`, { cache: 'no-store', credentials: 'omit',
+    redirect: 'error', headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(30000) })
+  assert.equal(response.ok, true, 'backendVersionHTTPFailed')
+  const data = await response.json()
+  assert.match(data.build ?? '', /^[a-f0-9]{40}$/, 'backendVersionSHARequired')
+  assert.ok(data.overlaySha === null || /^[a-f0-9]{40}$/.test(data.overlaySha ?? ''), 'backendOverlaySHARequired')
+  const version = { build: data.build, overlaySha: data.overlaySha }
+  if (expected) assert.deepEqual(version, expected, 'backendDeploymentChangedDuringCapture')
+  return version
+}
+
 export function pngDimensions(bytes) {
   assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
   assert.equal(bytes.subarray(12, 16).toString(), 'IHDR')
@@ -181,6 +193,7 @@ async function capture(env) {
       assert.equal(result.status, 0, `nativeUIFlowFailed:${name}`)
     } finally { closeSync(log) }
   }
+  const backendVersionBefore = await backendVersion()
   const readback = await verifyDemo(env)
   const appPath = join(privateDir, 'build/Build/Products/Release-iphonesimulator/Mikka.app')
   simctl('install', device.udid, appPath)
@@ -208,7 +221,8 @@ async function capture(env) {
     simctl('io', device.udid, 'screenshot', '--type=png', join(output, filename))
     screenshots.push({ filename, ...pngDimensions(readFileSync(join(output, filename))) })
   }
-  const manifest = { sourceSha: identity.sha, overlaySha: env.OVERLAY_SHA, runId: identity.runId,
+  const backendVersionAfter = await backendVersion(backendVersionBefore)
+  const manifest = { backendVersionBefore, backendVersionAfter, sourceSha: identity.sha, overlaySha: env.OVERLAY_SHA, runId: identity.runId,
     capturedAt: new Date().toISOString(), apiOrigin: ORIGIN, workspaceId: WORKSPACE, userId: USER,
     device: device.device, runtime: device.runtime, locale: 'en_US', languages: ['en'], appearance: 'light',
     orientation: 'portrait', dynamicType: 'default', workspaceSelection: 'native Settings local session', build: 'Release iphonesimulator unsigned',

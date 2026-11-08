@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { screenshotIdentity, pngDimensions, loginFlow, workspaceFlow, readFlow, SHOTS } from './mobile-screenshots.mjs'
+import { screenshotIdentity, pngDimensions, loginFlow, workspaceFlow, readFlow, backendVersion, SHOTS } from './mobile-screenshots.mjs'
 
 const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '123',
@@ -54,4 +54,24 @@ test('workflow credentials follow source and CI validation and exports remain al
   const build = readFileSync(new URL('./mobile-screenshots-build.sh', import.meta.url), 'utf8')
   assert.match(build, /CODE_SIGNING_ALLOWED=NO/)
   assert.match(build, /Set :EXUpdatesEnabled false/)
+})
+
+
+test('backend provenance reads the live version without cache and rejects deployment drift', async () => {
+  const before = { build: 'c'.repeat(40), overlaySha: 'd'.repeat(40) }
+  const read = data => async (url, init) => {
+    assert.equal(url, 'https://app.aspectlylabs.com/mikka/api/version')
+    assert.equal(init.cache, 'no-store')
+    assert.equal(init.credentials, 'omit')
+    assert.equal(init.redirect, 'error')
+    return Response.json({ ...data, privateField: 'excluded from manifest' })
+  }
+  assert.deepEqual(await backendVersion(undefined, read(before)), before)
+  assert.deepEqual(await backendVersion(before, read(before)), before)
+  for (const after of [{ ...before, build: 'e'.repeat(40) }, { ...before, overlaySha: null }]) {
+    await assert.rejects(backendVersion(before, read(after)), /backendDeploymentChangedDuringCapture/)
+  }
+  await assert.rejects(backendVersion(undefined, read({ build: 'unknown', overlaySha: null })), /backendVersionSHARequired/)
+  await assert.rejects(backendVersion(undefined, read({ ...before, overlaySha: 'main' })), /backendOverlaySHARequired/)
+  await assert.rejects(backendVersion(undefined, async () => new Response('', { status: 503 })), /backendVersionHTTPFailed/)
 })
