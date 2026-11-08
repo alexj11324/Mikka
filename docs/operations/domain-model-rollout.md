@@ -40,18 +40,20 @@ migrate: projects bound=<本轮绑定数> tasks=<本轮建关系数> pending=<�
 
 本次迁移文件的目标如下；以后若新增修复迁移，保留原记录，在发布证据中追加新文件。
 
+本 Epic 的九个文件已按协调分配移至 `20261108120300`–`20261108120308`，SQL 内容及相对顺序保持不变，排在先行的 Secret delivery 与 enabled-models 迁移之后。P0 四个 `20261107180000`–`20261107180003` 文件仍保留当前原 owner 交付的名称；须先合入其顺序修复的新 SHA，再同步下文 P0 名称与 runner 入口，不提前引用尚不存在的文件。
+
 | 文件 | 目标 |
 | --- | --- |
 | `20261107180000_task_workspace_ownership.sql`（P0 前置） | APP |
-| `20261107230000_project_v2.sql` | WS |
-| `20261107230001_task_identity.sql` | APP |
-| `20261107230002_task_identity_aliases.sql` | WS |
-| `20261107230003_team_lifecycle.sql` | WS |
-| `20261107230004_project_resources.sql` | WS |
-| `20261107230005_project_lifecycle.sql` | WS |
-| `20261107230006_project_history_retention.sql` | APP |
-| `20261107230007_task_alias_tenant.sql` | APP |
-| `20261107230008_project_writer_fence.sql` | WS |
+| `20261108120300_project_v2.sql` | WS |
+| `20261108120301_task_identity.sql` | APP |
+| `20261108120302_task_identity_aliases.sql` | WS |
+| `20261108120303_team_lifecycle.sql` | WS |
+| `20261108120304_project_resources.sql` | WS |
+| `20261108120305_project_lifecycle.sql` | WS |
+| `20261108120306_project_history_retention.sql` | APP |
+| `20261108120307_task_alias_tenant.sql` | APP |
+| `20261108120308_project_writer_fence.sql` | WS |
 
 ### 1.1 新旧服务交叠期间的 Project 写入
 
@@ -89,9 +91,9 @@ PGDATABASE="$MIKKA_DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on 
 SELECT name, "appliedAt" FROM schema_migrations
 WHERE name IN (
   '20261107180000_task_workspace_ownership.sql',
-  '20261107230001_task_identity.sql',
-  '20261107230006_project_history_retention.sql',
-  '20261107230007_task_alias_tenant.sql'
+  '20261108120301_task_identity.sql',
+  '20261108120306_project_history_retention.sql',
+  '20261108120307_task_alias_tenant.sql'
 ) ORDER BY name;
 
 SELECT "ownershipState", count(*) AS tasks FROM issues GROUP BY "ownershipState" ORDER BY 1;
@@ -146,9 +148,9 @@ PGDATABASE="$DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on -c sta
   psql -X --set=ON_ERROR_STOP=1 <<'SQL'
 SELECT name, "appliedAt" FROM schema_migrations
 WHERE name IN (
-  '20261107230000_project_v2.sql', '20261107230002_task_identity_aliases.sql',
-  '20261107230003_team_lifecycle.sql', '20261107230004_project_resources.sql',
-  '20261107230005_project_lifecycle.sql', '20261107230008_project_writer_fence.sql'
+  '20261108120300_project_v2.sql', '20261108120302_task_identity_aliases.sql',
+  '20261108120303_team_lifecycle.sql', '20261108120304_project_resources.sql',
+  '20261108120305_project_lifecycle.sql', '20261108120308_project_writer_fence.sql'
 ) ORDER BY name;
 
 SELECT count(*) FILTER (WHERE "workspaceId" IS NOT NULL) AS bound_projects,
