@@ -36,7 +36,8 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 | R1b 检查展开 | The check summary expands in place: the failing check with a log excerpt, 查看完整日志 and 附到评论; the passing checks in one row. | `1120:1542` | `1120:1895` |
 | R4 文件 | The top bar's ⋯ is open with 文件 checked (Conductor's All files): the repository tree, with changed files marked, and read-only source on the right. | `1125:22` | `1125:481` |
 | R5 终端 | The top bar's ⋯ is open with 终端 checked (or ⌘J): a bottom drawer on the review page. Teammates see the terminal read-only. | `1125:786` | `1125:1163` |
-| R2 iPhone 审阅 | Opened in one tap from the chat card's summary line. Under one centred title, the first row is the check summary (tap to expand) with 批准合并, then the changed files, and the floating 「N 条评论 · 发给 Agent」 bar. | `1121:54` | `1121:169` |
+| R2 iPhone 审阅 | Opened in one tap from the chat card's summary line. Under one centred title, the first row is the check summary (tap to expand) with 批准合并, then the changed files, and the floating bar: 「N 条评论 · 失败检查」 above 「写修改意见…」 and 发给 Agent. The bar is always there, also with no comments. | `1121:54` | `1121:169` |
+| R2b iPhone 修改意见 | Tap 「写修改意见…」: a sheet titled 「修改意见」 with ✕, a text area and a full-width 「发给 Agent」. A general note can be sent with no line comments; with comments, they go in the same message. | `1134:10` | `1134:119` |
 | R3 iPhone 文件 diff | A file's diff with inline comments and the floating bar. | `1121:274` | `1121:359` |
 | R3b iPhone 加评论 | Tap a line: a sheet titled 「第 22 行」 with the line, an input and 「加入评论」. The comment joins the floating batch. | `1131:224` | `1131:328` |
 | R2a iPhone 任务详情 | The iOS task detail has the summary row 「PR #1471 · +42 −7 · ⚠ 1 项失败 ›」 under the title; one tap opens R2. | `1131:2` | `1131:152` |
@@ -101,6 +102,7 @@ Every state can be reached and left from the screen; none is a dead end.
 | Teammate (R11) | A teammate opens any entry | ✕; disabled actions say why |
 | Fallbacks (R12) | No changes, a change too big, or the machine reclaimed | Per-file 加载; the source line says which checkpoint or PR is shown |
 | iPhone task (R2a) → review (R2) → diff (R3) → add comment (R3b) | The task, then its summary row, then a file, then a line | Back at each step; 加入评论 → R3; 发给 Agent → the task conversation |
+| iPhone note sheet (R2b) | 「写修改意见…」 in R2's floating bar | ✕ or swipe down → R2; 发给 Agent → the task conversation (「你：修改意见」, plus any comments) |
 
 ## Scope
 
@@ -113,6 +115,6 @@ Scope and priorities stay as [#1720](https://github.com/alexj11324/Mikka/issues/
 | Terminal, run actions (#1723, #1727, #1733) | ⋯ › 终端 or ⌘J: a bottom drawer on the review page (R5) |
 | Dev preview, ports (#1724, #1733) | ⋯ › 预览. It opens in the app's browser column (R-57) or a pop-out window |
 | Git history, undo, commit filter (#1726) | 按提交筛选 in the diff header; file and hunk actions on the review page |
-| iPhone | R2, R3 |
+| iPhone | R2, R2b, R3 |
 
 The rest of #1720 (#1728, #1729, #1730, #1734, #1735) keeps its priorities. When any of it gets a surface, it goes on the review page, never as a new tab on the task panel.
