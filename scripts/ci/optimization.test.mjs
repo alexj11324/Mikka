@@ -55,8 +55,13 @@ test('installed cache writes are main-only and a miss installs; hits do not inst
   assert.equal(saves.length, 2)
   for (const event of ['pull_request', 'merge_group', 'push', 'workflow_dispatch']) {
     for (const ref of ['refs/pull/10/merge', 'refs/heads/feature', 'refs/heads/main']) {
-      const context = { github: { event_name: event, ref }, steps: { 'modules-key': { outputs: { reusable: 'true' } }, install: { outcome: 'success' }, restore: { outputs: { 'cache-hit': 'false' } } } }
-      for (const save of saves) assert.equal(Boolean(evaluate(save.if, context)), ref === 'refs/heads/main' && ['push', 'workflow_dispatch'].includes(event), `${event}/${ref}`)
+      for (const reusable of ['true', 'false']) {
+        const context = { github: { event_name: event, ref }, steps: { 'modules-key': { outputs: { reusable } }, install: { outcome: 'success' }, restore: { outputs: { 'cache-hit': 'false' } } } }
+        const written = saves.filter(save => evaluate(save.if, context))
+        const main = ref === 'refs/heads/main' && ['push', 'workflow_dispatch'].includes(event)
+        assert.equal(written.length, main ? 1 : 0, `${event}/${ref}/${reusable}`)
+        if (main) assert.equal(written[0].with.key.includes('modules-key'), reusable === 'true')
+      }
     }
   }
   for (const hit of ['true', 'false', undefined]) assert.equal(evaluate(install.if, { steps: { modules: { outputs: { 'cache-hit': hit } } } }), hit !== 'true')

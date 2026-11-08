@@ -73,10 +73,14 @@ runs:
           apps/*/node_modules
           packages/*/node_modules
         key: ${{ steps.modules-key.outputs.key }}
-    - name: Save the pnpm store (main only)
+    # Avoid uploading two near-identical large archives for one installation.
+    # The store remains a fallback for misses; update it only when hooks prevent
+    # saving a reusable installed tree.
+    - name: Save the pnpm store when module reuse is disabled (main only)
       if: >-
         github.ref == 'refs/heads/main' &&
         (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+        steps.modules-key.outputs.reusable != 'true' &&
         steps.install.outcome == 'success' && steps.restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:

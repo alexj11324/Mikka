@@ -55,9 +55,27 @@ standalone Desktop dispatch on main populates the macOS and Desktop Linux keys;
 later PRs can restore those default-branch entries. Cache eviction or a changed
 runtime returns to the frozen-install path. Monitor cache transfer time and
 size against installation savings; package-store hits alone still rebuild the
-installed dependency tree.
+installed dependency tree. Each install saves at most one archive: reusable
+module trees normally, or the package store when workspace hooks disable reuse.
+Existing store entries remain a fallback on misses, avoiding duplicate uploads
+of both large trees.
 
 ## Measure the result
+
+The [local dependency receipt](1765-dependencies.json) compares the same Desktop
+profile with an empty store, a restored store and restored installed modules:
+
+| Local Linux setup | Archive MB (decimal) | Restore seconds | Install seconds |
+| --- | ---: | ---: | ---: |
+| Empty store | — | — | 39.908 |
+| Restored pnpm store | 818.1 | 4.639 | 4.998 |
+| Restored installed dependencies | 708.4 | 5.188 | 0 |
+
+This single sample uses Node 24.19.0, pnpm 10.34.3 and zstd archives. The restored
+native/tool packages load successfully. It excludes GitHub transfer and queues,
+and does not cache Electron runtime acceptance. Installed modules reduce local
+setup from 9.637 to 5.188 seconds and archive size by 13.4% relative to the store;
+these numbers do not predict macOS or end-to-end PR timing.
 
 Collect completed runs with the existing command:
 

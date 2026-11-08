@@ -19,7 +19,7 @@ function fixture(t) {
   write('pnpm-lock.yaml', 'lockfileVersion: 9')
   write('pnpm-workspace.yaml', 'packages: [apps/*]')
   write('apps/desktop/package.json', '{"name":"@mikka/desktop"}')
-  const context = { node: '24.22.1', pnpm: '10.34.3', platform: 'linux', arch: 'x64', image: 'ubuntu22', profile: 'full', electron: 'skip' }
+  const context = { node: '24.22.1', pnpm: '10.34.3', platform: 'linux', arch: 'x64', image: 'ubuntu22', profile: 'full', electron: 'skip', nodeEnv: '' }
   return { root, write, context, key: () => dependencyCache(root, context).key }
 }
 
