@@ -14,7 +14,8 @@ import { apiAliases } from '../../apps/api/compat-aliases.mjs'
 import type { ApiRoute } from '../../apps/api/src/routes'
 import { daemonStatusSchema, runAssignmentSchema } from '@mikka/protocol'
 import { remoteKey } from '@mikka/protocol/repository'
-import { runWorktreeIdentity } from '@mikka/protocol/coding-workspace'
+import { runWorktreeIdentity, workspaceReadReceipt, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
+import { diffFilePage, diffFilePatch, reviewBoard, type ReviewMutation } from '@mikka/protocol/coding-workspace-review'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
@@ -32,11 +33,11 @@ function fixtureDaemon(value: unknown): FixtureDaemon {
   return value as FixtureDaemon
 }
 
-/** This is the complete local Files transport: a real listening HTTP API,
+/** This is the complete local Files/Diff transport: a real listening HTTP API,
  * real session/PAT/device authentication, PostgreSQL LISTEN, the full daemon,
  * its on-disk RunJournal, and the daemon's default HttpServerLink fetch.
  * No mock transport, direct readWorkspace invocation, browser or model call. */
-test('Files HTTP API → commands → full daemon → receipt → HTTP response on PostgreSQL 17', { skip: !databaseURL, timeout: 180_000 }, async t => {
+test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP response on PostgreSQL 17', { skip: !databaseURL, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: databaseURL, max: 1, connectionTimeoutMillis: 5000 })
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'HTTP/daemon acceptance requires PostgreSQL 17')
@@ -64,8 +65,9 @@ test('Files HTTP API → commands → full daemon → receipt → HTTP response 
   let daemon: FixtureDaemon | undefined, appPool: Pool | undefined, workspacePool: Pool | undefined
   let closeHTTP: (() => Promise<void>) | undefined
   const traffic: Array<{ method: string; path: string; status: number }> = []
-  const deliveries: Array<{ id: string; runId: string; repoId: string }> = []
-  const receipts: Array<{ requestId: string; status: number }> = []
+  const deliveries: Array<{ id: string; runId: string; repoId: string; kind: string; path?: string }> = []
+  const receipts: Array<{ requestId: string; status: number; body: WorkspaceReadReceipt }> = []
+  const receiptEvents = new Map<string, PromiseWithResolvers<void>>()
   const firstReceipt = Promise.withResolvers<void>()
   try {
     const migrations = new URL('../../drizzle/', import.meta.url)
@@ -85,20 +87,33 @@ test('Files HTTP API → commands → full daemon → receipt → HTTP response 
       route('/api/runs/[runId]/workspace/identity', ['GET'], () => import('../../app/api/runs/[runId]/workspace/identity/route')),
       route('/api/runs/[runId]/workspace/files', ['GET'], () => import('../../app/api/runs/[runId]/workspace/files/route')),
       route('/api/runs/[runId]/workspace/mentions', ['POST'], () => import('../../app/api/runs/[runId]/workspace/mentions/route')),
+      route('/api/runs/[runId]/workspace/diff', ['GET'], () => import('../../app/api/runs/[runId]/workspace/diff/route')),
+      route('/api/runs/[runId]/workspace/diff/[snapshotId]/file', ['GET'], () => import('../../app/api/runs/[runId]/workspace/diff/[snapshotId]/file/route')),
+      route('/api/runs/[runId]/workspace/diff/[snapshotId]/review', ['GET', 'POST'], () => import('../../app/api/runs/[runId]/workspace/diff/[snapshotId]/review/route')),
     ]
     const application = createApiHandler(routes)
     const runtime = serve({ manual: true, gracefulShutdown: false, silent: true, trustProxy: false, hostname: '127.0.0.1', port: 0,
       async fetch(request) {
         assert.ok(request.runtime?.node?.req instanceof IncomingMessage, 'requests enter through a TCP socket and srvx NodeRequest')
         const path = new URL(request.url).pathname
+        // Observe the actual private TCP receipt without changing the request
+        // or response. Complete synthetic source proofs stay in test memory.
+        const receipt = request.method === 'POST' && path.includes('/workspace/requests/')
+          ? workspaceReadReceipt.parse(await request.clone().json()) : undefined
         const response = await application.fetch(request)
         traffic.push({ method: request.method, path, status: response.status })
         if (path.endsWith('/commands') && response.status === 200) {
           const body = await response.clone().json()
-          for (const command of body.workspaceRequests ?? []) deliveries.push({ id: command.id, runId: command.identity.runId, repoId: command.identity.repoId })
+          for (const command of body.workspaceRequests ?? []) {
+            deliveries.push({ id: command.id, runId: command.identity.runId, repoId: command.identity.repoId,
+              kind: command.request.kind, ...(command.request.kind === 'diff_file' ? { path: command.request.file.path } : {}) })
+            if (!receiptEvents.has(command.id)) receiptEvents.set(command.id, Promise.withResolvers<void>())
+          }
         }
-        if (request.method === 'POST' && path.includes('/workspace/requests/')) {
-          receipts.push({ requestId: path.split('/').at(-1)!, status: response.status })
+        if (receipt) {
+          const requestId = path.split('/').at(-1)!
+          receipts.push({ requestId, status: response.status, body: receipt })
+          receiptEvents.get(requestId)?.resolve()
           if (response.status === 204) firstReceipt.resolve()
         }
         return response
@@ -133,6 +148,7 @@ test('Files HTTP API → commands → full daemon → receipt → HTTP response 
     const source = 'export const answer = 42\nexport const transport = "real HTTP and daemon"\n'
     await mkdir(join(worktree, 'src'), { recursive: true })
     await writeFile(join(worktree, 'src/example.ts'), source)
+    await writeFile(join(worktree, 'src/lazy.ts'), 'export const lazy = "base"\n')
     await writeFile(join(worktree, '.env'), 'SYNTHETIC_PRIVATE=value\n')
     await writeFile(join(worktree, '.gitignore'), '.env\n')
     await execute('git', ['init', '--initial-branch=main', worktree])
@@ -256,6 +272,149 @@ test('Files HTTP API → commands → full daemon → receipt → HTTP response 
       const stale = await mention({ action: 'resolve', ids: [reference.id] })
       assert.equal(stale.status, 409)
       assert.equal((await stale.json()).code, 'workspace_version_conflict')
+    })
+
+    await t.test('Diff proofs and two inline drafts cross real HTTP, retain old anchors and fence changed or stopped live reads', async () => {
+      const query = new URLSearchParams({ workspaceId, repoId: clientIdentity.repoId })
+      const getDiff = (token?: string) => fetch(`${endpoint}/diff?${query}&source=working`, {
+        headers: token ? { authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(20_000),
+      })
+      const getDiffFile = (snapshotId: string, path: string) => fetch(`${endpoint}/diff/${snapshotId}/file?${query}&${new URLSearchParams({ path })}`, {
+        headers: { authorization: `Bearer ${ownerToken.token}` }, signal: AbortSignal.timeout(20_000),
+      })
+      const getReview = (snapshotId: string, token = ownerToken.token) => fetch(`${endpoint}/diff/${snapshotId}/review?${query}`, {
+        headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20_000),
+      })
+      const mutateReview = (snapshotId: string, mutation: ReviewMutation) => fetch(`${endpoint}/diff/${snapshotId}/review`, {
+        method: 'POST', headers: { authorization: `Bearer ${ownerToken.token}`, origin, 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId, repoId: clientIdentity.repoId, mutation }), signal: AbortSignal.timeout(20_000),
+      })
+      const beforeDenied = deliveries.length
+      assert.equal((await getDiff()).status, 401)
+      assert.equal((await getDiff(memberToken.token)).status, 404)
+      assert.equal((await getDiff(otherToken.token)).status, 404)
+      assert.equal(deliveries.length, beforeDenied, 'unauthorized Diff reads never reach the daemon')
+
+      const changedSource = source.replace('42', '43').replace('real HTTP and daemon', 'Diff over real HTTP')
+      await writeFile(join(worktree, 'src/example.ts'), changedSource)
+      await writeFile(join(worktree, 'src/lazy.ts'), 'export const lazy = "first observation"\n')
+      const beforeCapture = deliveries.length
+      const response = await getDiff(ownerToken.token)
+      assert.equal(response.status, 200, JSON.stringify(traffic))
+      assert.equal(response.headers.get('cache-control'), 'private, no-store')
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
+      const { ok, ...value } = await response.json()
+      assert.equal(ok, true)
+      const page = diffFilePage.parse(value), snapshot = page.snapshot
+      assert.equal(snapshot.identity.runId, runId); assert.equal(snapshot.identity.repoId, repoId)
+      assert.equal(snapshot.identity.workspaceId, workspaceId); assert.equal(snapshot.identity.repositoryKey, repositoryKey)
+      assert.equal(snapshot.revision.source, 'working'); assert.equal(snapshot.revision.baseSha, headSha); assert.equal(snapshot.revision.headSha, headSha)
+      assert.equal(snapshot.policy, 'combined_working_tree'); assert.equal(snapshot.availability, 'available')
+      assert.equal(snapshot.isStale, false); assert.equal(snapshot.counts.files, 2)
+      assert.deepEqual(page.files.map(file => file.path).sort(), ['src/example.ts', 'src/lazy.ts'])
+      assert.equal(page.boardRevision, 0)
+      const capture = deliveries.slice(beforeCapture).find(command => command.kind === 'diff_snapshot')
+      assert.ok(capture && capture.runId === runId && capture.repoId === repoId)
+      await receiptEvents.get(capture.id)!.promise
+      assert.ok(receipts.some(receipt => receipt.requestId === capture.id && receipt.status === 204
+        && receipt.body.result.ok && receipt.body.result.kind === 'diff_snapshot'))
+
+      const beforeFile = deliveries.length
+      const fileResponse = await getDiffFile(snapshot.id, 'src/example.ts')
+      assert.equal(fileResponse.status, 200, JSON.stringify(traffic))
+      const publicFile = await fileResponse.json()
+      assert.equal(publicFile.ok, true)
+      assert.doesNotMatch(JSON.stringify(publicFile), /"(?:base64|blobs)"/)
+      const patch = diffFilePatch.parse(publicFile.file)
+      assert.equal(patch.snapshotId, snapshot.id); assert.equal(patch.sourceVersion, snapshot.revision.version)
+      assert.equal(patch.format, 'text'); assert.ok(patch.patch)
+      assert.match(patch.patch, /^-export const answer = 42$/m); assert.match(patch.patch, /^\+export const answer = 43$/m)
+      assert.equal(patch.hunks.length, 1)
+      const delivered = deliveries.slice(beforeFile).find(command => command.kind === 'diff_file' && command.path === 'src/example.ts')
+      assert.ok(delivered && delivered.runId === runId && delivered.repoId === repoId)
+      await receiptEvents.get(delivered.id)!.promise
+      const receipt = receipts.find(item => item.requestId === delivered.id && item.status === 204)?.body
+      assert.ok(receipt?.result.ok && receipt.result.kind === 'diff_file')
+      assert.equal(receipt.result.patch, null); assert.deepEqual(receipt.result.hunks, []); assert.deepEqual(receipt.files, [])
+      const oldBlob = (await execute('git', ['-C', worktree, 'rev-parse', 'HEAD:src/example.ts'])).stdout.trim()
+      const newBlob = (await execute('git', ['-C', worktree, 'hash-object', 'src/example.ts'])).stdout.trim()
+      assert.equal(patch.file.oldBlob, oldBlob); assert.equal(patch.file.newBlob, newBlob)
+      assert.deepEqual(receipt.blobs?.map(proof => ({ sha: proof.sha, base64: proof.base64 })).sort((a, b) => a.sha.localeCompare(b.sha)), [
+        { sha: oldBlob, base64: Buffer.from(source).toString('base64') },
+        { sha: newBlob, base64: Buffer.from(changedSource).toString('base64') },
+      ].sort((a, b) => a.sha.localeCompare(b.sha)), 'the daemon sends complete Git source proofs; only the server constructs public hunks')
+      const retained = (await pool.query('SELECT metadata,patch FROM coding_workspace_snapshot_files WHERE "snapshotId"=$1 AND path=$2', [snapshot.id, patch.file.path])).rows[0]
+      assert.deepEqual(retained.patch, patch)
+      assert.doesNotMatch(JSON.stringify(retained), /"(?:base64|blobs)"/)
+
+      const anchor = { snapshotId: snapshot.id, sourceVersion: snapshot.revision.version, path: patch.file.path,
+        side: 'RIGHT' as const, lineStart: 1, lineEnd: 1, hunkFingerprint: patch.hunks[0]!.fingerprint }
+      const firstInput: ReviewMutation = { action: 'create', requestId: randomUUID(), expectedRevision: 0,
+        anchor, body: 'Check the changed answer', draft: true }
+      const created = await mutateReview(snapshot.id, firstInput)
+      assert.equal(created.status, 200)
+      const first = await created.json()
+      assert.equal(first.ok, true); assert.equal(first.revision, 1); assert.ok(first.commentId)
+      const secondResponse = await mutateReview(snapshot.id, { action: 'create', requestId: randomUUID(), expectedRevision: 1,
+        anchor: { ...anchor, lineStart: 2, lineEnd: 2 }, body: 'Check the changed transport', draft: true })
+      assert.equal(secondResponse.status, 200)
+      const second = await secondResponse.json()
+      assert.equal(second.ok, true); assert.equal(second.revision, 2); assert.ok(second.commentId)
+      assert.notEqual(second.commentId, first.commentId)
+      const replay = await mutateReview(snapshot.id, firstInput)
+      assert.equal(replay.status, 200); assert.deepEqual(await replay.json(), first)
+      const conflictingReplay = await mutateReview(snapshot.id, { ...firstInput, body: 'Different body with the same request id' })
+      assert.equal(conflictingReplay.status, 409); assert.equal((await conflictingReplay.json()).code, 'workspace_review_conflict')
+      const boardResponse = await getReview(snapshot.id)
+      assert.equal(boardResponse.status, 200)
+      const { ok: boardOK, ...boardValue } = await boardResponse.json()
+      assert.equal(boardOK, true)
+      const board = reviewBoard.parse(boardValue)
+      assert.equal(board.revision, 2); assert.equal(board.comments.length, 2)
+      assert.deepEqual(board.comments.map(comment => comment.id).sort(), [first.commentId, second.commentId].sort())
+      assert.ok(board.comments.every(comment => comment.draft && !comment.outdated && comment.anchor.snapshotId === snapshot.id))
+      assert.equal(board.permissions.canSendToAgent, false, 'PAT review drafts do not authorize model work')
+      assert.equal((await getReview(snapshot.id, memberToken.token)).status, 404)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM coding_workspace_review_receipts WHERE "requestId"=$1', [firstInput.requestId])).rows[0].n, 1)
+
+      await writeFile(join(worktree, 'src/example.ts'), changedSource.replace('43', '44'))
+      await writeFile(join(worktree, 'src/lazy.ts'), 'export const lazy = "second observation"\n')
+      const beforeRetained = deliveries.length
+      const oldCached = await getDiffFile(snapshot.id, 'src/example.ts')
+      assert.equal(oldCached.status, 200); assert.deepEqual((await oldCached.json()).file, patch)
+      assert.equal(deliveries.length, beforeRetained, 'retained history does not silently read or replace newer live bytes')
+      const oldUncached = await getDiffFile(snapshot.id, 'src/lazy.ts')
+      assert.equal(oldUncached.status, 409); assert.equal((await oldUncached.json()).code, 'workspace_version_conflict')
+      assert.equal((await pool.query('SELECT patch FROM coding_workspace_snapshot_files WHERE "snapshotId"=$1 AND path=$2', [snapshot.id, 'src/lazy.ts'])).rows[0].patch, null)
+      const freshResponse = await getDiff(ownerToken.token)
+      assert.equal(freshResponse.status, 200)
+      const { ok: freshOK, ...freshValue } = await freshResponse.json()
+      assert.equal(freshOK, true)
+      const fresh = diffFilePage.parse(freshValue).snapshot
+      assert.notEqual(fresh.id, snapshot.id); assert.notEqual(fresh.revision.version, snapshot.revision.version)
+      const outdatedResponse = await getReview(fresh.id)
+      assert.equal(outdatedResponse.status, 200)
+      const { ok: outdatedOK, ...outdatedValue } = await outdatedResponse.json()
+      assert.equal(outdatedOK, true)
+      const outdated = reviewBoard.parse(outdatedValue)
+      assert.equal(outdated.comments.length, 2); assert.ok(outdated.comments.every(comment => comment.outdated))
+      assert.ok(outdated.comments.every(comment => comment.anchor.snapshotId === snapshot.id), 'old anchors are never retargeted to a fresh snapshot')
+      const wrongAnchor = await mutateReview(fresh.id, { ...firstInput, requestId: randomUUID(), expectedRevision: 2 })
+      assert.equal(wrongAnchor.status, 409); assert.equal((await wrongAnchor.json()).code, 'workspace_review_anchor_invalid')
+
+      await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [runId])
+      try {
+        const beforeStop = deliveries.length
+        for (const stopped of [await getDiff(ownerToken.token), await getDiffFile(fresh.id, 'src/lazy.ts')]) {
+          assert.equal(stopped.status, 409); assert.equal((await stopped.json()).code, 'workspace_machine_unavailable')
+        }
+        const history = await getDiffFile(snapshot.id, 'src/example.ts')
+        assert.equal(history.status, 200); assert.deepEqual((await history.json()).file, patch)
+        const stoppedBoard = await getReview(fresh.id)
+        assert.equal(stoppedBoard.status, 200); assert.equal((await stoppedBoard.json()).permissions.canReadLive, false)
+        assert.equal(deliveries.length, beforeStop, 'Stop prevents both new live snapshots and lazy file source requests')
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM coding_workspace_requests WHERE "runId"=$1', [runId])).rows[0].n, 0)
+      } finally { await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1', [runId]) }
     })
 
     await t.test('revoked real device credentials block both Files and daemon HTTP authentication', async () => {

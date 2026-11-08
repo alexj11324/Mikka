@@ -13,6 +13,12 @@ import { maskDeep } from '../secrets/mask'
 import { resolveRunWorktree, type WorkspaceActor, type WorkspaceQuery } from './identity'
 import { validateWorkspaceReceipt } from './receipt'
 
+const receiptPolicy = Symbol('workspace-receipt-mask-policy')
+/** Internal evidence only: never serialized into a device or public DTO. */
+export function workspaceResultMaskPolicy(result: WorkspaceReadResult): string | undefined {
+  return (result as WorkspaceReadResult & { [receiptPolicy]?: string })[receiptPolicy]
+}
+
 export async function requestWorkspaceRead(database: Pool, membership: WorkspaceQuery, actor: WorkspaceActor,
   runId: string, repoId: string, request: WorkspaceReadRequest, signal?: AbortSignal): Promise<WorkspaceReadResult> {
   const binding = await resolveRunWorktree(database, membership, actor, runId, repoId)
@@ -41,11 +47,17 @@ export async function requestWorkspaceRead(database: Pool, membership: Workspace
     await wakeDeviceWorkNow(binding.identity.deviceId)
     for (;;) {
       subscription.reset()
-      const { rows: [row] } = await database.query<{ result: unknown }>('SELECT result FROM coding_workspace_requests WHERE id=$1 AND "ownerId"=$2 AND "expiresAt">clock_timestamp()', [id, actor.userId])
+      const { rows: [row] } = await database.query<{ result: unknown; maskPolicy: string | null }>('SELECT result,"maskPolicy" FROM coding_workspace_requests WHERE id=$1 AND "ownerId"=$2 AND "expiresAt">clock_timestamp()', [id, actor.userId])
       if (row?.result) {
         const fresh = await resolveRunWorktree(database, membership, actor, runId, repoId)
         if (fresh.identity.bindingId !== binding.identity.bindingId) throw new CodingWorkspaceError('workspace_version_conflict')
-        return workspaceReadResult.parse(row.result)
+        const result = workspaceReadResult.parse(row.result)
+        if (result.ok && result.kind === 'diff_file') {
+          const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
+          if (!row.maskPolicy || row.maskPolicy !== mask.sourcePolicy) throw new CodingWorkspaceError('workspace_path_unavailable')
+          Object.defineProperty(result, receiptPolicy, { value: row.maskPolicy })
+        }
+        return result
       }
       if (!row || signal?.aborted || subscription.lost || Date.now() >= expiresAt.getTime()) throw new CodingWorkspaceError('workspace_machine_unavailable')
       const wake = await subscription.next(expiresAt.getTime() - Date.now(), signal)
@@ -59,10 +71,12 @@ export async function requestWorkspaceRead(database: Pool, membership: Workspace
 
 /** Called only inside withDeviceRoute, so its queries retain the credential fence. */
 export async function pendingWorkspaceReads(database: WorkspaceQuery, membership: WorkspaceQuery,
-  caller: { userId: string; tokenId: string }, deviceId: string, skip: readonly string[] = []): Promise<WorkspaceReadCommand[]> {
+  caller: { userId: string; tokenId: string }, deviceId: string, skip: readonly string[] = [], capabilities: { diff?: boolean } = {}): Promise<WorkspaceReadCommand[]> {
   const { rows } = await database.query<{ id: string; identity: WorkspaceReadCommand['identity']; request: WorkspaceReadRequest; expiresAt: Date }>(
     `SELECT id,identity,request,"expiresAt" FROM coding_workspace_requests WHERE "deviceId"=$1 AND "ownerId"=$2 AND "tokenId"=$3
-      AND result IS NULL AND "expiresAt">clock_timestamp() AND NOT(id=ANY($4::uuid[])) ORDER BY "createdAt" LIMIT 4`, [deviceId, caller.userId, caller.tokenId, skip])
+      AND result IS NULL AND "expiresAt">clock_timestamp() AND NOT(id=ANY($4::uuid[]))
+      AND ($5::boolean OR request->>'kind' NOT IN ('diff_snapshot','diff_file'))
+      ORDER BY "createdAt" LIMIT 4`, [deviceId, caller.userId, caller.tokenId, skip, capabilities.diff === true])
   const result: WorkspaceReadCommand[] = []
   for (const row of rows) {
     try {
@@ -85,8 +99,8 @@ export async function finishWorkspaceRead(database: WorkspaceQuery, membership: 
   const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
   const response = validateWorkspaceReceipt(row.request, row.identity, receipt, mask)
   if (!response) return false
-  const saved = await database.query(`UPDATE coding_workspace_requests SET result=$5 WHERE id=$1 AND "ownerId"=$2 AND "deviceId"=$3 AND "tokenId"=$4
-    AND result IS NULL AND "expiresAt">clock_timestamp() RETURNING id`, [id, caller.userId, deviceId, caller.tokenId, response])
+  const saved = await database.query(`UPDATE coding_workspace_requests SET result=$5,"maskPolicy"=$6 WHERE id=$1 AND "ownerId"=$2 AND "deviceId"=$3 AND "tokenId"=$4
+    AND result IS NULL AND "expiresAt">clock_timestamp() RETURNING id`, [id, caller.userId, deviceId, caller.tokenId, response, mask.sourcePolicy ?? null])
   if (saved.rowCount) {
     await notifyChannel(database, DEVICE_WORK_CHANNEL, [`workspace:${id}`])
     // A push can coalesce a burst larger than one four-command page. Receipt

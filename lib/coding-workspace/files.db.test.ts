@@ -8,8 +8,10 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { Pool } from 'pg'
 import { runAssignmentSchema } from '@mikka/protocol'
+import { SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
 import { remoteKey } from '@mikka/protocol/repository'
-import { CodingWorkspaceError, WORKSPACE_MAX_FILE_BYTES, type WorkspaceReadRequest, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
+import { CodingWorkspaceError, WORKSPACE_MAX_FILE_BYTES, WORKSPACE_REQUEST_HEADER, type WorkspaceReadRequest, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
+import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
 import { readWorkspaceReceipt } from '../../packages/daemon/src/coding-workspace/files'
 import type { JournalEntry } from '../../packages/daemon/src/runs/journal'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -176,6 +178,63 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
       assert.equal(value.identity.repositoryKey, f.repositoryKey)
       assert.equal(value.availability, 'online')
       assert.equal(value.editable, false)
+    })
+
+    await t.test('Diff capability filters the real SQL page before LIMIT and never blocks an old Files daemon from Stop', async () => {
+      const f = await fixture(true), baseSha = f.entry.baseCommit
+      assert.ok(baseSha)
+      const requests: WorkspaceReadRequest[] = [
+        { kind: 'diff_snapshot', source: 'working' },
+        { kind: 'diff_file', snapshotId: randomUUID(),
+          revision: { source: 'working', baseSha, headSha: baseSha, treeSha: null, version: 'a'.repeat(64) },
+          file: { path: 'README.md', previousPath: null, status: 'modified', oldBlob: 'b'.repeat(40), newBlob: 'c'.repeat(40),
+            oldMode: '100644', newMode: '100644', additions: 1, deletions: 1, binary: false, fileVersion: 'd'.repeat(64) } },
+        { kind: 'diff_snapshot', source: 'commit', baseSha, headSha: baseSha },
+        { kind: 'diff_snapshot', source: 'working' },
+      ]
+      try {
+        const pending: Awaited<ReturnType<typeof queue>>[] = []
+        for (const request of requests) pending.push(await queue(f, request))
+        const file = await queue(f, { kind: 'file', path: 'README.md' })
+        // Make the oldest four slots exclusively Diff. A post-LIMIT filter
+        // would incorrectly hide the ordinary Files request behind this page.
+        const createdAt = Date.now() - 10_000
+        for (const [index, command] of [...pending, file].entries())
+          await pool.query('UPDATE coding_workspace_requests SET "createdAt"=$2 WHERE id=$1', [command.id, new Date(createdAt + index)])
+        const ids = (commands: { id: string }[]) => commands.map(command => command.id)
+        assert.deepEqual(ids(await pendingWorkspaceReads(pool, pool, f.caller, f.deviceId)), [file.id], 'omitted capability defaults to Files only')
+        assert.deepEqual(ids(await pendingWorkspaceReads(pool, pool, f.caller, f.deviceId, [], { diff: false })), [file.id])
+        assert.deepEqual(ids(await pendingWorkspaceReads(pool, pool, f.caller, f.deviceId, [], { diff: true })), ids(pending))
+        assert.deepEqual(ids(await pendingWorkspaceReads(pool, pool, f.caller, f.deviceId, [pending[0]!.id], { diff: true })),
+          [...ids(pending.slice(1)), file.id], 'skip still advances a mixed request page')
+
+        const stopRunId = randomUUID(), credential = randomUUID()
+        await pool.query('UPDATE device_tokens SET "tokenHash"=$2 WHERE id=$1', [f.tokenId, hash(credential)])
+        await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId","deviceRepoId","deviceTokenId",status,"worktreePath","leaseExpiresAt","agentDefinition","stopRequestedAt")
+          SELECT $2,"userId","agentId","deviceId","deviceRepoId","deviceTokenId",'running',"worktreePath",now()+interval '10 minutes',"agentDefinition",now()
+          FROM agent_runs WHERE id=$1`, [f.runId, stopRunId])
+        const { GET } = await import('../../app/v1/devices/[deviceId]/commands/route')
+        const get = async (capabilities: Record<string, string>) => {
+          const response = await GET(new Request(`http://127.0.0.1:3199/v1/devices/${f.deviceId}/commands?wait=0`, {
+            headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': SOURCE_DAEMON_VERSION, ...capabilities },
+          }), { params: Promise.resolve({ deviceId: f.deviceId }) })
+          assert.equal(response.status, 200, 'the real device token passes the normal route credential fence')
+          return response.json()
+        }
+        const old = await get({ [WORKSPACE_REQUEST_HEADER]: '1' })
+        assert.deepEqual(old.commands, [{ kind: 'stop', runId: stopRunId }])
+        assert.deepEqual(ids(old.workspaceRequests), [file.id])
+        const current = await get({ [WORKSPACE_REQUEST_HEADER]: '1', [WORKSPACE_DIFF_REQUEST_HEADER]: '1' })
+        assert.deepEqual(current.commands, old.commands)
+        assert.deepEqual(ids(current.workspaceRequests), ids(pending))
+        const legacy = await get({})
+        assert.deepEqual(legacy.commands, old.commands)
+        assert.equal(legacy.workspaceRequests, undefined)
+        assert.equal((await pool.query('SELECT 1 FROM coding_workspace_requests WHERE "runId"=$1 AND result IS NULL', [f.runId])).rowCount, 5,
+          'capability selection never consumes or falsely completes another daemon version\'s requests')
+      } finally {
+        await pool.query('DELETE FROM coding_workspace_requests WHERE "runId"=$1', [f.runId])
+      }
     })
 
     await t.test('files GET accepts real session/PAT authority and rejects missing, revoked, tenant and member credentials', async () => {

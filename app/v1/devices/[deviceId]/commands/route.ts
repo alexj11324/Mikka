@@ -6,6 +6,7 @@ import { cachedDaemonVersions, daemonVersions, newerDaemonRelease, daemonRequest
 import { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, deviceWorkSubscription, longPollIdleCheck, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 import { WORKSPACE_REQUEST_HEADER } from '@mikka/protocol/coding-workspace'
+import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
 import { pendingWorkspaceReads } from '@/lib/coding-workspace/requests'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
@@ -61,7 +62,8 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
         : await deviceMayHaveWork(deviceId, skip, knownRelease ? { ...options, skipDeviceCommands: list(COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_MAX_SKIP_DEVICE_COMMANDS) } : options)
       const { commands, queuedRuns: queued } = check.work ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
       const workspaceRequests = !obsolete && request.headers.get(WORKSPACE_REQUEST_HEADER) === '1'
-        ? await pendingWorkspaceReads(pool, workspacePool, caller, deviceId, list('skipWorkspaceRequests', 8).filter(id => z.uuid().safeParse(id).success)) : []
+        ? await pendingWorkspaceReads(pool, workspacePool, caller, deviceId, list('skipWorkspaceRequests', 8).filter(id => z.uuid().safeParse(id).success),
+          { diff: request.headers.get(WORKSPACE_DIFF_REQUEST_HEADER) === '1' }) : []
       if (request.signal.aborted) break
       // Memory only: a release published mid-poll ends it once this instance's cache has it.
       if (knownRelease) releases = cachedDaemonVersions() ?? releases

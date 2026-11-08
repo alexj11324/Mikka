@@ -1568,6 +1568,47 @@
       "sourceHash": "e0818cf6420a3c1ed1fa34e346716a3abb4c1e8ca55d77eff89ae1caaf8a3536"
     },
     {
+      "path": "/mikka/api/runs/[runId]/workspace/diff",
+      "template": "/api/runs/[runId]/workspace/diff",
+      "source": "app/api/runs/[runId]/workspace/diff/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "b15b0b7124a61b82cccd0248dcc23fd4d59dc412afb05fdfaf58ef41b0a37998"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/diff/[snapshotId]/file",
+      "template": "/api/runs/[runId]/workspace/diff/[snapshotId]/file",
+      "source": "app/api/runs/[runId]/workspace/diff/[snapshotId]/file/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "6e06aeda3384f7526f7e618c4f2df84b56dc36b504fa4c998a15e3455fb2b2f6"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/diff/[snapshotId]/files",
+      "template": "/api/runs/[runId]/workspace/diff/[snapshotId]/files",
+      "source": "app/api/runs/[runId]/workspace/diff/[snapshotId]/files/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "14c529aee135056b74f19198d4ba21c99b2737321b52f5e61d3ec64781053289"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/diff/[snapshotId]/review",
+      "template": "/api/runs/[runId]/workspace/diff/[snapshotId]/review",
+      "source": "app/api/runs/[runId]/workspace/diff/[snapshotId]/review/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "74448b28ceb7c177c71f8ad9c1c45fc1722e8114110cc39405cf3bb2946aca5a"
+    },
+    {
       "path": "/mikka/api/runs/[runId]/workspace/files",
       "template": "/api/runs/[runId]/workspace/files",
       "source": "app/api/runs/[runId]/workspace/files/route.ts",
@@ -2023,7 +2064,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "b57458bc3b1f6223feea4ae01a8f6e0fc1e7b12f4357216df3fa39883b5bc66d"
+      "sourceHash": "6046bbbdea7eac16df7cbd338a91bfda0838bf0fac8d16d4de72737596ecd32d"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/commands/ack",

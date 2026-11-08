@@ -67,7 +67,8 @@ const IMMUTABLE_PREFIX = 'improvement_'
  * that points at a kept thread still goes: run tokens, computer bindings and
  * thread machines are their credentials and machines, not the thread.
  */
-const KEPT_THREAD_TABLES = ['run_messages', 'run_checkpoints', 'run_captures', 'artifacts', 'agent_tool_approvals', 'coordinator_events'] as const
+const KEPT_THREAD_TABLES = ['run_messages', 'run_checkpoints', 'run_captures', 'artifacts', 'agent_tool_approvals', 'coordinator_events',
+  'coding_workspace_bindings', 'coding_workspace_snapshots', 'coding_workspace_checkpoint_reviews'] as const
 
 /** What stays in the person's shared workspaces: their bots there (not the Coordinator, which is personal), their threads and the agents those threads ran on. */
 export interface KeptThreads { bots: string[]; runs: string[]; agents: string[] }

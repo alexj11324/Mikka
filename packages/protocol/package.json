@@ -6,6 +6,7 @@
   "license": "AGPL-3.0-only",
   "exports": {
     "./coding-workspace": "./src/coding-workspace.ts",
+    "./coding-workspace-review": "./src/coding-workspace-review.ts",
     "./task-secrets": "./src/task-secrets.ts",
     "./claude-startup": "./src/claude-startup.ts",
     "./chat-attachments": "./src/chat-attachments.ts",

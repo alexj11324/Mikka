@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { WORKSPACE_REQUEST_HEADER, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
+import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
 import { ServerUnreachableError } from '../src/errors'
 import { HttpServerLink, SessionRejectedError } from '../src/server-link-http'
 
@@ -50,6 +51,30 @@ const deadline = () => new Date(Date.now() + 15_000).toISOString()
 afterEach(() => { vi.restoreAllMocks() })
 
 describe('workspace receipt HTTP delivery', () => {
+  it('advertises independent Files and Diff capabilities when fetching commands and decodes both beside Stop', async () => {
+    const runId = randomUUID(), identity = {
+      version: 1, runId, repoId: randomUUID(), deviceId, workspaceId: randomUUID(),
+      ownerId: 'fixture-owner', repositoryKey: 'github.com/mikka-fixtures/transport', bindingId: 'a'.repeat(64),
+    }
+    const workspaceRequests = [
+      { id: randomUUID(), identity, request: { kind: 'tree', path: '', limit: 100 }, expiresAt: deadline() },
+      { id: randomUUID(), identity, request: { kind: 'diff_snapshot', source: 'working' }, expiresAt: deadline() },
+    ]
+    const commands = [{ kind: 'stop', runId }]
+    const { link, calls } = await transport(() => Response.json({ commands, workspaceRequests }))
+    const onWorkspaceRequests = vi.fn()
+    expect(await link.fetchCommands(deviceId, 0, { onWorkspaceRequests, workspaceSkip: [requestId] })).toEqual(commands)
+    expect(calls).toHaveLength(1)
+    const [call] = calls
+    expect(call).toMatchObject({ method: 'GET', path: `/v1/devices/${deviceId}/commands?wait=0&skipWorkspaceRequests=${requestId}` })
+    expect(WORKSPACE_REQUEST_HEADER).toBe('x-mikka-coding-workspace')
+    expect(WORKSPACE_DIFF_REQUEST_HEADER).toBe('x-mikka-coding-workspace-diff')
+    expect(call.headers.get(WORKSPACE_REQUEST_HEADER)).toBe('1')
+    expect(call.headers.get(WORKSPACE_DIFF_REQUEST_HEADER)).toBe('1')
+    expect(call.headers.get('authorization')).toBe('Bearer fixture-device-credential')
+    expect(onWorkspaceRequests).toHaveBeenCalledExactlyOnceWith(workspaceRequests)
+  })
+
   it('recovers from one 503 with the same request, device credential and private receipt', async () => {
     const { link, calls } = await transport((_call, attempt) => new Response(null, { status: attempt === 1 ? 503 : 204 }))
     await expect(link.answerWorkspaceRead(deviceId, requestId, receipt, { expiresAt: deadline() })).resolves.toBeUndefined()
@@ -58,6 +83,7 @@ describe('workspace receipt HTTP delivery', () => {
       expect(call).toMatchObject({ method: 'POST', path: `/v1/devices/${deviceId}/workspace/requests/${requestId}`, body: receipt })
       expect(call.headers.get('authorization')).toBe('Bearer fixture-device-credential')
       expect(call.headers.get(WORKSPACE_REQUEST_HEADER)).toBe('1')
+      expect(call.headers.get(WORKSPACE_DIFF_REQUEST_HEADER)).toBe('1')
       expect(call.signal).toBeInstanceOf(AbortSignal)
     }
   })
