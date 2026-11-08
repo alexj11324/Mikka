@@ -163,6 +163,8 @@ jobs:
       # The installed renderer uses the shared Vite and application dependency
       # graph, including apps/frontend and root UI/CSS build dependencies.
       - run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - name: Install private UI runtime dependencies without license scripts
         run: |
           if ! pnpm --dir .hosted-ui install --ignore-workspace --prod --ignore-scripts --frozen-lockfile > "$RUNNER_TEMP/private-ui-install.log" 2>&1; then
@@ -178,6 +180,12 @@ jobs:
           key: electron-builder-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             electron-builder-${{ runner.os }}-
+      - name: Cache and install the checksum-verified official Electron runtime
+        run: |
+          node scripts/ci/warm-electron-cache.mjs
+          node apps/desktop/node_modules/electron/install.js
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Read existing APPLE_DEVELOPER_ID_P12_BASE64 through OIDC
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:

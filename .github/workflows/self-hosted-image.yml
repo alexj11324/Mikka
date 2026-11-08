@@ -78,6 +78,10 @@ jobs:
           chmod 600 "$RUNNER_TEMP/mikka-selfhost-daemon/session.json"
           docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})'
           node --import tsx scripts/acceptance/self-hosted-daemon.mjs
+      - name: Cache the checksum-verified official Electron release assets
+        run: node scripts/ci/warm-electron-cache.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Install the native desktop runtime dependencies
         run: |
           pnpm exec playwright install --with-deps chromium

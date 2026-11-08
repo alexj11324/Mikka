@@ -92,6 +92,14 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Cache the checksum-verified official Electron release assets
+        run: |
+          node --test scripts/ci/warm-electron-cache.test.mjs
+          node scripts/ci/warm-electron-cache.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Install Chromium system dependencies
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium
@@ -186,6 +194,14 @@ jobs:
           cache: pnpm
       - run: test "$(uname -m)" = arm64
       - run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Cache and install the checksum-verified official Electron runtime
+        run: |
+          node scripts/ci/warm-electron-cache.mjs
+          node apps/desktop/node_modules/electron/install.js
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Keep setup-node 24 in the native installer login shell
         run: node apps/desktop/test/native-node.mjs
       - run: pnpm exec playwright install chromium
