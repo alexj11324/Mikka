@@ -16,6 +16,7 @@ import { CodexAdapter, type CodexAdapterOptions } from "./adapters/codex"
 import type { AgentSession, StartOptions } from "./adapters/types"
 import { requireRunToolApproval } from "./agents/tool-approval"
 import { buildChildEnv } from "./env"
+import { taskExecutionEnv } from './task-env'
 import type { ServerLink } from "./server-link"
 import { removeRunCredentials } from "./run-scratch"
 
@@ -66,7 +67,7 @@ export function createLocalSubscriptionRunner(host: LocalSubscriptionHost) {
         })
         const first = prepared.first
         if (options.model !== undefined && first.modelId !== options.model) throw unavailable("model_mismatch")
-        const clean = buildChildEnv({ host: options.env, runId: options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId })
+        const clean = taskExecutionEnv(buildChildEnv({ host: options.env, runId: options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId }), options)
         if (Object.entries(options.env).some(([name, value]) => clean[name] !== value)) throw unavailable("env_not_clean")
         const next = () => prepared!.current()
         const adapter = kind === "codex"
