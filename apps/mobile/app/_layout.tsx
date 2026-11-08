@@ -106,7 +106,7 @@ function PushSetup({ session }: { session: string | null }) {
     let cleanup: (() => void) | undefined
     let gone = false
     void Promise.all([import('@/lib/push'), import('@/lib/task-push-app')]).then(([push, task]) => {
-      if (!gone) cleanup = push.watchPushes(openPush, task.openTaskPush)
+      if (!gone) cleanup = push.watchPushes(openPush, task.openTaskPush, task.refuseTaskPush)
     })
     return () => { gone = true; cleanup?.() }
   }, [])

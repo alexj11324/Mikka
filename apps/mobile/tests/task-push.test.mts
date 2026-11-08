@@ -20,12 +20,13 @@ function deferred<T>() {
 
 /** The server's selection and the app's context, as lib/api.ts saveWorkspace and GET /api/mobile/settings see them. */
 function workspaces(selected: string, members = [alpha, beta, gamma]) {
-  const state = { cookie: selected, server: selected, context: 0, saves: [] as string[], opened: [] as string[], reads: 0 }
+  const state = { cookie: selected, server: selected, context: 0, saves: [] as string[], opened: [] as string[], reads: 0, feedback: [] as ((() => void) | undefined)[] }
   const deps = {
     current: async () => { state.reads++; return state.server },
     save: async (id: string) => { state.saves.push(id); state.cookie = id; state.server = members.includes(id) ? id : state.server; state.context++ },
     context: () => state.context,
     open: (href: string) => { state.opened.push(href) },
+    unconfirmed: (retry?: () => void) => { state.feedback.push(retry) },
   }
   return { state, deps }
 }
@@ -43,16 +44,41 @@ test('generic pushes and privacy-mode reminders keep their old entry and never g
   assert.equal(pushTarget(privacy), `/bots/${bot}`)
   assert.equal(pushTaskTarget(server), null)
   assert.equal(pushTarget(server), '/bots/coordinator')
-  assert.equal(pushTaskTarget({ ...server, workspaceId: alpha }), null, 'a workspace alone is no task')
-  assert.equal(pushTaskTarget({ ...server, workspaceId: 'not-a-uuid', issueId: task }), null)
   assert.equal(pushTaskTarget({ ...server, targetWorkspaceId: alpha, issueId: task }), null, 'only the field the server sends counts')
   assert.equal(pushTaskTarget({ ...server, workspaceId: alpha, issueId: task, pendingActionId: run, botId: bot }), null, 'a proposal keeps its chat')
   assert.equal(pushTarget({ ...server, runId: run }), `/thread/${run}`)
 })
 
+test('legacy: a task push without a workspaceId field keeps the old /task entry, with no workspace guessed', () => {
+  assert.equal(pushTaskTarget({ ...server, botId: bot, issueId: task }), null)
+  assert.equal(pushTarget({ ...server, botId: bot, issueId: task }), `/task/${task}`)
+  assert.equal(pushTarget({ ...server, issueId: task, runId: run }), `/task/${task}?attempt=${run}`)
+})
+
+test('an explicit but invalid task target is refused, never degraded into the legacy entry', () => {
+  assert.equal(pushTaskTarget({ ...server, workspaceId: 'bad', issueId: task }), 'invalid')
+  assert.equal(pushTaskTarget({ ...server, workspaceId: alpha, issueId: 'bad' }), 'invalid')
+  assert.equal(pushTaskTarget({ ...server, workspaceId: alpha }), 'invalid', 'a workspace without a task')
+  assert.equal(pushTaskTarget({ ...server, workspaceId: '', issueId: task }), 'invalid')
+  assert.equal(pushTaskTarget({ ...server, workspaceId: null, issueId: task, runId: run }), 'invalid')
+  assert.equal(pushTaskTarget({ ...server, workspaceId: 'bad', issueId: task, pendingActionId: run, botId: bot }), null, 'a proposal is classified first')
+})
+
+test('an invalid target shows the feedback without a retry and supersedes an older tap', async () => {
+  const { state, deps } = workspaces(beta)
+  const first = deferred<string>()
+  const opener = taskPushOpener({ ...deps, current: () => first.promise })
+  const older = opener.open({ workspaceId: alpha, issueId: task, runId: null })
+  assert.equal(opener.invalid(), 'refused')
+  first.resolve(beta)
+  assert.equal(await older, 'superseded')
+  assert.deepEqual(state.opened, [])
+  assert.deepEqual(state.feedback, [undefined])
+})
+
 test('Beta is selected and a valid push in Alpha switches to Alpha, confirms it fresh, then opens the task', async () => {
   const { state, deps } = workspaces(beta)
-  const open = taskPushOpener(deps)
+  const { open } = taskPushOpener(deps)
   assert.equal(await open({ workspaceId: alpha, issueId: task, runId: run }), 'opened')
   assert.deepEqual(state.saves, [alpha])
   assert.equal(state.reads, 2, 'the selection is read before the switch and confirmed after it')
@@ -62,7 +88,7 @@ test('Beta is selected and a valid push in Alpha switches to Alpha, confirms it 
 
 test('a push in the workspace already selected is confirmed fresh and opens without a switch', async () => {
   const { state, deps } = workspaces(alpha)
-  assert.equal(await taskPushOpener(deps)({ workspaceId: alpha, issueId: task, runId: null }), 'opened')
+  assert.equal(await taskPushOpener(deps).open({ workspaceId: alpha, issueId: task, runId: null }), 'opened')
   assert.deepEqual(state.saves, [])
   assert.equal(state.reads, 1)
   assert.deepEqual(state.opened, [`/task/${task}?workspace=${alpha}`])
@@ -70,24 +96,54 @@ test('a push in the workspace already selected is confirmed fresh and opens with
 
 test('a revoked or invalid workspace is refused: the old selection comes back and nothing opens', async () => {
   const { state, deps } = workspaces(beta, [beta])
-  assert.equal(await taskPushOpener(deps)({ workspaceId: alpha, issueId: task, runId: null }), 'refused')
+  assert.equal(await taskPushOpener(deps).open({ workspaceId: alpha, issueId: task, runId: null }), 'refused')
   assert.deepEqual(state.saves, [alpha, beta], 'the switch restores Beta, it never opens another workspace')
   assert.equal(state.cookie, beta)
   assert.deepEqual(state.opened, [])
+  assert.equal(state.feedback.length, 1, 'the stop shows 无法确认工作区 once')
 })
 
-test('an unreadable selection (signed out, offline) stops before switching or opening', async () => {
+test('the feedback offers a retry that runs the same confirmation again', async () => {
+  const { state, deps } = workspaces(beta, [beta])
+  const { open } = taskPushOpener(deps)
+  assert.equal(await open({ workspaceId: alpha, issueId: task, runId: null }), 'refused')
+  assert.deepEqual(state.opened, [], 'the feedback does not change the stop')
+  // Access is granted meanwhile; 重试 confirms Alpha fresh and opens the task.
+  deps.save = async (id: string) => { state.saves.push(id); state.cookie = id; state.server = id; state.context++ }
+  const retry = state.feedback[0]
+  assert.ok(retry)
+  retry()
+  await new Promise(done => setImmediate(done)); await new Promise(done => setImmediate(done))
+  assert.deepEqual(state.opened, [`/task/${task}?workspace=${alpha}`])
+})
+
+test('signed out (401 authRequired) stops without feedback: the sign-in handling takes over', async () => {
   const { state, deps } = workspaces(beta)
-  assert.equal(await taskPushOpener({ ...deps, current: async () => { throw Object.assign(new Error('authRequired'), { status: 401 }) } })({ workspaceId: alpha, issueId: task, runId: null }), 'refused')
+  const authRequired = async () => { throw Object.assign(new Error('authRequired'), { status: 401, code: 'authRequired' }) }
+  assert.equal(await taskPushOpener({ ...deps, current: authRequired }).open({ workspaceId: alpha, issueId: task, runId: null }), 'signedOut')
   assert.deepEqual(state.saves, [])
   assert.deepEqual(state.opened, [])
+  assert.deepEqual(state.feedback, [])
+  let reads = 0
+  const lostWhileSwitching = async () => { if (++reads === 1) return beta; throw Object.assign(new Error('authRequired'), { status: 401 }) }
+  assert.equal(await taskPushOpener({ ...deps, current: lostWhileSwitching }).open({ workspaceId: alpha, issueId: task, runId: null }), 'signedOut')
+  assert.deepEqual(state.opened, [])
+  assert.deepEqual(state.feedback, [])
+})
+
+test('an unreadable selection (offline) stops before switching or opening and shows the feedback', async () => {
+  const { state, deps } = workspaces(beta)
+  assert.equal(await taskPushOpener({ ...deps, current: async () => { throw new Error('timeout') } }).open({ workspaceId: alpha, issueId: task, runId: null }), 'refused')
+  assert.deepEqual(state.saves, [])
+  assert.deepEqual(state.opened, [])
+  assert.equal(state.feedback.length, 1)
 })
 
 test('a selection that moves while the switch is confirmed stops the open', async () => {
   const { state, deps } = workspaces(beta)
   const confirm = deferred<string>()
   let reads = 0
-  const open = taskPushOpener({ ...deps, current: async () => (++reads === 1 ? beta : confirm.promise) })
+  const { open } = taskPushOpener({ ...deps, current: async () => (++reads === 1 ? beta : confirm.promise) })
   const pending = open({ workspaceId: alpha, issueId: task, runId: null })
   await new Promise(done => setImmediate(done))
   // The person picks Gamma in 设置 › 工作区 meanwhile.
@@ -101,7 +157,7 @@ test('a newer tap supersedes an older one still confirming', async () => {
   const { state, deps } = workspaces(beta)
   const first = deferred<string>()
   let reads = 0
-  const open = taskPushOpener({ ...deps, current: async () => (++reads === 1 ? first.promise : state.server) })
+  const { open } = taskPushOpener({ ...deps, current: async () => (++reads === 1 ? first.promise : state.server) })
   const older = open({ workspaceId: alpha, issueId: task, runId: null })
   const newer = open({ workspaceId: gamma, issueId: task, runId: null })
   first.resolve(beta)

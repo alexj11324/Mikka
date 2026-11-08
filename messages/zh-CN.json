@@ -4668,6 +4668,9 @@
   "MobilePush": {
     "verificationCode": "收到一条验证码"
   },
+  "MobileTaskPush": {
+    "workspaceUnconfirmed": "无法确认工作区"
+  },
   "MobileHandoff": {
     "title": "登录 Mikka",
     "confirm": "使用此账号继续",

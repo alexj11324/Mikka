@@ -9,7 +9,7 @@ export function taskPushHref(target: TaskPushTarget): string {
   return `/task/${target.issueId}?workspace=${target.workspaceId}${target.runId ? `&attempt=${target.runId}` : ''}`
 }
 
-export type TaskPushResult = 'opened' | 'refused' | 'superseded'
+export type TaskPushResult = 'opened' | 'refused' | 'signedOut' | 'superseded'
 
 export interface TaskPushDeps {
   /** The workspace the server has selected now: a fresh GET /api/mobile/settings. Throws when it cannot be read. */
@@ -19,7 +19,14 @@ export interface TaskPushDeps {
   /** The account/workspace context (lib/api-cache.ts): it moves on every switch and sign-out. */
   context: () => number
   open: (href: string) => void
+  /**
+   * Brief feedback after a stop (「无法确认工作区」). It never opens anything; `retry`, when given, taps the same push
+   * again. Not called for a 401 (the app's sign-in handling takes over) or a tap superseded by a newer one.
+   */
+  unconfirmed: (retry?: () => void) => void
 }
+
+const status = (error: unknown) => error && typeof error === 'object' ? (error as { status?: unknown }).status : undefined
 
 /**
  * Opens tapped task pushes in their own workspace (#1659 item 4), one at a time, in three steps:
@@ -27,8 +34,9 @@ export interface TaskPushDeps {
  * 2. the workspace selection is read fresh and, when it is another workspace, switched through the existing switch
  *    (lib/workspace-switch.ts), which reads the selection back and restores the old one when the server refuses;
  * 3. only a confirmed selection opens the task.
- * A refused or unreadable confirmation stops: nothing opens and no other workspace is tried. A newer tap supersedes an
- * older one still waiting, and a selection that moved while confirming (another switch, a sign-out) stops it too.
+ * A refused or unreadable confirmation stops: nothing opens and no other workspace is tried; the person sees
+ * `unconfirmed` with a retry. A newer tap supersedes an older one still waiting, and a selection that moved while
+ * confirming (another switch, a sign-out) stops it too. `invalid` refuses a push whose task target is malformed.
  */
 export function taskPushOpener(deps: TaskPushDeps) {
   let latest = 0
@@ -36,14 +44,19 @@ export function taskPushOpener(deps: TaskPushDeps) {
   const confirm = async (target: TaskPushTarget, ticket: number): Promise<TaskPushResult> => {
     if (ticket !== latest) return 'superseded'
     let fence = deps.context()
+    let signedOut = false
+    const current = async () => {
+      try { return await deps.current() } catch (error) { if (status(error) === 401) signedOut = true; throw error }
+    }
     let selected: string
-    try { selected = await deps.current() } catch { return 'refused' }
+    try { selected = await current() } catch { return signedOut ? 'signedOut' : 'refused' }
     if (selected !== target.workspaceId) {
       const failed = await switchWorkspace({ id: target.workspaceId, name: '' }, selected, {
         // The fence is the context the confirmed save made; any later move belongs to someone else.
         save: async id => { await deps.save(id); fence = deps.context() },
-        current: deps.current,
+        current,
       })
+      if (signedOut) return 'signedOut'
       if (failed) return 'refused'
     }
     if (deps.context() !== fence) return 'refused'
@@ -51,12 +64,23 @@ export function taskPushOpener(deps: TaskPushDeps) {
     deps.open(taskPushHref(target))
     return 'opened'
   }
-  return (target: TaskPushTarget): Promise<TaskPushResult> => {
+  const open = (target: TaskPushTarget): Promise<TaskPushResult> => {
     const ticket = ++latest
-    const next = queue.then(() => confirm(target, ticket))
+    const next = queue.then(() => confirm(target, ticket)).then(result => {
+      // The feedback is after the stop and changes nothing about it.
+      if (result === 'refused') deps.unconfirmed(() => { void open(target) })
+      return result
+    })
     queue = next.catch(() => undefined)
     return next
   }
+  /** A push that names a workspace without a valid task target: nothing opens, and there is nothing to retry. */
+  const invalid = (): TaskPushResult => {
+    latest++
+    deps.unconfirmed()
+    return 'refused'
+  }
+  return { open, invalid }
 }
 
 /** A task read refused before or after the request: shown as the server's own 404 for a task it will not show. */
