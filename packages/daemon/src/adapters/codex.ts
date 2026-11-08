@@ -1032,3 +1032,5 @@ export class CodexAdapter implements AgentAdapter {
   }
 }
 
+
+// Issue #1699 synthetic daemon performance probe; never merge.
