@@ -16,8 +16,11 @@ import { AgentProfileAdmissionError } from '../lib/factory/profile-admission'
 import { AgentProfileError } from '../lib/factory/agent-profile-definition'
 import type { ProjectExecutionSnapshot } from '../lib/project-resources/contracts'
 import type { ProjectExecutionInput } from '../lib/project-resources/store'
+import { resolveAppOrigin } from '../lib/auth-config'
+import { withBasePath } from '../lib/base-path'
 
 const workspaceId = '53100000-0000-4000-8000-000000000002'
+const claimRequestURL = 'http://127.0.0.1/mikka/v1/devices/device/runs/run/claim'
 function fixture() {
   const repository = normalizeRepository('https://github.com/synthetic/claim-fixture.git')
   const probe = {
@@ -67,7 +70,7 @@ function fixture() {
 async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'], expectsProjectAdmission = true) {
   const diagnostics: unknown[][] = []
   const errors = mock.method(console, 'error', (...args: unknown[]) => { diagnostics.push(args) })
-  try { return await POST(new Request('http://127.0.0.1/mikka/v1/devices/device/runs/run/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {}),...(probe.environmentCapability ? {[PROJECT_ENVIRONMENT_HEADER]:probe.environmentCapability} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
+  try { return await POST(new Request(claimRequestURL,{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {}),...(probe.environmentCapability ? {[PROJECT_ENVIRONMENT_HEADER]:probe.environmentCapability} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
     errors.mock.restore()
     assert.deepEqual(diagnostics, probe.tokenError && probe.preparation.includes('token')
@@ -300,7 +303,10 @@ test('a capable daemon receives the owner GitHub credential once even without op
     const body = await response.json()
     assert.equal(body.github.token, 'fixture-claim-github-token')
     assert.equal(body.github.expiresAt, '2030-01-01T00:00:00.000Z')
-    assert.equal(body.github.endpoint, 'http://127.0.0.1/api/runs/github-token')
+    // MCP uses the configured service origin; a refused optional token falls
+    // back to this claim's request URL. Neither expectation comes from body.
+    const endpointOrigin = tokenError ? claimRequestURL : resolveAppOrigin(process.env) || claimRequestURL
+    assert.equal(body.github.endpoint, new URL(withBasePath('/api/runs/github-token'), endpointOrigin).toString())
     assert.equal(Boolean(body.mcp), !tokenError, 'only the intentional token failure omits optional MCP')
     assert.deepEqual(probe.mailboxLookups, tokenError ? [] : [['member', 'run']])
     assert.deepEqual(probe.appToolkitLookups, tokenError ? [] : [['member', null]])

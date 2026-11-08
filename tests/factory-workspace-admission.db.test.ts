@@ -164,6 +164,47 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
     assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
   })
 
+  await t.test('the actual Factory task list retains membership through its read without an execution resource lease or writes', async () => {
+    const before = await state()
+    const originalList = factoryHumanStore.listForIssue.bind(factoryHumanStore)
+    let borrowed: ReturnType<typeof borrowTaskWorkspaceMembership> | undefined
+    // Observe the real store result inside the HTTP admission. Authorization,
+    // its APP transaction and every SQL query still use production code.
+    const observed = mock.method(factoryHumanStore, 'listForIssue', async (...args: Parameters<typeof originalList>) => {
+      const result = await originalList(...args)
+      assert.equal(args[0], owner); assert.equal(args[1], a.issueId)
+      const reader = await factoryWorkspaceReader(owner)
+      if (typeof reader === 'string') assert.fail('task discovery must retain its verified principal')
+      assert.equal(reader[enterprisePrincipal]?.kind, 'session')
+      assert.equal(taskReaderScope(reader).workspaceId, alpha)
+      borrowed = borrowTaskWorkspaceMembership(owner, alpha)
+      assert.ok(borrowed)
+      await borrowed.check()
+      assert.throws(() => requireProjectResourceLease(owner, alpha), error => code(error) === 'projectEnvironmentUnavailable')
+      const writer = await controls.connect()
+      try {
+        await writer.query('BEGIN')
+        assert.equal((await writer.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired',
+          ['project-resources:' + alpha])).rows[0].acquired, true, 'discovery does not hold the execution resource lock')
+        await writer.query("SET LOCAL lock_timeout='100ms'")
+        await assert.rejects(writer.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner]), error => code(error) === '55P03')
+      } finally { await writer.query('ROLLBACK'); writer.release() }
+      return result
+    })
+    try {
+      const response = await call('/api/factory/tasks?issueId=' + a.issueId, alpha, tasks.GET)
+      assert.equal(response.status, 200)
+      const body = await response.json()
+      assert.equal(body.liveWorkspaceId, alpha)
+      assert.deepEqual(body.tasks.map((task: { id: string }) => task.id), [a.task.id])
+      assert.equal(observed.mock.callCount(), 1)
+      assert.deepEqual(await state(), before)
+      assert.ok(borrowed)
+      await assert.rejects(borrowed.check(), error => code(error) === 'workspaceAccessDenied')
+      assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+    } finally { observed.mock.restore() }
+  })
+
   await t.test('the initial cookie choice and full native principal stay fixed for the whole handler', async () => {
     const req = new Request(origin + '/mikka/api/factory/tasks', { headers: { authorization: 'Bearer ' + native.token, cookie: 'mikka-workspace=' + alpha } })
     const scope = context.createRequestScope(req)
@@ -364,6 +405,7 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
     await controls.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner])
     try {
       assert.equal((await call('/api/factory/tasks/' + a.task.id, alpha, req => detail.GET(req, params(a.task.id)))).status, 404)
+      assert.equal((await call('/api/factory/tasks?issueId=' + a.issueId, alpha, tasks.GET)).status, 404)
       assert.equal((await call('/api/factory/tasks', alpha, tasks.POST, { binding: a.binding, agentId, deviceRepoId: repoId, profileId: profile.id })).status, 404)
       assert.equal((await call('/api/factory/agent-profiles?workspaceId=' + alpha, alpha, profiles.GET)).status, 404)
       assert.equal((await call('/api/factory/agent-profiles?workspaceId=' + alpha, alpha, profiles.POST,
@@ -380,6 +422,10 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
     const before = await state()
     const profilesBefore = (await controls.query('SELECT id,version,digest FROM factory_agent_profiles WHERE "ownerId"=$1 ORDER BY id', [owner])).rows
     assert.equal((await call('/api/factory/tasks/' + b.task.id, beta, req => detail.GET(req, params(b.task.id)), undefined, pat.token)).status, 404)
+    assert.equal((await call('/api/factory/tasks?issueId=' + b.issueId, beta, tasks.GET, undefined, pat.token)).status, 404)
+    const pinnedList = await call('/api/factory/tasks?issueId=' + a.issueId, alpha, tasks.GET, undefined, pat.token)
+    assert.equal(pinnedList.status, 200)
+    assert.equal((await pinnedList.json()).tasks[0].id, a.task.id)
     assert.equal((await call('/api/factory/agent-profiles?workspaceId=' + beta, beta, profiles.GET, undefined, pat.token)).status, 404)
     assert.equal((await call('/api/factory/agent-profiles?workspaceId=' + beta, beta, profiles.POST,
       { workspaceId: beta, profile: { ...definition, name: 'Pinned PAT must not create' } }, pat.token)).status, 404)

@@ -1,6 +1,6 @@
 import { factoryWorkspaceReader } from '@/lib/factory/workspace-reader';
 import { taskReaderScope } from '@/lib/task-workspace';
-import { factoryWorkspaceResponse } from '@/lib/factory/workspace-http';
+import { factoryMembershipResponse, factoryWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { actAs } from "@/lib/acting-user";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 /** GET /api/factory/tasks?issueId=...: session-owned task discovery, no writes. */
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
-  const scoped = () => factoryWorkspaceResponse(session?.user?.id, async () => {
+  const scoped = () => factoryMembershipResponse(session?.user?.id, async () => {
     const issueId = new URL(request.url).searchParams.get("issueId");
     const userId = session?.user?.id ?? null;
     // The list holds only this user's own tasks of this issue. Each request checks

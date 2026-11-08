@@ -22,6 +22,12 @@ export function factoryWorkspaceResponse(userId: string | undefined, work: () =>
   return factoryResponse(userId, work, withFactoryWorkspace)
 }
 
+/** Discovery under an existing verified actor holds membership, without
+ * admitting execution or serializing Project resource configuration. */
+export function factoryMembershipResponse(userId: string | undefined, work: () => Promise<Response>): Promise<Response> {
+  return factoryResponse(userId, work, withFactoryMembership)
+}
+
 /** Preserve the complete verified session/PAT principal at human adapters. */
 export function factoryHumanWorkspaceResponse(user: FactoryUser | null | undefined, work: () => Promise<Response>): Promise<Response> {
   return user ? actAs(user, () => factoryWorkspaceResponse(user.id, work)) : work()
@@ -30,5 +36,5 @@ export function factoryHumanWorkspaceResponse(user: FactoryUser | null | undefin
 /** Profile CRUD and availability keep the same current tenant/principal checks
  * without granting or serializing Project execution. */
 export function factoryHumanMembershipResponse(user: FactoryUser | null | undefined, work: () => Promise<Response>): Promise<Response> {
-  return user ? actAs(user, () => factoryResponse(user.id, work, withFactoryMembership)) : work()
+  return user ? actAs(user, () => factoryMembershipResponse(user.id, work)) : work()
 }

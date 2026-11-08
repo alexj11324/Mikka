@@ -134,18 +134,30 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
  * provider work. A never-claimed continuation may still own its task's native
  * history, so checking only the current run's status is not enough to kill. */
 async function canAcknowledgeQueuedThreadStop(client: PoolClient, actor: Actor, run: Record<string, any>, machine: Record<string, any> | undefined) {
-  if (run.status !== 'queued' || !run.stopRequestedAt || run.startedAt != null || run.sessionId != null ||
+  if (run.workspaceId !== actor.workspaceId || run.status !== 'queued' || !run.stopRequestedAt || run.startedAt != null || run.sessionId != null ||
     run.deviceTokenId != null || run.leaseExpiresAt != null || run.questionContinuation != null) return false
-  if (machine && (machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
-    machine.state === 'ended' || machine.botId !== run.runtimeBotId || machine.issueId !== run.issueId ||
+  const legacyMachine = machine?.issueId === null
+  if (machine && (machine.runId !== run.id || machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
+    machine.state === 'ended' || machine.botId !== run.runtimeBotId || (!legacyMachine && machine.issueId !== run.issueId) ||
     machine.workerLeaseId || (machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now()) ||
     machine.lifecycle?.requiresNativeExit === true)) return false
+  if (machine && legacyMachine) {
+    // The task-machine migration added a nullable column without backfilling
+    // old machines. A verified never-claimed binding may still be stopped;
+    // this does not assign a Task or authorize a wake, adoption or credential.
+    if (!machine.deviceId || !machine.repoId || machine.deviceId !== run.deviceId || machine.repoId !== run.deviceRepoId) return false
+    const target = await client.query(`SELECT 1 FROM devices d
+      JOIN device_repos repo ON repo."deviceId"=d.id AND repo."userId"=d."ownerId"
+      WHERE d.id=$1 AND d."ownerId"=$2 AND d.kind='cloud' AND repo.id=$3 FOR SHARE OF d,repo`,
+    [machine.deviceId, actor.userId, machine.repoId])
+    if (!target.rowCount) return false
+  }
   const native = await client.query(`SELECT 1 FROM byos_native_runs WHERE "runId"=$1
     UNION ALL SELECT 1 FROM agent_runs source WHERE source.id<>$1
-      AND source."userId"=$2 AND source."issueId" IS NOT DISTINCT FROM $3::uuid
+      AND ($5::boolean OR (source."userId"=$2 AND source."issueId" IS NOT DISTINCT FROM $3::uuid))
       AND source."deviceId"=$4 AND (source."sessionId" IS NOT NULL OR source."startedAt" IS NOT NULL
         OR source."deviceTokenId" IS NOT NULL OR EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=source.id))
-    LIMIT 1`, [run.id, actor.userId, run.issueId, machine?.deviceId ?? null])
+    LIMIT 1`, [run.id, actor.userId, run.issueId, machine?.deviceId ?? null, legacyMachine])
   return native.rowCount === 0
 }
 
@@ -160,13 +172,18 @@ export async function acknowledgeQueuedThreadStop(pool: Pool, actor: Actor, runI
   const candidate = await pool.query(`SELECT 1 FROM agent_runs r
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
     JOIN thread_machines m ON m."runId"=r.id AND m."ownerId"=r."userId" AND m."workspaceId"=b."workspaceId"
-    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r.status='queued' AND r."stopRequestedAt" IS NOT NULL
+    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId" AND r.status='queued' AND r."stopRequestedAt" IS NOT NULL
       AND r."startedAt" IS NULL AND r."sessionId" IS NULL AND r."deviceTokenId" IS NULL AND r."leaseExpiresAt" IS NULL AND r."questionContinuation" IS NULL
-      AND m."sandboxId" IS NOT NULL AND m.state<>'ended' AND m."botId"=b."botId" AND m."issueId" IS NOT DISTINCT FROM r."issueId"
+      AND m."sandboxId" IS NOT NULL AND m.state<>'ended' AND m."botId"=b."botId"
+      AND ((m."issueId" IS NOT NULL AND m."issueId"=r."issueId") OR (m."issueId" IS NULL
+        AND m."deviceId"=r."deviceId" AND m."repoId"=r."deviceRepoId"
+        AND EXISTS(SELECT 1 FROM devices d JOIN device_repos repo ON repo."deviceId"=d.id AND repo."userId"=d."ownerId"
+          WHERE d.id=m."deviceId" AND d."ownerId"=r."userId" AND d.kind='cloud' AND repo.id=m."repoId")))
       AND m."workerLeaseId" IS NULL AND (m."workerLeaseUntil" IS NULL OR m."workerLeaseUntil"<=now())
+      AND m.lifecycle->>'requiresNativeExit' IS DISTINCT FROM 'true'
       AND NOT EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=r.id)
       AND NOT EXISTS(SELECT 1 FROM agent_runs source WHERE source.id<>r.id
-        AND source."userId"=r."userId" AND source."issueId" IS NOT DISTINCT FROM r."issueId" AND source."deviceId"=m."deviceId"
+        AND (m."issueId" IS NULL OR (source."userId"=r."userId" AND source."issueId" IS NOT DISTINCT FROM r."issueId")) AND source."deviceId"=m."deviceId"
         AND (source."sessionId" IS NOT NULL OR source."startedAt" IS NOT NULL OR source."deviceTokenId" IS NOT NULL
           OR EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=source.id)))`, [runId, actor.userId, actor.workspaceId])
   if (!candidate.rowCount) return false
@@ -177,7 +194,7 @@ export async function acknowledgeQueuedThreadStop(pool: Pool, actor: Actor, runI
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machine:${runId}`])
     const run = (await client.query(`SELECT r.*,b."botId" AS "runtimeBotId"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
-      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
+      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId" FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run) { await client.query('ROLLBACK'); return false }
     const machine = (await client.query(`SELECT * FROM thread_machines
       WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
