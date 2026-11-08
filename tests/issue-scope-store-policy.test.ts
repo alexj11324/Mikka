@@ -3,7 +3,7 @@ import test from 'node:test'
 import { changeIssueScopeLocally } from '../lib/issue-scope-store'
 
 function reset(extra = {}) {
-  const probe={issue:{id:'issue',userId:'owner',revision:1,scope:'workspace',scopeVersion:1},link:false,outgoing:false,publication:false,writes:0,versions:0,...extra}
+  const probe={issue:{id:'issue',userId:'owner',revision:1,scope:'workspace',scopeVersion:1,status:'todo',content:{type:'doc',content:[]}},link:false,outgoing:false,publication:false,writes:0,versions:0,...extra}
   ;(globalThis as typeof globalThis & {scopeStoreProbe:typeof probe}).scopeStoreProbe=probe
   return probe
 }

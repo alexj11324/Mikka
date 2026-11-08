@@ -59,10 +59,10 @@ Mikka 将分布在你的电脑、远程服务器与云端基础设施上的 AI a
 
 - **运行在你自己的设备上。**
   - Mikka daemon 可连接你的 Mac、Linux 主机或服务器。桌面应用也可以通过 SSH 把 daemon 安装到服务器上。
-  - Daemon 通过你已安装并登录的 Agent 执行线程，因此沿用你现有的订阅与配置。
+  - Daemon 按需安装自己管理的固定版本 Claude Code 和 Codex，并使用选定的订阅或模型凭据执行工作。
 
 - **故障后自动恢复。**
-  - 运行使用租约和仓库 checkpoint。符合恢复条件的运行可在另一台在线设备上重试，该设备需要安装所需的 Agent，并能访问对应仓库。
+  - 运行使用租约和仓库 checkpoint。符合恢复条件的运行可在另一台在线设备上重试，该设备需要提供所需的 Agent 运行能力，并能访问对应仓库。
 
 - **融入现有工具。**
   - 其他 agent 可通过 MCP 操作 Mikka；在 Telegram 中发消息或在 Slack 中 @ 提及，即可联系 Coordinator。与 Linear 的双向同步已经完成，但处于关闭状态。
@@ -94,14 +94,14 @@ Factory 按任务所需选择分诊、方案、实现和审阅等阶段。检查
 - **使用自己的订阅和 key。** 在 设置 › 模型与订阅 中连接 ChatGPT（Codex）或 Claude 订阅，或添加模型服务商的 API key。受支持的订阅可以回复 bot 对话，并在本地或云端机器上运行编码任务。原生编码 CLI 使用为该运行选定的订阅或 API 凭据，并直接连接服务商。
 - **插件。** 插件商店列出应用，并可搜索公开的 Agent 技能。设置 › 连接列出已连接应用和自定义 MCP server，支持由所有者控制的工作区共享。已安装技能可通过 API 管理，并加入 Coordinator 指令。连接继续遵守所有者和工作区权限。
 - **群聊。** Web 与移动端可以使用自己的 bot 创建群聊，发送带 @ 提及的消息并阅读回复。未点名 bot 时，由后端判断哪些 bot 应该参与。
-- **应用内设置。** 设置在应用窗口内打开，包含账户、安全、偏好、通知、记忆、连接、模型、已保存的登录、隐私和设备等分区；工作区管理员另有通用、成员、团队、权限、密钥（包括工作区自己的 E2B API key）、审计日志、用量和计费。
+- **应用内设置。** 设置在应用窗口内打开，包含账户、安全、偏好、通知、记忆、连接、模型、已保存的登录、隐私和设备等分区；工作区管理员另有通用、成员、团队、权限、密钥、审计日志、用量和计费。
 - **计费。** 托管模型（Mikka 默认）按工作区创建者提供 20 条消息试用，由该创建者创建的所有工作区共同计数，并受平台限额控制。验卡通过 Stripe Checkout 完成，每张卡只向验卡人的个人工作区发放一次 1 美元免费额度。购买的工作区点数也可支付托管用量，充值通过 Stripe Checkout 完成。使用自己的订阅、设备和 E2B key 无需银行卡。
 - **管理设备。** 设置 › 设备列出你的电脑。移除在线设备时会同时卸载其 daemon。
 - **支持从其他工具调用。** 可在 Claude Code 或 Codex 中通过 [MCP server](https://aspectlylabs.com/mikka/docs/mcp) 操作 Mikka，也可通过 Telegram 或 Slack 联系 Coordinator。
 - **支持团队协作。** 提供工作区、成员、邀请和团队管理，在服务商配置完成后支持邮箱、Google 和 GitHub 登录。邮箱登录另有 kill switch。
 - **桌面应用。** 适用于 Apple Silicon 的 macOS 应用，在半透明窗口中渲染同一套界面，通过系统浏览器登录，在 Dock 和系统通知中提示等待中的运行，并从 GitHub Releases 自动更新。它还可以通过 SSH 添加 `~/.ssh/config` 中的服务器。应用图标是分层的 Liquid Glass 图标，在 macOS 26 上有默认、深色、着色和透明四种外观。
 - **iOS 应用。** 位于 [`apps/mobile`](apps/mobile)，使用原生的 Bot、任务、建议、设置和搜索标签，支持任务对话与推送通知。原生发布和 OTA 交付使用移动端 workflow。
-- **云端电脑。** 每个 bot 在 Mikka Cloud 上拥有自己的桌面，使用工作区自己的 E2B key。在「电脑」标签中可以实时查看、接管和交还控制权；你接管期间桌面自动化暂停，空闲时自动休眠并保留磁盘数据。Bot 可以在其中启动网页分身，每个分身使用独立的浏览器，桌面操作遵守适用的授权策略。编码任务遵循选定的执行位置，每个云端任务使用独立的 sandbox，两次运行之间暂停。
+- **云端电脑。** 每个 bot 在 Mikka Cloud 上拥有自己的桌面，直接 E2B 路径使用该桌面所有者的个人 key。在「电脑」标签中可以实时查看、接管和交还控制权；你接管期间桌面自动化暂停，空闲时自动休眠并保留磁盘数据。Bot 可以在其中启动网页分身，每个分身使用独立的浏览器，桌面操作遵守适用的授权策略。编码任务遵循选定的执行位置，每个云端任务使用独立的 sandbox，两次运行之间暂停。
 - **已保存的登录。** 网页分身可以请求安全登录卡片，凭据 broker 将已保存的凭据填入绑定的浏览器页面。云端存储使用 AWS KMS 信封加密，你可以在设置中删除已保存的登录。
 - **定时任务。** Bot 可以创建提醒、任务快照和只读 agent 任务，在指定时间或按周期运行。
 - **双语界面。** Web 和桌面端支持英文与简体中文，原生移动端源码使用简体中文标签。
@@ -118,7 +118,7 @@ Coordinator 的事件分诊通过具备视觉能力的 Decision 模型判断业�
 
 | 方向 | 规划内容 | 跟踪 |
 | --- | --- | --- |
-| **云端电脑** | 由 Mikka 计费的算力。点数界面受源码中默认关闭的 `mikka-computer-billing` 控制。工作区自带 E2B key 仍是受支持的执行路径。 | [#172](https://github.com/alexj11324/Mikka/issues/172) |
+| **云端电脑** | 由 Mikka 计费的算力。点数界面受源码中默认关闭的 `mikka-computer-billing` 控制。直接 E2B 路径使用运行所有者的个人 key。 | [#172](https://github.com/alexj11324/Mikka/issues/172) |
 | **混合执行** | 你电脑上的 Agent 将构建、测试和开发服务器交给 Mikka Cloud 运行。 | [#572](https://github.com/alexj11324/Mikka/issues/572) |
 | **插件** | 后续的已安装技能和工作区管理控制。设置 › 连接已提供自定义 MCP 列表和工作区共享控制。 | [#595](https://github.com/alexj11324/Mikka/issues/595) |
 | **主动建议** | 每晚的后台调研，根据你的截止日期和兴趣每天生成少量建议卡片，点击即可开始任务。 | [#350](https://github.com/alexj11324/Mikka/issues/350) |
@@ -139,15 +139,15 @@ Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和�
 
 和 CI 的托管 runner 与自托管 runner 一样，Agent 要么运行在 Mikka 托管的机器上，要么运行在你自带的机器上。
 
-**托管的 Mikka Cloud。** Mikka 负责启动机器，空闲时休眠并保留磁盘。受支持的自带凭据路径使用工作区的 E2B API key，在 设置 › 密钥与环境 中配置。独立的云端算力点数界面受 `mikka-computer-billing` 控制。
+**托管的 Mikka Cloud。** Mikka 负责启动机器，空闲时休眠并保留磁盘。云访问按运行所有者配置，直接 E2B 运行时使用该所有者的个人 key。具体按所连接服务器提供的账号或云服务连接入口完成设置。独立的云端算力点数界面受 `mikka-computer-billing` 控制。
 
-**你自己的环境。** 通过桌面应用或 daemon 接入你的电脑，或任何能通过 SSH 访问的服务器。Mikka 在上面安装 daemon，并把 Agent 派发过去。[`packages/daemon`](packages/daemon) 中的 daemon 会检测机器上已安装的 Agent，并通过它们执行线程：
+**你自己的环境。** 通过桌面应用或 daemon 接入你的电脑，或任何能通过 SSH 访问的服务器。Mikka 在上面安装 daemon，并把 Agent 派发过去。[`packages/daemon`](packages/daemon) 中的 daemon 报告受管运行时能力，并在首次使用时安装受支持的固定版本 Claude Code 和 Codex。
 
-| Agent | 检测的 CLI |
+| Agent | 本地运行时 |
 | --- | --- |
-| Claude Code | `claude` |
-| Codex | `codex` |
-| Cursor | `cursor-agent` 或 `agent` |
+| Claude Code | Daemon 管理的固定版本 `claude` |
+| Codex | Daemon 管理的固定版本 `codex` |
+| Cursor | `cursor-agent` 或 `agent`，仅用于报告支持 Cursor 的运行设备 |
 
 并行编码工作使用隔离的 git worktree，续接运行可以复用同一个 worktree。
 

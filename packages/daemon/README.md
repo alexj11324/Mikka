@@ -1,9 +1,10 @@
 # Mikka daemon
 
-The daemon connects your computer to Mikka and runs threads with your installed
-Claude Code, Codex or Cursor. Node.js 22 or newer and Git are required. Sign in to the
-coding CLI and make sure your local Git credentials can read the repositories
-you want to use.
+The daemon connects your computer to Mikka and runs threads with its own pinned
+Claude Code or Codex, installed when needed. Cursor is available on runners that
+report support for its adapter. Node.js 22 or newer and Git are required. Runs use
+the selected subscription or model credentials. Repository setup uses the task's
+authorized GitHub credential or existing machine Git credentials.
 
 On Linux the agent sandbox also needs `bwrap`, `socat` and `rg`. No root is
 required: on Debian and Ubuntu the daemon fetches any that are missing from the
@@ -11,11 +12,11 @@ machine's signed apt sources into its data directory. On other distributions,
 install them with the system package manager and the daemon picks them up by
 itself. Settings > Devices names anything it could not resolve.
 
-The release candidate is a single `@aspectlylabs/mikka` package containing the
-`mikka` command and its daemon subcommands. The workspace package has `private: true`;
+The published `@aspectlylabs/mikka` package contains the `mikka` command and its
+daemon subcommands. The workspace package has `private: true`.
 `pnpm --filter @mikka/daemon build` produces the package with the private
-protocol bundled. The npm organization and trusted publisher must be verified
-before publication.
+protocol bundled. The release workflow uses npm trusted publishing and verifies
+the published registry metadata.
 
 Install the public package and start the daemon.
 
@@ -60,7 +61,7 @@ The setting is saved in the service definition. Manual updates remain available
 through Mikka. An installation failure does not request a restart. npm replaces the global
 package in place, so an interrupted installation has no automatic rollback.
 
-## Release candidate
+## Build a release package
 
 ```sh
 pnpm --filter @mikka/daemon build
