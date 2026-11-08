@@ -29,7 +29,6 @@ import type { FactoryAuthorize } from "./store";
 import { configuredMonitorProbes } from "./monitor-probe";
 import { monitorWorkspacePartition } from "./monitor-fingerprint";
 import { createFactoryMonitorIssueLinks } from "./monitor-issue-links";
-import { readAuthorizedIssue } from "../github/user-access";
 
 // Preserve existing personal/workspace/team/deletion access rules on every operation.
 const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
@@ -100,7 +99,8 @@ export const factoryMonitor = createFactoryMonitor(
   appendMonitorEvidence,
   configuredMonitorProbes(process.env),
 );
-export const factoryMonitorIssueLinks = createFactoryMonitorIssueLinks(pool, authorize, readAuthorizedIssue);
+export const factoryMonitorIssueLinks = createFactoryMonitorIssueLinks(pool, authorize,
+  async (...args) => (await import('../github/user-access')).readAuthorizedIssue(...args));
 
 import { queueFactoryRun } from "@/lib/agent-runs";
 import { createFactoryDispatch, defaultFactoryDispatchAdapters } from "./dispatch";
