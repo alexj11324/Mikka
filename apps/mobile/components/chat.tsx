@@ -112,7 +112,7 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRe
  * A thread card: status icon and name, outputs as chips; no step line (R-66). Opens the thread's page. A thread
  * waiting for the person carries its action (去回答, #1386); a long name is cut here and read in full on its page.
  */
-export function ThreadCard({ title, status, info, onPress, action, icon }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string; icon?: ReactNode }) {
+export function ThreadCard({ title, status, info, onPress, action, icon, footer }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string; icon?: ReactNode; footer?: ReactNode }) {
   const body = (
     <>
       {/* A task card (2026-11-07) passes its task state's icon; a thread without a task keeps its bubble. */}
@@ -128,6 +128,13 @@ export function ThreadCard({ title, status, info, onPress, action, icon }: { tit
     <View style={[styles.threadCard, { paddingRight: 8 }]}>
       <Pressable accessibilityRole="button" accessibilityLabel={[title, info].filter(Boolean).join('，')} onPress={onPress} style={({ pressed }) => [styles.threadOpen, pressed && { opacity: 0.6 }]}>{body}</Pressable>
       <CardButton label={action} primary onPress={onPress} />
+    </View>
+  )
+  // A code task's card carries its review summary as a second button under the card's own (#1738).
+  if (footer) return (
+    <View style={[styles.threadCard, styles.threadCardStack]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={[title, info].filter(Boolean).join('，')} onPress={onPress} style={({ pressed }) => [styles.threadOpen, pressed && { opacity: 0.6 }]}>{body}</Pressable>
+      <View style={styles.threadFooter}>{footer}</View>
     </View>
   )
   return (
@@ -363,6 +370,8 @@ const styles = StyleSheet.create({
   threadCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bubble, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 8, minHeight: 52 },
   // The list's 12-point gap between a message and the cards that follow it.
   arrival: { gap: 12 },
+  threadCardStack: { flexDirection: 'column', alignItems: 'stretch', gap: 0, paddingVertical: 4 },
+  threadFooter: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator, marginLeft: 30 },
   threadOpen: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 },
   threadTitle: { fontSize: 16, fontWeight: '500' },
   threadInfo: { fontSize: 12, lineHeight: 16, color: colors.secondary },
