@@ -2,6 +2,9 @@
 
 状态：后端基础实现，尚非 #1722 完成声明。依赖 #1721 的 Run 精确工作树身份与按需 daemon RPC。UI #1731–#1735 的页面不在本实现中。
 
+Task 页面与卡片的接口适配、检查观察、原子发送和精确候选合并，见
+[Task review API](coding-workspace-task-review-api.md)。本页保留底层 Run API 合同。
+
 ## 当前可用行为
 
 Linux daemon 从已登记的仓库与精确 Run 工作树读取 working diff，合并 tracked、index 与 untracked 文件；显式 commit 比较使用完整 Git OID。工作区未变化时 snapshot version 稳定，文件自身内容或基线变化时 fileVersion 改变。读取不运行仓库的 filters、外部 diff、hooks 或 fsmonitor，不改 index、HEAD、用户 Git 配置或文件内容。
@@ -70,7 +73,7 @@ PR 原生文件最多 3,000 个、每页 100；读取全部页，验证 `changed
 
 Agent mutation 使用 `requestId,expectedRevision,batchId,snapshotId,sourceVersion,commentIds,failedCheckRefs,note?`。Factory 来源还必须带精确 `factory={taskId,revision,attemptId,candidateId,sourceEventId}`；执行中尚无候选时 candidateId 可为 null，但 attempt 必须属于所选原 Run。不能用当前 B attempt 的元组重新解释 A Run 的旧快照。
 
-服务端冻结所有选中评论的完整结构、LEFT/RIGHT 锚点、正文、note、来源 Run/repository/snapshot/base/head/tree/version，以及已验证的检查引用。最多 50 条评论，note 最多 4,000 字符；完整反馈文本最多 10,000 字符，整个冻结输入仍受实际 JSONB 32 KiB 限额。完整内容不能容纳就明确拒绝，不切掉尾部评论。检查引用仅接受当前来源的 `run-report:<uuid>`、`run-chunk:<uuid>`，以及本次精确 Factory task/attempt 的 `factory-attempt:<uuid>`；任意客户端字符串不成为检查证据。
+服务端冻结所有选中评论的完整结构、LEFT/RIGHT 锚点、正文、note、来源 Run/repository/snapshot/base/head/tree/version，以及已验证的检查引用。最多 50 条评论，note 最多 4,000 字符；完整反馈文本最多 10,000 字符，整个冻结输入仍受实际 JSONB 32 KiB 限额。完整内容不能容纳就明确拒绝，不切掉尾部评论。检查引用接受当前来源的 `run-report:<uuid>`、`run-chunk:<uuid>`、本次精确 Factory task/attempt 的 `factory-attempt:<uuid>`，以及 Task Checks API 为当前查看者和精确来源保存的 `github-check:` 引用；GitHub 附件只接受失败项，并冻结服务端已遮盖的日志节选。任意客户端字符串或日志正文不成为检查证据。
 
 投递前重新验证真实 working tree、当前完整 checkpoint，或冻结 GitHub PR/commit 证据。文件清单、完整 blob 身份、base/head 与来源不一致时拒绝，并提示 refresh/rebase。旧源码可继续作为历史查看，但不能借历史回执将后继 Run 当成原 Run。反馈指令要求 Agent 修改前核对原始目标、文件和版本；这是反馈合同，不代表本接口已经提供终端控制权租约或文件写入 CAS。
 

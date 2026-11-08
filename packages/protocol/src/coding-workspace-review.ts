@@ -145,14 +145,14 @@ export const githubReviewQuery = z.strictObject({ cursor: z.string().max(4096).o
 export type GitHubReviewQuery = z.infer<typeof githubReviewQuery>
 
 const request = { requestId: z.uuid(), expectedRevision: z.number().int().nonnegative() }
+export const reviewedFileChange = z.strictObject({ path, fileVersion: digest, reviewed: z.boolean() })
 export const reviewMutation = z.discriminatedUnion('action', [
   z.strictObject({ ...request, action: z.literal('create'), anchor: reviewAnchor,
     body: z.string().trim().min(1).max(4000), draft: z.boolean().default(true) }),
   z.strictObject({ ...request, action: z.literal('reply'), threadId: z.uuid(), body: z.string().trim().min(1).max(4000) }),
   z.strictObject({ ...request, action: z.literal('edit'), commentId: z.uuid(), body: z.string().trim().min(1).max(4000) }),
   z.strictObject({ ...request, action: z.literal('resolve'), threadId: z.uuid(), resolved: z.boolean() }),
-  z.strictObject({ ...request, action: z.literal('reviewed'), files: z.array(z.strictObject({ path, fileVersion: digest,
-    reviewed: z.boolean() })).min(1).max(WORKSPACE_DIFF_MAX_PAGE) }),
+  z.strictObject({ ...request, action: z.literal('reviewed'), files: z.array(reviewedFileChange).min(1).max(WORKSPACE_DIFF_MAX_PAGE) }),
 ])
 export type ReviewMutation = z.infer<typeof reviewMutation>
 export const reviewBatchRequest = z.strictObject({
@@ -192,6 +192,10 @@ export const taskReviewSubmission = z.strictObject({ reviewRef: taskReviewRef,
   attachedChecks: z.array(z.string().min(1).max(2000)).max(100), idempotencyKey: z.string().min(1).max(200) })
   .refine(value => value.comments.length > 0 || Boolean(value.note?.trim()) || value.attachedChecks.length > 0)
 export type TaskReviewSubmission = z.infer<typeof taskReviewSubmission>
+
+export const reviewAttachedCheck = z.strictObject({ id: z.string().min(1).max(2000), name: z.string().min(1).max(200),
+  status: z.literal('failed'), headSha: sha, logExcerpt: z.string().max(2000), logTruncated: z.boolean() })
+export type ReviewAttachedCheck = z.infer<typeof reviewAttachedCheck>
 
 export const WORKSPACE_REVIEW_ERROR_CODES = [
   'workspace_snapshot_unavailable', 'workspace_snapshot_outdated', 'workspace_review_conflict',

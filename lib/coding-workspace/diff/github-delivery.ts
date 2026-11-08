@@ -20,10 +20,11 @@ async function assertAssociation(deps: Pick<DiffDependencies, 'database'>, scope
     throw new WorkspaceReviewError('workspace_snapshot_outdated')
 }
 
-async function prepare(deps: DiffDependencies, actor: ReviewActor, runId: string, repoId: string, snapshotId: string,
-  input: GitHubReviewMutation, githubAccountId: string, signal?: AbortSignal) {
+/** Freeze inside the caller's single Task-send transaction when requested. */
+export async function prepareGitHubReviewInTransaction(client: PoolClient, actor: ReviewActor, scope: ReviewScope, snapshotId: string,
+  input: GitHubReviewMutation, githubAccountId: string) {
+  const { runId, repoId } = scope.identity
   const requestDigest = diffDigest(JSON.stringify([snapshotId, input]))
-  return withReviewTransaction(deps.database, deps.membership, actor, runId, repoId, async (client, scope) => {
     const board = await lockReviewBoard(client, scope)
     const prior = await priorReviewBatch(client, actor, scope, input.requestId, requestDigest)
     if (prior) return prior
@@ -38,11 +39,18 @@ async function prepare(deps: DiffDependencies, actor: ReviewActor, runId: string
         commentIds: comments.map(item => item.id), native: { githubAccountId, write } } }, board.revision)
     await assertBatchMaskPolicy(actor, scope, masks)
     return result
-  }, { signal })
 }
 
+async function prepare(deps: DiffDependencies, actor: ReviewActor, runId: string, repoId: string, snapshotId: string,
+  input: GitHubReviewMutation, githubAccountId: string, signal?: AbortSignal) {
+  return withReviewTransaction(deps.database, deps.membership, actor, runId, repoId,
+    (client, scope) => prepareGitHubReviewInTransaction(client, actor, scope, snapshotId, input, githubAccountId), { signal })
+}
+
+export type ReviewDeliveryGuard = { lock: (tx: PoolClient) => Promise<void>; check: (tx: PoolClient, scope: ReviewScope) => Promise<void> }
+
 export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewActor, runId: string, repoId: string,
-  snapshotId: string, raw: unknown, signal?: AbortSignal): Promise<ReviewBatchReceipt> {
+  snapshotId: string, raw: unknown, signal?: AbortSignal, guard?: ReviewDeliveryGuard): Promise<ReviewBatchReceipt> {
   if (actor.credential.kind !== 'session') throw new WorkspaceReviewError('workspace_review_unavailable')
   const input = githubReviewMutation.parse(raw)
   const scope = await resolveReviewScope(deps.database, deps.membership, actor, runId, repoId)
@@ -92,6 +100,7 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
       const current = await readReviewBatch(client, actor, fresh, row.id)
       if (current.fingerprint !== row.fingerprint || !isDeepStrictEqual(current.input, row.input)) throw new WorkspaceReviewError('workspace_review_conflict')
       if (phase === 'invoke' || phase === 'claim') {
+        await guard?.check(authority, fresh)
         const masks = await reviewMasks(actor, fresh)
         assertBatchSafe(row.input, masks)
         // Revalidate the retained full-source proof policy for every anchor.
@@ -133,6 +142,7 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
           grant.client.budget.signal = AbortSignal.any([combined, invokeSignal])
           accepted = await publishNativeGitHubReview(grant, snapshot, native.write, row.id, row.fingerprint, async () => {
             await beforeSend()
+            await guard?.check(authority, fresh)
             await grant.verifyCredential!(authority)
             await assertAssociation({ database: authority as unknown as DiffDependencies['database'] }, fresh, snapshot)
             await lease.check()
@@ -164,6 +174,7 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
     await lease.check()
     return batchReceipt(authority, fresh, await readReviewBatch(authority, actor, fresh, row.id))
   }, { signal: effectSignal, beforeRunLock: async client => {
+    await guard?.lock(client)
     if (snapshot.factory) await client.query('SELECT id FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR SHARE',
       [snapshot.factory.taskId, snapshot.identity.ownerId])
   } })

@@ -14,6 +14,7 @@ import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { mobileTaskActivity, mobileTaskGroup } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskBlock } from '@/lib/task-blocked'
+import { taskReviewSummaries } from '@/lib/coding-workspace/task-review/summaries'
 
 /** A fresh workspace context is required; task visibility still uses the existing task ACL. */
 export async function mobileTask(user: Exclude<IssueReader, string>, workspace: { id: string; kind: string }, id: string) {
@@ -24,7 +25,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, workspace: 
   const metadata = readIssueMetadata(issue.content)
   const blockerIds = metadata.blockedByIds ?? []
   const visibleBlockers = blockerIds.length ? await issueVisibility(user, false, workspace.id, db, { onlyIssueIds: blockerIds }) : null
-  const [identifiers, runs, [decoration], versions, labels, blockers] = await Promise.all([
+  const [identifiers, runs, [decoration], versions, labels, blockers, reviews] = await Promise.all([
     taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number }], db, access.linked === false ? new Map() : undefined),
     db.select({ runId: agentRuns.id, status: agentRuns.status, outcome: agentRuns.outcome,
       createdAt: agentRuns.createdAt, threadReplacedBy: agentRuns.threadReplacedBy,
@@ -46,6 +47,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, workspace: 
     taskScheduleLabels(),
     visibleBlockers ? db.select({ id: issues.id, status: issues.status }).from(issues)
       .where(and(inArray(issues.id, blockerIds), visibleBlockers.predicate)) : [],
+    taskReviewSummaries(user, [id], workspace.id),
   ])
   const [creation] = await enrichActivityActors(versions, issue.userId)
   const task = { ...issue, metadata }
@@ -60,6 +62,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, workspace: 
       id, identifier: identifiers.get(id) ?? null, title: displayTaskTitle({ ...issue, shortTitle: issue.shortTitleFrom === issue.title ? issue.shortTitle : null }), description: issueContentToMarkdown(issue.content).trim() || null,
       status: issue.status, priority: issue.priority, group: mobileTaskGroup(task, newest, blocked), bot: newest?.bot ?? null,
       agent: newest ? { harness: newest.harness, model: newest.model } : null, place, schedule: taskScheduleView(decoration?.schedule ?? null, labels),
+      review: reviews.get(id) ?? null,
     },
     activity: mobileTaskActivity(task, runs, { by: creation?.actor ? creation.actor.name : decoration?.owner ?? null, createdAt: issue.createdAt }),
     live: { workspaceId: workspace.id },

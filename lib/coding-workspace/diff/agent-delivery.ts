@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { z } from 'zod'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
-import { reviewBatchRequest, WorkspaceReviewError, type ReviewBatchReceipt, type ReviewBatchRequest } from '@mikka/protocol/coding-workspace-review'
+import { reviewBatchRequest, WorkspaceReviewError, type DiffSnapshot, type ReviewBatchReceipt, type ReviewBatchRequest } from '@mikka/protocol/coding-workspace-review'
 import { UNFINISHED_RUN_STATUSES } from '../../agent-run-statuses'
 import { readRunChain } from '../../run-chain'
 import { sendOwnedRunMessageInTransaction } from '../../run-control'
@@ -25,6 +25,7 @@ import { reviewFeedbackText } from './feedback'
 import { assertFeedbackFactory, freezeReviewFactory, lockReviewFeedbackTarget } from './feedback-factory'
 import { reviewSourceWitness } from './feedback-source'
 import { associatedGitHubPull } from './github'
+import { freezeAttachedReviewChecks } from '../task-review/checks'
 
 const live = (status: string) => UNFINISHED_RUN_STATUSES.some(value => value === status)
 const outdated = () => new WorkspaceReviewError('workspace_snapshot_outdated')
@@ -33,8 +34,10 @@ function owner(actor: ReviewActor, scope: ReviewScope) {
     throw new WorkspaceReviewError('workspace_review_unavailable')
 }
 
-async function checkReferences(tx: PoolClient, scope: ReviewScope, input: ReviewBatchRequest) {
+async function checkReferences(tx: PoolClient, actor: ReviewActor, scope: ReviewScope, snapshot: DiffSnapshot,
+  input: ReviewBatchRequest, masks: Awaited<ReturnType<typeof reviewMasks>>) {
   for (const reference of input.failedCheckRefs) {
+    if (reference.startsWith('github-check:')) continue
     const [kind, id, extra] = reference.split(':')
     if (extra !== undefined || !z.uuid().safeParse(id).success) throw new CodingWorkspaceError('workspace_invalid_request')
     const result = kind === 'run-report'
@@ -46,12 +49,14 @@ async function checkReferences(tx: PoolClient, scope: ReviewScope, input: Review
           : null
     if (!result?.rowCount) throw new WorkspaceReviewError('workspace_review_unavailable')
   }
+  return freezeAttachedReviewChecks(tx, actor, scope, snapshot, input.failedCheckRefs.filter(ref => ref.startsWith('github-check:')), masks)
 }
 
-async function prepare(deps: DiffDependencies, actor: ReviewActor, runId: string, repoId: string,
-  input: ReviewBatchRequest, signal?: AbortSignal) {
+/** Shared composition point for the Task's single send transaction. It only
+ * freezes the existing batch; the established delivery path owns its effect. */
+export async function prepareAgentReviewInTransaction(tx: PoolClient, actor: ReviewActor, scope: ReviewScope, input: ReviewBatchRequest) {
+    const { runId, repoId } = scope.identity
   const requestDigest = diffDigest(JSON.stringify(input))
-  return withReviewTransaction(deps.database, deps.membership, actor, runId, repoId, async (tx, scope) => {
     owner(actor, scope)
     const board = await lockReviewBoard(tx, scope)
     const prior = await priorReviewBatch(tx, actor, scope, input.requestId, requestDigest)
@@ -60,19 +65,24 @@ async function prepare(deps: DiffDependencies, actor: ReviewActor, runId: string
     if (snapshot.revision.version !== input.sourceVersion || snapshot.availability === 'unavailable') throw outdated()
     const masks = await reviewMasks(actor, scope)
     const comments = await freezeReviewComments(tx, actor, scope, snapshot, input.commentIds, masks)
-    await checkReferences(tx, scope, input)
+    const failedChecks = await checkReferences(tx, actor, scope, snapshot, input, masks)
     const factory = await freezeReviewFactory(tx, scope, snapshot, input.factory)
     const note = maskedReviewText(input.note ?? '', masks, 4000)
     const failedCheckRefs = [...new Set(input.failedCheckRefs.map(value => maskedReviewText(value, masks, 2000)))].sort()
-    const text = reviewFeedbackText(snapshot, comments, note, failedCheckRefs)
+    const text = reviewFeedbackText(snapshot, comments, note, failedCheckRefs, failedChecks)
     const row = await insertReviewBatch(tx, actor, scope, snapshot, { id: input.batchId, requestId: input.requestId,
       requestDigest, expectedRevision: input.expectedRevision, destination: 'agent', frozen: {
         version: 1, runId, repoId, sourceVersion: snapshot.revision.version, commentIds: comments.map(comment => comment.id),
-        agent: { text, comments, note, failedCheckRefs, ...(factory ? { factory } : {}) },
+        agent: { text, comments, note, failedCheckRefs, ...(failedChecks.length ? { failedChecks } : {}), ...(factory ? { factory } : {}) },
       } }, board.revision)
     await assertBatchMaskPolicy(actor, scope, masks)
     return row
-  }, { signal })
+}
+
+async function prepare(deps: DiffDependencies, actor: ReviewActor, runId: string, repoId: string,
+  input: ReviewBatchRequest, signal?: AbortSignal) {
+  return withReviewTransaction(deps.database, deps.membership, actor, runId, repoId,
+    (tx, scope) => prepareAgentReviewInTransaction(tx, actor, scope, input), { signal })
 }
 
 export async function readAgentReviewBatch(deps: DiffDependencies, actor: ReviewActor, runId: string, repoId: string,
@@ -107,7 +117,7 @@ async function reject(deps: DiffDependencies, actor: ReviewActor, row: ReviewBat
 /** One complete request joins the existing inbox or Factory queue. There is
  * no secondary dispatcher: queue/message and accepted receipt share COMMIT. */
 export async function deliverAgentReview(deps: DiffDependencies, actor: ReviewActor, runId: string, repoId: string,
-  raw: unknown, signal?: AbortSignal): Promise<ReviewBatchReceipt> {
+  raw: unknown, signal?: AbortSignal, guard?: (tx: PoolClient, scope: ReviewScope) => Promise<void>): Promise<ReviewBatchReceipt> {
   if (actor.credential.kind !== 'session') throw new WorkspaceReviewError('workspace_review_unavailable')
   const input = reviewBatchRequest.parse(raw)
   const requestSignal = AbortSignal.any([AbortSignal.timeout(25_000), ...(signal ? [signal] : [])])
@@ -125,6 +135,7 @@ export async function deliverAgentReview(deps: DiffDependencies, actor: ReviewAc
       await lockReviewBoard(tx, fresh)
       const current = await readReviewBatch(tx, actor, fresh, row.id)
       if (current.state !== 'prepared') return batchReceipt(tx, fresh, current)
+      await guard?.(tx, fresh)
       if (!current.input.agent || live(fresh.status) !== live(scope.status)) throw outdated()
       const agent = current.input.agent
       const masks = await reviewMasks(actor, fresh)

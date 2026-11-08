@@ -22,6 +22,12 @@ async function sourceFactory(tx: PoolClient, scope: ReviewScope) {
   return rows[0]
 }
 
+export async function currentReviewFactory(tx: PoolClient, scope: ReviewScope): Promise<ReviewBatchRequest['factory']> {
+  const task = await sourceFactory(tx, scope)
+  return task ? { taskId: task.id, revision: task.revision, attemptId: task.attemptId,
+    candidateId: task.candidateId, sourceEventId: task.sourceEventId } : undefined
+}
+
 /** Freeze the requested original tuple from retained host history. Current
  * lifecycle equality is checked only before a new effect, so a new request ID
  * can still dedupe an already accepted batch after the task has advanced. */
@@ -61,6 +67,10 @@ export async function assertFeedbackFactory(tx: PoolClient, scope: ReviewScope, 
   if (!task || !expected || task.id !== expected.taskId || task.revision !== expected.revision
     || task.attemptId !== expected.attemptId || task.candidateId !== expected.candidateId || task.sourceEventId !== expected.sourceEventId)
     throw outdated()
+  // A durable merge claim already owns the candidate. A repair cannot race
+  // its provider effect or move the Task between PUT and receipt settlement.
+  if (task.candidateId && (await tx.query(`SELECT 1 FROM factory_merges WHERE "taskId"=$1 AND "candidateId"=$2
+    AND status IN ('merging','merged')`, [task.id, task.candidateId])).rowCount) throw outdated()
   return task
 }
 

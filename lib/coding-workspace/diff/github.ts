@@ -17,6 +17,7 @@ import { buildDiffFilePatch, diffDigest, gitBlobHash } from './patch'
 import { buildGitHubFilePatch } from './github-patch'
 import { buildGitHubManifest, parseGitHubTree, type GitHubNativeFile } from './github-manifest'
 import { GitHubDiffClient } from './github-api'
+import { readGitHubPullState } from './github-state'
 
 const sha = z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/)
 const id = z.union([z.number().int().positive().max(Number.MAX_SAFE_INTEGER).transform(String), z.string().regex(/^[1-9]\d{0,39}$/)])
@@ -174,6 +175,7 @@ export function githubDiffProvider(database: Pool, userId: string, signal?: Abor
   }
   return {
     verify,
+    async pullState(scope, snapshot) { return readGitHubPullState(await access(scope), snapshot) },
     async capture(scope, selection) {
       const grant = await access(scope)
       let baseSha: string, headSha: string, sourceAccess: DiffSourceAccess, associated: Association | undefined, current: Pull | undefined

@@ -15,7 +15,8 @@ import type { ApiRoute } from '../../apps/api/src/routes'
 import { daemonStatusSchema, runAssignmentSchema } from '@mikka/protocol'
 import { remoteKey } from '@mikka/protocol/repository'
 import { WORKSPACE_ERROR_CODES, runWorktreeIdentity, workspaceReadReceipt, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
-import { WORKSPACE_REVIEW_ERROR_CODES, diffFilePage, diffFilePatch, reviewBoard, type ReviewMutation } from '@mikka/protocol/coding-workspace-review'
+import { WORKSPACE_REVIEW_ERROR_CODES, diffFilePage, diffFilePatch, reviewAnchor, reviewBoard, taskReviewRef,
+  type ReviewMutation, type TaskReviewRef, type TaskReviewSubmission } from '@mikka/protocol/coding-workspace-review'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
@@ -33,11 +34,11 @@ function fixtureDaemon(value: unknown): FixtureDaemon {
   return value as FixtureDaemon
 }
 
-/** This is the complete local Files/Diff transport: a real listening HTTP API,
+/** This is the complete local Files/Diff/Task review transport: a real listening HTTP API,
  * real session/PAT/device authentication, PostgreSQL LISTEN, the full daemon,
  * its on-disk RunJournal, and the daemon's default HttpServerLink fetch.
  * No mock transport, direct readWorkspace invocation, browser or model call. */
-test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP response on PostgreSQL 17', { skip: !databaseURL, timeout: 180_000 }, async t => {
+test('Files/Diff/Task review HTTP API → commands → full daemon → receipt → HTTP response on PostgreSQL 17', { skip: !databaseURL, timeout: 240_000 }, async t => {
   const admin = new Pool({ connectionString: databaseURL, max: 1, connectionTimeoutMillis: 5000 })
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'HTTP/daemon acceptance requires PostgreSQL 17')
@@ -74,7 +75,10 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
     let code: string | null = null
     if (!response.ok) {
       const body: unknown = await response.clone().json().catch(() => null)
-      if (body && typeof body === 'object' && 'code' in body && typeof body.code === 'string' && safeErrorCodes.has(body.code)) code = body.code
+      if (body && typeof body === 'object') {
+        const candidate = 'code' in body ? body.code : 'error' in body ? body.error : null
+        if (typeof candidate === 'string' && safeErrorCodes.has(candidate)) code = candidate
+      }
     }
     // Never print a source response, private proof, credential or raw error.
     return JSON.stringify({ status: response.status, code, traffic })
@@ -100,6 +104,11 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
       route('/api/runs/[runId]/workspace/diff', ['GET'], () => import('../../app/api/runs/[runId]/workspace/diff/route')),
       route('/api/runs/[runId]/workspace/diff/[snapshotId]/file', ['GET'], () => import('../../app/api/runs/[runId]/workspace/diff/[snapshotId]/file/route')),
       route('/api/runs/[runId]/workspace/diff/[snapshotId]/review', ['GET', 'POST'], () => import('../../app/api/runs/[runId]/workspace/diff/[snapshotId]/review/route')),
+      route('/api/tasks/[taskId]/review', ['GET'], () => import('../../app/api/tasks/[taskId]/review/route')),
+      route('/api/tasks/[taskId]/review/file', ['GET'], () => import('../../app/api/tasks/[taskId]/review/file/route')),
+      route('/api/tasks/[taskId]/review/summary', ['GET'], () => import('../../app/api/tasks/[taskId]/review/summary/route')),
+      route('/api/tasks/[taskId]/review/reviewed', ['POST'], () => import('../../app/api/tasks/[taskId]/review/reviewed/route')),
+      route('/api/tasks/[taskId]/review/send', ['POST'], () => import('../../app/api/tasks/[taskId]/review/send/route')),
     ]
     const application = createApiHandler(routes)
     const runtime = serve({ manual: true, gracefulShutdown: false, silent: true, trustProxy: false, hostname: '127.0.0.1', port: 0,
@@ -473,6 +482,264 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
         assert.equal(deliveries.length, beforeStop, 'Stop prevents both new live snapshots and lazy file source requests')
         assert.equal((await pool.query('SELECT count(*)::int AS n FROM coding_workspace_requests WHERE "runId"=$1', [runId])).rows[0].n, 0)
       } finally { await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1', [runId]) }
+    })
+
+    await t.test('Task review routes keep native source, human writes and durable inbox delivery on the real HTTP path', async t => {
+      const taskEndpoint = `${origin}/mikka/api/tasks/${issueId}/review`
+      const taskGet = (suffix = '', query: Record<string, string> = {}, token: string | null = session.token, selectedWorkspace = workspaceId) =>
+        fetch(`${taskEndpoint}${suffix}?${new URLSearchParams({ workspaceId: selectedWorkspace, ...query })}`, {
+          headers: token ? { authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(20_000),
+        })
+      const taskPost = (suffix: string, input: Record<string, unknown>, options: { token?: string; origin?: string; workspaceId?: string } = {}) =>
+        fetch(`${taskEndpoint}/${suffix}`, { method: 'POST',
+          headers: { authorization: `Bearer ${options.token ?? session.token}`, 'content-type': 'application/json',
+            ...(options.origin !== undefined ? { origin: options.origin } : {}) },
+          body: JSON.stringify({ workspaceId: options.workspaceId ?? workspaceId, ...input }), signal: AbortSignal.timeout(30_000),
+        })
+      const refQuery = (reference: TaskReviewRef) => ({ snapshotId: reference.snapshotId, sourceVersion: reference.sourceVersion })
+      const taskFile = (reference: TaskReviewRef, path: string, token = session.token, selectedWorkspace = workspaceId) =>
+        taskGet('/file', { ...refQuery(reference), path }, token, selectedWorkspace)
+      const { rows: [originalRun] } = await pool.query('SELECT status,"finishedAt","leaseExpiresAt","botId","agentDefinition" FROM agent_runs WHERE id=$1', [runId])
+      const botId = randomUUID(), secretId = randomUUID()
+      const secretParts = ['http-private-start-' + randomUUID(), 'http-private-end-' + randomUUID()]
+      const secretValue = secretParts.join('\n'), hiddenText = 'hidden-directory-' + randomUUID()
+      const safePublic = (value: unknown) => {
+        const serialized = JSON.stringify(value)
+        for (const privateValue of [...secretParts, hiddenText, '.mikka/http-private.txt', '.env'])
+          assert.equal(serialized.includes(privateValue), false, 'Task HTTP responses never expose protected paths or source values')
+        for (const field of ['base64', 'blobs', 'rawBlob', 'rawSize', 'oldBlob', 'newBlob', 'workingVersion',
+          'maskPolicy', 'sourcePolicy', 'bindingId', 'repositoryKey', 'worktreePath'])
+          assert.equal(serialized.includes('"' + field + '"'), false, 'Task HTTP projections exclude private proof and machine metadata')
+      }
+      const { admitRepositoryTask } = await import('../repository-admission')
+      const { sealSecret, userSecretAad } = await import('../secrets/crypto')
+      const admission = admitRepositoryTask({ userId: owner, issueId, deviceId, agentId, remoteKey: repositoryKey,
+        remoteUrl: remote, targetBranch: 'mikka/http-review-1', workspaceId, now: new Date() })
+      assert.ok(admission)
+      await pool.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'HTTP Task review\')', [botId, workspaceId, owner])
+      // The server's real live inbox has a complete repository admission. The
+      // harnessless daemon keeps its terminal journal: it reads source but
+      // never starts a model to prove durable message acceptance.
+      await pool.query(`UPDATE agent_runs SET status='running',"finishedAt"=NULL,"leaseExpiresAt"=now()+interval '10 minutes',
+        "botId"=$2,"agentDefinition"=$3 WHERE id=$1`, [runId, botId,
+        { executionIdentity: { workspaceId }, repositoryAdmission: admission }])
+      const secretRow = { id: secretId, userId: owner, name: 'HTTP_REVIEW_SECRET', kind: 'secret' }
+      const sealed = sealSecret(secretValue, userSecretAad(secretRow))
+      await pool.query('INSERT INTO user_secrets(id,"userId",name,kind,ciphertext,iv,"keyVersion") VALUES($1,$2,$3,$4,$5,$6,$7)',
+        [secretRow.id, owner, secretRow.name, secretRow.kind, sealed.ciphertext, sealed.iv, sealed.keyVersion])
+      const taskSource = source.replace('42', '45').replace('real HTTP and daemon', 'Task Review over TCP')
+      await writeFile(join(worktree, 'src/example.ts'), taskSource)
+      await writeFile(join(worktree, 'src/lazy.ts'), 'export const lazy = "Task first observation"\n')
+      await writeFile(join(worktree, 'src/sensitive.ts'), secretValue + '\n')
+      await mkdir(join(worktree, '.mikka'), { recursive: true })
+      await writeFile(join(worktree, '.mikka/http-private.txt'), hiddenText)
+      try {
+        const beforeCapture = deliveries.length
+        const response = await taskGet()
+        assert.equal(response.status, 200, await statusDiagnostic(response))
+        const initial = await response.json(), firstRef = taskReviewRef.parse(initial.diff.reviewRef)
+        let currentRef = firstRef
+        const initialFile = initial.diff.files.find((file: { path: string }) => file.path === 'src/example.ts')
+        assert.ok(initialFile)
+        const storedPatch = async (reference: TaskReviewRef, path = 'src/example.ts') => diffFilePatch.parse(
+          (await pool.query('SELECT patch FROM coding_workspace_snapshot_files WHERE "snapshotId"=$1 AND path=$2', [reference.snapshotId, path])).rows[0]?.patch)
+
+        await t.test('GET review, file and summary use actual daemon receipts and return only public projections', async () => {
+          safePublic(initial)
+          assert.equal(response.headers.get('cache-control'), 'private, no-store')
+          assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
+          assert.deepEqual(initial.summary.reviewRef, firstRef)
+          assert.equal(initial.summary.taskId, issueId); assert.equal(initial.summary.running, true)
+          assert.equal(initial.summary.permissions.canSend, true)
+          assert.equal(initial.diff.source.kind, 'machine'); assert.equal(initial.diff.live, true)
+          assert.equal(initial.diff.base, headSha); assert.equal(initial.diff.head, headSha)
+          assert.deepEqual(initial.diff.files.map((file: { path: string }) => file.path).sort(), ['src/example.ts', 'src/lazy.ts', 'src/sensitive.ts'])
+          assert.equal(initialFile.format, 'unloaded'); assert.equal(initialFile.countsKnown, false)
+          assert.equal(initialFile.additions, null); assert.equal(initialFile.deletions, null)
+          const capture = deliveries.slice(beforeCapture).find(command => command.kind === 'diff_snapshot')
+          assert.ok(capture && capture.runId === runId && capture.repoId === repoId)
+          await receiptEvents.get(capture.id)!.promise
+          assert.ok(receipts.some(receipt => receipt.requestId === capture.id && receipt.status === 204
+            && receipt.body.result.ok && receipt.body.result.kind === 'diff_snapshot'))
+          const beforeFile = deliveries.length, fileResponse = await taskFile(firstRef, 'src/example.ts')
+          assert.equal(fileResponse.status, 200, await statusDiagnostic(fileResponse))
+          const file = await fileResponse.json(); safePublic(file)
+          assert.deepEqual(file.reviewRef, firstRef); assert.deepEqual(file.comments, [])
+          assert.equal(file.file.format, 'text'); assert.equal(file.file.countsKnown, true)
+          assert.match(file.file.patch, /^\+export const answer = 45$/m)
+          assert.equal(file.file.fileVersion, initialFile.fileVersion)
+          const command = deliveries.slice(beforeFile).find(item => item.kind === 'diff_file' && item.path === 'src/example.ts')
+          assert.ok(command && command.runId === runId && command.repoId === repoId)
+          await receiptEvents.get(command.id)!.promise
+          assert.ok(receipts.some(receipt => receipt.requestId === command.id && receipt.status === 204
+            && receipt.body.result.ok && receipt.body.result.kind === 'diff_file' && (receipt.body.blobs?.length ?? 0) > 0))
+          const beforeSummary = deliveries.length, summaryResponse = await taskGet('/summary')
+          assert.equal(summaryResponse.status, 200, await statusDiagnostic(summaryResponse))
+          const summary = await summaryResponse.json(); safePublic(summary)
+          assert.deepEqual(summary.reviewRef, firstRef); assert.equal(summary.files, 3)
+          assert.equal(summary.countsKnown, false); assert.equal(summary.additions, null); assert.equal(summary.checks, null)
+          assert.equal(deliveries.length, beforeSummary, 'summary reads retained metadata without fetching source')
+        })
+
+        await t.test('reviewed POST accepts a real native session without Origin, refuses foreign Origin and persists one idempotent mark', async () => {
+          const input = { reviewRef: firstRef, idempotencyKey: randomUUID(), expectedRevision: initial.diff.boardRevision,
+            files: [{ path: 'src/example.ts', fileVersion: initialFile.fileVersion, reviewed: true }] }
+          const before = deliveries.length
+          const denied = await taskPost('reviewed', input, { origin: 'https://foreign.example.invalid' })
+          assert.equal(denied.status, 403); assert.deepEqual(await denied.json(), { error: 'workspace_not_found' })
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM coding_workspace_reviewed_files WHERE "userId"=$1', [owner])).rows[0].n, 0)
+          const marked = await taskPost('reviewed', input)
+          assert.equal(marked.status, 200, await statusDiagnostic(marked))
+          const receipt = await marked.json(); safePublic(receipt)
+          assert.deepEqual(receipt.reviewRef, firstRef); assert.equal(receipt.changed, 1)
+          const sameOriginReplay = await taskPost('reviewed', input, { origin })
+          assert.equal(sameOriginReplay.status, 200); assert.deepEqual(await sameOriginReplay.json(), receipt)
+          const rows = (await pool.query('SELECT path,"fileVersion" FROM coding_workspace_reviewed_files WHERE "userId"=$1', [owner])).rows
+          assert.deepEqual(rows, [{ path: 'src/example.ts', fileVersion: initialFile.fileVersion }])
+          const viewed = await taskFile(firstRef, 'src/example.ts')
+          assert.equal(viewed.status, 200); assert.equal((await viewed.json()).file.viewed, true)
+          assert.equal(deliveries.length, before, 'local marks and retained file reads do not refetch source')
+        })
+
+        await t.test('changed native source conflicts with an unloaded old file and mismatched references without retargeting old content', async () => {
+          const originalPatch = await storedPatch(firstRef)
+          await writeFile(join(worktree, 'src/example.ts'), taskSource.replace('45', '46'))
+          await writeFile(join(worktree, 'src/lazy.ts'), 'export const lazy = "Task second observation"\n')
+          const beforeCached = deliveries.length, cached = await taskFile(firstRef, 'src/example.ts')
+          assert.equal(cached.status, 200); assert.equal((await cached.json()).file.patch, originalPatch.patch)
+          assert.equal(deliveries.length, beforeCached)
+          const stale = await taskFile(firstRef, 'src/lazy.ts')
+          assert.equal(stale.status, 409, await statusDiagnostic(stale))
+          assert.deepEqual(await stale.json(), { error: 'workspace_version_conflict' })
+          const freshResponse = await taskGet()
+          assert.equal(freshResponse.status, 200, await statusDiagnostic(freshResponse))
+          const fresh = await freshResponse.json(); safePublic(fresh)
+          currentRef = taskReviewRef.parse(fresh.diff.reviewRef)
+          assert.notEqual(currentRef.snapshotId, firstRef.snapshotId); assert.notEqual(currentRef.sourceVersion, firstRef.sourceVersion)
+          const freshFile = fresh.diff.files.find((file: { path: string }) => file.path === 'src/example.ts')
+          assert.ok(freshFile); assert.notEqual(freshFile.fileVersion, initialFile.fileVersion); assert.equal(freshFile.viewed, false)
+          const beforeWrongRef = deliveries.length
+          const wrongRef = await taskFile({ ...firstRef, sourceVersion: currentRef.sourceVersion }, 'src/example.ts')
+          assert.equal(wrongRef.status, 409); assert.deepEqual(await wrongRef.json(), { error: 'workspace_snapshot_outdated' })
+          const wrongMark = await taskPost('reviewed', { reviewRef: currentRef, idempotencyKey: randomUUID(), expectedRevision: fresh.diff.boardRevision,
+            files: [{ path: 'src/example.ts', fileVersion: initialFile.fileVersion, reviewed: true }] })
+          assert.equal(wrongMark.status, 409); assert.deepEqual(await wrongMark.json(), { error: 'workspace_snapshot_outdated' })
+          assert.equal(deliveries.length, beforeWrongRef, 'invalid references are refused before any source request')
+        })
+
+        await t.test('owner send proves current source through the real daemon, freezes the displayed line and commits exactly one inbox message', async () => {
+          const fileResponse = await taskFile(currentRef, 'src/example.ts')
+          assert.equal(fileResponse.status, 200, await statusDiagnostic(fileResponse))
+          const file = await fileResponse.json(); safePublic(file)
+          assert.match(file.file.patch, /^\+export const answer = 46$/m)
+          const input: TaskReviewSubmission = { reviewRef: currentRef, idempotencyKey: randomUUID(), attachedChecks: [],
+            comments: [{ path: 'src/example.ts', line: 1, side: 'new', body: 'Please explain the changed answer.' }], note: 'Keep the original task branch.' }
+          const memberSession = await (await auth.$context).internalAdapter.createSession(member)
+          assert.ok(memberSession)
+          const beforeDenied = deliveries.length
+          for (const token of [ownerToken.token, memberSession.token]) {
+            const denied = await taskPost('send', input, { token })
+            assert.equal(denied.status, 403, await statusDiagnostic(denied))
+            assert.deepEqual(await denied.json(), { error: 'not_owner_send', reason: 'not_owner_send' })
+          }
+          assert.equal(deliveries.length, beforeDenied)
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_messages WHERE "runId"=$1', [runId])).rows[0].n, 0)
+          const sent = await taskPost('send', input)
+          assert.equal(sent.status, 200, await statusDiagnostic(sent))
+          const result = await sent.json(); safePublic(result)
+          assert.equal(result.state, 'sent'); assert.equal(result.agent.state, 'accepted'); assert.equal(result.github, null)
+          assert.equal(result.agent.delivery.kind, 'run_message'); assert.equal(result.agent.delivery.runId, runId)
+          assert.equal(result.agent.delivery.messageId, result.messageId); assert.equal(result.attempt, 1)
+          const preflight = deliveries.slice(beforeDenied).find(command => command.kind === 'diff_snapshot')
+          assert.ok(preflight && preflight.runId === runId && preflight.repoId === repoId, 'delivery proves its exact source through the real daemon')
+          await receiptEvents.get(preflight.id)!.promise
+          assert.ok(receipts.some(receipt => receipt.requestId === preflight.id && receipt.status === 204
+            && receipt.body.result.ok && receipt.body.result.kind === 'diff_snapshot'))
+          const { rows: [batch] } = await pool.query('SELECT input,receipt,state FROM coding_workspace_review_batches WHERE id=$1', [result.agent.batchId])
+          assert.ok(batch); assert.equal(batch.state, 'accepted')
+          assert.equal(batch.input.agent.comments.length, 1)
+          const comment = batch.input.agent.comments[0], anchor = reviewAnchor.parse(comment.anchor), patch = await storedPatch(currentRef)
+          assert.deepEqual(anchor, { ...currentRef, path: 'src/example.ts', side: 'RIGHT', lineStart: 1, lineEnd: 1,
+            hunkFingerprint: patch.hunks[0]!.fingerprint })
+          assert.equal(comment.body, input.comments[0]!.body)
+          const messages = (await pool.query('SELECT id,"runId","userId",text,origin,"mailboxWakeDepth" FROM run_messages WHERE "runId"=$1', [runId])).rows
+          assert.deepEqual(messages, [{ id: result.messageId, runId, userId: owner, text: batch.input.agent.text, origin: 'owner', mailboxWakeDepth: -1 }])
+          assert.ok(messages[0].text.includes(input.comments[0]!.body)); assert.ok(messages[0].text.includes(input.note!))
+          const beforeReplay = deliveries.length
+          for (const retry of [input, { ...input, idempotencyKey: randomUUID() }]) {
+            const repeated = await taskPost('send', retry)
+            assert.equal(repeated.status, 200); assert.deepEqual(await repeated.json(), result)
+          }
+          assert.equal(deliveries.length, beforeReplay, 'accepted retries reuse the durable source-bound receipt')
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_messages WHERE "runId"=$1', [runId])).rows[0].n, 1)
+          const published = await taskFile(currentRef, 'src/example.ts')
+          assert.equal(published.status, 200)
+          const value = await published.json(); safePublic(value)
+          assert.equal(value.file.comments, 1); assert.equal(value.comments.length, 1)
+          assert.deepEqual({ path: value.comments[0].path, line: value.comments[0].line, side: value.comments[0].side, body: value.comments[0].body }, input.comments[0])
+          assert.equal(value.comments[0].id, comment.id)
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM coding_workspace_requests WHERE "runId"=$1', [runId])).rows[0].n, 0)
+        })
+
+        await t.test('protected directories and complete secret source never enter Task HTTP file responses', async () => {
+          const beforeHidden = deliveries.length
+          for (const path of ['.env', '.mikka/http-private.txt']) {
+            const denied = await taskFile(currentRef, path)
+            assert.equal(denied.status, 400); const value = await denied.json(); safePublic(value)
+            assert.deepEqual(value, { error: 'workspace_invalid_request' })
+          }
+          assert.equal(deliveries.length, beforeHidden, 'hidden paths are refused before the daemon')
+          const secretResponse = await taskFile(currentRef, 'src/sensitive.ts')
+          assert.equal(secretResponse.status, 404, await statusDiagnostic(secretResponse))
+          const value = await secretResponse.json(); safePublic(value)
+          assert.deepEqual(value, { error: 'workspace_path_unavailable' })
+          const secretRead = deliveries.slice(beforeHidden).find(command => command.kind === 'diff_file' && command.path === 'src/sensitive.ts')
+          assert.ok(secretRead)
+          await receiptEvents.get(secretRead.id)!.promise
+          assert.ok(receipts.some(receipt => receipt.requestId === secretRead.id && receipt.status === 204
+            && receipt.body.result.ok && receipt.body.result.kind === 'diff_file' && (receipt.body.blobs?.length ?? 0) > 0),
+          'the real server refuses a complete private source proof rather than trusting a daemon-authored patch')
+          assert.equal((await pool.query('SELECT patch FROM coding_workspace_snapshot_files WHERE "snapshotId"=$1 AND path=$2',
+            [currentRef.snapshotId, 'src/sensitive.ts'])).rows[0].patch, null)
+        })
+
+        await t.test('wrong Workspace and revoked stored sessions or membership refuse Task routes before source access', async () => {
+          const before = deliveries.length
+          const unauthenticated = await taskGet('', {}, null)
+          assert.equal(unauthenticated.status, 401); assert.deepEqual(await unauthenticated.json(), { error: 'authRequired' })
+          const mark = { reviewRef: currentRef, idempotencyKey: randomUUID(), expectedRevision: 0,
+            files: [{ path: 'src/example.ts', fileVersion: initialFile.fileVersion, reviewed: true }] }
+          for (const denied of [await taskGet('', {}, session.token, otherWorkspace), await taskGet('/summary', {}, session.token, otherWorkspace),
+            await taskFile(currentRef, 'src/example.ts', session.token, otherWorkspace), await taskGet('', {}, otherToken.token),
+            await taskPost('reviewed', mark, { workspaceId: otherWorkspace })]) {
+            assert.equal(denied.status, 404, await statusDiagnostic(denied)); const body = await denied.json(); safePublic(body)
+            assert.deepEqual(body, { error: 'workspace_not_found' })
+          }
+          const revokedSession = await (await auth.$context).internalAdapter.createSession(owner)
+          assert.ok(revokedSession)
+          assert.equal((await taskGet('/summary', {}, revokedSession.token)).status, 200)
+          await pool.query('DELETE FROM "session" WHERE id=$1', [revokedSession.id])
+          for (const denied of [await taskGet('', {}, revokedSession.token), await taskFile(currentRef, 'src/example.ts', revokedSession.token),
+            await taskPost('reviewed', mark, { token: revokedSession.token })]) {
+            assert.equal(denied.status, 401); assert.deepEqual(await denied.json(), { error: 'authRequired' })
+          }
+          await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner])
+          try {
+            for (const denied of [await taskGet(), await taskGet('/summary'), await taskFile(currentRef, 'src/example.ts'), await taskPost('reviewed', mark)]) {
+              assert.equal(denied.status, 404); assert.deepEqual(await denied.json(), { error: 'workspace_not_found' })
+            }
+          } finally { await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner]) }
+          assert.equal(deliveries.length, before, 'authentication and tenant refusals never request machine source')
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_messages WHERE "runId"=$1', [runId])).rows[0].n, 1)
+        })
+      } finally {
+        await pool.query('DELETE FROM user_secrets WHERE id=$1', [secretId])
+        await pool.query('UPDATE agent_runs SET status=$2,"finishedAt"=$3,"leaseExpiresAt"=$4,"botId"=$5,"agentDefinition"=$6 WHERE id=$1',
+          [runId, originalRun.status, originalRun.finishedAt, originalRun.leaseExpiresAt, originalRun.botId, originalRun.agentDefinition])
+        await pool.query('DELETE FROM bots WHERE id=$1', [botId])
+        await rm(join(worktree, '.mikka'), { recursive: true, force: true })
+        await rm(join(worktree, 'src/sensitive.ts'), { force: true })
+      }
     })
 
     await t.test('revoked real device credentials block both Files and daemon HTTP authentication', async () => {

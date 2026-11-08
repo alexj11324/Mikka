@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'node:util'
 import type { PoolClient } from 'pg'
 import { z } from 'zod'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
-import { reviewAnchor, reviewBatchReceipt, type DiffSnapshot, type ReviewBatchReceipt, WorkspaceReviewError } from '@mikka/protocol/coding-workspace-review'
+import { reviewAnchor, reviewAttachedCheck, reviewBatchReceipt, type DiffSnapshot, type ReviewBatchReceipt, WorkspaceReviewError } from '@mikka/protocol/coding-workspace-review'
 import { secretMaskerFor } from '../../secrets/runtime'
 import { maskDeep, type Masker } from '../../secrets/mask'
 import { runChanged } from '../../live/panels'
@@ -18,7 +18,7 @@ export const frozenReviewBatch = z.strictObject({
   native: z.strictObject({ githubAccountId: z.string().regex(/^[1-9]\d{0,39}$/), write: nativeReviewWrite }).optional(),
   agent: z.strictObject({ text: z.string().min(1).max(10_000),
     comments: z.array(z.strictObject({ id: z.uuid(), anchor: reviewAnchor, body: z.string().max(4000) })).max(50),
-    note: z.string().max(4000), failedCheckRefs: z.array(z.string().max(2000)).max(100), factory: z.strictObject({ taskId: z.uuid(),
+    note: z.string().max(4000), failedCheckRefs: z.array(z.string().max(2000)).max(100), failedChecks: z.array(reviewAttachedCheck).max(100).optional(), factory: z.strictObject({ taskId: z.uuid(),
     revision: z.number().int().positive(), attemptId: z.uuid(), candidateId: z.uuid().nullable(), sourceEventId: z.uuid(),
     producerRunId: z.uuid(), sha: z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/).nullable() }).optional() }).optional(),
 }).refine(value => Boolean(value.native) !== Boolean(value.agent))

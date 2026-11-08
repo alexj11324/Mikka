@@ -2207,6 +2207,43 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal((await pool.query('SELECT 1 FROM coding_workspace_review_batches WHERE "boardId"=$1 AND state=\'accepted\'', [f.scope.boardId])).rowCount, 0)
   })
 
+  for (const status of ['merging', 'merged'] as const) await t.test('Review cannot move the exact candidate owned by a ' + status + ' merge receipt', async () => {
+    const f = await feedbackFixture(), mergeId = randomUUID(), beforeHandoffs = handoffs.length
+    assert.ok(f.current.candidateId)
+    await pool.query(`INSERT INTO factory_merges
+      (id,"taskId","candidateId","userId","eventId","pullRequestUrl",sha,status,source,"headSha","finishedAt")
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,'mikka',$9,CASE WHEN $8='merged' THEN clock_timestamp() ELSE NULL END)`,
+    [mergeId, f.task.id, f.current.candidateId, f.ownerId, randomUUID(),
+      'https://github.com/fixture/review-' + f.issueId + '/pull/71', reviewHeadSha, status, status === 'merged' ? reviewHeadSha : null])
+    const before = await feedbackState(f), mergeBefore = (await pool.query('SELECT * FROM factory_merges WHERE id=$1', [mergeId])).rows[0]
+    assert.deepEqual(before.messages, [])
+    const receipt = await deliverFeedback(f)
+    assert.equal(receipt.state, 'rejected'); assert.equal(receipt.reason, 'source_changed'); assert.equal(receipt.delivery, null)
+    assert.deepEqual(await feedbackState(f), before, 'no message, child Run, repair, attempt advance or epoch event is committed')
+    assert.deepEqual((await pool.query('SELECT * FROM factory_merges WHERE id=$1', [mergeId])).rows[0], mergeBefore)
+    assert.equal(handoffs.length, beforeHandoffs, 'the claimed candidate cannot wake a repair execution')
+    assert.equal((await pool.query('SELECT 1 FROM run_messages WHERE id=$1', [factoryEventId('workspace-review-message', f.input.batchId)])).rowCount, 0)
+    assert.equal((await pool.query('SELECT 1 FROM coding_workspace_review_comments WHERE "boardId"=$1 AND draft', [f.scope.boardId])).rowCount, 2)
+    assert.deepEqual(await deliverFeedback(f), receipt, 'replaying rejected feedback cannot move the merge-owned candidate')
+    assert.deepEqual(await feedbackState(f), before); assert.equal(handoffs.length, beforeHandoffs)
+  })
+
+  await t.test('a definitively failed merge receipt does not prevent repair of its still-current candidate', async () => {
+    const f = await feedbackFixture(), mergeId = randomUUID(), beforeHandoffs = handoffs.length
+    await pool.query(`INSERT INTO factory_merges
+      (id,"taskId","candidateId","userId","eventId","pullRequestUrl",sha,status,source,code,"finishedAt")
+      VALUES($1,$2,$3,$4,$5,$6,$7,'failed','mikka','githubMergeBlocked',clock_timestamp())`,
+    [mergeId, f.task.id, f.current.candidateId, f.ownerId, randomUUID(),
+      'https://github.com/fixture/review-' + f.issueId + '/pull/72', reviewHeadSha])
+    const mergeBefore = (await pool.query('SELECT * FROM factory_merges WHERE id=$1', [mergeId])).rows[0]
+    const receipt = await deliverFeedback(f)
+    assert.equal(receipt.state, 'accepted', receipt.reason); assert.equal(receipt.delivery?.kind, 'factory_repair')
+    assert.ok(receipt.delivery?.runId)
+    await assertCompleteFeedback(f, receipt.delivery.runId)
+    assert.equal(handoffs.length, beforeHandoffs + 1)
+    assert.deepEqual((await pool.query('SELECT * FROM factory_merges WHERE id=$1', [mergeId])).rows[0], mergeBefore)
+  })
+
   await t.test('Review cannot attach an old checkpoint to a newer candidate-less execute attempt', async () => {
     const f = await feedbackFixture('execute')
     let task = (await f.store.apply(f.ownerId, factoryBinding(f.current), randomUUID(),

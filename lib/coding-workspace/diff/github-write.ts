@@ -32,9 +32,9 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
 /** Native writes always use the connected person's own /user-verified token.
  * An installation credential never substitutes for a missing user identity. */
 export async function nativeReviewUserGrant(userId: string, repositoryKey: string, repositoryId: string,
-  budget: RequestBudget): Promise<NativeReviewGrant> {
+  budget: RequestBudget, prepared?: Awaited<ReturnType<typeof githubTokenForUser>>): Promise<NativeReviewGrant> {
   try {
-    const credential = await githubTokenForUser(userId, { minValidityMs: 45_000, budget })
+    const credential = prepared ?? await githubTokenForUser(userId, { minValidityMs: 45_000, budget })
     const repo = githubRepository(repositoryKey), client = new GitHubDiffClient(credential.token, budget)
     const current = parse(z.object({ id, full_name: z.string() }), (await client.get(repo.path, 512 * 1024)).value)
     if (current.id !== repositoryId || current.full_name.toLowerCase() !== `${repo.owner}/${repo.repo}`.toLowerCase())

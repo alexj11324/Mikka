@@ -7,6 +7,7 @@ import { displayTaskTitle } from '@/lib/short-title'
 import { boardBlocks } from '@/components/blocks/kanban-board-1/components/data'
 import { newestTaskRuns, taskScheduleLabels } from '@/lib/task-block-runs'
 import { mobileTaskGroup } from '@/lib/mobile-task-view'
+import { taskReviewSummaries } from '@/lib/coding-workspace/task-review/summaries'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +21,10 @@ async function handleGET(request: Request) {
   const { issues, workspaceId } = tokenWorkspaceId
     ? { issues: await actAs(user, () => listWorkspaceIssues(tokenWorkspaceId)), workspaceId: tokenWorkspaceId }
     : await pollIssues().then(snapshot => ({ issues: snapshot.items!, workspaceId: snapshot.live.selectedWorkspaceId }))
-  const snapshots = await newestTaskRuns(user.id, issues.map(issue => issue.id), workspaceId, await taskScheduleLabels())
+  const [snapshots, reviews] = await Promise.all([
+    newestTaskRuns(user.id, issues.map(issue => issue.id), workspaceId, await taskScheduleLabels()),
+    taskReviewSummaries(user, issues.map(issue => issue.id), workspaceId),
+  ])
   const runs = snapshots.flatMap(row => row.runId && row.status ? [{ ...row, runId: row.runId, status: row.status }] : [])
   const byIssue = new Map(snapshots.map(row => [row.issueId, row]))
   const runByIssue = new Map(runs.map(row => [row.issueId, row]))
@@ -35,6 +39,7 @@ async function handleGET(request: Request) {
         createdAt: issue.createdAt, group: mobileTaskGroup(issue, runByIssue.get(issue.id), Boolean(block)),
         bot: byIssue.get(issue.id)?.bot ?? null, schedule: byIssue.get(issue.id)?.schedule ?? null,
         blocked: block ? { reason: block.reason, blocker: block.blockerIdentifier ?? null } : null,
+        review: reviews.get(issue.id) ?? null,
       }
     }),
   })
