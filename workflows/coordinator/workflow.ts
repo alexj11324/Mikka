@@ -120,12 +120,13 @@ export async function coordinatorTurn(userId: string, botId: string) {
         : { stopped: false as const, result: await turn.catch((error: unknown) => { if (signal.aborted) return { text:'',finishReason:'stop',responseMessages:[] as ModelMessage[] }; throw error }) }
       if (!inbox.scheduledRead && !ended.stopped && !signal.aborted && selected.harness === 'ai_sdk' &&
           ended.result.finishReason === 'stop' && inbox.attentionQuestions?.length) {
+        const attentionQuestions = inbox.attentionQuestions
         // Completion is still part of this turn: Stop must not wait for an
         // already running escalation or audit before marking the turn stopped.
         await untilStopped((async () => {
           await Promise.all(audits)
           const escalation = hostedTools?.escalate_factory_question?.execute
-          await completeAttentionQuestions(inbox.attentionQuestions, ended.result.responseMessages, {
+          await completeAttentionQuestions(attentionQuestions, ended.result.responseMessages, {
             userId, enabled: Boolean(escalation), signal,
             escalate: async input => {
               // Reuse this execution's instrumented tool: its before/after hooks
