@@ -120,17 +120,21 @@ export async function coordinatorTurn(userId: string, botId: string) {
         : { stopped: false as const, result: await turn.catch((error: unknown) => { if (signal.aborted) return { text:'',finishReason:'stop',responseMessages:[] as ModelMessage[] }; throw error }) }
       if (!inbox.scheduledRead && !ended.stopped && !signal.aborted && selected.harness === 'ai_sdk' &&
           ended.result.finishReason === 'stop' && inbox.attentionQuestions?.length) {
-        await Promise.all(audits)
-        const escalation = hostedTools?.escalate_factory_question?.execute
-        await completeAttentionQuestions(inbox.attentionQuestions, ended.result.responseMessages, {
-          userId, enabled: Boolean(escalation), signal,
-          escalate: async input => {
-            // Reuse this execution's instrumented tool: its before/after hooks
-            // retain the running-execution, frozen-grant and stop fences.
-            const execute = escalation as (input: unknown, context: {toolCallId:string;messages:ModelMessage[];abortSignal?:AbortSignal}) => unknown
-            return await execute(input,{toolCallId:'question-attention:'+input.eventId,messages:ended.result.responseMessages,abortSignal:signal})
-          },
-        })
+        // Completion is still part of this turn: Stop must not wait for an
+        // already running escalation or audit before marking the turn stopped.
+        await untilStopped((async () => {
+          await Promise.all(audits)
+          const escalation = hostedTools?.escalate_factory_question?.execute
+          await completeAttentionQuestions(inbox.attentionQuestions, ended.result.responseMessages, {
+            userId, enabled: Boolean(escalation), signal,
+            escalate: async input => {
+              // Reuse this execution's instrumented tool: its before/after hooks
+              // retain the running-execution, frozen-grant and stop fences.
+              const execute = escalation as (input: unknown, context: {toolCallId:string;messages:ModelMessage[];abortSignal?:AbortSignal}) => unknown
+              return await execute(input,{toolCallId:'question-attention:'+input.eventId,messages:ended.result.responseMessages,abortSignal:signal})
+            },
+          })
+        })(), signal)
       }
       if (ended.stopped || (signal.aborted && !inbox.scheduledRead)) {
         const said = await steps.markStopped(writable,holder,streamId)

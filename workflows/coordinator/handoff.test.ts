@@ -49,6 +49,9 @@ let closeExecutionDuringModel = false
 const execution = {id:'10000000-0000-4000-8000-000000000009',snapshot:{runtime:{harness:'ai_sdk',model:'synthetic'},effectiveTools:['escalate_factory_question']}}
 const auditCallIds: string[] = []
 let toolRegistryBuilds = 0
+let pendingEscalationGate: Promise<void> | null = null
+let notifyPendingEscalation: (() => void) | null = null
+let stopMarkerReached = false
 
 const handoffOrder: string[] = []
 const escalations: unknown[] = []
@@ -109,6 +112,7 @@ const escalateQuestion = async (userId: string, input: { reference: typeof permi
   assert.deepEqual([userId, botId], [owner, bot])
   escalations.push(input)
   handoffOrder.push('escalated')
+  if (pendingEscalationGate) { notifyPendingEscalation?.(); await pendingEscalationGate }
   if (stopAt === 'escalation') { sendStop(); await stopDelivered }
   if (escalationError instanceof Error) throw escalationError
   if (escalationError) return {error:escalationError}
@@ -166,7 +170,7 @@ stub('./steps.ts', {
     return replies.length
   },
   escalateFactoryQuestionScoped: escalateQuestion,
-  markStopped: async () => 'Stopped.',
+  markStopped: async () => { stopMarkerReached = true; return 'Stopped.' },
   assertScheduleRead: async () => {},
   completeScheduleRead: async () => { handoffOrder.push('scheduled-result'); return 1 },
   noticeTurnFailure: async () => {},
@@ -182,6 +186,7 @@ beforeEach(() => {
   escalationEnabled = true; scheduledRead = false; questionView = structuredClone(permissionQuestion)
   extraMessages = []; escalationError = null; stopAt = null; failures.length = 0
   executionState='running';closeExecutionDuringModel=false;auditCallIds.length=0;toolRegistryBuilds=0
+  pendingEscalationGate=null;notifyPendingEscalation=null;stopMarkerReached=false
   lease = null; requests = 11; nextRun = 1; deferred = 0; firstFinished = false
 })
 
@@ -389,4 +394,35 @@ test('stop during preparation keeps the original lazy tool construction boundary
   assert.deepEqual(escalations,[])
   assert.deepEqual(handoffOrder,['stopped-reply','completed'])
   assert.deepEqual(failures,[])
+})
+
+
+test('stop marker precedes settlement of the new in-flight permission escalation', { timeout: 5000 }, async () => {
+  permissionCase = true; requests = 1
+  let releaseGate: () => void = () => {}
+  pendingEscalationGate = new Promise<void>(resolve => { releaseGate = resolve })
+  const entered = new Promise<void>(resolve => { notifyPendingEscalation = resolve })
+  const running = permissionTurn()
+  running.catch(() => {})
+  let markerBeforeRelease = false
+  let entryTimer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([entered, new Promise<void>((_resolve, reject) => {
+      entryTimer = setTimeout(() => reject(new Error('local escalation entry timeout')), 2000)
+    })])
+    if (entryTimer) clearTimeout(entryTimer)
+    sendStop()
+    await stopDelivered
+    await new Promise<void>(resolve => setImmediate(resolve))
+    markerBeforeRelease = stopMarkerReached
+    console.log(JSON.stringify({ event:'post_completion_stop_boundary', stage:'before_gate_release',
+      markerObserved:markerBeforeRelease, escalations:escalations.length, replies:replies.length }))
+  } finally {
+    if (entryTimer) clearTimeout(entryTimer)
+    releaseGate()
+    await running
+  }
+  console.log(JSON.stringify({ event:'post_completion_stop_boundary', stage:'after_gate_release',
+    markerObserved:stopMarkerReached, escalations:escalations.length, replies:replies.length }))
+  assert.equal(markerBeforeRelease, true, 'Stop must mark the turn without waiting for its already running tool body')
 })
