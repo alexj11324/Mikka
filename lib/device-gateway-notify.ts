@@ -51,6 +51,14 @@ export function notifyDeviceWork(deviceId: string | null | undefined) {
   afterJob('after:device-wake', async () => { await Promise.all([sendWake(deviceId, endpoint), notifyLongPoll(deviceId)]) }, { orRun: true })
 }
 
+/** A read RPC waits for its device response before returning. Deferring its
+ * wake with after() would deadlock an idle push-only daemon. The request's
+ * transaction has already committed (and sent the ordinary PG notification). */
+export async function wakeDeviceWorkNow(deviceId: string) {
+  const endpoint = deviceGatewayEndpoint(deviceId, 'push')
+  if (endpoint) await sendWake(deviceId, endpoint)
+}
+
 /** The outer Factory/Skill transaction has committed before this lookup. */
 export async function notifyQueuedLocalRun(database: {
   query: (text: string, values: unknown[]) => Promise<{ rows: { deviceId: string }[] }>

@@ -8,6 +8,15 @@
 //
 // No imports: the CI guard loads this file directly with Node.
 export const USER_ERROR_CODES = {
+  workspace_not_found: [],
+  workspace_machine_unavailable: [],
+  workspace_checkout_unavailable: [],
+  workspace_path_unavailable: [],
+  workspace_version_conflict: [],
+  workspace_limit_exceeded: [],
+  workspace_request_expired: [],
+  workspace_unsupported: [],
+  workspace_invalid_request: [],
   run_subscription_expired: [],
   run_api_key_invalid: [],
   run_quota_exceeded: [],

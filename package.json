@@ -9,6 +9,7 @@
     "node": "24.x"
   },
   "scripts": {
+    "test:coding-workspace-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-concurrency=1 lib/coding-workspace/files.db.test.ts lib/coding-workspace/http-daemon.db.test.ts",
     "test:web-auth-db": "node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/web-auth-handoff.db.test.ts",
     "test:mailbox-verification": "node --import tsx --test scripts/personal-mailbox-acceptance/r4-verification.test.mts",
     "test:factory-check-independence-db": "node --import tsx --test lib/factory/check-independence.db.test.ts",

@@ -13,6 +13,9 @@ import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
   { marker: 'lib/cloud-services/store.ts', file: 'lib/cloud-services/client.db.test.ts', script: 'test:cloud-services-db' },
+  { marker: 'lib/coding-workspace/requests.ts', file: 'lib/coding-workspace/files.db.test.ts', script: 'test:coding-workspace-db' },
+  { marker: 'app/api/runs/[runId]/workspace/files/route.ts', file: 'lib/coding-workspace/http-daemon.db.test.ts', script: 'test:coding-workspace-db' },
+  { marker: 'packages/daemon/src/main.ts', file: 'lib/coding-workspace/http-daemon.db.test.ts', script: 'test:coding-workspace-db' },
   { marker: 'app/api/web/exchange/route.ts', file: 'tests/web-auth-handoff.db.test.ts', script: 'test:web-auth-db' },
   { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },
   { marker: 'lib/chat-attachments/store.ts', file: 'lib/chat-attachments/store.db.test.ts', script: 'test:chat-attachments-db' },

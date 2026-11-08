@@ -4,6 +4,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 import { reconcileDue } from './reconcile-due'
+import { cleanupWorkspaceEphemera } from './coding-workspace/retention'
 
 // #1371: the one safety-net check. It is true for a job only when that job has
 // work already due that its own wake or timer did not pick up, and false on an
@@ -15,7 +16,7 @@ if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Reconcile tests r
 const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'agent_runs', 'devices', 'cloud_machines',
   'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
   'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'account_deletion_jobs', 'chat_attachments', 'chat_attachment_retirements',
-  'workspace_audit_retention', 'workspace_audit_events', 'workspace_deletions', 'workspace_audit_outbox', 'mobile_push_receipts']
+  'workspace_audit_retention', 'workspace_audit_events', 'workspace_deletions', 'workspace_audit_outbox', 'mobile_push_receipts', 'coding_workspace_requests', 'coding_workspace_mentions']
 
 test('the safety-net check names exactly the jobs with work already due', { skip: !valid }, async t => {
   const schema = `reconcile_due_${randomUUID().replaceAll('-', '')}`
@@ -25,7 +26,7 @@ test('the safety-net check names exactly the jobs with work already due', { skip
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 2 })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
   const due = () => reconcileDue(pool, { factoryLifecycle: true, workspace: pool })
-  const none = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false }
+  const none = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: false }
   const clear = async () => { for (const table of TABLES) await pool.query(`DELETE FROM ${table}`) }
   const event = (values: string) => pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"nextWakeAt","wakeLeaseUntil",tier,"deliveredAt") VALUES ($1,'owner',$2,'user_message',$3,'{}',${values})`, [randomUUID(), randomUUID(), randomUUID()])
 
@@ -94,6 +95,21 @@ test('the safety-net check names exactly the jobs with work already due', { skip
     assert.deepEqual(await due(), none)
     await pool.query("UPDATE mobile_push_receipts SET lease_until=now()-interval '1 second'")
     assert.deepEqual(await due(), { ...none, pushReceipts: true })
+    await clear()
+  })
+  await t.test('workspace crash residues expire through the existing sweep without deleting live references', async () => {
+    const expired = randomUUID(), live = randomUUID()
+    for (const [id, ttl] of [[expired, '-1 second'], [live, '5 minutes']]) {
+      await pool.query(`INSERT INTO coding_workspace_mentions(id,"ownerId","workspaceId","runId","repoId","bindingId",files,"expiresAt")
+        VALUES($1,'owner',$2,$3,$4,'binding','[{}]',now()+$5::interval)`, [id, randomUUID(), randomUUID(), randomUUID(), ttl])
+      await pool.query(`INSERT INTO coding_workspace_requests(id,"ownerId","workspaceId","runId","repoId","deviceId","tokenId",identity,request,"expiresAt")
+        VALUES($1,'owner',$2,$3,$4,$5,$6,'{}','{}',now()+$7::interval)`, [id, randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID(), ttl])
+    }
+    assert.deepEqual(await due(), { ...none, workspaceEphemera: true })
+    assert.deepEqual(await cleanupWorkspaceEphemera(pool), { requests: 1, mentions: 1 })
+    for (const table of ['coding_workspace_requests', 'coding_workspace_mentions'])
+      assert.deepEqual((await pool.query(`SELECT id FROM ${table}`)).rows, [{ id: live }])
+    assert.deepEqual(await due(), none)
     await clear()
   })
 })
