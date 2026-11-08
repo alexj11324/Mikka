@@ -147,7 +147,7 @@ function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(
         return Response.json({ workflow_runs: runs(elapsed) })
       }
       assert.equal(url.pathname, '/repos/alexj11324/Mikka/actions/runs/70/attempts/2/jobs')
-      return Response.json({ total_count: 1, jobs: [job] })
+      return Response.json({ total_count: 1, jobs: [typeof job === 'function' ? job(elapsed) : job] })
     }
     assert.equal(input, PRODUCTION_VERSION_URL)
     assert.equal(init.headers.authorization, undefined)
@@ -193,6 +193,51 @@ test('a docs-only skipped build or incomplete upload never passes even if public
     job.steps[index].conclusion = 'skipped'
     const fixture = webFixture({ job })
     await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/)
+    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+  }
+})
+
+test('a successful Web job waits for its required step results to catch up before reading public', async () => {
+  const fixture = webFixture({ job: elapsed => {
+    const job = buildJob()
+    if (elapsed < 200) {
+      job.steps[1] = { ...job.steps[1], status: 'in_progress', conclusion: null }
+      job.steps[2] = { ...job.steps[2], status: 'pending', conclusion: null }
+    }
+    return job
+  } })
+  const result = await fixture.run()
+  assert.equal(result.webRunId, 70)
+  assert.equal(fixture.elapsed(), 200)
+  assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at), [200])
+})
+
+test('required Web step results that remain pending cannot pass and retain the finite wait', async () => {
+  const job = buildJob()
+  job.steps[2] = { ...job.steps[2], status: 'pending', conclusion: null }
+  const fixture = webFixture({ job, budget: 250 })
+  await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
+  assert.equal(fixture.elapsed(), 250)
+  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+})
+
+test('pending Web step results retain the exact-main fence on every wait', async () => {
+  const job = buildJob()
+  job.steps[2] = { ...job.steps[2], status: 'pending', conclusion: null }
+  const fixture = webFixture({ job, main: elapsed => elapsed >= 100 ? OTHER : SHA })
+  await assert.rejects(fixture.run(), /mainChanged/)
+  assert.equal(fixture.elapsed(), 100)
+  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+})
+
+test('pending step metadata does not hide a required step that already failed or skipped', async () => {
+  for (const conclusion of ['failure', 'cancelled', 'timed_out', 'skipped']) {
+    const job = buildJob()
+    job.steps[1] = { ...job.steps[1], status: 'in_progress', conclusion: null }
+    job.steps[2].conclusion = conclusion
+    const fixture = webFixture({ job })
+    await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/)
+    assert.equal(fixture.elapsed(), 0)
     assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
   }
 })
