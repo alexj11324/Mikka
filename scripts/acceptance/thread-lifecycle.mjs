@@ -180,13 +180,13 @@ export function reviewDeliveryValidation(value, record) {
 }
 
 /** Tool pairs only: ordinary assistant text cannot satisfy any native proof. */
-export function nativeEvidence(detail, record) {
+export function nativeEvidence(detail, record, expectedRunId = record.runId) {
   const inputs = new Map(), pairs = []
   for (const [index, item] of (detail.chunks ?? []).entries()) {
     const chunk = item.chunk, id = chunk?.toolCallId
     if (typeof id !== 'string' || id.length > 500) continue
     const prefix = id.slice(0, 36)
-    if (UUID.test(prefix) && id[36] === ':' && prefix !== record.runId) continue
+    if (UUID.test(prefix) && id[36] === ':' && prefix !== expectedRunId) continue
     if (chunk.type === 'tool-input-available') {
       assert(!inputs.has(id), 'duplicate_native_tool_input')
       inputs.set(id, { index, chunk, at: item.at })
@@ -463,7 +463,7 @@ export async function runLifecycleCase({ client, botId, profile, scope, harness,
       noAbort(signal)
       if (TERMINAL.has(detail.thread?.status)) record.terminal.continuation = terminalObservation(detail, record.continuationRunId, now)
       const snapshot = await factorySnapshot(client, record, hooks)
-      const proof = nativeEvidence(detail, { ...record, runId: record.continuationRunId })
+      const proof = nativeEvidence(detail, record, record.continuationRunId)
       const machine = await readMachine(client, record, scope, observeProvider, TERMINAL.has(detail.thread?.status) ? 'after_delivery' : 'resumed_running', hooks.checkActive)
       if (!snapshot || !TERMINAL.has(detail.thread?.status)) return false
       const question = await client.json(`/api/factory/questions/${record.questionId}`)
