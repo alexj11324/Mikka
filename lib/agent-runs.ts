@@ -340,11 +340,9 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 /** Which runs `userId` may see: their own (on no task or a visible task) and teammates' runs on shared visible tasks. */
 async function runVisibilityPredicate(reader: IssueReader, input: { issueId?: string; runIds?: string[]; teams?: readonly TeamScope[] }) {
   const userId = typeof reader === 'string' ? reader : reader.id
-  // Asked about one task or known runs: only their tasks' team links are read.
-  const onlyIssueIds = input.issueId ? [input.issueId]
-    : input.runIds ? [...new Set((await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, input.runIds))).flatMap(row => row.issueId ? [row.issueId] : []))]
-    : undefined
-  const visibility = await issueVisibility(reader, false, undefined, db, { onlyIssueIds, teams: input.teams })
+  // The persisted run/task tenant and fresh reader authority decide access.
+  // Team links only name tasks; no run-to-task pre-read is needed for this gate.
+  const visibility = await issueVisibility(reader, false, undefined, db, { teams: input.teams, withTeamLinks: false })
   const tenant = visibility.workspaceIds.length ? inArray(agentRuns.workspaceId, visibility.workspaceIds) : sql`false`
   const task = and(visibility.predicate, eq(agentRuns.workspaceId, issues.workspaceId))
   return and(tenant, or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), task)), task))

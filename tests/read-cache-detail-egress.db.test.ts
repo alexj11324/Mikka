@@ -310,6 +310,13 @@ test('detail and activity revalidate current access while returning only changed
       const relinked = successful(await readWorkspace(() => pollIssue(id, renamed.version)))
       assert.match(relinked.issue?.identifier ?? '', /^CACHE-\d+$/)
       assert.notEqual(relinked.version, renamed.version, 'a negative team result is never kept across operations')
+      assert.match((await readWorkspace(() => listIssueConnections(id))).find(row => row.id === id)?.identifier ?? '', /^CACHE-\d+$/,
+        'a one-task connection read never retains its earlier missing link')
+      const relinkedSources = await readWorkspace(() => citationSources(owner, [issueCite, runCite]))
+      const relinkedTask = relinkedSources[id], relinkedRun = relinkedSources[citationRun]
+      assert.ok(relinkedTask?.kind === 'issue' && relinkedRun?.kind === 'run')
+      assert.match(relinkedTask.identifier ?? '', /^CACHE-\d+$/)
+      assert.match(relinkedRun.issue?.identifier ?? '', /^CACHE-\d+$/)
       // A creator loses this shared task with their current membership. The
       // saved team label and cached detail/citation cursors grant no authority.
       await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, owner, 'suspended'])

@@ -12,11 +12,11 @@ import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { ARTIFACT_CONTENT_TYPES, ARTIFACT_EXTENSIONS, ARTIFACT_MAX_BYTES, cleanTitle, utf8Bytes } from '@/lib/artifacts/limits'
 import { stripDiffMarkers } from '@/lib/artifacts/diff'
 import type { ArtifactDetail, ArtifactListItem, ArtifactMedia, ArtifactSummary } from '@/lib/artifacts/types'
-import { issueVisibility } from '@/lib/issue-visibility'
-import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { numberedIssueTeamScope } from '@/lib/issue-team-access'
+import { pageTaskPrefixInput, taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/artifacts/storage'
 import { artifactChanged } from '@/lib/live/artifacts'
-import { artifactAccess, artifactWorkspace, submissionWorkspace, type ArtifactReader } from './access'
+import { artifactAccess, artifactReadAccess, artifactWorkspace, submissionWorkspace, type ArtifactReader } from './access'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 
@@ -144,9 +144,9 @@ export async function readArtifact(reader: ArtifactReader, artifactId: string): 
 }
 
 /** A PR report's task id (「ALEX-84」) for its window title; null for any other artifact or a task the person no longer sees. */
-export async function reportIssueKey(userId: string, found: ArtifactDetail): Promise<string | null> {
+export async function reportIssueKey(reader: ArtifactReader, found: ArtifactDetail): Promise<string | null> {
   if (!found.acceptanceTaskId || !found.issueId) return null
-  const [keyed] = await withIssueKeys(userId, [{ id: found.id, kind: found.kind, title: found.title, latestVersion: found.latestVersion,
+  const [keyed] = await withIssueKeys(reader, [{ id: found.id, kind: found.kind, title: found.title, latestVersion: found.latestVersion,
     runId: found.runId, issueId: found.issueId, botId: null, authorName: null, updatedAt: new Date() }])
   return keyed?.issueKey ?? null
 }
@@ -179,13 +179,20 @@ const latestVersion = and(eq(artifactVersions.artifactId, artifacts.id), eq(arti
 const issueNumber = sql<number | null>`(coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'number')::int`
 
 /** Rows with their task key: only for tasks the person can still see. */
-async function withIssueKeys(userId: string, rows: (Omit<ArtifactListItem, 'issueKey' | 'updatedAt'> & { updatedAt: Date })[]): Promise<ArtifactListItem[]> {
+async function withIssueKeys(reader: ArtifactReader, rows: (Omit<ArtifactListItem, 'issueKey' | 'updatedAt'> & { updatedAt: Date })[], access?: Awaited<ReturnType<typeof artifactReadAccess>>): Promise<ArtifactListItem[]> {
+  const { userId } = taskReaderScope(reader)
   const issueIds = [...new Set(rows.flatMap(row => row.issueId ? [row.issueId] : []))]
-  const visibility = issueIds.length ? await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, withIdentifierTeams: true }) : null
-  const tasks = visibility ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, number: issueNumber })
+  const current = issueIds.length ? access ?? await artifactReadAccess(reader) : null
+  // Team links supply names only; tenant authority is the fresh read above.
+  const { taskTeams } = await numberedIssueTeamScope(userId, issueIds)
+  const prefixOwner = sql<string | null>`case when issues.scope = 'personal'
+    or not (issues.id = any(${`{${[...taskTeams.keys()].join(',')}}`}::uuid[]))
+    then issues."userId" end`
+  const tasks = current ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, number: issueNumber,
+    prefixInput: pageTaskPrefixInput(prefixOwner, sql`issues.id`) })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(inArray(issues.id, issueIds), visibility.predicate)) : []
-  const identifiers = await taskIdentifiers(tasks, db, visibility?.taskTeams)
+    .where(and(inArray(issues.id, issueIds), current.taskPredicate)) : []
+  const identifiers = await taskIdentifiers(tasks, db, taskTeams)
   const numbers = new Map(tasks.map(task => [task.id, task.number]))
   return rows.map(({ updatedAt, ...row }) => {
     const number = row.issueId ? numbers.get(row.issueId) ?? null : null
@@ -212,18 +219,18 @@ async function withAgentAuthors<T extends { runId: string | null; authorName: st
 
 /** The person's artifacts, last changed first, each with its latest author and the task it was made for. */
 export async function listArtifacts(reader: ArtifactReader): Promise<ArtifactListItem[]> {
-  const { userId } = taskReaderScope(reader)
+  const access = await artifactReadAccess(reader)
   const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion).leftJoin(agentRuns, madeBy)
-    .where(await artifactAccess(reader)).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
-  return withIssueKeys(userId, await withAgentAuthors(rows))
+    .where(access.artifactPredicate).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
+  return withIssueKeys(reader, await withAgentAuthors(rows), access)
 }
 
 /** What one of the person's runs handed over, last changed first. */
 export async function listRunArtifacts(reader: ArtifactReader, runId: string): Promise<ArtifactListItem[]> {
-  const { userId } = taskReaderScope(reader)
+  const access = await artifactReadAccess(reader)
   const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion).leftJoin(agentRuns, madeBy)
-    .where(and(await artifactAccess(reader), eq(artifacts.runId, runId))).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
-  return withIssueKeys(userId, await withAgentAuthors(rows))
+    .where(and(access.artifactPredicate, eq(artifacts.runId, runId))).orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
+  return withIssueKeys(reader, await withAgentAuthors(rows), access)
 }
 
 /** The file of one version, or null when the artifact or version is not there. */

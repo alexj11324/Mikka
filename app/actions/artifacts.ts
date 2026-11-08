@@ -35,7 +35,7 @@ export async function getArtifact(artifactId: string): Promise<(ArtifactDetail &
   const reader = await getReader()
   const found = await readArtifact(reader, artifactId)
   if (!found) return null
-  return { ...found, issueKey: await reportIssueKey(reader.id, found), live: { ownerId: reader.id, workspaceId: reader[tokenWorkspace] } }
+  return { ...found, issueKey: await reportIssueKey(reader, found), live: { ownerId: reader.id, workspaceId: reader[tokenWorkspace] } }
 }
 
 /** A Markdown artifact's text at `version`, for the reader. HTML is only ever served through its sandboxed frame. */

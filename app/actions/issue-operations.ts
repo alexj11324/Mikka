@@ -1,6 +1,6 @@
 'use server'
 
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
@@ -42,12 +42,12 @@ export async function listIssueConnections(id: string) {
  * owner, for copying a whole subtask tree.
  */
 async function issueConnections(id: string, reach: 'linked' | 'all') {
-  const { issue, user } = await requireIssueAccessWithoutBody(id)
+  const { issue, user, teamId } = await requireIssueAccessWithoutBody(id)
   return db.transaction(async tx => {
-  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
+  const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   await requireCurrentIssueWorkspace(user, issue.workspaceId)
-  let candidates: string[] | undefined
+  let related: SQL | undefined
   if (reach === 'linked') {
     const own = readIssueMetadata(locked.content)
     const named = [...new Set([own.parentId, own.duplicateOfId, ...own.blockedByIds, ...own.relatedIds].filter((value): value is string => !!value))]
@@ -56,18 +56,20 @@ async function issueConnections(id: string, reach: 'linked' | 'all') {
       const metadata = sql`${issues.content}->'attrs'->${sql.raw(`'${key}'`)}`
       return sql`(${metadata}->>'parentId' = ${id} or ${metadata}->'blockedByIds' ? ${id} or ${metadata}->'relatedIds' ? ${id})`
     }
-    candidates = (await tx.select({ id: issues.id }).from(issues).where(and(eq(issues.userId, issue.userId),
-      or(eq(issues.id, id), named.length ? inArray(issues.id, named) : undefined, namesTask('mikka'), namesTask('orvilo'))))).map(row => row.id)
+    related = or(eq(issues.id, id), named.length ? inArray(issues.id, named) : undefined, namesTask('mikka'), namesTask('orvilo'))
   }
   // Only each row's metadata is used: read the body's attrs, never every task's whole body.
   // Reuse the locked task's freshly checked tenant; team links only name rows.
   const rows = await tx.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
-    .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
-    .where(and(eq(issues.userId, issue.userId), candidates ? inArray(issues.id, candidates) : undefined, issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [issue.workspaceId!] }))).orderBy(desc(issues.updatedAt))
+    .where(and(eq(issues.userId, issue.userId), related, issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [issue.workspaceId!] }))).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
+  // The entry lookup is complete for this one task. Its missing link is only
+  // a same-operation naming fact; larger relation sets need their full read.
+  const knownTeams = reach === 'linked' && !teamId && live.length === 1 && live[0].id === id
+    ? new Map<string, { key: string; number: number }>() : undefined
   // The private whole-owner copy consumes structure only; labels belong to the public linked view.
   const identifiers = reach === 'linked'
-    ? await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), db)
+    ? await taskIdentifiers(live.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), db, knownTeams)
     : new Map<string, string | null>()
   return live.map(({ content, ...row }) => ({ ...row, identifier: identifiers.get(row.id) ?? null, metadata: readIssueMetadata(content) }))
   })
