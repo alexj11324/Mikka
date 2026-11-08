@@ -141,3 +141,14 @@ for (const [name, source] of [
   execFileSync('git',['add','.'],{cwd:root})
   assert.throws(()=>buildGraph(root),/DB test outside inventory roots/)
 })
+
+test('filesystem-based i18n and generated catalog policies cannot disappear from import-only selection', async () => {
+  const commands = JSON.parse(readFileSync('scripts/ci/tasks.json','utf8'))
+  for (const file of ['messages/en.json','apps/mobile/lib/theme.ts']) {
+    const result = await pick(file)
+    for (const command of ['pnpm test:i18n','pnpm i18n:check','pnpm check:agent-ui']) {
+      const key = Object.entries(commands).find(([,task])=>task.command===command)?.[0]
+      assert(result.units.includes(`ci-${key}`), `${file}: ${command}`)
+    }
+  }
+})

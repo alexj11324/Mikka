@@ -42,7 +42,9 @@ Shared backend dependencies can legitimately reach many suites. For example,
 selected for a Factory store change. Test mocks and runtime-generated imports
 are not used to prune transitive dependencies. Generated/unresolved imports on a
 changed file force full coverage. Unmapped server coverage uses all DB suites.
-The source job still runs the existing whole-repository typecheck/lint and API /
+Filesystem-scanning i18n and generated-catalog checks are unconditional source
+policies too: message files and discovered UI entries do not appear as literal
+imports in those scanners. The source job still runs the existing whole-repository typecheck/lint and API /
 frontend source tests; this is deliberate retained coverage, not a performance
 claim.
 

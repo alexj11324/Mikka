@@ -49,7 +49,7 @@ export async function select(plan, changes, { force = false } = {}) {
   } catch (error) { full = true; reasons.push(`Nx affected failed (${error.name})`) }
   const selected = new Set(affected)
   // Source policies and security/credential/release regressions stay unconditional.
-  const always = /test:(?:ui-policy|release-security|credentials|test-accounts|execution-rules|abuse|signup-turnstile|db-runner)|check:agent-definitions/
+  const always = /test:(?:ui-policy|i18n|release-security|credentials|test-accounts|execution-rules|abuse|signup-turnstile|db-runner)|(?:i18n:check|check:agent-ui|check:agent-definitions)/
   const units = Object.entries(tasks).filter(([key, value]) => !docs && (full || selected.has(taskId(key)) || always.test(value.command) || key === 'core-triage')).map(([key]) => taskId(key))
   let suites = docs ? [] : plan.db.scripts.filter(s => full || selected.has(dbId(s)))
   // Server paths without a proven suite mapping must never silently skip DB.
@@ -64,7 +64,9 @@ export async function select(plan, changes, { force = false } = {}) {
     image: !docs && (full || areas.includes('self-hosted/image') || files.some(f => area(f) === 'api/factory/coordinator' && !/\.(?:test|spec)\.[^.]+$/.test(f))),
     analytics: !docs && (full || files.some(f => /analytics|posthog|instrumentation|^apps\/frontend\/|^app\/\[locale\]\/layout/.test(f))),
   }
-  return { version: 1, full, docs_only: docs, areas, reasons, affected, units, db_suites: suites,
+  return { version: 1, full, docs_only: docs, areas, reasons, affected, units,
+    unit_tasks: units.map(id => ({ project: id, target: `ci-tasks:${id.slice(3)}`, command: tasks[id.slice(3)].command.trim(), reason: full ? 'full validation' : always.test(tasks[id.slice(3)].command) || id === 'ci-core-triage' ? 'mandatory source/security policy' : 'Nx reverse dependency' })),
+    db_suites: suites,
     db_matrix: { shard: Array.from({ length: shardCount }, (_, i) => `${i + 1}/${shardCount}`) }, ...flags }
 }
 export function emit(result, env = process.env) {
