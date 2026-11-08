@@ -1,9 +1,10 @@
 'use client'
 
-import useSWR from 'swr'
+import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
 import { withBasePath } from '@/lib/base-path'
-import { GovernanceRequestError, type GovernanceDetail } from '@/hooks/settings/use-workspace-governance'
+import { GovernanceRequestError, governanceKey, type GovernanceDetail } from '@/hooks/settings/use-workspace-governance'
+import { useLiveKey } from '@/hooks/use-live-key'
 
 /**
  * Enterprise v1 (#1608 P2, #1642 「Claude 界面交接」): the Organization a Shared
@@ -109,6 +110,17 @@ export const organizationsKey = ['organizations'] as const
 export const organizationKey = (id: string) => ['organization', id] as const
 export const identityKey = (id: string) => ['organization-identity', id] as const
 export const policyKey = (id: string) => ['organization-policy', id] as const
+
+/**
+ * The 组织 page's reads follow the existing `workspace_settings` invalidation
+ * of the workspace it is open for (membership, seats, governance templates),
+ * like the member list; no polling of its own. Its own actions still re-read
+ * what they changed.
+ */
+export function useOrganizationLive(workspaceId: string, organizationId: string | null | undefined) {
+  const keys = [governanceKey(workspaceId), organizationsKey, ...(organizationId ? [organizationKey(organizationId), identityKey(organizationId), policyKey(organizationId)] : [])]
+  useLiveKey('workspace_settings', workspaceId, keys.map(key => unstable_serialize(key)), workspaceId, { minIntervalMs: 2_000 })
+}
 
 /** Organizations the signed-in person belongs to, with their role in each. */
 export function useOrganizations(enabled = true) {

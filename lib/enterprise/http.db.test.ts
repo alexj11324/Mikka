@@ -672,6 +672,49 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.deepEqual(reasons, ['oidc_upstream_requested', 'oidc_upstream_returned'])
     assert.equal((await session(oidcCookies))?.user.id, userId, 'the independent OIDC session remains active')
   })
+  await t.test('the account-menu sign-out client follows OIDC RP logout; a SAML form POST from the page is refused before revoking anything (#1669)', async () => {
+    const { readLogoutTarget, enterpriseSignOutStep } = await import('./logout-client')
+    // A browser on the app origin: its cookie jar, Origin on writes, redirects left to the page (never read as JSON).
+    const browser = (jar: Cookies) => async (path: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers); headers.set('cookie', jar.header())
+      if ((init?.method ?? 'GET') !== 'GET') headers.set('origin', appOrigin)
+      const response = await fetch(new URL(path, appOrigin), { ...init, headers, redirect: 'manual' }); jar.take(response); return response
+    }
+    // This fixture serves the app's own routes with the application's cookie (the auth fixture signs its own); in the product they are one cookie.
+    const applicationBrowser = async (sessionId: string) => {
+      const token = (await pool.query('select token from session where id=$1', [sessionId])).rows[0].token as string
+      const cookie = await applicationCookie(token)
+      return (path: string, init?: RequestInit) => fetch(new URL(path, appOrigin), { ...init, headers: { ...init?.headers as Record<string, string>, cookie }, redirect: 'manual' })
+    }
+    const oidc = await oidcLogin()
+    const oidcSession = await session(oidc.jar)
+    assert.ok(oidcSession)
+    const oidcTarget = await readLogoutTarget(await applicationBrowser(oidcSession.session.id))
+    assert.deepEqual(oidcTarget, { providerId, protocol: 'oidc' })
+    const step = await enterpriseSignOutStep(oidcTarget!, { origin: appOrigin, fetch: browser(oidc.jar) })
+    assert.equal(step.kind, 'navigate')
+    if (step.kind !== 'navigate') return
+    assert.equal(step.upstream, 'requested')
+    assert.equal(new URL(step.url).searchParams.get('post_logout_redirect_uri'), `${appOrigin}/api/auth/sso/oidc/logout/callback/${providerId}`)
+    assert.equal(await session(oidc.jar), null, 'the local session is revoked before the browser leaves for the IdP')
+
+    const saml = await samlLogin()
+    const samlSession = await session(saml.jar)
+    assert.ok(samlSession)
+    const samlTarget = await readLogoutTarget(await applicationBrowser(samlSession.session.id))
+    assert.deepEqual(samlTarget, { providerId: samlProviderId, protocol: 'saml' })
+    const form = await enterpriseSignOutStep(samlTarget!, { origin: appOrigin })
+    assert.equal(form.kind, 'form')
+    if (form.kind !== 'form') return
+    // Exactly what the page's form submission sends: urlencoded fields, same-origin Origin and the cookie.
+    // The endpoint answers its 302 only to JSON (Better Auth's default media type), so a page cannot follow it
+    // as a navigation; the account menu keeps the existing sign-out for SAML until this answers a 302.
+    const submitted = await browser(saml.jar)(form.action, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form.fields) })
+    assert.equal(submitted.status, 415, await submitted.clone().text())
+    assert.equal((await session(saml.jar))?.session.id, samlSession.session.id, 'a refused form POST revokes nothing')
+    assert.equal((await session(oidcCookies))?.user.id, userId, 'the independent OIDC session stays intact')
+    await pool.query('delete from session where id=$1', [samlSession.session.id])
+  })
   await t.test('OIDC logout rejects wrong principals, cross-origin starts and client-selected redirects before revoking a session', async () => {
     const login = await oidcLogin(), active = await session(login.jar); assert.ok(active)
     const before = upstreamLogoutRequests
