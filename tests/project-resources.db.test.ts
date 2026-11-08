@@ -60,6 +60,52 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
     await rejects(resources.withProjectExecution({ ...request, runtime: 'cloud' }, async value => value), 'projectEnvironmentUnavailable')
     await rejects(resources.withProjectExecution({ ...request, harness: 'claude_code' }, async value => value), 'projectEnvironmentUnavailable')
   })
+  await t.test('two Projects in one Workspace select the same repository independently across a binding change', async () => {
+    const issueA = await seedIssue(connection, owner, workspace.id), issueB = await seedIssue(connection, owner, workspace.id)
+    const projectA = randomUUID(), projectB = randomUUID()
+    await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+      values($1,$3,$4,'Repository Project A','','','planned','none','','','','','[]',1),
+        ($2,$3,$4,'Repository Project B','','','planned','none','','','','','[]',1)`, [projectA, projectB, owner, workspace.id])
+    await seedProjectTasks(connection, projectA, [issueA])
+    await seedProjectTasks(connection, projectB, [issueB])
+    const environmentA = await resources.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Repository A',
+      configuration: { runtime: 'local', harness: 'codex', repositoryKeys: [repoA, repoC], variables: { PROJECT_CONTEXT: 'A' } } })
+    const environmentB = await resources.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Repository B',
+      configuration: { runtime: 'local', harness: 'codex', repositoryKeys: [repoA], variables: { PROJECT_CONTEXT: 'B' } } })
+    const savedA = await resources.saveProjectResources(owner, { workspaceId: workspace.id, projectId: projectA, revision: 1,
+      repositories: [{ repositoryKey: repoA, baseBranch: 'review-a', environmentId: environmentA.id, isPrimary: true }],
+      environmentIds: [environmentA.id], defaultEnvironmentId: environmentA.id })
+    await resources.saveProjectResources(owner, { workspaceId: workspace.id, projectId: projectB, revision: 1,
+      repositories: [{ repositoryKey: repoA, baseBranch: 'review-b', environmentId: environmentB.id, isPrimary: true }],
+      environmentIds: [environmentB.id], defaultEnvironmentId: environmentB.id })
+    const configA = await resources.listProjectResources(owner, workspace.id, projectA)
+    const configB = await resources.listProjectResources(owner, workspace.id, projectB)
+    assert.deepEqual(configA.repositories, [{ repositoryKey: repoA, baseBranch: 'review-a', environmentId: environmentA.id, isPrimary: true }])
+    assert.deepEqual(configB.repositories, [{ repositoryKey: repoA, baseBranch: 'review-b', environmentId: environmentB.id, isPrimary: true }])
+    const requestA = { ...request, issueId: issueA }, requestB = { ...request, issueId: issueB }
+    const frozenA = await resources.withProjectExecution(requestA, async snapshot => snapshot)
+    const frozenB = await resources.withProjectExecution(requestB, async snapshot => snapshot)
+    assert.deepEqual([frozenA.projectId, frozenA.repositoryKey, frozenA.baseBranch, frozenA.environment?.id, frozenA.environment?.variables.PROJECT_CONTEXT],
+      [projectA, repoA, 'review-a', environmentA.id, 'A'])
+    assert.deepEqual([frozenB.projectId, frozenB.repositoryKey, frozenB.baseBranch, frozenB.environment?.id, frozenB.environment?.variables.PROJECT_CONTEXT],
+      [projectB, repoA, 'review-b', environmentB.id, 'B'])
+    const originalSnapshots = JSON.stringify([frozenA, frozenB])
+
+    // Both repositories remain Workspace-allowed. Only A's nonempty Project
+    // binding changes; removing its last binding would instead inherit policy.
+    await resources.saveProjectResources(owner, { workspaceId: workspace.id, projectId: projectA, revision: savedA.revision,
+      repositories: [{ repositoryKey: repoC, baseBranch: 'review-a-next', environmentId: environmentA.id, isPrimary: true }],
+      environmentIds: [environmentA.id], defaultEnvironmentId: environmentA.id })
+    await rejects(resources.withProjectExecution(requestA, async () => assert.fail('Project A admitted its removed repository')), 'projectRepositoryDenied')
+    await rejects(withRunProjectExecution(requestA, frozenA, async () => assert.fail('Project A claimed its revoked frozen selection')), 'projectRepositoryDenied')
+    const changedA = await resources.withProjectExecution({ ...requestA, repositoryKey: repoC }, async snapshot => snapshot)
+    assert.deepEqual([changedA.projectId, changedA.repositoryKey, changedA.baseBranch, changedA.environment?.id],
+      [projectA, repoC, 'review-a-next', environmentA.id])
+    assert.deepEqual(await resources.listProjectResources(owner, workspace.id, projectB), configB, 'changing A leaves B resource selection unchanged')
+    assert.deepEqual(await resources.withProjectExecution(requestB, async snapshot => snapshot), frozenB, 'B still admits its own repository, branch and Environment')
+    assert.equal(await withRunProjectExecution(requestB, frozenB, async () => 'Project B claim'), 'Project B claim')
+    assert.equal(JSON.stringify([frozenA, frozenB]), originalSnapshots, 'neither previously frozen selection is rewritten')
+  })
   await t.test('snapshot remains immutable across edits; revocation blocks new admissions', async () => {
     const original = await admission()
     const serialized = JSON.stringify(original)
