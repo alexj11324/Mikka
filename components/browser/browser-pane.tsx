@@ -274,7 +274,7 @@ export function BrowserPane({ onClose, openAt = null }: { onClose: () => void; o
       <Input ref={addressRef} type="url" inputMode="url" enterKeyHint="go" aria-label={t('address')} placeholder={t('addressPlaceholder')} value={address} aria-invalid={invalid || undefined} spellCheck={false} autoCapitalize="off" autoCorrect="off"
         onChange={event => { setAddress(event.target.value); setInvalid(false) }} onFocus={event => event.target.select()}
         onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); submitAddress() } }}
-        className="mx-1 h-8 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-sm text-muted-foreground shadow-none focus-visible:text-foreground" />
+        className="mx-1 h-8 min-w-0 flex-1 rounded-lg border-0 bg-muted px-2.5 text-sm text-muted-foreground focus-visible:text-foreground" />
       {tool(t('selectElement'), <SquareDashedMousePointer data-icon="inline-start" />, { onClick: () => { setDraft(null); setPicking(value => !value) }, disabled: !canNote || !current, pressed: picking })}
       {tool(t('close'), <X data-icon="inline-start" />, { onClick: onClose })}
     </div>
