@@ -21,17 +21,22 @@ function workspaceQuery(columns) {
     from(value) { table = value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')]; return query },
     innerJoin() { return query },
     leftJoin(value, predicate) {
-      assert.equal(table, 'mikka_workspaces')
       assert.equal(value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')], 'mikka_organization_workspaces')
       const join = dialect.sqlToQuery(predicate)
-      assert.equal(join.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"')
       assert.deepEqual(join.params, [])
-      assert.deepEqual(Object.keys(columns), ['id', 'kind', 'organizationId'])
+      if (table === 'mikka_workspaces') {
+        assert.equal(join.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"')
+        assert.deepEqual(Object.keys(columns), ['id', 'kind', 'organizationId'])
+      } else {
+        assert.equal(table, 'mikka_workspace_members')
+        assert.equal(join.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+        assert.deepEqual(Object.keys(columns), ['id', 'organizationId'])
+      }
       organizationJoin = true
       return query
     },
     where(value) { condition = dialect.sqlToQuery(value); return query },
-    async for(mode) {
+    async for(mode, options) {
       const p = globalThis.claimResponseProbe
       assert.equal(mode, 'share')
       if (table === 'mikka_workspaces') {
@@ -40,9 +45,12 @@ function workspaceQuery(columns) {
         return [p.workspace]
       }
       assert.equal(table, 'mikka_workspace_members')
+      assert.equal(organizationJoin, true)
+      assert.ok(options?.of)
+      assert.equal(options.of[Object.getOwnPropertySymbols(options.of).find(s => s.description === 'drizzle:Name')], 'mikka_workspace_members')
       assert.deepEqual(condition.params, [p.workspace.id, p.run.userId, 'active'])
       p.locks.push('workspace_members')
-      return p.memberAllowed ? [{ id: p.run.userId }] : []
+      return p.memberAllowed ? [{ id: p.run.userId, organizationId: null }] : []
     },
     async limit(value) { assert.equal(value, 1); return organizations() },
     // oxlint-disable-next-line unicorn/no-thenable -- Match the awaited Org-link SELECT.
