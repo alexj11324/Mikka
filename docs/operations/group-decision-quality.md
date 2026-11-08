@@ -44,12 +44,19 @@ read. They remain distinct from explicit feedback, model-interpreted human
 corrections, human cancellation and automated evaluation. None is a trusted
 label by itself: the response always says `feedbackIsGroundTruth: false`.
 
-Only settled charges matching the provider generation and model in the current
-primary routing receipt are reported as `decisionCostUsd`. Missing charges remain
-`null`. The API and comparison report name this `primary-routing-decision-api`.
-It excludes correction and incremental-contribution Decisions, earlier retries,
-chat generation, Factory execution and external subscriptions. It is therefore
-not a total cost for the group turn or its delegated task.
+The API prices the retained routing Decision chain against settled ledger
+receipts. `costScope` is `routing-decision-chain`. Each retained decision keeps
+its phase, index, frozen policy version, status, failure and provider receipt.
+`decisionCalls` reports attempted, receipted and unreceipted calls.
+`decisionCost` separates known USD/calls, unknown calls and omitted calls.
+`decisionCostUsd` stays `null` if any attempted or omitted cost is unknown.
+Receipt IDs deduplicate repeated generations. Complete chain latency also stays
+unknown when receipts are missing or omitted. Correction and incremental
+contribution Decisions, chat generation, Factory work and subscriptions remain
+outside this routing-chain total. The older observation-file scorer
+`scripts/group-decision-eval.mts` still labels its imported aggregate
+`primary-routing-decision-api`. Preserve that evidence format's scope when
+comparing it with the richer live/replay chain.
 
 A confirmed Factory receipt records a delegation even when `on_completion`
 suppresses the acknowledgement. Task-result and publication events commit with
@@ -108,9 +115,11 @@ fault observation, not intentional silence.
 ### Real fixed-case Decision inference
 
 `POST /mikka/api/conversations/:id/decisions/replay` accepts only `caseId`
-from the fixed dataset and `policyVersion` (`group-route-v0` or
-`group-contribution-v1`). It requires the caller's normal authenticated group
-and workspace membership and token workspace scope. The call uses the same
+from the fixed dataset and `policyVersion` (`group-route-v0`,
+`group-contribution-v2`, `group-contribution-v3` or `group-contribution-v4`).
+Historical v1 receipts remain readable, while the HTTP replay schema rejects
+v1. The route requires the caller's normal authenticated group and workspace
+membership and token workspace scope. The call uses the same
 Decision API, provider receipt validation, model admission and paid usage
 ledger as ordinary routing. There is no arbitrary prompt, member, billing
 identity, task or tool input. Selecting a replay policy does not change the
@@ -119,7 +128,7 @@ live policy.
 The input consists exclusively of the reviewed synthetic fixture's message,
 public member descriptors, recent context and synthetic task references.
 Expected labels never reach the model. The response contains input/dataset
-digests, policy, safe provider receipt, validated route, primary Decision
+digests, policy, safe provider receipt, validated route, routing-chain Decision
 cost and latency. It does not contain customer content or credentials.
 The replay digest hashes `JSON.stringify` of the parsed fixture, unlike the
 raw-file digest used by the runtime-observation import format above.
@@ -145,8 +154,11 @@ export GROUP_REPLAY_REVISION='<40-character-git-sha>'
 node --import tsx scripts/group-decision-replay.ts --output decision-replay.json
 ```
 
-The runner checks the fixed production deployment before every call, runs
-both policy versions sequentially, and stops on an unavailable response
+The runner checks the public source revision before every call and runs the
+baseline `group-route-v0` and candidate `group-contribution-v4` sequentially.
+The owner separately verifies the supplied deployment ID and current alias.
+The public version check alone does not bind two deployments of the same SHA.
+It stops on an unavailable response
 without retrying or selecting another provider. It stores every received
 receipt, including failures, and emits a Decision-only comparison: measured
 coverage, action/responder accuracy, selected false/missed interventions,
@@ -156,7 +168,7 @@ No replay result changes the production policy automatically.
 
 ### Policy release
 
-The default policy is `group-contribution-v1`. It judges intervention value
+The live policy constant is `group-contribution-v4`. It judges intervention value
 and the member's duty separately and prefers one capable responder.
 `group-route-v0` is the explicit rollback baseline, retaining the older
 forced-responder behavior. Only reviewed code or authorized deployment
@@ -168,12 +180,16 @@ accuracy or a failed candidate expectation block the gate. The report always
 sets `productionAccepted: false` and `policyChanged: false`: production
 acceptance also needs actual API/CLI execution at an immutable deployment.
 
-For an incident rollback, set `MIKKA_GROUP_DECISION_POLICY=group-route-v0`
-through the existing configuration delivery path and deploy the reviewed
-revision. Retain the current trace schema and feedback. Verify the selected
-policy in the next trace; an unknown configuration value fails explicitly.
-To restore normal behavior, remove the override or select
-`group-contribution-v1`, deploy and repeat the relevant fixed cases.
+The `groupContribution` deployment switch selects the live constant when on
+and `group-route-v0` when off. For an incident rollback, use the existing
+`mikka-group-contribution-off` kill switch through the authorized PostHog CLI
+path. Retain the trace schema and feedback, then verify `group-route-v0` in the
+next trace. The legacy `MIKKA_GROUP_DECISION_POLICY=group-route-v0` setting
+also requests the baseline when no remote flag answer takes precedence.
+Historical v1/v2/v3 environment values enable the switch and select the live
+constant. They do not pin live execution to those older versions. To restore
+the live policy, turn the kill switch off and repeat the relevant fixed cases.
+Explicit replay versions remain independent of the live switch.
 
 Do not turn a small number of likes into a policy update. Review false-wake
 and missed-intervention examples together, separately identify infrastructure

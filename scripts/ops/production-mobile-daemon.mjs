@@ -62,8 +62,7 @@ export function proofConfiguration(env, event) {
 
 /** Complete owner-visible snapshots, not a guessed token id or an arbitrary device. */
 export function newEnrollmentCredential(before, after) {
-  check(before.length < 100 && after.length <= 100
-    && new Set(before.map(row => row.id)).size === before.length
+  check(new Set(before.map(row => row.id)).size === before.length
     && new Set(after.map(row => row.id)).size === after.length
     && before.every(row => after.some(next => next.id === row.id && tokenIdentity(next) === tokenIdentity(row))),
   'credential_ambiguous')
@@ -162,6 +161,8 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     check(known.has(path) || (core && method === 'GET' && body === undefined && (path === '/api/desktop/discovery'
       || ownerLiveWorkspaceId && path === '/api/live/ticket?workspace=' + ownerLiveWorkspaceId))
       || (method === 'GET' && body === undefined && isTeamWorkspaceReadPath(BASE + path))
+      || (method === 'GET' && body === undefined && path.startsWith('/api/device-tokens?cursor=')
+        && isUuid(path.slice('/api/device-tokens?cursor='.length)))
       || (tokenId && path === '/api/device-tokens/' + tokenId + '/revoke'),
       'request_rejected')
     const url = new URL(BASE + path, ORIGIN)
@@ -189,11 +190,28 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     return data
   }
   async function tokens() {
-    const response = await owner('/api/device-tokens')
-    check(response.status === 200 && Array.isArray(response.body?.tokens)
-      && response.body.tokens.length <= 100 && response.body.tokens.every(row => isUuid(row.id)
-        && typeof row.name === 'string' && Number.isFinite(Date.parse(row.createdAt))), 'resource_baseline_invalid')
-    return response.body.tokens
+    const rows = [], seen = new Set()
+    let cursor = null
+    // Bound operator work while refusing an incomplete snapshot. Never truncate
+    // history or weaken the before/after preservation proof to fit one page.
+    for (let page = 0; page < 100; page++) {
+      const response = await owner('/api/device-tokens' + (cursor ? '?cursor=' + cursor : ''))
+      const batch = response.body?.tokens
+      check(response.status === 200 && Array.isArray(batch) && batch.length <= 100
+        && batch.every(row => isUuid(row.id) && typeof row.name === 'string'
+          && Number.isFinite(Date.parse(row.createdAt)) && !seen.has(row.id))
+        && new Set(batch.map(row => row.id)).size === batch.length, 'resource_baseline_invalid')
+      for (const row of batch) { rows.push(row); seen.add(row.id) }
+      // Earlier deployed targets are reusable only when their page is complete.
+      if (!Object.hasOwn(response.body, 'nextCursor')) {
+        check(batch.length < 100, 'resource_baseline_invalid'); return rows
+      }
+      const next = response.body.nextCursor
+      if (next === null) return rows
+      check(batch.length === 100 && isUuid(next) && next === batch.at(-1).id && next !== cursor, 'resource_baseline_invalid')
+      cursor = next
+    }
+    throw new ProofError('resource_baseline_invalid')
   }
   async function devices() {
     const data = await rpc('agents.pollDevices')
@@ -294,7 +312,6 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     check(ACTIONS.every(action => used.has(action)), 'manifest_unavailable')
     report.checks.publishedActions = true
     beforeTokens = await tokens()
-    check(beforeTokens.length < 100, 'resource_baseline_invalid')
     beforeDevices = await devices()
     check(!beforeDevices.some(row => row.name === marker || row.id === unusedDeviceId), 'resource_baseline_invalid')
     if (core) {

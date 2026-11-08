@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync, realpathSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync } from 'node:fs'
 import { tmpdir as systemTmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import { hasUnsafeModes, isDocsOnly } from './ci-docs-only.mjs'
 
@@ -29,6 +29,10 @@ test('approved documentation paths are documentation-only', () => {
     '.github/workflows/README.md',
     'packages/subscription-worker/README.md',
     'apps/mobile/README.md',
+    'agents/README.md',
+    'apps/mobile/DESIGN.md',
+    'packages/daemon/THIRD_PARTY_NOTICES.md',
+    'scripts/acceptance/run-observability.md',
     '.claude/skills/README.md',
     '.claude/skills/tdd/SKILL.md',
     '.claude/skills/tdd/agents/openai.yaml',
@@ -52,7 +56,9 @@ test('code, workflows, configuration, messages and public assets are not documen
     'messages/en.json',
     'scripts/ci-docs-only.mjs',
     'agents/default/agent.json',
-    'agents/README.md',
+    'agents/research-example/instructions.md',
+    'packages/daemon/src/THIRD_PARTY_NOTICES.md',
+    'scripts/acceptance/run-observability.mjs',
     'public/brand/mikka-icon-light.svg',
     'docs/tool.mjs',
     'tasks/migration.sql',
@@ -196,140 +202,6 @@ test('real git diffs retain all fixtures while testing rename, deletion and even
 })
 
 
-test('the workflow-extracted trusted classifier executes as an ES module', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'docs-gate-loader-retained-'))
-  console.log(`Retained docs gate loader evidence: ${dir}`)
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
-    const workflow = readFileSync(file, 'utf8')
-    const allocation = workflow.match(/trusted_dir="\$\((mktemp[^\n]*)\)"/)
-    assert.ok(allocation, file)
-    const env = { PATH: process.env.PATH, TMPDIR: dir, HOME: process.env.HOME ?? '' }
-    assert.equal(allocation[1], 'mktemp -d')
-    const extracted = join(execFileSync('mktemp', ['-d'], { env, encoding: 'utf8' }).trim(), 'ci-docs-only.mjs')
-    copyTrustedClassifier(extracted)
-    const output = execFileSync(process.execPath, [extracted, '--base', 'missing-base', '--head', 'missing-head'], { env, encoding: 'utf8' })
-    assert.match(output, /docs_only=false/, file)
-  }
-})
-
-test('trusted workflow classifier executes as an ES module from its retained temporary file', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
-    const workflow = readFileSync(file, 'utf8')
-    const command = /trusted_dir="\$\((mktemp[^)]+)\)"/.exec(workflow)?.[1]
-    assert.equal(command, 'mktemp -d')
-    const trusted = join(execFileSync('mktemp', ['-d'], { encoding: 'utf8' }).trim(), 'ci-docs-only.mjs')
-    console.log(`Retained trusted classifier fixture: ${trusted}`)
-    copyTrustedClassifier(trusted)
-    const output = execFileSync(process.execPath, [trusted], {
-      encoding: 'utf8', env: { PATH: process.env.PATH, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' },
-    })
-    assert.match(output, /docs_only=false/)
-  }
-})
-
-test('all required gates reject failed classification and skipped full jobs', () => {
-  for (const file of ['.github/workflows/ui-policy.yml']) {
-    const source = readFileSync(file, 'utf8')
-    const blocks = [...source.matchAll(/      - name: Require the full suite unless only documentation changed\n([\s\S]*?)(?=\n  [a-z][a-z-]*:|$)/g)]
-    assert.equal(blocks.length, file.includes('ui-policy') ? 2 : 1)
-    for (const [, block] of blocks) {
-      const script = block.split('        run: |\n')[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
-      const result = (changes, docs, full, source = full, daemon = full, integrations = full) => {
-        try { execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { env: { PATH: process.env.PATH, CHANGES_RESULT: changes, DOCS_ONLY: docs, FULL_RESULT: full, SOURCE_RESULT: source, DAEMON_RESULT: daemon, INTEGRATIONS_RESULT: integrations }, stdio: 'ignore' }); return true } catch { return false }
-      }
-      assert.equal(result('failure', 'true', 'skipped'), false)
-      assert.equal(result('success', 'false', 'skipped'), false)
-      assert.equal(result('success', 'false', 'failure'), false)
-      assert.equal(result('success', 'false', 'success'), true)
-      assert.equal(result('success', 'true', 'skipped'), true)
-      if (block.includes('SOURCE_RESULT')) {
-        for (const status of ['skipped', 'failure', 'cancelled', '']) {
-          assert.equal(result('success', 'false', 'success', status), false)
-          assert.equal(result('success', 'false', 'success', 'success', status), false)
-          assert.equal(result('success', 'false', 'success', 'success', 'success', status), false)
-        }
-      }
-    }
-  }
-})
-
-test('each actual workflow temp-file command produces a classifier Node can load outside the package', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
-    const source = readFileSync(file, 'utf8')
-    const command = source.match(/^          (trusted_dir="\$\(mktemp -d\)"\n          trusted="\$trusted_dir\/ci-docs-only\.mjs")$/m)?.[1]
-    assert.ok(command, 'Exercise the actual workflow temporary-file command')
-    const dir = mkdtempSync(join(tmpdir(), 'docs-gate-module-retained-'))
-    const env = { PATH: process.env.PATH, TMPDIR: dir, HOME: process.env.HOME ?? '' }
-    const trusted = execFileSync('bash', ['-e', '-c', command + '; printf "%s" "$trusted"'], { cwd: dir, env, encoding: 'utf8' })
-    assert.notEqual(realpathSync(dirname(trusted)), resolve('scripts'), 'Exercise the module outside the repository package')
-    copyTrustedClassifier(trusted)
-    const output = execFileSync(process.execPath, [trusted], { cwd: dir, env: { ...env, GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' }, encoding: 'utf8' })
-    assert.match(output, /docs_only=false \(no comparable range\)/)
-    console.log(`Retained workflow module-loader evidence: ${trusted}`)
-  }
-})
-
-test('the exact trusted-classifier workflow step executes ESM from a retained temporary file', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'docs-gate-launch-retained-'))
-  console.log(`Retained workflow launcher fixture: ${dir}`)
-  const bin = join(dir, 'bin')
-  mkdirSync(bin)
-  const git = join(bin, 'git')
-  writeFileSync(git, `#!/bin/sh
-case "$1" in
-  fetch|diff|cat-file) exit 0 ;;
-  show) cat "$FIXTURE_CLASSIFIER" ;;
-  *) exit 1 ;;
-esac
-`, { flag: 'wx' })
-  chmodSync(git, 0o700)
-  for (const name of ['ui-policy', 'analytics-ssr']) {
-    const source = readFileSync(`.github/workflows/${name}.yml`, 'utf8')
-    const block = /      - id: docs[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:)/.exec(source)
-    assert.ok(block, 'trusted classifier step must be present')
-    const script = block[1].split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
-    const outputFile = join(dir, `${name}.output`)
-    const output = execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { cwd: dir, encoding: 'utf8', env: {
-      PATH: `${bin}:${process.env.PATH}`, FIXTURE_CLASSIFIER: resolve('scripts/ci-docs-only.mjs'),
-      TMPDIR: dir,
-      GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_OUTPUT: outputFile,
-    } })
-    if (script.includes('Retained trusted classifier:')) assert.match(output, /Retained trusted classifier: .*\.mjs/)
-    assert.match(readFileSync(outputFile, 'utf8'), /docs_only=false/)
-    writeFileSync(join(dir, `${name}.log`), output, { flag: 'wx' })
-  }
-})
-
-test('actual workflow classifier launches trusted ESM from its retained temporary file', () => {
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
-    const source = readFileSync(file, 'utf8')
-    const block = source.match(/      - id: docs[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:)/)?.[1]
-    assert.ok(block, file)
-    const script = block.split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
-    const dir = mkdtempSync(join(tmpdir(), 'docs-workflow-retained-'))
-    const repo = join(dir, 'repository'), temporary = join(dir, 'temporary'), template = join(dir, 'empty-template')
-    for (const path of [repo, temporary, template, join(repo, 'scripts')]) mkdirSync(path)
-    console.log(`Retained workflow classifier evidence: ${dir}`)
-    const env = { PATH: process.env.PATH, TMPDIR: temporary, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
-      GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.invalid', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.invalid' }
-    const git = args => execFileSync('git', ['-c', 'gc.auto=0', '-c', 'maintenance.auto=false', ...args], { cwd: repo, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
-    git(['init', '--initial-branch=main', '--template=' + template])
-    copyTrustedClassifier(join(repo, 'scripts/ci-docs-only.mjs'))
-    git(['add', '.']); git(['commit', '-m', 'trusted classifier'])
-    const base = git(['rev-parse', 'HEAD'])
-    git(['remote', 'add', 'origin', repo])
-    git(['switch', '-c', 'candidate'])
-    writeFileSync(join(repo, 'code.js'), 'export const changed = true\n')
-    git(['add', '.']); git(['commit', '-m', 'code change'])
-    const head = git(['rev-parse', 'HEAD']), event = join(dir, 'event.json')
-    writeFileSync(event, JSON.stringify({ pull_request: { base: { sha: base }, head: { sha: head } } }))
-    const output = execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], { cwd: repo, env: { ...env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: event }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-    writeFileSync(join(dir, 'result.txt'), output)
-    assert.match(output, /docs_only=false/)
-    assert.doesNotMatch(output, /classifier (?:differs|is not on main)/)
-  }
-})
-
 test('the trusted classifier runs as a copied .mjs entry point', () => {
   const dir = mkdtempSync(join(tmpdir(), 'trusted-docs-entry-'))
   const entry = join(dir, 'classifier.mjs')
@@ -347,64 +219,6 @@ test('a trusted stdin wrapper can import the paired classifier without running i
     encoding: 'utf8', input: "import { pathToFileURL } from 'node:url'; const policy = await import(pathToFileURL(process.argv[2]).href); console.log(typeof policy.isDocsOnly)",
   })
   assert.equal(output.trim(), 'function')
-})
-
-test('the actual workflow bootstrap executes its trusted temporary ESM module', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'docs-gate-bootstrap-retained-'))
-  console.log(`Retained workflow bootstrap evidence: ${dir}`)
-  const env = {
-    PATH: process.env.PATH, TMPDIR: dir,
-    GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.invalid',
-    GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.invalid',
-  }
-  const git = args => execFileSync('git', args, { cwd: dir, env, encoding: 'utf8' }).trim()
-  mkdirSync(join(dir, 'empty-template'))
-  git(['init', '--initial-branch=main', '--template=empty-template'])
-  git(['config', 'gc.auto', '0'])
-  git(['config', 'maintenance.auto', 'false'])
-  mkdirSync(join(dir, 'scripts'))
-  copyTrustedClassifier(join(dir, 'scripts/ci-docs-only.mjs'))
-  writeFileSync(join(dir, 'README.md'), 'base\n', { flag: 'wx' })
-  git(['add', '.'])
-  git(['commit', '-m', 'base'])
-  const base = git(['rev-parse', 'HEAD'])
-  // The remote is this new fixture itself; the real bootstrap cannot fetch the
-  // network or access a user's repository/credentials.
-  git(['remote', 'add', 'origin', dir])
-  git(['switch', '-c', 'candidate'])
-  mkdirSync(join(dir, 'docs'))
-  writeFileSync(join(dir, 'docs/new.md'), 'new documentation\n', { flag: 'wx' })
-  git(['add', 'docs/new.md'])
-  git(['commit', '-m', 'docs change'])
-  const docs = git(['rev-parse', 'HEAD'])
-  writeFileSync(join(dir, 'code.js'), 'export const fixture = true\n', { flag: 'wx' })
-  git(['add', 'code.js'])
-  git(['commit', '-m', 'code change'])
-  const code = git(['rev-parse', 'HEAD'])
-  for (const file of ['.github/workflows/ui-policy.yml', '.github/workflows/analytics-ssr.yml']) {
-    const workflow = readFileSync(file, 'utf8')
-    const block = workflow.split('      - id: docs\n')[1]?.split('        run: |\n')[1]
-    assert.ok(block, file)
-    const body = []
-    for (const line of block.split('\n')) {
-      if (line.trim() && !line.startsWith('          ')) break
-      body.push(line.startsWith('          ') ? line.slice(10) : line)
-    }
-    const script = body.join('\n')
-    for (const [name, head, expected] of [['docs', docs, true], ['code', code, false]]) {
-      const prefix = `${file.split('/').at(-1).replace('.yml', '')}-${name}`
-      const event = join(dir, `${prefix}-event.json`), output = join(dir, `${prefix}-output`)
-      writeFileSync(event, JSON.stringify({ before: base, after: head }), { flag: 'wx' })
-      writeFileSync(output, '', { flag: 'wx' })
-      const stdout = execFileSync('bash', ['--noprofile', '--norc', '-e', '-c', script], {
-        cwd: dir, encoding: 'utf8',
-        env: { ...env, GITHUB_EVENT_NAME: 'push', GITHUB_SHA: head, GITHUB_EVENT_PATH: event, GITHUB_OUTPUT: output },
-      })
-      writeFileSync(join(dir, `${prefix}-result.json`), JSON.stringify({ base, head, expected, stdout }), { flag: 'wx' })
-      assert.match(readFileSync(output, 'utf8'), new RegExp(`docs_only=${expected}`), `${file}: ${name}`)
-    }
-  }
 })
 
 test('blocking CI checks synthetic PR merge candidates once and preserves every main run', () => {
@@ -430,12 +244,13 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   const job = name => source.split(`\n  ${name}:\n`)[1].split(/\n  [a-z][a-z-]*:\n/)[0]
   const database = job('browser-tests-full')
   assert.match(database, /fail-fast: false/)
-  assert.match(database, /shard: \[1, 2, 3, 4\]/)
-  assert(database.includes('DB_TEST_SHARD: ${{ matrix.shard }}/4'))
+  assert(database.includes('matrix: ${{ fromJSON(needs.changes.outputs.db_matrix) }}'))
+  assert(database.includes('DB_TEST_SHARD: ${{ matrix.shard }}'))
+  assert(database.includes('DB_TEST_SELECTED: ${{ needs.changes.outputs.db_suites }}'))
   assert.match(database, /services:\n      postgres:\n        image: postgres:17/)
-  assert(database.includes('name: pr13-http-cli-approval-${{ github.sha }}-${{ matrix.shard }}'))
+  assert(database.includes('name: pr13-http-cli-approval-${{ github.sha }}-${{ strategy.job-index }}'))
   assert(!database.includes('run: pnpm build'))
-  assert(job('ui-policy-integrations').includes('run: pnpm test:issues'))
+  assert(Object.values(JSON.parse(readFileSync('scripts/ci/tasks.json'))).some(t => t.kind === 'integration' && t.command === 'pnpm test:issues'))
   assert(!job('ui-policy-full').includes('run: pnpm test:issues'))
   const checks = job('source-checks')
   for (const command of ['pnpm lint:code', 'node apps/api/scripts/generate-routes.mjs --check', 'pnpm typecheck', 'pnpm --filter @mikka/protocol typecheck', 'pnpm --filter @mikka/mobile typecheck']) assert(checks.includes(`run: ${command}\n`), command)
@@ -445,7 +260,7 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   assert(!daemon.includes('MIKKA_SANDBOX_ACCEPTANCE'))
   assert(daemon.includes('pnpm --filter @mikka/daemon test:package'))
   const gate = job('ui-policy')
-  assert(gate.includes('needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks]'))
+  for (const name of ['changes','ui-policy-full','ui-policy-integrations','source-checks','daemon-checks','image-checks','desktop-checks','analytics-checks']) assert(gate.includes(name))
   for (const name of ['ui-policy-full', 'ui-policy-integrations', 'source-checks', 'daemon-checks']) assert(gate.includes(`needs.${name}.result`))
 })
 

@@ -2,7 +2,8 @@ import { constants, closeSync, existsSync, fstatSync, mkdirSync, openSync, readF
 import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
-import { anonymousClaudeHintSchema, type AnonymousClaudeHint } from '@mikka/protocol/claude-startup'
+import { anonymousCodexHintSchema } from '@mikka/protocol/codex-startup'
+import { anonymousClaudeHintSchema } from '@mikka/protocol/claude-startup'
 import { deviceRegistered } from '@mikka/protocol/device'
 import { sanitizeTraceContext } from '@mikka/protocol/trace-context'
 import { readJson, writeJsonAtomic } from './fs-util'
@@ -18,6 +19,8 @@ const configSchema = z.object({
   protectionBypass: z.string().regex(/^[A-Za-z0-9_-]{20,256}$/).optional(),
   traceContext: z.unknown().transform(sanitizeTraceContext).optional(),
   tracing: deviceRegistered.shape.tracing,
+  /** Existing trusted host opt-in, used by isolated candidate acceptance only. */
+  collectCliTiming: z.literal(true).optional(),
 }).strict()
 
 const initialRunSchema = z.object({
@@ -43,7 +46,7 @@ function consumeInitialRun(path: string, bootstrap: string): string | undefined 
 
 /** Optional preparation metadata. Unsafe filesystem ownership is not an
  * optional parse failure; it remains a rejected handoff. */
-function consumeAnonymousClaude(path: string, bootstrap: string, runId?: string): AnonymousClaudeHint | undefined {
+function consumeAnonymous<T extends { runId: string; bootstrapSha256: string }>(path: string, bootstrap: string, runId: string | undefined, schema: z.ZodType<T>): T | undefined {
   let fd: number
   try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK) }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error }
@@ -60,7 +63,7 @@ function consumeAnonymousClaude(path: string, bootstrap: string, runId?: string)
   unlinkSync(path)
   if (body === undefined) return
   try {
-    const parsed = anonymousClaudeHintSchema.safeParse(JSON.parse(body))
+    const parsed = schema.safeParse(JSON.parse(body))
     if (parsed.success && parsed.data.runId === runId &&
       parsed.data.bootstrapSha256 === createHash('sha256').update(bootstrap).digest('hex')) return parsed.data
   } catch { /* Malformed optional configuration retains ordinary startup. */ }
@@ -79,8 +82,9 @@ export function consumeCloudBootstrap(path: string) {
     if (url.username || url.password || url.search || url.hash || (config.protectionBypass && !url.hostname.endsWith('.vercel.app'))) throw new Error('Invalid cloud worker server')
     unlinkSync(path)
     const initialRunId = consumeInitialRun(join(dirname(path), 'initial-run.json'), body)
-    const anonymousClaudeHint = consumeAnonymousClaude(join(dirname(path), 'anonymous-claude.json'), body, initialRunId)
-    return { ...config, ...(initialRunId ? { initialRunId } : {}), ...(anonymousClaudeHint ? { anonymousClaudeHint } : {}) }
+    const anonymousClaudeHint = consumeAnonymous(join(dirname(path), 'anonymous-claude.json'), body, initialRunId, anonymousClaudeHintSchema)
+    const anonymousCodexHint = consumeAnonymous(join(dirname(path), 'anonymous-codex.json'), body, initialRunId, anonymousCodexHintSchema)
+    return { ...config, ...(initialRunId ? { initialRunId } : {}), ...(anonymousClaudeHint ? { anonymousClaudeHint } : {}), ...(anonymousCodexHint ? { anonymousCodexHint } : {}) }
   } finally { closeSync(fd) }
 }
 

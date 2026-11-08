@@ -165,6 +165,17 @@ export async function admitProfileSelection(query: Query, input: {
 export async function assertRunProfileClaim(query: Query, runId: string) {
   const { rows: [run] } = await query.query<typeof import('@/lib/db/schema').agentRuns.$inferSelect>(
     'SELECT * FROM agent_runs WHERE id=$1', [runId])
+  if (run) await assertProfileClaimRow(query, run)
+}
+
+/** Internal cloud-claim path only: the complete row was just selected FOR UPDATE
+ * on this same client and transaction, with no intervening write or await.
+ * All Profile/source/credential reads below remain fresh; other callers reload. */
+export async function assertLockedRunProfileClaim(query: PoolClient, run: typeof import('@/lib/db/schema').agentRuns.$inferSelect) {
+  await assertProfileClaimRow(query, run)
+}
+
+async function assertProfileClaimRow(query: Query, run: typeof import('@/lib/db/schema').agentRuns.$inferSelect) {
   const definition = run?.agentDefinition
   if (!definition?.agentProfile) return
   const workspaceId = definition.executionIdentity?.workspaceId

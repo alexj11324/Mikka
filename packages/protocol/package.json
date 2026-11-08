@@ -5,6 +5,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "exports": {
+    "./task-secrets": "./src/task-secrets.ts",
     "./claude-startup": "./src/claude-startup.ts",
     "./chat-attachments": "./src/chat-attachments.ts",
     "./mailbox": "./src/mailbox.ts",
@@ -63,7 +64,8 @@
     "./repository": "./src/repository.ts",
     "./subagent": "./src/subagent.ts",
     "./trace-context": "./src/trace-context.ts",
-    "./tracing": "./src/tracing.ts"
+    "./tracing": "./src/tracing.ts",
+    "./codex-startup": "./src/codex-startup.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

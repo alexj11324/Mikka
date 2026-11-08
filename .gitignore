@@ -73,3 +73,6 @@ next-env.d.ts
 
 # hosted UI layer checkout (docs/ui-overlay.md)
 /.hosted-ui/
+
+# Nx Core local graph/task state
+.nx/

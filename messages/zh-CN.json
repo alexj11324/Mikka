@@ -885,6 +885,8 @@
     "sandboxUsernsSpec": "Ubuntu 对这项设置的说明",
     "sandboxDetail": "错误：{detail}",
     "sandboxFix": "修复方法",
+    "noAgentYet": "还没装 Agent",
+    "howToInstall": "怎么装",
     "installAgent": "安装方法",
     "copyInstall": "复制 {command}",
     "commands": {
@@ -2522,6 +2524,8 @@
       "byBot": "按 Bot",
       "byMember": "按成员",
       "exportCsv": "导出 CSV",
+      "runs": "运行次数",
+      "runsPerDay": "每天的运行次数",
       "threads": "新线程",
       "runTime": "运行时长",
       "runSeconds": "运行秒数",
@@ -2555,6 +2559,7 @@
     },
     "billing": {
       "loading": "正在加载计费",
+      "loadFailed": "读不到计费信息",
       "plan": "方案",
       "team": "Team",
       "free": "免费",
@@ -3441,7 +3446,7 @@
         "update_issue": "改任务",
         "list_issues": "查看任务",
         "get_issue": "查看任务",
-        "dispatch_run": "派发线程",
+        "dispatch_run": "派发任务",
         "dispatch_bot_computer": "派到电脑",
         "list_runs": "查看线程",
         "get_run": "查看线程",
@@ -3470,7 +3475,7 @@
         "append_notion_paragraph": "写 Notion",
         "list_drive_files": "查看 Drive",
         "dispatch_factory_task": "派发 Factory 任务",
-        "dispatch_factory_run": "派发线程",
+        "dispatch_factory_run": "派发任务",
         "get_factory_task": "查看 Factory 任务",
         "list_factory_requests": "查看 Factory 请求",
         "list_factory_questions": "查看 Factory 提问",
@@ -3489,7 +3494,7 @@
         "load_skill": "加载技能"
       },
       "summary": {
-        "dispatch": "{count, plural, other {派发了 # 个线程}}",
+        "dispatch": "{count, plural, other {派发了 # 个任务}}",
         "dispatchFactory": "{count, plural, other {派发了 # 个 Factory 任务}}",
         "wake": "{count, plural, =1 {唤醒了电脑} other {唤醒了 # 次电脑}}",
         "messageThread": "{count, plural, =1 {给线程发了消息} other {给线程发了 # 条消息}}",
@@ -4186,9 +4191,9 @@
       "unconfirmed": "群聊创建状态未确认",
       "reviewGroups": "查看群聊"
     },
-    "searchPlaceholder": "搜索 Bot、对话、群聊、任务、线程和项目",
+    "searchPlaceholder": "搜索 Bot、对话、群聊、任务和项目",
     "searchLabel": "全局搜索",
-    "searchDescription": "搜索对话、群聊、任务、线程和项目，用方向键选择，按 Enter 打开。",
+    "searchDescription": "搜索对话、群聊、任务和项目，用方向键选择，按 Enter 打开。",
     "searchEmpty": "没有匹配的结果",
     "groups": {
       "bots": "Bot",
@@ -4200,6 +4205,7 @@
       "groupChats": "群聊"
     },
     "newTask": "新建任务",
+    "reviewTask": "审阅 {identifier}",
     "newConversation": "新对话",
     "openList": "展开 Bot 列表",
     "back": "后退",
@@ -4229,6 +4235,7 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
+      "overview": "概览",
       "allThreads": "全部线程",
       "allThreadsWaiting": "全部线程，{count} 条等你",
       "tabs": "右栏内容",
@@ -4244,6 +4251,84 @@
         "saved": "已保存"
       },
       "threads": "线程",
+      "tasks": "任务",
+      "back": "返回",
+      "allTasks": "全部任务",
+      "allTasksPending": "全部任务，{count} 个等你处理",
+      "closeAllTasks": "关闭全部任务",
+      "noTasks": "还没有任务",
+      "taskGroup": {
+        "pending": "等待你",
+        "running": "进行中",
+        "todo": "待办",
+        "done": "已完成"
+      },
+      "task": {
+        "properties": "属性",
+        "status": "状态",
+        "priority": "优先级",
+        "bot": "派出的 Bot",
+        "agent": "Agent",
+        "description": "描述",
+        "noDescription": "没有描述",
+        "activity": "活动",
+        "attempt": "第 {n} 次尝试",
+        "created": "创建了任务",
+        "createdBy": "{name} 创建了任务",
+        "dispatchedTask": "{bot} 派出了这个任务 · {time}",
+        "divider": "第 {n} 次尝试{outcome} · 换 {agent} 再试",
+        "dividerOutcome": {
+          "failed": "失败",
+          "blocked": "受阻",
+          "other": "结束"
+        },
+        "replaced": "换了新线程",
+        "openPage": "打开任务页",
+        "more": "更多",
+        "comment": "评论",
+        "commentOnPage": "在任务页评论",
+        "loadFailed": "任务加载失败",
+        "retry": "重试",
+        "notFound": "这个任务不在你的列表里",
+        "state": {
+          "waiting": "等你处理",
+          "blocked": "受阻",
+          "failed": "失败",
+          "running": "运行中",
+          "queued": "排队中",
+          "todo": "待办",
+          "idle": "暂不处理",
+          "done": "完成",
+          "canceled": "已取消",
+          "duplicate": "重复"
+        },
+        "reason": {
+          "needsReply": "等你回复",
+          "running": "运行中",
+          "confirm": "等你确认",
+          "review": "待审阅",
+          "failed": "失败",
+          "blocked": "受阻",
+          "quota": "额度用完",
+          "paused": "已暂停",
+          "notStarted": "还没开始",
+          "idle": "暂不处理",
+          "canceled": "已取消",
+          "duplicate": "重复",
+          "merged": "PR 已合并"
+        },
+        "result": {
+          "running": "进行中",
+          "needsReply": "等你回复",
+          "paused": "已暂停",
+          "failed": "失败",
+          "blocked": "受阻",
+          "replaced": "已替换",
+          "done": "完成",
+          "idle": "暂不处理",
+          "ended": "已结束"
+        }
+      },
       "prs": "PR",
       "computer": "电脑",
       "routines": "例行",
@@ -5148,6 +5233,18 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "task_secret_unavailable": {
+      "default": "任务密钥不可用。请检查使用方式后重试任务。",
+      "invalid_capability": "任务密钥的授权无效，请重试任务以重新授权。",
+      "expired_capability": "任务密钥的授权已到期或未获续期，请重试任务。",
+      "binding_mismatch": "密钥授权不属于当前任务或设备。",
+      "invalid_request": "密钥请求的方法、路径或请求头不受支持。",
+      "destination_denied": "该密钥的规则不允许访问此目标或执行此操作。",
+      "upstream_unavailable": "无法连接已授权的服务，请检查服务状态后重试。",
+      "response_blocked": "服务响应可能暴露认证信息或格式不受支持，已阻止返回。",
+      "limit_exceeded": "密钥请求超出支持的数据大小或授权数量。",
+      "configuration": "请配置该密钥的受保护 HTTP 规则，或明确允许 Agent 直接读取此密钥。"
+    },
     "run_subscription_expired": { "default": "模型订阅需要重新连接。" },
     "run_api_key_invalid": { "default": "服务商拒绝了 API 密钥，请在模型设置中检查密钥。" },
     "run_quota_exceeded": { "default": "服务商用量额度或余额已用尽，请查看用量。" },
@@ -5530,6 +5627,20 @@
       "failed": "操作失败，请重试"
     }
   },
+  "HostedConnections": {
+    "appsTitle": "应用",
+    "appsNote": "你已连接的应用。Bot 只能在你开启时使用它们。",
+    "addMore": "在插件中添加",
+    "emptyNote": "在插件中连接 GitHub、Linear、Slack 等应用后，会在这里出现。",
+    "state": {
+      "on": "已开启",
+      "off": "已停用",
+      "expired": "需要重新连接",
+      "connected": "已连接",
+      "paused": "已暂停",
+      "pending": "读取中"
+    }
+  },
   "HostedSettings": {
     "back": "返回",
     "general": {
@@ -5577,6 +5688,14 @@
       "providerOn": "{on}/{total} 个可用",
       "firstModel": "任务先用",
       "keyProvider": "服务商"
+    }
+  },
+  "CodeReview": {
+    "summary": {
+      "pr": "PR #{number}",
+      "files": "{count} 个文件 +{additions} −{deletions}",
+      "failed": "⚠ {count} 项检查失败",
+      "running": "运行中"
     }
   }
 }

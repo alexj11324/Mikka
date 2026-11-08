@@ -10,8 +10,9 @@ import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { remoteKey } from '@mikka/protocol/repository'
 import { db, pool, withDatabaseClient, withDatabaseTransaction } from '@/lib/db'
 import { agentRuns, devices, issues, issueVersions, runPublications, runTokens, type RunStatus } from '@/lib/db/schema'
-import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { taskIdentifiers, taskPrefixInput } from '@/lib/task-identifier-server'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
@@ -55,7 +56,7 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
   // Kept for old readers only: pushing needs no approval (decision 2026-11-02-1600).
   const pushApproved = true
   const row = await db.transaction(async tx => {
-    const [task] = await tx.select().from(issues).where(eq(issues.id, issueId)).for('update')
+    const [task] = await tx.select({ id: issues.id, userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion, title: issues.title, content: issueAttrsContent, prefixInput: taskPrefixInput(sql`issues."userId"`) }).from(issues).where(eq(issues.id, issueId)).for('update')
     if (!task || !await mayCompleteIssue(task, run.userId)) throw new PublicationError('issue_unavailable')
     const [currentRun] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.id, run.id), eq(agentRuns.userId, run.userId), eq(agentRuns.issueId, issueId))).for('update')
     if (!currentRun) throw new PublicationError('issue_unavailable')
@@ -70,8 +71,7 @@ export async function prepareRunPublication(run: Pick<Run, 'id' | 'userId' | 'is
     const [previous] = await tx.select().from(runPublications)
       .where(and(eq(runPublications.issueId, issueId), eq(runPublications.remoteKey, key), sql`${runPublications.branch} is not null`))
       .orderBy(asc(runPublications.createdAt)).limit(1)
-    const identifiers = await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }], tx)
-    const identifier = previous?.identifier ?? identifiers.get(issueId) ?? null
+    const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, prefixInput: task.prefixInput }], tx)).get(issueId) ?? null
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (admission && branch !== admission.targetBranch) throw new PublicationError('publication_mismatch')
     if (branch) {

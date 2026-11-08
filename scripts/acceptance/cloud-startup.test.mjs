@@ -6,6 +6,9 @@ import { alignServerTimings, cleanupCase, createSessionClient, hasStartupInitial
   startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from './cloud-startup.mjs'
 import { mcpBusinessEvidence, readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
+import { runSummaryView } from '../../lib/issue-run-conversation.ts'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
+import { rawCliShellAvailable } from '../../packages/daemon/src/permissions.ts'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const workspace = id(1), botId = id(2), deviceId = id(3), agentId = id(4)
@@ -73,7 +76,7 @@ test('v3 requires an exact observed claim catalogue before accepting zero physic
 
 function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false,
   wrongPayer = false, wrongScope = false, wrongProfile = false, wrongSource = false, ambiguousSource = false, withdrawShare = false, checkingMenu = false, remapCurrentId = false, fallbackMenu = false, failRestore = false,
-  workspaceRole = 'member', timingSecret = false } = {}) {
+  workspaceRole = 'member', timingSecret = false, leaseAudit = false } = {}) {
   const calls = [], samples = [], profiles = new Map(), sockets = []
   let current, clock = epoch, profileCount = 0
   let chosenModel
@@ -175,7 +178,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         }
         if (action === 'coordinator.sendCoordinatorMessage') {
           const input = JSON.parse(args[0].match(/参数如下：(.*)。使用/)[1])
-          assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, true)
+          assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, !leaseAudit)
           assert.deepEqual(input.target, candidate ? { deviceId } : 'cloud')
           assert.equal(input.model, undefined)
           assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
@@ -419,6 +422,101 @@ test('a completed tool followed by the task marker proves reply order', () => {
   assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_ordered/)
 })
 
+function submittedReply() {
+  const record = { sampleId: 'submitted', runId: id(901), harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true, requireTerminal: true }
+  const detail = { thread: { id: record.runId, rootRunId: record.runId, latestRunId: record.runId, ownedByCurrentUser: true,
+    status: 'succeeded', error: null, finishedAt: new Date(epoch + 6000).toISOString(), continuation: null,
+    attempts: [{ runId: record.runId, status: 'succeeded' }], detail: { harness: 'codex', summary: 'PRIVATE_REPORT STARTUP_OK_submitted', summarySource: 'report' } },
+    chunks: [stage('agent_start', 20),
+      { at: new Date(epoch + 100).toISOString(), chunk: { type: 'tool-input-available', toolCallId: 'read-file', toolName: 'mcp__mikka__inspect_artifact', input: { path: 'README.md' } } },
+      { at: new Date(epoch + 200).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'read-file', output: 'PRIVATE_README' } },
+      delta('Read the README.'),
+      { at: new Date(epoch + 4500).toISOString(), chunk: { type: 'tool-input-available', toolCallId: 'hand-in', toolName: 'mcp__mikka__submit', input: { summary: 'PRIVATE_REPORT STARTUP_OK_submitted' } } },
+      { at: new Date(epoch + 5000).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'hand-in', output: [] } }] }
+  return { record, detail }
+}
+
+test('a successful same-run canonical submit report proves delivery after the completed read', () => {
+  const { record, detail } = submittedReply()
+  assert.equal(observeChunks(record, detail, epoch + 7000), true)
+  assert.equal(record.replyVerified, true)
+  assert.equal(record.replyVerifiedAfterTool, true)
+  assert.equal(record.replySource, 'submitted_report')
+  assert.equal(observeChunks(record, detail, epoch + 8000), true, 'replaying the same stream preserves the actual order')
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted|Read the README/)
+})
+
+test('an empty final report cannot borrow a residual error through the real summary selector', () => {
+  const { record, detail } = submittedReply()
+  detail.thread.detail = { harness: 'codex', ...runSummaryView({ report: { summary: '' }, error: 'PRIVATE_ERROR STARTUP_OK_submitted' }) }
+  // The public successful thread masks row.error; this does not prove where
+  // its displayed summary came from. Preserve that UI projection unchanged.
+  assert.equal(detail.thread.error, null)
+  assert.equal(detail.thread.detail.summary, 'PRIVATE_ERROR STARTUP_OK_submitted')
+  detail.chunks.push(
+    { at: new Date(epoch + 5100).toISOString(), chunk: { type: 'tool-input-available', toolCallId: 'empty-handoff', toolName: 'mcp__mikka__submit', input: { summary: '' } } },
+    { at: new Date(epoch + 5200).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'empty-handoff', output: [] } })
+  assert.equal(observeChunks(record, detail, epoch + 7000), false)
+  assert.notEqual(record.replyVerified, true)
+  assert.equal(record.replyVerifiedAfterTool, false)
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted/)
+})
+
+test('canonical delivery cannot borrow another run, a pending or failed result, or an unordered submit', () => {
+  const mutations = [
+    d => { d.thread.id = id(902) }, d => { d.thread.rootRunId = id(902) }, d => { d.thread.latestRunId = id(902) },
+    d => { d.thread.ownedByCurrentUser = false }, d => { d.thread.detail.harness = 'claude_code' },
+    d => { d.thread.detail.summary = 'A different report' }, d => { d.thread.detail = null },
+    d => { d.thread.detail.summarySource = 'error' }, d => { d.thread.detail.summarySource = null },
+    d => { delete d.thread.detail.summarySource },
+    d => { d.thread.status = 'running' }, d => { d.thread.status = 'failed' }, d => { d.thread.status = 'stopped' },
+    d => { d.thread.error = 'PRIVATE_ERROR' }, d => { d.thread.finishedAt = null },
+    d => { d.thread.finishedAt = new Date(epoch + 4900).toISOString() },
+    d => { d.thread.attempts.push({ runId: id(902), status: 'succeeded' }) },
+    d => { d.thread.attempts[0].runId = id(902) }, d => { d.thread.attempts[0].status = 'failed' },
+    d => { d.thread.continuation = { id: id(902), status: 'succeeded' } },
+    d => { d.chunks[4].chunk.input.summary = 'No matching receipt' },
+    d => { d.chunks[4].chunk.toolName = 'mcp__other__submit' },
+    d => { d.chunks[5].chunk.type = 'tool-output-error' }, d => { d.chunks[5].chunk.toolCallId = 'other-call' },
+    d => { d.chunks[5].at = 'invalid' }, d => { d.chunks.pop() },
+    d => { d.chunks = [d.chunks[0], ...d.chunks.slice(4), ...d.chunks.slice(1, 4)] },
+    d => { d.chunks[2].chunk.type = 'tool-output-error' },
+  ]
+  for (const mutate of mutations) {
+    const { record, detail } = submittedReply(); mutate(detail)
+    assert.equal(observeChunks(record, detail, epoch + 7000), false, String(mutate))
+    assert.notEqual(record.replyVerified, true, String(mutate))
+    assert.equal(record.replyVerifiedAfterTool, false, String(mutate))
+    assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted/)
+  }
+})
+
+test('the complete candidate driver accepts canonical report delivery with all runtime and cleanup gates intact', async () => {
+  const io = fixture({ candidate: true, runtime: true })
+  io.onDetail = (sample, detail) => {
+    if (sample.reads <= 1) return
+    Object.assign(detail.thread, { status: 'succeeded', rootRunId: sample.runId, ownedByCurrentUser: true, error: null,
+      finishedAt: new Date(epoch + 6000).toISOString(), continuation: null,
+      detail: { harness: sample.harness, summary: `PRIVATE_REPORT STARTUP_OK_${sample.marker}`, summarySource: 'report' } })
+    detail.thread.attempts[0].status = 'succeeded'
+    detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta')
+    detail.chunks.splice(4, 0,
+      { at: new Date(epoch + 4500).toISOString(), chunk: { type: 'tool-input-available', toolCallId: 'hand-in', toolName: 'mcp__mikka__submit', input: { summary: `PRIVATE_REPORT STARTUP_OK_${sample.marker}` } } },
+      { at: new Date(epoch + 5000).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'hand-in', output: [] } })
+  }
+  const report = await runCloudStartup({ ...oneCodexCandidate(), minToolCalls: 1 }, { env, ...io })
+  assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+  const sample = report.samples[0]
+  assert.equal(sample.replySource, 'submitted_report')
+  assert.equal(sample.replyVerifiedAfterTool, true)
+  assert.equal(sample.runtimeEvidence.status, 'passed')
+  assert.equal(sample.lastStatus, 'succeeded')
+  assert.equal(sample.cleanup.status, 'passed')
+  assert.ok(io.samples.every(row => row.cancelled && row.deleted))
+  assert.equal(io.calls.some(call => call.path.endsWith('/machine')), false, 'the candidate VM remains the publishing workflow cleanup scope')
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|STARTUP_OK_/)
+})
+
 test('three real-shaped runs use normal cookies, pinned subscriptions, push reads and strictly owned cleanup', async () => {
   const io = fixture(), report = await runCloudStartup(options(), { env, ...io })
   assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
@@ -506,12 +604,13 @@ test('startup intervals retain only closed fields and reject foreign run data or
   }
 })
 
-for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(source + ' keeps its actual earlier origin and requires both real initialization boundaries', () => {
-  const runId = id(98), late = { ...startupTiming(runId, 'claude_code'), phases: [] }
+for (const source of ['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize']) test(source + ' keeps its actual earlier origin and requires both real initialization boundaries', () => {
+  const harness = source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code'
+  const runId = id(98), late = { ...startupTiming(runId, harness), phases: [] }
   const early = { ...late, source, ...(source === 'bootstrap_claude_start' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}), startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
     phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
       { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
-  const record = { runIdHash: late.runIdHash, harness: 'claude_code' }, item = stage('agent_start', 3500)
+  const record = { runIdHash: late.runIdHash, harness }, item = stage('agent_start', 3500)
   item.chunk.data.startupTiming = late
   item.chunk.data.preparationTiming = { ...early, cwd: 'PRIVATE', phases: early.phases.map(phase => ({ ...phase, token: 'PRIVATE' })) }
   observeChunks(record, { chunks: [item] }, epoch + 4000)
@@ -523,26 +622,27 @@ for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(so
   for (const preparation of [...(source === 'bootstrap_claude_start' ? [{ ...early, claimAuthentication: 'unverified' }, { ...early, claimAuthentication: undefined }, { ...early, observedAuthSource: 'unknown' }, { ...early, observedAuthSource: undefined }] : []), { ...early, truncated: true }, { ...early, outcome: 'error' },
     { ...early, phases: [early.phases[0]] }, { ...early, phases: [early.phases[1]] },
     { ...early, phases: [{ ...early.phases[0], outcome: 'error' }, early.phases[1]] }]) {
-    const failed = { runIdHash: late.runIdHash, harness: 'claude_code' }
+    const failed = { runIdHash: late.runIdHash, harness }
     item.chunk.data.preparationTiming = preparation
     observeChunks(failed, { chunks: [item] }, epoch + 4000)
     assert.equal(hasStartupInitialization(failed), false)
   }
 })
 
-for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(source + ' invalid evidence cannot hide behind an otherwise valid ordinary initialization', () => {
-  const late = startupTiming(id(97), 'claude_code')
+for (const source of ['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize']) test(source + ' invalid evidence cannot hide behind an otherwise valid ordinary initialization', () => {
+  const harness = source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code'
+  const late = startupTiming(id(97), harness)
   const early = { ...late, source, ...(source === 'bootstrap_claude_start' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}), startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
     phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
       { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
-  const invalid = [{ ...early, source: 'unknown' }, { ...early, runIdHash: '0'.repeat(16) }, { ...early, harness: 'codex' },
+  const invalid = [{ ...early, source: 'unknown' }, { ...early, runIdHash: '0'.repeat(16) }, { ...early, harness: harness === 'codex' ? 'claude_code' : 'codex' },
     { ...early, startedAt: late.startedAt + 1 }, { ...early, endedAt: late.endedAt + 1 },
     { ...early, phases: [{ ...early.phases[0], startMs: -1 }] },
     { ...early, phases: [{ ...early.phases[0], endMs: early.ms + 1 }] },
     { ...early, phases: [{ ...early.phases[0], name: 'daemon.adapter.PRIVATE' }] },
     { ...early, phases: Array.from({ length: 65 }, () => early.phases[0]) }]
   for (const value of invalid) {
-    const record = { runIdHash: late.runIdHash, harness: 'claude_code' }, item = stage('agent_start', 3500)
+    const record = { runIdHash: late.runIdHash, harness }, item = stage('agent_start', 3500)
     item.chunk.data.startupTiming = late; item.chunk.data.preparationTiming = value
     observeChunks(record, { chunks: [item] }, epoch + 4000)
     assert.equal(record.startupTimingStatus, 'complete')
@@ -821,7 +921,7 @@ test('trusted candidate timing cannot claim a host without a pinned device and a
 })
 
 test('lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics', async () => {
-  const io = fixture()
+  const io = fixture({ leaseAudit: true })
   io.onDetail = (sample, detail) => {
     if (sample.reads > 1) {
       sample.finished = true
@@ -834,6 +934,18 @@ test('lease audit uses ordinary cloud placement and waits for a terminal reply a
   assert.deepEqual(report.samples.map(sample => sample.harness), ['claude_code', 'codex'])
   assert.ok(report.samples.every(sample => sample.requireTerminal && sample.requireReplyAfterTool
     && sample.replyVerifiedAfterTool && sample.lastStatus === 'stopped' && sample.cleanup.status === 'passed'))
+  const dispatches = io.calls.filter(call => call.path === '/api/rpc' && JSON.parse(call.init.body).action === 'coordinator.sendCoordinatorMessage')
+    .map(call => JSON.parse(JSON.parse(call.init.body).args[0].match(/参数如下：(.*)。使用/)[1]))
+  assert.equal(dispatches.length, 2)
+  for (const dispatch of dispatches) {
+    assert.equal(dispatch.readOnly, false)
+    assert.equal(rawCliShellAvailable({ ...defaultRunPolicy(), readOnly: dispatch.readOnly }), true,
+      'the real CLI permission policy must permit the Python lease probe')
+    assert.equal(rawCliShellAvailable({ ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, install_dependency: 'deny' }, readOnly: dispatch.readOnly }), false,
+      'the audit must retain the workspace shell restriction')
+  }
+  assert.equal(rawCliShellAvailable({ ...defaultRunPolicy(), readOnly: true }), false,
+    'ordinary read-only checks retain their native-shell restriction')
   assert.equal(io.calls.some(call => call.init.body?.includes('workspace-secrets.')), false)
   assert.ok(io.calls.some(call => /^\/api\/threads\/.*\/machine$/.test(call.path)))
 })
@@ -1235,4 +1347,157 @@ test('remote authorization after the actual task ACK cannot hide in the preparin
   assert.equal(result.extraRemoteCalls, 1)
   value.agentAccepted.ms = 3200
   assert.equal(runtimeEvidence(readRuntimeTiming(value, { runIdHash: value.runIdHash, harness: value.harness })).status, 'passed')
+})
+
+test('failed execution keeps all six version brackets without changing the failed proof', async () => {
+  for (const failedSample of [-1, 3]) {
+    const io = fixture({ runtime: true })
+    io.onDetail = (sample, detail) => {
+      if (io.samples.indexOf(sample) !== failedSample || sample.reads <= 1) return
+      sample.finished = true
+      detail.thread.status = 'succeeded'
+      detail.thread.attempts[0].status = 'succeeded'
+      detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta')
+      for (const item of detail.chunks) if (item.chunk.type === 'finish') item.chunk.messageMetadata.mikkaRuntimeTiming.providerOutputChunks = 0
+    }
+    const release = { workerSha: 'a'.repeat(40), sourceCommit: 'b'.repeat(40),
+      templates: { desktop: 'desktop-fixture', claude: 'claude-fixture', codex: 'codex-fixture' } }
+    let checks = 0
+    const report = await runCloudStartup(options(['--runs', '6', '--mode', 'acceptance', '--expected-build', 'BUILD1',
+      '--revision', 'c'.repeat(40), '--bot-id', botId, '--runtime-evidence', 'required', '--official-timing', 'enabled',
+      '--expected-worker-sha', release.workerSha, '--expected-worker-source', release.sourceCommit]),
+    { env, ...io, readWorkerRelease: async () => { checks++; return release } })
+    assert.equal(report.samples.length, 6)
+    assert.equal(checks, 14, 'initial, before/after every attempted sample, and final version checks are retained')
+    assert.equal(report.status, failedSample < 0 ? 'awaiting_server_timings' : 'failed')
+    if (failedSample >= 0) {
+      assert.equal(report.samples[failedSample].error, 'startup_ended_before_execution_proof')
+      assert.equal(report.samples[failedSample].replyVerifiedAfterTool, false)
+      assert.equal(report.samples[failedSample].runtimeEvidence.reason, 'execution_cycle_missing')
+    }
+    assert.ok(report.samples.every(sample => sample.cleanup.status === 'passed'))
+    assert.ok(io.samples.every(sample => sample.deleted && sample.machineEnded))
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
+test('a version change after failed execution stops later dispatches and preserves both failures', async () => {
+  const io = fixture({ runtime: true })
+  io.onDetail = (sample, detail) => {
+    if (io.samples.indexOf(sample) !== 3 || sample.reads <= 1) return
+    sample.finished = true
+    detail.thread.status = 'succeeded'
+    detail.thread.attempts[0].status = 'succeeded'
+    detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta')
+  }
+  const release = { workerSha: 'a'.repeat(40), sourceCommit: 'b'.repeat(40),
+    templates: { desktop: 'desktop-fixture', claude: 'claude-fixture', codex: 'codex-fixture' } }
+  let checks = 0
+  const report = await runCloudStartup(options(['--runs', '6', '--mode', 'acceptance', '--expected-build', 'BUILD1',
+    '--revision', 'c'.repeat(40), '--bot-id', botId, '--runtime-evidence', 'required', '--official-timing', 'enabled',
+    '--expected-worker-sha', release.workerSha, '--expected-worker-source', release.sourceCommit]),
+  { env, ...io, readWorkerRelease: async () => { checks++; return checks >= 9 ? { ...release, workerSha: 'd'.repeat(40) } : release } })
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'startup_worker_release_mismatch')
+  assert.equal(report.batchAborted, 'version_pin_changed')
+  assert.equal(report.samples.length, 4, 'version drift closes the failed sample rather than starting a later sample record')
+  assert.equal(report.samples[3].error, 'startup_ended_before_execution_proof')
+  assert.deepEqual(report.samples[3].versionPinFailure, { phase: 'build_pin', code: 'startup_worker_release_mismatch' })
+  assert.ok(report.samples.every(sample => sample.cleanup.status === 'passed'))
+  assert.ok(io.samples.every(sample => sample.deleted && sample.machineEnded))
+})
+
+test('candidate bootstrap callback runs once after owner provenance and before any task stream observation', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl, order = []
+  io.fetchImpl = async (url, init) => {
+    if (url.pathname.includes('/api/runs/') && url.pathname.endsWith('/evidence')) order.push('owner-provenance')
+    if (url.pathname.endsWith('/api/live/ticket')) order.push('task-watch')
+    return original(url, init)
+  }
+  let count = 0, published
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io, onCandidateRunQueued: async binding => {
+    count++; order.push('bootstrap')
+    assert.equal(binding.deviceId, deviceId); assert.equal(binding.agentId, agentId)
+    assert.equal(binding.harness, 'codex'); assert.equal(binding.model, 'gpt-6-luna')
+    assert.ok(binding.workspaceId && binding.runId && binding.issueId)
+    assert.ok(order.indexOf('owner-provenance') >= 0)
+    assert.equal(order.includes('task-watch'), false)
+    published = { version: 1, runId: binding.runId, harness: binding.harness,
+      bootstrapSha256: 'a'.repeat(64), hintSha256: 'b'.repeat(64) }
+    return published
+  } })
+  assert.equal(count, 1)
+  assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+  assert.deepEqual(report.samples[0].bootstrapPublication, published)
+  assert.equal(report.samples[0].cleanup.status, 'passed')
+})
+
+test('candidate bootstrap refuses provenance failure and retains normal cleanup after a publication failure', async () => {
+  let calls = 0
+  const refused = await runCloudStartup(oneCodexCandidate(), { env, ...fixture({ candidate: true, runtime: true, wrongScope: true }),
+    onCandidateRunQueued: async () => { calls++; throw Error('must not start') } })
+  assert.equal(calls, 0)
+  assert.equal(refused.samples[0].status, 'failed')
+  const io = fixture({ candidate: true, runtime: true })
+  const failed = await runCloudStartup(oneCodexCandidate(), { env, ...io, onCandidateRunQueued: async () => {
+    calls++; throw Error('PRIVATE_BOOTSTRAP_SECRET')
+  } })
+  assert.equal(calls, 1)
+  assert.deepEqual(failed.samples[0].failure, { phase: 'bootstrap_publication', code: 'startup_bootstrap_publication_failed' })
+  assert.equal(failed.samples[0].cleanup.status, 'passed')
+  assert.ok(io.samples[0].cancelled && io.samples[0].deleted)
+  assert.doesNotMatch(JSON.stringify(failed), /PRIVATE_BOOTSTRAP_SECRET/)
+})
+
+test('repository Git receipt stays independent and closed', () => {
+  const record = { runIdHash: 'a'.repeat(16), harness: 'claude_code' }
+  const receipt = { version: 1, source: 'prepare_run_repository', clock: 'repository_prepare_monotonic',
+    runIdHash: record.runIdHash, harness: record.harness, startedAt: epoch, endedAt: epoch + 50,
+    ms: 50, outcome: 'ok', truncated: false,
+    phases: [{ name: 'daemon.repository.git.clone', startMs: 2, endMs: 42, ms: 40, outcome: 'ok' }] }
+  const item = stage('repository', 100)
+  item.chunk.data.repositoryTiming = receipt
+  observeChunks(record, { chunks: [item] }, epoch + 100)
+  assert.deepEqual(record.daemonRepositoryTiming, receipt)
+  assert.equal(record.repositoryTimingStatus, 'complete')
+  assert.equal(record.agentStart, undefined)
+  // First valid receipt wins; duplicate status must describe that same object.
+  for (const [firstTruncated, secondTruncated] of [[true, false], [false, true], [true, true], [false, false]]) {
+    const next = { runIdHash: record.runIdHash, harness: record.harness }
+    const first = { ...receipt, truncated: firstTruncated }
+    const second = { ...receipt, truncated: secondTruncated }
+    const event = timing => ({ ...item, chunk: { type: 'data-run-stage', data: { ...item.chunk.data, repositoryTiming: timing } } })
+    observeChunks(next, { chunks: [event(first)] }, epoch + 100)
+    observeChunks(next, { chunks: [event(second)] }, epoch + 101)
+    assert.deepEqual(next.daemonRepositoryTiming, first)
+    assert.equal(next.repositoryTimingStatus, firstTruncated ? 'truncated' : 'complete')
+  }
+  const afterInvalid = { runIdHash: record.runIdHash, harness: record.harness }
+  const invalidEvent = { ...item, chunk: { type: 'data-run-stage', data: { ...item.chunk.data,
+    repositoryTiming: { ...receipt, runIdHash: 'b'.repeat(16) } } } }
+  observeChunks(afterInvalid, { chunks: [invalidEvent] }, epoch + 100)
+  observeChunks(afterInvalid, { chunks: [item] }, epoch + 101)
+  assert.deepEqual(afterInvalid.daemonRepositoryTiming, receipt)
+  assert.equal(afterInvalid.repositoryTimingStatus, 'invalid')
+
+  for (const mutate of [
+    value => { value.runIdHash = 'b'.repeat(16) },
+    value => { value.harness = 'codex' },
+    value => { value.phases[0].name = 'PRIVATE_COMMAND' },
+    value => { value.phases[0].endMs = 51 },
+    value => { value.phases[0].startMs = -1 },
+    value => { value.phases[0].ms = NaN },
+    value => { value.phases = Array(33).fill(value.phases[0]) },
+    value => { value.secret = 'PRIVATE_TOKEN' },
+  ]) {
+    const bad = structuredClone(receipt); mutate(bad)
+    const next = { runIdHash: record.runIdHash, harness: record.harness }
+    observeChunks(next, { chunks: [{ ...item, chunk: { type: 'data-run-stage', data: { ...item.chunk.data, repositoryTiming: bad } } }] }, epoch + 100)
+    assert.equal(next.repositoryTimingStatus, 'invalid')
+    assert.equal(next.daemonRepositoryTiming, undefined)
+  }
+  const ordinary = { runIdHash: record.runIdHash, harness: record.harness }
+  observeChunks(ordinary, { chunks: [stage('repository', 100)] }, epoch + 100)
+  assert.equal(Object.hasOwn(ordinary, 'daemonRepositoryTiming'), false)
+  assert.equal(Object.hasOwn(ordinary, 'repositoryTimingStatus'), false)
 })

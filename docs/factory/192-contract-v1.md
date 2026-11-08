@@ -1,5 +1,10 @@
 # Factory state contract v1 (issue #192)
 
+> Historical v1 contract and integration evidence. Public v2 stages, operation
+> bindings and completion receipts are described in [the flow contract](1276-flow-v2.md).
+> Skill approval follows [#494](494-approve-and-publish.md), and code acceptance
+> follows [the merge contract](warp-aligned-factory.md#acceptance-is-the-merge-528).
+
 Frozen against main 7c11935f1965915986a44ae2a311b1a0378171af. Consumers: #191 dispatch, #193 review/verification, #194 approval, #195 recovery monitoring. `lib/factory/contract.ts` is the machine readable source. Changes to this version require coordinated consumers.
 
 Identity is `(userId, issueId, taskId, attemptId, revision, candidateId)`. The server derives userId from authenticated identity, never tool arguments. Every mutation carries an eventId plus the full binding; revision is a compare-and-swap fence. A duplicate event returns its recorded result only for an identical payload and binding, after current authorization/terminal checks. Stale attempts, changed candidates, foreign owners/issues and changed replay payloads fail closed.

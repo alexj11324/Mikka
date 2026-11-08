@@ -7,7 +7,7 @@ import { cleanAllowedModels, seedAllowedModel } from '../../tests/support/allowe
 import { createFactoryStore, type FactoryTask } from './store'
 import { factoryBinding } from './dispatch'
 import { FactoryError } from './contract'
-import { advanceFactoryRequest } from './request-epoch'
+import { advanceFactoryRequest, continueActiveFactoryRequest } from './request-epoch'
 import { currentFactoryRequest } from './checks'
 import { factoryRecoveryHandoff, persistFactoryHandoff } from './handoff'
 import { sweepFactoryWatchdog, type WatchdogDependencies } from './watchdog'
@@ -156,6 +156,42 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     return id
   }
   const advance = (task: FactoryTask, id: string) => transaction(async tx => advanceFactoryRequest(tx, await store.lockTask(tx, owner, task.id), id))
+
+  await t.test('forwarding the accepted dispatch source preserves the live executor, event and attempt', async () => {
+    const original = await fixture()
+    await pool.query(`UPDATE factory_tasks SET status='running' WHERE id=$1`, [original.id])
+    await pool.query(`UPDATE factory_attempts SET status='running',"finishedAt"=NULL WHERE id=$1`, [original.attemptId])
+    await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now(),"leaseExpiresAt"=now()+interval '90 seconds' WHERE id=$1`, [original.runId])
+    const snapshot = async () => (await pool.query(`SELECT t."sourceEventId",t."attemptId",t.status,r."stopRequestedAt",
+      (SELECT count(*)::int FROM factory_attempts WHERE "taskId"=t.id) AS attempts,
+      (SELECT count(*)::int FROM coordinator_events WHERE "userId"=t."userId" AND "issueId"=t."issueId" AND kind='user_message') AS messages
+      FROM factory_tasks t JOIN agent_runs r ON r.id=$2 WHERE t.id=$1`, [original.id, original.runId])).rows[0]
+    const before = await snapshot()
+    assert.equal(await continueActiveFactoryRequest(pool, owner, original.runId,
+      'Forward the already accepted task; this is not a new owner request.', original.sourceEventId), true)
+    assert.deepEqual(await snapshot(), before)
+    assert.equal(before.status, 'running')
+    assert.equal(before.stopRequestedAt, null)
+    assert.equal(before.attempts, 1)
+    assert.equal(before.messages, 1)
+    assert.equal(await continueActiveFactoryRequest(pool, 'not-the-owner', original.runId,
+      'An event ID does not grant a different account authority.', original.sourceEventId), false)
+    assert.deepEqual(await snapshot(), before)
+  })
+
+  await t.test('a genuinely new authenticated request still replaces the current execution', async () => {
+    const original = await fixture()
+    await pool.query(`UPDATE factory_tasks SET status='running' WHERE id=$1`, [original.id])
+    await pool.query(`UPDATE factory_attempts SET status='running',"finishedAt"=NULL WHERE id=$1`, [original.attemptId])
+    await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now(),"leaseExpiresAt"=now()+interval '90 seconds' WHERE id=$1`, [original.runId])
+    const sourceEventId = await followup(original, 'The owner now requests a different exact artifact.')
+    assert.equal(await continueActiveFactoryRequest(pool, owner, original.runId, 'Forward the new request.', sourceEventId), true)
+    const current = (await pool.query(`SELECT t."sourceEventId",t."attemptId",r."stopRequestedAt"
+      FROM factory_tasks t JOIN agent_runs r ON r.id=$2 WHERE t.id=$1`, [original.id, original.runId])).rows[0]
+    assert.equal(current.sourceEventId, sourceEventId)
+    assert.notEqual(current.attemptId, original.attemptId)
+    assert.ok(current.stopRequestedAt)
+  })
 
   await t.test('concurrent resend keeps one Task/epoch/attempt; old callbacks cannot finish or repair it', async () => {
     const original = await fixture()

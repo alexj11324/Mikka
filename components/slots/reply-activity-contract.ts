@@ -23,6 +23,11 @@ export type ActivityToolView = {
   output?: string
   /** False while running, or when there is nothing to open. */
   openable: boolean
+  /**
+   * The thread a dispatch started, when the chat shows it as a card under the reply (thread-card slot). A layer
+   * that lets the card stand for the dispatch leaves this row out; the folded summary still counts it.
+   */
+  card?: string
 }
 
 export type ActivityThinkingProps = {

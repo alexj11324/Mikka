@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { ActivityIndicator, Animated, Easing, Platform, useColorScheme, View } from 'react-native'
-import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg'
+import { ActivityIndicator, Animated, Easing, Platform, View } from 'react-native'
+import Svg, { Circle, Path, Rect } from 'react-native-svg'
 import { Cloud, LoaderCircle, Laptop, MessageCircle, Server } from 'lucide-react-native'
 import type { MachineKind, Source, ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
@@ -139,69 +139,6 @@ export function SourceIcon({ source, size = 20 }: { source: Source | 'google'; s
   }
 }
 
-/** Bot colours, as on the web (app/globals.css --bot-*). */
-/** The web's twelve bot colours (lib/bot-shapes.ts BOT_COLORS), in its order. */
-export const BOT_COLORS: Record<string, string> = {
-  encre: '#0a0a0c', brun: '#8b5e3c', rouge: '#e8483f', orange: '#f08a24', ambre: '#f0b429', vert: '#3ecf8e',
-  turquoise: '#2fbfa0', bleu: '#3b93f0', violet: '#8b5cf6', rose: '#e152b0', gris: '#a3a3a3', creme: '#d9d5ca',
-}
-
-type Shape = 'circle' | 'squircle' | 'flower' | 'cloud' | 'cat' | 'drop'
-
-/** The web's sixteen bloub shapes, drawn still with the nearest of six. */
-const SHAPES: Record<string, Shape> = {
-  cercle: 'circle', galet: 'circle', coeur: 'circle', champignon: 'circle', fantome: 'circle', feuille: 'drop',
-  squircle: 'squircle', capsule: 'squircle', triangle: 'squircle', hexagone: 'squircle', ecran: 'squircle',
-  nuage: 'cloud', goutte: 'drop', fleur: 'flower', etoile: 'flower', chat: 'cat',
-}
-
-/** The shapes 新建 Bot offers: one per drawing the app has, as the web names them. */
-export const BOT_PICKER_SHAPES = ['cercle', 'squircle', 'nuage', 'goutte', 'fleur', 'chat'] as const
-
-/** A bot's avatar: its blob in its colour and shape, with one bright eye (a still bloub, R-36). The Coordinator is the ink circle; in dark mode ink is drawn crème, as on the web (bot-avatar.tsx). */
-export function BotAvatar({ color = 'encre', shape = 'cercle', size = 24 }: { color?: string; shape?: string; size?: number }) {
-  const dark = useColorScheme() === 'dark'
-  const known = BOT_COLORS[color] ? color : 'encre'
-  const c = BOT_COLORS[known === 'encre' && dark ? 'creme' : known]
-  const body = (() => {
-    switch (SHAPES[shape] ?? 'circle') {
-      case 'circle': return <Circle cx={12} cy={12} r={10} fill={c} />
-      case 'squircle': return <Rect x={2.5} y={2.5} width={19} height={19} rx={6.5} fill={c} />
-      case 'flower':
-        return (
-          <>
-            {[0, 72, 144, 216, 288].map(a => {
-              const r = (a - 90) * Math.PI / 180
-              return <Circle key={a} cx={12 + 5.4 * Math.cos(r)} cy={12.4 + 5.4 * Math.sin(r)} r={5} fill={c} />
-            })}
-            <Circle cx={12} cy={12.4} r={6} fill={c} />
-          </>
-        )
-      case 'cloud':
-        return (
-          <>
-            <Circle cx={8} cy={13} r={6} fill={c} />
-            <Circle cx={14} cy={9.5} r={6.5} fill={c} />
-            <Circle cx={17} cy={14} r={5.5} fill={c} />
-            <Rect x={4} y={13} width={17} height={6.5} rx={3.2} fill={c} />
-          </>
-        )
-      case 'cat':
-        return (
-          <>
-            <Path d="M3.6 10.5 4.6 3l6 4.3M20.4 10.5 19.4 3l-6 4.3" fill={c} stroke={c} strokeWidth={1.6} strokeLinejoin="round" />
-            <Ellipse cx={12} cy={13.5} rx={9.4} ry={8} fill={c} />
-          </>
-        )
-      case 'drop': return <Path d="M12 2.2c3.6 4.4 7.8 8.7 7.8 13a7.8 7.8 0 0 1-15.6 0c0-4.3 4.2-8.6 7.8-13z" fill={c} />
-    }
-  })()
-  return (
-    <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} viewBox="0 0 24 24">
-        {body}
-        <Ellipse cx={15.6} cy={8.6} rx={1.5} ry={2.3} fill="#fff" />
-      </Svg>
-    </View>
-  )
-}
+export { BOT_COLORS, BOT_PICKER_SHAPES } from '@/lib/bot-look'
+/** A bot's avatar. It is a UI slot (docs/ui-overlay.md, 「iOS app」): the official build draws the hosted layer's avatar here. */
+export { BotAvatar } from '@ui-slot/bot-avatar'

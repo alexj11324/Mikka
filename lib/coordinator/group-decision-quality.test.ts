@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { createGroupDecisionTrace, groupDecisionReceipt, groupDecisionSteps } from './group-decision-trace'
 import { compareGroupPolicies, evaluateGroupDecisions, groupTraceObservation, type GroupEvalCase, type GroupEvalObservation } from './group-decision-eval'
-import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_LIVE_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION, GROUP_V2_POLICY_VERSION } from './group-decision-policy'
+import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_LIVE_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION, GROUP_V2_POLICY_VERSION, GROUP_V3_POLICY_VERSION } from './group-decision-policy'
 import { groupFeedbackInput } from './group-decision-feedback'
 import { groupDecisionReplayInput } from './group-decision-replay-api'
 import type { GroupDecisionStep } from './group-decision-chain'
@@ -23,7 +23,7 @@ test('deployment rollback changes live policy while host-selected replay version
   assert.equal(getGroupDecisionPolicy().version,GROUP_BASELINE_VERSION)
   assert.equal(getGroupDecisionPolicy(GROUP_POLICY_VERSION).version,GROUP_POLICY_VERSION)
   overrideDeploymentSwitch('groupContribution',true)
-  assert.equal(GROUP_LIVE_POLICY_VERSION,GROUP_POLICY_VERSION,'the reviewed v3 candidate is promoted to live')
+  assert.equal(GROUP_LIVE_POLICY_VERSION,GROUP_POLICY_VERSION,'the reviewed v4 candidate is promoted to live')
   assert.equal(getGroupDecisionPolicy(GROUP_PREVIOUS_POLICY_VERSION).version,GROUP_PREVIOUS_POLICY_VERSION,'historical v1 remains explicitly readable')
   assert.equal(getGroupDecisionPolicy().version,GROUP_LIVE_POLICY_VERSION)
   assert.equal(getGroupDecisionPolicy(GROUP_BASELINE_VERSION).version,GROUP_BASELINE_VERSION)
@@ -99,16 +99,17 @@ test('feedback provenance cannot be client-selected and policy rollback is expli
   assert.throws(() => getGroupDecisionPolicy('unknown'), /unknown_group_decision_policy/)
 })
 
-test('v3 is live while historical v1 and v2 receipts keep their original versions', () => {
+test('v4 is live while historical v1, v2 and v3 receipts keep their original versions', () => {
   const receipt = { executionId: 'execution', modelId: DECISION_MODEL as typeof DECISION_MODEL, providerGenerationId: 'provider', startedAt: '2026-11-03T00:00:00Z', completedAt: '2026-11-03T00:00:01Z', requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' as const }
-  const versions = [GROUP_BASELINE_VERSION, GROUP_PREVIOUS_POLICY_VERSION, GROUP_V2_POLICY_VERSION, GROUP_POLICY_VERSION]
+  const versions = [GROUP_BASELINE_VERSION, GROUP_PREVIOUS_POLICY_VERSION, GROUP_V2_POLICY_VERSION, GROUP_V3_POLICY_VERSION, GROUP_POLICY_VERSION]
   const steps = versions.map((policyVersion,index)=>({id:`version-${index}`,phase:'responder' as const,index:0,status:'complete' as const,failure:null,receipt,policyVersion}))
   assert.deepEqual(groupDecisionSteps(steps).map(step=>step.policyVersion),versions)
   const unknown = {...steps[0],policyVersion:'group-contribution-unknown'} as unknown as GroupDecisionStep
   assert.equal(groupDecisionSteps([unknown])[0].policyVersion,undefined)
   assert.equal(getGroupDecisionPolicy(GROUP_PREVIOUS_POLICY_VERSION).version,GROUP_PREVIOUS_POLICY_VERSION)
   assert.equal(getGroupDecisionPolicy(GROUP_V2_POLICY_VERSION).version,GROUP_V2_POLICY_VERSION)
-  for(const policyVersion of [GROUP_BASELINE_VERSION,GROUP_V2_POLICY_VERSION,GROUP_POLICY_VERSION]){
+  assert.equal(getGroupDecisionPolicy(GROUP_V3_POLICY_VERSION).version,GROUP_V3_POLICY_VERSION)
+  for(const policyVersion of [GROUP_BASELINE_VERSION,GROUP_V2_POLICY_VERSION,GROUP_V3_POLICY_VERSION,GROUP_POLICY_VERSION]){
     assert.equal(groupDecisionReplayInput.safeParse({caseId:'small-talk',policyVersion}).success,true)
   }
   assert.equal(groupDecisionReplayInput.safeParse({caseId:'small-talk',policyVersion:GROUP_PREVIOUS_POLICY_VERSION}).success,false)

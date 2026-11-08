@@ -5,8 +5,13 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { execa } from 'execa'
 import lockfile from 'proper-lockfile'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
+import type { Harness } from '@mikka/protocol'
+import { daemonTracer } from './tracing'
+import type { RepositoryGitTimer } from './repository-git-timing'
 import { assertBranchName } from './agents/publish'
 import { FETCH_GIT, FETCH_TIMEOUT_MS, isInside, withRepoConfig } from './worktrees'
+
+type RepositoryDiagnostics = { runIdHash: string; harness: Harness; timer?: RepositoryGitTimer }
 
 /** git's empty tree: an initial commit with no files. */
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
@@ -35,22 +40,33 @@ export class RepositoryCache {
   }
 
   /** Serialize clone/fetch against the same cache, including other processes. */
-  async prepare(remoteUrl: string, signal?: AbortSignal, env: Record<string, string> = {}): Promise<string> {
+  async prepare(remoteUrl: string, signal?: AbortSignal, env: Record<string, string> = {}, diagnostics?: RepositoryDiagnostics): Promise<string> {
     signal?.throwIfAborted()
     const { remoteUrl: remote } = normalizeRepository(remoteUrl, { allowFile: this.allowFile })
     const path = this.pathFor(remote)
     this.ensureParents(dirname(path))
     const release = await this.lock(path, signal)
     try {
-      return await withRepoConfig(path, () => this.update(path, remote, signal, env))
+      return await withRepoConfig(path, () => this.update(path, remote, signal, env, diagnostics))
     } finally { await release() }
   }
 
-  private async update(path: string, remote: string, signal?: AbortSignal, env: Record<string, string> = {}): Promise<string> {
+  private async update(path: string, remote: string, signal?: AbortSignal, env: Record<string, string> = {}, diagnostics?: RepositoryDiagnostics): Promise<string> {
     signal?.throwIfAborted()
-    const git = (args: string[], cwd?: string) => execa('git', [
-      ...FETCH_GIT, '-c', `protocol.file.allow=${this.allowFile ? 'always' : 'never'}`, ...args,
-    ], { cwd, env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: '0' }, stdin: 'ignore', timeout: FETCH_TIMEOUT_MS, cancelSignal: signal, killDescendants: true })
+    const git = (args: string[], cwd?: string) => {
+      const execute = () => execa('git', [
+        ...FETCH_GIT, '-c', `protocol.file.allow=${this.allowFile ? 'always' : 'never'}`, ...args,
+      ], { cwd, env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: '0' }, stdin: 'ignore', timeout: FETCH_TIMEOUT_MS, cancelSignal: signal, killDescendants: true })
+      if (!diagnostics) return execute()
+      // Explicit run diagnostics only. Never export command arguments,
+      // repository URLs, checkout paths or credential environment values.
+      const phase = args[0] === 'clone' ? 'clone' : args[0] === 'fetch' ? 'fetch'
+        : args[0] === 'remote' && args[1] === 'set-head' ? 'remote_head'
+        : args[0] === 'ls-remote' ? 'remote_refs' : 'local'
+      const traced = () => daemonTracer.span(`daemon.repository.git.${phase}`,
+        { 'mikka.run.id_hash': diagnostics.runIdHash, 'mikka.harness': diagnostics.harness }, execute)
+      return diagnostics.timer ? diagnostics.timer.measure(phase, traced) : traced()
+    }
     let cloned = false
     if (!existsSync(path)) {
       const temporary = `${path}.clone-${randomUUID()}`

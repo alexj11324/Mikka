@@ -8,7 +8,11 @@ import { NavBar, underBar } from '@/components/NavBar'
 import { Row, ToggleRow } from '@/components/settings'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
-import { ThreadRow } from '@/components/ThreadsScreen'
+import { useTasks } from '@/features/tasks/components/task-list'
+import { TaskStateIcon } from '@/features/tasks/components/task-icons'
+import { menuTasks } from '@/features/chat/model/chat-header-menu'
+import { rowState } from '@/features/tasks/model/task-groups'
+import { displayTitle } from '@/lib/display-title'
 import { Group } from '@/components/ui'
 import { api } from '@/lib/api'
 import { saveOptimistic } from '@/lib/optimistic'
@@ -32,7 +36,7 @@ function computerLabel(state: ComputerStatus) {
 /**
  * A bot's page, opened from its name at the top of its chat (as in Grok and
  * WhatsApp): the avatar and name, then what the web's right panel shows beside
- * the chat (components/nav/context-panel.tsx): its latest threads, its
+ * the chat (components/nav/context-panel.tsx): its latest tasks, its
  * computer, its tasks' PRs, its 资料库 and its 例行, with the person's 置顶
  * and 通知 for it. A section with nothing in it is left out. The computer's
  * screen and an HTML document open on the web, where they are drawn.
@@ -49,8 +53,11 @@ export default function BotInfo() {
   const computerBot = coordinator ? bots?.find(item => item.coordinator)?.id : id
   const page = useLiveApi<BotPage>(`/api/mobile/bots/${id}`, current => botPageLive(current, computerBot, homeData?.live?.workspaceId, homeData?.workspace.id))
   const computer = useLiveApi<ComputerStatus>(computerBot ? `/api/bots/${computerBot}/computer` : null, current => computerLive(current, computerBot))
-  const refresh = useRefresh(async () => { await Promise.all([page.reload(), computer.reload()]) })
-  const threads = page.data?.threads ?? []
+  const refresh = useRefresh(async () => { await Promise.all([page.reload(), computer.reload(), allTasks.reload()]) })
+  // Its tasks, waiting ones first (2026-11-07: lists show tasks; a thread opens inside its task).
+  const allTasks = useTasks()
+  const ownTasks = (allTasks.data?.tasks ?? []).filter(task => task.bot?.id === computerBot)
+  const tasks = menuTasks(ownTasks, computerBot, SHOWN)
   const pullRequests = page.data?.pullRequests ?? []
   const schedules = page.data?.schedules ?? []
   const library = page.data?.library ?? []
@@ -97,7 +104,7 @@ export default function BotInfo() {
       <NavBar title="" />
       <ScrollView {...underBar} contentContainerStyle={styles.body} refreshControl={<RefreshControl {...refresh} />}>
         <View style={styles.hero}>
-          <BotAvatar color={bot?.color} shape={bot?.shape} size={96} />
+          <BotAvatar id={id} coordinator={bot?.coordinator} color={bot?.color} shape={bot?.shape} size={96} />
           {name ? <Text style={styles.name}>{name}</Text> : <Spinner />}
         </View>
         <ReadNotice error={page.error} hasData={Boolean(page.data)} label="Bot 资料" onRetry={page.reload} />
@@ -111,10 +118,10 @@ export default function BotInfo() {
         ) : null}
         {busy ? <Text accessibilityLiveRegion="polite" style={{ color: colors.secondary, marginBottom: 16 }}>正在保存</Text> : null}
         {unsaved ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.unsaved}>{unsaved}没保存，请稍后重试</Text> : null}
-        {threads.length ? (
-          <Group label="线程">
-            {threads.slice(0, SHOWN).map(thread => <ThreadRow key={thread.id} thread={thread} />)}
-            {threads.length > SHOWN ? <Row label="全部线程" value={String(threads.length)} onPress={() => router.push(`/bots/${id}/threads`)} /> : null}
+        {tasks.length ? (
+          <Group label="任务">
+            {tasks.map(task => <Row key={task.id} icon={<TaskStateIcon state={rowState(task).state} status={task.status} />} label={displayTitle(task.title)} value={task.identifier ?? undefined} onPress={() => router.push(`/task/${task.id}`)} />)}
+            {ownTasks.length > SHOWN ? <Row label="全部任务" value={String(ownTasks.length)} onPress={() => router.push(`/bots/${id}/tasks`)} /> : null}
           </Group>
         ) : null}
         {computer.data ? (

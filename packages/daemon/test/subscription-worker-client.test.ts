@@ -2,10 +2,17 @@ import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { SubscriptionWorkerClient } from '../src/subscription-worker-client'
+import { SubscriptionCallTiming, withSubscriptionTiming } from '../src/subscription-worker-timing'
 import { cleanupTempDirs, tempDir } from './helpers'
 
 afterEach(cleanupTempDirs)
-function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string; accessSnapshot?: {name: string; value: string} }>, accessProject?: string, snapshotMode = false, prepareFailure?: string, streamFailure?: unknown) {
+
+function deferred<T>() {
+  let resolve!: (value: T) => void, reject!: (reason: unknown) => void
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+  return { promise, resolve, reject }
+}
+function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal?: AbortSignal) => Promise<{ workloadToken?: string; accessToken?: string; accessSnapshot?: {name: string; value: string} }>, accessProject?: string, snapshotMode = false, prepareFailure?: string, streamFailure?: unknown, streamIdentity?: ConstructorParameters<typeof SubscriptionWorkerClient>[3]) {
   const directory = tempDir('mikka-worker-boundary-')
   const journal = join(directory, 'calls')
   const binary = join(directory, 'worker.mjs')
@@ -14,7 +21,7 @@ function fixture(hold = false, resolveIdentity?: (executionOnly: boolean, signal
 import {createInterface} from 'node:readline';import{appendFileSync}from'node:fs';
 let config;const lines=createInterface({input:process.stdin});lines.on('line',line=>{const value=JSON.parse(line);if(!config){config=value;return};const request=value;appendFileSync(${JSON.stringify(journal)},request.method+'\\n');
 const result={fullAuthority:Boolean(config.workloadToken||config.path),sourceAuthority:Boolean(config.enrollmentAttemptPath||config.enrollmentClaimPath||config.enrollmentGrantPath),accessAuthority:config.accessToken==='fixture-access-reader',snapshot:config.accessSnapshot?.name,binding:config.use?.bindingId,consumer:config.use?.consumerId,accessProject:config.accessProject};
-if(request.method==='prepare'){setTimeout(()=>{console.log(JSON.stringify({id:request.id,...(${JSON.stringify(prepareFailure)} ? {error:${JSON.stringify(prepareFailure)}} : {result:{ready:true}})}));lines.close()},${hold ? 500 : 0});return}
+if(request.method==='prepare'||request.method==='prepareStream'){setTimeout(()=>{console.log(JSON.stringify({id:request.id,...(${JSON.stringify(prepareFailure)} ? {error:${JSON.stringify(prepareFailure)}} : {result:{ready:true}})}));lines.close()},${hold ? 500 : 0});return}
 if(request.method==='nativeStream'){console.log(JSON.stringify({id:request.id,head:{contentType:'application/json'}}));for(const byte of Buffer.from(JSON.stringify({...result,text:'汉字🙂'})))console.log(JSON.stringify({id:request.id,binaryChunk:Buffer.from([byte]).toString('base64')}));console.log(JSON.stringify({id:request.id,result:{done:true}}));lines.close();return}
 if(request.method==='executeStream'&&${JSON.stringify(Boolean(streamFailure))}){console.log(JSON.stringify({id:request.id,error:'provider_request_rejected',providerFailure:${JSON.stringify(streamFailure ?? null)}}));lines.close();return}
 if(request.method==='executeStream'){console.log(JSON.stringify({id:request.id,chunk:JSON.stringify(result)}));console.log(JSON.stringify({id:request.id,result:{done:true}}))}else console.log(JSON.stringify({id:request.id,result}));lines.close()})
@@ -23,7 +30,7 @@ if(request.method==='executeStream'){console.log(JSON.stringify({id:request.id,c
   const client = new SubscriptionWorkerClient({ binary }, {
     scope: { ownerId: 'fixture-owner', workspaceId: 'fixture-workspace', connectionId: '20000000-0000-4000-8000-000000000001', provider: 'codex' },
     databaseUrl: 'synthetic', infisicalOrigin: 'https://fixture.invalid', project: 'fixture', environment: 'test', path: '/grants', workloadToken: 'fixture-custody-identity', accessPath: '/access', accessProject, accessToken: snapshotMode ? undefined : 'fixture-access-reader', enableRuntime: true, enrollmentAttemptPath: '/attempts', enrollmentClaimPath: '/claims', enrollmentGrantPath: '/pending'
-  }, resolveIdentity).forUse({ bindingId: '20000000-0000-4000-8000-000000000002', consumerId: 'fixture-task' })
+  }, resolveIdentity, streamIdentity).forUse({ bindingId: '20000000-0000-4000-8000-000000000002', consumerId: 'fixture-task' })
   return { client, journal }
 }
 it('quota and inference children receive no full-bundle identity and retain the exact task binding', async () => {
@@ -169,4 +176,150 @@ setTimeout(()=>console.log(JSON.stringify({id:value.id,error:'provider_operation
       expect(JSON.stringify(warn.mock.calls)).not.toContain('fixture-private')
     } finally { warn.mockRestore() }
   }
+})
+
+const projectedScope = { ownerId: 'fixture-owner', workspaceId: 'fixture-workspace', connectionId: '20000000-0000-4000-8000-000000000001', provider: 'codex' }
+const freshProjection = (changes: Record<string, unknown> = {}) => ({ name: 'mikka-byos-00000000-0000-4000-8000-000000000001', value: JSON.stringify({
+  schema: 1, ...projectedScope, payload: { type: 'codex', access_token: 'fixture-access', account_id: 'fixture-account', expired: new Date(Date.now() + 3_600_000).toISOString() }, ...changes,
+}) })
+it('a fresh same-call parent snapshot skips custody preparation and resolves the projection once', async () => {
+  const projected = freshProjection()
+  let reads = 0
+  const ordinary = vi.fn(async () => ({ workloadToken: 'fixture-custody-identity' }))
+  const { client, journal } = fixture(false, ordinary, undefined, true, undefined, undefined, async () => { reads++; return { accessSnapshot: projected } })
+  const result = await new Response(client.stream(2, 'fixture-model', {})).json()
+  expect(readFileSync(journal, 'utf8').trim().split('\n')).toEqual(['executeStream'])
+  expect(reads).toBe(1)
+  expect(ordinary).not.toHaveBeenCalled()
+  expect(result).toMatchObject({ fullAuthority: false, sourceAuthority: false, accessAuthority: false, snapshot: projected.name, binding: '20000000-0000-4000-8000-000000000002', consumer: 'fixture-task' })
+})
+
+
+it.each(['missing', 'expiring'] as const)('uses the original custody path for an authorized %s projection, then reads a new snapshot', async reason => {
+  const stale = freshProjection()
+  const payload = JSON.parse(stale.value)
+  payload.payload.expired = new Date(Date.now() + 30_000).toISOString()
+  stale.value = JSON.stringify(payload)
+  const fresh = freshProjection()
+  fresh.name = 'mikka-byos-00000000-0000-4000-8000-000000000002'
+  const calls: boolean[] = []
+  const preRead = vi.fn(async () => reason === 'missing' ? null : { accessSnapshot: stale })
+  const { client, journal } = fixture(false, async execution => {
+    calls.push(execution)
+    return execution ? { accessSnapshot: fresh } : { workloadToken: 'fixture-custody-identity' }
+  }, undefined, true, undefined, undefined, preRead)
+  expect(await new Response(client.stream(2, 'fixture-model', {})).json()).toMatchObject({ snapshot: fresh.name, fullAuthority: false, accessAuthority: false })
+  expect(readFileSync(journal, 'utf8').trim().split('\n')).toEqual(['prepareStream', 'executeStream'])
+  expect(preRead).toHaveBeenCalledTimes(1)
+  expect(calls).toEqual([false, true])
+})
+
+it('a denied or malformed pre-read cannot turn into custody preparation', async () => {
+  const wrongOwner = freshProjection({ ownerId: 'other-owner' })
+  for (const resolution of [
+    async () => { throw new Error('subscription_access_unavailable') },
+    async () => { throw new TypeError('private network cause') },
+    async () => ({ accessSnapshot: { ...freshProjection(), value: 'private malformed JSON' } }),
+    async () => ({ accessSnapshot: wrongOwner }),
+  ]) {
+    const ordinary = vi.fn(async () => ({ workloadToken: 'fixture-custody-identity' }))
+    const { client, journal } = fixture(false, ordinary, undefined, true, undefined, undefined, resolution)
+    await expect(new Response(client.stream(2, 'fixture-model', {})).text()).rejects.toMatchObject({ code: 'subscription_worker_unavailable' })
+    expect(readFileSync(journal, 'utf8')).toBe('')
+    expect(ordinary).not.toHaveBeenCalled()
+  }
+})
+
+it('Stop while a pre-read is pending ends the read; a late snapshot cannot start a child', async () => {
+  const pending = deferred<{ accessSnapshot: { name: string; value: string } }>()
+  const entered = deferred<void>()
+  const { client, journal } = fixture(false, undefined, undefined, true, undefined, undefined, async () => { entered.resolve(); return pending.promise })
+  const abort = new AbortController()
+  const read = new Response(client.stream(2, 'fixture-model', {}, abort.signal)).text()
+  const failure = expect(read).rejects.toMatchObject({ code: 'subscription_cancelled' })
+  await entered.promise
+  abort.abort()
+  await failure
+  pending.resolve({ accessSnapshot: freshProjection() })
+  await new Promise(resolve => setImmediate(resolve))
+  expect(readFileSync(journal, 'utf8')).toBe('')
+})
+
+it('a pre-read that ignores cancellation is bounded by the original 35s preparation deadline', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    const pending = deferred<{ accessSnapshot: { name: string; value: string } }>()
+    const { client, journal } = fixture(false, undefined, undefined, true, undefined, undefined, () => pending.promise)
+    const read = new Response(client.stream(2, 'fixture-model', {})).text()
+    const failure = expect(read).rejects.toMatchObject({ code: 'subscription_timeout' })
+    await vi.advanceTimersByTimeAsync(35_000)
+    await failure
+    pending.resolve({ accessSnapshot: freshProjection() })
+    await Promise.resolve()
+    expect(readFileSync(journal, 'utf8')).toBe('')
+  } finally { vi.useRealTimers() }
+})
+
+it('cold custody receives only the time left in the original preparation budget', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    const pending = deferred<null>()
+    const custodyStarted = deferred<void>()
+    const custody = deferred<{ workloadToken: string }>()
+    const ordinary = vi.fn(async (_execution: boolean) => { custodyStarted.resolve(); return custody.promise })
+    const { client, journal } = fixture(false, ordinary, undefined, true, undefined, undefined, () => pending.promise)
+    const timing = new SubscriptionCallTiming()
+    const read = withSubscriptionTiming(timing, () => new Response(client.stream(2, 'fixture-model', {})).text())
+    const failure = expect(read).rejects.toMatchObject({ code: 'subscription_timeout' })
+    await vi.advanceTimersByTimeAsync(34_900)
+    pending.resolve(null)
+    await custodyStarted.promise
+    await vi.advanceTimersByTimeAsync(100)
+    await failure
+    custody.resolve({ workloadToken: 'fixture-custody-identity' })
+    await Promise.resolve()
+    expect(ordinary).toHaveBeenCalledTimes(1)
+    expect(ordinary.mock.calls[0][0]).toBe(false)
+    expect(timing.snapshot().workers).toHaveLength(1)
+    expect(timing.snapshot().workers[0]).toMatchObject({ method: 'prepareStream', outcome: 'error' })
+    expect(readFileSync(journal, 'utf8')).toBe('')
+  } finally { vi.useRealTimers() }
+})
+
+it('a warm provider refusal does not retry preparation or the provider', async () => {
+  const ordinary = vi.fn(async () => ({ workloadToken: 'fixture-custody-identity' }))
+  const { client, journal } = fixture(false, ordinary, undefined, true, undefined,
+    { provider: 'codex', status: 429, error: { type: 'rate_limit_error' } },
+    async () => ({ accessSnapshot: freshProjection() }))
+  await expect(new Response(client.stream(2, 'fixture-model', {})).text()).rejects.toMatchObject({ code: 'provider_request_rejected' })
+  expect(readFileSync(journal, 'utf8').trim().split('\n')).toEqual(['executeStream'])
+  expect(ordinary).not.toHaveBeenCalled()
+})
+
+it('forUse and concurrent streams each read their own revision and snapshot exactly once', async () => {
+  const seen: Array<{ revision: unknown; bindingId?: string; consumerId?: string }> = []
+  const { client, journal } = fixture(false, undefined, undefined, true, undefined, undefined, async (_signal, use, revision) => {
+    seen.push({ revision, bindingId: use?.bindingId, consumerId: use?.consumerId })
+    const snapshot = freshProjection()
+    snapshot.name = 'mikka-byos-00000000-0000-4000-8000-00000000000' + revision
+    return { accessSnapshot: snapshot }
+  })
+  const other = client.forUse({ bindingId: 'other-binding', consumerId: 'other-consumer' })
+  const [one, two] = await Promise.all([new Response(client.stream(2, 'fixture-model', {})).json(), new Response(other.stream(3, 'fixture-model', {})).json()])
+  expect(seen).toEqual([
+    { revision: 2, bindingId: '20000000-0000-4000-8000-000000000002', consumerId: 'fixture-task' },
+    { revision: 3, bindingId: 'other-binding', consumerId: 'other-consumer' },
+  ])
+  expect(one).toMatchObject({ snapshot: 'mikka-byos-00000000-0000-4000-8000-000000000002', consumer: 'fixture-task' })
+  expect(two).toMatchObject({ snapshot: 'mikka-byos-00000000-0000-4000-8000-000000000003', consumer: 'other-consumer' })
+  expect(readFileSync(journal, 'utf8').trim().split('\n')).toEqual(['executeStream', 'executeStream'])
+})
+
+it('run-associated streams retain the original prepare path and never use the new hint', async () => {
+  const preRead = vi.fn(async () => ({ accessSnapshot: freshProjection() }))
+  const { client, journal } = fixture(false, undefined, undefined, false, undefined, undefined, preRead)
+  const bound = client.forUse({ bindingId: 'run-binding', consumerId: 'run-consumer', runId: 'run-id' })
+  await new Response(bound.stream(2, 'fixture-model', {})).json()
+  expect(preRead).not.toHaveBeenCalled()
+  expect(readFileSync(journal, 'utf8').trim().split('\n')).toEqual(['prepare', 'executeStream'])
 })

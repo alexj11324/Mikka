@@ -28,6 +28,8 @@ if (!migrationRequested(env, targets)) {
   process.exit(0)
 }
 
+// This marks entry into the requested command, before guards or database work.
+console.log('migrate: starting')
 const { warning } = migrationGuard(process.env, targets, process.argv.slice(2))
 if (warning) console.warn(warning)
 

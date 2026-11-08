@@ -19,8 +19,10 @@ export function firstAnonymousClaudeTask(machine: { created: boolean; refresh: b
  * No fresh permission, credential or assignment is granted here. A mismatch
  * at normal claim discards this process before the existing cold path. */
 export function anonymousClaudeStartupHint(input: {
-  runId: string; bootstrap: string; kind: string; repository: string | null; userId: string; botId: string | null
+  runId: string; bootstrap: string | { sha256: string }; kind: string; repository: string | null; userId: string; botId: string | null
   freshTask: boolean
+  /** Trusted operator opt-in for the isolated candidate gate; never an execution grant. */
+  diagnostics?: true
   definition: WorkerDefinitionSnapshot | null | undefined
 }) {
   const d = input.definition
@@ -32,9 +34,9 @@ export function anonymousClaudeStartupHint(input: {
   if (d.readOnly) policy = applyApprovalMode(policy, 'read_only')
   const parsed = anonymousClaudeHintSchema.safeParse({
     version: 1, profile: 'cloud_repository_claude_v1', runId: input.runId,
-    bootstrapSha256: createHash('sha256').update(input.bootstrap).digest('hex'),
+    bootstrapSha256: typeof input.bootstrap === 'string' ? createHash('sha256').update(input.bootstrap).digest('hex') : input.bootstrap.sha256,
     model: d.model, effort: d.agentProfile?.effort ?? d.modelDispatch?.routing?.effort,
-    kind: input.kind, github: true, diagnostics: cloudStartupDiagnosticCandidate({
+    kind: input.kind, github: true, diagnostics: input.diagnostics === true || cloudStartupDiagnosticCandidate({
       deviceKind: 'cloud', repository: input.repository.slice('v2/github.com/'.length), harness: d.harness,
       subscriptionBindingId: d.subscription.bindingId, run: { userId: input.userId, botId: input.botId, agentDefinition: d },
     }), policy,

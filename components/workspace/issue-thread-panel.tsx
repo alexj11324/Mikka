@@ -2,11 +2,11 @@
 
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { PersonAvatar } from '@/components/person-avatar'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { ArrowLeft, MessageSquareDiff, Square, SquareKanban, X } from 'lucide-react'
+import { MessageSquareDiff } from 'lucide-react'
 import { getIssueThread, getThreadChanges, getThreadInstructions, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
@@ -27,12 +27,12 @@ import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { ChatFileCards } from '@/components/chat/chat-file-cards'
 import { CollapsibleMessage } from '@/components/chat/collapsible-message'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { harnessLabel, type IssueThreadsRead } from './issue-threads'
-import { ThreadStatus } from './thread-status-icon'
+import { ThreadHeader, ThreadStatusLine } from './thread-header'
+import { useRightColumnWiden } from './right-column-widen'
 import { RunErrorDetails, useRunErrorText } from './run-error-text'
 import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
@@ -96,7 +96,7 @@ function ThreadInstructions({ issueId, runId, mine }: { issueId: string | null; 
  * the bot that dispatched it.
  */
 type ThreadTab = 'chat' | 'changes' | 'acceptance'
-type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest }
+type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void; /** The name its thread-list row shows (glossary: its task, else what it was asked); defaults to what it was asked. */ name?: string; /** Inside the Artifact window (P2): 要求修改 waits in the composer as a chip; sending it starts the fix run on the same PR. */ changeRequest?: ThreadChangeRequest; /** A task's earlier attempts, drawn above this one's transcript in the same scroll (the task-conversation slot). */ before?: ReactNode; /** Scroll to this attempt's section of `before` when it appears. */ focusRunId?: string; /** Only the transcript, for an earlier attempt inside another panel's `before`: no header, scroll, composer or acceptance. */ transcriptOnly?: boolean; /** Its place in its task's one conversation: the status line names the attempt, and the dispatch is not a person's bubble. */ attempt?: { n: number; first: boolean; taskTitle?: string } }
 
 export type ThreadChangeRequest = { label: string; onSend: (note: string) => Promise<boolean>; onCancel: () => void }
 
@@ -105,7 +105,7 @@ export function IssueThreadPanel(props: IssueThreadPanelProps) {
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName, changeRequest, before, focusRunId, transcriptOnly = false, attempt }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const runErrorText = useRunErrorText()
   const format = useFormatter()
@@ -168,6 +168,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   useFocusReturn(runId, headingRef, !bare)
+  // ⤢ of the right column it sits in, for a layer's header; null in task detail and the Artifact window.
+  const widen = useRightColumnWiden()
   const detail = data?.thread.detail
   // 等你回复: the run ended on a question; the composer answers it (lib/agent-runs.ts addRunMessage).
   // Once answered it reads as the running thread it continues, with nothing to send or stop yet;
@@ -263,48 +265,30 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   }
   const canStop = active && !!data?.thread.ownedByCurrentUser && !sending && !stopPending
   const title = (!readRejected && listedName) || (detail?.name ?? t('title'))
-  // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
-  return <section ref={rootRef} aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
-    {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
-      {onBack && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('back')} aria-keyshortcuts="Escape" onClick={onBack} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>}
-      <h2 ref={headingRef} tabIndex={-1} className="min-w-0 truncate text-sm font-semibold outline-none">{title}</h2>
-      {/* Icons only after the title: where it runs and its Agent; names on hover (Alex, 2026-11-06). */}
-      {detail && <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} />}
-      {acceptance && <AcceptanceStateBadge task={acceptance} />}
-      <span className="flex-1" />
-      {data?.thread.ownedByCurrentUser && <ThreadExecutionIdentity runId={liveRunId} />}
-      {/* Always there, left of stop: off until the thread hands an Artifact over (decision 2026-11-06-1615). */}
-      {!readRejected && <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} />}
-      {/* Stop lives here for every live run, also one waiting for an answer, whose composer button sends. */}
-      {canStop && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('stop')} data-slot="thread-stop" onClick={() => { void stop() }} />}><Square data-icon="inline-start" className="fill-current" /></TooltipTrigger><TooltipContent side="bottom">{t('stop')}</TooltipContent></Tooltip>}
-      {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
-      {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
-      {acceptance && !hasChanges && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
-        <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
-      </Tabs>}
-      {onClose && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
-    </header>}
-    {/* With 改动 the tabs get their own row: the side panel has no room for them beside the title. */}
-    {!bare && hasChanges && <div className="flex shrink-0 items-center px-3 pt-2">
-      <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)}>
-        <TabsList><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="changes" className="gap-1.5"><ChangesTabLabel changes={changes.state === 'ready' ? changes.changes : null} /></TabsTrigger>{acceptance && <TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger>}</TabsList>
-      </Tabs>
-    </div>}
-    {viewingChanges ? (changes.state === 'ready'
-      ? <ThreadChangesPane stateKey={`thread:${runId}:changes`} changes={changes.changes} />
-      : <p className="p-4 text-sm text-muted-foreground">{t('changesTooLarge')}</p>)
-    : accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
-    <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+  // An earlier attempt opened from its task's 活动 scrolls to its section once that section has loaded (TaskConversation).
+  useEffect(() => {
+    const root = rootRef.current
+    if (!focusRunId || focusRunId === runId || !root) return
+    const reveal = () => {
+      const section = root.querySelector(`[data-attempt-section="${CSS.escape(focusRunId)}"]`)
+      if (!section?.childElementCount) return false
+      section.scrollIntoView({ block: 'start' })
+      return true
+    }
+    if (reveal()) return
+    const observer = new MutationObserver(() => { if (reveal()) observer.disconnect() })
+    observer.observe(root, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [focusRunId, runId])
+  const transcriptBody = <>
       {error && !data ? <InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <ThreadStatus status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} />
-            <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
-            {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-82). */}
-            {detail?.agentName && <span>{detail.agentName} {t('dispatched')}</span>}
-          </div>
-          {data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
+          <ThreadStatusLine status={view?.status ?? data.thread.status} outcome={displayOutcome} stopping={stopRequested} waiting={question === 'waiting'} startedAt={new Date(data.thread.createdAt).toISOString()} dispatchedBy={detail?.agentName || null}
+            issueId={issueId} runId={runId} harness={detail?.harness ?? null}
+            {...(attempt ? { attempt: { ...attempt, harness: detail?.harness ?? null, prompt: data.thread.prompt.trim() || null } } : {})} />
+          {/* In a task's one conversation the dispatch is the status line's, not a person's bubble (#1681). */}
+          {!attempt && data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} />{data.thread.hasInstructions && <ThreadInstructions issueId={issueId} runId={runId} mine={data.thread.ownedByCurrentUser} />}</div>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
             {items.map(item => <li key={item.id} className="group/message flex flex-col gap-1">
               {item.kind === 'agent' && <>
@@ -339,6 +323,33 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
           {!active && (view?.status ?? data.thread.status) === 'succeeded' && <ThreadArtifactCards runId={runId} />}
           {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
         </>}
+  </>
+  if (transcriptOnly) return <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
+  // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
+  return <section ref={rootRef} aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
+    {!bare && <ThreadHeader issueId={issueId} runId={runId} title={title} headingRef={headingRef} onBack={onBack} onClose={onClose}
+      onStop={canStop ? () => { void stop() } : null} onOpenTask={onOpenTask} wraps={!!acceptance}
+      widen={widen ?? undefined} liveRunId={liveRunId} status={data?.thread.status ?? ''} acceptanceTaskId={acceptance?.id ?? null}
+      place={detail ? <ThreadRunPlace issueId={issueId} runId={runId} status={view?.status ?? data?.thread.status ?? ''} harness={detail.harness} botName={detail.agentName} /> : null}
+      acceptanceBadge={acceptance ? <AcceptanceStateBadge task={acceptance} /> : null}
+      identity={data?.thread.ownedByCurrentUser ? <ThreadExecutionIdentity runId={liveRunId} /> : null}
+      artifact={!readRejected ? <ThreadArtifactButton runId={runId} status={data?.thread.status ?? ''} taskId={acceptance?.id} /> : null}
+      tabs={acceptance && !hasChanges ? <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
+        <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
+      </Tabs> : null} />}
+    {/* With 改动 the tabs get their own row: the side panel has no room for them beside the title. */}
+    {!bare && hasChanges && <div className="flex shrink-0 items-center px-3 pt-2">
+      <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)}>
+        <TabsList><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="changes" className="gap-1.5"><ChangesTabLabel changes={changes.state === 'ready' ? changes.changes : null} /></TabsTrigger>{acceptance && <TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger>}</TabsList>
+      </Tabs>
+    </div>}
+    {viewingChanges ? (changes.state === 'ready'
+      ? <ThreadChangesPane stateKey={`thread:${runId}:changes`} changes={changes.changes} />
+      : <p className="p-4 text-sm text-muted-foreground">{t('changesTooLarge')}</p>)
+    : accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
+    <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+      {before}
+      <div data-attempt-section={runId} className="flex flex-col gap-3">{transcriptBody}</div>
     </div>
     {data?.thread.quota?.paused && <div className="shrink-0 p-3">
       <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />

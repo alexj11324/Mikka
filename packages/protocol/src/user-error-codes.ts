@@ -20,6 +20,7 @@ export const USER_ERROR_CODES = {
   run_network_error: [],
   run_provider_error: [],
   run_failed: [],
+  task_secret_unavailable: ['invalid_capability', 'expired_capability', 'binding_mismatch', 'invalid_request', 'destination_denied', 'upstream_unavailable', 'response_blocked', 'limit_exceeded', 'configuration'],
 
   installer_failed: ["node_required", "unsupported_os", "npm_permission", "npm_cache_permission", "cancelled", "timeout", "service_failed", "connection_failed", "command_failed"],
   model_tool_unavailable: [],

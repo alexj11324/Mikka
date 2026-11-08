@@ -6,40 +6,7 @@ name: Desktop shell
 # Pull requests only: the same suite already passed on the PR, and main's
 # CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
-  pull_request:
-    paths:
-      - 'apps/desktop/**'
-      - 'apps/frontend/**'
-      - 'apps/api/**'
-      - 'packages/protocol/**'
-      - 'lib/platform/**'
-      - 'lib/swr/**'
-      - 'components/**'
-      - 'hooks/**'
-      - 'app/actions/**'
-      - 'app/api/desktop/**'
-      - 'app/api/live/**'
-      - 'app/[locale]/**'
-      - 'app/fonts/**'
-      - 'app/globals.css'
-      - 'lib/desktop-rpc/**'
-      - 'lib/browser-rpc/**'
-      - 'scripts/start-app*'
-      - 'lib/live/**'
-      - 'lib/auth*.ts'
-      - 'lib/fresh-session.ts'
-      - 'lib/request-log.ts'
-      - 'scripts/test-accounts/**'
-      - 'tests/desktop-*'
-      - 'messages/**'
-      - 'i18n/**'
-      - 'next.config.mjs'
-      - 'lib/auth-return.ts'
-      - 'instrumentation-client.ts'
-      - 'lib/analytics-policy.ts'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - '.github/workflows/desktop.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -57,7 +24,11 @@ env:
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
 
 jobs:
+  changes:
+    uses: ./.github/workflows/ci-selection.yml
   checks:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -83,6 +54,8 @@ jobs:
       - run: pnpm lint:ui
 
   smoke:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -125,8 +98,10 @@ jobs:
       - run: sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
       - name: Install the pinned Electron runtime and its Linux sandbox helper
         working-directory: apps/desktop
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          node node_modules/electron/install.js
+          node scripts/install-electron.mjs
           electron_sandbox="$(node -p "require('node:path').join(require('node:path').dirname(require('electron')), 'chrome-sandbox')")"
           sudo chown root:root "$electron_sandbox"
           sudo chmod 4755 "$electron_sandbox"
@@ -185,8 +160,9 @@ jobs:
           retention-days: 7
 
   native-arm64:
+    if: needs.changes.outputs.desktop == 'true'
     name: Apple Silicon packaged acceptance and ad-hoc Mikka Dev
-    needs: [smoke, icon]
+    needs: [changes, smoke, icon]
     runs-on: macos-26  # Standard ARM64 runner; macOS 26 is required for the shared glass icon.
     timeout-minutes: 150
     env:
@@ -214,6 +190,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Keep setup-node 24 in the native installer login shell
         run: node apps/desktop/test/native-node.mjs
+      - name: Prepare the pinned native Electron and builder checksum cache
+        run: node apps/desktop/scripts/install-electron.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - run: pnpm exec playwright install chromium
       - name: Start an independent local PostgreSQL
         run: |
@@ -302,6 +282,8 @@ jobs:
   # Desktop release runs only on main; compile the Icon Composer bundle here so a
   # broken build/icon.icon or a runner without Xcode 26 fails on the pull request.
   icon:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
     runs-on: macos-26  # macos-15's Xcode 26.3 crashes compiling the glass layers of build/icon.icon
     timeout-minutes: 10
     steps:
