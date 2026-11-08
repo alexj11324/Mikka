@@ -264,10 +264,10 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
     assert.deepEqual(args,[workspace]);return fixtureRows([])
    }
    const keyColumns='id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi"'
-   if(sql===`SELECT ${keyColumns} FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`){
+   if(sql===`SELECT ${keyColumns},to_jsonb(model_api_keys)->'modelSettings' AS "modelSettings" FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`){
     assert.deepEqual(args,[owner]);return fixtureRows([])
    }
-   if(sql===`SELECT ${keyColumns.split(',').map(column=>`k.${column}`).join(',')} FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId" WHERE s."workspaceId"=$1 AND k."ownerId"<>$2 ORDER BY s."createdAt",k.id`){
+   if(sql===`SELECT ${keyColumns.split(',').map(column=>`k.${column}`).join(',')},to_jsonb(k)->'modelSettings' AS "modelSettings" FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId" WHERE s."workspaceId"=$1 AND k."ownerId"<>$2 ORDER BY s."createdAt",k.id`){
     assert.deepEqual(args,[workspace,owner]);return fixtureRows([])
    }
    const identity=identityFixtureQuery(sql,args);if(identity)return identity

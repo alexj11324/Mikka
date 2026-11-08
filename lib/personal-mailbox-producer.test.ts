@@ -138,11 +138,11 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
       assert.deepEqual(params, [workspaceId])
       return { rows: [] }
     }
-    if (sql === 'SELECT id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi" FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id') {
+    if (sql === `SELECT id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi",to_jsonb(model_api_keys)->'modelSettings' AS "modelSettings" FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`) {
       assert.deepEqual(params, [owner])
       return { rows: [] }
     }
-    if (sql === `SELECT k.id,k."ownerId",k.provider,k.name,k."baseUrl",k.protocol,k.last4,k.models,k."modelsError",k."responsesApi" FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
+    if (sql === `SELECT k.id,k."ownerId",k.provider,k.name,k."baseUrl",k.protocol,k.last4,k.models,k."modelsError",k."responsesApi",to_jsonb(k)->'modelSettings' AS "modelSettings" FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
     WHERE s."workspaceId"=$1 AND k."ownerId"<>$2 ORDER BY s."createdAt",k.id`) {
       assert.deepEqual(params, [workspaceId, owner])
       return { rows: [] }
