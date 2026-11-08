@@ -108,7 +108,7 @@ jobs:
       - name: Install the pinned MIT standalone driver
         run: |
           mkdir -p "$RUNNER_TEMP/cua"
-          curl -fL --retry 2 https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-darwin-universal-binary.tar.gz -o "$RUNNER_TEMP/cua/driver.tar.gz"
+          curl -fL --retry 2 -H 'Accept: application/octet-stream' https://api.github.com/repos/trycua/cua/releases/assets/661454894 -o "$RUNNER_TEMP/cua/driver.tar.gz"
           echo "2bb8dc4a7e69185ffd04c4a9c0eab590bd2c54b72c2c1be13ab675be4f487732  $RUNNER_TEMP/cua/driver.tar.gz" | shasum -a 256 --check
           tar -xzf "$RUNNER_TEMP/cua/driver.tar.gz" -C "$RUNNER_TEMP/cua"
       - name: Observe native screenshot, input and click through the run broker

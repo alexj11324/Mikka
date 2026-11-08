@@ -17,7 +17,7 @@ import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { userActor } from '@/lib/activity-actor'
 import { readIssueMetadata } from '@/lib/issue-metadata'
-import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { taskIdentifiers, taskPrefixInput, type TaskPrefixInput } from '@/lib/task-identifier-server'
 import { numberedIssueTeamScope } from '@/lib/issue-team-access'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { isIssueTeamAccessAllowed } from '@/lib/issue-team-access-policy'
@@ -107,12 +107,14 @@ function issueContent(description: string) {
 type LabelIssue = Pick<typeof issues.$inferSelect, 'id' | 'userId' | 'scope' | 'content'> & {
   /** A complete current lookup: null means there is no usable team identifier. */
   identifierTeam?: { key: string; number: number } | null
+  /** Private naming input from this operation's bounded, authorized task read. */
+  prefixInput?: TaskPrefixInput | null
 }
 
 async function issueLabels(tx: Transaction, rows: LabelIssue[]) {
   const knownTeams = rows.every(issue => issue.scope !== 'workspace' || issue.identifierTeam !== undefined)
     ? new Map(rows.flatMap(issue => issue.identifierTeam ? [[issue.id, issue.identifierTeam] as const] : [])) : undefined
-  const identifiers = await taskIdentifiers(rows.map(issue => ({ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: readIssueMetadata(issue.content).number })), tx, knownTeams)
+  const identifiers = await taskIdentifiers(rows.map(issue => ({ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: readIssueMetadata(issue.content).number, prefixInput: issue.prefixInput })), tx, knownTeams)
   return new Map(rows.map(issue => [issue.id, identifiers.get(issue.id) ?? issue.id]))
 }
 
@@ -142,11 +144,13 @@ async function findAccessibleIssues(tx: Transaction, userId: string, workspaceId
       ? or(sql`${metadata}->>'number' = ${String(match.number)}`, sql`exists (select 1 from ${linearIssueLinks} where ${linearIssueLinks.issueId} = ${issues.id} and upper(${linearIssueLinks.linearIdentifier}) = ${match.identifier})`)
       : undefined
   const rows = await tx.select({ id: issues.id, userId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status,
-    content: issueAttrsContent, updatedAt: issues.updatedAt,
+    content: issueAttrsContent, updatedAt: issues.updatedAt, prefixInput: taskPrefixInput(sql`issues."userId"`),
   }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(
-      (await issueVisibility(userId, false, workspaceId)).predicate,
+      // Tenant authorization does not consume the global team-link list. The
+      // bounded lookup below still rechecks linked-task membership and labels.
+      (await issueVisibility(userId, false, workspaceId, tx, { withTeamLinks: false })).predicate,
       condition,
       sql`${metadata}->>'deletedAt' is null`,
     ))
