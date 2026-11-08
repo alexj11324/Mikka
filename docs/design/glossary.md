@@ -40,12 +40,14 @@ Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspac
 ## Rules for designs
 
 - The left column is the **bot list**: bots and group chats only. The right
-  column is the **thread list**. There is no "conversation list".
+  column is the **task list** (since 2026-11-07: no list shows threads; a
+  thread opens only from inside its task,
+  [decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)). There is no "conversation list".
 - The bot list holds bots and group chats only. A thread name ("#66 …",
   "MIK-11 …") is never a left-column row. A bot row's preview line may quote
   the latest message, which may mention a thread, but the row is the bot.
 - The right panel's 概览 header is the selected bot (the same avatar and
-  name as its left row), followed by the tabs 详情 / 线程 / PR / 电脑. A
+  name as its left row), followed by the tabs 详情 / 任务 / PR / 电脑. A
   thread's name appears only as its row in a thread list, never as that
   header (Alex, 2026-10-28; `rules.md` R-02, R-50).
 - Choosing another bot on the left changes the center chat and the right
@@ -63,7 +65,7 @@ Decided by Alex, 2026-10-28.
 | **Agent** | Agent | The coding agent that runs a thread: Claude Code, Codex, Cursor (`agents` table, a harness). It does the coding work; a bot never does. Shown by its own brand mark wherever a thread or run has an icon (R-78). Never called harness or 执行器 in the UI (R-43). |
 | **Agent Profile** | Agent 配置 | A reusable logical coding role owned by a person in a workspace: responsibilities, capabilities, Agent/model policy, effort, private instructions and controlled Skills. Several Profiles may use the same physical Agent/model. Managed in Settings › Models and subscriptions; frozen into each selected run. It never becomes a Bot or a left-column row. [Spec](factory-agent-profiles.md). |
 | **Library** | 资料库 | A bot's files, listed under 概览 › 详情; the person can delete their own (R-51). Files are added with the composer's 「+」. |
-| **Thread** | 线程 | As above. The right panel's tab is 线程, never 任务 (R-43). |
+| **Thread** | 线程 | As above. Since 2026-11-07 it is shown only inside its task (an attempt in the task's 活动); no list or tab is named 线程. |
 | **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |
 | **Computer** | 电脑 | A bot's cloud computer: its own desktop (X display) on its owner's bot machine, which is one per person per workspace (`cloud_machines` keyed by `workspaceId`, `ownerId`; `bot_desktops` keyed by `botId`). Used by that bot only; a thread that needs a desktop gets its own machine ([0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md)). Shown in the 电脑 tab of 概览 (R-50). Never called 浏览器. |
 
@@ -72,7 +74,7 @@ Decided by Alex, 2026-10-28.
 - "会话" / "session" / "conversation list" for the left column. The left
   column is the **bot list** and the right column is the **thread list**.
 - "会话" for a run (e.g. "打开会话" on a task's run). Say **线程**.
-- "任务" for the right panel's thread tab. Say **线程**.
+- 「线程」 as the name of a list or tab. Lists hold tasks (2026-11-07); the right panel's tab is **任务**.
 - A Chinese word for Artifact. Keep **Artifact**.
 - "浏览器" for a bot's cloud computer, or "电脑" for the local browser.
 - "Agent" when you mean the thing on the left. Say **bot**. **Agent** is the
