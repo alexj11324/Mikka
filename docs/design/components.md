@@ -10,9 +10,11 @@ component covers.
 
 ## Build selection
 
-The public components below include the default UI slots. Official builds can
-replace those slots through the private [hosted UI layer](../ui-overlay.md).
-`@ui-slot/*` resolution determines which implementation ships. The accepted
+The components below include the default UI slots. Official builds fill some
+slots from `mikka-hosted-ui` ([UI slots](../ui-overlay.md)), and `@ui-slot/*`
+resolution decides which implementation ships. There is one UI
+([decision](decisions/2026-11-08-2133-one-ui.md)): the defaults only have to
+compile. The accepted
 navigation lists tasks and joins a task's attempts in one conversation
 ([task lists](decisions/2026-11-07-2045-tasks-only-threads-inside.md),
 [conversation](decisions/2026-11-07-2300-one-conversation-per-task.md)); public
