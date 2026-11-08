@@ -30,9 +30,9 @@ export type ExecutionContextSource = { [Key in keyof ExecutionFacts]: (userId: s
 const AGENT: Record<string, string> = { claude_code: 'Claude Code', codex: 'Codex' }
 const agentName = (harness: string) => AGENT[harness] ?? harness
 /** Why a server or computer cannot run a model, from what its daemon reported. */
-const WHY: Record<'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'subscriptionRuntimeUnavailable' | 'ready', string> = {
+const WHY: Record<'notInstalled' | 'needsUpdate' | 'subscriptionRuntimeUnavailable' | 'ready', string> = {
   ready: '',
-  notInstalled: 'Agent not installed', modelNotReported: 'its daemon did not report this model', needsUpdate: 'its Mikka is too old to report its models',
+  notInstalled: 'Agent not installed', needsUpdate: 'its Mikka needs subscription injection support',
   subscriptionRuntimeUnavailable: messages.RunErrors.subscription_local_runtime_unavailable.default,
 }
 

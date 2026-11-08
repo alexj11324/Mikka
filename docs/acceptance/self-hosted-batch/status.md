@@ -14,6 +14,11 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
   Next bot turns follow the preferred available source; existing frozen turns
   are unchanged. The hosted source currently exposes the installation's single
   configured default model; there is no invented hosted model catalogue.
+  The issue's later credential-only requirement is included: devices no longer
+  constrain full model IDs using CLI reports, `OrderView.deviceModels` is
+  removed, and the native runner checks its exact lease/model instead of a
+  shortcut catalogue. Structured provider model refusals continue the current
+  preference-driven task on its next entry without global yellow status.
 - #1556: a reproduced desktop transport defect. The community server's actual
   live ticket contains `/mikka/v1/live/<channel>/socket`, while `BundledLive`
   previously accepted only `/v1/live/<channel>/socket`. The fix accepts both
@@ -124,6 +129,33 @@ the required final headings and asks the model to check each section before
 delivery. Validation remains unchanged and the regression proves a missing
 Limits section still throws while preserving only its closed diagnosis.
 Full lifecycle acceptance remains independent and incomplete.
+
+## Credential-only model follow-up
+
+The old device gate reproduced RED for both Claude and Codex when an authorized
+historical model was absent from the CLI shortcut report. After the change:
+
+- 169 execution-rule unit cases and 24 context/dispatch cases pass.
+- 39 protocol failure cases pass, including six structured model-refusal codes
+  and rejection of bare 404/unstructured tool text as provider evidence.
+- 45 real-adapter/native-CLI protocol fixture cases pass, including both
+  harnesses without a model probe and exact mismatched-lease refusals. The
+  initial local run inherited the executor's OpenAI key and failed its existing
+  offline fake-auth guard; running the isolated fixture without that inherited
+  key or Codex home passed. No product environment filtering was introduced.
+- 47 real-PG17 model-order/provider-continuation cases pass. A structured
+  model_not_found switches to the next authorized entry, keeps the original
+  session/worktree and leaves the failed model's global availability unchanged.
+  Foreign credentials and stale bindings remain excluded.
+- 96 native provider-boundary/adapter/run cases pass, including Claude's
+  structured model refusal and Codex badRequest/other model refusals. Ordinary
+  tool errors and unrelated bad requests still do not trigger fallback.
+- Application/API/frontend and daemon typechecks, source lint, polling and
+  error-cause policies pass.
+
+This adds a provider-failure contract variant; the ordinary version-bound Web
+and E2B release gates still apply. Historical model-not-reported error rendering
+remains solely for existing receipts; new dispatches do not emit that refusal.
 
 ## Local idle receipt
 

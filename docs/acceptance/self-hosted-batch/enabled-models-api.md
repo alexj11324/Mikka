@@ -63,3 +63,20 @@ Settings mutations never cancel or rewrite frozen runs. Disabling removes
 matching preferred entries and filters old saved bot choices on the next turn.
 A source disappearing due to provider failure remains distinguishable from an
 explicit disable in the ordinary preferred-model view.
+
+The #1539 follow-up makes credentials the sole model catalogue. Devices check
+participation, presence, Agent installation and subscription injection, never
+exact CLI model IDs or slots. `OrderView.deviceModels` and device
+`modelNotReported`/`modelEvidence` projections are removed. An older model
+listed by an authorized enabled credential can run on an eligible device even
+when the device reports only current shortcuts. Cloud image provenance and
+installed-Agent checks remain; the image's model list is not a model gate.
+
+The native runner still requires the exact prepared credential's model and
+owner, route and lease checks. It no longer probes the CLI for model admission.
+A structured native provider model refusal enters the existing per-task
+ordered continuation as `ProviderFailure {kind:'model', retryable:false,
+code:...}`. It neither marks the model/source unavailable globally nor changes
+the catalogue. Generic tool errors and bare HTTP 404s cannot trigger this path.
+Explicitly pinned model choices retain their existing refusal semantics;
+preference-driven tasks try the next authorized entry.
