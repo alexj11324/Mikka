@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { BASE, FILES, SOURCE, REF, HISTORY_SQL, METADATA_SQL, compilerExit, databaseInputs, inspectTarget, safeCode, sourceGuard } from './production-build-database-diagnostics.mjs'
+import { BASE, FILES, SOURCE, REF, HISTORY_SQL, METADATA_SQL, compilerExit, databaseInputs, inspectTarget, inspectDefaultSession, SESSION_SQL, safeCode, sourceGuard } from './production-build-database-diagnostics.mjs'
 import { REQUIRED, buildEnvironmentValues } from '../release/web-deploy.mjs'
 
 const head = 'a'.repeat(40)
@@ -86,5 +86,36 @@ test('compiler exit input cannot contain raw errors, shell fragments or out-of-r
   assert.equal(compilerExit('137'), 137)
   for (const value of [undefined, '', '-1', '256', '1; private-value', 'private-error', 1]) {
     assert.throws(() => compilerExit(value), { code: 'PROBE_METADATA_INVALID' })
+  }
+})
+
+const session = { database: 'private-db', role: 'private-role', transaction_read_only: false, default_read_only: false,
+  recovery: false, public_schema: true, public_journal: true, public_connections: true, public_keys: true,
+  statement_timeout_configured: false, function_present: true, function_owned: true, function_returns_trigger: true }
+test('default-session inspection preserves writable or read-only facts and only sends one fixed SELECT', async () => {
+  for (const readonly of [true, false]) {
+    const calls = []
+    const receipt = await inspectDefaultSession({ async query(input) { calls.push(input); return { rows: [{ ...session,
+      transaction_read_only: readonly, default_read_only: readonly }] } } }, 'MIKKA_DATABASE_URL',
+    'postgresql://private:password@ep-twilight-violet-b5lbqgbv.fixture.neon.tech/private-db?options=private')
+    assert.deepEqual(calls, [{ text: SESSION_SQL, query_timeout: 5000 }])
+    assert.match(SESSION_SQL, /^SELECT /)
+    assert.doesNotMatch(SESSION_SQL, /\b(SET|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)\b/i)
+    assert.equal(receipt.default_read_only, readonly)
+    assert.equal(receipt.expectedBranchEndpoint, true)
+    for (const secret of ['private-db', 'private-role', 'password', 'fixture.neon.tech', '?options=private']) {
+      assert.equal(JSON.stringify(receipt).includes(secret), false)
+    }
+  }
+})
+test('function absence is explicit N/A; malformed, arbitrary or nullable catalog facts fail closed', async () => {
+  const pool = row => ({ async query() { return { rows: [row] } } })
+  const receipt = await inspectDefaultSession(pool({ ...session, function_present: false, function_owned: null,
+    function_returns_trigger: null }), 'DATABASE_URL', 'postgres://fixture@localhost/db')
+  assert.equal(receipt.function_owned, null)
+  for (const row of [{ ...session, default_read_only: 'on' }, { ...session, public_keys: null },
+    { ...session, function_owned: null }]) {
+    await assert.rejects(inspectDefaultSession(pool(row), 'DATABASE_URL', 'postgres://fixture@localhost/db'),
+      { code: 'PROBE_METADATA_INVALID' })
   }
 })

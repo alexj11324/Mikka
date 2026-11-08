@@ -571,3 +571,90 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           COMPILER_EXIT: ${{ steps.compiler.outputs.exit }}
+
+  production-migration-default-session:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/ops/production-build-databases-20261108' &&
+      github.run_attempt == 1 && startsWith(github.event.head_commit.message, 'ops: diagnose migration default sessions')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MIKKA_EDITION: cloud
+      MIKKA_CLOUD_BACKEND_URL: https://mikka-cloud.vercel.app
+      VERCEL_ORG_ID: team_C7lwxVVvnUicFli6112mvxpv
+      VERCEL_PROJECT_ID: prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH
+      VERCEL_GIT_COMMIT_REF: main
+      VERCEL_GIT_COMMIT_SHA: c275637ed73966875610da7f831548d566868a62
+      NEXT_TELEMETRY_DISABLED: '1'
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: c275637ed73966875610da7f831548d566868a62
+          path: diagnostic-source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.2
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - name: Test source, fixed catalog SELECT and privacy boundaries before credentials
+        run: node --test scripts/ops/production-build-database-diagnostics.test.mjs
+      - name: Require the exact reviewed source and current main before authentication
+        run: node scripts/ops/production-build-database-diagnostics.mjs --preflight
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Install only the original frozen source dependencies without lifecycle scripts
+        run: pnpm --dir diagnostic-source install --frozen-lockfile --ignore-scripts
+      - name: Read the original production build-time values
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          recursive: false
+          include-imports: false
+      - name: Read the original Vercel pull credential
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_DEPLOY_TOKEN
+          include-imports: false
+      - name: Pull and fill the original production environment only on the runner
+        working-directory: diagnostic-source
+        run: |
+          umask 077
+          if ! npx --yes vercel@65.4.0 pull --yes --environment=production --token "$VERCEL_TOKEN" > "$RUNNER_TEMP/production-db-vercel-pull.log" 2>&1; then
+            echo '{"event":"production_build_db_diagnostics_failed","code":"PROBE_VERCEL_PULL_FAILED"}'
+            exit 1
+          fi
+          GITHUB_SHA=c275637ed73966875610da7f831548d566868a62 node scripts/release/web-deploy.mjs env .vercel/.env.production.local
+          chmod 600 .vercel/.env.production.local
+          id="$(GITHUB_SHA=c275637ed73966875610da7f831548d566868a62 node lib/deployment-id.mjs)"
+          echo "MIKKA_DEPLOYMENT_ID=$id" >> "$GITHUB_ENV"
+        env:
+          VERCEL_ORG_ID: team_C7lwxVVvnUicFli6112mvxpv
+          VERCEL_PROJECT_ID: prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH
+          VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
+      - name: Inspect only fixed catalog facts with original migrator session defaults
+        run: node scripts/ops/production-build-database-diagnostics.mjs --default-session
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

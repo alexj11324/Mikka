@@ -1,12 +1,12 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-export const SOURCE = '75930406dda8708a84786475656ae449f5ffda88'
-export const BASE = '85815106154cf6875872bb9e97f5c2ee33b37bcb'
+export const SOURCE = 'c275637ed73966875610da7f831548d566868a62'
+export const BASE = 'e676918397ff546d8b2c749946975906d397b477'
 export const REF = 'refs/heads/ops/production-build-databases-20261108'
 export const FILES = ['.github/workflows/infisical-cloud-capabilities.yml',
   'scripts/ops/production-build-database-diagnostics.mjs', 'scripts/ops/production-build-database-diagnostics.test.mjs']
@@ -85,6 +85,35 @@ export async function inspectTarget(pool, target, files, helpers, observe = () =
     pendingMigrationNames: missing.slice(0, 5), pendingNamesTruncated: missing.length > 5 }
 }
 
+// Fixed catalog/settings reads on the original migrator session. No SET or DDL.
+export const SESSION_SQL = `SELECT current_database() AS database, current_user AS role,
+  current_setting('transaction_read_only') = 'on' AS transaction_read_only,
+  current_setting('default_transaction_read_only') = 'on' AS default_read_only,
+  pg_is_in_recovery() AS recovery, current_schema() = 'public' AS public_schema,
+  to_regclass('schema_migrations') = to_regclass('public.schema_migrations') AS public_journal,
+  to_regclass('byos_connections') = to_regclass('public.byos_connections') AS public_connections,
+  to_regclass('model_api_keys') = to_regclass('public.model_api_keys') AS public_keys,
+  current_setting('statement_timeout') <> '0' AS statement_timeout_configured,
+  p.oid IS NOT NULL AS function_present,
+  CASE WHEN p.oid IS NOT NULL THEN pg_has_role(p.proowner, 'USAGE') ELSE NULL END AS function_owned,
+  CASE WHEN p.oid IS NOT NULL THEN p.prorettype = 'pg_catalog.trigger'::regtype ELSE NULL END AS function_returns_trigger
+  FROM (SELECT to_regprocedure('model_api_key_catalogue_settings()') AS oid) f
+  LEFT JOIN pg_proc p ON p.oid = f.oid`
+const sessionFlags = ['transaction_read_only', 'default_read_only', 'recovery', 'public_schema', 'public_journal',
+  'public_connections', 'public_keys', 'statement_timeout_configured', 'function_present']
+export async function inspectDefaultSession(pool, target, directUrl) {
+  if (!['MIKKA_DATABASE_URL', 'DATABASE_URL'].includes(target)) fail('PROBE_INPUT_REQUIRED')
+  const row = (await pool.query({ text: SESSION_SQL, query_timeout: 5000 })).rows?.[0]
+  if (!row || typeof row.database !== 'string' || typeof row.role !== 'string'
+    || sessionFlags.some(key => typeof row[key] !== 'boolean')
+    || ['function_owned', 'function_returns_trigger'].some(key => row.function_present
+      ? typeof row[key] !== 'boolean' : row[key] !== null)) fail('PROBE_METADATA_INVALID')
+  const host = new URL(directUrl).hostname
+  return { target, connected: true, databaseHash: hash(row.database), roleHash: hash(row.role), hostnameHash: hash(host),
+    expectedBranchEndpoint: host.split('.')[0] === 'ep-twilight-violet-b5lbqgbv',
+    ...Object.fromEntries([...sessionFlags, 'function_owned', 'function_returns_trigger'].map(key => [key, row[key]])) }
+}
+
 async function run() {
   const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
   const root = process.cwd(), sourceRoot = resolve(root, 'diagnostic-source'), env = process.env
@@ -105,6 +134,39 @@ async function run() {
       overlaySha: '0aef26958544fb9579c4d2b01dd1d34cfa22c051', log })
     console.log(JSON.stringify({ ...evidence, event: 'production_compiler_diagnostics', compilerWrapperExit: exitStatus,
       migrationSuppressed: true, deployed: false }))
+    return
+  }
+  if (process.argv[2] === '--default-session') {
+    const { productionBuildEnvironment } = await import(pathToFileURL(resolve(sourceRoot, 'scripts/release/build-vercel.mjs')).href)
+    const buildEnv = productionBuildEnvironment({ text: readFileSync(resolve(sourceRoot, '.vercel/.env.production.local'), 'utf8'),
+      env: { ...env, GITHUB_SHA: SOURCE }, sourceSha: SOURCE })
+    // Preserve the original Ops event identity for the child's independent guard;
+    // all PostgreSQL defaults and file/job values stay exactly as in the build.
+    const child = spawnSync(process.execPath, [process.argv[1], '--default-session-child'], {
+      cwd: root, env: { ...buildEnv, GITHUB_SHA: env.GITHUB_SHA }, stdio: 'inherit', timeout: 45000 })
+    if (child.error || child.status !== 0) fail('PROBE_METADATA_INVALID')
+    return
+  }
+  if (process.argv[2] === '--default-session-child') {
+    const { directDatabaseURL } = await import(pathToFileURL(resolve(sourceRoot, 'scripts/postgres-connection.mjs')).href)
+    const { Pool } = createRequire(resolve(sourceRoot, 'package.json'))('pg')
+    const receipts = []
+    for (const target of ['MIKKA_DATABASE_URL', 'DATABASE_URL']) {
+      let pool
+      try {
+        if (!env[target]) fail('PROBE_INPUT_REQUIRED')
+        const url = directDatabaseURL(env[target])
+        // Exact original migrator Pool options; do not override PGOPTIONS,
+        // readonly, search_path, application_name or connection URL parameters.
+        pool = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
+        pool.on('error', () => {})
+        receipts.push(await inspectDefaultSession(pool, target, url))
+      } catch (error) { receipts.push({ target, status: 'failed', code: safeCode(error) }) }
+      finally { await pool?.end() }
+    }
+    console.log(JSON.stringify({ event: 'production_migration_default_sessions', source: SOURCE,
+      fixedSelects: 2, sqlMutations: 0, migrations: 0, modelRequests: 0, deployed: false, receipts }))
+    if (receipts.some(row => row.connected !== true)) process.exitCode = 1
     return
   }
   if (process.argv[2] !== '--inspect') fail('PROBE_INPUT_REQUIRED')
