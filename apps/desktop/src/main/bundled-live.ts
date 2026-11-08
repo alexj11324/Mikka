@@ -24,7 +24,7 @@ export class BundledLive {
     if (generation !== this.generation || ownerGeneration !== (this.ownerGeneration.get(owner) ?? 0)) return null
     if (typeof ticket.url !== 'string' || typeof ticket.protocol !== 'string' || typeof ticket.expiresAt !== 'number') return null
     const target = new URL(ticket.url)
-    if (target.username || target.password || target.hash || target.search || !/^\/v1\/live\/[a-f0-9]{64}\/socket$/.test(target.pathname) || (target.protocol !== 'wss:' && !(target.protocol === 'ws:' && ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname))) || ticket.protocol.length > 4096 || ticket.expiresAt <= Date.now() || ticket.expiresAt > Date.now() + 15 * 60_000) throw new Error('Invalid live ticket')
+    if (target.username || target.password || target.hash || target.search || !/^(?:\/mikka)?\/v1\/live\/[a-f0-9]{64}\/socket$/.test(target.pathname) || (target.protocol !== 'wss:' && !(target.protocol === 'ws:' && ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname))) || ticket.protocol.length > 4096 || ticket.expiresAt <= Date.now() || ticket.expiresAt > Date.now() + 15 * 60_000) throw new Error('Invalid live ticket')
     const id = randomUUID()
     const expiry = setTimeout(() => this.close(owner, id), Math.max(0, ticket.expiresAt - Date.now()))
     expiry.unref()

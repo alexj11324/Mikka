@@ -181,10 +181,11 @@ const issueNumber = sql<number | null>`(coalesce(${issues.content}->'attrs'->'mi
 /** Rows with their task key: only for tasks the person can still see. */
 async function withIssueKeys(userId: string, rows: (Omit<ArtifactListItem, 'issueKey' | 'updatedAt'> & { updatedAt: Date })[]): Promise<ArtifactListItem[]> {
   const issueIds = [...new Set(rows.flatMap(row => row.issueId ? [row.issueId] : []))]
-  const tasks = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, number: issueNumber })
+  const visibility = issueIds.length ? await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, withIdentifierTeams: true }) : null
+  const tasks = visibility ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, number: issueNumber })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds })).predicate)) : []
-  const identifiers = await taskIdentifiers(tasks)
+    .where(and(inArray(issues.id, issueIds), visibility.predicate)) : []
+  const identifiers = await taskIdentifiers(tasks, db, visibility?.taskTeams)
   const numbers = new Map(tasks.map(task => [task.id, task.number]))
   return rows.map(({ updatedAt, ...row }) => {
     const number = row.issueId ? numbers.get(row.issueId) ?? null : null

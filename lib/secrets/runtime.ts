@@ -1,7 +1,8 @@
 import 'server-only'
+import { createHash } from 'node:crypto'
 // Workspace and repository secrets are enabled whenever the deployment has its
 // encryption key. Choosing BYO or platform E2B billing does not disable secret protection.
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq, inArray, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { userSecrets, workspaceSecrets } from '@/lib/db/secrets-schema'
 import { openSecret, secretAad, SecretsKeyMissingError, userSecretAad } from './crypto'
@@ -9,18 +10,58 @@ import { byoE2BKeyEnabled, workspaceSecretsConfigured, E2BKeyError } from './fla
 import { isReservedEnvName, repositoryRef } from './format'
 import type { SecretAuditHook } from './store'
 import { createSecretMasker, identityMasker, maskDeep, withCredentialMasking, type Masker } from './mask'
+import { effectiveSecretDelivery, type SecretDelivery } from './delivery'
 
 // The settings store (and its workspace-access chain) loads only when the encryption key is configured and a query runs.
 const guardSecretsDb: typeof import('./store').guardSecretsDb = async (work, onUnique) => (await import('./store')).guardSecretsDb(work, onUnique)
 
 type Env = Record<string, string | undefined>
-export interface RuntimeSecret { id?: string; name: string; kind: 'secret' | 'env'; value: string }
+export interface RuntimeSecret { id?: string; name: string; kind: 'secret' | 'env'; value: string; delivery?: SecretDelivery; revision?: string }
+
+type SecretRevisionRow = Pick<typeof userSecrets.$inferSelect, 'id' | 'name' | 'kind' | 'ciphertext' | 'iv' | 'keyVersion' | 'delivery'> & { scopeType?: string; scopeRef?: string }
+/** Note edits do not revoke a grant. Re-sealing, scope and delivery changes do. */
+export function secretRevision(row: SecretRevisionRow): string {
+  return createHash('sha256').update(JSON.stringify([row.id, row.name, row.kind, row.scopeType ?? null,
+    row.scopeRef ?? null, row.ciphertext, row.iv, row.keyVersion, effectiveSecretDelivery(row.delivery)])).digest('hex')
+}
+
+function snapshotOf(secrets: Array<{ name: string; revision?: string }>): string {
+  return createHash('sha256').update(JSON.stringify(secrets.map(secret => [secret.name, secret.revision])
+    .sort((a, b) => a[0]!.localeCompare(b[0]!)))).digest('hex')
+}
+
+/** Metadata only, in the caller's claim/renewal transaction. No plaintext is
+ * opened and no data-plane request calls this function. */
+export async function taskSecretMetadata(workspaceId: string | null, repository: string | null, ownerId: string,
+  query: Pick<typeof db, 'select'> = db, names?: readonly string[]): Promise<Array<{ id: string; name: string; kind: 'secret' | 'env'; revision: string; delivery: SecretDelivery }>> {
+  if (names && !names.length) return []
+  const scope = repository
+    ? or(eq(workspaceSecrets.scopeType, 'workspace'), and(eq(workspaceSecrets.scopeType, 'repository'), eq(workspaceSecrets.scopeRef, repository.toLowerCase())))
+    : eq(workspaceSecrets.scopeType, 'workspace')
+  const shared = workspaceId ? await query.select({ id: workspaceSecrets.id, name: workspaceSecrets.name, kind: workspaceSecrets.kind,
+    ciphertext: workspaceSecrets.ciphertext, iv: workspaceSecrets.iv, keyVersion: workspaceSecrets.keyVersion, delivery: workspaceSecrets.delivery,
+    scopeType: workspaceSecrets.scopeType, scopeRef: workspaceSecrets.scopeRef }).from(workspaceSecrets)
+    .where(and(eq(workspaceSecrets.workspaceId, workspaceId), scope, names ? inArray(workspaceSecrets.name, [...names]) : undefined)) : []
+  const own = await query.select({ id: userSecrets.id, name: userSecrets.name, kind: userSecrets.kind, ciphertext: userSecrets.ciphertext,
+    iv: userSecrets.iv, keyVersion: userSecrets.keyVersion, delivery: userSecrets.delivery }).from(userSecrets)
+    .where(and(eq(userSecrets.userId, ownerId), names ? inArray(userSecrets.name, [...names]) : undefined))
+  const effective = new Map<string, typeof shared[number] | typeof own[number]>()
+  for (const row of [...shared].sort((a, b) => Number(a.scopeType === 'repository') - Number(b.scopeType === 'repository'))) effective.set(row.name, row)
+  for (const row of own) effective.set(row.name, row)
+  return [...effective.values()].map(row => ({ id: row.id, name: row.name, kind: row.kind,
+    revision: secretRevision(row), delivery: effectiveSecretDelivery(row.delivery) }))
+}
+
+export async function taskSecretSnapshot(workspaceId: string | null, repository: string | null, ownerId: string,
+  query: Pick<typeof db, 'select'> = db): Promise<string> {
+  return snapshotOf(await taskSecretMetadata(workspaceId, repository, ownerId, query))
+}
 
 /** Workspace-scoped secrets and env vars, decrypted. Repository-scoped rows are not included. */
 export async function loadWorkspaceRuntimeSecrets(workspaceId: string, env: Env = process.env): Promise<RuntimeSecret[]> {
   const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.scopeType, 'workspace'))))
   return rows.map(row => {
-    try { return { id: row.id, name: row.name, kind: row.kind, value: openSecret(row, secretAad(row), env) } } catch (error) {
+    try { return { id: row.id, name: row.name, kind: row.kind, value: openSecret(row, secretAad(row), env), delivery: effectiveSecretDelivery(row.delivery), revision: secretRevision(row) } } catch (error) {
       if (error instanceof SecretsKeyMissingError) throw new E2BKeyError('e2b_unavailable', 'secrets key missing')
       console.error(`workspace secret ${row.id} failed to decrypt`)
       throw new E2BKeyError('e2b_unavailable', 'workspace secret unavailable')
@@ -45,7 +86,7 @@ export async function reservedInjectionFilter(workspaceId: string, secrets: Runt
 }
 
 function openRuntime(row: typeof workspaceSecrets.$inferSelect, env: Env): RuntimeSecret {
-  try { return { id: row.id, name: row.name, kind: row.kind, value: openSecret(row, secretAad(row), env) } } catch (error) {
+  try { return { id: row.id, name: row.name, kind: row.kind, value: openSecret(row, secretAad(row), env), delivery: effectiveSecretDelivery(row.delivery), revision: secretRevision(row) } } catch (error) {
     if (error instanceof SecretsKeyMissingError) throw new E2BKeyError('e2b_unavailable', 'secrets key missing')
     console.error(`workspace secret ${row.id} failed to decrypt`)
     throw new E2BKeyError('e2b_unavailable', 'workspace secret unavailable')
@@ -76,7 +117,7 @@ export function remoteRepositoryRef(remoteUrl: string | null | undefined): strin
 export async function loadUserRuntimeSecrets(ownerId: string, env: Env = process.env): Promise<RuntimeSecret[]> {
   const rows = await guardSecretsDb(() => db.select().from(userSecrets).where(eq(userSecrets.userId, ownerId)))
   return rows.map(row => {
-    try { return { id: row.id, name: row.name, kind: row.kind, value: openSecret(row, userSecretAad(row), env) } } catch (error) {
+    try { return { id: row.id, name: row.name, kind: row.kind, value: openSecret(row, userSecretAad(row), env), delivery: effectiveSecretDelivery(row.delivery), revision: secretRevision(row) } } catch (error) {
       if (error instanceof SecretsKeyMissingError) throw new E2BKeyError('e2b_unavailable', 'secrets key missing')
       console.error(`user secret ${row.id} failed to decrypt`)
       throw new E2BKeyError('e2b_unavailable', 'user secret unavailable')
@@ -84,12 +125,12 @@ export async function loadUserRuntimeSecrets(ownerId: string, env: Env = process
   })
 }
 
-export async function loadTaskRuntimeSecrets(workspaceId: string, repository: string | null, env: Env = process.env, ownerId?: string | null): Promise<RuntimeSecret[]> {
+export async function loadTaskRuntimeSecrets(workspaceId: string | null, repository: string | null, env: Env = process.env, ownerId?: string | null): Promise<RuntimeSecret[]> {
   const repo = repository?.toLowerCase() ?? null
   const scope = repo
     ? or(eq(workspaceSecrets.scopeType, 'workspace'), and(eq(workspaceSecrets.scopeType, 'repository'), eq(workspaceSecrets.scopeRef, repo)))
     : eq(workspaceSecrets.scopeType, 'workspace')
-  const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), scope)))
+  const rows = workspaceId ? await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), scope))) : []
   const rank = (row: typeof rows[number]) => row.scopeType === 'repository' ? 1 : 0
   const merged = new Map<string, RuntimeSecret>()
   for (const row of [...rows].sort((a, b) => rank(a) - rank(b))) merged.set(row.name, openRuntime(row, env))
@@ -99,14 +140,28 @@ export async function loadTaskRuntimeSecrets(workspaceId: string, repository: st
 }
 
 /**
- * Task env (NAME -> value) for the claim response, plus the names in it that are secrets (the daemon
- * masks those values before upload). Empty when the encryption key is not configured. Reserved names are skipped and audited by name.
+ * Ordinary env and explicitly approved direct values only. Protected values
+ * stay in server memory until sealed for this exact run; the snapshot fences
+ * concurrent changes before any claim bytes leave the server.
  */
-export async function taskSecretInjection(workspaceId: string, repository: string | null, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }, ownerId?: string | null): Promise<{ env: Record<string, string>; secretNames: string[] }> {
-  if (!workspaceSecretsConfigured(env)) return { env: {}, secretNames: [] }
+export interface TaskSecretInjection {
+  env: Record<string, string>
+  secretNames: string[]
+  /** Server memory only. The claim must encrypt these, never spread them into its response. */
+  protectedSecrets: RuntimeSecret[]
+  unavailable: string[]
+  snapshot?: string
+}
+
+export async function taskSecretInjection(workspaceId: string | null, repository: string | null, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }, ownerId?: string | null): Promise<TaskSecretInjection> {
+  if (!workspaceSecretsConfigured(env)) return { env: {}, secretNames: [], protectedSecrets: [], unavailable: [] }
   const secrets = await loadTaskRuntimeSecrets(workspaceId, repository, env, ownerId)
-  const injected = await reservedInjectionFilter(workspaceId, secrets, skipped)
-  return { env: injected, secretNames: secrets.filter(s => s.kind === 'secret' && Object.hasOwn(injected, s.name)).map(s => s.name) }
+  const direct = secrets.filter(secret => secret.kind === 'env' || effectiveSecretDelivery(secret.delivery).mode === 'direct')
+  const injected = await reservedInjectionFilter(workspaceId ?? 'personal', direct, workspaceId ? skipped : undefined)
+  const protectedSecrets = secrets.filter(secret => secret.kind === 'secret' && effectiveSecretDelivery(secret.delivery).mode === 'protected' && !isReservedEnvName(secret.name))
+  return { env: injected, secretNames: direct.filter(secret => secret.kind === 'secret' && Object.hasOwn(injected, secret.name)).map(secret => secret.name), snapshot: snapshotOf(secrets),
+    protectedSecrets: protectedSecrets.filter(secret => effectiveSecretDelivery(secret.delivery).mode === 'protected' && secret.delivery?.mode === 'protected' && secret.delivery.http),
+    unavailable: protectedSecrets.filter(secret => secret.delivery?.mode !== 'protected' || !secret.delivery.http).map(secret => secret.name) }
 }
 
 /** Task env (NAME -> value) only; see taskSecretInjection. */
@@ -146,10 +201,11 @@ export async function maskFor<T>(target: { workspaceId: string | null | undefine
   return maskDeep(value, await secretMaskerFor(target, env))
 }
 
-/** Workspace whose secrets a run's sandbox received: the workspace its cloud device token is bound to. Null for local devices (nothing injected, nothing to mask). */
+/** Output masking follows the persisted Task/Run tenant, including Personal
+ * workspaces and retained history. A device token cannot reattribute a run. */
 export async function runWorkspaceId(runId: string): Promise<string | null> {
-  const { rows } = await guardSecretsDb(async () => (await import('@/lib/db')).pool.query<{ workspaceId: string }>(
-    'SELECT t."boundWorkspaceId" AS "workspaceId" FROM agent_runs r JOIN device_tokens t ON t."boundDeviceId"=r."deviceId" WHERE r.id=$1 AND t."boundWorkspaceId" IS NOT NULL ORDER BY t."createdAt" DESC LIMIT 1', [runId]))
+  const { rows } = await guardSecretsDb(async () => (await import('@/lib/db')).pool.query<{ workspaceId: string | null }>(
+    'SELECT "workspaceId" FROM agent_runs WHERE id=$1 LIMIT 1', [runId]))
   return rows[0]?.workspaceId ?? null
 }
 

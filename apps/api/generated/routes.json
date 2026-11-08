@@ -803,7 +803,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "dc3284cf87d77b0e5cf0f738d4d95a1fc3e6033468068a6ca930af48f223c7b1"
+      "sourceHash": "83690e72095683aef1961e15b399dab4abaac18d56f67e04357e6decf722173d"
     },
     {
       "path": "/mikka/api/device-tokens/[tokenId]/revoke",
@@ -1577,6 +1577,16 @@
       "sourceHash": "276c412e105af607495eb724c5559b61656e5a0d89ef23cf5a9d51c7cb1211ae"
     },
     {
+      "path": "/mikka/api/secrets/delivery",
+      "template": "/api/secrets/delivery",
+      "source": "app/api/secrets/delivery/route.ts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "sourceHash": "d7090f753f8af5da218953a744e79e3f22ab9af95482625e725021b9bdd35f0c"
+    },
+    {
       "path": "/mikka/api/self-improvement",
       "template": "/api/self-improvement",
       "source": "app/api/self-improvement/route.ts",
@@ -2075,7 +2085,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "e7afdeb463e80355680671f123e2ee1bb6e9f8d9f06f1880e42a1c27ba51bd75"
+      "sourceHash": "b32fa96dd7fa77afca9900389f1a11266293eccfd7ce8b89e02d734a0de1395c"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/repos",
@@ -2111,7 +2121,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "586ced81afbb37c2215ffac487cdac1f0a92286902ada4c1536fdab5157e4d1d"
+      "sourceHash": "7e9cc34e7c980ed91a89298dd84bf05f2164679ea6300f36ea6503ad6276c2dd"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
@@ -2270,6 +2280,16 @@
         "POST"
       ],
       "sourceHash": "20557762165127bd0f548041265b7d1d3ffbdee769b3bf79e2f3736ad9d7e346"
+    },
+    {
+      "path": "/mikka/v1/task-secrets/[runId]",
+      "template": "/v1/task-secrets/[runId]",
+      "source": "app/v1/task-secrets/[runId]/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "8b9677d86e78dbad178a9f04fd694867050535246795269b6d18b6be0e21da8b"
     },
     {
       "path": "/mikka/w/[slug]",

@@ -11,6 +11,7 @@ import {
   runAssignmentSchema,
   runPatchSchema,
 } from "./device"
+import { TASK_SECRET_MAX_CAPABILITIES, TASK_SECRET_MAX_TOKEN_BYTES } from './task-secrets'
 
 describe("device online state", () => {
   const now = Date.parse("2026-10-16T12:00:00Z")
@@ -138,6 +139,52 @@ describe("device link schemas", () => {
     expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, token: "fixture-access" } }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, expiresAt: null } }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, token: "fixture\nheader", expiresAt: null } }).success).toBe(false)
+  })
+
+  it('preserves protected task metadata alongside unchanged native and GitHub credentials', () => {
+    const grant = { name: 'VENDOR_KEY', capability: 'synthetic-opaque-grant', expiresAt: '2030-01-01T00:00:00.000Z', origin: 'https://api.example.com' }
+    const taskSecrets = { version: 1, endpoint: 'https://mikka.example.com/v1/task-secrets/r1', grants: [grant], unavailable: ['SIGNING_KEY'] }
+    const github = { endpoint: 'https://mikka.example.com/api/runs/github-token', repository: 'owner/repo', token: 'synthetic-native-github', expiresAt: null }
+    const base = { runId: 'r1', issueId: 'i1', deviceId: 'd1', repoId: 'repo', harness: 'claude_code', prompt: 'p', github, taskSecrets }
+    const provider = { kind: 'provider', protocol: 'anthropic', baseUrl: 'https://api.anthropic.com', key: 'synthetic-native-model' }
+    const api = runAssignmentSchema.parse({ ...base, modelCredential: provider })
+    expect(api.taskSecrets).toEqual(taskSecrets)
+    expect(api.github).toEqual(github)
+    expect(api.modelCredential).toEqual(provider)
+    expect(api.taskEnv).toBeUndefined()
+    expect(api.taskSecretNames).toBeUndefined()
+    const subscriptionBinding = { bindingId: '00000000-0000-4000-8000-000000000001', ownerId: 'o', workspaceId: '00000000-0000-4000-8000-000000000002', consumerId: '00000000-0000-4000-8000-000000000003', route: 'claude_code_cli' }
+    const subscriptionLease = { route: 'claude_code_cli', modelId: 'claude-haiku-5-5', revision: 1, accountId: 'fixture', expiresAt: '2030-01-01T00:00:00.000Z', accessToken: 'synthetic-native-access' }
+    const subscription = runAssignmentSchema.parse({ ...base, subscriptionBinding, subscriptionLease })
+    expect(subscription.taskSecrets).toEqual(taskSecrets)
+    expect(subscription.github).toEqual(github)
+    expect(subscription.subscriptionLease).toEqual(subscriptionLease)
+    expect(runAssignmentSchema.parse({ ...base, taskSecrets: undefined }).taskSecrets).toBeUndefined()
+    for (const invalid of [{ ...taskSecrets, version: 2 }, { ...taskSecrets, env: { VENDOR_KEY: 'plaintext' } },
+      { ...taskSecrets, grants: [{ ...grant, secret: 'plaintext' }] }, { ...taskSecrets, grants: [{ ...grant, name: 'bad-name' }] },
+      { ...taskSecrets, grants: [{ ...grant, expiresAt: 'never' }] }]) {
+      expect(runAssignmentSchema.safeParse({ ...base, taskSecrets: invalid }).success).toBe(false)
+    }
+  })
+
+  it('bounds opaque assignment and heartbeat payloads while retaining renewal metadata', () => {
+    const grant = { name: 'VENDOR_KEY', capability: 'synthetic-opaque-grant', expiresAt: '2030-01-01T00:00:00.000Z', origin: 'https://api.example.com' }
+    const taskSecrets = { version: 1, endpoint: 'https://mikka.example.com/v1/task-secrets/r1', grants: [grant], unavailable: [] }
+    const assignment = { runId: 'r1', issueId: 'i1', deviceId: 'd1', repoId: 'repo', harness: 'codex', prompt: 'p', taskSecrets }
+    const heartbeat = { harnesses: [], runs: [{ runId: 'r1', lastProgressAt: '2030-01-01T00:00:00.000Z', secretCapabilities: [grant.capability] }], worktreeDiskBytes: 0 }
+    expect(deviceHeartbeatSchema.parse(heartbeat).runs[0].secretCapabilities).toEqual([grant.capability])
+    expect(heartbeatResultSchema.parse({ leases: { r1: grant.expiresAt }, taskSecrets: { r1: taskSecrets } }).taskSecrets).toEqual({ r1: taskSecrets })
+    const largest = 'x'.repeat(TASK_SECRET_MAX_TOKEN_BYTES)
+    expect(runAssignmentSchema.safeParse({ ...assignment, taskSecrets: { ...taskSecrets, grants: [{ ...grant, capability: largest }] } }).success).toBe(true)
+    for (const grants of [Array.from({ length: TASK_SECRET_MAX_CAPABILITIES + 1 }, () => grant),
+      [{ ...grant, capability: largest + 'x' }], Array.from({ length: 4 }, () => ({ ...grant, capability: largest }))]) {
+      expect(runAssignmentSchema.safeParse({ ...assignment, taskSecrets: { ...taskSecrets, grants } }).success).toBe(false)
+      expect(heartbeatResultSchema.safeParse({ leases: {}, taskSecrets: { r1: { ...taskSecrets, grants } } }).success).toBe(false)
+    }
+    for (const secretCapabilities of [Array(TASK_SECRET_MAX_CAPABILITIES + 1).fill(grant.capability), [largest + 'x'], Array(5).fill(largest), ['']]) {
+      expect(deviceHeartbeatSchema.safeParse({ ...heartbeat, runs: [{ ...heartbeat.runs[0], secretCapabilities }] }).success).toBe(false)
+    }
+    expect(deviceHeartbeatSchema.safeParse({ ...heartbeat, runs: [{ ...heartbeat.runs[0], secretCapabilities: Array(4).fill(largest) }] }).success).toBe(true)
   })
 
   it("accepts every daemon-local state in a patch, including stopped", () => {

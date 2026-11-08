@@ -1,4 +1,4 @@
-import { deviceModelEvidence, deviceStage, deviceSupport, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice, type RunLocation } from './model-order-plan'
+import { deviceStage, deviceSupport, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice, type RunLocation } from './model-order-plan'
 import type { CloudModelState } from './cloud-template-models'
 
 export type PresenceReason = 'online' | 'never_seen' | 'future_heartbeat' | 'heartbeat_expired'
@@ -22,7 +22,7 @@ export interface SchedulingNode {
   offlineDays: number | null
   presenceReason: PresenceReason | null
   harnesses: { harness: string; installed: boolean; models: string[] }[]
-  models: { id: string; harness: string; available: boolean; reason: string; modelEvidence?: 'account_catalogue' | 'cli_report' | 'only_latest_confirmed' | 'unknown' }[]
+  models: { id: string; harness: string; available: boolean; reason: string }[]
 }
 
 type Device = PoolDevice & { lastSeenAt?: Date | string | number | null }
@@ -70,7 +70,7 @@ export function deviceSchedulingView(input: {
       harnesses: device.harnesses.map(info => ({ harness: info.harness, installed: info.installed,
         models: [...new Set(input.entries.filter(entry => entry.harness === info.harness && deviceSupport(device, entry) === 'ready').map(entry => entry.model))] })),
       models: input.entries.map(entry => { const state = input.credential(entry); const stage = deviceStage(device, entry); return { id: entry.model, harness: entry.harness,
-        available: state.usable && stage === 'ready', reason: stage !== 'ready' ? stage : !state.usable ? state.reason : 'ready', modelEvidence: deviceModelEvidence(device, entry) } }),
+        available: state.usable && stage === 'ready', reason: stage !== 'ready' ? stage : !state.usable ? state.reason : 'ready' } }),
     })
   }
   for (const node of nodes) { const rank = ready.indexOf(node.id); node.order = rank < 0 ? null : rank + 1 }
