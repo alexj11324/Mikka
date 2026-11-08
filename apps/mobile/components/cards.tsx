@@ -16,15 +16,19 @@ export function ChatCard({ children, highlighted, style }: { children: ReactNode
 /**
  * A card button: primary is filled ink, secondary is grey with no stroke
  * (R-31), both pills. `busy` shows a spinner in place of nothing else changing.
+ * `hollow` draws a disabled primary as its ink outline at reduced opacity, not a
+ * grey fill (the review's 批准合并, #1738); `icon` sits before the label.
  */
-export function CardButton({ label, onPress, primary, disabled, busy, destructive }: {
-  label: string; onPress: () => void; primary?: boolean; disabled?: boolean; busy?: boolean; destructive?: boolean
+export function CardButton({ label, onPress, primary, disabled, busy, destructive, hollow, icon }: {
+  label: string; onPress: () => void; primary?: boolean; disabled?: boolean; busy?: boolean; destructive?: boolean; hollow?: boolean; icon?: ReactNode
 }) {
+  const outline = Boolean(hollow && primary && disabled)
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled || busy), busy: Boolean(busy) }} aria-disabled={Platform.OS === 'web' ? Boolean(disabled || busy) : undefined} aria-busy={Platform.OS === 'web' ? Boolean(busy) : undefined} disabled={disabled || busy} onPress={onPress}
-      style={({ pressed }) => [styles.button, primary ? styles.primary : styles.secondary, pressed && { opacity: 0.8 }, disabled && { opacity: 0.4 }]}>
+      style={({ pressed }) => [styles.button, outline ? styles.outline : primary ? styles.primary : styles.secondary, pressed && { opacity: 0.8 }, disabled && { opacity: outline ? 0.35 : 0.4 }]}>
       {busy ? <Spinner size={14} color={primary ? colors.onInk : colors.secondary} /> : null}
-      <Text style={[styles.buttonText, primary ? { color: colors.onInk } : destructive ? { color: colors.danger } : null]}>{label}</Text>
+      {icon && !busy ? icon : null}
+      <Text style={[styles.buttonText, outline ? { color: colors.ink } : primary ? { color: colors.onInk } : destructive ? { color: colors.danger } : null]}>{label}</Text>
     </Pressable>
   )
 }
@@ -52,6 +56,7 @@ const styles = StyleSheet.create({
   highlighted: { shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 14 },
   button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22 },
   primary: { backgroundColor: colors.ink },
+  outline: { borderWidth: 1.5, borderColor: colors.ink },
   secondary: { backgroundColor: colors.bubble },
   buttonText: { fontSize: 15, fontWeight: '600' },
   field: { flexDirection: 'row', gap: 12 },
