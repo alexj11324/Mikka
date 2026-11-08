@@ -184,15 +184,16 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
       if (jobs.total_count !== jobs.jobs?.length || builds.length !== 1 || job.status !== 'completed' || job.conclusion !== 'success') {
         throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
       }
-      const incomplete = BUILD_STEPS.filter(name => job.steps?.filter(step => step.name === name && step.status === 'completed' && step.conclusion === 'success').length !== 1)
-      if (incomplete.length) {
-        // Job completion can arrive before its step details. Keep every success
-        // gate, but wait within the existing deadline for missing/pending steps.
-        const awaitingSteps = incomplete.every(name => {
-          const steps = job.steps?.filter(step => step.name === name) ?? []
-          return steps.length === 0 || (steps.length === 1 && ['pending', 'in_progress'].includes(steps[0].status) && steps[0].conclusion == null)
-        })
-        if (!awaitingSteps) throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+      const required = BUILD_STEPS.map(name => Array.isArray(job.steps) ? job.steps.filter(step => step.name === name) : [])
+      if (required.some(steps => steps.length !== 1)) throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+      const steps = required.map(([step]) => step)
+      if (!steps.every(step => step.status === 'completed' && step.conclusion === 'success')) {
+        // GitHub can finish a job before its step list catches up. Only pending
+        // results may wait; skipped, failed, missing or duplicate proof refuses.
+        if (!steps.every(step => step.status === 'completed' ? step.conclusion === 'success'
+          : ['queued', 'pending', 'in_progress'].includes(step.status) && step.conclusion == null)) {
+          throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+        }
         if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))
         continue
       }
