@@ -281,11 +281,17 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
       await pool.query('UPDATE device_tokens SET "boundWorkspaceId"=$2 WHERE id=$1', [f.tokenId, personalId])
       const personalActor = { userId: owner, workspaceId: personalId }
       assert.equal((await resolve(f, personalActor)).identity.workspaceId, personalId)
-      // An unlinked workspace-scoped legacy task follows the same personal
-      // workspace rule; removing a team link never grants a team PAT access.
-      await pool.query('UPDATE issues SET scope=\'workspace\' WHERE id=$1', [issueId])
+      // The existing domain rejects promotion without an authorized Team.
+      // Seed a separate historical row to test legacy reads; do not disable
+      // the production promotion guard to manufacture this state.
+      await assert.rejects(() => pool.query('UPDATE issues SET scope=\'workspace\' WHERE id=$1', [issueId]),
+        (error: unknown) => (error as { code?: string }).code === '23514')
+      const legacyIssueId = randomUUID()
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope)
+        VALUES($1,$2,'Unlinked legacy task fixture','{"type":"doc"}','doing','normal','workspace')`, [legacyIssueId, owner])
+      await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [f.runId, legacyIssueId])
       assert.equal((await resolve(f, personalActor)).identity.workspaceId, personalId)
-      await pool.query('UPDATE issues SET "userId"=$2,scope=\'personal\' WHERE id=$1', [issueId, member])
+      await pool.query('UPDATE issues SET "userId"=$2,scope=\'personal\' WHERE id=$1', [legacyIssueId, member])
       await assert.rejects(() => resolve(f, personalActor), errorCode('workspace_not_found'))
     })
 
