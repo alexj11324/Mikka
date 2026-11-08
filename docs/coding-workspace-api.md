@@ -236,6 +236,33 @@ through `createApiHandler`, the complete daemon and its default `HttpServerLink`
 The latter uses retained fixture code and never starts a model. `REQUIRE_DB=1`
 fails when the isolated database is missing; a local skip is not a pass.
 
+`Coding Workspace Files acceptance` consumes a successful canonical main E2B
+release. Before checkout or smoke credentials it verifies the actual workflow,
+repository, SHA and run attempt; the driver rechecks the matching READY Web
+deployment and served SHA before and after execution. A relevant change with
+no newly validated/published worker is explicitly skipped, never a runtime pass.
+
+The production driver uses the shared smoke member and two ordinary tasks in
+`alexj11324/Mikka-handoff`, fixed to Claude Haiku 5.5 and Codex GPT-6 Luna. It
+waits for the normal persisted running state and worktree live event, then
+records identity, tree/search, a README range, and mention create/resolve through
+the public API. A paired native shell input/output independently reads the
+actual Git HEAD, README hash/range and root-owned installed worker identity.
+No assistant prose, mocked receipt or production configuration value substitutes
+for this native evidence. Reports retain hashes, versions, timings and request
+counts; they do not retain source text, credentials or absolute worktree paths.
+
+Cleanup uses the existing task/VM end path. Before deleting the owned fixture,
+the driver verifies actual machine-end receipts and an ended/no-resource view,
+then requires typed rejection of identity, file and old mention access. Normal
+end can revoke the device token, yielding `workspace_not_found` (404); a still
+authorized but released machine yields `workspace_machine_unavailable` (409).
+Neither a generic 404, an auth failure nor a timeout counts as this proof.
+An active-window miss or either harness failure remains a failed acceptance;
+the driver does not launch replacement model turns. It currently uses a real
+authorized Team task: canonical Shared No-Team coverage remains dependent on
+the domain-owner integration and is not claimed by this harness.
+
 Record final PR head, CI run, merge SHA, Web READY/served SHA, real E2B source
 read/reference evidence and remaining platform/canonical-integration gaps on
 #1721. Keep #1720 open until all its backend and UI scenarios are accepted.
