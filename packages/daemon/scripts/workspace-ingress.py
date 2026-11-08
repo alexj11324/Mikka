@@ -31,15 +31,44 @@ WORKER = '/opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js'
 FIELDS = {'version', 'sourceSha256', 'bootId', 'installedTicks', 'providerPorts', 'preparedBeforeWorker'}
 FAILURES = frozenset(('listener', 'boot', 'identity', 'state', 'receipt', 'provider', 'command', 'tool',
                       'backend', 'rule_order', 'late_install', 'worker', 'worker_order', 'operation', 'runtime'))
+COMMAND_OPERATIONS = frozenset(('new_chain', 'provider_rule', 'reply_rule', 'output_jump', 'check_output',
+                                'check_provider', 'check_reply', 'list_output', 'list_chain'))
 
 
 class IngressError(Exception):
     pass
 
 
+class IngressCommandError(IngressError):
+    """Retain closed observations only, never process arguments or output."""
+    def __init__(self, family, operation, failure_kind, returncode=None, stderr=b''):
+        if (family not in ('ipv4', 'ipv6') or not isinstance(operation, str) or operation not in COMMAND_OPERATIONS
+                or failure_kind not in ('exit', 'timeout', 'output_limit', 'execution')):
+            raise IngressError('runtime')
+        super().__init__('command')
+        text = stderr[:16384].lower() if isinstance(stderr, bytes) else b''
+        self.diagnostic = {
+            'family': family, 'operation': operation, 'failureKind': failure_kind,
+            'returnCode': returncode if type(returncode) is int and -255 <= returncode <= 255 else None,
+            'unsupportedRevision': bool(re.search(rb'revision [0-9]+ not supported', text)),
+            'missingKernelModule': b'missing kernel module' in text,
+            'missingExtension': b"couldn't load match" in text or b'could not load match' in text,
+            'operationNotSupported': b'operation not supported' in text,
+            'permissionDenied': b'permission denied' in text or b'operation not permitted' in text,
+            'invalidArgument': b'invalid argument' in text,
+        }
+
+
 def failure_detail(error):
     value = str(error) if isinstance(error, IngressError) else 'runtime'
     return value if value in FAILURES else 'runtime'
+
+
+def failure_receipt(error):
+    value = {'ok': False, 'detail': failure_detail(error)}
+    if isinstance(error, IngressCommandError):
+        value['command'] = error.diagnostic
+    return value
 
 
 def refuse(condition, reason):
@@ -124,12 +153,19 @@ def provider_ports():
     return [port for port, uids in owners.items() if uids == {0}]
 
 
-def execute(program, arguments, *, check=True):
-    result = subprocess.run([program, '--wait', '5', *arguments], stdin=subprocess.DEVNULL,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=7, check=False)
-    refuse(len(result.stdout) <= 65536 and len(result.stderr) <= 65536, 'command')
-    if check:
-        refuse(result.returncode == 0, 'command')
+def execute(program, arguments, *, family, operation, check=True):
+    refuse(family in ('ipv4', 'ipv6') and operation in COMMAND_OPERATIONS, 'runtime')
+    try:
+        result = subprocess.run([program, '--wait', '5', *arguments], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=7, check=False)
+    except subprocess.TimeoutExpired as error:
+        raise IngressCommandError(family, operation, 'timeout', stderr=error.stderr) from error
+    except OSError as error:
+        raise IngressCommandError(family, operation, 'execution') from error
+    if len(result.stdout) > 65536 or len(result.stderr) > 65536:
+        raise IngressCommandError(family, operation, 'output_limit', result.returncode, result.stderr)
+    if check and result.returncode != 0:
+        raise IngressCommandError(family, operation, 'exit', result.returncode, result.stderr)
     return result
 
 
@@ -157,15 +193,17 @@ def policy(ports):
     return provider, blocked, jump
 
 
-def check_rules(program, ports):
+def check_rules(program, ports, family):
     provider, blocked, jump = policy(ports)
-    execute(program, ['--check', 'OUTPUT', *jump])
-    execute(program, ['--check', CHAIN, *provider])
-    execute(program, ['--check', CHAIN, *blocked])
-    output = [shlex.split(line) for line in execute(program, ['--list-rules', 'OUTPUT']).stdout.decode('ascii').splitlines()]
+    execute(program, ['--check', 'OUTPUT', *jump], family=family, operation='check_output')
+    execute(program, ['--check', CHAIN, *provider], family=family, operation='check_provider')
+    execute(program, ['--check', CHAIN, *blocked], family=family, operation='check_reply')
+    output = [shlex.split(line) for line in execute(program, ['--list-rules', 'OUTPUT'],
+              family=family, operation='list_output').stdout.decode('ascii').splitlines()]
     output = [row for row in output if row[:2] == ['-A', 'OUTPUT']]
     refuse(output and output[0] == ['-A', 'OUTPUT', *jump], 'rule_order')
-    rules = [shlex.split(line) for line in execute(program, ['--list-rules', CHAIN]).stdout.decode('ascii').splitlines()]
+    rules = [shlex.split(line) for line in execute(program, ['--list-rules', CHAIN],
+             family=family, operation='list_chain').stdout.decode('ascii').splitlines()]
     rules = [row for row in rules if row[:2] == ['-A', CHAIN]]
     # -C above verifies each complete rule. Count/order reject an inserted
     # broad ACCEPT or another rule before the guarded reply decision.
@@ -175,8 +213,8 @@ def check_rules(program, ports):
 
 def verify():
     value = read_receipt()
-    for program in programs():
-        check_rules(program, value['providerPorts'])
+    for family, program in zip(('ipv4', 'ipv6'), programs()):
+        check_rules(program, value['providerPorts'], family)
     return {**value, 'rulesVerified': {'ipv4': True, 'ipv6': True}}
 
 
@@ -196,14 +234,14 @@ def prepare():
         ports = provider_ports()
         executables = programs()
         provider, blocked, jump = policy(ports)
-        for program in executables:
+        for family, program in zip(('ipv4', 'ipv6'), executables):
             # Unknown/partial installations fail closed. Do not flush or adopt
             # a pre-existing chain without its original root-owned receipt.
-            execute(program, ['--new-chain', CHAIN])
-            execute(program, ['--append', CHAIN, *provider])
-            execute(program, ['--append', CHAIN, *blocked])
-            execute(program, ['--insert', 'OUTPUT', '1', *jump])
-            check_rules(program, ports)
+            execute(program, ['--new-chain', CHAIN], family=family, operation='new_chain')
+            execute(program, ['--append', CHAIN, *provider], family=family, operation='provider_rule')
+            execute(program, ['--append', CHAIN, *blocked], family=family, operation='reply_rule')
+            execute(program, ['--insert', 'OUTPUT', '1', *jump], family=family, operation='output_jump')
+            check_rules(program, ports, family)
         value = {'version': VERSION, 'sourceSha256': source_hash(), 'bootId': boot_id(),
                  'installedTicks': ticks(), 'providerPorts': ports, 'preparedBeforeWorker': True}
         temporary = ROOT / 'receipt.next'
@@ -249,7 +287,7 @@ if __name__ == '__main__':
     except Exception as error:
         # Kernel/tool errors can include arbitrary rule comments. Expose only
         # a closed diagnosis, never raw stderr, command output or credentials.
-        receipt = json.dumps({'ok': False, 'detail': failure_detail(error)})
+        receipt = json.dumps(failure_receipt(error))
         print(receipt)
         # Startup suppresses success stdout. Preserve the same closed failure
         # diagnosis in builder logs without raw tool stderr, paths or data.

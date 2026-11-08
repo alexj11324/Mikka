@@ -33,6 +33,10 @@ BOOTSTRAP_PHASES = frozenset(('validation', 'source', 'node', 'gh', 'dependencie
                              'journal', 'desktop', 'finalize'))
 INGRESS_DETAILS = frozenset(('listener', 'boot', 'identity', 'state', 'receipt', 'provider', 'command', 'tool',
                              'backend', 'rule_order', 'late_install', 'worker', 'worker_order', 'operation', 'runtime'))
+INGRESS_COMMAND_OPERATIONS = frozenset(('new_chain', 'provider_rule', 'reply_rule', 'output_jump', 'check_output',
+                                      'check_provider', 'check_reply', 'list_output', 'list_chain'))
+INGRESS_COMMAND_FLAGS = ('unsupportedRevision', 'missingKernelModule', 'missingExtension',
+                         'operationNotSupported', 'permissionDenied', 'invalidArgument')
 HOST_ERRORS = frozenset(('official_cli_kind_invalid', 'official_cli_path_invalid', 'official_cli_baseline_mismatch',
     'official_cli_missing', 'official_cli_manifest_invalid', 'runtime_cli_missing', 'cli_relocation_invalid',
     'added_cli_paths_invalid', 'official_cli_changed', 'added_cli_path_invalid', 'official_cli_manifest_untrusted',
@@ -110,6 +114,17 @@ def exception_diagnostic(error):
     return {'exceptionChain': rows, 'exceptionChainTruncated': error is not None}
 
 
+def ingress_command(value):
+    if (not isinstance(value, dict) or value.get('family') not in ('ipv4', 'ipv6')
+            or not isinstance(value.get('operation'), str) or value['operation'] not in INGRESS_COMMAND_OPERATIONS
+            or value.get('failureKind') not in ('exit', 'timeout', 'output_limit', 'execution')
+            or 'returnCode' not in value
+            or not (value['returnCode'] is None or type(value['returnCode']) is int and -255 <= value['returnCode'] <= 255)
+            or any(type(value.get(flag)) is not bool for flag in INGRESS_COMMAND_FLAGS)):
+        return None
+    return {key: value[key] for key in ('family', 'operation', 'failureKind', 'returnCode', *INGRESS_COMMAND_FLAGS)}
+
+
 class BuildDiagnostics:
     """Consume the pinned SDK's public callback; retain no raw log messages.
 
@@ -168,9 +183,13 @@ class BuildDiagnostics:
                 value = json.loads(line) if line.startswith('{') else None
             except (ValueError, RecursionError):
                 value = None
-            if (isinstance(value, dict) and set(value) == {'ok', 'detail'} and value['ok'] is False
+            if (isinstance(value, dict) and set(value) in ({'ok', 'detail'}, {'ok', 'detail', 'command'}) and value['ok'] is False
                     and isinstance(value['detail'], str) and value['detail'] in INGRESS_DETAILS):
-                self.event({'phase': 'ingress', 'detail': value['detail']})
+                event = {'phase': 'ingress', 'detail': value['detail']}
+                command = ingress_command(value.get('command')) if value['detail'] == 'command' else None
+                if command is not None:
+                    event['command'] = command
+                self.event(event)
             elif (isinstance(value, dict) and set(value) == {'entries', 'sha256'}
                   and type(value['entries']) is int and 0 <= value['entries'] <= 10_000_000
                   and isinstance(value['sha256'], str) and re.fullmatch(r'[a-f0-9]{64}', value['sha256'])):

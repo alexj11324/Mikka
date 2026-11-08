@@ -24,6 +24,7 @@ class Netfilter:
         self.rules = {family: {'OUTPUT': []} for family in ('iptables', 'ip6tables')}
         self.calls = []
         self.fail = None
+        self.fail_exact = None
 
     def run(self, args, **options):
         self.calls.append(args)
@@ -34,7 +35,7 @@ class Netfilter:
         action, chain, *rule = tail[2:]
         table = self.rules[family]
         status, output = 0, b''
-        if self.fail == (family, action):
+        if self.fail == (family, action) or self.fail_exact == tuple(args):
             status = 1
         elif action == '--new-chain':
             if chain in table:
@@ -123,6 +124,34 @@ class IngressPolicy(unittest.TestCase):
             guard.prepare()
         self.assertFalse(guard.RECEIPT.exists(), 'a later request cannot adopt a partially installed chain')
 
+    def test_each_family_and_policy_operation_reports_the_actual_failing_call(self):
+        provider, reply, jump = guard.policy([49983])
+        operations = {
+            'new_chain': ['--new-chain', guard.CHAIN],
+            'provider_rule': ['--append', guard.CHAIN, *provider],
+            'reply_rule': ['--append', guard.CHAIN, *reply],
+            'output_jump': ['--insert', 'OUTPUT', '1', *jump],
+            'check_output': ['--check', 'OUTPUT', *jump],
+            'check_provider': ['--check', guard.CHAIN, *provider],
+            'check_reply': ['--check', guard.CHAIN, *reply],
+            'list_output': ['--list-rules', 'OUTPUT'],
+            'list_chain': ['--list-rules', guard.CHAIN],
+        }
+        for family, program in (('ipv4', 'iptables'), ('ipv6', 'ip6tables')):
+            for operation, arguments in operations.items():
+                with self.subTest(family=family, operation=operation):
+                    self.filter.rules = {name: {'OUTPUT': []} for name in ('iptables', 'ip6tables')}
+                    self.filter.fail_exact = tuple([program, '--wait', '5', *arguments])
+                    directory = self.root / (family + '-' + operation)
+                    with patch.object(guard, 'ROOT', directory), patch.object(guard, 'RECEIPT', directory / 'receipt.json'):
+                        with self.assertRaises(guard.IngressCommandError) as failed:
+                            guard.prepare()
+                        receipt = guard.failure_receipt(failed.exception)
+                        self.assertEqual(receipt['detail'], 'command')
+                        self.assertEqual({key: receipt['command'][key] for key in ('family', 'operation', 'failureKind', 'returnCode')},
+                                         {'family': family, 'operation': operation, 'failureKind': 'exit', 'returnCode': 1})
+                        self.assertFalse(guard.RECEIPT.exists(), 'failure must not grant a readiness receipt')
+
     def test_rule_precedence_and_added_broad_allow_fail_verification(self):
         guard.prepare()
         self.filter.rules['iptables']['OUTPUT'].insert(0, ['-j', 'ACCEPT'])
@@ -157,6 +186,78 @@ class IngressPolicy(unittest.TestCase):
                 guard.prepare()
         self.assertFalse(guard.RECEIPT.exists())
         self.assertFalse(self.filter.calls)
+
+
+class CommandDiagnostics(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix='mikka-command-diagnostic-')
+        self.addCleanup(temporary.cleanup)
+        self.program = Path(temporary.name) / 'fixture'
+        self.private = 'synthetic-private-command-value'
+        self.program.write_text(f'''#!{sys.executable}
+import sys,time
+mode=sys.argv[-1]
+private={self.private!r}
+if mode=='success':
+    sys.stdout.write('safe-result')
+elif mode=='failure':
+    sys.stdout.write(private)
+    sys.stderr.write(private+' revision 7 not supported; missing kernel module; could not load match; operation not supported; permission denied; invalid argument')
+    sys.exit(23)
+elif mode=='oversized':
+    sys.stderr.write(private*3000)
+elif mode=='timeout':
+    sys.stderr.write(private+' operation not permitted'); sys.stderr.flush(); time.sleep(30)
+''')
+        self.program.chmod(0o700)
+
+    def test_real_child_failure_emits_only_closed_fields_and_six_independent_flags(self):
+        with self.assertRaises(guard.IngressCommandError) as failed:
+            guard.execute(str(self.program), ['failure'], family='ipv6', operation='provider_rule')
+        value = guard.failure_receipt(failed.exception)
+        command = value['command']
+        self.assertEqual({key: command[key] for key in ('family', 'operation', 'failureKind', 'returnCode')},
+                         {'family': 'ipv6', 'operation': 'provider_rule', 'failureKind': 'exit', 'returnCode': 23})
+        flags = {'unsupportedRevision', 'missingKernelModule', 'missingExtension',
+                 'operationNotSupported', 'permissionDenied', 'invalidArgument'}
+        self.assertEqual(set(command), flags | {'family', 'operation', 'failureKind', 'returnCode'})
+        self.assertTrue(all(command[key] is True for key in flags))
+        self.assertNotIn(self.private, json.dumps(value))
+        self.assertNotIn(str(self.program), json.dumps(value))
+        success = guard.execute(str(self.program), ['success'], family='ipv4', operation='list_output')
+        self.assertEqual((success.returncode, success.stdout), (0, b'safe-result'))
+
+    def test_real_oversized_timeout_and_execution_errors_remain_closed_and_fail(self):
+        with self.assertRaises(guard.IngressCommandError) as failed:
+            guard.execute(str(self.program), ['oversized'], family='ipv4', operation='list_chain')
+        oversized = guard.failure_receipt(failed.exception)
+        self.assertEqual((oversized['command']['failureKind'], oversized['command']['returnCode']), ('output_limit', 0))
+        run = subprocess.run
+        with patch.object(guard.subprocess, 'run', side_effect=lambda *args, **kwargs: run(*args, **{**kwargs, 'timeout': 0.05})):
+            with self.assertRaises(guard.IngressCommandError) as failed:
+                guard.execute(str(self.program), ['timeout'], family='ipv4', operation='new_chain')
+        timed_out = guard.failure_receipt(failed.exception)
+        self.assertIsInstance(failed.exception.__cause__, subprocess.TimeoutExpired)
+        self.assertEqual((timed_out['command']['failureKind'], timed_out['command']['returnCode']), ('timeout', None))
+        with self.assertRaises(guard.IngressCommandError) as failed:
+            guard.execute(str(self.program.parent / self.private), [], family='ipv6', operation='new_chain')
+        unavailable = guard.failure_receipt(failed.exception)
+        self.assertIsInstance(failed.exception.__cause__, FileNotFoundError)
+        self.assertEqual((unavailable['command']['failureKind'], unavailable['command']['returnCode']), ('execution', None))
+        for value in (oversized, timed_out, unavailable):
+            self.assertEqual(value['detail'], 'command')
+            self.assertNotIn(self.private, json.dumps(value))
+            self.assertNotIn(str(self.program.parent), json.dumps(value))
+
+    def test_invalid_context_and_unbounded_returncodes_cannot_escape_the_closed_schema(self):
+        for family, operation, kind in ((self.private, 'new_chain', 'exit'), ('ipv4', self.private, 'exit'),
+                                        ('ipv4', 'new_chain', self.private)):
+            with self.assertRaises(guard.IngressError) as failed:
+                guard.IngressCommandError(family, operation, kind)
+            self.assertEqual(guard.failure_receipt(failed.exception), {'ok': False, 'detail': 'runtime'})
+        for code in (self.private, True, 256, -256):
+            failure = guard.IngressCommandError('ipv4', 'new_chain', 'exit', code)
+            self.assertIsNone(guard.failure_receipt(failure)['command']['returnCode'])
 
 
 class ProviderAndWorkerProof(unittest.TestCase):
