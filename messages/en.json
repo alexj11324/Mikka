@@ -1014,6 +1014,8 @@
       "changedTitle": "Renamed the task to {title}",
       "assigned": "Assigned to {name}",
       "unassigned": "Cleared the assignee",
+      "delegated": "Delegated to {name}",
+      "undelegated": "Cleared the delegate",
       "addedSubtask": "Added subtask {title}",
       "addedLabel": "Added label {name}",
       "removedLabel": "Removed label {name}",
@@ -1640,6 +1642,8 @@
       "readingActivity": "Loading activity…"
     },
     "activity": {
+      "archived": "archived the project",
+      "restored": "restored the project",
       "created": "created the project",
       "updatedOverview": "updated the project properties and overview",
       "updatedFields": "updated {fields}",

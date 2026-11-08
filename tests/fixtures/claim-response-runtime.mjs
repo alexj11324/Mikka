@@ -38,6 +38,58 @@ export const claimWorkspaceDatabase = { select: workspaceQuery, transaction: cal
 export const claimWorkspacePool = { query() { throw new Error('unexpected raw workspace query in claim fixture') } }
 const nextServer = import.meta.resolve('next/server')
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
+const actionError = new URL('../../lib/action-error.ts', import.meta.url).href
+const projectExecutionSource = `
+import assert from 'node:assert/strict'
+import {ActionFailureError} from ${JSON.stringify(actionError)}
+export async function withRunProjectExecution(input,frozen,operation){
+  const p=globalThis.claimResponseProbe, lease=p.projectAdmission
+  assert.ok(lease,'project admission must be explicitly configured')
+  assert.equal(lease.calls.length,0,'one resource admission per claim')
+  assert.deepEqual(input,{userId:p.run.userId,workspaceId:p.run.workspaceId,issueId:p.run.issueId,
+    repositoryKey:p.repo.remoteUrl?p.repo.repoPath:null,baseBranch:p.run.baseBranch,
+    runtime:p.device.kind==='cloud'?'cloud':'local',harness:p.run.agentDefinition?.harness??p.agent.harness})
+  assert.deepEqual(frozen,p.run.agentDefinition?.projectExecution,'validate the stored execution snapshot')
+  assert.equal(typeof operation,'function')
+  if(!['allow','projectRepositoryDenied','projectEnvironmentUnavailable'].includes(lease.decision))throw new Error('unexpected project admission decision')
+  lease.calls.push({input:structuredClone(input),frozen:structuredClone(frozen)})
+  lease.active=true
+  try{
+    if(lease.decision!=='allow')throw new ActionFailureError(lease.decision)
+    lease.operations++
+    return await operation()
+  }finally{lease.active=false;lease.releases++}
+}
+`
+const secretSource = `
+import assert from 'node:assert/strict'
+export function remoteRepositoryRef(url){assert.equal(url,globalThis.claimResponseProbe.repo.remoteUrl);return url}
+export async function taskSecretInjection(...args){
+  const p=globalThis.claimResponseProbe
+  assert.equal(args.length,5)
+  assert.equal(args[0],p.run.workspaceId);assert.equal(args[1],p.repo.remoteUrl)
+  assert.ok(args[2]===process.env,'ordinary task secrets use the process environment')
+  assert.equal(args[3],undefined);assert.equal(args[4],p.run.userId)
+  assert.equal(p.projectAdmission.active,true,'secret preparation requires the live resource lease')
+  assert.equal(p.run.agentDefinition?.projectExecution?.environment??null,null,'selected environments cannot fall back to all workspace secrets')
+  p.preparation.push('secrets');(p.secretReads??=[]).push(args)
+  return p.secretInjection??{env:{},secretNames:[]}
+}
+export async function environmentSecretInjection(...args){
+  const p=globalThis.claimResponseProbe,configuration=p.run.agentDefinition?.projectExecution?.environment
+  assert.ok(configuration,'environment injection requires a frozen selection')
+  assert.equal(args.length,5)
+  assert.equal(args[0],p.run.workspaceId);assert.equal(args[1],p.repo.remoteUrl)
+  assert.deepEqual(args[2],configuration)
+  assert.ok(args[3]===process.env,'environment secrets use the process environment')
+  assert.equal(args[4],p.run.userId)
+  assert.equal(p.projectAdmission.active,true,'environment preparation requires the live resource lease')
+  assert.ok(p.environmentInjection,'environment secret outcome must be explicitly configured')
+  p.preparation.push('environment-secrets')
+  p.environmentReads.push({workspaceId:args[0],repository:args[1],configuration:structuredClone(args[2]),ownerId:args[4]})
+  return structuredClone(p.environmentInjection)
+}
+`
 const dbSource = `import assert from 'node:assert/strict'
 import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
 
@@ -76,6 +128,7 @@ export const pool={connect:async()=>{
   const p=globalThis.claimResponseProbe
   assert.equal(checkedOutClient,undefined,'claim cannot acquire a second APP client')
   assert.equal(p.appActive,0)
+  assert.equal(p.projectAdmission.active,true,'resource lease survives through the final response fence')
   assert.equal(p.locks.at(-1),'workspace_members','Workspace admission precedes APP checkout')
   p.appActive=1;p.appCheckouts++
   const client={release(){
@@ -93,6 +146,7 @@ export async function withDatabaseClient(client,operation){
 `
 const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],
+  ['/lib/project-resources/run-lease.ts', projectExecutionSource],
   ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
   ['/lib/db/index.ts', dbSource],
   ['/lib/workspace-db.ts', `export {claimWorkspaceDatabase as workspaceDb, claimWorkspacePool as workspacePool} from ${JSON.stringify(import.meta.url)}`],
@@ -134,7 +188,7 @@ const sources = new Map([
     }
   `],
   ['/lib/computer/native-run-binding.ts', 'export async function nativeRunBinding(){return globalThis.claimResponseProbe.cloud.subscription}'],
-  ['/lib/secrets/runtime.ts', 'export function remoteRepositoryRef(url){return url};export async function taskSecretInjection(...args){const p=globalThis.claimResponseProbe;p.preparation.push("secrets");(p.secretReads??=[]).push(args);return p.secretInjection??{env:{},secretNames:[]}}'],
+  ['/lib/secrets/runtime.ts', secretSource],
   ['/lib/run-completion-effects.ts', 'export async function afterRunEnded(ownerId,runId){const p=globalThis.claimResponseProbe;(p.endedRuns??=[]).push({ownerId,runId})}'],
   ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(){throw new Error("unexpected daemon upgrade refusal")};export async function failQueuedSubscriptionRuntime(...args){const p=globalThis.claimResponseProbe;p.preparation.push("subscription-preflight");p.runtimeRefusal=args;p.run.status="failed";return true}'],
   ['/lib/app-tools-server.ts', 'export async function runAppToolkits(){return []}'],

@@ -132,8 +132,10 @@ export async function withProjectWriteScope<T>(reader: IssueReader, projectId: s
   const { withTaskWorkspace } = await import('@/lib/task-workspace')
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
     await lockTeamRelations(tx)
-    await tx.select({ id: projects.id }).from(projects)
+    const [current] = await tx.select({ id: projects.id, archivedAt: projects.archivedAt }).from(projects)
       .where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId))).for('share')
+    if (!current) throw new ProjectMapError('PROJECT_NOT_FOUND', 404)
+    if (current.archivedAt) throw new ProjectMapError('PROJECT_ARCHIVED', 409)
     const scope = await resolveProjectScope(reader, projectId, workspaceId, tx, observed.issueIds)
     return operation(scope)
   })

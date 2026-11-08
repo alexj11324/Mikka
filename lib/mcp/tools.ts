@@ -17,6 +17,7 @@ import { logReplyCompletion } from './reply-completion'
 import { coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
@@ -132,12 +133,14 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
 
 export async function listIssues(userId: string, input: { status?: string }) {
   if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
-  const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
+  const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
-  return rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50).map(({ content, updatedAt, ...row }) => ({
-    ...row, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
+  const page = rows.filter(row => !readIssueMetadata(row.content).deletedAt).slice(0, 50)
+  const identifiers = await taskIdentifiers(page)
+  return page.map(({ content, updatedAt, ownerId: _ownerId, scope: _scope, ...row }) => ({
+    ...row, identifier: identifiers.get(row.id) ?? null, number: readIssueMetadata(content).number ?? null, updatedAt: updatedAt.toISOString(),
   }))
 }
 
@@ -146,7 +149,8 @@ export async function getIssue(userId: string, issueId: string) {
   const issue = await issueForUser(userId, issueId)
   if (!issue) return null
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
-  const metadata = readIssueMetadata(issue.content)
+  const view = await issueView(issue)
+  const metadata = view.metadata
   // Children and the issues this one blocks point at it, so they are found by looking the other way.
   const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issueAttrsContent }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
@@ -157,9 +161,9 @@ export async function getIssue(userId: string, issueId: string) {
     return row ? [{ id: row.id, title: row.title, status: row.status }] : []
   })
   return {
-    id: issue.id, number: metadata.number ?? null, title: issue.title,
+    id: issue.id, identifier: view.identifier, projectId: view.projectId, number: metadata.number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
-    project: metadata.project, labels: metadata.labels.map(label => label.name), assignee: metadata.assignee ? { kind: metadata.assignee.kind, id: metadata.assignee.id, name: metadata.assignee.name } : null,
+    project: metadata.project, delegate: metadata.delegate, labels: metadata.labels.map(label => label.name), assignee: metadata.assignee ? { kind: metadata.assignee.kind, id: metadata.assignee.id, name: metadata.assignee.name } : null,
     dueDate: metadata.dueDate, pullRequests: metadata.pullRequests,
     relations: {
       parent: pick([metadata.parentId])[0] ?? null,

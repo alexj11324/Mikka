@@ -22,6 +22,8 @@
 
 生命周期操作按 Workspace/管理员成员 → `mikka-team-relations` 事务锁 → Team 行的顺序取锁，与 canonical Task/Project 写入一致。归档不跨数据库修改业务数据。移除分组前，所有仍存在的 Task 必须已经绑定同一 Workspace，Project 必须拥有相同 canonical `workspaceId`；pending 或冲突的遗留归属返回 `teamLifecycleConflict`，保留修复线索。
 
+普通 Team 关系写入持有 Workspace/member 的共享锁，随后只锁定 Team 行；不能在取得关系锁后将租户共享锁升级为排他锁。已有明确 Workspace 的调用在预读 Team 归属后即拒绝跨 Workspace 目标，不进入其他租户的锁序。
+
 Workspace 数据库的触发器在插入/更换 Team 关联时取得 Team 行共享锁，拒绝归档 Team 和跨 Workspace 链接；已有归档链接可保留、解除或移到可用 Team。Team 创建及项目绑定服务在创建 APP 对象之前也检查归档状态，避免两个数据库之间先写后失败。
 
 移除 Team 不删除 Project，也不触及 `workspace_project_tasks`、项目成员、依赖、milestone、项目版本或事件。Task 编号由稳定身份 ADR 的迁移和 Team 解绑触发器保存历史 alias；解绑不是重新发号或重新发布 PR。

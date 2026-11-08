@@ -1014,6 +1014,8 @@
       "changedTitle": "任务重命名为{title}",
       "assigned": "指派给{name}",
       "unassigned": "取消了负责人",
+      "delegated": "交给{name}执行",
+      "undelegated": "取消了执行委派",
       "addedSubtask": "添加了子任务 {title}",
       "addedLabel": "添加了标签 {name}",
       "removedLabel": "移除了标签 {name}",
@@ -1640,6 +1642,8 @@
       "readingActivity": "正在读取活动…"
     },
     "activity": {
+      "archived": "归档了项目",
+      "restored": "恢复了项目",
       "created": "创建了项目",
       "updatedOverview": "更新了项目属性与概览",
       "updatedFields": "更新了{fields}",

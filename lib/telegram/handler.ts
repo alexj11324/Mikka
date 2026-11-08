@@ -3,7 +3,7 @@ import 'server-only'
 
 import { createHash } from 'node:crypto'
 import { getTranslations } from 'next-intl/server'
-import { and, desc, eq, gt, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import type { Message, SlashCommandEvent, Thread } from 'chat'
 import type { TelegramMessage } from '@chat-adapter/telegram'
 import { z } from 'zod'
@@ -12,12 +12,13 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
-import { issueMembers, issues, linearIssueLinks, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
+import { issueMembers, issues, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { userActor } from '@/lib/activity-actor'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
+import { resolveTaskIdentifierAlias } from '@/lib/task-identity-store'
 import { issueTeamAccess } from '@/lib/issue-team-access'
 import { isIssueTeamAccessAllowed } from '@/lib/issue-team-access-policy'
 import { parseTelegramCommand } from './commands'
@@ -125,19 +126,13 @@ function statusLabel(status: string, t: Translator) {
   }
 }
 
-async function findAccessibleIssues(tx: Transaction, userId: string, workspaceId: string, match?: { id: string } | { identifier: string; number: number }) {
+async function findAccessibleIssues(tx: Transaction, userId: string, workspaceId: string, match?: { id: string }) {
   const metadata = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')`
-  const condition = match && 'id' in match
-    ? eq(issues.id, match.id)
-    : match && 'identifier' in match
-      // Narrowed here, then matched exactly against the shown identifier below.
-      ? or(sql`${metadata}->>'number' = ${String(match.number)}`, sql`exists (select 1 from ${linearIssueLinks} where ${linearIssueLinks.issueId} = ${issues.id} and upper(${linearIssueLinks.linearIdentifier}) = ${match.identifier})`)
-      : undefined
   const rows = await tx.select({ issue: issues }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(
       (await issueVisibility(userId, false, workspaceId)).predicate,
-      condition,
+      match ? eq(issues.id, match.id) : undefined,
       sql`${metadata}->>'deletedAt' is null`,
     ))
     .orderBy(desc(issues.updatedAt))
@@ -200,17 +195,21 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
     }
     case 'link': {
       if (conversation.draftTitle) return t('finishDraft')
-      const id = uuidSchema.safeParse(command.args)
-      const typed = command.args.trim().toUpperCase()
-      const number = typed.match(/^(?:[A-Z]+-|#)([1-9]\d*)$/)
-      const issueNumber = number ? Number(number[1]) : null
-      if (!id.success && (!issueNumber || !Number.isSafeInteger(issueNumber))) return t('linkUsage')
-      const candidates = await findAccessibleIssues(tx, userId, workspaceId, id.success ? { id: id.data } : { identifier: typed, number: issueNumber! })
-      const labels = await issueLabels(tx, candidates)
-      const matches = id.success ? candidates : candidates.filter(issue => labels.get(issue.id)?.toUpperCase() === typed)
-      if (!matches.length) return t('taskUnavailable')
-      if (matches.length > 1) return t('ambiguous')
-      const issue = matches[0]
+      const typed = command.args.trim()
+      if (!typed || typed.length > 256 || /\s/u.test(typed)) return t('linkUsage')
+      const id = uuidSchema.safeParse(typed)
+      let issueId: string
+      if (id.success) issueId = id.data
+      else {
+        // A historical spelling is a tenant-scoped hint, not permission or the
+        // current display value. Shared tasks may have another creator.
+        const resolved = await resolveTaskIdentifierAlias({ workspaceId, identifier: typed.toUpperCase() }, tx)
+        if (resolved.kind === 'ambiguous') return t('ambiguous')
+        if (resolved.kind === 'missing') return t('taskUnavailable')
+        issueId = resolved.issueId
+      }
+      const [issue] = await findAccessibleIssues(tx, userId, workspaceId, { id: issueId })
+      if (!issue) return t('taskUnavailable')
       await tx.update(telegramConversations).set({ issueId: issue.id, updatedAt: new Date() })
         .where(eq(telegramConversations.threadId, conversation.threadId))
       return t('linked', { issue: await issueLabel(tx, issue), title: issue.title })

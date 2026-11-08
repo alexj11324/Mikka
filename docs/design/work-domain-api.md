@@ -59,6 +59,29 @@ Names are display values. Renaming a Project cannot detach Tasks or reconnect
 a same-named Project. Member departure/suspension clears current lead/member
 projections while preserving historical event authors.
 
+### Project lifecycle
+
+The `projects` group also exposes `getProjectLifecycleImpact({id,workspaceId?})`,
+`archiveProject` / `restoreProject` with `{id,revision?,workspaceId?}`, and
+`deleteProject({id,revision,confirmation,workspaceId?})`. The impact result
+includes exact Task, Team, member, repository/environment, dependency,
+milestone, event, decision and frozen execution-reference counts plus
+`canDelete` and `recovery: 'restore_archive'`.
+
+Archiving preserves the UUID, delivery status, Task links and history. Reads
+remain authorized by the same Workspace; new writes, bindings, decisions,
+Run admission and claim are refused until restore. Tasks may be explicitly
+moved out of an archived Project. Restore advances revision and records an
+event. `projectArchived` is distinct from `projectNotFound`.
+
+Hard deletion is an admin operation, requires matching revision and typed
+name, and refuses any relationship or historical reference with
+`projectDeleteNotEmpty`. A normal Project already has its creation event,
+so archive is the normal retirement path. Only truly unused legacy/imported
+rows can satisfy the strict deletion predicate. The deletion audit remains
+at Workspace scope. The UI must not relabel hard delete as archive or hide
+its real impact behind a generic confirmation.
+
 ## Human responsibility and Agent delegation
 
 Task metadata has two independent nullable fields:

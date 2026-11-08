@@ -4,7 +4,9 @@ import { issueListChanged } from '../live/lists'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { z } from 'zod'
-import { issueDocuments, issueMembers, issueVersions, issues, linearConnections, linearIssueDetachments, linearIssueLinks, linearIssuePublications, linearTeamSyncs, users } from '@/lib/db/schema'
+import { issueDocuments, issueVersions, issues, linearConnections, linearIssueDetachments, linearIssueLinks, linearIssuePublications, linearTeamSyncs, users } from '@/lib/db/schema'
+import { workspaceMembers } from '@/lib/db/workspace-schema'
+import type { workspaceDb } from '@/lib/workspace-db'
 import { issuePriorityForLinear, issueStatusForLinearType, labelColorForLinear, linearPriorityForIssue, linearStateForIssue } from './mapping'
 import type { LinearStateOption } from './mapping'
 import { linearMarkdownToIssueContent, issueContentToMarkdown } from './markdown'
@@ -20,10 +22,14 @@ import { encodedIssueDocument, loadIssueDocument, replaceIssueDescription } from
 import { linearDescriptionChanged, shouldApplyLinearSnapshot } from './sync-guards'
 import { reserveLinearPublication, requireCurrentPublication, withCurrentPublication, withPublicationWriter, RetiredPublicationError, type Publication, type OutboxFence } from './publication'
 import { systemActor } from '@/lib/activity-actor'
-import { withTaskWorkspace } from '@/lib/task-workspace'
+import { withTaskWorkspace, type TaskWorkspace } from '@/lib/task-workspace'
+import { taskAssignees } from '@/lib/task-identifier-server'
 
 type IssueRow = typeof issues.$inferSelect
 type TeamRow = typeof linearTeamSyncs.$inferSelect
+type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+type AssigneeCandidate = { id: string; email: string }
 
 export class LinearSyncConflictError extends Error {
   constructor(message: string, readonly retryable = false) { super(message); this.name = 'LinearSyncConflictError' }
@@ -34,21 +40,36 @@ function externalLabelColor(color: string) {
   return colors[color] ?? colors.gray!
 }
 
-async function localAssigneeForRemote(ownerId: string, issueId: string, remote: LinearIssueSnapshot, isNew: boolean) {
+/** The caller already holds the workspace/owner lease. Lock the target member
+ * on that same WS transaction before entering the APP write transaction. Old
+ * issue invitations and provider emails never grant workspace membership. */
+async function localAssigneeForRemote(ownerId: string, workspace: TaskWorkspace, remote: LinearIssueSnapshot, workspaceTx: WorkspaceTransaction): Promise<AssigneeCandidate | null> {
   if (!remote.assignee?.email) return null
-  const [member] = await db.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.email, remote.assignee.email.toLowerCase())).limit(1)
+  const [member] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.email, remote.assignee.email.toLowerCase())).limit(1)
   if (!member) return null
-  if (member.id === ownerId) return { ...member, kind: 'member' as const }
-  if (isNew) return null
-  const [membership] = await db.select({ id: issueMembers.memberId }).from(issueMembers)
-    .where(and(eq(issueMembers.issueId, issueId), eq(issueMembers.userId, ownerId), eq(issueMembers.memberId, member.id))).limit(1)
-  return membership ? { ...member, kind: 'member' as const } : null
+  if (workspace.kind === 'personal' && member.id !== ownerId) return null
+  const [membership] = await workspaceTx.select({ id: workspaceMembers.userId }).from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, member.id), eq(workspaceMembers.status, 'active'))).for('share')
+  return membership ? member : null
 }
 
-async function linearAssigneeId(ownerId: string, metadata: ReturnType<typeof readIssueMetadata>, token: string) {
-  if (!metadata.assignee || metadata.assignee.kind !== 'member') return null
-  const [member] = await db.select({ email: users.email }).from(users).where(eq(users.id, metadata.assignee.id)).limit(1)
-  return member ? findLinearUserByEmail(token, member.email) : null
+async function lockedLocalAssignee(candidate: AssigneeCandidate | null, tx: Transaction) {
+  if (!candidate) return null
+  const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users)
+    .where(and(eq(users.id, candidate.id), eq(users.email, candidate.email))).for('share')
+  return member ? { ...member, kind: 'member' as const } : null
+}
+
+async function linearAssigneeId(issue: IssueRow, token: string) {
+  const reference = { id: issue.id, workspaceId: issue.workspaceId, assignee: readIssueMetadata(issue.content).assignee }
+  const assignee = (await taskAssignees([reference])).get(issue.id)
+  if (!assignee) return null
+  const [member] = await db.select({ email: users.email }).from(users).where(eq(users.id, assignee.id)).limit(1)
+  if (!member) return null
+  const remoteId = await findLinearUserByEmail(token, member.email)
+  // A provider lookup can take seconds; do not use a membership snapshot from
+  // before that HTTP request if the person was revoked while it was pending.
+  return remoteId && (await taskAssignees([reference])).get(issue.id) ? remoteId : null
 }
 
 async function labelIdsForLocal(token: string, teamId: string, metadata: ReturnType<typeof readIssueMetadata>, beforeWrite: () => Promise<void>) {
@@ -72,7 +93,8 @@ async function syncLink(snapshot: Publication, identifier: string, linearUpdated
 async function buildLinearIssueInput(issue: IssueRow, team: TeamRow, token: string, states: LinearStateOption[], snapshot: Publication) {
   const metadata = readIssueMetadata(issue.content)
   const state = linearStateForIssue(issue.status as Parameters<typeof linearStateForIssue>[0], states)
-  const assigneeId = await linearAssigneeId(issue.userId, metadata, token)
+  const labelIds = await labelIdsForLocal(token, team.linearTeamId, metadata, () => requireCurrentPublication(snapshot))
+  const assigneeId = await linearAssigneeId(issue, token)
   return {
     id: snapshot.publication.linearIssueId,
     teamId: team.linearTeamId,
@@ -82,7 +104,7 @@ async function buildLinearIssueInput(issue: IssueRow, team: TeamRow, token: stri
     dueDate: metadata.dueDate,
     ...(state ? { stateId: state.id } : {}),
     ...(assigneeId ? { assigneeId } : {}),
-    labelIds: await labelIdsForLocal(token, team.linearTeamId, metadata, () => requireCurrentPublication(snapshot)),
+    labelIds,
   }
 }
 
@@ -100,27 +122,29 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   const incomingContent = linearMarkdownToIssueContent(remote.description)
   if (JSON.stringify(incomingContent).length > 250_000) throw new LinearSyncConflictError('Linear description is larger than Mikka supports')
   if (remote.labels.length > 12) throw new LinearSyncConflictError('Linear issue has more than 12 labels; Mikka supports up to 12')
-  const assignee = await localAssigneeForRemote(team.ownerId, link.issue.id, remote, false)
   const nextPriority = issuePriorityForLinear(remote.priority)
   let statusEvent = false
   // A status change from Linear is recorded for its owner's Coordinator (triage decides whether it matters); its bot row
   // is resolved here, before the transaction. A Linear team sync belongs to its owner: the personal workspace's Coordinator.
   const coordinator = link.issue.status !== issueStatusForLinearType(remote.state?.type ?? '', link.issue.status as Parameters<typeof issueStatusForLinearType>[1], remote.state?.name)
     ? (await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(team.ownerId, team.workspaceId, { backfill: false })).botId : null
-  const saved = await withTaskWorkspace(team.ownerId, team.workspaceId, () => db.transaction(async tx => {
-    await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
-    const [latest] = await tx.select().from(issues).where(and(eq(issues.id, link.issue.id), eq(issues.userId, team.ownerId))).for('update')
-    if (!latest || latest.ownershipState !== 'bound' || latest.workspaceId !== team.workspaceId || latest.linearSyncPolicy !== 'explicit' || latest.linearSyncBlocked) return null
-    const [currentLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, link.link.id)).for('update')
-    if (!currentLink || !currentLink.externalTargetVerified || currentLink.ownerId !== team.ownerId || currentLink.teamSyncId !== team.id || currentLink.linearIssueId !== remote.id || !shouldApplyLinearSnapshot({ remoteUpdatedAt: new Date(remote.updatedAt), localUpdatedAt: latest.updatedAt, appSyncedAt: currentLink.appSyncedAt, linearUpdatedAt: currentLink.linearUpdatedAt, force })) return latest
-    const latestMetadata = readIssueMetadata(latest.content)
-    const nextStatus = issueStatusForLinearType(remote.state?.type ?? '', latest.status as Parameters<typeof issueStatusForLinearType>[1], remote.state?.name)
-    const descriptionChanged = linearDescriptionChanged(remote.description, currentLink.linearDescriptionHash, issueContentToMarkdown(latest.content))
-    const latestIncoming = withIssueMetadata(descriptionChanged ? incomingContent : latest.content, {
-      ...latestMetadata,
-      assignee,
-      dueDate: remote.dueDate,
-      labels: remote.labels.map(label => ({ name: label.name, color: labelColorForLinear(label.color) })),
+  const saved = await withTaskWorkspace(team.ownerId, team.workspaceId, async (workspace, workspaceTx) => {
+    const candidate = await localAssigneeForRemote(team.ownerId, workspace, remote, workspaceTx)
+    return db.transaction(async tx => {
+      await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
+      const [latest] = await tx.select().from(issues).where(and(eq(issues.id, link.issue.id), eq(issues.userId, team.ownerId))).for('update')
+      if (!latest || latest.ownershipState !== 'bound' || latest.workspaceId !== team.workspaceId || latest.linearSyncPolicy !== 'explicit' || latest.linearSyncBlocked) return null
+      const [currentLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.id, link.link.id)).for('update')
+      if (!currentLink || !currentLink.externalTargetVerified || currentLink.ownerId !== team.ownerId || currentLink.teamSyncId !== team.id || currentLink.linearIssueId !== remote.id || !shouldApplyLinearSnapshot({ remoteUpdatedAt: new Date(remote.updatedAt), localUpdatedAt: latest.updatedAt, appSyncedAt: currentLink.appSyncedAt, linearUpdatedAt: currentLink.linearUpdatedAt, force })) return latest
+      const latestMetadata = readIssueMetadata(latest.content)
+      const assignee = await lockedLocalAssignee(candidate, tx)
+      const nextStatus = issueStatusForLinearType(remote.state?.type ?? '', latest.status as Parameters<typeof issueStatusForLinearType>[1], remote.state?.name)
+      const descriptionChanged = linearDescriptionChanged(remote.description, currentLink.linearDescriptionHash, issueContentToMarkdown(latest.content))
+      const latestIncoming = withIssueMetadata(descriptionChanged ? incomingContent : latest.content, {
+        ...latestMetadata,
+        assignee,
+        dueDate: remote.dueDate,
+        labels: remote.labels.map(label => ({ name: label.name, color: labelColorForLinear(label.color) })),
     })
     const fieldsChanged = latest.title !== remote.title || latest.status !== nextStatus || latest.priority !== nextPriority || JSON.stringify(latestMetadata) !== JSON.stringify(readIssueMetadata(latestIncoming)) || descriptionChanged
     const nextRevision = latest.revision + (fieldsChanged ? 1 : 0)
@@ -150,7 +174,8 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
     await issueListChanged(tx, saved.id, latest.title !== saved.title)
     await tx.update(linearIssueLinks).set({ appSyncedAt: saved.updatedAt, linearUpdatedAt: new Date(remote.updatedAt), linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.id, link.link.id))
     return saved
-  }))
+    })
+  })
   if (statusEvent && await defaultModelAvailable(team.ownerId)) {
     const { wakeCoordinator } = await import('@/lib/coordinator/wake')
     await wakeCoordinator(team.ownerId)
@@ -167,79 +192,82 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
   if (remote.labels.length > 12) throw new LinearSyncConflictError('Linear issue has more than 12 labels; Mikka supports up to 12')
   const content = linearMarkdownToIssueContent(remote.description)
   if (JSON.stringify(content).length > 250_000) throw new LinearSyncConflictError('Linear description is larger than Mikka supports')
-  const assignee = await localAssigneeForRemote(team.ownerId, remote.id, remote, true)
-  const created = await withTaskWorkspace(team.ownerId, team.workspaceId, workspace => db.transaction(async tx => {
-    await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
-    const [binding] = await tx.select().from(linearTeamSyncs).where(eq(linearTeamSyncs.id, team.id)).for('share')
-    if (!binding?.active || binding.ownerId !== team.ownerId || binding.workspaceId !== workspace.id || binding.linearTeamId !== remote.team.id) return null
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${linearId.data}, 0))`)
-    const [detached] = await tx.select({ id: linearIssueDetachments.linearIssueId }).from(linearIssueDetachments).where(eq(linearIssueDetachments.linearIssueId, remote.id)).limit(1)
-    if (detached) return null
-    const [imported] = await tx.select({ issue: issues, link: linearIssueLinks }).from(linearIssueLinks)
-      .innerJoin(issues, eq(issues.id, linearIssueLinks.issueId)).where(eq(linearIssueLinks.linearIssueId, remote.id)).for('update')
-    if (imported) {
-      if (imported.issue.userId !== team.ownerId || imported.issue.workspaceId !== workspace.id || imported.issue.ownershipState !== 'bound' || imported.issue.linearSyncPolicy !== 'explicit' || imported.issue.linearSyncBlocked || imported.link.teamSyncId !== team.id || !imported.link.externalTargetVerified) return null
-      return { issue: imported.issue, syncRemote: true }
-    }
-    const [publication] = await tx.select().from(linearIssuePublications).where(eq(linearIssuePublications.linearIssueId, remote.id)).limit(1)
-    if (publication && (publication.retiredAt || publication.ownerId !== team.ownerId || publication.teamSyncId !== team.id)) return null
-    const localId = publication?.issueId ?? linearId.data
-    const [sameId] = await tx.select().from(issues).where(and(eq(issues.id, localId), eq(issues.userId, team.ownerId))).for('update').limit(1)
-    if (sameId) {
-      // Import never overrides a person's scope choice, including a detached UUID.
-      if (sameId.ownershipState !== 'bound' || sameId.workspaceId !== workspace.id || sameId.linearSyncPolicy !== 'explicit' || sameId.linearSyncBlocked) return null
-      const [existingLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.issueId, sameId.id)).limit(1)
-      // A reserved create is still owned by the outgoing worker. Its webhook
-      // must not acknowledge an old request against a newer local snapshot.
-      if (publication && !existingLink) return { issue: sameId, syncRemote: false }
-      if (existingLink && existingLink.linearIssueId !== remote.id) throw new LinearSyncConflictError('The issue is already linked to another Linear issue')
-      const [remoteLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remote.id)).limit(1)
-      if (remoteLink && remoteLink.issueId !== sameId.id) throw new LinearSyncConflictError('The Linear issue is already linked in Mikka')
-      const syncRemote = existingLink
-        ? !existingLink.linearUpdatedAt || remote.updatedAt > existingLink.linearUpdatedAt.toISOString()
-        : remote.updatedAt > sameId.updatedAt.toISOString()
-      if (!existingLink) await tx.insert(linearIssueLinks).values({
-        id: crypto.randomUUID(), issueId: sameId.id, ownerId: team.ownerId, teamSyncId: team.id,
-        linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: syncRemote ? null : hashValue(remote.description ?? ''), syncStatus: 'synced',
-        appSyncedAt: sameId.updatedAt, linearUpdatedAt: syncRemote ? null : new Date(remote.updatedAt), updatedAt: new Date(),
-      })
-      if (!existingLink) await issueListChanged(tx, sameId.id)
-      return { issue: sameId, syncRemote }
-    }
-    const [collision] = await tx.select({ id: issues.id }).from(issues).where(eq(issues.id, linearId.data)).limit(1)
-    if (collision) throw new LinearSyncConflictError('Linear issue ID conflicts with an existing Mikka issue')
-    const number = await allocateIssueNumbers(tx, team.ownerId)
-    const metadata = {
-      ...readIssueMetadata({ type: 'doc' }),
-      number,
-      assignee,
-      dueDate: remote.dueDate,
-      labels: remote.labels.slice(0, 12).map(label => ({ name: label.name, color: labelColorForLinear(label.color) })),
-    }
-    const id = crypto.randomUUID()
-    const issueContent = withIssueMetadata(content, metadata)
-    const now = new Date()
-    const [issue] = await tx.insert(issues).values({
-      id, userId: team.ownerId, workspaceId: workspace.id, ownershipState: 'bound', scope: workspace.kind === 'personal' ? 'personal' : 'workspace', scopeSetBy: 'user', linearSyncPolicy: 'explicit', linearSyncBlocked: false, title: remote.title, content: issueContent,
-      status: issueStatusForLinearType(remote.state?.type ?? '', 'todo', remote.state?.name), priority: issuePriorityForLinear(remote.priority),
-      revision: 1, createdAt: now, updatedAt: now,
-    }).returning()
-    const doc = loadIssueDocument(null, content)
-    try {
-      const state = encodedIssueDocument(doc)
-      await tx.insert(issueDocuments).values({ issueId: id, userId: team.ownerId, state, updatedAt: now })
-      await documentChanged(tx, id)
-    } finally { doc.destroy() }
-    await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: team.ownerId, revision: 1, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...systemActor('linear') })
-    await tx.insert(linearIssueLinks).values({
-      id: crypto.randomUUID(), issueId: id, ownerId: team.ownerId, teamSyncId: team.id,
-      externalTargetVerified: true,
-      linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced',
-      appSyncedAt: now, linearUpdatedAt: new Date(remote.updatedAt), updatedAt: now,
+  const created = await withTaskWorkspace(team.ownerId, team.workspaceId, async (workspace, workspaceTx) => {
+    const candidate = await localAssigneeForRemote(team.ownerId, workspace, remote, workspaceTx)
+    return db.transaction(async tx => {
+      await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
+      const [binding] = await tx.select().from(linearTeamSyncs).where(eq(linearTeamSyncs.id, team.id)).for('share')
+      if (!binding?.active || binding.ownerId !== team.ownerId || binding.workspaceId !== workspace.id || binding.linearTeamId !== remote.team.id) return null
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${linearId.data}, 0))`)
+      const [detached] = await tx.select({ id: linearIssueDetachments.linearIssueId }).from(linearIssueDetachments).where(eq(linearIssueDetachments.linearIssueId, remote.id)).limit(1)
+      if (detached) return null
+      const [imported] = await tx.select({ issue: issues, link: linearIssueLinks }).from(linearIssueLinks)
+        .innerJoin(issues, eq(issues.id, linearIssueLinks.issueId)).where(eq(linearIssueLinks.linearIssueId, remote.id)).for('update')
+      if (imported) {
+        if (imported.issue.userId !== team.ownerId || imported.issue.workspaceId !== workspace.id || imported.issue.ownershipState !== 'bound' || imported.issue.linearSyncPolicy !== 'explicit' || imported.issue.linearSyncBlocked || imported.link.teamSyncId !== team.id || !imported.link.externalTargetVerified) return null
+        return { issue: imported.issue, syncRemote: true }
+      }
+      const [publication] = await tx.select().from(linearIssuePublications).where(eq(linearIssuePublications.linearIssueId, remote.id)).limit(1)
+      if (publication && (publication.retiredAt || publication.ownerId !== team.ownerId || publication.teamSyncId !== team.id)) return null
+      const localId = publication?.issueId ?? linearId.data
+      const [sameId] = await tx.select().from(issues).where(and(eq(issues.id, localId), eq(issues.userId, team.ownerId))).for('update').limit(1)
+      if (sameId) {
+        // Import never overrides a person's scope choice, including a detached UUID.
+        if (sameId.ownershipState !== 'bound' || sameId.workspaceId !== workspace.id || sameId.linearSyncPolicy !== 'explicit' || sameId.linearSyncBlocked) return null
+        const [existingLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.issueId, sameId.id)).limit(1)
+        // A reserved create is still owned by the outgoing worker. Its webhook
+        // must not acknowledge an old request against a newer local snapshot.
+        if (publication && !existingLink) return { issue: sameId, syncRemote: false }
+        if (existingLink && existingLink.linearIssueId !== remote.id) throw new LinearSyncConflictError('The issue is already linked to another Linear issue')
+        const [remoteLink] = await tx.select().from(linearIssueLinks).where(eq(linearIssueLinks.linearIssueId, remote.id)).limit(1)
+        if (remoteLink && remoteLink.issueId !== sameId.id) throw new LinearSyncConflictError('The Linear issue is already linked in Mikka')
+        const syncRemote = existingLink
+          ? !existingLink.linearUpdatedAt || remote.updatedAt > existingLink.linearUpdatedAt.toISOString()
+          : remote.updatedAt > sameId.updatedAt.toISOString()
+        if (!existingLink) await tx.insert(linearIssueLinks).values({
+          id: crypto.randomUUID(), issueId: sameId.id, ownerId: team.ownerId, teamSyncId: team.id,
+          linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: syncRemote ? null : hashValue(remote.description ?? ''), syncStatus: 'synced',
+          appSyncedAt: sameId.updatedAt, linearUpdatedAt: syncRemote ? null : new Date(remote.updatedAt), updatedAt: new Date(),
+        })
+        if (!existingLink) await issueListChanged(tx, sameId.id)
+        return { issue: sameId, syncRemote }
+      }
+      const [collision] = await tx.select({ id: issues.id }).from(issues).where(eq(issues.id, linearId.data)).limit(1)
+      if (collision) throw new LinearSyncConflictError('Linear issue ID conflicts with an existing Mikka issue')
+      const number = await allocateIssueNumbers(tx, team.ownerId)
+      const assignee = await lockedLocalAssignee(candidate, tx)
+      const metadata = {
+        ...readIssueMetadata({ type: 'doc' }),
+        number,
+        assignee,
+        dueDate: remote.dueDate,
+        labels: remote.labels.slice(0, 12).map(label => ({ name: label.name, color: labelColorForLinear(label.color) })),
+      }
+      const id = crypto.randomUUID()
+      const issueContent = withIssueMetadata(content, metadata)
+      const now = new Date()
+      const [issue] = await tx.insert(issues).values({
+        id, userId: team.ownerId, workspaceId: workspace.id, ownershipState: 'bound', scope: workspace.kind === 'personal' ? 'personal' : 'workspace', scopeSetBy: 'user', linearSyncPolicy: 'explicit', linearSyncBlocked: false, title: remote.title, content: issueContent,
+        status: issueStatusForLinearType(remote.state?.type ?? '', 'todo', remote.state?.name), priority: issuePriorityForLinear(remote.priority),
+        revision: 1, createdAt: now, updatedAt: now,
+      }).returning()
+      const doc = loadIssueDocument(null, content)
+      try {
+        const state = encodedIssueDocument(doc)
+        await tx.insert(issueDocuments).values({ issueId: id, userId: team.ownerId, state, updatedAt: now })
+        await documentChanged(tx, id)
+      } finally { doc.destroy() }
+      await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: team.ownerId, revision: 1, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...systemActor('linear') })
+      await tx.insert(linearIssueLinks).values({
+        id: crypto.randomUUID(), issueId: id, ownerId: team.ownerId, teamSyncId: team.id,
+        externalTargetVerified: true,
+        linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced',
+        appSyncedAt: now, linearUpdatedAt: new Date(remote.updatedAt), updatedAt: now,
     })
     await issueListChanged(tx, id)
     return { issue, syncRemote: false }
-  }))
+    })
+  })
   if (!created) return null
   if (created.syncRemote) return await applyLinearIssueToApp(team, remote) ?? created.issue
   return created.issue
@@ -309,7 +337,7 @@ async function syncPublication(snapshot: Publication) {
     const remoteLabelNames = remote!.labels.map(label => label.name.toLowerCase()).sort()
     const localLabelNames = metadata.labels.map(label => label.name.toLowerCase()).sort()
     const nextState = linearStateForIssue(issue.status as Parameters<typeof linearStateForIssue>[0], externalTeam.states)
-    const assigneeId = await linearAssigneeId(issue.userId, metadata, token)
+    const assigneeId = await linearAssigneeId(issue, token)
     const patch: Record<string, unknown> = {}
     if (remote!.title !== input.title) patch.title = input.title
     if ((remote!.description ?? '') !== input.description) patch.description = input.description

@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import test, { mock } from 'node:test'
 import { count, dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedProject, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('Team lifecycle preserves canonical workspace objects and their history', { skip: !dbUrl }, async t => {
+  const intl = await import('next-intl/server')
+  mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en',
+    getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  t.after(() => mock.restoreAll())
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 4 })
   const lifecycle = await import('../lib/workspace-admin/teams')
   const { WorkspaceError } = await import('../lib/workspace-access')
-  const { accessibleTeams, accessibleTeamScopes } = await import('../lib/team-access')
+  const { accessibleTeams, accessibleTeamScopes, lockTeamRelations, requireActiveTeam } = await import('../lib/team-access')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
@@ -57,9 +61,9 @@ test('Team lifecycle preserves canonical workspace objects and their history', {
     await assert.rejects(pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [personalTask, legacyTeam.id, legacyWorkspace.id, legacyOwner]), /teamPersonalWorkspace/)
     await assert.rejects(pool.query('insert into mikka_team_projects("projectId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [randomUUID(), legacyTeam.id, legacyWorkspace.id, legacyOwner]), /teamPersonalWorkspace/)
     await assert.rejects(pool.query('insert into mikka_team_members("teamId","userId") values($1,$2)', [legacyTeam.id, member]), /teamPersonalWorkspace/)
-    await teamLifecycle.archiveTeamData(legacyOwner, legacyTeam.id)
-    await teamLifecycle.restoreTeamData(legacyOwner, legacyTeam.id)
-    await teamLifecycle.removeTeamGroupingData(legacyOwner, legacyTeam.id, legacyTeam.name)
+    await lifecycle.archiveTeamData(legacyOwner, legacyTeam.id)
+    await lifecycle.restoreTeamData(legacyOwner, legacyTeam.id)
+    await lifecycle.removeTeamGroupingData(legacyOwner, legacyTeam.id, legacyTeam.name)
     assert.equal(await count(pool, 'issues where id=$1 and "workspaceId"=$2', [personalTask, legacyWorkspace.id]), 1)
   })
 
@@ -74,6 +78,49 @@ test('Team lifecycle preserves canonical workspace objects and their history', {
     }
     await rejects(lifecycle.archiveTeamData(admin, foreignTeam.id), 'workspaceAccessDenied')
     assert.equal(await count(pool, 'team_lifecycle_events where "teamId"=$1', [team.id]), 0)
+  })
+
+  await t.test('concurrent Team writes keep shared workspace authority without a lock upgrade', async () => {
+    const { sql } = await import('drizzle-orm')
+    const { withTaskWorkspace } = await import('../lib/task-workspace')
+    let arrived = 0
+    let release!: () => void
+    const ready = new Promise<void>(resolve => { release = resolve })
+    const write = async () => {
+      try {
+        return await withTaskWorkspace(admin, workspace.id, async (_scope, tx) => {
+          await tx.execute(sql`set local lock_timeout = '2s'`)
+          // Reproduce the two real setIssueTeam/setProjectTeams callbacks:
+          // both hold Workspace/member SHARE before asking for the relation lock.
+          if (++arrived === 2) release()
+          await ready
+          await lockTeamRelations(tx)
+          return (await requireActiveTeam(tx, team.id, admin)).id
+        })
+      } catch (error) {
+        release()
+        throw error
+      }
+    }
+    assert.deepEqual(await Promise.all([write(), write()]), [team.id, team.id])
+  })
+
+  await t.test('a foreign Team is rejected before taking any destination workspace lock', async () => {
+    const { sql } = await import('drizzle-orm')
+    const { withTaskWorkspace } = await import('../lib/task-workspace')
+    const blockedTenant = await pool.connect()
+    try {
+      await blockedTenant.query('begin')
+      await blockedTenant.query('select id from mikka_workspaces where id=$1 for update', [foreign.id])
+      await rejects(withTaskWorkspace(admin, workspace.id, async (_scope, tx) => {
+        await tx.execute(sql`set local lock_timeout = '150ms'`)
+        await lockTeamRelations(tx)
+        await requireActiveTeam(tx, foreignTeam.id, admin, false, workspace.id)
+      }), 'workspaceAccessDenied')
+    } finally {
+      await blockedTenant.query('rollback')
+      blockedTenant.release()
+    }
   })
 
   await t.test('preview counts shared projects and real Run/PR references; nonempty hard delete refuses', async () => {

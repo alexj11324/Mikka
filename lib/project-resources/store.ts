@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { db } from '@/lib/db'
+import { inDatabaseTransaction } from '@/lib/db/request-scope'
 import { workspaceSecrets } from '@/lib/db/secrets-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
@@ -25,7 +26,7 @@ export async function withProjectResourceLease<T>(reader: Reader, workspaceId: s
   if (scope.workspaceId && scope.workspaceId !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   const held = resourceLease.getStore()
   if (held?.active && held.userId === scope.userId && held.workspaceId === workspaceId) return work(held.tx)
-  if (requireExisting || held?.active) throw new ActionFailureError('projectEnvironmentUnavailable')
+  if (requireExisting || inDatabaseTransaction() || held?.active) throw new ActionFailureError('projectEnvironmentUnavailable')
   return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations',0))`)
     await resourceLock(tx, workspaceId, false)
@@ -146,8 +147,9 @@ export async function saveProjectResources(reader: Reader, raw: z.input<typeof p
   return withTaskWorkspace(reader, input.workspaceId, async (_workspace, tx) => {
     await admin(tx, reader, input.workspaceId)
     await resourceWriteLock(tx, input.workspaceId)
-    const current = await tx.execute(sql`select revision from workspace_projects where id=${input.projectId} and "workspaceId"=${input.workspaceId} for update`)
+    const current = await tx.execute(sql`select revision,"archivedAt" from workspace_projects where id=${input.projectId} and "workspaceId"=${input.workspaceId} for update`)
     if (!current.rowCount) throw new ActionFailureError('projectNotFound')
+    if (current.rows[0].archivedAt) throw new ActionFailureError('projectArchived')
     if (Number(current.rows[0].revision) !== input.revision) throw new ActionFailureError('projectResourceConflict')
     const ids = [...new Set(input.environmentIds)]
     for (const id of ids) {
@@ -173,8 +175,9 @@ export async function withProjectExecution<T>(input: ProjectExecutionInput, oper
   return withProjectResourceLease(input.userId, input.workspaceId, async tx => {
     const policy = await tx.execute<{ mode: string; repositoryKeys: string[]; revision: number }>(sql`select mode,"repositoryKeys",revision from workspace_repository_policies where "workspaceId"=${input.workspaceId}`)
     if (policy.rows[0]?.mode === 'restricted' && input.repositoryKey && !policy.rows[0].repositoryKeys.includes(input.repositoryKey)) throw new ActionFailureError('projectRepositoryDenied')
-    const project = await tx.execute<{ id: string; revision: number }>(sql`select p.id,p.revision from workspace_project_tasks t join workspace_projects p on p.id=t."projectId" and p."workspaceId"=t."workspaceId" where t."issueId"=${input.issueId} and t."workspaceId"=${input.workspaceId}`)
+    const project = await tx.execute<{ id: string; revision: number; archivedAt: Date | null }>(sql`select p.id,p.revision,p."archivedAt" from workspace_project_tasks t join workspace_projects p on p.id=t."projectId" and p."workspaceId"=t."workspaceId" where t."issueId"=${input.issueId} and t."workspaceId"=${input.workspaceId}`)
     const selected = project.rows[0]
+    if (selected?.archivedAt) throw new ActionFailureError('projectArchived')
     let environmentId: string | null = null
     let baseBranch = input.baseBranch
     if (selected) {

@@ -36,7 +36,7 @@ export async function setIssueTeam(input: { issueId: string; teamId: string | nu
       const [current] = await tx.select().from(teamIssues).where(eq(teamIssues.issueId, issue.id)).limit(1)
       if ((current?.teamId ?? null) !== input.expectedTeamId) throw new ActionFailureError('teamIssueChanged')
       if (current && current.workspaceId !== workspace.id) throw new ActionFailureError('workspaceAccessDenied')
-      const destination = input.teamId ? await requireActiveTeam(tx, input.teamId, user.id) : null
+      const destination = input.teamId ? await requireActiveTeam(tx, input.teamId, user.id, false, workspace.id) : null
       if (destination && (workspace.kind === 'personal' || destination.workspaceId !== workspace.id)) throw new ActionFailureError('workspaceAccessDenied')
       // Project collaboration Teams are independent of the task's optional grouping.
       const previousLists = await issueListScopesBeforeChange(issue)
@@ -68,7 +68,7 @@ export async function setProjectTeams(input: { projectId: string; revision: numb
       if (project.revision !== parsed.revision) throw new ActionFailureError('projectStale')
       if (tenant.kind === 'personal' && ids.length) throw new ActionFailureError('workspaceAccessDenied')
       for (const id of ids) {
-        const team = await requireActiveTeam(tx, id, user.id)
+        const team = await requireActiveTeam(tx, id, user.id, false, tenant.id)
         if (team.workspaceId !== tenant.id) throw new ActionFailureError('workspaceAccessDenied')
       }
       const [updated] = await tx.update(projects).set({ revision: parsed.revision + 1, updatedAt: new Date() })

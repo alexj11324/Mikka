@@ -72,7 +72,7 @@ export async function saveTeam(input: { id?: string; workspaceId: string; name: 
       const { workspace } = await requireWorkspace(tx, input.workspaceId, user.id)
       await lockTeamRelations(tx)
       if (input.id) {
-        const current = await requireActiveTeam(tx, input.id, user.id, true)
+        const current = await requireActiveTeam(tx, input.id, user.id, true, input.workspaceId)
         if (current.workspaceId !== input.workspaceId) throw new WorkspaceError(i18nText("FeatureCopy.c_55559894"))
         const [team] = await tx.update(teams).set({ ...values, updatedAt: new Date() }).where(and(eq(teams.id, input.id), eq(teams.workspaceId, current.workspaceId))).returning()
         await workspaceListChanged(tx, current.workspaceId, ['workspace_settings', 'issue_list'])

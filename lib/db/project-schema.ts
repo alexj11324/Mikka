@@ -1,6 +1,6 @@
 import { pgTable, uuid, text, varchar, jsonb, integer, timestamp, index, unique, primaryKey, foreignKey } from 'drizzle-orm/pg-core'
 import type { ProjectDraft } from '@/lib/project-input'
-import { workspaces } from './workspace-schema'
+import { workspaces } from './workspace-schema.ts'
 
 export const projects = pgTable('workspace_projects', {
   id: uuid('id').primaryKey(),
@@ -9,6 +9,8 @@ export const projects = pgTable('workspace_projects', {
   /** Stable creator identity; retained under the old column name for compatibility. */
   userId: text('userId').notNull(),
   leadUserId: text('leadUserId'),
+  archivedAt: timestamp('archivedAt', { withTimezone: true }),
+  archivedBy: text('archivedBy'),
   name: varchar('name', { length: 200 }).notNull(), summary: varchar('summary', { length: 500 }).notNull(), description: text('description').notNull(), status: text('status').notNull(), priority: text('priority').notNull(), lead: text('lead').notNull(), team: varchar('team', { length: 100 }).notNull(), startDate: varchar('startDate', { length: 10 }).notNull(), targetDate: varchar('targetDate', { length: 10 }).notNull(), properties: jsonb('properties').$type<ProjectDraft['properties']>().notNull().default({ color: 'green', members: [], labels: [], dependencyIds: [], milestones: [] }),
   /** Migration input only. Public reads hydrate this compatibility field from projectTasks. */
   issueIds: jsonb('issueIds').$type<string[]>().notNull(), revision: integer('revision').notNull(), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),

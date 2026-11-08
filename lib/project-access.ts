@@ -20,13 +20,14 @@ function projectMembership(reader: ProjectReader, workspaceId: string) {
 
 /** Caller holds withTaskWorkspace and lockTeamRelations before taking this row lock.
  * It intentionally uses only the Workspace DB, including the fresh ACL check. */
-export async function requireProjectWrite(tx: ProjectTransaction, reader: ProjectReader, projectId: string, workspaceId: string) {
+export async function requireProjectWrite(tx: ProjectTransaction, reader: ProjectReader, projectId: string, workspaceId: string, options: { allowArchived?: boolean } = {}) {
   const [row] = await tx.select({ project: projects }).from(projects)
     .innerJoin(workspaces, eq(workspaces.id, projects.workspaceId))
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, projects.workspaceId))
     .where(and(eq(projects.id, projectId), projectMembership(reader, workspaceId)))
     .for('update', { of: projects })
   if (!row) throw new ActionFailureError('projectNotFound')
+  if (row.project.archivedAt && !options.allowArchived) throw new ActionFailureError('projectArchived')
   return row.project
 }
 

@@ -48,6 +48,11 @@ immutable `default` Agent Profile reference is also accepted. Delegation itself
 does not dispatch a Run, grant credentials, alter content access or approve work.
 Actual execution continues through ordinary live admission and frozen receipts.
 
+Duplicating another person's Task clears its human assignee and execution
+delegate. Copying a reference does not admit a private Agent/Profile for the new
+creator. A child that retains the original creator may retain those relations;
+normal runtime admission still applies to every new Run.
+
 ## Legacy compatibility
 
 | Input/history | Result |

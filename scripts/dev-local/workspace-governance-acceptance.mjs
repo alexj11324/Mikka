@@ -159,4 +159,6 @@ export async function verifyWorkspaceGovernance({ accounts, pool, progress, sign
   const [runs] = await query('SELECT count(*)::int AS count FROM agent_runs WHERE "issueId"=ANY($1::uuid[])', [[personalTask.id, taskA.id, taskB.id, peerTask.id]])
   assert.equal(runs.count, 0, 'governance acceptance must not dispatch a model or daemon run')
   await progress('item11-workspace-governance', 'evidence', 'Suspension rejects the creator’s task and Factory access without side effects; explicit reactivation restores access; no Agent runs dispatched')
+  const { verifyWorkDomain } = await import('./work-domain-acceptance.mjs')
+  await verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, taskA, taskB, peerTask, personalTask, progress, signal, runId })
 }

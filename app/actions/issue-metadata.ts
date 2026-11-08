@@ -94,16 +94,12 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         let delegate = metadata.delegate
         if (parsed.data.inviteEmail) {
           if (user.id !== issue.userId) return { error: 'memberOwnerOnly' }
-          const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.email, parsed.data.inviteEmail.toLowerCase()))
+          const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.email, parsed.data.inviteEmail.toLowerCase())).for('share')
           if (!member) return { error: 'memberNotRegistered' }
-          if (member.id !== issue.userId) {
-            const added = await tx.insert(issueMembers).values({ issueId: issue.id, userId: issue.userId, memberId: member.id }).onConflictDoNothing().returning({ memberId: issueMembers.memberId })
-            if (added.length) await issueMembersChanged(tx, issue.id)
-          }
           assignee = { ...member, kind: 'member' }
         } else if (patch.assignee === null) assignee = null
         else if (patch.assignee?.kind === 'member') {
-            const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, patch.assignee.id))
+            const [member] = await tx.select({ id: users.id, name: users.name, image: users.image }).from(users).where(eq(users.id, patch.assignee.id)).for('share')
             if (!member) return { error: 'memberNotFound' }
             assignee = { ...member, kind: 'member' }
         }
@@ -135,6 +131,12 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
         next.pullRequests = [...new Map(next.pullRequests.map(pr => [pr.url.replace(/\/$/, ''), { ...pr, url: pr.url.replace(/\/$/, '') }])).values()]
         const [saved] = await tx.update(issues).set({ content: withIssueMetadata(latest.content, next), revision: latest.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId), eq(issues.revision, latest.revision))).returning()
         if (!saved) return { error: 'issueOutdated' }
+        // Invitation bookkeeping follows every validation and the revision
+        // fence. An invalid delegate must not leave a partial invitation.
+        if (parsed.data.inviteEmail && assignee?.kind === 'member' && assignee.id !== issue.userId) {
+          const added = await tx.insert(issueMembers).values({ issueId: issue.id, userId: issue.userId, memberId: assignee.id }).onConflictDoNothing().returning({ memberId: issueMembers.memberId })
+          if (added.length) await issueMembersChanged(tx, issue.id)
+        }
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(user.id) })
         await issueListChanged(tx, saved.id)
         await issueRelationsChanged(tx, [saved.id, ...relationIds(latest.content), ...relationIds(saved.content)])

@@ -19,6 +19,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { lockTeamRelations } from '@/lib/team-access'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { notifyStoppedPolicyRuns, runPolicyStopSQL, type StoppedPolicyRun } from '@/lib/run-policy-stop'
+import { deleteProjectData, projectLifecycleImpact, setProjectArchive } from '@/lib/project-lifecycle'
 
 const batchSize = 200
 
@@ -122,7 +123,7 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
       if (previous && previous.workspaceId !== context.workspaceId) throw new ActionFailureError('issueNotFound')
       const projectIds = [...new Set([previous?.projectId, parsed.data.projectId].filter((id): id is string => Boolean(id)))].sort()
       const linked: (typeof projects.$inferSelect)[] = []
-      for (const id of projectIds) linked.push(await requireProjectWrite(tx, context.user, id, context.workspaceId))
+      for (const id of projectIds) linked.push(await requireProjectWrite(tx, context.user, id, context.workspaceId, { allowArchived: id !== parsed.data.projectId }))
       return db.transaction(async application => {
         const [task] = await application.select().from(issues).where(and(eq(issues.id, parsed.data.issueId), issueVisibilityPredicate(context.user.id, { allowedIds: [], workspaceIds: [context.workspaceId] }))).for('update')
         if (!task) throw new ActionFailureError('issueNotFound')
@@ -198,5 +199,40 @@ export async function setProjectIssues(input: { id: string; revision: number; is
     })
   } catch (error) {
     return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectIssuesSaveFailed') }
+  }
+}
+
+const lifecycleInput = z.object({ id: z.uuid(), workspaceId: z.uuid().optional(), revision: z.number().int().positive().optional() })
+
+export async function getProjectLifecycleImpact(input: { id: string; workspaceId?: string }) {
+  const parsed = lifecycleInput.parse(input)
+  const context = await projectContext(parsed.workspaceId)
+  return projectLifecycleImpact(context.user, context.workspaceId, parsed.id)
+}
+
+async function changeProjectArchive(input: { id: string; revision?: number; workspaceId?: string }, archived: boolean) {
+  const parsed = lifecycleInput.parse(input)
+  const context = await projectContext(parsed.workspaceId)
+  const i18nText = await getTranslations()
+  try {
+    return { project: await setProjectArchive(context.user, context.workspaceId, { ...parsed, archived,
+      message: i18nText(archived ? 'Projects.activity.archived' : 'Projects.activity.restored') }) }
+  } catch (error) {
+    if (error instanceof ActionFailureError) return { error: i18nText(`Errors.${error.code}`) }
+    throw error
+  }
+}
+
+export async function archiveProject(input: { id: string; revision?: number; workspaceId?: string }) { return changeProjectArchive(input, true) }
+export async function restoreProject(input: { id: string; revision?: number; workspaceId?: string }) { return changeProjectArchive(input, false) }
+
+export async function deleteProject(input: { id: string; revision: number; confirmation: string; workspaceId?: string }) {
+  const parsed = lifecycleInput.extend({ revision: z.number().int().positive(), confirmation: z.string().trim().max(200) }).parse(input)
+  const context = await projectContext(parsed.workspaceId)
+  const i18nText = await getTranslations()
+  try { return await deleteProjectData(context.user, context.workspaceId, parsed) }
+  catch (error) {
+    if (error instanceof ActionFailureError) return { error: i18nText(`Errors.${error.code}`) }
+    throw error
   }
 }

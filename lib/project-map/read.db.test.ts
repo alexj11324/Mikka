@@ -6,8 +6,10 @@ import { gzipSync } from 'node:zlib'
 import { mock, test } from 'node:test'
 import type { PoolClient } from 'pg'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedProjectTasks, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { ownLiveRuntime } from '../../tests/support/live-runtime'
 
 test('project map uses real PostgreSQL and normal HTTP PAT authorization', { skip: !dbUrl, timeout: 180_000 }, async t => {
+  const live = await ownLiveRuntime(t)
   // Sample every SQL result on the real app/workspace pools only during the
   // bounded benchmark below. No parameters or row contents enter diagnostics.
   const previousBasePath = process.env.MIKKA_BASE_PATH
@@ -101,7 +103,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
   server.listen(0, '127.0.0.1'); await once(server, 'listening')
   const address = server.address(); assert.ok(address && typeof address === 'object')
   const origin = 'http://127.0.0.1:' + address.port
-  t.after(async () => { server.close(); server.closeAllConnections(); await Promise.all([connection.end(), pool.end(), workspacePool.end()]); mock.restoreAll() })
+  t.after(async () => { server.close(); server.closeAllConnections(); try { await live.close() } finally { await Promise.all([connection.end(), pool.end(), workspacePool.end()]); mock.restoreAll() } })
   const base = '/mikka/api/projects/' + projectId + '/map'
   const get = (suffix = '', bearer: string | null = token.token, target = base, workspaceId = home.id) => fetch(origin + target + suffix + (suffix.includes('?') ? '&' : '?') + 'workspaceId=' + workspaceId,
     { headers: bearer ? { authorization: 'Bearer ' + bearer } : {}, signal: AbortSignal.timeout(15_000) })
@@ -434,6 +436,7 @@ test('project map uses real PostgreSQL and normal HTTP PAT authorization', { ski
       // real secret reads here so the HTTP count includes production's mask path.
       const previousKey = process.env.WORKSPACE_SECRETS_KEY
       try {
+        await live.flush()
         process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('base64')
         cachedSessionOwner = owner; measurement = { queries: 0, selects: 0, bytes: 0 }; overrideDeploymentSwitch('dbEgressSample', true)
         const response = await get('', null, '/mikka/api/projects/' + project + '/map', shared.id), body = await response.json()
