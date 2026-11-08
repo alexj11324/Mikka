@@ -279,7 +279,7 @@ test('「Octo 官网的导航栏在手机上错位了」 without repository fact
   const eagerReads: string[] = []
   const context = await githubPromptContext(OWNER, { hosted: true, effectiveTools: ['find_repository'] }, {
     connection: async () => ({ githubLogin: 'octo-dev' }),
-    list: async () => { eagerReads.push('list'); return { repositories: [] } },
+    list: async () => { eagerReads.push('list'); return { login: 'octo-dev', installationAccounts: ['octo'], repositories: [] } },
     used: async () => { eagerReads.push('used'); return [] },
   })
   assert.deepEqual(eagerReads, [], 'ordinary preparation leaves repository discovery to the tool')
