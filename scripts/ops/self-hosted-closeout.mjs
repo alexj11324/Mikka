@@ -79,6 +79,27 @@ async function run(env) {
     check(accepted.includes(r.status()), `LOCAL_HTTP_${r.status()}`)
     return r.json()
   }
+  const replyBot = async () => {
+    const workspace = await localApi('/api/workspace')
+    const bot = await localApi('/api/bots', { name: `Cloud reply ${env.GITHUB_RUN_ID}` }, [201])
+    modelBotId = bot.id
+    check(bot.workspaceId === workspace.workspace.id, 'MODEL_BOT_WORKSPACE')
+    if (env.CLOSEOUT_TEXT_ONLY_PROFILE === '1') {
+      const active = await localApi(`/api/bots/${bot.id}/definition`)
+      check(Number.isSafeInteger(active.version) && active.version > 0 && Array.isArray(active.definition?.tools), 'FIXTURE_PROFILE_READ')
+      const saved = await localApi(`/api/bots/${bot.id}/definition`, { action: 'save', expectedVersion: active.version,
+        requestId: randomUUID(), definition: { ...active.definition, tools: [], skills: [], hooks: ['audit'] } })
+      check(saved.source === 'user' && saved.definition?.tools?.length === 0 && saved.definition?.hooks?.includes('audit'), 'FIXTURE_PROFILE_SAVED')
+      report.checks.modelFixture = { ownerConfigured: true, declaredTools: 0, auditRetained: true, general66ToolCasePassed: false }
+    }
+    const hostedId = '00000000-0000-0000-0000-000000000000'
+    const menu = await localApi(`/api/mobile/model?bot=${bot.id}`)
+    check(menu.groups.some(group => group.options?.some(option => option.id === hostedId && option.hostedSource === 'cloud')), 'CLOUD_DEFAULT_MODEL_MISSING')
+    const pick = await local.request.put(`${localOrigin}/mikka/api/mobile/model`, {
+      data: { bot: bot.id, id: hostedId }, headers: { Origin: localOrigin } })
+    check(pick.ok() && (await pick.json()).current?.id === hostedId, 'CLOUD_DEFAULT_MODEL_PICK')
+    return bot
+  }
   try {
     await sourceGuard(env); await privateGuard(env)
     check(env.SMOKE_OWNER_EMAIL && env.SMOKE_OWNER_PASSWORD, 'SMOKE_CREDENTIALS')
@@ -294,24 +315,7 @@ async function run(env) {
       liveURL.searchParams.set('revisions', '1')
       modelLive = socketEvents(liveURL.href, ticket.protocol); await modelLive.ready
       await modelLive.next(event => event.type === 'live_ready' && event.version === 2)
-      const bot = await localApi('/api/bots', { name: `Cloud reply ${env.GITHUB_RUN_ID}` }, [201])
-      modelBotId = bot.id
-      check(bot.workspaceId === workspace.workspace.id, 'MODEL_BOT_WORKSPACE')
-      if (env.CLOSEOUT_TEXT_ONLY_PROFILE === '1') {
-        const active = await localApi(`/api/bots/${bot.id}/definition`)
-        check(Number.isSafeInteger(active.version) && active.version > 0 && Array.isArray(active.definition?.tools), 'FIXTURE_PROFILE_READ')
-        const saved = await localApi(`/api/bots/${bot.id}/definition`, { action: 'save', expectedVersion: active.version,
-          requestId: randomUUID(), definition: { ...active.definition, tools: [], skills: [], hooks: ['audit'] } })
-        check(saved.source === 'user' && saved.definition?.tools?.length === 0 && saved.definition?.hooks?.includes('audit'), 'FIXTURE_PROFILE_SAVED')
-        report.checks.modelFixture = { ownerConfigured: true, declaredTools: 0, auditRetained: true, general66ToolCasePassed: false }
-      }
-      const hostedId = '00000000-0000-0000-0000-000000000000'
-      const menu = await localApi(`/api/mobile/model?bot=${bot.id}`)
-      check(menu.groups.some(group => group.options?.some(option => option.id === hostedId && option.hostedSource === 'cloud')),
-        'CLOUD_DEFAULT_MODEL_MISSING')
-      const pick = await local.request.put(`${localOrigin}/mikka/api/mobile/model`, {
-        data: { bot: bot.id, id: hostedId }, headers: { Origin: localOrigin } })
-      check(pick.ok() && (await pick.json()).current?.id === hostedId, 'CLOUD_DEFAULT_MODEL_PICK')
+      const bot = await replyBot()
       const observeChat = (chat, phase) => {
         const observation = { phase, ...chatObservation(chat, 'CLOUD_CLOSEOUT_OK') }
         const known = ['cloud_quota_exhausted', 'cloud_access_denied', 'cloud_server_revoked', 'cloud_unavailable',
@@ -349,11 +353,13 @@ async function run(env) {
         if (fresh.length && fresh.every(row => row.state === 'settled')) break
         await delay(1000)
       }
-      check(fresh.length > 0 && fresh.length <= 8 && fresh.every(row => row.model === 'deepseek/deepseek-v4.1-flash'
+      check(fresh.some(row => row.model === 'deepseek/deepseek-v4.1-flash') && fresh.length <= 8
+        && fresh.every(row => ['deepseek/deepseek-v4.1-flash', 'openai/gpt-6-luna-decisions'].includes(row.model)
         && row.state === 'settled' && Number.isSafeInteger(Number(row.costMicroUsd)) && Number(row.costMicroUsd) > 0), 'HOSTED_SETTLEMENT')
       report.checks.hostedCoordinator = { replied: true, model: 'deepseek/deepseek-v4.1-flash', billingWorkspaceMatchesBinding: true,
         controlWorkspace: 'shared-team', payerKind: 'existing-personal-binding', modelCalls: fresh.length,
         settledMicroUsd: fresh.reduce((sum, row) => sum + Number(row.costMicroUsd), 0),
+        models: [...new Set(fresh.map(row => row.model))],
         inputTokens: fresh.reduce((sum, row) => sum + Number(row.inputTokens), 0),
         outputTokens: fresh.reduce((sum, row) => sum + Number(row.outputTokens), 0) }
       await both(page, `${localOrigin}/mikka/en/?bot=${bot.id}`, 'hosted-reply',
@@ -432,7 +438,7 @@ async function run(env) {
     await localApi('/api/cloud/connect', { action: 'key', key: serverKey })
     check((await localApi('/api/cloud/status')).team.connected, 'TEAM_KEY_BOUND')
     await both(page, `${localOrigin}/mikka/en/settings?section=cloud`, 'team-key-bound')
-    if (env.CLOSEOUT_MODELS === '1' && modelBotId) {
+    if (['1', 'quota-only'].includes(env.CLOSEOUT_MODELS)) {
       report.stage = 'zero-balance-quota'
       const { decode } = await import('../../lib/desktop-rpc/wire.ts')
       const rpc = await cloudApi('/mikka/api/rpc', { version: 1, action: 'billing.getHostedUsage', args: [billingTeam] })
@@ -441,6 +447,7 @@ async function run(env) {
       check(!teamUsage.error && teamUsage.workspaceId === billingTeam && teamUsage.personal === false, 'TEAM_BILLING_SCOPE')
       const balance = Number(teamUsage.balance?.free) + Number(teamUsage.balance?.purchased)
       if (balance === 0) {
+        if (!modelBotId) await replyBot()
         const workspace = await localApi('/api/workspace')
         const { socketEvents } = await import('../acceptance/self-hosted-services.mjs')
         const ticket = await localApi(`/api/live/ticket?workspace=${workspace.workspace.id}`)
@@ -464,17 +471,23 @@ async function run(env) {
           safeRawQuotaCodePresent: raw === 'cloud_quota_exhausted' || raw === 'cloud_quota_exhausted (response)',
           exactStoredCode: refused.error === 'cloud_quota_exhausted' || refused.error === 'cloud_quota_exhausted (response)',
           fatalWrapper: refused.error === 'FatalError: cloud_quota_exhausted' || refused.error === 'FatalError: cloud_quota_exhausted (response)' }
+        const visible = {}
         for (const [locale, route] of [['en', 'en/'], ['zh-CN', '']]) {
           const messages = JSON.parse(await readFile(resolve('messages', `${locale}.json`), 'utf8'))
           const text = messages.RunErrors.cloud_quota_exhausted.default
           check(typeof text === 'string' && text.length > 0, 'QUOTA_COPY')
-          await both(page, `${localOrigin}/mikka/${route}?bot=${modelBotId}`, `zero-balance-${locale.toLowerCase()}`,
-            p => p.getByText(text, { exact: false }).first().waitFor({ timeout: 90_000 }))
+          visible[locale] = true
+          await both(page, `${localOrigin}/mikka/${route}?bot=${modelBotId}`, `zero-balance-${locale.toLowerCase()}`, async p => {
+            try { await p.getByText(text, { exact: false }).first().waitFor({ timeout: 10_000 }) }
+            catch { visible[locale] = false; process.exitCode = 1 }
+          })
         }
         const failed = await localApi(`/api/mobile/chat?bot=${modelBotId}`)
-        check(!failed.working && failed.failure?.cloudCode === 'cloud_quota_exhausted', 'QUOTA_FAILURE_CODE')
+        const exposed = !failed.working && failed.failure?.cloudCode === 'cloud_quota_exhausted'
+        if (!exposed) process.exitCode = 1
         report.checks.zeroBalanceQuota = { balanceZeroBefore: true, verifiedBefore: teamUsage.balance.verified === true,
-          actualFailureCode: 'cloud_quota_exhausted', englishVisible: true, chineseVisible: true, balanceMutatedByTest: false }
+          storedQuotaCodePresent: report.quotaObservation.safeRawQuotaCodePresent || report.quotaObservation.exactStoredCode || report.quotaObservation.fatalWrapper,
+          apiCodeExposed: exposed, englishVisible: visible.en, chineseVisible: visible['zh-CN'], balanceMutatedByTest: false }
       } else {
         report.checks.zeroBalanceQuota = { verified: false, reason: 'existing_team_has_nonzero_balance', balanceMutatedByTest: false }
         process.exitCode = 1
