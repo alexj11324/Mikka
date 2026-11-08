@@ -98,14 +98,16 @@ export function TaskRowView({ task }: { task: Task }) {
   )
 }
 
+/** A group bar adds only what the rows' own 15 pt padding leaves: 30 pt from the last row's text to the next bar, and
+ * the first row's padding alone (about 12–15 pt) under the bar. */
 const styles = StyleSheet.create({
   center: { paddingTop: 40, alignItems: 'center' },
   empty: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, marginHorizontal: ROW_SURFACE_INSET, marginTop: SPACE.section, marginBottom: SPACE.barBelow, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous', backgroundColor: colors.bubble },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, marginHorizontal: LIST_INSET - 4, marginTop: SPACE.section - SPACE.rowY, marginBottom: 0, paddingHorizontal: 12, borderRadius: 10, borderCurve: 'continuous', backgroundColor: colors.bubble },
   barTitle: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.text },
   barCount: { fontSize: 15, lineHeight: 20, color: colors.secondary, fontVariant: ['tabular-nums'] },
   fill: { flex: 1 },
-  row: { justifyContent: 'center', gap: SPACE.lineGap, minHeight: 56, paddingVertical: SPACE.rowY - 3, marginHorizontal: ROW_SURFACE_INSET, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
+  row: { justifyContent: 'center', gap: SPACE.lineGap, minHeight: SPACE.rowMin, paddingVertical: SPACE.rowY, marginHorizontal: ROW_SURFACE_INSET, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
   line: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   key: { fontSize: 14, color: colors.secondary, fontVariant: ['tabular-nums'] },
   title: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 21 },

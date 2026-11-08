@@ -11,6 +11,8 @@ All values live in `lib/theme.ts`; screens use the tokens, never their own numbe
 |---|---|
 | Page side margin (plain and inset grouped lists) | 20 pt |
 | A list row's vertical padding | 15 pt (a Bot row is 78 pt with its 48 pt avatar) |
+| A row with a title and a grey line | at least 72 pt |
+| A group bar | 16 pt in from each edge, 40 pt tall |
 | Chat row avatar | 48 pt; name 17 pt, preview 15 pt secondary, date on the right; no separators |
 | Pinned tile avatar | 86 pt, the name under it |
 | Between a row's title and its grey line | 4 pt |

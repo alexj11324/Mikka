@@ -30,12 +30,12 @@ export const ROW_SURFACE_INSET = 6
 export const SPACE = {
   /** A list row's vertical padding: a Bot row comes to 78 pt with its 48 pt avatar. */
   rowY: 15,
+  /** A list row with a title and a grey line is at least this tall. */
+  rowMin: 72,
   /** Between a row's title line and its grey line. */
   lineGap: 4,
   /** Between groups and sections. */
   section: 30,
-  /** Below a group bar, before its first row. */
-  barBelow: 12,
   /** Between a detail page's blocks (title, properties, description, 活动). */
   block: 20,
   /** Between items of 活动. */
