@@ -27,7 +27,8 @@ test('web component edits select their consumers without server DB or Docker', a
   assert(result.source)
 })
 test('daemon is selected through its package dependency and protocol expands globally', async () => {
-  const result = await pick('packages/daemon/src/index.ts')
+  const result = await pick('packages/daemon/src/adapters/codex.ts')
+  assert.equal(result.full, false)
   assert.equal(result.daemon, true)
   const shared = await pick('packages/protocol/src/run.ts')
   assert(shared.full)

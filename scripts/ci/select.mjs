@@ -7,13 +7,14 @@ import { buildGraph, dbId, taskId } from './graph.mjs'
 import { isDocsOnly } from '../ci-docs-only.mjs'
 import tasks from './tasks.json' with { type: 'json' }
 
-export const GLOBAL = /^(?:\.github\/(?!workflows\/README\.md$)|scripts\/|tests\/(?:helpers|support)\/|drizzle\/|patches\/|packages\/(?:config|protocol)\/|services\/|cloudflare\/|(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|[^/]*config[^/]*|[^/]*lock[^/]*|Dockerfile|docker-compose[^/]*|\.dockerignore|\.npmrc)$|lib\/(?:db(?:\/|\.)|auth|api-auth|fresh-session|credentials\/|secrets\/|permissions|.*authorization|.*tenant|.*scope))/
+export const GLOBAL = /^(?:\.github\/(?!workflows\/README\.md$)|scripts\/|tests\/(?:helpers|support)\/|drizzle\/|patches\/|packages\/(?:config|protocol|subscription-worker)\/|services\/|cloudflare\/|(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|[^/]*config[^/]*|[^/]*lock[^/]*|Dockerfile|docker-compose[^/]*|\.dockerignore|\.npmrc)$|lib\/(?:db(?:\/|\.)|auth|api-auth|fresh-session|credentials\/|secrets\/|permissions|.*authorization|.*tenant|.*scope))/
 // Keep the expression readable without a trailing whitespace token.
 const globalPath = file => GLOBAL.test(file) || /(?:^|\/)(?:package\.json|tsconfig[^/]*\.json)$/.test(file)
 export function area(file) {
   if (file.startsWith('apps/mobile/')) return 'mobile'
   if (file.startsWith('apps/desktop/')) return 'desktop'
   if (file.startsWith('packages/daemon/')) return 'daemon'
+  if (file.startsWith('packages/subscription-worker/')) return 'e2b/runtime'
   if (file.startsWith('packages/')) return 'protocol/shared'
   if (/^(?:components|hooks|i18n|messages|public|apps\/frontend)\/|^app\/(?:\[locale\]|fonts|globals)/.test(file)) return 'frontend/web'
   if (/^(?:lib|app|apps\/api)\//.test(file)) return 'api/factory/coordinator'
@@ -60,7 +61,7 @@ export async function select(plan, changes, { force = false } = {}) {
     source: !docs, daemon: !docs && (full || selected.has('@mikka/daemon') || areas.includes('daemon')),
     mobile: !docs && (full || selected.has('@mikka/mobile') || areas.includes('mobile')),
     desktop: !docs && (full || selected.has('@mikka/desktop') || areas.includes('desktop')),
-    image: !docs && (full || areas.some(a => ['api/factory/coordinator', 'self-hosted/image'].includes(a))),
+    image: !docs && (full || areas.includes('self-hosted/image') || files.some(f => area(f) === 'api/factory/coordinator' && !/\.(?:test|spec)\.[^.]+$/.test(f))),
     analytics: !docs && (full || files.some(f => /analytics|posthog|instrumentation|^apps\/frontend\/|^app\/\[locale\]\/layout/.test(f))),
   }
   return { version: 1, full, docs_only: docs, areas, reasons, affected, units, db_suites: suites,
