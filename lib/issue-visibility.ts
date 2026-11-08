@@ -3,7 +3,7 @@ import { and, eq, inArray, or, sql } from 'drizzle-orm'
 import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
 import { issues, issueMembers } from '@/lib/db/schema'
-import { issueTeamScope } from '@/lib/issue-team-access'
+import { issueTeamScope, numberedIssueTeamScope } from '@/lib/issue-team-access'
 import type { TeamScope } from '@/lib/team-access'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { tokenWorkspace } from '@/lib/tokens/principal'
@@ -28,30 +28,46 @@ export async function issueVisibility(reader: IssueReader, includeDeleted = fals
   /** Reuse only a membership read made by this same operation. */
   teams?: readonly TeamScope[]
   withTaskNumbers?: boolean
+  /** Complete identifier dependencies, only for the exact bounded ids. */
+  withIdentifierTeams?: boolean
 } = {}) {
   const userId = typeof reader === 'string' ? reader : reader.id
   const token = readerTokenWorkspace(reader)
   const only = options.onlyIssueIds
-  const allowed = await issueTeamScope(userId, [], { onlyIssueIds: only, teams: options.teams, withTaskNumbers: options.withTaskNumbers })
+  if (options.withIdentifierTeams && !only) throw new Error('Identifier team reads require bounded issue ids')
+  if (options.withIdentifierTeams && !token && options.teams?.length === 0) {
+    // No accessible teams does not prove these issues are unlinked. Reuse the
+    // exact naming read without reloading membership or unused complete links.
+    const { teamNumbers } = await import('@/lib/task-identifier-server')
+    const allowedIds: string[] = []
+    return {
+      predicate: issueVisibilityPredicate(userId, { allowedIds }, includeDeleted),
+      allowedIds,
+      links: [],
+      taskTeams: await teamNumbers([...only!]),
+    }
+  }
+  const numbered = options.withIdentifierTeams ? await numberedIssueTeamScope(userId, only!, { teams: options.teams }) : undefined
+  const allowed = numbered?.allowed ?? await issueTeamScope(userId, [], { onlyIssueIds: only, teams: options.teams, withTaskNumbers: options.withTaskNumbers })
   const scopeWorkspace = token ?? workspaceId
   const allowedIds = allowed.filter(link => !scopeWorkspace || link.workspaceId === scopeWorkspace).map(link => link.issueId)
   const predicate = issueVisibilityPredicate(userId, { allowedIds }, includeDeleted)
-  if (!token) return { predicate, allowedIds, links: allowed }
+  if (!token) return { predicate, allowedIds, links: allowed, ...(numbered ? { taskTeams: numbered.taskTeams } : {}) }
   // Only a token's workspace scoping reads the reader's own and shared tasks' links; a browser session skips the lookup.
-  const candidates = only && !only.length ? [] : await executor.select({ id: issues.id }).from(issues).where(and(only ? inArray(issues.id, [...only]) : undefined, or(
+  const candidates = numbered || (only && !only.length) ? [] : await executor.select({ id: issues.id }).from(issues).where(and(only ? inArray(issues.id, [...only]) : undefined, or(
     eq(issues.userId, userId),
     sql`exists (select 1 from ${issueMembers} where ${issueMembers.issueId} = ${issues.id} and ${issueMembers.userId} = ${issues.userId} and ${issueMembers.memberId} = ${userId})`,
   )))
   // issueTeamScope includes candidate links even when membership is revoked.
-  const links = await issueTeamScope(userId, candidates.map(row => row.id), { onlyIssueIds: only, teams: options.teams })
+  const links = numbered?.links ?? await issueTeamScope(userId, candidates.map(row => row.id), { onlyIssueIds: only, teams: options.teams })
   // The workspace is the tenant (decision 0231): a token for a team workspace reaches only tasks linked to it,
   // never the owner's personal or unlinked tasks. The personal workspace's token keeps those, but not a
   // workspace task linked elsewhere (as lib/issue-access.ts). Browser sessions are unchanged.
   const ids = (match: (workspaceId: string) => boolean) => [...new Set([...links, ...allowed].filter(link => match(link.workspaceId)).map(link => link.issueId))]
   if (await isPersonalWorkspace(userId, token)) {
     const elsewhere = ids(workspace => workspace !== token)
-    return { predicate: elsewhere.length ? and(predicate, sql`not (${issues.scope} = 'workspace' and ${inArray(issues.id, elsewhere)})`)! : predicate, allowedIds, links: allowed }
+    return { predicate: elsewhere.length ? and(predicate, sql`not (${issues.scope} = 'workspace' and ${inArray(issues.id, elsewhere)})`)! : predicate, allowedIds, links: allowed, ...(numbered ? { taskTeams: numbered.taskTeams } : {}) }
   }
   const linked = ids(workspace => workspace === token)
-  return { predicate: and(predicate, linked.length ? inArray(issues.id, linked) : sql`false`)!, allowedIds, links: allowed }
+  return { predicate: and(predicate, linked.length ? inArray(issues.id, linked) : sql`false`)!, allowedIds, links: allowed, ...(numbered ? { taskTeams: numbered.taskTeams } : {}) }
 }

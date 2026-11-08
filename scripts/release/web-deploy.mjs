@@ -191,7 +191,7 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
         // GitHub can finish a job before its step list catches up. Only pending
         // results may wait; skipped, failed, missing or duplicate proof refuses.
         if (!steps.every(step => step.status === 'completed' ? step.conclusion === 'success'
-          : ['queued', 'pending', 'in_progress'].includes(step.status) && step.conclusion == null)) {
+          : ['queued', 'pending', 'in_progress'].includes(step.status) && step.conclusion === null)) {
           throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
         }
         if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))

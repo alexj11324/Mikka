@@ -93,4 +93,5 @@ lines.on('line', async line => {
 lines.once('close', () => process.exit(0))
 emit({ event: 'spawn', cwd: process.cwd(), awaitingClaim: args.includes('--await-claim'),
   home: process.env.HOME, model: flag('--model'), append: flag('--append-system-prompt'),
+  attribution: JSON.parse(flag('--settings') ?? '{}').attribution ?? null,
   mcpNames: Object.keys(JSON.parse(flag('--mcp-config') ?? '{"mcpServers":{}}').mcpServers).sort() })
