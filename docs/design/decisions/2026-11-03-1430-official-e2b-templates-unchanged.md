@@ -484,7 +484,7 @@ accountInfo 的实际值；只设置 Claim.env 不能生成通过证明。采用
 初始化、错绑或不完整 exact ACK 都不能通过。普通任务不添加
 详细持久化诊断字段，派发入口、六样本分母和 5000ms 判定公式不变。
 
-已安装 SDK 0.3.305 的真实进程/IPC 离线回归只能证明协议与拒绝边界。现有真实
+已安装 SDK 0.3.305 的真实进程/IPC 离线回归只能证明协议与拒绝边界。0479675 已发布的真实
 订阅候选 gate 使用 personal acceptance daemon，继续验证原 FD3 路径；它没有
 bootstrap sidecar，因此不能证明新的匿名采用及环境 OAuth 来源。原有官方文件
 保全和双真实订阅 gate 仍是发布门槛，新的实际采用与耗时还必须由随后相同最终
@@ -551,3 +551,120 @@ process.env 增加 CLAUDE_AGENT_SDK_VERSION，而匿名 options 的快照早于�
 [本轮失败与修正证据索引](../research/2026-11-08-e2b-adoption-correction.json)
 区分原始生产失败、源代码复现和后续待完成的发布/生产验证。官方文件校验和、
 Claude/Codex 双真实订阅及最终同一部署元组的全部六次五秒验收继续作为门槛。
+
+
+### 生产关键路径与后继的请求重叠
+
+固定 78c3c13 / run 42430097946 的 16 个不重复区间与原完整公式逐例相加一致。
+本批注册与 claim 的实际重叠为零。单独扣除整个 ensure 的账面余量仍为
+8.780–12.913 秒，因此不能把预热 VM 的局部收益推算为五秒通过；该扣除也不是
+预热池的因果预测。实际阶段与原件摘要见
+[关键路径及后继候选证据](../research/2026-11-08-e2b-startup-roundtrips-candidate.json)。
+
+仅对可信 bootstrap 携带的首次 hosted 仓库任务，daemon 请求把原 claim 已读取的
+仓库设置放入同一最终响应。服务端仍先通过原 fresh 响应栅栏；daemon 仍先处理
+heartbeat、撤销、凭据轮换、卸载及 checkpoint，再采用准确匹配 run/device/repo/remote
+且 schema 有效的一次性设置。它替代该次 listRepos GET，不增加发现或授权查询，
+也不写入恢复 journal。旧服务端、缺失或错绑投影、本地设备、续作等保留原 GET。
+设置的一致性时点是原 claim 的读取；不能声称与稍后第二次 GET 对并发编辑的观察
+时点完全相同。旧服务端首次 GET 现在等待这次 claim 回应后回退；取消仍须中止
+claim 并排空，不能用等待顺序变化掩盖相互等待。
+
+真实隔离 PostgreSQL 的受影响正常 Task 切片从 9 条 SQL 降为 1 条；缺失/完整设置
+返回行分别从 5→0 / 7→1，实际 PostgreSQL 双向消息分别减少 3173 / 3278 B，
+Unicode 大设置场景减少 5077 B。旧 claim＋repos 的 JSON 响应体总量比新 claim
+多 4 B。完整 Task 是未改变的共同前后缀加该切片；这些不是整个 Task 的绝对
+查询数或 HTTP/TCP/TLS 总量，也不代表生产毫秒收益。
+
+下一轮 Git 细分仅沿用已有任务或可信 host 的显式诊断 opt-in，记录 clone、fetch、
+remote HEAD、refs 和本地 Git 的闭式阶段；标签只有 run hash 与 harness，不记录
+命令、远端 URL、路径或凭据。默认执行仍直接调用原 execa，参数、环境、取消和
+超时不变，没有新 SQL、HTTP 或产品轮询。首次并行局部验证的一个子进程排空断言
+曾失败；原日志保留，未放宽断言。随后同断言隔离通过，旧源码 30/30、新源码
+33/33 顺序完整套件通过；这不足以把原失败武断归因为已证实的旧抖动，合成 CI
+仍必须重新通过。该诊断不增加正式 39 项门槛，也不改变派发起点或 ACK 公式。
+
+
+### 提前建立、确认上传后才提交的 worker broker
+
+仅新建仓库 TaskVM 尝试提前启动自有 broker；官方文件、旧 worker/refresh/desktop
+的执行边界不变。loader 验证所选 release 的目录所有权、symlink、worker 标记、
+实际构建能力及 broker 完整字节 SHA 后，才执行 /opt/mikka 内的资源。准备阶段
+不含账号凭据。原 fresh 凭据事务提交后，仍用原 multipart 请求完整上传 bootstrap、
+initial run、Claude 和 Codex 四个文件；只有上传响应成功，才通过已经打开的 E2B
+输入流发送一次长度/摘要及 run/lease/device/workspace/token hash 绑定的 commit。
+完整原子发布、以 user 身份唤醒、旧启动回退、真实匹配注册通知和最后 fresh SQL
+栅栏保持。文件部分写入或上传结果未知都不能发布。
+
+这将后置连接和进程启动提前，不减少正常请求总数：旧、新、legacy 三组均为
+3 请求。实际 SDK 2.61 loopback 的 HTTP 请求行/头/体与响应头/体为
+11796→10847 B（−949 B）；legacy fallback 为 17913 B（+6117 B）。不包含
+TCP/TLS、HTTP2 或 chunk framing，且不是生产省时证明。136 个现有 SQL 调用点
+的完整文本不变；未引入数据库查询、额外数据库写入或产品轮询。
+
+预提交等待、提交后的发布与注册均有独立有界期限。取消通过独立输入流有序发送；
+send 只排队，close 的确认才证明输入传输完成。响应流断开不等于进程已退出。
+提交后若输入流也不可确认，保留失败和原 TaskVM recovery 的清理责任，由有界
+broker 排空其发布子进程；不能只杀父进程后宣称干净。实际进程取消、上传 ACK
+丢失、凭据撤销、错绑/损坏文件、老版本兼容与真实 PG 路径均有回归。
+[broker 候选索引](../research/2026-11-08-worker-bootstrap-broker-candidate.json)
+单列正常预算、失败不确定性和旧版本开销。
+
+### 实际 bootstrap 采用成为双订阅发布门槛
+
+本后继把候选测试接到模板内真正的预载 cloud-worker：先用原注册流程登记候选
+个人设备，暂不 claim；保持原 push socket 在线，正常 Coordinator 为共享冒烟身份
+创建新的只读仓库任务，再由 owner evidence 的显式 opt-in 投影生成 canonical
+提示。投影核对 run、owner、device、workspace 和冻结 execution identity，复用
+原 hint builder，不携带任务凭据或授予执行权限。默认 evidence 的原 SQL/JSON
+完全不变；额外投影仅属于这项明确开启的候选诊断。
+
+辅助脚本来自固定候选 source 的 /opt/mikka 安装，并进入 worker recipe hash，
+不是 runner 临时注入的替代 worker。它保留 VM 内原 bootstrap 凭据字节，先发布
+一次性 sidecar，最后独占发布 bootstrap，再唤醒实际 dist/cloud/cloud-worker.js。
+该进程执行原正常 register、fresh claim、租约、policy、仓库与账号边界。
+helper 的运行依赖从实际安装的 daemon 包作用域解析，不能依赖未安装的根依赖。
+
+发布 reader 要求同 run/harness、恰好一次成功 prewarm/init、真实 bootstrap
+source 及未截断的原时间轴。Claude 另要求实际 accountInfo 的 oauth_environment
+与 claim 来源一致，ordinary FD3 回退不能通过。Codex 的 preparation receipt
+只在真实采用成功后可见；初始化成功而项目、环境或身份拒绝采用时保持缺失。
+Node 验证器、Python release verifier 和最终环境发布都重复核验该证明，官方
+三模板文件校验、双真实订阅、工具后的回复和官方 exact ACK 继续保留。
+
+这是候选真实采用门槛，不能替代正式 cloud-kind Task 的端到端验收。历史 047
+个人 acceptance daemon 的 ordinary 路径成绩仍保留，不能追认为采用成功。
+本地 166 项 Node、Python 32/22/16、25 项 daemon、21 项真实 PG 与类型/lint
+只证明候选实现及拒绝边界；仍需最新合成 head CI、生产真实双订阅和同一最终
+app/deployment/runtime/worker/三模板的全部六次完整派发 ≤5000ms。
+
+
+### GitHub 身份与第一安装页的同 token 读取重叠
+
+原 App 配置和唯一一次 fresh user token 取得后，/user 与第一安装页并发读取。
+两者全部结束后仍先检查 /user 的原错误、合法 ID 和绑定身份，再处理安装结果；
+本 App、suspended、用户 explicit 仓库交集和后续分页顺序不变，不换成公开 repo
+GET，也不并行 model/Profile/queue。第一安装页只消费一次，正常本批仍为三个
+GitHub GET，SQL 和 token 刷新次数不变。
+
+身份拒绝时可能已经多发一个只读 GET（失败前缀 1→2）；快速身份错误也可能
+等另一请求的原有 10 秒截止。原错误优先级和排空保持，不声称失败等待完全不变。
+请求累计 github.ms 在并发后不能作为墙钟耗时再相加。35 项原 transport/fetch
+回归通过；生产节省多少时间仍待新六例测量。
+
+### 合成验证与主干依赖变化
+
+合成后的本地验证包含：发布 Node 168 项、cloud limits 105＋11 项、GitHub 35 项、
+真实 PG Task 121 项、bootstrap 投影 21 项、完整 heartbeat 2 项及 daemon 142 项，
+均通过且无跳过；应用/API/daemon 原类型门槛、65 文件显式 lint 同时通过。
+缺失本地 semver 依赖链接、误用空测试库和旧构建证明脚本中的 probe 文件名错误
+均保留原始失败日志，分别修正环境/使用完整迁移和核验真实产物；没有修改业务
+断言、降低门槛或把缺失 schema 当成产品结果。
+
+随后正常合入主干 3c32675 的 trusted affected CI。它的锁变化使 worker 指纹变化，
+原因是 Vitest/Vite 新解析了 YAML 2.9.0 可选 peer；183 个生产 package/snapshot
+内容与旧锁相同。另在 b75 隔离树用 pnpm 10.34.3 实际 frozen filtered install、
+cloud build 与资源字节核验通过，worker 为
+73be9136ba4b51af098403074f35fc5eecb58fb2。开发 Node 24.22.1 与模板 24.19.0
+不同，因此这仍不替代新 head CI、真实 E2B 和双订阅门槛。最终待生产六例的完整
+派发结果，不将上述局部测试或固定指纹当作五秒成绩。

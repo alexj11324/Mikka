@@ -501,3 +501,26 @@ describe('HttpServerLink.decide', () => {
     }
   })
 })
+
+it('requests and decodes the initial repository only on the explicitly selected claim', async () => {
+  const calls: { path: string; initial: string | null }[] = []
+  const initialRepository = { repoId: 'repo-1', path: 'v2/github.com/fixture/repository', name: 'repository',
+    remoteUrl: 'https://github.com/fixture/repository.git', setup: { approved: true, copyFiles: ['.env.local'], command: 'npm ci' }, networkAllow: ['registry.npmjs.org'] }
+  const link = new HttpServerLink('https://fixture.invalid', (async (url, init) => {
+    const path = new URL(String(url)).pathname
+    calls.push({ path, initial: new Headers(init?.headers).get('x-mikka-initial-repository') })
+    return json(path.endsWith('/repos') ? { repos: [initialRepository] } : { ...assignment('run-1'), repo: initialRepository })
+  }) as typeof fetch)
+  const first = await link.claimRun('dev-1', 'run-1', undefined, { initialRepository: true })
+  expect(first.repo).toEqual(initialRepository)
+  await link.claimRun('dev-1', 'run-1')
+  await link.listRepos('dev-1')
+  expect(calls.map(call => call.initial)).toEqual(['1', null, null])
+})
+
+it.each([undefined, { repoId: 'repo-1', setup: { approved: 'wrong' } }])('drops unknown or malformed initial settings while retaining the assignment', async initialRepository => {
+  const link = new HttpServerLink('https://fixture.invalid', (async () => json({ ...assignment('run-1'), repo: initialRepository })) as typeof fetch)
+  const result = await link.claimRun('dev-1', 'run-1', undefined, { initialRepository: true })
+  expect(result.runId).toBe('run-1')
+  expect(result.repo).toBeUndefined()
+})

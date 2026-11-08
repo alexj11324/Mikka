@@ -1,25 +1,26 @@
 import { Platform } from 'react-native'
 import { Tabs } from 'expo-router/js-tabs'
 import { NativeTabs } from 'expo-router/native-tabs'
-import { Lightbulb, Layers, MessagesSquare, Search, UserCircle } from 'lucide-react-native'
+import { Bot, Lightbulb, ListChecks, Search, UserCircle } from 'lucide-react-native'
 import { colors } from '@/lib/theme'
 
 /**
- * The app's places, as the system's tab bar with Liquid Glass (docs/design/mobile-comma-redesign.md, Alex
- * 2026-11-06): 对话, 线程 (with 任务), 建议 and 设置, then the system search tab. A chat or a thread opens over the
- * tabs, so the tab bar goes away there. The tabs carry no badges (Alex 2026-11-06).
+ * The app's places, as the system's tab bar with Liquid Glass: Bot, 任务, 建议 and 设置, then the system search tab
+ * (decisions/2026-11-07-2045-tasks-only-threads-inside.md; no 线程 tab, threads open inside their task). A chat, a
+ * task and a thread open over the tabs, so the tab bar goes away there. The tabs carry no badges (Alex 2026-11-06).
  */
 export default function TabsLayout() {
   if (Platform.OS === 'web') return <WebTabs />
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="(chats)">
-        <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} />
-        <NativeTabs.Trigger.Label>对话</NativeTabs.Trigger.Label>
+        {/* SF Symbols has no robot: lucide's bot as a template image, so the system tints it like the others. */}
+        <NativeTabs.Trigger.Icon src={{ default: require('@/assets/tabs/bot.png'), selected: require('@/assets/tabs/bot-fill.png') }} renderingMode="template" />
+        <NativeTabs.Trigger.Label>Bot</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="threads">
-        <NativeTabs.Trigger.Icon sf={{ default: 'rectangle.stack', selected: 'rectangle.stack.fill' }} />
-        <NativeTabs.Trigger.Label>线程</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="tasks">
+        <NativeTabs.Trigger.Icon sf="checklist" />
+        <NativeTabs.Trigger.Label>任务</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="suggestions">
         <NativeTabs.Trigger.Icon sf={{ default: 'lightbulb', selected: 'lightbulb.fill' }} />
@@ -42,8 +43,8 @@ function WebTabs() {
   return (
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.accent, tabBarInactiveTintColor: colors.secondary,
       tabBarStyle: { backgroundColor: colors.page, borderTopColor: colors.separator } }}>
-      <Tabs.Screen name="(chats)" options={{ title: '对话', tabBarIcon: icon(MessagesSquare) }} />
-      <Tabs.Screen name="threads" options={{ title: '线程', tabBarIcon: icon(Layers) }} />
+      <Tabs.Screen name="(chats)" options={{ title: 'Bot', tabBarIcon: icon(Bot) }} />
+      <Tabs.Screen name="tasks" options={{ title: '任务', tabBarIcon: icon(ListChecks) }} />
       <Tabs.Screen name="suggestions" options={{ title: '建议', tabBarIcon: icon(Lightbulb) }} />
       <Tabs.Screen name="settings" options={{ title: '设置', tabBarIcon: icon(UserCircle) }} />
       <Tabs.Screen name="search" options={{ title: '搜索', tabBarIcon: icon(Search) }} />

@@ -79,6 +79,13 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 	return nil
 }
 func (w *Worker) PrepareRuntime(ctx context.Context, epoch int64) (Metadata, error) {
+	return w.prepareRuntime(ctx, epoch, true)
+}
+
+// Plain shared streams need the same fresh readiness and refresh/migration
+// boundary, but never consume maintenance metadata. Dedicated cleanup,
+// Disconnect and the original PrepareRuntime keep their maintenance behavior.
+func (w *Worker) prepareRuntime(ctx context.Context, epoch int64, maintenance bool) (Metadata, error) {
 	if w.ExecutionOnly || w.Secrets == nil {
 		return Metadata{}, ErrUnsupported
 	}
@@ -120,6 +127,9 @@ func (w *Worker) PrepareRuntime(ctx context.Context, epoch int64) (Metadata, err
 	}
 	if _, _, err := w.readyAuth(ctx, epoch); err != nil {
 		return Metadata{}, err
+	}
+	if !maintenance {
+		return Metadata{}, nil
 	}
 	cleanupDone := timingSpan(ctx, timingCleanup)
 	_, _ = w.Cleanup(ctx)

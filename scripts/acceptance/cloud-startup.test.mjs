@@ -1296,3 +1296,45 @@ test('a version change after failed execution stops later dispatches and preserv
   assert.ok(report.samples.every(sample => sample.cleanup.status === 'passed'))
   assert.ok(io.samples.every(sample => sample.deleted && sample.machineEnded))
 })
+
+test('candidate bootstrap callback runs once after owner provenance and before any task stream observation', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl, order = []
+  io.fetchImpl = async (url, init) => {
+    if (url.pathname.includes('/api/runs/') && url.pathname.endsWith('/evidence')) order.push('owner-provenance')
+    if (url.pathname.endsWith('/api/live/ticket')) order.push('task-watch')
+    return original(url, init)
+  }
+  let count = 0, published
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io, onCandidateRunQueued: async binding => {
+    count++; order.push('bootstrap')
+    assert.equal(binding.deviceId, deviceId); assert.equal(binding.agentId, agentId)
+    assert.equal(binding.harness, 'codex'); assert.equal(binding.model, 'gpt-6-luna')
+    assert.ok(binding.workspaceId && binding.runId && binding.issueId)
+    assert.ok(order.indexOf('owner-provenance') >= 0)
+    assert.equal(order.includes('task-watch'), false)
+    published = { version: 1, runId: binding.runId, harness: binding.harness,
+      bootstrapSha256: 'a'.repeat(64), hintSha256: 'b'.repeat(64) }
+    return published
+  } })
+  assert.equal(count, 1)
+  assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+  assert.deepEqual(report.samples[0].bootstrapPublication, published)
+  assert.equal(report.samples[0].cleanup.status, 'passed')
+})
+
+test('candidate bootstrap refuses provenance failure and retains normal cleanup after a publication failure', async () => {
+  let calls = 0
+  const refused = await runCloudStartup(oneCodexCandidate(), { env, ...fixture({ candidate: true, runtime: true, wrongScope: true }),
+    onCandidateRunQueued: async () => { calls++; throw Error('must not start') } })
+  assert.equal(calls, 0)
+  assert.equal(refused.samples[0].status, 'failed')
+  const io = fixture({ candidate: true, runtime: true })
+  const failed = await runCloudStartup(oneCodexCandidate(), { env, ...io, onCandidateRunQueued: async () => {
+    calls++; throw Error('PRIVATE_BOOTSTRAP_SECRET')
+  } })
+  assert.equal(calls, 1)
+  assert.deepEqual(failed.samples[0].failure, { phase: 'bootstrap_publication', code: 'startup_bootstrap_publication_failed' })
+  assert.equal(failed.samples[0].cleanup.status, 'passed')
+  assert.ok(io.samples[0].cancelled && io.samples[0].deleted)
+  assert.doesNotMatch(JSON.stringify(failed), /PRIVATE_BOOTSTRAP_SECRET/)
+})

@@ -44,7 +44,7 @@ async function accept(preloadedModels?: HostedModelProbe) {
     // Diagnostics are opt-in per assignment. A trusted operator can authorize a
     // bounded Bot/repository window through the existing claim response.
     let code: number | null
-    try { code = await runCli(['daemon', '--data-dir', dataDir, '--server', config.server, '--hosted-subscriptions', '--e2b-container-runtime', ...computer], undefined, { protectionBypass: config.protectionBypass, preloadedModels, initialRunId: config.initialRunId, anonymousClaudeCandidate, anonymousCodexCandidate }) }
+    try { code = await runCli(['daemon', '--data-dir', dataDir, '--server', config.server, '--hosted-subscriptions', '--e2b-container-runtime', ...computer], undefined, { protectionBypass: config.protectionBypass, preloadedModels, initialRunId: config.initialRunId, collectCliTiming: config.collectCliTiming, anonymousClaudeCandidate, anonymousCodexCandidate }) }
     catch (error) { await Promise.all([anonymousClaudeCandidate?.close(), anonymousCodexCandidate?.close()]); throw error }
     if (code !== null && code !== 0) { await Promise.all([anonymousClaudeCandidate?.close(), anonymousCodexCandidate?.close()]); throw new Error('Cloud worker failed') }
   })

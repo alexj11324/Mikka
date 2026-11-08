@@ -19,6 +19,8 @@ const configSchema = z.object({
   protectionBypass: z.string().regex(/^[A-Za-z0-9_-]{20,256}$/).optional(),
   traceContext: z.unknown().transform(sanitizeTraceContext).optional(),
   tracing: deviceRegistered.shape.tracing,
+  /** Existing trusted host opt-in, used by isolated candidate acceptance only. */
+  collectCliTiming: z.literal(true).optional(),
 }).strict()
 
 const initialRunSchema = z.object({

@@ -42,6 +42,7 @@ rl.createInterface({input:process.stdin}).on('line',line=>{
     policyHash: policySnapshotHash(policy), diagnostics, decisionCatalogue: hint.decisionCatalogue }
   const binding = async () => {
     const timing = diagnostics ? await candidate.takeTiming(fresh) : undefined
+    if (timing) cleanups.push(() => timing.close({ publish: false, cliExitObserved: candidate.nativeExitObserved }))
     const finalEnv = { ...env, ...buildChildEnv({ host: env, adapterAllow: [], runId }), ...(diagnostics ? { CLOUD_STARTUP_TIMING: '1' } : {}),
       MIKKA_POLICY_HASH: policySnapshotHash(policy), CODEX_HOME: join(home, '.codex'),
       PATH: dirname(binary) + delimiter + env.PATH, ...timing?.env }
@@ -112,4 +113,18 @@ it('reaps owned descendants on leader exit before waiting for inherited pipes to
     expect(closed).toBe(true)
     expect(f.candidate.nativeExitObserved).toBe(true)
   } finally { clearTimeout(timer); await f.candidate.close() }
+})
+
+it.each(['project', 'environment', 'identity'] as const)('does not publish bootstrap adoption timing after initialized candidate %s rejection', async kind => {
+  const f = fixture('normal', true); await f.candidate.ready; f.checkout()
+  expect(f.candidate.preparationTiming).toBeUndefined()
+  const binding = await f.binding()
+  if (kind === 'project') mkdirSync(join(f.cwd, '.codex'))
+  if (kind === 'environment') binding.env.PATH += ':changed'
+  if (kind === 'identity') binding.fresh.deviceId = randomUUID()
+  expect(await f.candidate.adopt(binding)).toBeUndefined()
+  expect(f.candidate.preparationTiming).toBeUndefined()
+  expect(f.candidate.state).toBe('closed'); expect(f.candidate.nativeExitObserved).toBe(true)
+  expect(f.events().filter(method => method === 'initialize')).toHaveLength(1)
+  expect(f.events().every(method => ['initialize', 'initialized'].includes(method))).toBe(true)
 })

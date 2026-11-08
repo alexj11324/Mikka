@@ -30,6 +30,7 @@ import { logThreadLifecycle } from './thread-lifecycle-log'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { readWorkerTail, saveWorkerTail, workerCommand, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
 import { registrationCommand, quoteShell, REGISTRATION_WAITING, REGISTRATION_COMPLETE, REGISTRATION_LEGACY } from '@/lib/computer/registration-command'
+import { openWorkerBootstrapBroker, type WorkerBootstrapBroker } from '@/lib/computer/bootstrap-broker'
 import { finishThreadRegistration, prepareThreadRegistration } from './thread-registration'
 import { factoryEventId } from '../factory/event-id'
 import { questionFingerprint } from '../factory/questions/contract'
@@ -592,6 +593,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
   let reservedStartLease = false
   let runtimeRollback: (() => Promise<void>) | undefined
   let verifyRefreshedRuntime: (() => Promise<unknown>) | undefined
+  let workerBroker: WorkerBootstrapBroker | undefined
   try {
     await client.query('BEGIN')
     if (refreshBudget) await client.query("SELECT set_config('lock_timeout',$1,true),set_config('statement_timeout',$1,true)", [`${refreshBudget(5_000)}ms`])
@@ -829,12 +831,37 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     const origin = new URL(process.env.MIKKA_CLOUD_WORKER_URL ?? '')
     if (origin.protocol !== 'https:' || origin.username || origin.password) throw new Error('Worker unavailable')
     const expectedSha = process.env.MIKKA_CLOUD_WORKER_SHA
+    const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
+    const directory = '/home/user/.mikka/worker'
+    const publish = `install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next && install -o user -g user -m 600 ${handoff}.run /home/user/.mikka/initial-run.next && mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json && install -o user -g user -m 600 ${handoff}.claude /home/user/.mikka/anonymous-claude.next && mv /home/user/.mikka/anonymous-claude.next /home/user/.mikka/anonymous-claude.json && install -o user -g user -m 600 ${handoff}.codex /home/user/.mikka/anonymous-codex.next && mv /home/user/.mikka/anonymous-codex.next /home/user/.mikka/anonymous-codex.json && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${handoff} && unlink ${handoff}.run && unlink ${handoff}.claude && unlink ${handoff}.codex`
+    let registrationWaiting = false, phaseOutput = ''
+    const onRegistrationOutput = (chunk: string) => {
+      phaseOutput = (phaseOutput + chunk).slice(-1024)
+      if (!registrationWaiting && phaseOutput.includes(REGISTRATION_WAITING)) {
+        registrationWaiting = true
+        refreshPhase = timings.next('worker_register')
+      }
+    }
     // Version verification and viewer startup are independent. Hosted runs no
     // longer use Docker; never pull its obsolete image on the critical path.
     // A repository task's machine (claude or codex template) has no desktop.
     refreshPhase = timings.next('read_worker')
     const [sourceSha] = await Promise.all([
-      sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root', ...runtimeRequestOptions(refreshBudget) }).then(value => value.trim()).catch(error => { parallelFailurePhase ??= 'read_worker'; throw error }),
+      (repositoryTask && anonymousFreshMachine && !refreshRuntime && !retainedSandboxId && !exactQuestionMachine &&
+        expectedSha && /^[a-f0-9]{40}$/.test(expectedSha) && typeof sandbox.commands.streamInput === 'function'
+        ? openWorkerBootstrapBroker(sandbox, {
+          runId, leaseId, workerSha: expectedSha, handoff, directory,
+          prepare: `install -d -o user -g user -m 700 /home/user/.mikka ${directory}`,
+          publish, wake: `runuser -u user -- sh -c ${quoteShell(CLOUD_PRELOADER_WAKE_COMMAND)}`,
+          wakeReceipt: CLOUD_PRELOADER_WAKE_RECEIPT,
+          start: `runuser -u user -- sh -c ${quoteShell(workerCommand(CLOUD_WORKER_COMMAND))}`,
+          timeoutMs: 40_000, registrationTimeoutMs: 30_000,
+        }, { ...runtimeRequestOptions(refreshBudget), onStdout: onRegistrationOutput }).then(broker => {
+          workerBroker = broker
+          return broker.sourceSha
+        })
+        : sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root', ...runtimeRequestOptions(refreshBudget) }).then(value => value.trim())
+      ).catch(error => { parallelFailurePhase ??= 'read_worker'; throw error }),
       repositoryTask ? undefined : installComputerRuntime(sandbox, refreshBudget).catch(error => { parallelFailurePhase ??= 'install_computer'; throw error }),
     ])
     refreshPhase = timings.next('verify_worker')
@@ -998,7 +1025,6 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     // command. Count only this credential's use since its handoff began.
     refreshPhase = timings.next('publish_bootstrap')
     const handoffStartedAt = issuedCredential.now as Date
-    const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     const bootstrap = JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(),
       traceContext: captureTraceContext({ runId }), tracing: daemonTraceSettings(),
       ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) })
@@ -1014,17 +1040,21 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       freshTask: firstAnonymousClaudeTask({ created: anonymousFreshMachine, refresh: refreshRuntime, retained: Boolean(retainedSandboxId), question: exactQuestionMachine }, current),
       runId, bootstrap, kind: current.kind, repository: run.repoPath, definition, userId: actor.userId, botId: current.botId,
     })
-    await sandbox.files.write([{ path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun }, { path: `${handoff}.claude`, data: anonymousClaude }, { path: `${handoff}.codex`, data: anonymousCodex }], { user: 'root', useOctetStream: false, ...runtimeRequestOptions(refreshBudget) })
+    const uploads = [{ path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun }, { path: `${handoff}.claude`, data: anonymousClaude }, { path: `${handoff}.codex`, data: anonymousCodex }]
+    if (workerBroker?.active) workerBroker.assertAwaitingUpload()
+    await sandbox.files.write(uploads, { user: 'root', useOctetStream: false, ...runtimeRequestOptions(refreshBudget) })
     // The foreground command must finish the atomic publication before waking
     // the existing watcher as user. Keep credential bytes in the file upload,
     // never in this command/argv/env. Only an acknowledged signal skips the
     // redundant remote start; absent/old preloaders keep the original fallback.
-    const directory = '/home/user/.mikka/worker'
-    const publish = `install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next && install -o user -g user -m 600 ${handoff}.run /home/user/.mikka/initial-run.next && mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json && install -o user -g user -m 600 ${handoff}.claude /home/user/.mikka/anonymous-claude.next && mv /home/user/.mikka/anonymous-claude.next /home/user/.mikka/anonymous-claude.json && install -o user -g user -m 600 ${handoff}.codex /home/user/.mikka/anonymous-codex.next && mv /home/user/.mikka/anonymous-codex.next /home/user/.mikka/anonymous-codex.json && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${handoff} && unlink ${handoff}.run && unlink ${handoff}.claude && unlink ${handoff}.codex`
-    let registrationWaiting = false, phaseOutput = ''
     refreshPhase = timings.next('start_worker')
     try {
-      const publication = await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka ${directory} && ${registrationCommand({
+      // Only an acknowledged whole upload may commit on the existing stream.
+      // Enter start_worker first: a fast registration push may arrive in send().
+      if (workerBroker?.active) await workerBroker.commit(uploads, {
+        deviceId, workspaceId: actor.workspaceId, tokenSha256: createHash('sha256').update(credential).digest('hex'),
+      })
+      const publication = workerBroker?.active ? await workerBroker.result : await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka ${directory} && ${registrationCommand({
         directory, deviceId, workspaceId: actor.workspaceId, workerSha: expectedSha,
         tokenSha256: createHash('sha256').update(credential).digest('hex'),
         publish, wake: `runuser -u user -- sh -c ${quoteShell(CLOUD_PRELOADER_WAKE_COMMAND)}`,
@@ -1033,13 +1063,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
         // keeping this foreground wait's stdout/stderr pipes open.
         start: `runuser -u user -- sh -c ${quoteShell(workerCommand(CLOUD_WORKER_COMMAND))}`,
         timeoutMs: refreshBudget ? refreshBudget(30_000) : 30_000,
-      })}`, { user: 'root', ...runtimeCommandOptions(40_000, refreshBudget), onStdout: chunk => {
-        phaseOutput = (phaseOutput + chunk).slice(-256)
-        if (!registrationWaiting && phaseOutput.includes(REGISTRATION_WAITING + '\n')) {
-          registrationWaiting = true
-          refreshPhase = timings.next('worker_register')
-        }
-      } })
+      })}`, { user: 'root', ...runtimeCommandOptions(40_000, refreshBudget), onStdout: onRegistrationOutput })
       const messages = publication.stdout.split('\n')
       if (messages.includes(REGISTRATION_LEGACY)) {
         // Rolling deployments/rollback can still select a legitimate old worker.
@@ -1066,6 +1090,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       await saveWorkerTail(pool, runId, await readWorkerTail(async () => sandbox), mask, refreshRuntime ? undefined : 'Thread worker did not register').catch(() => undefined)
       throw new Error('Thread worker did not register', { cause: error })
     }
+    await workerBroker?.close()
     refreshPhase = timings.next('verify_runtime')
     if (verifyRefreshedRuntime) await verifyRefreshedRuntime()
     refreshPhase = timings.next('finish')
@@ -1086,6 +1111,9 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     logRuntimeRefreshFailure(runId, parallelFailurePhase ?? refreshPhase, error, undefined,
       refreshRuntime || upgradeRetainedRuntime ? 'refresh' : 'start')
     await client.query('ROLLBACK')
+    // Abort this lease's unpublished broker before start-failure recovery.
+    // Preserve the primary admission/upload/registration failure if transport cleanup also fails.
+    await workerBroker?.close().catch(() => undefined)
     if (runtimeRollback) {
       try { await runtimeRollback() } catch (rollbackError) { logRuntimeRefreshFailure(runId, 'rollback', rollbackError) }
     }

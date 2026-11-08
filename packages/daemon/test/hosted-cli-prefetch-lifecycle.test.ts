@@ -132,7 +132,9 @@ it('still aborts and drains an in-flight claim before completing daemon stop', a
   })
   cleanups.unshift(async () => { released.resolve() })
   await f.daemon.start()
-  await f.daemon.syncWithServer()
+  // The first cloud sync can now await settings carried by this same claim.
+  // Stop while both are in flight; it must abort before waiting for either.
+  const syncing = f.daemon.syncWithServer()
   await entered.promise
   let stopped = false
   const stopping = f.daemon.stop().then(() => { stopped = true })
@@ -140,6 +142,7 @@ it('still aborts and drains an in-flight claim before completing daemon stop', a
   expect(stopped).toBe(false)
   released.resolve()
   await stopping
+  await syncing
   expect(f.claim).toHaveBeenCalledTimes(1)
   expect(prefetchHostedCliFiles).not.toHaveBeenCalled()
   expect(f.softwareReads).toEqual([])
