@@ -1,6 +1,6 @@
 # 项目地图后端 RFC
 
-- **Status:** implementation plan；按 Alex 2026-11-04 最新指令连续实施，作者在 CI 通过后自行合并。
+- **Status:** 2026-11-04 实施方案及原始交接计划；写入与读取接口已在仓库实现，现行合同见 [项目地图后端接口](project-map-api.md)。以下基线、步骤和示例保留实施时语境，不代表生产验收结果。
 - **GitHub:** 父 issue [#1243](https://github.com/alexj11324/Mikka/issues/1243)；本 RFC [#1244](https://github.com/alexj11324/Mikka/issues/1244)；实施依次为 [#1245](https://github.com/alexj11324/Mikka/issues/1245)、[#1247](https://github.com/alexj11324/Mikka/issues/1247)。
 - **Owner thread:** ChatGPT Pro，项目地图后端。
 - **执行顺序:** #1244 文档 → #1245 决定写入 → #1247 地图读取；每步自行开 PR、合并、部署核对和验收，不等待中间评审。
@@ -347,7 +347,7 @@ type MapPage = {
 - 使用签名的不透明游标包含 `viewerId, workspaceId, projectId, fingerprint, filtersHash, laneLimit, layoutVersion, lastOrder, lastNodeId, expiresAt`，有效 10 分钟。签名由服务端现有 secret 使用 `project-map-cursor:v1` 域隔离派生；不把 secret 放进 token。
 - 下一页重新构造同 scope 的轻量投影；fingerprint 或筛选/宽度不一致，返回 **409 `MAP_SNAPSHOT_CHANGED`** 和 `restart: true`。前端保留旧画面再取首屏，不把旧页和新页拼接。
 - 失效 token 为 410 `MAP_SNAPSHOT_EXPIRED`；签名/结构错误为 400；跨 reader/workspace/project 或已撤销权限为 404。鉴权先于内容和总数计算。
-- 两个数据库不具备统一 MVCC snapshot：应用库元数据读取用短只读事务，工作区/项目/权限版本在读取前后复核；变化时至多重读一次，再返回 409。不能把分布式竞态写成“绝对快照一致”。
+- 两个数据库不具备统一 MVCC snapshot。实现中的应用库元数据和来源权限由一条只读 SELECT 读取，无额外 BEGIN/COMMIT；工作区/项目权限在读取前后复核。现行读取边界见 [接口说明](project-map-api.md#分页来源与界限)。
 - 服务端不持久化图副本；snapshot.id 是不透明、签名且绑定调用主体/scope/查询的版本 token；detail/path/overview 每次以它复核相同 fingerprint，不是任意客户端可填的哈希。新决定到达或实际状态改变时，版本改变是预期行为。
 
 ### 5.6 详情、原始来源与 minimap
@@ -673,17 +673,21 @@ GET /mikka/api/projects/00000000-0000-4000-8000-000000000001/map?workspaceId=000
 5. 生产 API 版本验证后，在 #1247 评论写清：接口路径、请求/响应、**真实项目脱敏 JSON**、cursor/409、lane/fold/path、权限/已知限制、验证 revision 和证据。然后在 #1243 写「**后端已完成，可以开始前端**」。
 6. 前端交接前没有通过的限制必须写明；不能将 RFC、WIP 或单元测试结果称为后端已上线。
 
-### 7.4 三条真实模型路径独立记录
+### 7.4 两条订阅路径独立记录
+
+按 `AGENTS.md` 的最新验收规则执行。两条路径各用自己的订阅和小模型。
 
 | 路径 | 固定模型 | 必须记录的真实证据 | 外部阻塞时 |
 | --- | --- | --- | --- |
-| API key | `deepseek-flash` | 调用前 `node scripts/assert-test-model.mjs deepseek-flash`；实际 key claim、run、决定/地图记录 | 余额/限流/服务故障记录真实错误并标 BLOCKED，继续另外两条；不以模型列表可读宣称能调用 |
-| Claude Code 官方订阅 | `claude-haiku-5-5` | 原生订阅 claim、原始 run/session、工具调用、来源对话 | 不切到 API 或其他模型凑通过 |
-| Codex 官方订阅 | `gpt-6-luna` | 原生订阅 claim、原始 run/session、工具调用、来源对话 | 同左 |
+| Claude Code 官方订阅 | `claude-haiku-5-5` | 原生订阅 claim、原始 run/session、工具调用、来源对话 | 记录实际错误和 BLOCKED，继续 Codex 路径 |
+| Codex 官方订阅 | `gpt-6-luna` | 原生订阅 claim、原始 run/session、工具调用、来源对话 | 记录实际错误和 BLOCKED，继续 Claude Code 路径 |
 
-内部 Decision 裁判沿用现有 `DECISION_MODEL`，不属于被测编码模型替换。每条为 PASS / FAIL / BLOCKED，不能把一条 PASS 合并成“三条通过”。产品自身的问题必须修复产品后重跑；余额等外部原因才是 BLOCKED。
+API-key/DeepSeek 不作为合并或验收门禁，不为补齐矩阵发送付费 API 请求。
+已有用例保留原绑定的订阅与模型。内部 Decision 裁判沿用现有 `DECISION_MODEL`。
+每条订阅分别记录 PASS / FAIL / BLOCKED。产品缺陷修复后重跑，外部额度或服务故障记录真实阻塞。
 
-每个子 issue 的评论模板：**PR / merge SHA；适用 CI 和部署 run；生产版本及核对时间；本路径结果和证据；其他两条路径结果；还剩什么**。明确的外部阻塞不阻止其余两条发版；未完成项保留在 issue 或链接的补验项中，不能在关单时消失。
+每个子 issue 记录 PR、merge SHA、适用 CI、部署 run、生产版本、核对时间、两条路径的结果与证据及剩余事项。
+生产身份使用 `AGENTS.md` 指定的共享验收账号及其已授权团队工作区。
 
 ## 8. 实施风险
 

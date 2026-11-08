@@ -5,7 +5,7 @@ says which source wins when two disagree, and where each kind of rule lives.
 
 ## Read in this order
 
-1. [`glossary.md`](glossary.md): what bot, chat and thread mean.
+1. [`glossary.md`](glossary.md): what bot, chat, task and thread mean.
 2. [`rules.md`](rules.md): the product and visual rules. Every rule has an id
    (`R-12`) so reviews can cite it.
 3. [`components.md`](components.md): which component to use for each job, and
@@ -56,8 +56,13 @@ Notes:
 - A measured value (a width, a gap) that differs between Figma and code is a
   conflict. Do not pick one quietly: use the order above, and if it is still
   unclear ask Alex.
-- Chat messages, project memory and handoff notes are not sources. If a rule
-  matters, it goes into `rules.md` or `decisions.md`.
+- Chat messages, project memory and handoff notes are not sources. Record a
+  lasting decision in `decisions/` and update its rule in `rules.md`.
+- Feature specs record requirements and their stated implementation evidence.
+  Acceptance of a design does not establish that it shipped. Dated audits and
+  research keep their original revision and findings. The official UI layer
+  and the public default slots can render differently; see
+  [UI slots](../ui-overlay.md) before describing implementation coverage.
 
 ## Where things live and who keeps them
 
