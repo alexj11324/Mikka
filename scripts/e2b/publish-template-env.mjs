@@ -1,3 +1,4 @@
+import { readBootstrapAcceptance } from '../acceptance/cloud-startup.mjs'
 // Publishes the verified additive runtime configuration inside Web deploy's
 // production queue. The caller then builds on GitHub and uploads --prebuilt;
 // this module never requests a Vercel source build.
@@ -143,7 +144,8 @@ export function assertReleaseEvidence({ releaseEvidence, templates, sourceSha, s
       || authorization.extraRemoteCalls !== 0
       || !Number.isSafeInteger(authorization.observedProviderEvents) || authorization.observedProviderEvents < 1
       || authorization.officialDelivery !== 'best_effort_not_a_complete_call_count'
-      || mcpBusinessEvidence(authorization.mcpHttpTiming, { runIdHash: ack.runIdHash, harness }).status !== 'observed')
+      || mcpBusinessEvidence(authorization.mcpHttpTiming, { runIdHash: ack.runIdHash, harness }).status !== 'observed'
+      || !readBootstrapAcceptance(row.bootstrapAcceptance, { runIdHash: ack.runIdHash, harness }))
       fail(`runtime_release_subscription_missing ${kind}`)
   }
 }

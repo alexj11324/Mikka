@@ -1,3 +1,4 @@
+import type { RepositoryGitTiming } from './repository-git-timing'
 // Run output format: Vercel AI SDK `UIMessageChunk`s (types only, the `ai`
 // package is never used to call a model). AI Elements and `useChat` render
 // them directly; Mikka-specific facts travel as `data-*` parts.
@@ -24,7 +25,7 @@ export type MikkaDataTypes = {
   /** Run state transitions written by the daemon. */
   "run-state": { state: RunState; error?: string; stopReason?: StopReason }
   /** One start-up stage of a run and how long it took; stored, so a failed run shows where it stopped. */
-  "run-stage": { stage: RunStage; ms: number; ok: boolean; startupTiming?: DaemonStartupTiming; preparationTiming?: DaemonPreparationTiming }
+  "run-stage": { stage: RunStage; ms: number; ok: boolean; startupTiming?: DaemonStartupTiming; preparationTiming?: DaemonPreparationTiming; repositoryTiming?: RepositoryGitTiming }
   /** A real task is attached to this Bot's desktop, not to an agent identity. */
   computer: { botId: string; runId: string; task: string; state: 'working' }
   /**
@@ -59,10 +60,11 @@ export type RunChunk = UIMessageChunk<unknown, MikkaDataTypes>
 
 /** A start-up stage's outcome (stored, unlike `run-state`). */
 export function runStageChunk(stage: RunStage, ms: number, ok: boolean, startupTiming?: DaemonStartupTiming,
-  preparationTiming?: DaemonPreparationTiming): RunChunk {
+  preparationTiming?: DaemonPreparationTiming, repositoryTiming?: RepositoryGitTiming): RunChunk {
   return { type: "data-run-stage", data: { stage, ms: Math.max(0, Math.round(ms)), ok,
     ...(stage === "agent_start" && startupTiming ? { startupTiming } : {}),
-    ...(stage === "agent_start" && preparationTiming ? { preparationTiming } : {}) } }
+    ...(stage === "agent_start" && preparationTiming ? { preparationTiming } : {}),
+    ...(stage === "repository" && repositoryTiming ? { repositoryTiming } : {}) } }
 }
 export type RunMessage = UIMessage<unknown, MikkaDataTypes>
 

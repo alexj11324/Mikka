@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { MockAdapter } from '../src/adapters/mock'
 import { consumeCloudBootstrap, installCloudCredential } from '../src/cloud-bootstrap'
@@ -121,13 +121,13 @@ it('a real FIFO locator cannot block the optional hint before fstat', () => {
   expect(existsSync(f.hint)).toBe(false)
 })
 
-async function machine(hint = true, options: { delayedClaim?: boolean } = {}) {
+async function machine(hint = true, options: { delayedClaim?: boolean; cloud?: boolean; seed?: 'valid' | 'missing' | 'wrong-repo' | 'wrong-remote' | 'malformed' | 'continuation'; claimFailure?: boolean } = {}) {
   const deviceId = randomUUID(), repo = await makeRepo(), dataDir = tempDir()
   const server = new MemoryServer(deviceId)
   const recipe = { approved: true, copyFiles: ['.env.local'], command: `node -e "require('fs').writeFileSync('setup-ran','complete')"` }
   server.addRepo(deviceId, { repoId: 'repo-1', name: 'fixture', path: repo, setup: recipe })
   const runId = server.queueRun(deviceId, { issueId: 'issue-1', repoId: 'repo-1', baseBranch: 'main', harness: 'mock', prompt: 'complete prompt', fixture: 'stall' })
-  const link = server.link(), original = { ...link }, calls: string[] = []
+  const link = server.link(), original = { ...link }, calls: string[] = [], claimOptions: unknown[] = []
   const registerEntered = deferred(), registration = deferred()
   const reposEntered = deferred(), repositories = deferred()
   const claimEntered = deferred(), claimResponse = deferred(), queued = deferred<string[]>()
@@ -138,10 +138,15 @@ async function machine(hint = true, options: { delayedClaim?: boolean } = {}) {
   link.listRepos = async (...args) => { calls.push('repos'); reposEntered.resolve(); await repositories.promise; return original.listRepos(...args) }
   link.pendingRuns = async (...args) => { calls.push('pending'); return original.pendingRuns(...args) }
   link.claimRun = async (...args) => {
-    calls.push('claim'); claimEntered.resolve()
+    calls.push('claim'); claimOptions.push(args[3]); claimEntered.resolve(); if (options.claimFailure) throw new Error('Fixture claim refused')
     const assignment = await original.claimRun(...args)
     await claimResponse.promise
-    return assignment
+    if (!options.seed || options.seed === 'missing') return assignment
+    const initialRepository = { ...(await original.listRepos(deviceId))[0], remoteUrl: assignment.remoteUrl, networkAllow: ['packages.example.invalid'] }
+    if (options.seed === 'wrong-repo') initialRepository.repoId = 'other-repo'
+    if (options.seed === 'wrong-remote') initialRepository.remoteUrl = 'https://github.com/fixture/other.git'
+    if (options.seed === 'malformed') Object.assign(initialRepository, { setup: { approved: 'not-a-boolean' } })
+    return { ...assignment, repo: initialRepository, ...(options.seed === 'continuation' ? { continuesRunId: 'previous-run' } : {}) }
   }
   if (!options.delayedClaim) claimResponse.resolve()
   link.verifyRunPolicy = vi.fn(async () => { calls.push('policy'); if (revoked) throw new Error('Current run was stopped') })
@@ -157,13 +162,14 @@ async function machine(hint = true, options: { delayedClaim?: boolean } = {}) {
     } finally { options?.signal?.removeEventListener('abort', abort) }
   }
   const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link, credential: 'fixture-credential',
+    ...(options.cloud ? { hostedSubscriptions: true, e2bContainerRuntime: true, harnessBinaries: { claude_code: resolve(import.meta.dirname, 'fakes/fake-claude-subscription.mjs') } } : {}),
     initialRunId: hint ? runId : undefined, harnesses: [{ harness: 'mock', installed: true, version: 'fixture' }],
     modelProbe: false, mockSpeed: Infinity, heartbeatMs: 60_000, quotaSource: null }).start()
   const started = vi.spyOn(daemon.supervisor, 'start')
   const warnings = vi.spyOn(daemon.log, 'warn')
   cleanups.push(async () => { registration.resolve(); repositories.resolve(); claimResponse.resolve(); await daemon.stop() })
   return { daemon, runId, link, calls, recipe, started, registration, registerEntered, repositories, reposEntered,
-    claimEntered, claimResponse, queued, commandsEntered, warnings, revoke: () => { revoked = true; server.requestStop(runId) } }
+    claimEntered, claimResponse, queued, commandsEntered, warnings, claimOptions, revoke: () => { revoked = true; server.requestStop(runId) } }
 }
 
 it.each([false, true])('uses the same first-pass RPCs and preserves complete setup/copyFiles (hint=%s)', async hint => {
@@ -286,5 +292,79 @@ it('uninstall rejects the repository wait and drains a late claim before closing
   expect(f.started).not.toHaveBeenCalled()
   expect(f.calls).not.toContain('repos')
   expect(prepare).not.toHaveBeenCalled()
+  expect(adapter).not.toHaveBeenCalled()
+})
+
+it('uses claim repository settings once after the heartbeat barrier, preserving real setup and copyFiles', async () => {
+  const actualBootstrap = WorktreeManager.prototype.bootstrap
+  vi.spyOn(WorktreeManager.prototype, 'bootstrap').mockImplementation(async function (this: WorktreeManager, worktree, repo, recipe) {
+    writeFileSync(join(repo, '.env.local'), 'CACHE_INPUT=1\n')
+    return actualBootstrap.call(this, worktree, repo, recipe)
+  })
+  const adapter = vi.spyOn(MockAdapter.prototype, 'start')
+  const f = await machine(true, { cloud: true, seed: 'valid' })
+  const heartbeat = f.link.heartbeat, barrier = deferred()
+  f.link.heartbeat = async (...args) => { await barrier.promise; return heartbeat(...args) }
+  f.repositories.resolve()
+  f.registration.resolve()
+  await f.claimEntered.promise
+  await new Promise(resolve => setImmediate(resolve))
+  expect(f.started).not.toHaveBeenCalled()
+  barrier.resolve()
+  const options = await waitFor(() => adapter.mock.calls[0]?.[0])
+  expect(f.calls.filter(name => name === 'repos')).toHaveLength(0)
+  expect(f.claimOptions).toEqual([{ initialRepository: true }])
+  expect(f.started.mock.calls[0][0].repo).toBeUndefined()
+  expect(readFileSync(join(options.cwd, '.env.local'), 'utf8')).toBe('CACHE_INPUT=1\n')
+  expect(readFileSync(join(options.cwd, 'setup-ran'), 'utf8')).toBe('complete')
+  expect(JSON.parse(readFileSync(f.daemon.paths.device, 'utf8')).repos[0].networkAllow).toEqual(['packages.example.invalid'])
+  await f.daemon.syncWithServer()
+  expect(f.calls.filter(name => name === 'repos')).toHaveLength(1)
+  expect(f.calls.filter(name => name === 'claim')).toHaveLength(1)
+})
+
+it.each(['missing', 'wrong-repo', 'wrong-remote', 'malformed', 'continuation'] as const)('retains normal repository GET for an unusable initial claim (%s)', async seed => {
+  const f = await machine(true, { cloud: true, seed })
+  f.repositories.resolve(); f.registration.resolve()
+  await waitFor(() => f.started.mock.calls.length === 1)
+  expect(f.calls.filter(name => name === 'repos')).toHaveLength(1)
+  expect(f.claimOptions).toEqual([{ initialRepository: true }])
+})
+
+it('does not request the one-shot repository projection on a local hinted claim', async () => {
+  const f = await machine(true, { seed: 'valid' })
+  f.repositories.resolve(); f.registration.resolve()
+  await waitFor(() => f.started.mock.calls.length === 1)
+  expect(f.claimOptions).toEqual([undefined])
+  expect(f.calls.filter(name => name === 'repos')).toHaveLength(1)
+})
+
+it('settles the repository handoff when the initial claim is refused', async () => {
+  const f = await machine(true, { cloud: true, seed: 'valid', claimFailure: true })
+  f.repositories.resolve(); f.registration.resolve()
+  await waitFor(() => f.calls.includes('pending'))
+  expect(f.calls.filter(name => name === 'repos')).toHaveLength(1)
+  expect(f.started).not.toHaveBeenCalled()
+  await f.daemon.stop()
+})
+
+it.each(['heartbeat-refused', 'credential-rotated', 'uninstall'] as const)('keeps the original initial barrier with claim settings (%s)', async refusal => {
+  vi.spyOn(service, 'uninstallService').mockResolvedValue()
+  const adapter = vi.spyOn(MockAdapter.prototype, 'start')
+  const f = await machine(true, { cloud: true, seed: 'valid', delayedClaim: true })
+  const heartbeat = f.link.heartbeat
+  f.link.heartbeat = async (...args) => {
+    if (refusal === 'heartbeat-refused') throw new SessionRejectedError()
+    const result = await heartbeat(...args)
+    if (refusal === 'uninstall') return { ...result, deviceCommands: [{ id: randomUUID(), kind: 'uninstall' as const }] }
+    await handlers['device.setCredential']({ credential: 'orv_' + 'b'.repeat(43) })
+    return result
+  }
+  f.repositories.resolve(); f.registration.resolve()
+  await f.claimEntered.promise
+  f.claimResponse.resolve()
+  await waitFor(() => f.warnings.mock.calls.find(args => args[1] === 'could not start run') || f.daemon.status().draining)
+  await f.daemon.stop()
+  expect(f.started).not.toHaveBeenCalled()
   expect(adapter).not.toHaveBeenCalled()
 })
