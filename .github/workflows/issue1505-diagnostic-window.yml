@@ -1,11 +1,11 @@
 # Fresh diagnostic window after exact removal of the preceding window.
 # Reuse only the same independently verified idle Bot. No task/Profile/model/VM creation.
-# Normal child of 302ea829; exact prior prepared receipt is embedded and hash-bound.
+# Normal child of a9c61594; exact prior prepared receipt is embedded and hash-bound.
 # Prepared before merge; create this helper ref only after latest CI and actual writers permit release.
 name: Issue 1505 renew exact owned diagnostic window
 on:
   push:
-    branches: [ops/1505-renew-window-e33-2308]
+    branches: [ops/1505-renew-window-e33-0018]
 permissions:
   contents: write
   id-token: write
@@ -22,7 +22,7 @@ jobs:
       run:
         working-directory: source
     env:
-      DIAGNOSTIC_WINDOW_GO: root-reviewed-1505-renew-window-e33-2308
+      DIAGNOSTIC_WINDOW_GO: root-reviewed-1505-renew-window-e33-0018
     steps:
       - name: Check out the exact temporary helper
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -42,11 +42,11 @@ jobs:
           node-version: 24
       - name: Verify immutable source and explicit root review before credentials
         run: |
-          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-renew-window-e33-2308'
+          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-renew-window-e33-0018'
           test "$GITHUB_RUN_ATTEMPT" = '1'
           test "$(git rev-parse HEAD)" = 'e33e3a91d4011efbe768b11b428a5d152ede744a'
           test "$(git rev-parse HEAD^{tree})" = 'b2e36d3351654fceec59fe138a55de31cb155df9'
-          printf '%s  %s\n' '266bed08ab45c16f6b7e88c33d7254835e9ba9e51296099be976f3168cb5396c' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
+          printf '%s  %s\n' '46d8b905518cf480fecdf0a3bce1a3863f4e79c92609b1cd3ec9d4231820898c' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
           node ../ops/scripts/ops/issue1505-diagnostic-window.mjs verify "$RUNNER_TEMP/diagnostic-window-preflight.json"
       - name: Read the existing SMOKE email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -109,7 +109,7 @@ jobs:
         run: |
           import json, os, urllib.request, urllib.error
           from pathlib import Path
-          repo, branch = 'alexj11324/Mikka', 'ops/1505-renew-window-e33-2308'
+          repo, branch = 'alexj11324/Mikka', 'ops/1505-renew-window-e33-0018'
           assert os.environ['GITHUB_REPOSITORY'] == repo and os.environ['GITHUB_REF'] == 'refs/heads/' + branch
           receipt = {'branch': branch, 'expectedSha': os.environ['GITHUB_SHA'], 'status': 'failed'}
           class NoRedirect(urllib.request.HTTPRedirectHandler):
