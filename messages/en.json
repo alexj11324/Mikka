@@ -4230,6 +4230,7 @@
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
     "panel": {
       "label": "Right panel",
+      "overview": "Overview",
       "allThreads": "All threads",
       "allThreadsWaiting": "All threads, {count} waiting on you",
       "tabs": "Right panel content",
