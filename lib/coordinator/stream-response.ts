@@ -67,7 +67,7 @@ const reasoningMasker = withCredentialMasking(identityMasker)
 type ReasoningBlock = { pending: string; buf: string; sent: number; blocked: boolean }
 
 /** Changes to projection boundaries invalidate the HTTP event cursor, including for recorded raw streams. */
-export const COORDINATOR_STREAM_PROJECTION_VERSION = 2
+export const COORDINATOR_STREAM_PROJECTION_VERSION = 3
 
 /** Local HTTP projection time, including replay: not the provider's generation clock or send-to-first-text time. */
 export type CoordinatorStreamTiming = {
@@ -161,6 +161,25 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
     sent = through
   }
 
+  /** The persisted chat trims each completed assistant step, including a stopped partial one. */
+  function canonicalStepText() {
+    const current = stepText.trim()
+    if (quietEligible && QUIET_REPLY.startsWith(current)) return text.slice(0, stepStart)
+    return text.slice(0, stepStart) + (stepStart && current ? '\n\n' : '') + current
+  }
+
+  /** Replace already emitted whitespace without releasing a saved-secret tail before commit. */
+  function finishTextStep(controller: TransformStreamDefaultController<CoordinatorStreamEvent>) {
+    if (!id) return
+    const next = canonicalStepText()
+    if (next === text) return
+    assertNoSecret(userId, next, fingerprints)
+    text = next
+    const through = Math.min(sent, Math.max(0, text.length - holdback))
+    if (sent > 0) controller.enqueue({ type: 'reset', id, text: text.slice(0, through) })
+    sent = through
+  }
+
   return Object.assign(new TransformStream<CoordinatorWorkflowStreamPart, CoordinatorStreamEvent>({
     transform(part, controller) {
       try {
@@ -181,6 +200,7 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
           return
         } else if (part.type === 'coordinator-turn-stopped') {
           if (part.id === id) {
+            finishTextStep(controller)
             stopped = true
             if (timing) timing.stopped = 1
           }
@@ -191,7 +211,7 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
             throw new Error('coordinator_stream_turn_mismatch')
           }
           if (timing) timing.committedMs = elapsed()
-          if (!part.quiet) publish(controller, true)
+          if (!part.quiet) { finishTextStep(controller); publish(controller, true) }
           controller.enqueue({ type: 'committed', id: part.id, through: part.through, quiet: part.quiet })
           reportTerminal(0)
           id = null
@@ -208,6 +228,8 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
           stepStart = text.length
           stepText = ''
           stepThought = thought.length
+        } else if (type === 'finish-step') {
+          finishTextStep(controller)
         } else if (id && part.type === 'reset-step') {
           invalidCalls.clear()
           // A retried durable model step replaces its partial attempt, keeping earlier completed steps.
@@ -238,7 +260,7 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
           const input = part.type === 'tool-call' ? preview(userId, part.input, fingerprints) : undefined
           const output = part.type === 'tool-result' ? preview(userId, part.output, fingerprints) : undefined
           const words = part.type === 'tool-call' ? quote(userId, part.input, fingerprints) : undefined
-          controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, ...result, ...metadata, ...(input ? { input } : {}), ...(output ? { output } : {}), ...(words ? { quote: words } : {}), ...(part.type === 'tool-call' ? { at: text.length } : {}) })
+          controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, ...result, ...metadata, ...(input ? { input } : {}), ...(output ? { output } : {}), ...(words ? { quote: words } : {}), ...(part.type === 'tool-call' ? { at: canonicalStepText().length } : {}) })
         } else if (id && part.type === 'reasoning-start') {
           reasoning.set(part.id, { pending: '', buf: '', sent: 0, blocked: false })
           if (!quietEligible) controller.enqueue({ type: 'thinking', id, state: 'start' })

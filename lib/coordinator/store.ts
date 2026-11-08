@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { chatProjectionHash } from './chat-projection-version'
 import { captureRunFailure, readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 import { APP_BUILD } from '@/lib/app-build'
 import { sourcedEventMessage } from './message-safety'
@@ -648,7 +648,7 @@ async function chatPrefix(userId: string, botId: string, through: number) {
   const rows = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message }).from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.position} <= ${through}`)).orderBy(desc(coordinatorMessages.position)).limit(200).as('chat_prefix')
   const [result] = await db.select({ hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))` }).from(rows)
-  return result.hash
+  return chatProjectionHash(result.hash)
 }
 
 /** Hash and metadata share one statement snapshot, so a concurrent prefix edit
@@ -661,7 +661,7 @@ async function chatPrefixMetadata(userId: string, botId: string, through: number
     hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))`,
     rows: sql<ChatToolMetadataRow[]>`coalesce(jsonb_agg(jsonb_build_object('position', ${rows.position}, 'parts', ${rows.parts}) order by ${rows.position}) filter (where ${rows.position} >= ${Math.max(0, cursor - 199)} and jsonb_array_length(${rows.parts}) > 0), '[]'::jsonb)`,
   }).from(rows)
-  return result
+  return { ...result, hash: chatProjectionHash(result.hash) }
 }
 
 /** The web chat's first screen: the latest messages, older ones a page at a time
@@ -738,7 +738,7 @@ export async function chatVersionState(userId: string, limit = 200, botId: strin
   const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}), ...(stored.createdAt ? { createdAt: new Date(stored.createdAt) } : {}) } : undefined
   const now = new Date()
   return {
-    version: createHash('sha256').update(`${limit}|${stored.hash}|${snapshot.failureVersion ?? ''}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`).digest('hex').slice(0, 32),
+    version: chatProjectionHash(`${limit}|${stored.hash}|${snapshot.failureVersion ?? ''}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`),
     cursor: stored.last,
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting, now, lastMessage),
