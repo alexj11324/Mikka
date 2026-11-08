@@ -1,0 +1,97 @@
+{
+  "schema": "issue1512.root-independent-native-arithmetic.v1",
+  "observedAt": "2026-11-08T23:22:14.974003+00:00",
+  "revision": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+  "featureHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "tree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+  "sourceFileBytes": 274919,
+  "sourceFileSha256": "5b2a401a348cb03965e8666b66acf0e253463dbd8af6555a8dc4558d58da376f",
+  "identity": [
+    32339,
+    1794179337854,
+    "nitro"
+  ],
+  "recordsChecked": 24,
+  "operations": 17,
+  "sources": 78,
+  "allCounterDifferencesAndSegmentsConserve": true,
+  "allBackgroundAndPkceRetained": true,
+  "windows": {
+    "webLogin": {
+      "queryCalls": 480,
+      "startedAt": "2026-11-08T23:15:37.875Z",
+      "finishedAt": "2026-11-08T23:15:41.372Z",
+      "durationMs": 3497,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 461
+        }
+      ],
+      "receiveBytes": 105042,
+      "sendBytes": 325957
+    },
+    "nativeLogin": {
+      "queryCalls": 504,
+      "startedAt": "2026-11-08T23:15:42.890Z",
+      "finishedAt": "2026-11-08T23:15:51.828Z",
+      "durationMs": 8938,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 13
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 472
+        }
+      ],
+      "receiveBytes": 110489,
+      "sendBytes": 356737
+    },
+    "startup-bundled": {
+      "queryCalls": 156,
+      "startedAt": "2026-11-08T23:16:05.516Z",
+      "finishedAt": "2026-11-08T23:16:08.168Z",
+      "durationMs": 2652,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 156
+        }
+      ],
+      "receiveBytes": 33878,
+      "sendBytes": 111028
+    },
+    "startup-hosted": {
+      "queryCalls": 195,
+      "startedAt": "2026-11-08T23:16:08.912Z",
+      "finishedAt": "2026-11-08T23:16:12.539Z",
+      "durationMs": 3627,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 195
+        }
+      ],
+      "receiveBytes": 45507,
+      "sendBytes": 161110
+    }
+  },
+  "loginBudgetPass": false,
+  "firstStartupBudgetPass": true,
+  "changedWindowsOrPairs": false,
+  "productionAcceptance": false
+}

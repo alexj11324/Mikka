@@ -1,0 +1,9 @@
+{
+  "sha": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+  "tree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+  "parents": [
+    "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+    "4a07f5bd1d29853edfe26e7aaddb777870b2dae0"
+  ],
+  "source": "Previously retrieved GitHub Git commit object; safe projection excludes author/committer identities."
+}

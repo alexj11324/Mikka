@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "observedAt": "2026-11-08T23:05:16Z",
+  "status": "source_supported_pending_actual_render",
+  "product": "PostHog",
+  "projectId": 670821,
+  "region": "US",
+  "actualProductionCases": 0,
+  "newQueriesExecuted": 0,
+  "newInsightsCreated": 0,
+  "newExportsCreated": 0,
+  "screenshotScope": {
+    "intended": "An actual PostHog native saved SQL timeline view, rendered by the official PNG exporter, of real APM spans including cloud and daemon stages from the same production trace.",
+    "notClaimed": "Not a screenshot of the Tracing drawer/waterfall. No image has been rendered or visually accepted. No AI-only table substitutes for the required APM stages.",
+    "acceptance": "Use only actual case IDs and fixed UTC bounds after production tasks. Full raw pagination and independent counts remain separate. Inspect actual PNG pixels, row coverage and stage completeness before claiming acceptance."
+  },
+  "evidence": [
+    {
+      "repo": "PostHog/posthog",
+      "commit": "c640dcd5e3ecd033f695f7d10a9e2fefb2572638",
+      "path": "posthog/hogql/query.py",
+      "blob": "45c05ed95d2e3638df5ea4092f6a89fce0352c90",
+      "finding": "HogQL executor uses resolved table workload for DEFAULT/ONLINE/OFFLINE main workloads; LOGS safety limit applies to HogQLQuery."
+    },
+    {
+      "repo": "PostHog/posthog",
+      "commit": "c640dcd5e3ecd033f695f7d10a9e2fefb2572638",
+      "path": "posthog/hogql/printer/utils.py",
+      "blob": "165ae9a2ac59ac1053d29b50eee7fc35065ff886",
+      "finding": "Resolved table types determine workload through WorkloadCollector; Logs-cluster property mode is forced to OPTIMIZED."
+    },
+    {
+      "repo": "PostHog/posthog",
+      "commit": "c640dcd5e3ecd033f695f7d10a9e2fefb2572638",
+      "path": "posthog/hogql/workload.py",
+      "blob": "34ba82f61e660c5a02489ff457d4593234028f5f",
+      "finding": "One resolved table workload is selected automatically; mixed clusters reject. No guessed connectionId is needed or permitted."
+    },
+    {
+      "repo": "PostHog/posthog",
+      "commit": "c640dcd5e3ecd033f695f7d10a9e2fefb2572638",
+      "path": "products/exports/backend/tasks/image_exporter.py",
+      "blob": "6ca6144126330ce324f813568233538a10acefb7",
+      "finding": "Saved insights are rendered by PostHog's own /exporter route with .ExportedInsight and actual Chromium PNG screenshot. Supports insight, dashboard, recording, heatmap, query source; no direct APM waterfall export branch found."
+    },
+    {
+      "repo": "PostHog/posthog",
+      "commit": "c640dcd5e3ecd033f695f7d10a9e2fefb2572638",
+      "path": "frontend/src/exporter/ExportedInsight/ExportedInsight.tsx",
+      "blob": "d514e59bce0eb2dd8763a274c04462f1a76d4177",
+      "finding": "ExportedInsight uses the regular Query component with saved query and cached results, readOnly/embedded/inSharedMode, preserving title, description and PostHog branding."
+    },
+    {
+      "source": "PostHog MCP live references",
+      "reference": "posthog:querying-posthog-data references/models-apm-spans.md",
+      "finding": "posthog.trace_spans is a supported namespaced HogQL table. IDs are base64 and must be converted for hex display; duration_nano is nanoseconds."
+    }
+  ],
+  "boundaries": [
+    "Current source supports this path; deployment behavior and actual rendering remain unverified.",
+    "No browser authentication retry, cookie injection, public-sharing change or new credential.",
+    "Do not create placeholder insights or export invented traces.",
+    "Use genuine span names, IDs, timestamps, services, duration and status only; never raw attributes, messages or secrets.",
+    "If visible row limits require multiple pages, label actual consecutive pages and retain full query/count receipts; do not fabricate a merged waterfall.",
+    "Each saved insight must be source/window/trace bound and read back before the existing numeric-ID export workflow runs.",
+    "No export_context workaround, custom screenshot page or locally recreated PostHog UI."
+  ]
+}

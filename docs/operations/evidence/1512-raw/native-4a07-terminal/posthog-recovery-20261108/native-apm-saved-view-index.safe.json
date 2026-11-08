@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "kind": "native_apm_saved_view_preparation_archive_index",
+  "status": "prepared_render_pending",
+  "files": [
+    {
+      "path": "native-apm-saved-view-template.safe.json",
+      "bytes": 4422,
+      "sha256": "e5344d71bfe2634cd143379b53feaa608a724aaa5d3080324a163c81b5e714a8",
+      "gitBlobSha1": "4fbe808eacd07251c97854379813274cc28a3524"
+    },
+    {
+      "path": "prepare-native-apm-saved-view.mjs",
+      "bytes": 7405,
+      "sha256": "f25f220b04157e95b902a9f49fd51df208423a21f05c08c8348e34f5a64bbf3f",
+      "gitBlobSha1": "0756c6a391c9686dba33f2f8f24bb83468b9845b"
+    },
+    {
+      "path": "native-apm-saved-view-png-plan.safe.md",
+      "bytes": 9762,
+      "sha256": "4df58151bdfe4d3808075f5c79461d7ca4053ee5e221cb6501eb6665fb12dd2f",
+      "gitBlobSha1": "4dba4dae873315278d37a8fc17d71813fbb38eb2"
+    },
+    {
+      "path": "native-apm-saved-view-rendering-contract.safe.json",
+      "bytes": 23497,
+      "sha256": "1a2eaf36b6b6d3451ef58edd4a4fae2b3a5a3bfa08cdfca44f20c0142a7a9dc1",
+      "gitBlobSha1": "d09062b1b288ecf0746d394159fdb200fed26fe2"
+    },
+    {
+      "path": "native-apm-saved-view-official-read-receipts.json",
+      "bytes": 46130,
+      "sha256": "12412f1da249982651fd3bd5c2ad5d9138b42084c76a1a5ade741886040768fc",
+      "gitBlobSha1": "ba533d3d5709a143a189c075d2262aae6e1d1a1e"
+    },
+    {
+      "path": "native-apm-saved-view-validation.safe.json",
+      "bytes": 982,
+      "sha256": "e9c4d98bd7cf44635ba72d776044c9f8608c4169cd4f5fe125dcef049c1c2292",
+      "gitBlobSha1": "bbf76de5a8a1753b267c70605161693910ce1e60"
+    }
+  ],
+  "newProductionQueries": 0,
+  "newModelCalls": 0,
+  "newPosthogObjects": 0,
+  "newExports": 0,
+  "newCompute": 0,
+  "productWorkflowRefMutations": 0,
+  "upstreamCompleteness": "not_proven",
+  "renderVerified": false
+}

@@ -1,0 +1,87 @@
+{
+  "schema": "issue1512.native-original-artifact-custody.v1",
+  "workflowRunId": 42531278865,
+  "jobId": 128890716022,
+  "actualRevision": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+  "artifacts": [
+    {
+      "artifactId": 13638283077,
+      "archiveName": "native-4a07-original.zip",
+      "sourceLocalRelativePath": "native4a07/native-4a07-original.zip",
+      "bytes": 14784929,
+      "sha256": "e5ebd8c9346fe6568a3aebf6bab9a070f6db613f21582dcf12fb66d03c4e7b36",
+      "gitBlobIfStoredAsBinary": "72350dd2fe21b5f823748ee68b48bb6eefce2d74",
+      "metadataDigestMatches": true,
+      "members": 308,
+      "uncompressedBytes": 18018130,
+      "jsonEntries": [
+        {
+          "artifactId": 13638283077,
+          "archiveEntry": "lifecycle.json",
+          "sourceLocalRelativePath": "native4a07/native-4a07-original/lifecycle.json",
+          "bytes": 274919,
+          "sha256": "5b2a401a348cb03965e8666b66acf0e253463dbd8af6555a8dc4558d58da376f",
+          "gitBlob": "3e43b04d07f236126a7742dc37224cc271918e90"
+        },
+        {
+          "artifactId": 13638283077,
+          "archiveEntry": "parity/parity.json",
+          "sourceLocalRelativePath": "native4a07/native-4a07-original/parity/parity.json",
+          "bytes": 106583,
+          "sha256": "40304c07ea5529fc93b5e9be11afc38522b9734222e5744ef69bfded64323206",
+          "gitBlob": "15f71f768c50048985ba39019d41fdb1c126d22b"
+        },
+        {
+          "artifactId": 13638283077,
+          "archiveEntry": "smoke.json",
+          "sourceLocalRelativePath": "native4a07/native-4a07-original/smoke.json",
+          "bytes": 3105,
+          "sha256": "c2729c87384cf5420a903bf9d3ad1e68478fe6adb80b11476f9fea2a10563c0f",
+          "gitBlob": "cafc77fb49689238d4f234b3e735c03ce374ed62"
+        }
+      ],
+      "publicPayloadIncludesArchive": false
+    },
+    {
+      "artifactId": 13638078488,
+      "archiveName": "package-4a07-original.zip",
+      "sourceLocalRelativePath": "native4a07/package-4a07-original.zip",
+      "bytes": 1592,
+      "sha256": "f3b51cf7c6fdaf7eafc79453cb23341187bd34ca5ba33675aff6db11a7afe73d",
+      "gitBlobIfStoredAsBinary": "788ff919cb26d232d46aa4a9a2e739e2742e95e5",
+      "metadataDigestMatches": true,
+      "members": 2,
+      "uncompressedBytes": 3825,
+      "jsonEntries": [
+        {
+          "artifactId": 13638078488,
+          "archiveEntry": "mac-acceptance-package.json",
+          "sourceLocalRelativePath": "native4a07/package-4a07-original/mac-acceptance-package.json",
+          "bytes": 957,
+          "sha256": "f2c6db01cfa76a956a911189e1d24ec549a6945f64d34e3211a2d8fa3303e396",
+          "gitBlob": "3e0d18cc7f47b20e33c20538557524b800b1b404"
+        },
+        {
+          "artifactId": 13638078488,
+          "archiveEntry": "native-crypto.json",
+          "sourceLocalRelativePath": "native4a07/package-4a07-original/native-crypto.json",
+          "bytes": 2868,
+          "sha256": "db7f5448bae1640e5ce87019a14a5b174e05cbbf0c1936f432e6a145a0318d5d",
+          "gitBlob": "ed1c38a73ca41abdf14904f3e2ff102c202e1bf9"
+        }
+      ],
+      "publicPayloadIncludesArchive": false
+    }
+  ],
+  "originalArchiveJsonCount": 5,
+  "originalArchiveJsonSelection": "All five JSON members in the two original ZIPs; no sixth JSON member exists or is synthesized.",
+  "selectedJsonByteForByteMatchesArchive": true,
+  "originalFilesIndex": {
+    "sourceLocalRelativePath": "native4a07/native-4a07-original-file-hashes.json",
+    "bytes": 55496,
+    "sha256": "b6927b6fe5268cbbab37d32a6eb6efc53750a1d6d0cf3f80e98d1432bf4c11c2",
+    "files": 310,
+    "uncompressedBytes": 18021955
+  },
+  "binaryBoundary": "The two unchanged ZIPs and all 305 PNG members remain local; public payload carries metadata and hashes, not unreviewed images."
+}

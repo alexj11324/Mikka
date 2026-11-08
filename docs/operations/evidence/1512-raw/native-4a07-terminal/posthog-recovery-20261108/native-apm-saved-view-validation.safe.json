@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "validatedAtUtc": "2026-11-08T23:19:27.818975+00:00",
+  "status": "offline_preparation_validated_not_executed",
+  "nodeSyntaxCheck": {
+    "exitCode": 0
+  },
+  "officialSchemaValidation": {
+    "exitCode": 0,
+    "validator": "preexisting ajv@8.20.0 draft2020",
+    "schemaSource": "posthog-png-official-contracts-20261108.json / tool_schemas.insight-create",
+    "result": "valid"
+  },
+  "canonicalTimelineSqlHashMatched": true,
+  "frozen14QueryTemplatesAndNormalizerReconcilerHashesUnchanged": true,
+  "environmentNotes": [
+    "Python jsonschema is not installed in either existing runtime; no packages installed.",
+    "Default Ajv class does not load draft2020; existing Ajv2020 class then validated successfully."
+  ],
+  "actualManifestExecution": false,
+  "actualProductionCases": 0,
+  "dataQueries": 0,
+  "posthogObjectsCreated": 0,
+  "exportsStarted": 0,
+  "browserLoginRetries": 0,
+  "renderVerified": false,
+  "productWorkflowRefMutations": 0
+}

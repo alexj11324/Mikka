@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "kind": "native_saved_apm_sql_png_rendering_preparation",
+  "preparedAtUtc": "2026-11-08T23:15:01Z",
+  "status": "source_supported_actual_query_export_and_visual_check_pending",
+  "projectId": 670821,
+  "region": "US",
+  "officialSourceCommit": "c640dcd5e3ecd033f695f7d10a9e2fefb2572638",
+  "actualProductionCases": 0,
+  "newProductionQueries": 0,
+  "newInsights": 0,
+  "newExports": 0,
+  "newCompute": 0,
+  "browserLoginRetries": 0,
+  "evidenceScope": {
+    "intended": "Official PostHog saved DataVisualizationNode/ActionsTable view of real APM cloud+daemon spans, rendered to PNG by the official exporter.",
+    "notClaimed": [
+      "Tracing drawer waterfall screenshot",
+      "Locally recreated PostHog UI",
+      "AI-only generation table",
+      "A proof of universal upstream delivery",
+      "A successful production render"
+    ],
+    "validation": "Inspect real PNG pixels after matching all actual displayed rows to the canonical stable raw APM evidence. SQL result success alone does not establish screenshot readability."
+  },
+  "priorSourceReview": "native-apm-saved-view-source-review.json",
+  "priorOfficialSchemas": "posthog-png-official-contracts-20261108.json",
+  "newKnowledgeReads": "native-apm-saved-view-official-read-receipts.json",
+  "businessKnowledgeAttempt": "info business-knowledge-documents-search: tool exists but is disabled on this connection; no repeated probe. docs-search and official skill reads succeeded.",
+  "sources": [
+    {
+      "path": "frontend/src/queries/nodes/DataVisualization/DataVisualization.tsx",
+      "blob": "57f6b5b89347e75e9b1d93226afc4c11ae872aac",
+      "ranges": [
+        [
+          602,
+          611
+        ]
+      ],
+      "finding": "ActionsTable renders the native Table and forwards cachedResults and embedded.",
+      "url": "https://github.com/PostHog/posthog/blob/c640dcd5e3ecd033f695f7d10a9e2fefb2572638/frontend/src/queries/nodes/DataVisualization/DataVisualization.tsx",
+      "excerpts": [
+        {
+          "from": 602,
+          "to": 611,
+          "text": "    } else if (effectiveVisualizationType === ChartDisplayType.ActionsTable) {\n        component = (\n            <Table\n                uniqueKey={props.uniqueKey}\n                query={query}\n                context={props.context}\n                cachedResults={props.cachedResults as HogQLQueryResponse | undefined}\n                embedded={props.embedded}\n                onInspect={canDrill ? inspect : undefined}\n            />"
+        }
+      ]
+    },
+    {
+      "path": "frontend/src/queries/nodes/DataVisualization/Components/Table.tsx",
+      "blob": "358a4d99de3c3639218dfe2f29156a01fcf82d4c",
+      "ranges": [
+        [
+          28,
+          36
+        ],
+        [
+          319,
+          336
+        ],
+        [
+          487,
+          502
+        ],
+        [
+          539,
+          584
+        ]
+      ],
+      "finding": "Default page size is 500. Cells use CSS truncate. Embedded table allows content scrolling. Virtualization requires an extra context flag; ExportedInsight does not explicitly set it.",
+      "url": "https://github.com/PostHog/posthog/blob/c640dcd5e3ecd033f695f7d10a9e2fefb2572638/frontend/src/queries/nodes/DataVisualization/Components/Table.tsx",
+      "excerpts": [
+        {
+          "from": 28,
+          "to": 36,
+          "text": "    query: VisualizationNode\n    uniqueKey: string | number | undefined\n    context: QueryContext<VisualizationNode> | undefined\n    cachedResults: HogQLQueryResponse | undefined\n    embedded?: boolean\n    onInspect?: (record: Record<string, unknown>) => void\n}\n\nexport const DEFAULT_PAGE_SIZE = 500"
+        },
+        {
+          "from": 319,
+          "to": 336,
+          "text": "    const virtualizationCellThreshold = props.context?.dataVisualizationTableVirtualizationCellThreshold ?? 0\n    const virtualized =\n        !!props.embedded &&\n        !!props.context?.dataVisualizationTableVirtualized &&\n        tableRows.length * tabularColumns.length > virtualizationCellThreshold\n    const virtualizeColumns = (virtualized || isTransposed) && tabularColumns.length > 50\n    const { toggleColumnPin, setTableSorted } = useActions(dataVisualizationLogic)\n\n    // Virtualized tables use a fixed layout, which can't fit columns to cells that aren't rendered\n    const columnWidths = useMemo(\n        () =>\n            virtualized || virtualizeColumns\n                ? estimateColumnWidths(\n                      tabularColumns.map(({ column, settings }) => settings?.display?.label || column.name),\n                      tableRows.length,\n                      (sampleRowIndex, columnIndex) => getTableCell(tableRows[sampleRowIndex].rowIndex, columnIndex)\n                  )\n                : undefined,"
+        },
+        {
+          "from": 487,
+          "to": 502,
+          "text": "                const sourceColumnName = cell.sourceColumnName ?? column.name\n                const columnFormat = getColumnFormat(response, sourceColumnName)\n\n                return (\n                    <div className=\"truncate\" title={getCellTitle(cell)}>\n                        {renderColumn(\n                            sourceColumnName,\n                            cell.formattedValue,\n                            tableResults[isTransposed ? index - 1 : data.rowIndex],\n                            recordIndex,\n                            rowCount,\n                            {\n                                kind: NodeKind.DataTableNode,\n                                source: props.query.source,\n                            },\n                            undefined,"
+        },
+        {
+          "from": 539,
+          "to": 584,
+          "text": "            <LemonTable\n                className=\"DataVisualizationTable\"\n                rowKey=\"rowIndex\"\n                dataSource={tableRows}\n                columns={tableColumns}\n                pinnedColumns={isPinningEnabled ? pinnedColumns : undefined}\n                loading={responseLoading}\n                useURLForSorting={false}\n                onSort={(newSorting) => {\n                    if (newSorting) {\n                        setTableSorted()\n                    }\n                }}\n                pagination={{ pageSize: DEFAULT_PAGE_SIZE }}\n                maxHeaderWidth=\"15rem\"\n                emptyState={\n                    responseError ? (\n                        <InsightErrorState\n                            query={props.query}\n                            excludeDetail\n                            title={\n                                queryCancelled\n                                    ? 'The query was cancelled'\n                                    : response && 'error' in response\n                                      ? (response as any).error\n                                      : responseError\n                            }\n                        />\n                    ) : (\n                        <InsightEmptyState\n                            heading=\"There are no matching rows for this query\"\n                            detail=\"\"\n                            sampleDataVariant=\"table\"\n                        />\n                    )\n                }\n                footer={tableRows.length > 0 ? <LoadNext query={props.query} /> : null}\n                rowClassName=\"DataVizRow\"\n                embedded={props.embedded}\n                allowContentScroll={!!props.embedded}\n                virtualized={virtualized}\n                virtualizedColumnWidth={virtualizeColumns ? 192 : undefined}\n                tableLayout={virtualized ? 'fixed' : 'auto'}\n                tableStyle={\n                    columnWidths ? { minWidth: columnWidths.reduce((total, width) => total + width, 0) } : undefined\n                }"
+        }
+      ]
+    },
+    {
+      "path": "frontend/src/queries/nodes/DataVisualization/dataVisualizationLogic.ts",
+      "blob": "34bb8be6540257e92628f0c3521c837a04a44adf",
+      "ranges": [
+        [
+          1666,
+          1679
+        ],
+        [
+          1728,
+          1757
+        ]
+      ],
+      "finding": "SQL returned columns drive sourceTabularColumns; tableSettings supplies settings rather than a reliable hiding layer in this pinned source. Numeric decimalPlaces affects rendered values only.",
+      "url": "https://github.com/PostHog/posthog/blob/c640dcd5e3ecd033f695f7d10a9e2fefb2572638/frontend/src/queries/nodes/DataVisualization/dataVisualizationLogic.ts",
+      "excerpts": [
+        {
+          "from": 1666,
+          "to": 1679,
+          "text": "            ): AxisSeries<any>[] => {\n                if (!response) {\n                    return []\n                }\n\n                return columns.map((col) => {\n                    const series = (tabularColumnSettings || []).find((n) => n?.name === col.name)\n\n                    return {\n                        column: col,\n                        data: [],\n                        settings: series?.settings ?? DefaultAxisSettings(),\n                    }\n                })"
+        },
+        {
+          "from": 1728,
+          "to": 1757,
+          "text": "                    if (column.column.type.isNumerical) {\n                        try {\n                            if (value === null) {\n                                const nullReplacement = showNullsAsZero ? 0 : null\n\n                                return {\n                                    value: nullReplacement,\n                                    formattedValue: formatDataWithSettings(nullReplacement, column.settings),\n                                    type: column.column.type.name,\n                                }\n                            }\n\n                            const multiplier = column.settings?.formatting?.style === 'percent' ? 100 : 1\n\n                            if (\n                                column.settings?.formatting?.decimalPlaces != null &&\n                                column.settings.formatting.style !== 'short'\n                            ) {\n                                return {\n                                    value,\n                                    formattedValue: formatDataWithSettings(\n                                        parseFloat(\n                                            (parseFloat(value.toString()) * multiplier).toFixed(\n                                                column.settings.formatting.decimalPlaces\n                                            )\n                                        ),\n                                        column.settings\n                                    ),\n                                    type: column.column.type.name,\n                                }"
+        }
+      ]
+    },
+    {
+      "path": "frontend/src/exporter/ExportedInsight/ExportedInsight.tsx",
+      "blob": "d514e59bce0eb2dd8763a274c04462f1a76d4177",
+      "ranges": [
+        [
+          100,
+          136
+        ]
+      ],
+      "finding": "Saved title/description/branding and normal Query render, readOnly/embedded/inSharedMode, using saved query and cachedResults.",
+      "url": "https://github.com/PostHog/posthog/blob/c640dcd5e3ecd033f695f7d10a9e2fefb2572638/frontend/src/exporter/ExportedInsight/ExportedInsight.tsx",
+      "excerpts": [
+        {
+          "from": 100,
+          "to": 136,
+          "text": "    return (\n        <BindLogic logic={insightLogic} props={insightLogicProps}>\n            <div className={clsx('ExportedInsight', isMetric && 'ExportedInsight--metric')}>\n                {!noHeader && (\n                    <div className=\"ExportedInsight__header\">\n                        <div>\n                            <h5>\n                                <TopHeading query={query} />\n                            </h5>\n                            <h4 title={name} className=\"ExportedInsight__header__title\">\n                                {name || derived_name}\n                            </h4>\n                            {description && <div className=\"ExportedInsight__header-description\">{description}</div>}\n                        </div>\n\n                        {!whitelabel && <Logo size=\"xs\" className=\"shrink-0 ml-3\" />}\n                    </div>\n                )}\n                {showWatermark && (\n                    <div className=\"ExportedInsight__watermark\">\n                        <Logo size=\"xs\" />\n                    </div>\n                )}\n                <div\n                    className={clsx({\n                        ExportedInsight__content: true,\n                        'ExportedInsight__content--with-watermark': showWatermark,\n                    })}\n                >\n                    <Query\n                        query={insight.query}\n                        cachedResults={insight}\n                        readOnly\n                        context={{ insightProps: insightLogicProps }}\n                        embedded\n                        inSharedMode\n                    />"
+        }
+      ]
+    },
+    {
+      "path": "products/exports/backend/tasks/image_exporter.py",
+      "blob": "6ca6144126330ce324f813568233538a10acefb7",
+      "ranges": [
+        [
+          78,
+          100
+        ],
+        [
+          145,
+          151
+        ],
+        [
+          171,
+          198
+        ],
+        [
+          241,
+          251
+        ],
+        [
+          489,
+          517
+        ]
+      ],
+      "finding": "Non-metric table starts at 800x600. Exporter measures outer/body height and table width, caps width4000/height5000, and screenshots viewport. It does not paginate/scroll table rows to assemble a full dataset.",
+      "url": "https://github.com/PostHog/posthog/blob/c640dcd5e3ecd033f695f7d10a9e2fefb2572638/products/exports/backend/tasks/image_exporter.py",
+      "excerpts": [
+        {
+          "from": 78,
+          "to": 100,
+          "text": "MAX_WIDTH_PIXELS = 4000  # Max width for wide content like funnels with many steps\nMAX_HEIGHT_PIXELS = 5000  # Prevents Chrome from consuming excessive memory on very tall pages\nCONTENT_PADDING = 80  # Padding for card borders\n\nREPLAY_WRAPPER_SELECTOR = \".replayer-wrapper\"\n\n# The replay player mounts rrweb either in the app document or inside its own same-origin frame\n# document, and a document query never crosses into a frame, so look in both.\nFIND_REPLAY_WRAPPER_JS = f\"\"\"(\n    document.querySelector('{REPLAY_WRAPPER_SELECTOR}') ||\n    document.querySelector('iframe.PlayerFrame__document')?.contentDocument?.querySelector('{REPLAY_WRAPPER_SELECTOR}')\n)\"\"\"\n\nMEASURE_CONTENT_HEIGHT_JS = f\"\"\"\n    const element = document.querySelector('.InsightCard__viz') ||\n                  document.querySelector('.ExportedInsight__content') ||\n                  {FIND_REPLAY_WRAPPER_JS} ||\n                  document.querySelector('.heatmap-exporter');\n    if (element) {{\n        const rect = element.getBoundingClientRect();\n        return Math.max(rect.height, document.body.scrollHeight);\n    }}\n    return document.body.scrollHeight;"
+        },
+        {
+          "from": 145,
+          "to": 151,
+          "text": "            // Fall back to table width for insights\n            const tableElement = document.querySelector('table');\n            if (tableElement) {{\n                return tableElement.offsetWidth * 1.5;\n            }}\n\n            return null;"
+        },
+        {
+          "from": 171,
+          "to": 198,
+          "text": "def _insight_query_screenshot_width(query: dict) -> ScreenWidth:\n    \"\"\"Initial viewport width for an insight-style query render.\n\n    Only left-to-right funnels (vertical layout, which is the default) need the wide\n    viewport — they grow horizontally with step count. Top-to-bottom funnels (horizontal\n    layout) grow vertically, not horizontally. Small funnels are constrained later by the\n    width measurement. The higher the number, the more RAM the Chromium driver needs.\n\n    A metric renders as a card whose height derives from the viewport width, so a narrower\n    viewport keeps it at dashboard-tile size instead of a 400px-tall banner.\n    Mirrors the frontend's check (InsightVizNode wrapper required), which gates the\n    metric card CSS — a bare TrendsQuery gets neither, so it must keep the default viewport.\n    \"\"\"\n    source = query.get(\"source\", query)  # This to handle the InsightVizNode wrapper\n    is_funnel = source.get(\"kind\") == NodeKind.FUNNELS_QUERY\n    funnels_filter = source.get(\"funnelsFilter\") or {}\n    funnel_layout = funnels_filter.get(\"layout\")\n    is_left_to_right_funnel = is_funnel and (funnel_layout is None or funnel_layout == FunnelLayout.VERTICAL)\n    if is_left_to_right_funnel:\n        return 4000\n\n    trends_filter = source.get(\"trendsFilter\") or {}\n    is_metric = (\n        query.get(\"kind\") == NodeKind.INSIGHT_VIZ_NODE\n        and source.get(\"kind\") == NodeKind.TRENDS_QUERY\n        and trends_filter.get(\"display\") == ChartDisplayType.METRIC\n    )\n    return 600 if is_metric else 800"
+        },
+        {
+          "from": 241,
+          "to": 251,
+          "text": "        screenshot_width: ScreenWidth\n        wait_for_css_selector: CSSSelector\n        screenshot_height: int = 600\n        page_load_timeout: int = 40\n        if exported_asset.insight is not None:\n            show_legend = exported_asset.insight.show_legend\n            legend_param = \"&legend=true\" if show_legend else \"\"\n            cache_keys_param = _build_cache_keys_param(insight_cache_keys)\n            url_to_render = _exporter_url(f\"token={access_token}{legend_param}{cache_keys_param}\")\n            wait_for_css_selector = \".ExportedInsight\"\n            screenshot_width = _insight_query_screenshot_width(exported_asset.insight.query or {})"
+        },
+        {
+          "from": 489,
+          "to": 517,
+          "text": "            try:\n                page.wait_for_selector(\".Spinner\", state=\"detached\", timeout=20000)\n            except PlaywrightTimeoutError as e:\n                with posthoganalytics.new_context():\n                    posthoganalytics.tag(\"stage\", \"image_exporter.wait_for_spinner_timeout\")\n                    _save_debug_screenshot(lambda p: page.screenshot(path=p), image_path)\n                    capture_exception(e)\n\n            effective_max = _effective_max_height(max_height_pixels)\n            height = _cap_height(\n                int(page.evaluate(f\"() => {{ {MEASURE_CONTENT_HEIGHT_JS} }}\")), effective_max, url_to_render\n            )\n            width = _resolve_width(\n                page.evaluate(f\"() => {{ {MEASURE_CONTENT_WIDTH_JS} }}\"), screenshot_width, url_to_render\n            )\n\n            page.set_viewport_size({\"width\": width, \"height\": height})\n\n            page.wait_for_timeout(500)\n\n            final_height = _cap_height(\n                int(page.evaluate(f\"() => {{ {MEASURE_CONTENT_HEIGHT_JS} }}\")), effective_max, url_to_render, final=True\n            )\n\n            if final_height != height:\n                page.set_viewport_size({\"width\": width, \"height\": final_height})\n                # Charts redraw their canvas after a resize, so a screenshot taken at once can catch them blank.\n                page.wait_for_timeout(500)\n            page.screenshot(path=image_path)"
+        }
+      ]
+    }
+  ],
+  "frozenArtifacts": [
+    {
+      "path": "../ops1512/production-evidence-query-templates.json",
+      "sha256": "a52df37feff2ef4c304d4bc47960657dc5c5badbde0fba4416f0e9bf4fea4c68",
+      "modified": false
+    },
+    {
+      "path": "../ops1512/normalize-posthog-metadata.mjs",
+      "sha256": "56ce0805aa5e75fece1efcd06ab9c0652ab90037c7e453e7e4fe6b7748b36ae5",
+      "modified": false
+    },
+    {
+      "path": "../ops1512/reconcile-production-evidence.mjs",
+      "sha256": "52884757d76555bd8478ec7e3154a0b58746a6c9bbe56e7c15083494526626d2",
+      "modified": false
+    }
+  ],
+  "design": {
+    "queryScope": "Exact actual trace, fixed UTC [start,end), production resource environment and services mikka-web/mikka-daemon, same as frozen span_timeline.",
+    "pagination": "Canonical raw 500-row pagination remains unchanged. Display pages use consecutive actual UUID sets, eight rows maximum by default (one to eight configurable offline); no display OFFSET.",
+    "offsets": "Compute min(timestamp) OVER () before filtering to selected page UUIDs, so every page shares the full-trace start anchor.",
+    "order": "timestamp, base64 span_id, uuid; preserve existing canonical page order. Do not re-sort decoded hex IDs.",
+    "displayedColumns": [
+      "service",
+      "stage",
+      "offset_ms",
+      "duration_ms",
+      "status_code",
+      "span_id_hex",
+      "parent_span_id_hex"
+    ],
+    "returnedColumns": "Exactly the displayed seven columns; no raw attributes or hidden message/secret fields.",
+    "durationFormatting": "Milliseconds with three displayed decimal places only. Underlying expected/query numeric receipts retain original precision. Status0 is Unset, not success.",
+    "sentinelLimit": "Expected page length + 1; unexpected extra row rejects that page instead of being hidden.",
+    "lowerCapacity": "If actual pixels clip rows, generate smaller consecutive pages using --rows 1..8. Do not alter server pageSize or export dimensions via invented properties.",
+    "wideColumns": "If a critical string/ID is clipped, reduce the actual SQL projection into paired timing/lineage views of the same UUID page; both must retain span identity and actual stage/service. tableSettings alone is not relied on to hide/reorder columns. Requery and inspect each official PNG.",
+    "exactDataRequirement": "Every page row must match its expected projection from actual canonical metadata. All page identity sets must be disjoint and their union equal the canonical span_timeline IDs. Stage presence and parent integrity remain separate canonical acceptance checks."
+  },
+  "permissions": {
+    "data": "Actual Logs/APM query and exporter service access remain untested until a real case; do not infer them from Default/events access or source code.",
+    "insights": "Use existing authorized MCP insight create/get/query; only real case-bound new insights or already owned issue targets.",
+    "exports": "Use existing trusted runner and numeric insight id, existing export:write/read access and expected-main-SHA gate; no new key or sharing change.",
+    "blocked": "Do not retry interrupted browser login, inject cookies, invent connectionId or export_context, change public access, or bypass RBAC.",
+    "uncertainMutation": "Do not blindly repeat insight-create/export POST after a timeout with unknown outcome; retain the response/request identity and resolve the existing request first."
+  },
+  "preparedFiles": [
+    "native-apm-saved-view-template.safe.json",
+    "prepare-native-apm-saved-view.mjs",
+    "native-apm-saved-view-png-plan.safe.md"
+  ],
+  "localValidation": {
+    "nodeSyntaxCheck": "exit_0",
+    "templateSchema": "valid_against_archived_official_insight_create_draft2020_schema_using_existing_ajv8.20.0",
+    "canonicalTimelineSqlHash": "matched",
+    "executedAgainstActualManifest": false,
+    "renderVerified": false
+  }
+}

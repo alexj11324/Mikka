@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "kind": "local_unbound_template_do_not_submit",
+  "actualProductionEvidence": false,
+  "officialSourceCommit": "c640dcd5e3ecd033f695f7d10a9e2fefb2572638",
+  "canonicalSpanTimelineSqlSha256": "ea6a0f5e5a26dc82e9d44e2cf7707e316b89169265f49d52f79e871083c5d2b3",
+  "rowsPerDisplayPage": 8,
+  "insightCreate": {
+    "name": "#1512 {{case_name}} APM SQL timeline p{{page_number}}/{{page_count}}",
+    "description": "Trace {{trace_id_hex}}; UTC [{{window_start_iso}}, {{window_end_iso}}); rows {{row_start}}-{{row_end}}/{{row_count}}. Offset from {{anchor_utc}}; ms (3 dp). Official APM SQL table, not Tracing drawer. Status 0=unset, 1=OK, 2=error.",
+    "tags": [
+      "issue-1512",
+      "production-evidence",
+      "native-apm-sql"
+    ],
+    "query": {
+      "kind": "DataVisualizationNode",
+      "display": "ActionsTable",
+      "source": {
+        "kind": "HogQLQuery",
+        "query": "WITH selected_spans AS (\n    SELECT timestamp, uuid, span_id, parent_span_id, service_name, name, duration_nano, status_code\n    FROM posthog.trace_spans\n    WHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n      AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n      AND timestamp >= {filters.dateRange.from}\n      AND timestamp < {filters.dateRange.to}\n      AND service_name IN ('mikka-web', 'mikka-daemon')\n      AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\n      AND trace_id = base64Encode(unhex('{{trace_id_hex}}'))\n), timed_spans AS (\n    SELECT timestamp, uuid, span_id, parent_span_id, service_name, name, duration_nano, status_code,\n        dateDiff('microsecond', min(timestamp) OVER (), timestamp) / 1000 AS offset_ms\n    FROM selected_spans\n)\nSELECT service_name AS service, name AS stage, offset_ms,\n    duration_nano / 1000000 AS duration_ms, status_code,\n    lower(hex(base64Decode(span_id))) AS span_id_hex,\n    lower(hex(base64Decode(parent_span_id))) AS parent_span_id_hex\nFROM timed_spans\nWHERE toString(uuid) IN ({{row_uuids_sql}})\nORDER BY timestamp, span_id, uuid\nLIMIT {{page_limit}}",
+        "filters": {
+          "dateRange": {
+            "date_from": "{{window_start_iso}}",
+            "date_to": "{{window_end_iso}}"
+          }
+        }
+      },
+      "tableSettings": {
+        "columns": [
+          {
+            "column": "service"
+          },
+          {
+            "column": "stage"
+          },
+          {
+            "column": "offset_ms",
+            "settings": {
+              "formatting": {
+                "style": "none",
+                "decimalPlaces": 3
+              }
+            }
+          },
+          {
+            "column": "duration_ms",
+            "settings": {
+              "formatting": {
+                "style": "none",
+                "decimalPlaces": 3
+              }
+            }
+          },
+          {
+            "column": "status_code",
+            "settings": {
+              "formatting": {
+                "style": "none",
+                "decimalPlaces": 0
+              }
+            }
+          },
+          {
+            "column": "span_id_hex"
+          },
+          {
+            "column": "parent_span_id_hex"
+          }
+        ],
+        "pinnedColumns": [],
+        "transpose": false
+      }
+    }
+  },
+  "sourceBindingRules": [
+    "Only bind from the actual case's reconciled fixed-window manifest, never schema fixtures, old baseline traces or invented IDs.",
+    "All raw APM data and independent counts are collected through unchanged frozen fourteen queries first. This projection is for display only.",
+    "Build consecutive UUID pages from the canonical span_timeline page rows in their existing timestamp/base64-span-id/UUID order.",
+    "UUID membership is applied AFTER the full-scope window function; no per-page reset of offset_ms.",
+    "Use actual page row count plus one as page_limit, at most nine, to detect unexpected extra matches. Expected visible row count remains at most eight.",
+    "Return only seven selected safe columns; tableSettings.columns is not relied on to hide raw fields.",
+    "No guessed cluster/connectionId, no events/AI table join, no OFFSET, no partial query placeholders in a real call.",
+    "Eight rows is a conservative preparation choice, not a proven visible capacity. PNG pixels remain the deciding rendering check."
+  ]
+}
