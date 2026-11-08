@@ -970,6 +970,44 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal((await pool.query('select count(*) from session where id=$1', [signedIn.session.id])).rows[0].count, '0')
     assert.equal((await session(oidcCookies))?.user.id, userId, 'SAML logout leaves the independent OIDC session intact')
   })
+  await t.test('native SAML logout form preserves origin and callback fences and completes signed one-use SLO', async () => {
+    const login = await samlLogin(), signedIn = await session(login.jar)
+    assert.ok(signedIn)
+    const startForm = (origin = appOrigin, callbackURL = `${appOrigin}/signed-out`) => fetch(`${appOrigin}/api/auth/sso/saml2/logout/${samlProviderId}`, {
+      method: 'POST', headers: { origin, 'content-type': 'application/x-www-form-urlencoded', cookie: login.jar.header() },
+      body: new URLSearchParams({ callbackURL }), redirect: 'manual',
+    })
+    for (const [origin, callbackURL] of [
+      ['https://foreign.example.invalid', `${appOrigin}/signed-out`],
+      [appOrigin, 'https://foreign.example.invalid/signed-out'],
+    ]) {
+      const denied = await startForm(origin, callbackURL)
+      assert.equal(denied.status, 403, await denied.clone().text())
+      login.jar.take(denied)
+      assert.equal((await session(login.jar))?.session.id, signedIn.session.id, 'a rejected form cannot revoke or clear the current session')
+    }
+    const start = await startForm()
+    assert.equal(start.status, 302, await start.clone().text())
+    login.jar.take(start)
+    assert.equal(await session(login.jar), null, 'the accepted native form revokes its initiating session before navigation')
+    const nativeRequest = new URL(start.headers.get('location')!)
+    const requestId = /\bID="([^"]+)"/.exec(inflateRawSync(Buffer.from(nativeRequest.searchParams.get('SAMLRequest')!, 'base64')).toString())?.[1]
+    assert.ok(requestId)
+    assert.ok(nativeRequest.searchParams.get('Signature'), 'the original native handler still signs the IdP redirect')
+    const idpReply = await fetch(nativeRequest)
+    assert.equal(idpReply.status, 200, await idpReply.clone().text())
+    const payload = await idpReply.json() as { SAMLResponse: string; RelayState: string }
+    const finish = () => fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: {
+      origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded',
+    }, body: new URLSearchParams(payload), redirect: 'manual' })
+    const returned = await finish()
+    assert.equal(returned.status, 302, await returned.clone().text())
+    assert.equal(returned.headers.get('location'), `${appOrigin}/signed-out`)
+    assert.equal((await pool.query('select count(*) from verification where identifier=$1', [`saml-logout-request:${requestId}`])).rows[0].count, '0')
+    assert.equal((await finish()).status, 400, 'the form-started signed callback is still one-use')
+    assert.equal((await pool.query('select count(*) from session where id=$1', [signedIn.session.id])).rows[0].count, '0')
+    assert.equal((await session(oidcCookies))?.user.id, userId, 'the independent OIDC session is untouched')
+  })
   await t.test('SP-initiated SAML Single Logout rejects a signed response after its persistent request expires', async () => {
     const login = await samlLogin()
     const start = await fetch(`${appOrigin}/api/auth/sso/saml2/logout/${samlProviderId}`, { method: 'POST', headers: {
