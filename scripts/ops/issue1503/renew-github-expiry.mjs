@@ -11,6 +11,7 @@ const MAX_MS = 4 * 60 * 60_000, MIN_MS = 2 * 60 * 60_000, MARGIN_MS = 10_000
 const PERMISSIONS = { metadata: 'read', contents: 'write', pull_requests: 'write', checks: 'read', statuses: 'read', actions: 'read' }
 const ACTIVE = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
 const hash = value => createHash('sha256').update(value).digest('hex')
+const emailHash = value => typeof value === 'string' ? createHash('sha256').update(value, 'utf8').digest('hex') : null
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const id = value => /^(?:[1-9]\d*)$/.test(String(value)) && (typeof value !== 'number' || Number.isSafeInteger(value))
 const fail = code => { throw new Error(`issue1503_github_renewal_${code}`) }
@@ -147,13 +148,16 @@ export async function runRenewal() {
     pool = database.pool; workspacePool = (await import('../../../lib/workspace-db.ts')).workspacePool
     const connection = await import('../../../lib/github/connection.ts')
     stage = 'validate_fixture'
-    const { rows: users } = await pool.query(`SELECT id FROM "user" WHERE (id=$1 AND email=$2) OR (id=$3 AND email=$4)`,
-      [OWNER_USER_ID, 'alexjiang20232024@gmail.com', SMOKE_USER_ID, 'alexjiang20232024+mikka-smoke-owner@gmail.com'])
+    const { rows: users } = await pool.query(`SELECT id,email FROM "user" WHERE id=$1 OR id=$2`,
+      [OWNER_USER_ID, SMOKE_USER_ID])
     const { rows: [workspace] } = await workspacePool.query(`SELECT w.id,w."userId",w.kind,w.slug,
       (SELECT count(*) FROM mikka_workspace_members m WHERE m."workspaceId"=w.id) AS members,
       (SELECT count(*) FROM mikka_workspace_members m WHERE m."workspaceId"=w.id AND m.status='active' AND m."userId"=ANY($2::text[])) AS active
       FROM mikka_workspaces w WHERE w.id=$1`, [WORKSPACE_ID, [SMOKE_USER_ID, OWNER_USER_ID]])
-    check(users.length === 2 && workspace?.userId === SMOKE_USER_ID && workspace.kind === 'team'
+    check(users.length === 2
+      && emailHash(users.find(user => user.id === OWNER_USER_ID)?.email) === 'c6032681fcca35e9a45d042dc67def8773bf58b68cc42392d2ce643c79765a42'
+      && emailHash(users.find(user => user.id === SMOKE_USER_ID)?.email) === 'a20ddbf2c101381c3de802e5e546365caf46bc80b69f3526cd967331cf9bb20d'
+      && workspace?.userId === SMOKE_USER_ID && workspace.kind === 'team'
       && workspace.slug === 'issue-1503-factory-smoke-20261106' && Number(workspace.members) === 2 && Number(workspace.active) === 2, 'fixture_membership_changed')
     report.activityBefore = await idle(pool)
     stage = 'matching_existing_child'
