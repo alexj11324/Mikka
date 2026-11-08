@@ -22,6 +22,7 @@ import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions,
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
+import { attentionQuestionsFromEvents, type AttentionQuestion } from './question-attention'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
@@ -113,6 +114,8 @@ export interface InboxTake {
   pushHidesText: boolean
   taskEventId?: string
   sourceEventId?: string
+  /** Durable human handoffs already chosen by this inbox's Decision receipts. */
+  attentionQuestions?: AttentionQuestion[]
   scheduledRead?: ScheduledRead
 }
 
@@ -202,6 +205,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       ...(taskEventId ? { taskEventId } : {}),
       ...(sourceEventId ? { sourceEventId } : {}),
       ...(scheduledRead ? { scheduledRead } : {}),
+      ...(!scheduledRead ? { attentionQuestions: attentionQuestionsFromEvents(events) } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
