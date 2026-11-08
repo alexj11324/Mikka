@@ -161,7 +161,9 @@ export interface Threads { threads: Thread[]; devices: { id: string; name: strin
 
 export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }
-  | { kind: 'steps'; id: string; count: number; at: number }
+  | { kind: 'steps'; id: string; count: number; at: number
+    /** Each tool call (lib/issue-run-conversation.ts ThreadStep); absent from an older server. */
+    steps?: import('@/features/tasks/model/thread-steps').ThreadStep[] }
   | { kind: 'error'; id: string; text: string; at: number }
   | { kind: 'person'; id: string; text: string; mine: boolean; at: number }
 

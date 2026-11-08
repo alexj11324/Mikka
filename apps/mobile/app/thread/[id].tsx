@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check, Square } from 'lucide-react-native'
+import { Square } from 'lucide-react-native'
 import { BotBubble, MyBubble } from '@/components/chat'
 import { Spinner, StatusIcon } from '@/components/icons'
 import { ThreadPlace } from '@/components/ThreadPlace'
@@ -11,6 +11,7 @@ import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
+import { ThreadSteps } from '@/features/tasks/components/thread-steps'
 import { Composer } from '@/features/chat/components/chat-composer'
 import { api, ApiError } from '@/lib/api'
 import { ReadNotice } from '@/components/ReadNotice'
@@ -84,15 +85,8 @@ export default function ThreadScreen() {
         <ReadNotice error={error} hasData={Boolean(data)} label="线程" onRetry={reload} />
         {data?.items.map((item, index) => {
           switch (item.kind) {
-            case 'steps': {
-              const live = data.active && index === data.items.length - 1
-              return (
-                <View key={item.id} style={styles.step}>
-                  {live ? <Spinner size={14} /> : <Check size={15} color={colors.secondary} strokeWidth={2.2} />}
-                  <Text style={styles.stepText}>{item.count} 步</Text>
-                </View>
-              )
-            }
+            case 'steps':
+              return <ThreadSteps key={item.id} steps={item.steps} count={item.count} live={data.active && index === data.items.length - 1} />
             case 'agent': return <View key={item.id} style={{ marginVertical: 4 }}><BotBubble><Markdown text={item.text} /></BotBubble></View>
             case 'error': return <Text key={item.id} style={styles.error}>{item.text}</Text>
             case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} /></View>
@@ -117,7 +111,5 @@ const styles = StyleSheet.create({
   subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   subtitle: { fontSize: 11, color: colors.secondary, flexShrink: 1 },
   body: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, gap: 4 },
-  step: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 },
-  stepText: { fontSize: 14, color: colors.secondary },
   error: { fontSize: 14, color: colors.danger, marginVertical: 4 },
 })
