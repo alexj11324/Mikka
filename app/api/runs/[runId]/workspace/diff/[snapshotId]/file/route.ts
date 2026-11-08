@@ -9,4 +9,4 @@ const query = z.strictObject({ workspaceId: z.uuid().optional(), repoId: z.uuid(
 export const GET = reviewHttp(async ({ deps, actor, runId, repoId, snapshotId, input, request }) => {
   const value = query.parse(input)
   return { file: await diffFile(deps, actor, runId, repoId, z.uuid().parse(snapshotId), value.path, request.signal) }
-})
+}, { sourceFile: true })

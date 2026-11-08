@@ -1585,7 +1585,7 @@
         "GET"
       ],
       "maxDuration": 30,
-      "sourceHash": "6e06aeda3384f7526f7e618c4f2df84b56dc36b504fa4c998a15e3455fb2b2f6"
+      "sourceHash": "f8992cad4f38813926d7aa9d47386568c0778b728d316541c2cbf4f42cdac57e"
     },
     {
       "path": "/mikka/api/runs/[runId]/workspace/diff/[snapshotId]/files",
@@ -1616,7 +1616,7 @@
         "GET"
       ],
       "maxDuration": 30,
-      "sourceHash": "d5955bf861d306a217f3fcd37c11321f2dd15739ba445a4828bc58ad87b2b658"
+      "sourceHash": "e8d815c9b938f970ece9b1b51a9775c17e2cfa547feffb8f5acd58ab36c8a717"
     },
     {
       "path": "/mikka/api/runs/[runId]/workspace/identity",
@@ -1635,7 +1635,7 @@
         "POST"
       ],
       "maxDuration": 30,
-      "sourceHash": "a95188c73286856d155f72b207ce76bca94da485e6f231d3dac5634ea2f6221b"
+      "sourceHash": "5b75fb4cff6800e6787dc28267a059689eff3bda4b42790b6705fcaadbcf99c4"
     },
     {
       "path": "/mikka/api/search",
@@ -2274,7 +2274,8 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "a498321fd6872af2e98709fe78d714157073f3073ba107aeeb66326da9eec371"
+      "maxDuration": 30,
+      "sourceHash": "8dde586205e7bdcca38ca0f801cd7414fe5cea9c3c67912f7de618b42d13dcde"
     },
     {
       "path": "/mikka/v1/runs/[runId]/complete",

@@ -153,3 +153,15 @@ export const workspaceDiffBlobProof = z.strictObject({ sha, base64: encodedBlob,
   /** base64 is the complete raw file; the server verifies and converts it. */
   clean: z.literal('crlf_to_lf').optional(), rawSha: sha.optional(),
 }).refine(value => Boolean(value.clean) === Boolean(value.rawSha))
+
+export const CHECKPOINT_REVIEW_MAX_PROOF_BYTES = 4 * 1024 * 1024
+/** Optional evidence is parsed separately from the recovery checkpoint. A bad
+ * review envelope must not discard an otherwise valid recovery safe point. */
+export const checkpointReviewEvidence = z.strictObject({
+  version: z.literal(1), repoId: z.uuid(),
+  revision: diffRevision.extend({ source: z.literal('checkpoint'), baseSha: sha, treeSha: sha }),
+  files: z.array(diffFileMetadata).max(WORKSPACE_DIFF_MAX_FILES),
+  blobs: z.array(workspaceDiffBlobProof).max(WORKSPACE_DIFF_MAX_FILES * 2),
+  reason: z.enum(['missing_evidence', 'too_large', 'unsupported', 'version_changed']).nullable(),
+})
+export type CheckpointReviewEvidence = z.infer<typeof checkpointReviewEvidence>

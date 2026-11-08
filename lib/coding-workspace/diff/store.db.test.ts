@@ -6,12 +6,17 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { gunzipSync } from 'node:zlib'
 import { Pool } from 'pg'
 import { runAssignmentSchema } from '@mikka/protocol'
+import { runCheckpointReceiptSchema, SOURCE_DAEMON_VERSION, type RunCheckpoint } from '@mikka/protocol/device'
+import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
 import { remoteKey } from '@mikka/protocol/repository'
 import { CodingWorkspaceError, workspaceReadReceipt, type WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
-import { WorkspaceReviewError, type DiffFileMetadata, type DiffFilePatch, type DiffSnapshot } from '@mikka/protocol/coding-workspace-review'
+import { CHECKPOINT_REVIEW_MAX_PROOF_BYTES, checkpointReviewEvidence, WorkspaceReviewError,
+  type DiffFileMetadata, type DiffFilePatch, type DiffSnapshot } from '@mikka/protocol/coding-workspace-review'
 import { readWorkspaceDiffReceipt } from '../../../packages/daemon/src/coding-workspace/diff'
+import { takeCheckpoint } from '../../../packages/daemon/src/agents/checkpoint'
 import type { JournalEntry } from '../../../packages/daemon/src/runs/journal'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../../tests/helpers/e2e-target.mjs'
@@ -60,6 +65,10 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
     const { validateDiffReceipt } = await import('./receipt')
     const { validateReviewAnchor } = await import('./patch')
     const { secretMaskerFor } = await import('../../secrets/runtime')
+    const { newDeviceToken, hashDeviceToken, issueDeviceToken } = await import('../../device-link')
+    const { POST: checkpointPOST } = await import('../../../app/v1/runs/[runId]/checkpoint/route')
+    const { prepareCheckpointReview, retainCheckpointReview } = await import('./checkpoint')
+    const { diffPage, diffFile } = await import('./service')
     appPool = (await import('../../db')).pool; workspacePool = (await import('../../workspace-db')).workspacePool
 
     async function session(userId: string) {
@@ -185,6 +194,260 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
         VALUES($1,$2,$3,$4,$5,'agent','prepared',$6)`, [randomUUID(), scope.boardId, snapshot.id, userId, hash(commentId), { commentIds: [commentId] }])
       return { scope, commentId }
     }
+
+    async function checkpointFixture() {
+      const f = await fixture(), token = newDeviceToken()
+      await pool.query('UPDATE device_tokens SET "tokenHash"=$2 WHERE id=$1', [f.tokenId, hashDeviceToken(token)])
+      return { ...f, token }
+    }
+    type CheckpointFixture = Awaited<ReturnType<typeof checkpointFixture>>
+    async function nativeCheckpoint(f: Fixture) {
+      assert.ok(f.entry.baseCommit)
+      const captured = await takeCheckpoint({ repoPath: f.repository, worktree: f.worktree,
+        baseCommit: f.entry.baseCommit, repoId: f.repoId })
+      assert.ok(captured, 'a capture without a previous tree returns the current real Git checkpoint')
+      return captured.checkpoint
+    }
+    const checkpointState = async (f: Fixture) => ({
+      recovery: (await pool.query('SELECT "baseCommit",patch,files,"takenAt","unavailableReason" FROM run_checkpoints WHERE "runId"=$1', [f.runId])).rows[0],
+      review: (await pool.query('SELECT "snapshotId","baseSha","headSha","treeSha",reason,"capturedAt" FROM coding_workspace_checkpoint_reviews WHERE "runId"=$1', [f.runId])).rows[0],
+    })
+    const checkpointPage = (f: Fixture) => diffPage({ database: pool, membership: pool }, f.who, f.runId, f.repoId,
+      { selection: { source: 'checkpoint' } })
+    const postCheckpoint = (f: CheckpointFixture, checkpoint: RunCheckpoint, token: string | null = f.token) => checkpointPOST(
+      new Request(`http://127.0.0.1:3199/v1/runs/${f.runId}/checkpoint`, { method: 'POST',
+        headers: { 'content-type': 'application/json', [CLIENT_VERSION_HEADER]: SOURCE_DAEMON_VERSION,
+          ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(checkpoint) }),
+      { params: Promise.resolve({ runId: f.runId }) })
+    async function acknowledgeCheckpoint(f: CheckpointFixture, checkpoint: RunCheckpoint, token = f.token) {
+      const response = await postCheckpoint(f, checkpoint, token)
+      assert.equal(response.status, 200, 'the real authenticated checkpoint route accepts the recovery point')
+      const body = await response.json()
+      assert.deepEqual(Object.keys(body).sort(), ['runId', 'takenAt'], 'the recovery ACK contract must not grow review fields')
+      const receipt = runCheckpointReceiptSchema.parse(body), state = await checkpointState(f)
+      assert.ok(state.recovery, 'the ACK follows a committed recovery record')
+      assert.ok(state.review, 'the admitted live Run also commits its latest review observation')
+      assert.equal(receipt.runId, f.runId)
+      assert.equal(receipt.takenAt, state.recovery.takenAt.toISOString(), 'ACK names the committed server timestamp')
+      assert.equal(receipt.takenAt, state.review.capturedAt.toISOString(), 'review pointer and recovery share one committed observation')
+      return { receipt, ...state }
+    }
+
+    await t.test('a native checkpoint retains verified patches, discards private proofs and remains readable after Stop and device deletion', async () => {
+      const f = await checkpointFixture(), checkpoint = await nativeCheckpoint(f)
+      const proof = checkpointReviewEvidence.parse(checkpoint.review), mask = await maskFor(f)
+      assert.equal(proof.reason, null)
+      assert.equal(proof.files.length, 3)
+      assert.equal(proof.blobs.length, 6, 'both full Git blobs of each modified file are present')
+      for (const blob of proof.blobs) {
+        const bytes = Buffer.from(blob.base64, 'base64')
+        assert.equal(createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex'), blob.sha)
+      }
+      const prepared = prepareCheckpointReview(checkpoint, f.repoId, mask)
+      assert.equal(prepared.reason, null)
+      assert.equal(prepared.input?.patches?.size, 3)
+      const saved = await acknowledgeCheckpoint(f, { ...checkpoint, takenAt: '2099-01-01T00:00:00.000Z' })
+      assert.notEqual(saved.receipt.takenAt, '2099-01-01T00:00:00.000Z', 'device clock never becomes recovery authority')
+      assert.deepEqual(gunzipSync(saved.recovery.patch), gunzipSync(Buffer.from(checkpoint.patch, 'base64')))
+      assert.equal(saved.review.reason, null)
+      assert.ok(saved.review.snapshotId)
+      const before = await checkpointPage(f)
+      assert.equal(before.snapshot.id, saved.review.snapshotId)
+      assert.equal(before.snapshot.revision.source, 'checkpoint')
+      assert.deepEqual(before.snapshot.counts, { files: 3, additions: 3, deletions: 3, complete: true })
+      const persisted = (await pool.query(`SELECT s.snapshot,f.metadata,f.patch FROM coding_workspace_snapshots s
+        JOIN coding_workspace_snapshot_files f ON f."snapshotId"=s.id WHERE s.id=$1 ORDER BY f.path`, [saved.review.snapshotId])).rows
+      assert.equal(persisted.length, 3)
+      assert.ok(persisted.every(row => row.patch.format === 'text' && row.patch.hunks.length === 1))
+      const serialized = JSON.stringify(persisted)
+      for (const name of ['blobs', 'base64', 'review']) assert.ok(!serialized.includes(`"${name}":`), 'private checkpoint proof is not stored in review JSON')
+      for (const blob of proof.blobs) assert.ok(!serialized.includes(blob.base64), 'full source encodings never become retained patch data')
+      await retire(f)
+      const history = await checkpointPage(f)
+      assert.equal(history.snapshot.id, before.snapshot.id)
+      assert.equal(history.snapshot.observedAt, saved.receipt.takenAt)
+      assert.equal(history.snapshot.isStale, true)
+      assert.equal(history.files.length, 3)
+      const patch = await diffFile({ database: pool, membership: pool }, f.who, f.runId, f.repoId, history.snapshot.id, 'alpha.txt')
+      assert.ok(patch.patch?.includes('+after alpha.txt'))
+      assert.equal((await pool.query('SELECT 1 FROM coding_workspace_requests WHERE "runId"=$1', [f.runId])).rowCount, 0,
+        'checkpoint history never queues a live daemon read')
+    })
+
+    await t.test('malformed full-source evidence still ACKs recovery and replaces the latest good review with an honest unavailable observation', async () => {
+      const f = await checkpointFixture(), first = await acknowledgeCheckpoint(f, await nativeCheckpoint(f))
+      await f.write('alpha.txt', 'second recovery remains intact\n')
+      const checkpoint = await nativeCheckpoint(f), proof = checkpointReviewEvidence.parse(checkpoint.review)
+      assert.ok(proof.blobs[0])
+      proof.blobs[0].base64 = Buffer.from('not the claimed Git object').toString('base64')
+      const malformed = { ...checkpoint, review: proof }
+      assert.equal(prepareCheckpointReview(malformed, f.repoId, await maskFor(f)).reason, 'missing_evidence')
+      const current = await acknowledgeCheckpoint(f, malformed)
+      assert.deepEqual(gunzipSync(current.recovery.patch), gunzipSync(Buffer.from(checkpoint.patch, 'base64')))
+      assert.equal(current.review.snapshotId, null)
+      assert.equal(current.review.reason, 'missing_evidence')
+      assert.ok(Date.parse(current.receipt.takenAt) > Date.parse(first.receipt.takenAt))
+      const page = await checkpointPage(f)
+      assert.equal(page.snapshot.availability, 'unavailable')
+      assert.equal(page.snapshot.reason, 'missing_evidence')
+      assert.equal(page.snapshot.observedAt, current.receipt.takenAt)
+      assert.notEqual(page.snapshot.id, first.review.snapshotId)
+      assert.deepEqual(page.files, [])
+      assert.equal((await read(f, first.review.snapshotId)).id, first.review.snapshotId, 'old history remains explicitly addressable')
+      assert.equal((await pool.query('SELECT count(*)::int AS count FROM coding_workspace_snapshots WHERE "runId"=$1', [f.runId])).rows[0].count, 1)
+    })
+
+    await t.test('real Git evidence above the proof budget preserves its smaller recovery patch without serving the old good checkpoint as latest', async () => {
+      const f = await checkpointFixture(), first = await acknowledgeCheckpoint(f, await nativeCheckpoint(f))
+      const bytesPerFile = Math.ceil(CHECKPOINT_REVIEW_MAX_PROOF_BYTES / 5) + 64
+      for (let index = 0; index < 5; index++) await f.write(`budget-${index}.txt`, `${String(index).repeat(bytesPerFile)}\n`)
+      const checkpoint = await nativeCheckpoint(f), proof = checkpointReviewEvidence.parse(checkpoint.review)
+      assert.equal(proof.reason, 'too_large', 'actual distinct Git blobs exceed the aggregate 4 MiB review budget')
+      assert.deepEqual(proof.blobs, [], 'the daemon never sends a partial source proof')
+      assert.equal(checkpoint.unavailableReason, undefined, 'the compressible recovery payload is still admissible')
+      assert.equal(prepareCheckpointReview(checkpoint, f.repoId, await maskFor(f)).reason, 'too_large')
+      const saved = await acknowledgeCheckpoint(f, checkpoint)
+      assert.equal(saved.recovery.unavailableReason, null)
+      assert.deepEqual(gunzipSync(saved.recovery.patch), gunzipSync(Buffer.from(checkpoint.patch, 'base64')))
+      assert.equal(saved.review.snapshotId, null)
+      assert.equal(saved.review.reason, 'too_large')
+      const page = await checkpointPage(f)
+      assert.equal(page.snapshot.availability, 'unavailable')
+      assert.equal(page.snapshot.reason, 'too_large')
+      assert.equal(page.snapshot.observedAt, saved.receipt.takenAt)
+      assert.notEqual(page.snapshot.id, first.review.snapshotId)
+      assert.equal((await read(f, first.review.snapshotId)).counts.files, 3)
+    })
+
+    await t.test('unchanged checkpoint content refreshes observation time and a new empty tree supersedes the prior nonempty snapshot', async () => {
+      const f = await checkpointFixture(), first = await acknowledgeCheckpoint(f, await nativeCheckpoint(f))
+      const original = await read(f, first.review.snapshotId)
+      const repeated = await acknowledgeCheckpoint(f, { ...await nativeCheckpoint(f), takenAt: '2000-01-01T00:00:00.000Z' })
+      assert.equal(repeated.review.snapshotId, first.review.snapshotId, 'same source version deduplicates immutable content')
+      assert.ok(Date.parse(repeated.receipt.takenAt) > Date.parse(first.receipt.takenAt))
+      assert.equal((await read(f, first.review.snapshotId)).observedAt, original.observedAt, 'stored snapshot time remains immutable')
+      assert.equal((await checkpointPage(f)).snapshot.observedAt, repeated.receipt.takenAt, 'latest observation uses the new server receipt')
+      await git(f.worktree, 'checkout', f.entry.baseCommit!, '--', 'alpha.txt', 'beta.txt', 'gamma.txt')
+      const empty = await nativeCheckpoint(f), proof = checkpointReviewEvidence.parse(empty.review)
+      assert.equal(empty.files, 0)
+      assert.equal(gunzipSync(Buffer.from(empty.patch, 'base64')).length, 0)
+      assert.deepEqual(proof.files, [])
+      assert.deepEqual(proof.blobs, [])
+      assert.equal(proof.reason, null)
+      const saved = await acknowledgeCheckpoint(f, empty), page = await checkpointPage(f)
+      assert.ok(saved.review.snapshotId)
+      assert.notEqual(saved.review.snapshotId, first.review.snapshotId)
+      assert.equal(saved.review.reason, null)
+      assert.equal(page.snapshot.id, saved.review.snapshotId)
+      assert.equal(page.snapshot.availability, 'empty')
+      assert.equal(page.snapshot.observedAt, saved.receipt.takenAt)
+      assert.deepEqual(page.snapshot.counts, { files: 0, additions: 0, deletions: 0, complete: true })
+      assert.deepEqual(page.files, [])
+    })
+
+    await t.test('fresh complete checkpoint proofs cannot mark an immutable snapshot from an older secret policy as latest available', async () => {
+      const f = await checkpointFixture(), checkpoint = await nativeCheckpoint(f), oldMask = await maskFor(f)
+      const firstProof = checkpointReviewEvidence.parse(checkpoint.review)
+      const first = await acknowledgeCheckpoint(f, checkpoint)
+      assert.ok(first.review.snapshotId)
+      assert.equal(first.review.reason, null)
+      const stored = (await pool.query('SELECT path,patch,"maskPolicy" FROM coding_workspace_snapshot_files WHERE "snapshotId"=$1 ORDER BY path',
+        [first.review.snapshotId])).rows
+      assert.equal(stored.length, 3)
+      const { sealSecret, userSecretAad } = await import('../../secrets/crypto')
+      const secret = `unrelated-checkpoint-recapture-${randomUUID()}`
+      const row = { id: randomUUID(), userId: f.person.id, name: 'DIFF_CHECKPOINT_RECAPTURE_FIXTURE', kind: 'secret' }
+      const sealed = sealSecret(secret, userSecretAad(row))
+      await pool.query('INSERT INTO user_secrets(id,"userId",name,kind,ciphertext,iv,"keyVersion") VALUES($1,$2,$3,$4,$5,$6,$7)',
+        [row.id, row.userId, row.name, row.kind, sealed.ciphertext, sealed.iv, sealed.keyVersion])
+      try {
+        const freshMask = await maskFor(f), repeated = await nativeCheckpoint(f)
+        assert.notEqual(freshMask(secret), secret, 'the new policy decrypts the real encrypted owner secret')
+        assert.notEqual(freshMask.sourcePolicy, oldMask.sourcePolicy)
+        const freshProof = checkpointReviewEvidence.parse(repeated.review)
+        assert.deepEqual(freshProof.revision, firstProof.revision, 'the unchanged real Git content has the identical source version')
+        const prepared = prepareCheckpointReview(repeated, f.repoId, freshMask)
+        assert.equal(prepared.reason, null, 'the unrelated new secret does not occur in either complete source blob')
+        assert.equal(prepared.input?.patches?.size, 3, 'all files have newly validated complete proofs')
+        const current = await acknowledgeCheckpoint(f, repeated)
+        assert.equal(current.recovery.unavailableReason, null)
+        assert.deepEqual(gunzipSync(current.recovery.patch), gunzipSync(Buffer.from(repeated.patch, 'base64')),
+          'review deduplication refusal does not change the valid recovery patch')
+        assert.ok(Date.parse(current.receipt.takenAt) > Date.parse(first.receipt.takenAt))
+        assert.equal(current.review.snapshotId, null, 'the catch path must clear an already assigned deduplicated snapshot')
+        assert.equal(current.review.reason, 'missing_evidence')
+        const page = await checkpointPage(f)
+        assert.equal(page.snapshot.availability, 'unavailable')
+        assert.equal(page.snapshot.reason, 'missing_evidence')
+        assert.equal(page.snapshot.observedAt, current.receipt.takenAt)
+        assert.notEqual(page.snapshot.id, first.review.snapshotId)
+        assert.deepEqual(page.files, [])
+        assert.deepEqual((await pool.query('SELECT path,patch,"maskPolicy" FROM coding_workspace_snapshot_files WHERE "snapshotId"=$1 ORDER BY path',
+          [first.review.snapshotId])).rows, stored, 'old immutable patches and their private validation policy are unchanged')
+        assert.equal((await pool.query('SELECT count(*)::int AS count FROM coding_workspace_snapshots WHERE "runId"=$1', [f.runId])).rows[0].count, 1)
+        await assert.rejects(() => diffFile({ database: pool, membership: pool }, f.who, f.runId, f.repoId,
+          first.review.snapshotId, 'alpha.txt'), code('workspace_path_unavailable'))
+      } finally { await pool.query('DELETE FROM user_secrets WHERE id=$1', [row.id]) }
+    })
+
+    await t.test('real checkpoint authentication, current claim token, Stop and device takeover reject unauthorized recovery overwrites', async () => {
+      const f = await checkpointFixture(), checkpoint = await nativeCheckpoint(f)
+      assert.equal((await postCheckpoint(f, checkpoint, null)).status, 401)
+      const saved = await acknowledgeCheckpoint(f, checkpoint), original = await checkpointState(f)
+      const replacementToken = await issueDeviceToken(f.person.id, 'checkpoint claim fixture')
+      const replacementId = (await pool.query('SELECT id FROM device_tokens WHERE "tokenHash"=$1', [hashDeviceToken(replacementToken)])).rows[0].id
+      assert.equal((await postCheckpoint(f, checkpoint, replacementToken)).status, 409, 'another valid login has not claimed this Run')
+      assert.deepEqual(await checkpointState(f), original)
+      await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [f.runId])
+      assert.equal((await postCheckpoint(f, checkpoint)).status, 409)
+      assert.deepEqual(await checkpointState(f), original, 'Stop preserves both the recovery point and review pointer')
+      await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL,"deviceTokenId"=$2 WHERE id=$1', [f.runId, replacementId])
+      assert.equal((await postCheckpoint(f, checkpoint)).status, 409, 'a previous claim token cannot follow a new login')
+      assert.deepEqual(await checkpointState(f), original)
+      const renewed = await acknowledgeCheckpoint(f, checkpoint, replacementToken)
+      assert.equal(renewed.review.snapshotId, saved.review.snapshotId)
+      const beforeTakeover = await checkpointState(f), successor = await checkpointFixture()
+      await pool.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"deviceTokenId"=$4,"worktreePath"=$5 WHERE id=$1',
+        [f.runId, successor.deviceId, successor.repoId, successor.tokenId, successor.worktree])
+      for (const token of [f.token, replacementToken]) assert.equal((await postCheckpoint(f, checkpoint, token)).status, 409)
+      assert.deepEqual(await checkpointState(f), beforeTakeover, 'old-device credentials cannot overwrite a takeover recovery point')
+    })
+
+    await t.test('retaining a prepared checkpoint rechecks the real secret policy and a refused proof does not block a masked recovery ACK', async () => {
+      const f = await checkpointFixture(), first = await acknowledgeCheckpoint(f, await nativeCheckpoint(f))
+      const secret = `checkpoint-source-secret-${randomUUID()}`
+      await f.write('alpha.txt', `after ${secret}\n`)
+      const checkpoint = await nativeCheckpoint(f), oldMask = await maskFor(f)
+      const prepared = prepareCheckpointReview(checkpoint, f.repoId, oldMask)
+      assert.equal(prepared.reason, null, 'source was not registered as a secret during preparation')
+      const { sealSecret, userSecretAad } = await import('../../secrets/crypto')
+      const row = { id: randomUUID(), userId: owner.id, name: 'DIFF_CHECKPOINT_POLICY_FIXTURE', kind: 'secret' }
+      const sealed = sealSecret(secret, userSecretAad(row))
+      await pool.query('INSERT INTO user_secrets(id,"userId",name,kind,ciphertext,iv,"keyVersion") VALUES($1,$2,$3,$4,$5,$6,$7)',
+        [row.id, row.userId, row.name, row.kind, sealed.ciphertext, sealed.iv, sealed.keyVersion])
+      try {
+        const freshMask = await maskFor(f)
+        assert.notEqual(freshMask.sourcePolicy, oldMask.sourcePolicy)
+        await withReviewTransaction(pool, pool, f.who, f.runId, f.repoId, (client, scope) =>
+          retainCheckpointReview(client, scope, prepared, new Date(first.receipt.takenAt), freshMask), { live: f.identity })
+        assert.equal((await checkpointState(f)).review.snapshotId, null, 'a stale preparation cannot persist its former safe-source proof')
+        assert.equal((await checkpointState(f)).review.reason, 'missing_evidence')
+        assert.equal(prepareCheckpointReview(checkpoint, f.repoId, freshMask).reason, 'missing_evidence', 'fresh full-source masking rejects the same private bytes')
+        const current = await acknowledgeCheckpoint(f, checkpoint)
+        assert.equal(current.review.snapshotId, null)
+        assert.equal(current.review.reason, 'missing_evidence')
+        const recovery = gunzipSync(current.recovery.patch).toString('utf8')
+        assert.ok(!recovery.includes(secret), 'valid recovery is admitted only after its plaintext secret is masked')
+        assert.ok(recovery.includes('alpha.txt'))
+        const page = await checkpointPage(f)
+        assert.equal(page.snapshot.reason, 'missing_evidence')
+        assert.equal(page.snapshot.observedAt, current.receipt.takenAt)
+        const rows = (await pool.query(`SELECT s.snapshot,f.metadata,f.patch FROM coding_workspace_snapshots s
+          JOIN coding_workspace_snapshot_files f ON f."snapshotId"=s.id WHERE s."runId"=$1`, [f.runId])).rows
+        assert.equal(rows.length, 3, 'neither preparation path persisted the unsafe source version')
+        assert.ok(!JSON.stringify(rows).includes(secret))
+      } finally { await pool.query('DELETE FROM user_secrets WHERE id=$1', [row.id]) }
+    })
 
     await t.test('a live owner freezes authority; lazy verified patches survive stopped Run and deleted device/repository rows', async () => {
       const f = await fixture(), { snapshot, files } = await capture(f), scope = await scopeFor(f), mask = await maskFor(f)

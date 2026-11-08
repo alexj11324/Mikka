@@ -5,6 +5,7 @@ import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { requestWorkspaceRead } from '@/lib/coding-workspace/requests'
+import { workspaceReadResponse } from '@/lib/coding-workspace/response'
 import { workspaceErrorStatus, workspaceSessionStillValid } from '@/lib/coding-workspace/http'
 
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,8 @@ export async function GET(request: Request, context: { params: Promise<{ runId: 
     const workspace = await loadWorkspaceContext(search.get('workspaceId') ?? undefined, session.user)
     const result = await requestWorkspaceRead(pool, workspacePool, { userId: session.user.id, workspaceId: workspace.workspace.id }, runId, repoId, input, request.signal)
     if (!await workspaceSessionStillValid(request, session)) return Response.json({ ok: false, code: 'authRequired' }, { status: 401, headers })
+    if (result.ok) return await workspaceReadResponse(pool, workspacePool, request, session,
+      { userId: session.user.id, workspaceId: workspace.workspace.id }, result, () => Response.json(result, { headers }))
     return Response.json(result, { status: result.ok ? 200 : workspaceErrorStatus(new CodingWorkspaceError(result.code)), headers })
   } catch (error) {
     if (error instanceof z.ZodError) return Response.json({ ok: false, code: 'workspace_invalid_request' }, { status: 400, headers })

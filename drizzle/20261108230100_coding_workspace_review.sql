@@ -1,8 +1,6 @@
 -- Retained review artifacts are independent of the lifetime of a device or
 -- its device_repos row. Workspace membership lives in the other database;
 -- application writes hold its workspace/member lease through this commit.
-ALTER TABLE coding_workspace_requests ADD COLUMN IF NOT EXISTS "maskPolicy" text CHECK ("maskPolicy" ~ '^[a-f0-9]{64}$');
-
 CREATE TABLE IF NOT EXISTS coding_workspace_bindings (
   "runId" uuid NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
   "repoId" uuid NOT NULL,

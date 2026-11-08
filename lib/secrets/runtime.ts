@@ -178,7 +178,7 @@ async function workspaceE2BKeySecret(workspaceId: string, env: Env): Promise<{ n
 function retainedSourceMasker(secrets: readonly MaskableSecret[], env: Env): Masker {
   const mask = withCredentialMasking(createSecretMasker(secrets))
   const material = JSON.stringify(['retained-source/v1', MASK_RULES_VERSION,
-    secrets.map(({ name, value }) => [name, value]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))])
+    secrets.map(({ name, value }) => [name, value]).sort((a, b) => Buffer.compare(Buffer.from(JSON.stringify(a)), Buffer.from(JSON.stringify(b))))])
   // Never persist an unkeyed hash of a potentially low-entropy secret. The
   // fingerprint and masker use the same already-loaded values, without a
   // second query that could certify a different set of secrets.

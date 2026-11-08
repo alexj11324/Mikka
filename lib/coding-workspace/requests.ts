@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from 'node:util'
 import type { Pool } from 'pg'
 import {
   CodingWorkspaceError, WORKSPACE_REQUEST_TTL_MS, workspaceReadCommand, workspaceReadResult, workspaceRequestPathsAllowed,
-  type WorkspaceReadCommand, type WorkspaceReadRequest, type WorkspaceReadResult, type WorkspaceReadReceipt,
+  type WorkspaceReadCommand, type WorkspaceReadRequest, type WorkspaceReadResult, type WorkspaceReadReceipt, type RunWorktreeIdentity,
 } from '@mikka/protocol/coding-workspace'
 import { DEVICE_WORK_CHANNEL, notifyChannel, subscribeShared } from '../db/listen'
 import { wakeDeviceWorkNow } from '../device-gateway-notify'
@@ -14,9 +14,29 @@ import { resolveRunWorktree, type WorkspaceActor, type WorkspaceQuery } from './
 import { validateWorkspaceReceipt } from './receipt'
 
 const receiptPolicy = Symbol('workspace-receipt-mask-policy')
-/** Internal evidence only: never serialized into a device or public DTO. */
-export function workspaceResultMaskPolicy(result: WorkspaceReadResult): string | undefined {
-  return (result as WorkspaceReadResult & { [receiptPolicy]?: string })[receiptPolicy]
+const receiptIdentity = Symbol('workspace-receipt-identity')
+/** Private evidence only; it never appears in a device or public DTO. */
+export function workspaceResultMaskPolicy(result: object): string | undefined {
+  return (result as { [receiptPolicy]?: string })[receiptPolicy]
+}
+
+export function workspaceResultIdentity(result: object): RunWorktreeIdentity | undefined {
+  return (result as { [receiptIdentity]?: RunWorktreeIdentity })[receiptIdentity]
+}
+
+export function copyWorkspaceResultMaskPolicy<T extends object>(source: object, target: T): T {
+  Object.defineProperty(target, receiptPolicy, { value: workspaceResultMaskPolicy(source) })
+  Object.defineProperty(target, receiptIdentity, { value: workspaceResultIdentity(source) })
+  return target
+}
+
+/** Call after asynchronous authorization and immediately before exposing or
+ * committing source fragments. Partial text cannot prove safety against a
+ * newly registered secret that spans multiple selected ranges. */
+export async function assertWorkspaceResultMaskPolicy(result: object, actor: WorkspaceActor): Promise<void> {
+  const policy = workspaceResultMaskPolicy(result)
+  const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
+  if (!policy || policy !== mask.sourcePolicy) throw new CodingWorkspaceError('workspace_path_unavailable')
 }
 
 export async function requestWorkspaceRead(database: Pool, membership: WorkspaceQuery, actor: WorkspaceActor,
@@ -52,10 +72,10 @@ export async function requestWorkspaceRead(database: Pool, membership: Workspace
         const fresh = await resolveRunWorktree(database, membership, actor, runId, repoId)
         if (fresh.identity.bindingId !== binding.identity.bindingId) throw new CodingWorkspaceError('workspace_version_conflict')
         const result = workspaceReadResult.parse(row.result)
-        if (result.ok && result.kind === 'diff_file') {
-          const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
-          if (!row.maskPolicy || row.maskPolicy !== mask.sourcePolicy) throw new CodingWorkspaceError('workspace_path_unavailable')
-          Object.defineProperty(result, receiptPolicy, { value: row.maskPolicy })
+        if (result.ok) {
+          Object.defineProperty(result, receiptPolicy, { value: row.maskPolicy ?? undefined })
+          Object.defineProperty(result, receiptIdentity, { value: result.identity })
+          await assertWorkspaceResultMaskPolicy(result, actor)
         }
         return result
       }

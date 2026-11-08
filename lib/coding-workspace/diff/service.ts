@@ -41,7 +41,7 @@ async function checkpoint(deps: DiffDependencies, scope: ReviewScope): Promise<D
     snapshotId: string | null; baseSha: string; headSha: string | null; treeSha: string | null; capturedAt: Date; reason: DiffSnapshot['reason'];
   }>(`SELECT "snapshotId","baseSha","headSha","treeSha","capturedAt",reason FROM coding_workspace_checkpoint_reviews
     WHERE "runId"=$1 AND "repoId"=$2 AND "workspaceId"=$3`, [scope.identity.runId, scope.identity.repoId, scope.identity.workspaceId])
-  if (current?.snapshotId && !current.reason) return readDiffSnapshot(deps.database, scope, current.snapshotId)
+  if (current?.snapshotId && !current.reason) return { ...await readDiffSnapshot(deps.database, scope, current.snapshotId), observedAt: current.capturedAt.toISOString() }
   if (current) return unavailableSnapshot(scope, 'checkpoint', current.reason ?? 'missing_evidence', current)
   const { rows: [legacy] } = await deps.database.query<{ baseSha: string; capturedAt: Date; reason: string | null }>(
     'SELECT "baseCommit" AS "baseSha","takenAt" AS "capturedAt","unavailableReason" AS reason FROM run_checkpoints WHERE "runId"=$1 AND "userId"=$2',
@@ -63,7 +63,8 @@ export async function captureDiffSnapshot(deps: DiffDependencies, actor: ReviewA
       if (!result.ok) throw new CodingWorkspaceError(result.code)
       if (result.kind !== 'diff_snapshot') throw new WorkspaceReviewError('workspace_snapshot_unavailable')
       return await withReviewTransaction(deps.database, deps.membership, actor, runId, repoId, async (client, fresh) => {
-        const snapshot = await retainDiffSnapshot(client, fresh, { revision: result.revision, files: result.files }, mask)
+        const latestMask = await secretMaskerFor({ workspaceId: fresh.identity.workspaceId, ownerId: fresh.identity.ownerId })
+        const snapshot = await retainDiffSnapshot(client, fresh, { revision: result.revision, files: result.files }, latestMask)
         return { ...snapshot, isStale: false }
       }, { live: result.identity, signal })
     } catch (error) {
@@ -80,7 +81,12 @@ export async function captureDiffSnapshot(deps: DiffDependencies, actor: ReviewA
     try {
       const input = await deps.external.capture(scope, selection.source === 'commit' ? selection : { source: 'pull_request' }, mask)
       return await withReviewTransaction(deps.database, deps.membership, actor, runId, repoId,
-        async (client, fresh) => retainDiffSnapshot(client, fresh, input, mask), { signal })
+        async (client, fresh) => {
+          const latestMask = await secretMaskerFor({ workspaceId: fresh.identity.workspaceId, ownerId: fresh.identity.ownerId })
+          if (input.patches?.size && (!mask.sourcePolicy || mask.sourcePolicy !== latestMask.sourcePolicy))
+            throw new CodingWorkspaceError('workspace_path_unavailable')
+          return retainDiffSnapshot(client, fresh, input, latestMask)
+        }, { signal })
     } catch (error) {
       if (selection.source !== 'auto' || !(error instanceof WorkspaceReviewError)
         || !['workspace_review_github_unavailable', 'workspace_review_github_forbidden', 'workspace_snapshot_unavailable'].includes(error.code)) throw error
@@ -108,7 +114,8 @@ export async function diffPage(deps: DiffDependencies, actor: ReviewActor, runId
     const page = snapshot.availability === 'unavailable'
       ? { snapshot, boardRevision: (await client.query<{ revision: number }>(
         'SELECT revision FROM coding_workspace_review_boards WHERE id=$1', [fresh.boardId])).rows[0]?.revision ?? 0, files: [], nextCursor: null }
-      : await readDiffFilePage(client, fresh, { ...await readDiffSnapshot(client, fresh, snapshot.id), isStale: snapshot.isStale }, actor.userId, input)
+      : await readDiffFilePage(client, fresh, { ...await readDiffSnapshot(client, fresh, snapshot.id),
+        isStale: snapshot.isStale, observedAt: snapshot.observedAt }, actor.userId, input)
     const mask = await secretMaskerFor({ workspaceId: fresh.identity.workspaceId, ownerId: fresh.identity.ownerId })
     if (!isDeepStrictEqual(maskDeep(page, mask), page)) throw new CodingWorkspaceError('workspace_path_unavailable')
     return page

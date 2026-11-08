@@ -5,14 +5,11 @@ import { CodingWorkspaceError, type RunWorktreeIdentity } from '@mikka/protocol/
 import { runRepositoryIdentity, type RunRepositoryIdentity } from '@mikka/protocol/coding-workspace-review'
 import { issueForUser } from '../../issue-access'
 import { tokenWorkspace } from '../../tokens/principal'
-import { observeCommitEffects } from '../../db/commit-effects'
+import { withWorkspaceAuthority, type WorkspaceAuthorizedActor } from '../authority'
 import { resolveRunWorktree, type WorkspaceActor, type WorkspaceQuery } from '../identity'
 import { diffDigest } from './patch'
 
-export type ReviewActor = WorkspaceActor & { credential:
-  | { kind: 'session'; id: string }
-  | { kind: 'pat'; id: string }
-  | { kind: 'device'; id: string; deviceId: string } }
+export type ReviewActor = WorkspaceAuthorizedActor
 export type ReviewScope = { identity: RunRepositoryIdentity; taskId: string | null; boardId: string; status: string; stopped: boolean }
 const denied = () => new CodingWorkspaceError('workspace_not_found')
 
@@ -64,84 +61,16 @@ async function retainBinding(database: WorkspaceQuery, membership: WorkspaceQuer
     throw new CodingWorkspaceError('workspace_version_conflict')
 }
 
-async function lockCredential(client: PoolClient, actor: ReviewActor, runId: string) {
-  const credential = actor.credential
-  const result = credential.kind === 'session'
-    ? await client.query('SELECT id FROM "session" WHERE id=$1 AND "userId"=$2 AND "expiresAt">clock_timestamp() FOR SHARE', [credential.id, actor.userId])
-    : credential.kind === 'pat'
-      ? await client.query(`SELECT id FROM personal_access_tokens WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3
-        AND "revokedAt" IS NULL AND ("expiresAt" IS NULL OR "expiresAt">clock_timestamp()) FOR SHARE`, [credential.id, actor.userId, actor.workspaceId])
-      : await client.query(`SELECT t.id FROM device_tokens t JOIN agent_runs r ON r."deviceTokenId"=t.id AND r."userId"=t."userId"
-        WHERE t.id=$1 AND t."userId"=$2 AND r.id=$3 AND r."deviceId"=$4
-          AND t."revokedAt" IS NULL AND (t."expiresAt" IS NULL OR t."expiresAt">clock_timestamp())
-          AND (t."boundDeviceId" IS NULL OR t."boundDeviceId"=$4)
-          AND (t."boundWorkspaceId" IS NULL OR t."boundWorkspaceId"=$5) FOR SHARE OF t`,
-      [credential.id, actor.userId, runId, credential.deviceId, actor.workspaceId])
-  if (!result.rowCount) throw denied()
-}
-
-/** Fetch remote evidence before entering this short transaction. Workspace
- * deletion locks WS before sweeping APP, so take that same order and retain
- * the workspace/member/task-link locks until the APP commit is acknowledged. */
+/** Review-specific state is built inside the shared final-authority lease. */
 export async function withReviewTransaction<T>(database: Pool, membership: Pool, actor: ReviewActor,
   runId: string, repoId: string, work: (client: PoolClient, scope: ReviewScope) => Promise<T>,
   options: { live?: RunWorktreeIdentity; signal?: AbortSignal } = {}): Promise<T> {
-  options.signal?.throwIfAborted()
-  const { rows: [initial] } = await database.query<{ issueId: string | null }>('SELECT "issueId" FROM agent_runs WHERE id=$1', [runId])
-  if (!initial) throw denied()
-  const workspace = await membership.connect()
-  let client: PoolClient | undefined, workspaceFailed = false, appBegan = false
-  const failWorkspace = () => { workspaceFailed = true }
-  workspace.on('error', failWorkspace); workspace.on('end', failWorkspace)
-  const check = () => { options.signal?.throwIfAborted(); if (workspaceFailed) throw denied() }
-  try {
-    await workspace.query('BEGIN')
-    await workspace.query("SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='5s'; SET LOCAL idle_in_transaction_session_timeout='20s'")
-    if (!(await workspace.query('SELECT id FROM mikka_workspaces WHERE id=$1 FOR SHARE', [actor.workspaceId])).rowCount) throw denied()
-    if (!(await workspace.query(`SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,
-      [actor.workspaceId, actor.userId])).rowCount) throw denied()
-    if (initial.issueId) {
-      const link = await workspace.query<{ workspaceId: string; teamId: string }>(
-        'SELECT "workspaceId","teamId" FROM mikka_team_issues WHERE "issueId"=$1 FOR SHARE', [initial.issueId])
-      if (link.rows.some(value => value.workspaceId !== actor.workspaceId)) throw denied()
-      for (const row of link.rows) {
-        if (!(await workspace.query('SELECT id FROM mikka_teams WHERE id=$1 AND "workspaceId"=$2 FOR SHARE', [row.teamId, actor.workspaceId])).rowCount) throw denied()
-      }
-    }
-    check()
-    client = await database.connect(); observeCommitEffects(client)
-    await client.query('BEGIN'); appBegan = true
-    await client.query("SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='5s'; SET LOCAL idle_in_transaction_session_timeout='20s'")
-    if (initial.issueId && !(await client.query('SELECT id FROM issues WHERE id=$1 FOR SHARE', [initial.issueId])).rowCount) throw denied()
-    const locked = await client.query<{ issueId: string | null }>('SELECT "issueId" FROM agent_runs WHERE id=$1 FOR SHARE', [runId])
-    if (!locked.rowCount || locked.rows[0]!.issueId !== initial.issueId) throw new CodingWorkspaceError('workspace_version_conflict')
-    await lockCredential(client, actor, runId)
-    if ((await client.query('SELECT 1 FROM workspace_deletions WHERE id=$1', [actor.workspaceId])).rowCount) throw denied()
-    if (options.live) {
-      await client.query(`SELECT d.id,p.id,t.id FROM agent_runs r JOIN devices d ON d.id=r."deviceId"
-        JOIN device_repos p ON p.id=r."deviceRepoId" JOIN device_tokens t ON t.id=r."deviceTokenId"
-        WHERE r.id=$1 FOR SHARE OF d,p,t`, [runId])
-      await client.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 FOR SHARE', [runId])
-      await retainBinding(client, workspace, actor, options.live)
-    }
+  return withWorkspaceAuthority(database, membership, actor, runId, async (client, workspace) => {
+    if (options.live) await retainBinding(client, workspace, actor, options.live)
     const scope = await resolveReviewScope(client, workspace, actor, runId, repoId)
-    if (scope.taskId !== initial.issueId) throw new CodingWorkspaceError('workspace_version_conflict')
     await client.query(`INSERT INTO coding_workspace_review_boards (id,"workspaceId","taskId","runId","repositoryKey")
       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING`,
     [scope.boardId, actor.workspaceId, scope.taskId, scope.taskId ? null : runId, scope.identity.repositoryKey])
-    const result = await work(client, scope)
-    await lockCredential(client, actor, runId)
-    if (options.live && (await resolveRunWorktree(client, workspace, actor, runId, repoId)).identity.bindingId !== options.live.bindingId)
-      throw new CodingWorkspaceError('workspace_version_conflict')
-    check(); await workspace.query('SELECT 1'); check()
-    await client.query('COMMIT'); appBegan = false
-    return result
-  } catch (error) {
-    if (appBegan) await client?.query('ROLLBACK')
-    throw error
-  } finally {
-    client?.release()
-    try { if (!workspaceFailed) await workspace.query('ROLLBACK') }
-    finally { workspace.removeListener('error', failWorkspace); workspace.removeListener('end', failWorkspace); workspace.release(workspaceFailed ? denied() : undefined) }
-  }
+    return work(client, scope)
+  }, options)
 }

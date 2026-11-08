@@ -13,6 +13,7 @@ import { MailboxError } from '../mailbox-error'
 import type { MailboxTransactionLease } from '../mailbox-transaction-guard'
 import { resolveRunWorktree, type WorkspaceActor } from './identity'
 import { fileMentionMessage, type resolveFileMentions } from './mentions'
+import { assertWorkspaceResultMaskPolicy } from './requests'
 
 /** Supplement the exact observed Run. A stale selection never follows a chain
  * successor or advances a Factory request epoch. Those are separate actions. */
@@ -68,6 +69,7 @@ export async function submitFileMentions(database: Pool, membership: Pool,
     deviceId = await sendOwnedRunMessageInTransaction(drizzle(client), actor.userId, { runId: input.runId, text: message, messageId })
     await lease.check()
     signal?.throwIfAborted()
+    await assertWorkspaceResultMaskPolicy(resolved, actor)
     await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')

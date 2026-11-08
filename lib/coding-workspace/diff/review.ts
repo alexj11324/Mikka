@@ -7,6 +7,7 @@ import { reviewMutation, reviewComment, WorkspaceReviewError, type ReviewBoard, 
 import { secretMaskerFor } from '../../secrets/runtime'
 import { maskDeep } from '../../secrets/mask'
 import { runChanged } from '../../live/panels'
+import { LEASED_RUN_STATUSES } from '../../run-retry'
 import { diffDigest, validateReviewAnchor } from './patch'
 import { resolveReviewScope, withReviewTransaction, type ReviewActor } from './authority'
 import { readDiffSnapshot, readStoredDiffFile } from './store'
@@ -55,7 +56,7 @@ export async function readReviewBoard(deps: DiffDependencies, actor: ReviewActor
     nextCursor: page.comments.length > 100 ? Buffer.from(JSON.stringify({ version: snapshot.revision.version, revision: page.revision,
       at: selected.at(-1)!.cursorTime, id: selected.at(-1)!.id })).toString('base64url') : null,
     permissions: { canComment: actor.credential.kind !== 'device', canSendToAgent: actor.userId === scope.identity.ownerId && actor.credential.kind === 'session',
-      canReadLive: actor.userId === scope.identity.ownerId && !scope.stopped && ['claimed', 'running', 'waiting'].includes(scope.status) } }
+      canReadLive: actor.userId === scope.identity.ownerId && !scope.stopped && LEASED_RUN_STATUSES.some(status => status === scope.status) } }
   })
 }
 
@@ -68,15 +69,6 @@ export async function mutateReview(deps: DiffDependencies, actor: ReviewActor, r
   const input = reviewMutation.parse(raw)
   const scope = await resolveReviewScope(deps.database, deps.membership, actor, runId, repoId)
   const snapshot = await readDiffSnapshot(deps.database, scope, snapshotId)
-  const masks = await Promise.all([
-    secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: scope.identity.ownerId }),
-    secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId }),
-  ])
-  const maskBody = (body: string) => {
-    const text = masks.reduce((text, mask) => mask(text), body)
-    if (text.length > 4000) throw new CodingWorkspaceError('workspace_limit_exceeded')
-    return text
-  }
   if (input.action === 'create') {
     if (input.anchor.snapshotId !== snapshotId || input.anchor.sourceVersion !== snapshot.revision.version)
       throw new WorkspaceReviewError('workspace_review_anchor_invalid')
@@ -92,6 +84,15 @@ export async function mutateReview(deps: DiffDependencies, actor: ReviewActor, r
     if (prior) {
       if (prior.fingerprint !== fingerprint) throw new WorkspaceReviewError('workspace_review_conflict')
       return prior.response
+    }
+    const masks = await Promise.all([
+      secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: fresh.identity.ownerId }),
+      secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId }),
+    ])
+    const maskBody = (body: string) => {
+      const text = masks.reduce((text, mask) => mask(text), body)
+      if (text.length > 4000) throw new CodingWorkspaceError('workspace_limit_exceeded')
+      return text
     }
     if (board.revision !== input.expectedRevision) throw new WorkspaceReviewError('workspace_review_conflict')
     const requests = await client.query<{ count: number }>('SELECT count(*)::int AS count FROM coding_workspace_review_receipts WHERE "boardId"=$1', [fresh.boardId])
@@ -150,6 +151,14 @@ export async function mutateReview(deps: DiffDependencies, actor: ReviewActor, r
     await client.query(`INSERT INTO coding_workspace_review_receipts ("boardId","userId","requestId",fingerprint,action,response)
       VALUES ($1,$2,$3,$4,$5,$6)`, [fresh.boardId, actor.userId, input.requestId, fingerprint, input.action, response])
     await runChanged(client, runId)
+    if (input.action === 'create' || input.action === 'reply' || input.action === 'edit') {
+      const currentMasks = await Promise.all([
+        secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: fresh.identity.ownerId }),
+        secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId }),
+      ])
+      if (masks.some((mask, index) => !mask.sourcePolicy || mask.sourcePolicy !== currentMasks[index]!.sourcePolicy))
+        throw new CodingWorkspaceError('workspace_path_unavailable')
+    }
     return response
   }, { signal })
 }

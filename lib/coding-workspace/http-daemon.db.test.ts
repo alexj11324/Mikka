@@ -6,7 +6,7 @@ import { createServer, IncomingMessage } from 'node:http'
 import { registerHooks } from 'node:module'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { Pool } from 'pg'
@@ -14,8 +14,8 @@ import { apiAliases } from '../../apps/api/compat-aliases.mjs'
 import type { ApiRoute } from '../../apps/api/src/routes'
 import { daemonStatusSchema, runAssignmentSchema } from '@mikka/protocol'
 import { remoteKey } from '@mikka/protocol/repository'
-import { runWorktreeIdentity, workspaceReadReceipt, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
-import { diffFilePage, diffFilePatch, reviewBoard, type ReviewMutation } from '@mikka/protocol/coding-workspace-review'
+import { WORKSPACE_ERROR_CODES, runWorktreeIdentity, workspaceReadReceipt, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
+import { WORKSPACE_REVIEW_ERROR_CODES, diffFilePage, diffFilePatch, reviewBoard, type ReviewMutation } from '@mikka/protocol/coding-workspace-review'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
@@ -69,6 +69,16 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
   const receipts: Array<{ requestId: string; status: number; body: WorkspaceReadReceipt }> = []
   const receiptEvents = new Map<string, PromiseWithResolvers<void>>()
   const firstReceipt = Promise.withResolvers<void>()
+  const safeErrorCodes = new Set<string>([...WORKSPACE_ERROR_CODES, ...WORKSPACE_REVIEW_ERROR_CODES, 'authRequired'])
+  const statusDiagnostic = async (response: Response) => {
+    let code: string | null = null
+    if (!response.ok) {
+      const body: unknown = await response.clone().json().catch(() => null)
+      if (body && typeof body === 'object' && 'code' in body && typeof body.code === 'string' && safeErrorCodes.has(body.code)) code = body.code
+    }
+    // Never print a source response, private proof, credential or raw error.
+    return JSON.stringify({ status: response.status, code, traffic })
+  }
   try {
     const migrations = new URL('../../drizzle/', import.meta.url)
     for (const name of orderMigrations((await readdir(migrations)).filter(name => name.endsWith('.sql'))))
@@ -145,17 +155,29 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
     const runId = randomUUID(), repoId = randomUUID(), deviceId = randomUUID(), tokenId = randomUUID(), agentId = randomUUID()
     const dataDir = join(root, 'daemon'), worktree = join(dataDir, 'worktrees', runId)
     const remote = `https://github.com/mikka-http-fixtures/${runId}.git`, repositoryKey = remoteKey(remote)
+    const { daemonPaths } = await import('../../packages/daemon/src/paths')
+    const { RepositoryCache } = await import('../../packages/daemon/src/repositories')
+    const { WorktreeManager } = await import('../../packages/daemon/src/worktrees')
+    const paths = daemonPaths(dataDir), repository = new RepositoryCache(paths.repos).pathFor(remote)
+    const seed = join(root, 'seed')
     const source = 'export const answer = 42\nexport const transport = "real HTTP and daemon"\n'
-    await mkdir(join(worktree, 'src'), { recursive: true })
-    await writeFile(join(worktree, 'src/example.ts'), source)
-    await writeFile(join(worktree, 'src/lazy.ts'), 'export const lazy = "base"\n')
+    await mkdir(join(seed, 'src'), { recursive: true })
+    await writeFile(join(seed, 'src/example.ts'), source)
+    await writeFile(join(seed, 'src/lazy.ts'), 'export const lazy = "base"\n')
+    await writeFile(join(seed, '.gitignore'), '.env\n')
+    await execute('git', ['init', '--initial-branch=main', seed])
+    await execute('git', ['-C', seed, 'add', '.'])
+    await execute('git', ['-C', seed, '-c', 'user.name=Mikka fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', 'commit', '-m', 'HTTP Files fixture'])
+    const headSha = (await execute('git', ['-C', seed, 'rev-parse', 'HEAD'])).stdout.trim()
+    // Diff resolves Git through the daemon-owned cache, never a source .git.
+    // Seed it locally without fetching the synthetic GitHub remote, then use
+    // the normal manager to register this Run's linked worktree.
+    await mkdir(dirname(repository), { recursive: true })
+    await execute('git', ['clone', '--no-hardlinks', '--no-checkout', seed, repository])
+    await execute('git', ['-C', repository, 'remote', 'set-url', 'origin', remote])
+    assert.equal(await new WorktreeManager(paths.worktrees, true).create(runId, repository, headSha), worktree)
+    assert.equal((await execute('git', ['-C', worktree, 'rev-parse', 'HEAD'])).stdout.trim(), headSha)
     await writeFile(join(worktree, '.env'), 'SYNTHETIC_PRIVATE=value\n')
-    await writeFile(join(worktree, '.gitignore'), '.env\n')
-    await execute('git', ['init', '--initial-branch=main', worktree])
-    await execute('git', ['-C', worktree, 'remote', 'add', 'origin', remote])
-    await execute('git', ['-C', worktree, 'add', '.'])
-    await execute('git', ['-C', worktree, '-c', 'user.name=Mikka fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', 'commit', '-m', 'HTTP Files fixture'])
-    const headSha = (await execute('git', ['-C', worktree, 'rev-parse', 'HEAD'])).stdout.trim()
     const { newDeviceToken, hashDeviceToken } = await import('../device-link')
     const credential = newDeviceToken()
     await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,harnesses) VALUES($1,$2,\'HTTP Files daemon\',\'local\',true,\'[]\')', [deviceId, owner])
@@ -168,8 +190,6 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
       VALUES($1,$2,$3,$4,$5,$6,$7,'succeeded',$8,now(),$9)`, [runId, owner, issueId, agentId, deviceId, repoId, tokenId, worktree,
       { executionIdentity: { workspaceId }, repositoryAdmission: { workspaceId, remoteKey: repositoryKey } }])
     const { RunJournal } = await import('../../packages/daemon/src/runs/journal')
-    const { daemonPaths } = await import('../../packages/daemon/src/paths')
-    const paths = daemonPaths(dataDir)
     await writeFile(paths.device, JSON.stringify({ credential, deviceId, workspaceId }), { mode: 0o600 })
     new RunJournal(paths.journal).put({
       assignment: runAssignmentSchema.parse({ runId, issueId, repoId, deviceId, remoteUrl: remote, baseBranch: 'main', harness: 'codex', prompt: 'Retained source fixture', kind: 'implement' }),
@@ -198,7 +218,13 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
     assert.equal(status.server, 'online', JSON.stringify(traffic))
     assert.equal(status.deviceId, deviceId)
     assert.deepEqual(status.harnesses, [])
-    assert.equal(new RunJournal(paths.journal).get(runId)?.state, 'succeeded')
+    const retainedRun = new RunJournal(paths.journal).get(runId)
+    assert.ok(retainedRun)
+    assert.equal(retainedRun.state, 'succeeded')
+    assert.equal(retainedRun.worktree, worktree)
+    assert.equal(retainedRun.baseCommit, headSha)
+    assert.equal((await execute('git', ['-C', worktree, 'rev-parse', 'HEAD'])).stdout.trim(), headSha, 'startup preserves the retained Run checkout')
+    assert.equal(await readFile(join(worktree, 'src/example.ts'), 'utf8'), source)
     const endpoint = `${origin}/mikka/api/runs/${runId}/workspace`
     const getIdentity = (token?: string, selectedWorkspace = workspaceId) => fetch(`${endpoint}/identity?${new URLSearchParams({ workspaceId: selectedWorkspace })}`, {
       headers: token ? { authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(20_000),
@@ -206,7 +232,7 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
     // A real client knows its Run, not the task VM's database repo binding.
     // Discover that binding through the authenticated API before Files/Mentions.
     const discovery = await getIdentity(ownerToken.token)
-    assert.equal(discovery.status, 200, JSON.stringify(traffic))
+    assert.equal(discovery.status, 200, await statusDiagnostic(discovery))
     assert.equal(discovery.headers.get('cache-control'), 'private, no-store')
     const discovered = await discovery.json()
     assert.equal(discovered.ok, true)
@@ -233,7 +259,7 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
 
     await t.test('a real GET traverses commands, daemon journal/filesystem, receipt and API response', async () => {
       const response = await getFile(ownerToken.token)
-      assert.equal(response.status, 200, JSON.stringify(traffic))
+      assert.equal(response.status, 200, await statusDiagnostic(response))
       assert.equal(response.headers.get('cache-control'), 'private, no-store')
       assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
       const body = await response.json()
@@ -300,7 +326,7 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
       await writeFile(join(worktree, 'src/lazy.ts'), 'export const lazy = "first observation"\n')
       const beforeCapture = deliveries.length
       const response = await getDiff(ownerToken.token)
-      assert.equal(response.status, 200, JSON.stringify(traffic))
+      assert.equal(response.status, 200, await statusDiagnostic(response))
       assert.equal(response.headers.get('cache-control'), 'private, no-store')
       assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
       const { ok, ...value } = await response.json()
@@ -321,7 +347,7 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
 
       const beforeFile = deliveries.length
       const fileResponse = await getDiffFile(snapshot.id, 'src/example.ts')
-      assert.equal(fileResponse.status, 200, JSON.stringify(traffic))
+      assert.equal(fileResponse.status, 200, await statusDiagnostic(fileResponse))
       const publicFile = await fileResponse.json()
       assert.equal(publicFile.ok, true)
       assert.doesNotMatch(JSON.stringify(publicFile), /"(?:base64|blobs)"/)
@@ -387,7 +413,7 @@ test('Files/Diff HTTP API → commands → full daemon → receipt → HTTP resp
       assert.equal(oldUncached.status, 409); assert.equal((await oldUncached.json()).code, 'workspace_version_conflict')
       assert.equal((await pool.query('SELECT patch FROM coding_workspace_snapshot_files WHERE "snapshotId"=$1 AND path=$2', [snapshot.id, 'src/lazy.ts'])).rows[0].patch, null)
       const freshResponse = await getDiff(ownerToken.token)
-      assert.equal(freshResponse.status, 200)
+      assert.equal(freshResponse.status, 200, await statusDiagnostic(freshResponse))
       const { ok: freshOK, ...freshValue } = await freshResponse.json()
       assert.equal(freshOK, true)
       const fresh = diffFilePage.parse(freshValue).snapshot

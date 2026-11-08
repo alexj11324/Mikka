@@ -23,7 +23,10 @@ moving its task to a Workspace cannot grant access to the old checkout.
 The device resolves the same Run from its persisted `RunJournal`. Its Run,
 repository, device and canonical origin must match. `bindingId` changes when
 the checkout, original token, machine sandbox or machine generation changes.
-Human session/PAT validity is checked again after a device round trip.
+Human session/PAT validity is checked again after a device round trip. Before
+returning successful source or mention metadata, a short WS-to-APP transaction
+holds the current workspace, membership, task, Run, credential and live device
+binding while refreshing the source policy and serializing the response.
 
 This layer consumes existing Repo and task authorization. Canonical
 Project/Environment and no-Team task authority remain owned by #1687/#1695;
@@ -183,6 +186,15 @@ all public metadata. A secret anywhere in a file rejects the observation,
 including requests for a seemingly harmless range. Secret values are never
 sent to the daemon for this check. Proofs remain in request memory and never
 enter the public response, database result, mention, logs or traces.
+
+The result and a private keyed fingerprint of the exact mask inputs/rules are
+stored together. Every successful receipt must still match the current policy
+when consumed and at the final response or message-commit boundary. A newly
+registered multiline secret can span omitted lines or separate selections, so
+masking only the returned fragments is insufficient: a changed or missing
+policy rejects the old observation and requires a new full-proof read. Derived
+mentions carry this evidence only in non-enumerable server-side properties;
+neither the fingerprint nor the private receipt identity is serialized.
 
 This protects the Files API. It does not claim that a privileged process on
 the same native machine cannot inspect native CLI/Git credentials; #1712 owns

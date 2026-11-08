@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { WORKSPACE_MAX_FILE_BYTES, WORKSPACE_MAX_RESPONSE_BYTES, visibleWorkspacePath, workspacePath, runWorktreeIdentity, workingSourceRevision, type RunWorktreeIdentity } from './coding-workspace-common'
+import { WORKSPACE_MAX_FILE_BYTES, WORKSPACE_MAX_RESPONSE_BYTES, visibleWorkspacePath, workspacePath, runWorktreeIdentity, sourceRevision, type RunWorktreeIdentity } from './coding-workspace-common'
 import { workspaceDiffReadRequest, workspaceDiffReadResult, workspaceDiffBlobProof } from './coding-workspace-review'
 export * from './coding-workspace-common'
 const sha = z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/)
@@ -50,7 +50,9 @@ export const workspaceEntry = z.strictObject({
 })
 export type WorkspaceEntry = z.infer<typeof workspaceEntry>
 const observation = {
-  ok: z.literal(true), identity: runWorktreeIdentity, revision: workingSourceRevision,
+  // Keep the v1 wire schema compatible. matchesWorkspaceResponse separately
+  // rejects a non-working receipt; checkpoint HEAD nullability is Diff-only.
+  ok: z.literal(true), identity: runWorktreeIdentity, revision: sourceRevision.extend({ headSha: sha }),
   observedAt: z.iso.datetime(), availability: z.literal('online'),
 }
 export const workspaceFileResult = z.strictObject({ ...observation, kind: z.literal('file'), path: workspacePath, size: z.number().int().nonnegative(),
