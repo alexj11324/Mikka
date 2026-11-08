@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { randomBytes } from 'node:crypto'
 import test from 'node:test'
 import { gzipSync } from 'node:zlib'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
@@ -8,17 +9,23 @@ import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER } from '@mikka/protocol/subscriptio
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { POLICY_SNAPSHOT_HEADER } from '@mikka/protocol/policy-snapshot'
+import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 import { policyDistributionContext } from '../lib/agent-tool-approval/policy-distribution'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { POST } from '../app/v1/devices/[deviceId]/runs/[runId]/claim/route'
 import { overrideDeploymentSwitch } from '../lib/deployment-switches'
+import { BASE_PATH } from '../lib/base-path'
+import { appOrigin } from '../lib/mcp/resource'
 import { AgentProfileAdmissionError } from '../lib/factory/profile-admission'
 import { AgentProfileError } from '../lib/factory/agent-profile-definition'
+import { openEgressCapability, EGRESS_CAPABILITY_TTL_MS } from '../lib/secrets/egress-capability'
+import type { TaskSecretInjection } from '../lib/secrets/runtime'
+import type { ExecutionIdentity } from '../lib/execution-identity'
 
 function fixture() {
   const repository = normalizeRepository('https://github.com/synthetic/claim-fixture.git')
   const probe = {
-    run: { id:'run',userId:'member',issueId:'issue',agentId:'agent',deviceId:'device',deviceRepoId:'repo',status:'queued',prompt:'private claim instructions',kind:'implement',retryOf:null as string|null,stopReason:null as string|null,stopRequestedAt:null as Date|null,leaseExpiresAt:null as Date|null },
+    run: { id:'run',userId:'member',issueId:'issue',agentId:'agent',deviceId:'device',deviceRepoId:'repo',botId:null,attempt:1,status:'queued',prompt:'private claim instructions',kind:'implement',retryOf:null as string|null,stopReason:null as string|null,stopRequestedAt:null as Date|null,leaseExpiresAt:null as Date|null },
     issue: {id:'issue',userId:'owner',scope:'workspace',content:{type:'doc'}},
     device: {id:'device',ownerId:'member',enabled:true,kind:'local',protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]},
     agent: {id:'agent',userId:'member',deviceId:'device',harness:'codex'},
@@ -37,6 +44,13 @@ function fixture() {
     issueAccessError: undefined as Error | undefined,
     credentialCapability: false,
     catalogueCapability: false,
+    secretCapability: undefined as string | undefined,
+    secretInjection: undefined as Partial<TaskSecretInjection> | undefined,
+    secretSnapshot: undefined as string | undefined,
+    secretReads: [] as unknown[][],
+    secretSnapshotReads: [] as unknown[][],
+    membershipReads: [] as unknown[][],
+    workspaceMemberAllowed: true,
     nativeLeaseCapabilities: [] as boolean[],
     credentialOwners: [] as string[],
     credentialFailure: undefined as Error | undefined,
@@ -45,8 +59,8 @@ function fixture() {
   Object.assign(globalThis,{claimResponseProbe:probe})
   return probe
 }
-async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings']) {
-  try { return await POST(new Request('http://127.0.0.1/mikka/v1/devices/device/runs/run/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
+async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','secrets','publication','claim','skill-claim','benchmark-claim','token','settings']) {
+  try { return await POST(new Request('http://127.0.0.1/mikka/v1/devices/device/runs/run/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {}),...(probe.secretCapability ? {[TASK_SECRETS_HEADER]:probe.secretCapability} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
     // Trace the intended gate: an unrelated failed prerequisite must not
     // masquerade as a successful lineage, scope or lease rejection.
@@ -122,7 +136,7 @@ test('native claims check both stored Bot and task workspace model limits before
 test('ordinary retries retain the normal claim path after question lineage validation',async()=>{
   const probe=fixture();probe.run.retryOf='ordinary-parent'
   probe.checkpoint=validCheckpoint()
-  const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
+  const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','secrets','publication','claim','skill-claim','benchmark-claim','token','settings'])
   assert.equal(response.status,200)
   assert.equal(probe.run.status,'preparing')
   assert.equal((await response.json()).continuesRunId,'ordinary-parent')
@@ -135,7 +149,7 @@ test('every github.com run of a connected owner gets the owner credential endpoi
     if (variant === 'plan') probe.run.kind = 'plan'
     if (variant === 'readOnly') Object.assign(probe.run, { agentDefinition: { readOnly: true } })
     probe.cliPolicy.policy.permissions.git_push = 'deny' as never
-    const response = await claim(probe, variant === 'readOnly' ? ['skill-preflight','policy','claim','skill-claim','benchmark-claim','token','settings'] : undefined)
+    const response = await claim(probe, variant === 'readOnly' ? ['skill-preflight','policy','secrets','claim','skill-claim','benchmark-claim','token','settings'] : undefined)
     assert.equal(response.status, 200, variant)
     const body = await response.json()
     assert.ok(body.mcp, JSON.stringify(Object.keys(body)))
@@ -166,7 +180,11 @@ test('a capable daemon receives the owner GitHub credential once even without op
     const body = await response.json()
     assert.equal(body.github.token, 'fixture-claim-github-token')
     assert.equal(body.github.expiresAt, '2030-01-01T00:00:00.000Z')
-    assert.equal(body.github.endpoint, 'http://127.0.0.1/api/runs/github-token')
+    assert.equal(Boolean(body.mcp), !tokenError)
+    // Successful MCP provisioning uses the configured application origin;
+    // an unavailable MCP token leaves GitHub refresh on the request origin.
+    const refreshOrigin = tokenError ? 'http://127.0.0.1' : appOrigin ?? 'http://127.0.0.1'
+    assert.equal(body.github.endpoint, `${refreshOrigin}${BASE_PATH}/api/runs/github-token`)
     assert.deepEqual(probe.credentialOwners, ['member'])
     assert.equal((probe.run as typeof probe.run & { machineAuthority: boolean }).machineAuthority, true)
   }
@@ -215,7 +233,7 @@ test('legacy retries of the same Agent retain their session only on the same dev
     const probe=fixture();probe.run.retryOf='lost-parent'
     probe.checkpoint=validCheckpoint()
     probe.lost={deviceId:sameDevice ? 'device' : 'old-device',sessionId:'old-machine-session',agentId:'agent',agentDefinition:null}
-    const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
+    const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','secrets','publication','claim','skill-claim','benchmark-claim','token','settings'])
     assert.equal(response.status,200)
     const body=await response.json()
     assert.equal(body.continuesRunId,'lost-parent')
@@ -230,7 +248,7 @@ test('strict legacy same-Agent continuation can use its original worktree withou
     const probe=fixture();probe.run.retryOf='lost-parent';probe.strictRecovery=true
     probe.lost={deviceId:'device',sessionId:'original-session',agentId:'agent',agentDefinition:null}
     if(snapshot!=='missing')probe.checkpoint={...validCheckpoint(),...(snapshot==='stale' ? {takenAt:new Date(Date.now()-31*60_000).toISOString()} : {unavailableReason:'too_large' as const})}
-    const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
+    const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','secrets','publication','claim','skill-claim','benchmark-claim','token','settings'])
     assert.equal(response.status,200)
     const body=await response.json()
     assert.equal(body.requireWorktreeContinuation,true)
@@ -250,7 +268,7 @@ test('frozen retry harnesses take precedence and an unrecorded different Agent c
   ]) {
     const probe=fixture();probe.run.retryOf='lost-parent';probe.checkpoint=validCheckpoint()
     probe.lost={deviceId:'device',sessionId:'source-session',agentId:source.agentId,agentDefinition:source.agentDefinition}
-    const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
+    const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','secrets','publication','claim','skill-claim','benchmark-claim','token','settings'])
     assert.equal(response.status,200)
     const body=await response.json()
     assert.equal(body.harness,'codex')
@@ -461,7 +479,7 @@ test('platform cloud claims inject the configured secret assignment with BYO off
       assert.deepEqual(body.taskEnv,configured ? injection.env : undefined)
       assert.deepEqual(body.taskSecretNames,configured ? injection.secretNames : undefined)
       // The run owner's own secrets join the workspace's (decision 2026-11-02-2120): the claim passes run.userId.
-      assert.deepEqual((probe as typeof probe & {secretReads:unknown[][]}).secretReads.map(args=>[args[0],args[1],args[4]]),[['ws',probe.repo.remoteUrl,probe.run.userId]])
+      assert.deepEqual((probe as typeof probe & {secretReads:unknown[][]}).secretReads.map(args=>[args[0],args[1],args[4]]),[['ws','synthetic/claim-fixture',probe.run.userId]])
     }
     for(const denial of ['authentication','device-scope','workspace-scope'] as const) {
       const probe=fixture()
@@ -516,7 +534,7 @@ test('Profile model, source or version changes keep ancestry but start a fresh n
       target.subscription.modelId = target.model
       Object.assign(probe, { cloud: { subscription: { id: target.subscription.bindingId, modelId: target.model, route: target.subscription.route, consumerId: 'agent', workspaceId: 'ws' } } })
       probe.device.harnesses = [{ harness: target.harness, installed: true, toolApproval: true, subscriptionBroker: true } as typeof probe.device.harnesses[number]]
-      const preparation = ['skill-preflight','policy','model-admission','publication','claim','skill-claim','benchmark-claim','token','settings']
+      const preparation = ['skill-preflight','policy','model-admission','secrets','publication','claim','skill-claim','benchmark-claim','token','settings']
       if (lineage === 'retry') preparation.unshift('question-retry','checkpoint')
       const response = await claim(probe, preparation)
       assert.equal(response.status, 200, `${lineage}:${change}`)
@@ -540,7 +558,7 @@ test('Profile claim rejection preserves its cause and safe diagnostic while fenc
     Object.assign(probe, { claimError: error, ...(concurrentClaim ? { beforeUpdate: async () => {
       probe.run.status = 'preparing'; probe.run.leaseExpiresAt = new Date(Date.now() + 30_000)
     } } : {}) })
-    const response = await claim(probe, ['skill-preflight', 'policy', 'publication', 'claim-rejected'])
+    const response = await claim(probe, ['skill-preflight', 'policy', 'secrets','publication', 'claim-rejected'])
     assert.equal(response.status, 409)
     const body = await response.json()
     assert.equal(body.code, 'agentProfileUnavailable')
@@ -558,4 +576,159 @@ test('Profile claim rejection preserves its cause and safe diagnostic while fenc
     for (const field of ['prompt', 'mcp', 'skills', 'skillReceipt', 'modelCredential']) assert.equal(Object.hasOwn(body, field), false)
   }
   assert.equal(lines.length, 2)
+})
+
+const preparedClaim = ['skill-preflight', 'policy', 'secrets', 'publication', 'claim', 'skill-claim', 'benchmark-claim', 'token', 'settings']
+const preparedCloudClaim = ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token', 'settings']
+
+function protectedFixture() {
+  const probe = fixture()
+  const canary = `synthetic-claim-canary-${randomBytes(24).toString('hex')}`
+  const secret = {
+    id: 'protected-secret', revision: 'a'.repeat(64), name: 'VENDOR_KEY', kind: 'secret' as const, value: canary,
+    delivery: { mode: 'protected' as const, http: { origin: 'https://api.example.com', header: 'authorization' as const,
+      prefix: 'Bearer ', rules: [{ method: 'POST' as const, path: '/v1/messages', match: 'exact' as const }] } },
+  }
+  probe.secretCapability = TASK_SECRETS_VERSION
+  probe.secretInjection = { env: { TASK_REGION: 'fixture' }, secretNames: [], protectedSecrets: [secret], unavailable: [], snapshot: 'a'.repeat(64) }
+  return { probe, canary, secret }
+}
+
+function localExecutionIdentity(workspaceId: string): ExecutionIdentity {
+  return { version: 1, requester: 'member', botId: null, botOwner: null, executionPrincipal: 'member', workspaceId,
+    outputOwner: 'member', resourceBindings: [{ kind: 'device', id: 'device', ownerId: 'member', access: 'owner' }],
+    billingAccount: { model: { kind: 'native_login', ownerId: 'member', resourceId: 'device', amount: 'provider_unknown' },
+      runtime: { kind: 'local_device', ownerId: 'member', resourceId: 'device', amount: 'not_applicable' } },
+    personalResourcePolicy: 'requester_only' }
+}
+
+test('the actual claim response carries an opaque sealed task grant bound to the locked run', async t => {
+  const saved = process.env.WORKSPACE_SECRETS_KEY
+  process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+  t.after(() => { if (saved === undefined) delete process.env.WORKSPACE_SECRETS_KEY; else process.env.WORKSPACE_SECRETS_KEY = saved })
+  const { probe, canary, secret } = protectedFixture()
+  const response = await claim(probe, [...preparedClaim, 'secret-snapshot'])
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('cache-control'), 'private, no-store')
+  const wire = await response.text(), body = JSON.parse(wire)
+  for (const form of [canary, Buffer.from(canary).toString('base64')]) assert.equal(wire.includes(form), false)
+  assert.deepEqual(body.taskEnv, { TASK_REGION: 'fixture' })
+  assert.equal(body.taskSecretNames, undefined)
+  assert.equal(body.modelCredential, undefined)
+  assert.equal(body.subscriptionLease, undefined)
+  assert.equal(body.taskSecrets.endpoint, 'http://127.0.0.1/v1/task-secrets/run')
+  assert.deepEqual(body.taskSecrets.unavailable, [])
+  assert.equal(body.taskSecrets.grants.length, 1)
+  const grant = body.taskSecrets.grants[0]
+  assert.deepEqual(Object.keys(grant).sort(), ['capability', 'expiresAt', 'name', 'origin'])
+  const binding = { ownerId: 'member', workspaceId: null, repository: 'synthetic/claim-fixture', runId: 'run', deviceId: 'device', deviceTokenId: 'synthetic-device-token', attempt: 1 }
+  const opened = openEgressCapability(grant.capability, binding)
+  assert.equal(opened.secret, canary)
+  assert.equal(opened.secretId, secret.id)
+  assert.equal(opened.revision, secret.revision)
+  assert.deepEqual(opened.http, secret.delivery.http)
+  assert.ok(opened.expiresAt - opened.issuedAt <= EGRESS_CAPABILITY_TTL_MS)
+  assert.ok(opened.expiresAt <= new Date(probe.run.leaseExpiresAt!).getTime())
+  for (const mismatch of [{ ownerId: 'other' }, { workspaceId: 'other' }, { repository: 'other/repo' }, { runId: 'other' },
+    { deviceId: 'other' }, { deviceTokenId: 'other' }, { attempt: 2 }]) {
+    assert.throws(() => openEgressCapability(grant.capability, { ...binding, ...mismatch }), { code: 'task_secret_unavailable', detail: 'binding_mismatch' })
+  }
+  assert.deepEqual(probe.locks, ['issues', 'agent_runs'])
+  assert.deepEqual(probe.secretReads.map(args => [args[0], args[1], args[4]]), [[null, 'synthetic/claim-fixture', 'member']])
+  assert.deepEqual(probe.secretSnapshotReads.map(args => args.slice(0, 3)), [[null, 'synthetic/claim-fixture', 'member']])
+  assert.equal(typeof (probe.secretSnapshotReads[0][3] as { select: unknown }).select, 'function')
+})
+
+test('protected and unconfigured secrets refuse old daemons before lease, publication or credentials', async () => {
+  for (const capability of [undefined, '2']) for (const unconfigured of [false, true]) {
+    const { probe, canary } = protectedFixture()
+    probe.secretCapability = capability
+    if (unconfigured) probe.secretInjection = { env: {}, secretNames: [], protectedSecrets: [], unavailable: ['VENDOR_KEY'] }
+    const response = await claim(probe, ['skill-preflight', 'policy', 'secrets', 'daemon-upgrade'])
+    assert.equal(response.status, 409)
+    const wire = await response.text(), body = JSON.parse(wire)
+    assert.equal(body.code, 'daemonUpgradeRequired')
+    assert.equal(wire.includes(canary), false)
+    assert.equal(body.taskSecrets, undefined)
+    assert.equal(body.taskEnv, undefined)
+    assert.equal(probe.run.leaseExpiresAt, null)
+    assert.equal(probe.run.status, 'failed')
+    assert.deepEqual(probe.credentialOwners, [])
+    assert.deepEqual(probe.secretSnapshotReads, [])
+  }
+})
+
+test('final response authorization rejects changed secret metadata, repository, attempt and device token', async t => {
+  const saved = process.env.WORKSPACE_SECRETS_KEY
+  process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+  t.after(() => { if (saved === undefined) delete process.env.WORKSPACE_SECRETS_KEY; else process.env.WORKSPACE_SECRETS_KEY = saved })
+  for (const change of ['revision', 'repository', 'attempt', 'device-token'] as const) {
+    const { probe, canary } = protectedFixture()
+    probe.credentialCapability = true
+    probe.beforeToken = async () => {
+      if (change === 'revision') probe.secretSnapshot = 'b'.repeat(64)
+      if (change === 'repository') probe.repo.remoteUrl = 'https://github.com/other/repository.git'
+      if (change === 'attempt') probe.run.attempt++
+      if (change === 'device-token') Object.assign(probe.run, { deviceTokenId: 'rotated-device-token' })
+    }
+    const response = await claim(probe, [...preparedClaim, ...(change === 'revision' ? ['secret-snapshot'] : [])])
+    assert.equal(response.status, 409, change)
+    const wire = await response.text()
+    for (const value of [canary, 'mikka-egress-v1.', 'fixture-claim-github-token', probe.run.prompt]) assert.equal(wire.includes(value), false, change)
+    assert.deepEqual(probe.locks, ['issues', 'agent_runs'])
+    assert.deepEqual(probe.credentialOwners, ['member'])
+    assert.equal(probe.secretSnapshotReads.length, change === 'revision' ? 1 : 0)
+  }
+})
+
+test('a changed valid frozen workspace identity cannot release a grant prepared for the earlier workspace', async t => {
+  const saved = process.env.WORKSPACE_SECRETS_KEY
+  process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+  t.after(() => { if (saved === undefined) delete process.env.WORKSPACE_SECRETS_KEY; else process.env.WORKSPACE_SECRETS_KEY = saved })
+  for (const changed of [false, true]) {
+    const { probe, canary } = protectedFixture()
+    Object.assign(probe.run, { agentDefinition: { harness: 'codex', executionIdentity: localExecutionIdentity('initial-workspace') } })
+    probe.beforeToken = async () => {
+      if (changed) Object.assign(probe.run, { agentDefinition: { harness: 'codex', executionIdentity: localExecutionIdentity('other-workspace') } })
+    }
+    const response = await claim(probe, [...preparedClaim, ...(changed ? [] : ['secret-snapshot'])])
+    assert.equal(response.status, changed ? 409 : 200)
+    const wire = await response.text()
+    assert.equal(wire.includes(canary), false)
+    assert.deepEqual(probe.membershipReads, [[changed ? 'other-workspace' : 'initial-workspace', ['member']]], 'real execution identity revalidation reaches the valid workspace before the secret fence')
+    if (changed) assert.equal(wire.includes('mikka-egress-v1.'), false)
+    else assert.equal(openEgressCapability(JSON.parse(wire).taskSecrets.grants[0].capability).workspaceId, 'initial-workspace')
+    assert.deepEqual(probe.secretReads.map(args => args[0]), ['initial-workspace'])
+  }
+})
+
+test('cloud protected grants preserve native subscription and GitHub credentials, and revoked membership fences all three', async t => {
+  const keys = ['MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_BYOS_ENABLED', 'MIKKA_BYO_E2B_KEY', 'WORKSPACE_SECRETS_KEY'] as const
+  const saved = keys.map(key => process.env[key])
+  Object.assign(process.env, { MIKKA_CLOUD_COMPUTER_TASKS: '1', MIKKA_BYOS_ENABLED: '1', MIKKA_BYO_E2B_KEY: '0', WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') })
+  t.after(() => keys.forEach((key, index) => { if (saved[index] === undefined) delete process.env[key]; else process.env[key] = saved[index] }))
+  for (const revoked of [false, true]) {
+    const { probe, canary } = protectedFixture()
+    probe.credentialCapability = true
+    const nativeLease = { route: 'codex_cli', modelId: 'gpt-6-luna', revision: 1, accountId: 'fixture-account', accessToken: 'fixture-native-access', expiresAt: '2030-01-01T00:00:00.000Z' }
+    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: 'ws' },
+      cloud: { subscription: { id: 'binding', workspaceId: 'ws', route: 'codex_cli', modelId: 'gpt-6-luna' } } })
+    Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, subscriptionBroker: true }] })
+    probe.beforeToken = async () => { if (revoked) probe.workspaceMemberAllowed = false }
+    const response = await claim(probe, [...preparedCloudClaim, ...(revoked ? [] : ['secret-snapshot'])])
+    assert.equal(response.status, revoked ? 409 : 200)
+    const wire = await response.text(), body = JSON.parse(wire)
+    assert.equal(wire.includes(canary), false)
+    assert.deepEqual(probe.membershipReads, [['ws', ['member']]])
+    assert.deepEqual(probe.nativeLeaseCapabilities, [false])
+    assert.deepEqual(probe.credentialOwners, ['member'])
+    if (revoked) {
+      for (const value of ['mikka-egress-v1.', nativeLease.accessToken, 'fixture-claim-github-token', probe.run.prompt]) assert.equal(wire.includes(value), false)
+    } else {
+      assert.deepEqual(body.subscriptionLease, nativeLease)
+      assert.equal(body.github.token, 'fixture-claim-github-token')
+      assert.equal(openEgressCapability(body.taskSecrets.grants[0].capability).workspaceId, 'ws')
+      assert.deepEqual(body.taskEnv, { TASK_REGION: 'fixture' })
+    }
+  }
 })

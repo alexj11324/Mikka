@@ -7,15 +7,17 @@ import { issueTeamAccess } from '@/lib/issue-team-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 
 type Run = typeof agentRuns.$inferSelect
+type ClaimTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+type ResourceFence = (run: Run, tx: ClaimTransaction) => Promise<boolean>
 
 /** Authorize the response after all asynchronous claim preparation. Retirement
  * uses the same issue -> run locks. Building the response synchronously here
  * gives it an authorization point before retirement, or refuses it afterwards.
  * Bytes already handed to the transport cannot be recalled. No provider IO or
  * additional database work belongs in the response builder. */
-export async function authorizedClaimResponse(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response): Promise<Response | null> {
+export async function authorizedClaimResponse(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response, authorizeResources?: ResourceFence): Promise<Response | null> {
   for (let attempt = 0; ; attempt++) {
-    try { return await claimResponseTransaction(userId, hint, leaseExpiresAt, respond) }
+    try { return await claimResponseTransaction(userId, hint, leaseExpiresAt, respond, authorizeResources) }
     catch (error) {
       const cause = error instanceof Error && error.cause ? error.cause : error
       const code = cause && typeof cause === 'object' && 'code' in cause ? cause.code : null
@@ -26,7 +28,7 @@ export async function authorizedClaimResponse(userId: string, hint: Pick<Run, 'i
   }
 }
 
-async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response) {
+async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response, authorizeResources?: ResourceFence) {
   return db.transaction(async tx => {
     if (!hint.issueId) return null
     const [issue] = await tx.select().from(issues).where(eq(issues.id, hint.issueId)).for('update')
@@ -41,6 +43,7 @@ async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | '
     if (issue.userId !== userId && (issue.scope !== 'workspace' || !(await issueTeamAccess(issue.id, userId)).allowed)) return null
     try { await revalidateExecutionIdentity(pool, run) }
     catch (error) { if (error instanceof ExecutionIdentityError) return null; throw error }
+    if (authorizeResources && !await authorizeResources(run, tx)) return null
     return respond(run)
   })
 }
