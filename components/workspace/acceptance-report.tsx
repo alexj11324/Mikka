@@ -115,7 +115,8 @@ export function AcceptanceReport({ artifactId, issueId, runId, detail, flow, res
       </Row>}
     </section>
     {(ready || summary) && <section aria-label={t('changes')} className="flex flex-col gap-4">{changesHeader}{summary}{fileList}</section>}
-    {media.length > 0 && <section aria-label={t('evidence')} className="flex flex-col gap-4">
+    {/* Every capture is shown here once: the report's text below embeds the same ones, and steps them aside (ArtifactDocument). */}
+    {media.length > 0 && <section aria-label={t('evidence')} data-slot="report-evidence" className="flex flex-col gap-4">
       <h3 className="text-md font-semibold">{t('evidence')}</h3>
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">{media.map(item => <li key={item.captureId} className="relative">
         <Button variant="ghost" className="h-auto w-full overflow-hidden rounded-xl bg-muted p-0" aria-label={item.title} onClick={() => setViewing(item)}>
