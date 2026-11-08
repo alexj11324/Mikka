@@ -1,6 +1,6 @@
 // Drawing primitives shared by the README diagrams (generate-diagrams.mjs):
 // square boxes, diamonds, blue flow tags, orthogonal lines and open chevrons.
-// Solid shapes are shipped; dashed ones are on the roadmap.
+// Solid shapes are implemented source flows; dashed ones are conditional.
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -70,7 +70,7 @@ export function chevron(x, y, direction, p) {
   return [`<path d="${d}" fill="none" stroke="${p.ink}" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"/>`]
 }
 
-/** The shipped/planned key along the bottom edge. `t` carries the four legend labels. */
+/** Source-flow and conditional-flow key. `t` carries the four legend labels. */
 export function legend(y, t, p) {
   const flowX = Math.round(352 + textWidth(t.lFlow) + 36)
   return [
@@ -84,8 +84,8 @@ export function legend(y, t, p) {
 }
 
 export const LEGEND_TEXT = {
-  en: { lShipped: 'Shipped', lPlanned: 'Pending', lFlow: 'Data flow', lPlannedFlow: 'Pending flow' },
-  zh: { lShipped: '已上线', lPlanned: '待完成', lFlow: '数据流', lPlannedFlow: '待完成的数据流' },
+  en: { lShipped: 'Implemented', lPlanned: 'Conditional', lFlow: 'Data flow', lPlannedFlow: 'Conditional flow' },
+  zh: { lShipped: '已实现', lPlanned: '按条件启用', lFlow: '数据流', lPlannedFlow: '按条件启用的数据流' },
 }
 
 /** Each file paints its own background, so the dark variant stays readable on a light page and vice versa. */

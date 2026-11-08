@@ -222,8 +222,18 @@ In the PostHog app: **Tracing** (`https://us.posthog.com/tracing`), filter
 service `mikka-web`, then by attribute, for example `mikka.client_kind = daemon`
 or `mikka.route = /v1/devices/[deviceId]/commands`.
 
-From an agent, the PostHog MCP tool `query-apm-spans`. Use `flatSpans: true` to
-get the database spans themselves rather than their traces:
+For Agent queries and operations, use `posthog-cli api`. Before the first
+PostHog command in a session, read its full `--agent-help` output, then list
+skills and install/read the matching skill as `AGENTS.md` requires.
+
+```sh
+posthog-cli api --agent-help
+posthog-cli api skill list
+```
+
+Use the installed guide's schema-discovery steps to find `query-apm-spans`.
+`flatSpans: true` returns database spans directly. The following is a query
+payload to validate against the discovered CLI schema.
 
 ```json
 { "query": { "serviceNames": ["mikka-web"], "flatSpans": true, "dateRange": { "date_from": "-6h" },
@@ -231,8 +241,8 @@ get the database spans themselves rather than their traces:
                   { "key": "db.operation", "operator": "is_set", "type": "span_attribute" }] } }
 ```
 
-`apm-attributes-list` and `apm-attribute-values-list` list the attribute keys
-and values; `apm-trace-get` returns one trace's tree. Counts now mix full
+Discover `apm-attributes-list` and `apm-attribute-values-list` for attribute
+keys/values, and `apm-trace-get` for one trace's tree through the same CLI. Counts now mix full
 retention and sampling. Estimate totals with each span's
 `1 / mikka.trace.sample_rate`, not a single global multiplier; historical
 records without that field use the previous 0.1 rate.
@@ -452,21 +462,19 @@ and the alerts; the SQL is in `scripts/ops/posthog/`. It finds each object by
 its production id, else its `key:<name>` tag, else its exact name, and
 changes only what differs, so running it twice changes nothing.
 
-```sh
-# POSTHOG_PERSONAL_API_KEY: a personal API key (phx_…) with insight, dashboard
-# and alert write access, kept in Infisical prod:/platform; never in a file.
-infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs           # plan, read-only
-infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs --check   # exit 1 on drift
-infisical run --env=prod --path=/platform -- node scripts/ops/posthog-observability.mjs --apply
-```
-
-Edit the definitions or SQL in a PR, then apply once it merges. A change made
-in the PostHog app shows as drift in the next `--check`; copy it back into the
-repository or it is overwritten on the next `--apply`.
+Edit definitions or SQL through a PR. Run operational reads and writes through
+`posthog-cli api`, following the discovered guide and matching task skill.
+Preserve the definition manager's object IDs, tag/name resolution and
+change-only comparison. `scripts/ops/posthog-observability.mjs` still contains
+a direct REST client using `POSTHOG_PERSONAL_API_KEY`; its existence does not
+establish that the CLI-only operating requirement has been implemented in that
+script. Cloud credentials arrive through existing workload delivery. On Alex's
+Mac, follow `~/.codex/rules/infisical-api.md` for the signed authentication
+helper and direct Infisical HTTPS API.
 
 Validate the error-spike classifier with `node scripts/ops/posthog-alert-acceptance.mjs`.
 It runs one synthetic read-only query through the authenticated PostHog CLI in
-project 670821. `--query-only` prints the exact packet for review or MCP use.
+project 670821. `--query-only` prints the exact packet for review through the CLI.
 The 64 cases exercise the actual HogQL CTEs, including continuous/linked delivery,
 non-root entries, the single queue hop, wake/cron/nudge handling, missing or
 conflicting proof, unrelated failures and duplicate physical span rows. The
@@ -754,7 +762,7 @@ current billing period, and **73 MB** of traces on 2026-11-05. AI events and
 recordings were zero before the new instrumentation. Billing usage can lag
 ingestion; a single observed day is not a peak-capacity forecast.
 
-| Product | Current published allowance and first paid tier |
+| Product | Published allowance and first paid tier recorded on 2026-11-06 |
 | --- | --- |
 | Logs + Tracing, shared ingestion | 10 GB/month free; $0.25/GB from 10–300 GB, then $0.15/GB |
 | Retention | 14 days standard; custom retention $0.05/GB per month retained |
@@ -789,8 +797,9 @@ changes in workload or tail-retained error/slow traffic.
   browser sessions/day, Replay is **3,000/month**. These planning volumes
   remain below their respective allowances, but are not measured demand.
 
-Recheck the observed bytes, AI events and recordings after production acceptance
-with `billing-usage-get` and `billing-overview-get`. Do not apply the tracing
+Recheck the observed bytes, AI events, recordings and actual plan after
+production acceptance through the CLI-discovered `billing-usage-get` and
+`billing-overview-get` operations. Do not apply the tracing
 multiplier to AI-event or Replay pricing.
 
 ### Repeatable production acceptance
@@ -808,9 +817,12 @@ version during its run; that check alone does not prove the worker release.
 
 Start with `mode=preflight`. For an actual task, `mode=execute` uses the existing
 Infisical production acceptance account and its own official Claude Haiku 5.5
-or Codex GPT-6 Luna subscription. It verifies the account's unique personal
-workspace through the normal workspace API and, when necessary, switches only
-its own newly authenticated session before selecting the Coordinator. Each model
+or Codex GPT-6 Luna subscription. The retained
+`scripts/acceptance/run-observability.mjs` driver selects the account's unique
+personal workspace through the normal API and switches its own new session
+when required. That is a driver limitation against the shared **Acme Inc.**
+acceptance requirement in [acceptance.md](../acceptance.md). A personal-workspace
+result cannot establish shared-team acceptance. Each model
 case is independent and submits once per revision. The driver verifies native execution identity, the current
 Factory flow's independent checks, exact Artifact bytes and the formal
 deliverable acceptance receipt. Factory v2 uses execute/review; historical

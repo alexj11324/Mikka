@@ -5,6 +5,16 @@ transport. Credentials stay in the GitHub Actions runner. It creates no tokens,
 logs into no model provider, changes no workflow and makes no direct database
 writes.
 
+## Retained driver scope
+
+This driver retains `ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD` inputs and an
+admin-owned personal-workspace preflight. Current production acceptance uses
+the shared SMOKE account in the Acme Inc. workspace under
+[the acceptance guide](../../docs/acceptance.md#shared-production-acceptance-workspace).
+Reconcile that identity and workspace requirement before executing this retained
+driver. Its receipts prove only its selected legacy scope. The driver
+implementation has not been migrated to the shared-team fixture.
+
 ## Commands
 
 Node 24 is sufficient for the driver and manual-browser helper; no package

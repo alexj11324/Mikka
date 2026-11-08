@@ -1,11 +1,28 @@
 # Controlled Skill improvement: live completion plan
 
+This is the historical completion plan for the #316 composition. Its unchecked
+work list is not a current implementation inventory. The repository contains
+candidate generation requests (`regression.ts`, `factory-bridge.ts`), immutable
+registration (`registry.ts`), frozen execution comparison (`evaluations.ts`,
+`comparison-collector.ts`) and Factory activation/monitoring (`activation.ts`,
+`lib/factory/monitor-probe.ts`). Paths are under `lib/self-improvement/` unless
+qualified. Read [self-improvement.md](self-improvement.md) for the source map.
+
+For a new run, follow [acceptance.md](../acceptance.md) and `AGENTS.md`. Model
+acceptance covers official Claude Code with `claude-haiku-5-5` and official Codex
+with `gpt-6-luna`, independently. The shared acceptance account and its authorized
+team workspace supply the production identity. API-key/DeepSeek work is outside
+the merge and acceptance gates. UI evidence comes from production-build
+screenshots in cloud Linux. Production checks cover the external subscription,
+activation and other service behavior that local evidence cannot establish.
+The historical checklist below does not establish a completed live result.
+
 > Note (2026-11-03): the fixed trigger of 25 distinct failures or a seven-day-old
 > failure named below was later replaced by the Decision API's `propose` answer
 > (`lib/self-improvement/proposal-judgment.ts`,
 > [decision 2026-11-01-1500](decisions/2026-11-01-1500-self-improvement-and-profile-decided-by-decision-api.md)).
 
-Status: implementation in progress. User direction, 2026-10-26: repair the failed
+Recorded status on 2026-10-26: implementation in progress. User direction: repair the failed
 acceptance requirements until the complete feature passes. This extends the
 earlier synthetic rehearsal; it does not relabel that rehearsal as acceptance.
 Tracking: #237; composed delivery PR #316; source PRs #238/#247.
@@ -41,10 +58,12 @@ approved active selection; historical provenance remains readable after withdraw
 
 ## Host cost configuration
 
-`MIKKA_SKILL_MODEL_EVALUATION=1` explicitly enables the existing paid semantic
-comparison in the production evaluator. With the variable absent or any value
-other than `1`, a valid comparison remains pending with
-`decision_model_disabled`; no semantic-judgment model is called. This replaces
+The `skillModelEvaluation` deployment switch controls paid semantic comparison
+(`lib/deployment-switches.ts`, `registered-evaluation.ts`). Its PostHog gate is
+`mikka-skill-model-evaluation`; `MIKKA_SKILL_MODEL_EVALUATION=1` is the legacy
+fallback when that gate has no answer. With the effective switch off, a valid
+comparison remains pending with `decision_model_disabled`, without a semantic
+judgment call. This replaces
 the earlier hardcoded false, which made the real assessment path unreachable
 regardless of host configuration.
 
