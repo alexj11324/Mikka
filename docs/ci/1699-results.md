@@ -54,3 +54,5 @@ sample was still running when collected and is excluded from completed timings.
 ## After
 
 Pending actual Actions evidence; local selection counts are not timings.
+
+<!-- Issue #1699 synthetic docs-only performance probe; never merge. -->
