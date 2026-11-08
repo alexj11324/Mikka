@@ -258,8 +258,21 @@ export async function verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, ta
   assert.equal(sharedView.runStatus, null)
   assert.equal(sharedView.completion, null)
   await denied(accounts.peer, 'task-domain.getTaskPresentation', [taskB.id], ['issueNotFound', 'workspaceAccessDenied'])
+  const wanted = [taskA.id, peerTask.id, taskB.id, personalTask.id, randomUUID(), taskA.id]
+  for (const account of [accounts.owner, accounts.peer]) {
+    const batch = await rpc(account, 'task-domain.getTaskPresentations', { workspaceId, issueIds: wanted })
+    assert.equal(batch.version, 1)
+    assert.equal(batch.workspaceId, workspaceId)
+    assert.deepEqual(Object.keys(batch.items).sort(), [taskA.id, peerTask.id].sort(), 'batch omits foreign, personal, missing and duplicate Task IDs')
+    for (const id of [taskA.id, peerTask.id]) {
+      assert.deepEqual(batch.items[id], await rpc(account, 'task-domain.getTaskPresentation', id), 'batch and detail use the same authorized projection')
+    }
+    assert.deepEqual(await rpc(account, 'task-domain.getTaskPresentations', { workspaceId, issueIds: [] }), { version: 1, workspaceId, items: {} })
+  }
+  await denied(accounts.peer, 'task-domain.getTaskPresentations', [{ workspaceId: b.workspaceId, issueIds: [taskB.id] }], ['workspaceAccessDenied'])
+  await denied(accounts.peer, 'task-domain.getTaskPresentations', [{ workspaceId: b.workspaceId, issueIds: [] }], ['workspaceAccessDenied'])
   assert.deepEqual(await factoryHistory(), originalFactory, 'Project and Team lifecycle must preserve Factory history')
   assert.deepEqual(await identities(), originalIdentities)
   await noRuns()
-  await evidence('task-domain reports todo, Factory triage and needs-question separately; no Run or delivery completion is invented; cross-tenant reads refuse and all original Factory history remains unchanged')
+  await evidence('task-domain detail and one batch report the same business/Factory/Run state; batches omit foreign/missing Tasks and duplicate IDs, empty batches still enforce membership, and Shared Task access cannot reveal another owner’s Factory; all original history remains unchanged')
 }

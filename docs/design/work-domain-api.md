@@ -176,8 +176,8 @@ all refusals to a generic network error or retry writes without a revision.
 
 ## One Task state projection
 
-`task-domain.getTaskPresentation(issueId)` is a detail read, using the
-existing authorization and live update paths. It returns:
+`task-domain.getTaskPresentation(issueId)` retains its detail signature and
+returns the same projection as the batch reader:
 
 ```ts
 {
@@ -190,6 +190,40 @@ existing authorization and live update paths. It returns:
   completion    // 'merged' | 'accepted' | null
 }
 ```
+
+Lists use one `task-domain.getTaskPresentations({ workspaceId, issueIds })`
+read for up to 200 requested Task UUIDs:
+
+```ts
+{
+  version: 1,
+  workspaceId,
+  items: { [issueId]: TaskPresentation }
+}
+```
+
+The server validates the Workspace against the authenticated principal and
+current membership, including an empty batch. Duplicate IDs are read once.
+Missing, deleted, inaccessible and other-Workspace Tasks are all omitted from
+`items`; callers must not infer which case caused an omission. A readable
+Shared Task exposes only the current reader's authorized Run and Factory
+state. Sharing a Task does not share another member's private execution.
+
+Task metadata, dependency status, the newest same-actor Run and Factory evidence
+are read in batches. If the newest Factory row has an unavailable source, its
+Factory fields are null; the batch never falls back to an older Factory. The
+existing detail call retains its canonical Factory refusal behavior. The
+reader reuses the existing public Factory state
+projection, with the application data read in one consistent snapshot. It
+does not query a full detail or report for each row. APP and Workspace database
+connections remain independent.
+
+The UI owner should attach this one batch read to the existing list and live
+update lifecycle. Reuse current Task, Run and Factory invalidation; do not add
+per-row detail requests, timers or another status writer. Keep the current
+list/mobile response fields compatible while moving their state consumers to
+this contract. A batch response is useful only with its returned Workspace;
+clear it when the active Workspace changes or access is revoked.
 
 `Blocked` remains derived from dependencies, explicit flags, run outcome or
 Factory state. A Run succeeding does not set the Task to done. Coding work

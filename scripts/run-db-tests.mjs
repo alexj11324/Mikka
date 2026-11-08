@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/task-presentation-read.ts', file: 'tests/task-presentation.db.test.ts', script: 'test:task-presentation-db' },
   { marker: 'lib/telegram/handler.ts', file: 'tests/telegram-task-link.db.test.ts', script: 'test:task-identity-db' },
   { marker: 'lib/linear-sync/issue-sync.ts', file: 'tests/linear-responsibility.db.test.ts', script: 'test:task-identity-db' },
   { marker: 'lib/project-lifecycle.ts', file: 'tests/project-lifecycle.db.test.ts', script: 'test:project-v2-db' },

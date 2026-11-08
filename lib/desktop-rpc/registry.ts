@@ -205,6 +205,7 @@ const functions = {
   'team-relations.listProjectTeams': actions27.listProjectTeams,
   'team-relations.setProjectTeams': actions27.setProjectTeams,
   'task-domain.getTaskPresentation': taskDomainActions.getTaskPresentation,
+  'task-domain.getTaskPresentations': taskDomainActions.getTaskPresentations,
   'teams.getTeamLifecycleImpact': actions28.getTeamLifecycleImpact,
   'teams.getTeamLifecycleAudit': actions28.getTeamLifecycleAudit,
   'teams.archiveTeam': actions28.archiveTeam,

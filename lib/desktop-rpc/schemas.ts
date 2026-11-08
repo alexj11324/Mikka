@@ -1,4 +1,5 @@
 import { saveEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
+import { taskPresentationsInput } from '@/lib/task-presentation-input'
 import { z } from 'zod'
 import { projectInput, projectPatch } from '@/lib/project-input'
 import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
@@ -89,6 +90,7 @@ const readBatch: z.ZodType = tuple(z.array(object({ action: z.enum(READ_BATCH_AC
 export const desktopActionSchemas = {
   'desktop.readBatch': readBatch,
   'task-domain.getTaskPresentation': oneId,
+  'task-domain.getTaskPresentations': tuple(taskPresentationsInput),
   'teams.getTeamLifecycleImpact': oneId,
   'teams.getTeamLifecycleAudit': tuple(uuid, uuid),
   'teams.archiveTeam': oneId,

@@ -223,7 +223,8 @@
     "test:project-v2-db": "node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/project-v2.db.test.ts tests/project-lifecycle.db.test.ts",
     "test:task-identity-db": "node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/task-identity.db.test.ts tests/task-responsibility.db.test.ts tests/telegram-task-link.db.test.ts tests/linear-responsibility.db.test.ts",
     "test:project-resources-db": "node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/project-resources.db.test.ts tests/project-resource-lease.db.test.ts",
-    "test:domain-lifecycle-db": "node --test-force-exit --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/domain-lifecycle.db.test.ts"
+    "test:domain-lifecycle-db": "node --test-force-exit --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/domain-lifecycle.db.test.ts",
+    "test:task-presentation-db": "node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/task-presentation.db.test.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.121",
