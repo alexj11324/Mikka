@@ -56,6 +56,34 @@ test('unrecognized or unstructured child text does not become an observed system
   }
 })
 
+test('compiler observations retain only bounded diagnostic codes and fixed public commands', () => {
+  const log = Buffer.from([
+    '> tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck',
+    '/private/renderer.tsx(1,1): error TS2322: private-source secret-fixture-value',
+    'error TS2307: private module', 'error TS2322: repeated private message',
+    'error TS_PRIVATE: secret-fixture-value', 'error TS123456: private message',
+  ].join('\n'))
+  const result = buildFailureEvidence({ result: { status: 1 }, log })
+  assert.equal(result.lastTypecheckCommand, 'root-and-api')
+  assert.deepEqual(result.typescriptCodes, ['TS2307', 'TS2322'])
+  const frontend = buildFailureEvidence({ result: { status: 1 }, log: Buffer.from(log + '\n> tsc --noEmit -p tsconfig.json\n') })
+  assert.equal(frontend.lastTypecheckCommand, 'frontend')
+  for (const marker of ['private', 'renderer', 'secret-fixture-value', 'TS_PRIVATE', 'TS123456']) assert.equal(JSON.stringify(result).includes(marker), false)
+  const bounded = buildFailureEvidence({ result: { status: 1 }, log: Buffer.from(Array.from({ length: 30 }, (_, n) => `error TS${1000 + n}: private`).join('\n')) })
+  assert.equal(bounded.typescriptCodes.length, 16)
+})
+
+test('migration entry is observed without requiring an error stack or claiming SQL execution', () => {
+  const result = buildFailureEvidence({ result: { status: 1 }, log: Buffer.from('> mikka@1 typecheck /work\nmigrate: starting\nprivate guard error\n') })
+  assert.equal(result.lastObservedPhase, 'migrate')
+  assert.equal(result.lastTypecheckCommand, null)
+  assert.deepEqual(result.typescriptCodes, [])
+  assert.equal(JSON.stringify(result).includes('private guard'), false)
+  const unknown = buildFailureEvidence({ result: { status: 1 }, log: Buffer.from('private migrate: starting\n> private tsc --noEmit -p tsconfig.json') })
+  assert.equal(unknown.lastObservedPhase, 'unknown')
+  assert.equal(unknown.lastTypecheckCommand, null)
+})
+
 test('unknown failure details remain unknown and a kill signal is not labeled as OOM', () => {
   const value = buildFailureEvidence({ result: { status: null, signal: 'SIGKILL', error: { code: 'PRIVATE_VALUE' } },
     sourceSha: 'not-a-source', overlaySha: 'private-value', log: Buffer.from('private typecheck\n code: \'PRIVATE_VALUE\'\n') })
