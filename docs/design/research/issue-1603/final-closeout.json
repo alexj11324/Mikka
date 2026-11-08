@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "reconciledAt": "2026-11-08T00:43:19.046Z",
+  "repository": "alexj11324/Mikka",
+  "issue": 1603,
+  "state": "closed",
+  "stateReason": "completed",
+  "closedAt": "2026-11-07T17:11:55Z",
+  "closedBy": "alexj11324",
+  "closureComment": "https://github.com/alexj11324/Mikka/issues/1603#issuecomment-6710483644",
+  "acceptedDefects": 19,
+  "finalMerge": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+  "mergeTree": "fa0d02cab2a760544f4d7d2991f1be0f6585fd70",
+  "mergeEvidence": "b73-final-merge-verification.json",
+  "finalReleaseEvidence": "b73-final-release.json",
+  "mainCiEvidence": "b73-final-main-ci.json",
+  "policy": {
+    "pullRequest": 1644,
+    "url": "https://github.com/alexj11324/Mikka/pull/1644",
+    "mergedAt": "2026-11-07T14:28:02Z",
+    "mergeCommit": "0dee82a7737d29297186b77360370832cfcc3f5d",
+    "decisionPath": "docs/design/decisions/2026-11-07-1400-production-acceptance-scope.md",
+    "currentRuleReadAt": "2026-11-08T00:43:19.046Z",
+    "currentRuleMain": "78c3c13d35c2c664113a140bccb3db4ae9606021",
+    "filesIndependentlyRead": [
+      "AGENTS.md",
+      "docs/acceptance.md"
+    ],
+    "applicableRequirement": "UI, interaction, navigation and refresh that can be verified by a local production build are accepted through CI plus real local production-build screenshots; the deployed merge commit must be READY and served. Generic production sign-in is no longer required for this class.",
+    "externalServiceAcceptanceStillRequiredFor": "Real subscriptions, OAuth, model providers, GitHub App, payments, push and other external services"
+  },
+  "acceptanceMatrix": {
+    "A": {
+      "status": "PASS",
+      "basis": "19 dynamically confirmed defects have trigger/root cause/minimal patch/red-to-green evidence and source-bound baseline records",
+      "evidence": [
+        "defect-register.md",
+        "README.md"
+      ]
+    },
+    "B": {
+      "status": "PASS_FOR_RECORDED_SCOPE",
+      "basis": "Real local production cold Settings, history navigation, stable navigation/content loading and no extra ordinary-navigation document request",
+      "evidence": [
+        "integration-observations.json",
+        "b73-ui-summary.json"
+      ]
+    },
+    "C": {
+      "status": "PASS_FOR_RECORDED_SCOPE",
+      "basis": "Existing read cache and scoped state preserve drafts, focus/selection, reading position and existing content on ordinary failures; denial, in-flight responses, workspace change and sign-out isolation covered",
+      "evidence": [
+        "integration-observations.json",
+        "b73-ui-summary.json",
+        "hosted-provider-review.json",
+        "switcher-followup-evidence.json"
+      ]
+    },
+    "D": {
+      "status": "PASS_FOR_RECORDED_SCOPE",
+      "basis": "Reduced-motion styles, local feedback, Retry failure/success and modal keyboard recovery; native iOS remains separate issue1296",
+      "evidence": [
+        "integration-observations.json",
+        "b73-ui-summary.json",
+        "toast-fix-evidence.json"
+      ]
+    }
+  },
+  "localProductionEvidence": {
+    "historicalIntegratedSource": "5a752a50eb74c22681cd7dd8511ff6d2e58fc46f",
+    "historicalOverlay": "ac5980696802f188a81124a8a3f2513be2d14e9e",
+    "historicalOperations": 296,
+    "historicalScreenshots": 23,
+    "finalCandidateSource": "b73e477934f9fa803ea971837e37c6011db15839",
+    "finalCandidateOverlay": "e290220f8beac1e52f7b33cb097cc24f55b96d48",
+    "finalCandidateRawOperations": 149,
+    "publicCuratedOperations": 102,
+    "finalCandidateScreenshots": 14,
+    "totalArchivedScreenshots": 56,
+    "apiReads": 35,
+    "versionsRelabeled": false
+  },
+  "productionUiReplay": {
+    "performed": false,
+    "requiredForThisIssueUnderCurrentPolicy": false,
+    "priorSecureAuthRequest": "User-aborted before a successful designated shared-account session was verified; no success claimed",
+    "freshBrowserObservation": "The existing session did not expose the required Acme Inc. workspace; it was not used as acceptance",
+    "noFurtherSignInRequestedAfterPolicyVerification": true
+  },
+  "limits": [
+    "A folded toast stack can overlap and intercept an intended pointer click; this limitation remains documented and is not misrepresented as a permanently blocked recovery path.",
+    "The premature LI-keyboard screenshot is excluded from the 14-image final gallery.",
+    "Existing automatic read retries are not attributed to one click.",
+    "No full shared-account production UI replay, new interactive desktop GUI run, iOS/TestFlight run or general external-service acceptance is claimed by issue1603.",
+    "Historical PENDING/OPEN fields remain as their original observation snapshots; this closeout records their later resolution."
+  ],
+  "resources": {
+    "localTestRuntimeStopped": true,
+    "receipt": "final5-runtime-cleanup.json",
+    "runtimeReleaseCleanup": "b73-final-release.json"
+  },
+  "publicEvidenceBeforeCloseout": {
+    "head": "b80d37ef768321e00760985ce11ea624e73503b6",
+    "documents": 44,
+    "images": 56
+  },
+  "reconciliationMutations": "Evidence documentation and stale issue/PR progress summaries only; no product edits, reruns, deployments, credentials or resource changes"
+}

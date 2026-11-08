@@ -1,0 +1,2119 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-08T00:43:19.046Z",
+  "repository": "alexj11324/Mikka",
+  "source": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+  "tree": "fa0d02cab2a760544f4d7d2991f1be0f6585fd70",
+  "parents": [
+    "b5271361bbef8a619e06d472a58a03925dc6489f",
+    "b73e477934f9fa803ea971837e37c6011db15839"
+  ],
+  "scope": "Final exact-merge CI and release reconciliation; not a claim about later main behavior or current production alias",
+  "primaryRuns": [
+    {
+      "id": 42374084263,
+      "name": "CI",
+      "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "event": "push",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T12:48:14Z",
+      "updatedAt": "2026-11-07T13:00:30Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084263",
+      "jobCount": 12
+    },
+    {
+      "id": 42374084247,
+      "name": "Web deploy",
+      "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "event": "push",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T12:48:14Z",
+      "updatedAt": "2026-11-07T13:08:31Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084247",
+      "jobCount": 1
+    },
+    {
+      "id": 42374084345,
+      "name": "E2B additive runtime release",
+      "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "event": "push",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T12:48:14Z",
+      "updatedAt": "2026-11-07T13:35:47Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084345",
+      "jobCount": 7
+    },
+    {
+      "id": 42374084248,
+      "name": "Desktop release",
+      "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "event": "push",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T12:48:14Z",
+      "updatedAt": "2026-11-07T13:18:17Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084248",
+      "jobCount": 2
+    },
+    {
+      "id": 42374084245,
+      "name": "Publish daemon",
+      "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "event": "push",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-07T12:48:14Z",
+      "updatedAt": "2026-11-07T13:02:07Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084245",
+      "jobCount": 1
+    }
+  ],
+  "primaryJobTotals": {
+    "total": 23,
+    "success": 23,
+    "failed": 0,
+    "pending": 0,
+    "skipped": 0,
+    "note": "Job conclusions. Conditional individual steps may be skipped."
+  },
+  "mainCiEvidence": "b73-final-main-ci.json",
+  "webJobs": [
+    {
+      "id": 128407995423,
+      "name": "deploy",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T12:50:54Z",
+      "completedAt": "2026-11-07T13:08:30Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084247/job/128407995423",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:50:55Z",
+          "completedAt": "2026-11-07T12:50:57Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:50:57Z",
+          "completedAt": "2026-11-07T12:51:03Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:03Z",
+          "completedAt": "2026-11-07T12:51:04Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:04Z",
+          "completedAt": "2026-11-07T12:51:05Z"
+        },
+        {
+          "number": 5,
+          "name": "Refuse an obsolete source before release work",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:05Z",
+          "completedAt": "2026-11-07T12:51:05Z"
+        },
+        {
+          "number": 6,
+          "name": "Require one immutable runtime release artifact reference",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T12:51:05Z",
+          "completedAt": "2026-11-07T12:51:05Z"
+        },
+        {
+          "number": 7,
+          "name": "Download the complete verified runtime release report",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T12:51:05Z",
+          "completedAt": "2026-11-07T12:51:05Z"
+        },
+        {
+          "number": 8,
+          "name": "Bind the release bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T12:51:05Z",
+          "completedAt": "2026-11-07T12:51:05Z"
+        },
+        {
+          "number": 9,
+          "name": "Read the Vercel deploy token",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:05Z",
+          "completedAt": "2026-11-07T12:51:06Z"
+        },
+        {
+          "number": 10,
+          "name": "Skip documentation-only changes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:06Z",
+          "completedAt": "2026-11-07T12:51:06Z"
+        },
+        {
+          "number": 11,
+          "name": "Read the private UI checkout credential",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:06Z",
+          "completedAt": "2026-11-07T12:51:06Z"
+        },
+        {
+          "number": 12,
+          "name": "Check out the private UI",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:06Z",
+          "completedAt": "2026-11-07T12:51:08Z"
+        },
+        {
+          "number": 13,
+          "name": "Pin the private UI revision",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:08Z",
+          "completedAt": "2026-11-07T12:51:08Z"
+        },
+        {
+          "number": 14,
+          "name": "Read the existing Vercel runtime release token",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T12:51:08Z",
+          "completedAt": "2026-11-07T12:51:08Z"
+        },
+        {
+          "number": 15,
+          "name": "Publish the verified additive runtime pair inside the deployment queue",
+          "status": "completed",
+          "conclusion": "skipped",
+          "startedAt": "2026-11-07T12:51:08Z",
+          "completedAt": "2026-11-07T12:51:08Z"
+        },
+        {
+          "number": 16,
+          "name": "Read the production values Vercel withholds from `vercel pull`",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:08Z",
+          "completedAt": "2026-11-07T12:51:09Z"
+        },
+        {
+          "number": 17,
+          "name": "Pull the production project settings and environment",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:09Z",
+          "completedAt": "2026-11-07T12:51:21Z"
+        },
+        {
+          "number": 18,
+          "name": "Fill build-time values",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:21Z",
+          "completedAt": "2026-11-07T12:51:21Z"
+        },
+        {
+          "number": 19,
+          "name": "Choose the deployment id",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:21Z",
+          "completedAt": "2026-11-07T12:51:21Z"
+        },
+        {
+          "number": 20,
+          "name": "Install the pinned workspace dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:21Z",
+          "completedAt": "2026-11-07T12:51:51Z"
+        },
+        {
+          "number": 21,
+          "name": "Install private UI runtime dependencies without license scripts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:51:51Z",
+          "completedAt": "2026-11-07T12:52:00Z"
+        },
+        {
+          "number": 22,
+          "name": "Build (runs migrations last, as the Vercel build did)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:52:00Z",
+          "completedAt": "2026-11-07T12:56:19Z"
+        },
+        {
+          "number": 23,
+          "name": "Audit the public output for source and source maps",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:56:19Z",
+          "completedAt": "2026-11-07T12:56:20Z"
+        },
+        {
+          "number": 24,
+          "name": "Upload the prebuilt output to production",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:56:20Z",
+          "completedAt": "2026-11-07T13:08:22Z"
+        },
+        {
+          "number": 25,
+          "name": "Verify the public production version before releasing the deployment queue",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:22Z",
+          "completedAt": "2026-11-07T13:08:27Z"
+        },
+        {
+          "number": 47,
+          "name": "Post Check out the private UI",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:28Z",
+          "completedAt": "2026-11-07T13:08:28Z"
+        },
+        {
+          "number": 48,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:28Z",
+          "completedAt": "2026-11-07T13:08:28Z"
+        },
+        {
+          "number": 49,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:28Z",
+          "completedAt": "2026-11-07T13:08:28Z"
+        },
+        {
+          "number": 50,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:28Z",
+          "completedAt": "2026-11-07T13:08:28Z"
+        },
+        {
+          "number": 51,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:28Z",
+          "completedAt": "2026-11-07T13:08:28Z"
+        }
+      ]
+    }
+  ],
+  "runtimeJobs": [
+    {
+      "id": 128408933101,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T12:54:22Z",
+      "completedAt": "2026-11-07T12:54:33Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084345/job/128408933101",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:23Z",
+          "completedAt": "2026-11-07T12:54:23Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:23Z",
+          "completedAt": "2026-11-07T12:54:26Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:26Z",
+          "completedAt": "2026-11-07T12:54:27Z"
+        },
+        {
+          "number": 4,
+          "name": "Install only the offline gate test dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:27Z",
+          "completedAt": "2026-11-07T12:54:28Z"
+        },
+        {
+          "number": 5,
+          "name": "Run node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:28Z",
+          "completedAt": "2026-11-07T12:54:30Z"
+        },
+        {
+          "number": 6,
+          "name": "Run python3 scripts/e2b/build-template.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:30Z",
+          "completedAt": "2026-11-07T12:54:31Z"
+        },
+        {
+          "number": 7,
+          "name": "Run python3 scripts/e2b/official-files.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:31Z",
+          "completedAt": "2026-11-07T12:54:31Z"
+        },
+        {
+          "number": 8,
+          "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:31Z",
+          "completedAt": "2026-11-07T12:54:31Z"
+        },
+        {
+          "number": 9,
+          "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:31Z",
+          "completedAt": "2026-11-07T12:54:31Z"
+        },
+        {
+          "number": 10,
+          "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:31Z",
+          "completedAt": "2026-11-07T12:54:31Z"
+        },
+        {
+          "number": 19,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:31Z",
+          "completedAt": "2026-11-07T12:54:31Z"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:31Z",
+          "completedAt": "2026-11-07T12:54:31Z"
+        },
+        {
+          "number": 21,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:31Z",
+          "completedAt": "2026-11-07T12:54:31Z"
+        }
+      ]
+    },
+    {
+      "id": 128409321081,
+      "name": "check",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T12:54:46Z",
+      "completedAt": "2026-11-07T12:55:06Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084345/job/128409321081",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:47Z",
+          "completedAt": "2026-11-07T12:54:48Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:48Z",
+          "completedAt": "2026-11-07T12:54:59Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:59Z",
+          "completedAt": "2026-11-07T12:55:00Z"
+        },
+        {
+          "number": 4,
+          "name": "Refuse an obsolete source before runtime validation",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:00Z",
+          "completedAt": "2026-11-07T12:55:00Z"
+        },
+        {
+          "number": 5,
+          "name": "Check publication-control changes across this push",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:00Z",
+          "completedAt": "2026-11-07T12:55:00Z"
+        },
+        {
+          "number": 6,
+          "name": "Read the Vercel team token through Infisical workload identity",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:00Z",
+          "completedAt": "2026-11-07T12:55:01Z"
+        },
+        {
+          "number": 7,
+          "name": "Compare the worker hash with production",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:01Z",
+          "completedAt": "2026-11-07T12:55:02Z"
+        },
+        {
+          "number": 13,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:02Z",
+          "completedAt": "2026-11-07T12:55:02Z"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:02Z",
+          "completedAt": "2026-11-07T12:55:02Z"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:02Z",
+          "completedAt": "2026-11-07T12:55:02Z"
+        }
+      ]
+    },
+    {
+      "id": 128409433638,
+      "name": "validate / build",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T12:55:09Z",
+      "completedAt": "2026-11-07T13:04:07Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084345/job/128409433638",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:10Z",
+          "completedAt": "2026-11-07T12:55:12Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:12Z",
+          "completedAt": "2026-11-07T12:55:15Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:15Z",
+          "completedAt": "2026-11-07T12:55:16Z"
+        },
+        {
+          "number": 4,
+          "name": "Refuse an obsolete source before building candidates",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:16Z",
+          "completedAt": "2026-11-07T12:55:16Z"
+        },
+        {
+          "number": 5,
+          "name": "Install the pinned E2B SDK",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:16Z",
+          "completedAt": "2026-11-07T12:55:23Z"
+        },
+        {
+          "number": 6,
+          "name": "Read the existing E2B build key",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:23Z",
+          "completedAt": "2026-11-07T12:55:24Z"
+        },
+        {
+          "number": 7,
+          "name": "Build private versioned candidates and require official file conservation",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:24Z",
+          "completedAt": "2026-11-07T13:04:00Z"
+        },
+        {
+          "number": 8,
+          "name": "Preserve the complete private candidate report",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:00Z",
+          "completedAt": "2026-11-07T13:04:02Z"
+        },
+        {
+          "number": 9,
+          "name": "Close leftover probes and failed private builds",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:02Z",
+          "completedAt": "2026-11-07T13:04:02Z"
+        },
+        {
+          "number": 10,
+          "name": "Preserve candidate build cleanup receipt",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:02Z",
+          "completedAt": "2026-11-07T13:04:04Z"
+        },
+        {
+          "number": 19,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:04Z",
+          "completedAt": "2026-11-07T13:04:04Z"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:04Z",
+          "completedAt": "2026-11-07T13:04:04Z"
+        },
+        {
+          "number": 21,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:04Z",
+          "completedAt": "2026-11-07T13:04:04Z"
+        }
+      ]
+    },
+    {
+      "id": 128411375610,
+      "name": "await-web",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:04:09Z",
+      "completedAt": "2026-11-07T13:08:45Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084345/job/128411375610",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:10Z",
+          "completedAt": "2026-11-07T13:04:11Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:11Z",
+          "completedAt": "2026-11-07T13:04:15Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:15Z",
+          "completedAt": "2026-11-07T13:04:15Z"
+        },
+        {
+          "number": 4,
+          "name": "Await this source's actual Web build and public version",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:04:15Z",
+          "completedAt": "2026-11-07T13:08:41Z"
+        },
+        {
+          "number": 7,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:41Z",
+          "completedAt": "2026-11-07T13:08:42Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:42Z",
+          "completedAt": "2026-11-07T13:08:42Z"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:42Z",
+          "completedAt": "2026-11-07T13:08:42Z"
+        }
+      ]
+    },
+    {
+      "id": 128412429140,
+      "name": "subscriptions",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:08:47Z",
+      "completedAt": "2026-11-07T13:11:43Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084345/job/128412429140",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:47Z",
+          "completedAt": "2026-11-07T13:08:49Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:49Z",
+          "completedAt": "2026-11-07T13:08:52Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:52Z",
+          "completedAt": "2026-11-07T13:08:53Z"
+        },
+        {
+          "number": 4,
+          "name": "Refuse an obsolete source before real subscription work",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:53Z",
+          "completedAt": "2026-11-07T13:08:53Z"
+        },
+        {
+          "number": 5,
+          "name": "Require one immutable candidate artifact reference",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:53Z",
+          "completedAt": "2026-11-07T13:08:53Z"
+        },
+        {
+          "number": 6,
+          "name": "Download this run's complete private candidate report",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:53Z",
+          "completedAt": "2026-11-07T13:08:54Z"
+        },
+        {
+          "number": 7,
+          "name": "Bind the candidate bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:54Z",
+          "completedAt": "2026-11-07T13:08:54Z"
+        },
+        {
+          "number": 8,
+          "name": "Install only the pinned gate SDKs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:54Z",
+          "completedAt": "2026-11-07T13:09:03Z"
+        },
+        {
+          "number": 9,
+          "name": "Read the existing candidate E2B key",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:09:03Z",
+          "completedAt": "2026-11-07T13:09:04Z"
+        },
+        {
+          "number": 10,
+          "name": "Read the authorized acceptance account email",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:09:04Z",
+          "completedAt": "2026-11-07T13:09:04Z"
+        },
+        {
+          "number": 11,
+          "name": "Read the authorized acceptance account password",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:09:04Z",
+          "completedAt": "2026-11-07T13:09:05Z"
+        },
+        {
+          "number": 12,
+          "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:09:05Z",
+          "completedAt": "2026-11-07T13:11:36Z"
+        },
+        {
+          "number": 13,
+          "name": "Preserve closed diagnostics and any accepted subscription proof",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:36Z",
+          "completedAt": "2026-11-07T13:11:38Z"
+        },
+        {
+          "number": 14,
+          "name": "Make only fully accepted candidates public",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:38Z",
+          "completedAt": "2026-11-07T13:11:39Z"
+        },
+        {
+          "number": 15,
+          "name": "Preserve the complete public release report",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:39Z",
+          "completedAt": "2026-11-07T13:11:41Z"
+        },
+        {
+          "number": 29,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:41Z",
+          "completedAt": "2026-11-07T13:11:41Z"
+        },
+        {
+          "number": 30,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:41Z",
+          "completedAt": "2026-11-07T13:11:41Z"
+        },
+        {
+          "number": 31,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:41Z",
+          "completedAt": "2026-11-07T13:11:41Z"
+        }
+      ]
+    },
+    {
+      "id": 128413114675,
+      "name": "publish / deploy",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:11:51Z",
+      "completedAt": "2026-11-07T13:35:27Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084345/job/128413114675",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:52Z",
+          "completedAt": "2026-11-07T13:11:54Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:54Z",
+          "completedAt": "2026-11-07T13:12:01Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:01Z",
+          "completedAt": "2026-11-07T13:12:03Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:03Z",
+          "completedAt": "2026-11-07T13:12:06Z"
+        },
+        {
+          "number": 5,
+          "name": "Refuse an obsolete source before release work",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:06Z",
+          "completedAt": "2026-11-07T13:12:06Z"
+        },
+        {
+          "number": 6,
+          "name": "Require one immutable runtime release artifact reference",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:06Z",
+          "completedAt": "2026-11-07T13:12:07Z"
+        },
+        {
+          "number": 7,
+          "name": "Download the complete verified runtime release report",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:07Z",
+          "completedAt": "2026-11-07T13:12:08Z"
+        },
+        {
+          "number": 8,
+          "name": "Bind the release bytes to this source, worker and run attempt",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:08Z",
+          "completedAt": "2026-11-07T13:12:08Z"
+        },
+        {
+          "number": 9,
+          "name": "Read the Vercel deploy token",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:08Z",
+          "completedAt": "2026-11-07T13:12:09Z"
+        },
+        {
+          "number": 10,
+          "name": "Skip documentation-only changes",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:09Z",
+          "completedAt": "2026-11-07T13:12:09Z"
+        },
+        {
+          "number": 11,
+          "name": "Read the private UI checkout credential",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:09Z",
+          "completedAt": "2026-11-07T13:12:09Z"
+        },
+        {
+          "number": 12,
+          "name": "Check out the private UI",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:09Z",
+          "completedAt": "2026-11-07T13:12:17Z"
+        },
+        {
+          "number": 13,
+          "name": "Pin the private UI revision",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:17Z",
+          "completedAt": "2026-11-07T13:12:17Z"
+        },
+        {
+          "number": 14,
+          "name": "Read the existing Vercel runtime release token",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:17Z",
+          "completedAt": "2026-11-07T13:12:18Z"
+        },
+        {
+          "number": 15,
+          "name": "Publish the verified additive runtime pair inside the deployment queue",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:18Z",
+          "completedAt": "2026-11-07T13:12:20Z"
+        },
+        {
+          "number": 16,
+          "name": "Read the production values Vercel withholds from `vercel pull`",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:20Z",
+          "completedAt": "2026-11-07T13:12:21Z"
+        },
+        {
+          "number": 17,
+          "name": "Pull the production project settings and environment",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:21Z",
+          "completedAt": "2026-11-07T13:12:37Z"
+        },
+        {
+          "number": 18,
+          "name": "Fill build-time values",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:37Z",
+          "completedAt": "2026-11-07T13:12:37Z"
+        },
+        {
+          "number": 19,
+          "name": "Choose the deployment id",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:37Z",
+          "completedAt": "2026-11-07T13:12:37Z"
+        },
+        {
+          "number": 20,
+          "name": "Install the pinned workspace dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:12:37Z",
+          "completedAt": "2026-11-07T13:13:10Z"
+        },
+        {
+          "number": 21,
+          "name": "Install private UI runtime dependencies without license scripts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:13:10Z",
+          "completedAt": "2026-11-07T13:13:17Z"
+        },
+        {
+          "number": 22,
+          "name": "Build (runs migrations last, as the Vercel build did)",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:13:17Z",
+          "completedAt": "2026-11-07T13:19:34Z"
+        },
+        {
+          "number": 23,
+          "name": "Audit the public output for source and source maps",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:34Z",
+          "completedAt": "2026-11-07T13:19:34Z"
+        },
+        {
+          "number": 24,
+          "name": "Upload the prebuilt output to production",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:19:34Z",
+          "completedAt": "2026-11-07T13:35:22Z"
+        },
+        {
+          "number": 25,
+          "name": "Verify the public production version before releasing the deployment queue",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:22Z",
+          "completedAt": "2026-11-07T13:35:23Z"
+        },
+        {
+          "number": 47,
+          "name": "Post Check out the private UI",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:23Z",
+          "completedAt": "2026-11-07T13:35:23Z"
+        },
+        {
+          "number": 48,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:23Z",
+          "completedAt": "2026-11-07T13:35:23Z"
+        },
+        {
+          "number": 49,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:23Z",
+          "completedAt": "2026-11-07T13:35:23Z"
+        },
+        {
+          "number": 50,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:23Z",
+          "completedAt": "2026-11-07T13:35:23Z"
+        },
+        {
+          "number": 51,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:23Z",
+          "completedAt": "2026-11-07T13:35:24Z"
+        }
+      ]
+    },
+    {
+      "id": 128418475728,
+      "name": "cleanup",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:35:30Z",
+      "completedAt": "2026-11-07T13:35:47Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084345/job/128418475728",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:30Z",
+          "completedAt": "2026-11-07T13:35:31Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:31Z",
+          "completedAt": "2026-11-07T13:35:34Z"
+        },
+        {
+          "number": 3,
+          "name": "Install the pinned cleanup SDK",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:34Z",
+          "completedAt": "2026-11-07T13:35:42Z"
+        },
+        {
+          "number": 4,
+          "name": "Read this release's E2B key",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:42Z",
+          "completedAt": "2026-11-07T13:35:42Z"
+        },
+        {
+          "number": 5,
+          "name": "Close this attempt's instances and remove only its private candidates",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:42Z",
+          "completedAt": "2026-11-07T13:35:44Z"
+        },
+        {
+          "number": 6,
+          "name": "Preserve release cleanup receipt",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:44Z",
+          "completedAt": "2026-11-07T13:35:45Z"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:45Z",
+          "completedAt": "2026-11-07T13:35:45Z"
+        },
+        {
+          "number": 13,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:35:45Z",
+          "completedAt": "2026-11-07T13:35:45Z"
+        }
+      ]
+    }
+  ],
+  "desktopJobs": [
+    {
+      "id": 128407995424,
+      "name": "preflight",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T12:49:39Z",
+      "completedAt": "2026-11-07T13:08:35Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084248/job/128407995424",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:49:39Z",
+          "completedAt": "2026-11-07T12:49:40Z"
+        },
+        {
+          "number": 2,
+          "name": "Require main",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:49:40Z",
+          "completedAt": "2026-11-07T12:49:40Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:49:40Z",
+          "completedAt": "2026-11-07T12:49:43Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:49:43Z",
+          "completedAt": "2026-11-07T12:49:44Z"
+        },
+        {
+          "number": 5,
+          "name": "Require the matching production Web deployment",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:49:44Z",
+          "completedAt": "2026-11-07T13:08:33Z"
+        },
+        {
+          "number": 6,
+          "name": "Select the production Web overlay",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:33Z",
+          "completedAt": "2026-11-07T13:08:33Z"
+        },
+        {
+          "number": 7,
+          "name": "Version from workflow run",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:33Z",
+          "completedAt": "2026-11-07T13:08:33Z"
+        },
+        {
+          "number": 13,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:33Z",
+          "completedAt": "2026-11-07T13:08:33Z"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:33Z",
+          "completedAt": "2026-11-07T13:08:33Z"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:33Z",
+          "completedAt": "2026-11-07T13:08:33Z"
+        }
+      ]
+    },
+    {
+      "id": 128412394538,
+      "name": "macos",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:08:37Z",
+      "completedAt": "2026-11-07T13:18:16Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084248/job/128412394538",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:38Z",
+          "completedAt": "2026-11-07T13:08:41Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:41Z",
+          "completedAt": "2026-11-07T13:08:47Z"
+        },
+        {
+          "number": 3,
+          "name": "Read the private UI checkout credential",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:47Z",
+          "completedAt": "2026-11-07T13:08:47Z"
+        },
+        {
+          "number": 4,
+          "name": "Check out the production Web UI revision",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:47Z",
+          "completedAt": "2026-11-07T13:08:51Z"
+        },
+        {
+          "number": 5,
+          "name": "Pin the private UI revision",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:51Z",
+          "completedAt": "2026-11-07T13:08:52Z"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:52Z",
+          "completedAt": "2026-11-07T13:08:53Z"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:08:53Z",
+          "completedAt": "2026-11-07T13:09:39Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:09:39Z",
+          "completedAt": "2026-11-07T13:11:07Z"
+        },
+        {
+          "number": 9,
+          "name": "Install private UI runtime dependencies without license scripts",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:07Z",
+          "completedAt": "2026-11-07T13:11:45Z"
+        },
+        {
+          "number": 10,
+          "name": "Cache electron-builder downloads",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:45Z",
+          "completedAt": "2026-11-07T13:11:47Z"
+        },
+        {
+          "number": 11,
+          "name": "Require the Developer ID certificate",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:47Z",
+          "completedAt": "2026-11-07T13:11:48Z"
+        },
+        {
+          "number": 12,
+          "name": "Materialize App Store Connect key",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:48Z",
+          "completedAt": "2026-11-07T13:11:48Z"
+        },
+        {
+          "number": 13,
+          "name": "Require notarization credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:48Z",
+          "completedAt": "2026-11-07T13:11:48Z"
+        },
+        {
+          "number": 14,
+          "name": "Select Xcode 26 for actool",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:48Z",
+          "completedAt": "2026-11-07T13:11:56Z"
+        },
+        {
+          "number": 15,
+          "name": "Stamp the release version",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:57Z",
+          "completedAt": "2026-11-07T13:11:58Z"
+        },
+        {
+          "number": 16,
+          "name": "Package signed macOS app",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:11:58Z",
+          "completedAt": "2026-11-07T13:17:44Z"
+        },
+        {
+          "number": 17,
+          "name": "Audit the packaged app-owned files",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:44Z",
+          "completedAt": "2026-11-07T13:17:46Z"
+        },
+        {
+          "number": 18,
+          "name": "Verify production fuses in the signed bundle",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:46Z",
+          "completedAt": "2026-11-07T13:17:47Z"
+        },
+        {
+          "number": 19,
+          "name": "Verify updater metadata",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:47Z",
+          "completedAt": "2026-11-07T13:17:47Z"
+        },
+        {
+          "number": 20,
+          "name": "Stage and inventory the exact signed installers",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:47Z",
+          "completedAt": "2026-11-07T13:17:50Z"
+        },
+        {
+          "number": 21,
+          "name": "Record the installer overlay revision",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:50Z",
+          "completedAt": "2026-11-07T13:17:50Z"
+        },
+        {
+          "number": 22,
+          "name": "Seal the signed candidate",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:50Z",
+          "completedAt": "2026-11-07T13:17:52Z"
+        },
+        {
+          "number": 23,
+          "name": "Require successful checks for this exact main commit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:52Z",
+          "completedAt": "2026-11-07T13:17:53Z"
+        },
+        {
+          "number": 24,
+          "name": "Reject an installer whose production UI overlay changed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:53Z",
+          "completedAt": "2026-11-07T13:17:53Z"
+        },
+        {
+          "number": 25,
+          "name": "Require the matching production Web deployment",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:53Z",
+          "completedAt": "2026-11-07T13:17:54Z"
+        },
+        {
+          "number": 26,
+          "name": "Verify the signed candidate before creating the release",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:54Z",
+          "completedAt": "2026-11-07T13:17:55Z"
+        },
+        {
+          "number": 27,
+          "name": "Run softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:17:55Z",
+          "completedAt": "2026-11-07T13:18:12Z"
+        },
+        {
+          "number": 50,
+          "name": "Post Cache electron-builder downloads",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:12Z",
+          "completedAt": "2026-11-07T13:18:12Z"
+        },
+        {
+          "number": 51,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:12Z",
+          "completedAt": "2026-11-07T13:18:12Z"
+        },
+        {
+          "number": 52,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:12Z",
+          "completedAt": "2026-11-07T13:18:13Z"
+        },
+        {
+          "number": 53,
+          "name": "Post Check out the production Web UI revision",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:13Z",
+          "completedAt": "2026-11-07T13:18:13Z"
+        },
+        {
+          "number": 54,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:13Z",
+          "completedAt": "2026-11-07T13:18:14Z"
+        },
+        {
+          "number": 55,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:18:14Z",
+          "completedAt": "2026-11-07T13:18:14Z"
+        }
+      ]
+    }
+  ],
+  "daemonJobs": [
+    {
+      "id": 128409072274,
+      "name": "publish",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-07T12:53:30Z",
+      "completedAt": "2026-11-07T13:02:07Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084245/job/128409072274",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:53:31Z",
+          "completedAt": "2026-11-07T12:53:32Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:53:32Z",
+          "completedAt": "2026-11-07T12:53:35Z"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:53:35Z",
+          "completedAt": "2026-11-07T12:53:36Z"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:53:36Z",
+          "completedAt": "2026-11-07T12:53:59Z"
+        },
+        {
+          "number": 5,
+          "name": "Run npm install --global npm@11.19.0",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:53:59Z",
+          "completedAt": "2026-11-07T12:54:03Z"
+        },
+        {
+          "number": 6,
+          "name": "Prepare release version and check registry",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:03Z",
+          "completedAt": "2026-11-07T12:54:03Z"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:03Z",
+          "completedAt": "2026-11-07T12:54:15Z"
+        },
+        {
+          "number": 8,
+          "name": "Run node --test packages/daemon/test/release.node-test.mjs",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:15Z",
+          "completedAt": "2026-11-07T12:54:15Z"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/daemon typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:15Z",
+          "completedAt": "2026-11-07T12:54:18Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/daemon test",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:54:18Z",
+          "completedAt": "2026-11-07T12:55:59Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm --filter @mikka/daemon build",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:59Z",
+          "completedAt": "2026-11-07T12:55:59Z"
+        },
+        {
+          "number": 12,
+          "name": "Pin and inventory the released runtime dependency graph",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:55:59Z",
+          "completedAt": "2026-11-07T12:56:03Z"
+        },
+        {
+          "number": 13,
+          "name": "Seal the exact candidate before its package acceptance test",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:56:03Z",
+          "completedAt": "2026-11-07T12:56:03Z"
+        },
+        {
+          "number": 14,
+          "name": "Run pnpm --filter @mikka/daemon test:package",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:56:03Z",
+          "completedAt": "2026-11-07T12:56:15Z"
+        },
+        {
+          "number": 15,
+          "name": "Require successful checks for this exact main commit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T12:56:15Z",
+          "completedAt": "2026-11-07T13:00:35Z"
+        },
+        {
+          "number": 16,
+          "name": "Verify the tested candidate was not changed",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:00:35Z",
+          "completedAt": "2026-11-07T13:00:35Z"
+        },
+        {
+          "number": 17,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:00:35Z",
+          "completedAt": "2026-11-07T13:00:36Z"
+        },
+        {
+          "number": 18,
+          "name": "Publish with npm trusted publishing and provenance",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:00:36Z",
+          "completedAt": "2026-11-07T13:02:04Z"
+        },
+        {
+          "number": 34,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:02:04Z",
+          "completedAt": "2026-11-07T13:02:04Z"
+        },
+        {
+          "number": 35,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:02:04Z",
+          "completedAt": "2026-11-07T13:02:04Z"
+        },
+        {
+          "number": 36,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:02:04Z",
+          "completedAt": "2026-11-07T13:02:04Z"
+        },
+        {
+          "number": 37,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-07T13:02:04Z",
+          "completedAt": "2026-11-07T13:02:04Z"
+        }
+      ]
+    }
+  ],
+  "productionBinding": {
+    "firstWeb": {
+      "deploymentId": "dpl_4FGA5sdtRr29WUEJa4ajkbNyi2Bh",
+      "hostname": "mikka-e141peizs-mikka-dev.vercel.app",
+      "target": "production",
+      "readyAt": "2026-11-07T13:08:19.364Z",
+      "rootMetadataObservedAt": "2026-11-07T13:08:53.538Z",
+      "metadataSource": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "rootBrowserReload": {
+        "origin": "https://app.aspectlylabs.com",
+        "path": "/mikka/api/version",
+        "observedBefore": "2026-11-07T13:09:16.172Z",
+        "build": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "overlaySha": "ca99cf4719a890c214d187c146c07406ffebfba2"
+      },
+      "independentUnauthenticatedHttp": {
+        "observedAt": "2026-11-07T13:10:45Z",
+        "status": 200,
+        "build": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "overlaySha": "ca99cf4719a890c214d187c146c07406ffebfba2",
+        "bodySha256": "78543159dba16b476996ac73da3fd5c0437bed208db6dfffb584787d57a388e4"
+      },
+      "evidenceComment": "https://github.com/alexj11324/Mikka/issues/1603#issuecomment-6707391899"
+    },
+    "runtimeRedeploy": {
+      "observedAt": "2026-11-08T00:37:44.739Z",
+      "id": "dpl_GapgptxYMt1dQEzcFf37fZkdXC15",
+      "url": "mikka-mjhpzojfh-mikka-dev.vercel.app",
+      "state": "READY",
+      "source": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+      "gitSource": null,
+      "target": "production",
+      "aliases": [
+        "app.aspectlylabs.com",
+        "mikka.aspectlylabs.com",
+        "new-base-nova-project-ten.vercel.app",
+        "mikka-mikka-dev.vercel.app"
+      ],
+      "ready": 1794058495262,
+      "error": null,
+      "isError": false,
+      "readyAt": "2026-11-07T13:34:55.262Z",
+      "observedDeploymentUrl": "https://mikka-mjhpzojfh-mikka-dev.vercel.app",
+      "workflowRun": 42374084345,
+      "job": 128413114675,
+      "unmaskedOverlayPin": "ca99cf4719a890c214d187c146c07406ffebfba2",
+      "overlayPinLogAt": "2026-11-07T13:12:17.2311596Z",
+      "strictPublicVersionVerification": "SUCCESS",
+      "strictPublicVersionStep": 25,
+      "strictPublicVersionCompletedAt": "2026-11-07T13:35:23Z",
+      "maskedFinalLogPayloadReconstructed": false,
+      "currentCanonicalAliasClaimed": false
+    },
+    "renderer": "NOT_EXPOSED_BY_PUBLIC_VERSION_ENDPOINT; not inferred from the local b73 renderer",
+    "browserScreenshot": {
+      "captured": true,
+      "availableAsAttachment": false,
+      "publicImagePublished": false,
+      "reason": "Browser file did not synchronize to the executor within the prescribed five-second check; no alternate transfer or recapture was used."
+    }
+  },
+  "runtime": {
+    "actualNewRelease": true,
+    "reusedPreviousWorker": false,
+    "sourceWorkerHash": "ae1e07716ca8438282031824b2e1cdf4c75ce078",
+    "productionWorkerHashObservedBeforeRelease": "2618694fe7ece1fbcd46af6d15b6162360efcbe5",
+    "realSubscriptions": {
+      "jobId": 128412429140,
+      "step": 12,
+      "conclusion": "success",
+      "startedAt": "2026-11-07T13:09:05Z",
+      "completedAt": "2026-11-07T13:11:36Z",
+      "logConclusion": "Both candidate images passed real official subscription execution and cleanup",
+      "acceptedCandidatesPublicStep": 14,
+      "acceptedCandidatesPublicConclusion": "success"
+    },
+    "cleanup": {
+      "jobId": 128418475728,
+      "conclusion": "success",
+      "receiptObservedAt": "2026-11-07T13:35:44.2837505Z",
+      "sandboxes": [],
+      "publicTemplatesRetained": 3,
+      "retainedKinds": [
+        "desktop",
+        "claude",
+        "codex"
+      ],
+      "errors": [],
+      "scope": "Release cleanup receipt; no new provider inventory performed for this reconciliation"
+    }
+  },
+  "allExactSourceWorkflowRuns": {
+    "total": 20,
+    "success": 6,
+    "skipped": 12,
+    "cancelled": 2,
+    "failed": 0,
+    "pending": 0,
+    "allTwentyClaimedSuccessful": false,
+    "runs": [
+      {
+        "id": 42377428705,
+        "name": "Task VM question-resume evidence",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T13:32:28Z",
+        "updatedAt": "2026-11-07T13:32:29Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42377428705"
+      },
+      {
+        "id": 42376285277,
+        "name": "Task VM question-resume evidence",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T13:17:37Z",
+        "updatedAt": "2026-11-07T13:17:38Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42376285277"
+      },
+      {
+        "id": 42375812900,
+        "name": "Task VM question-resume evidence",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T13:11:21Z",
+        "updatedAt": "2026-11-07T13:11:22Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42375812900"
+      },
+      {
+        "id": 42375795855,
+        "name": "Task VM question-resume evidence",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T13:11:09Z",
+        "updatedAt": "2026-11-07T13:11:17Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42375795855"
+      },
+      {
+        "id": 42375591228,
+        "name": "Issue 1225 model provider acceptance",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T13:08:33Z",
+        "updatedAt": "2026-11-07T13:10:23Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42375591228"
+      },
+      {
+        "id": 42375591026,
+        "name": "Read cache production acceptance",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-07T13:08:33Z",
+        "updatedAt": "2026-11-07T13:10:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42375591026"
+      },
+      {
+        "id": 42375591006,
+        "name": "Project decisions production acceptance",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "cancelled",
+        "createdAt": "2026-11-07T13:08:33Z",
+        "updatedAt": "2026-11-07T13:08:35Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42375591006"
+      },
+      {
+        "id": 42375464745,
+        "name": "Task VM question-resume evidence",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T13:06:55Z",
+        "updatedAt": "2026-11-07T13:06:56Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42375464745"
+      },
+      {
+        "id": 42374507534,
+        "name": "Task VM question-resume evidence",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T12:54:09Z",
+        "updatedAt": "2026-11-07T12:54:10Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374507534"
+      },
+      {
+        "id": 42374406855,
+        "name": "Task VM question-resume evidence",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T12:52:44Z",
+        "updatedAt": "2026-11-07T12:52:52Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374406855"
+      },
+      {
+        "id": 42374255539,
+        "name": "Task VM question-resume evidence",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T12:50:35Z",
+        "updatedAt": "2026-11-07T12:50:46Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374255539"
+      },
+      {
+        "id": 42374221169,
+        "name": "Read cache production acceptance",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T12:50:08Z",
+        "updatedAt": "2026-11-07T12:50:10Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374221169"
+      },
+      {
+        "id": 42374221074,
+        "name": "Issue 1225 model provider acceptance",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T12:50:08Z",
+        "updatedAt": "2026-11-07T12:50:09Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374221074"
+      },
+      {
+        "id": 42374221173,
+        "name": "Project decisions production acceptance",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "cancelled",
+        "createdAt": "2026-11-07T12:50:08Z",
+        "updatedAt": "2026-11-07T12:50:18Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374221173"
+      },
+      {
+        "id": 42374154187,
+        "name": "Task VM question-resume evidence",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-07T12:49:13Z",
+        "updatedAt": "2026-11-07T12:49:19Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374154187"
+      },
+      {
+        "id": 42374084248,
+        "name": "Desktop release",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-07T12:48:14Z",
+        "updatedAt": "2026-11-07T13:18:17Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084248"
+      },
+      {
+        "id": 42374084345,
+        "name": "E2B additive runtime release",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-07T12:48:14Z",
+        "updatedAt": "2026-11-07T13:35:47Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084345"
+      },
+      {
+        "id": 42374084263,
+        "name": "CI",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-07T12:48:14Z",
+        "updatedAt": "2026-11-07T13:00:30Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084263"
+      },
+      {
+        "id": 42374084245,
+        "name": "Publish daemon",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-07T12:48:14Z",
+        "updatedAt": "2026-11-07T13:02:07Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084245"
+      },
+      {
+        "id": 42374084247,
+        "name": "Web deploy",
+        "head": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-07T12:48:14Z",
+        "updatedAt": "2026-11-07T13:08:31Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42374084247"
+      }
+    ]
+  },
+  "boundaries": [
+    "The 12 skipped and two cancelled auxiliary runs are not counted as successful acceptance.",
+    "A success conclusion of the separate read-cache production workflow is not, by itself, proof of execution or UI acceptance.",
+    "The local production UI screenshots remain bound to their original source and official overlay.",
+    "These release gates do not establish a full shared-account production UI replay.",
+    "Later main commits and deployments are outside this frozen exact-source release report."
+  ],
+  "credentialsIncluded": false
+}

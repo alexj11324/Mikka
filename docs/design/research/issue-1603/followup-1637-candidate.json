@@ -294,5 +294,40 @@
       1637
     ],
     "issueCompletion": "Formal deployment and designated SMOKE production acceptance pending."
+  },
+  "latestReconciliation": {
+    "recordedAt": "2026-11-08T00:43:19.046Z",
+    "status": "COMPLETED_UNDER_APPLICABLE_UI_ACCEPTANCE_POLICY",
+    "issueState": "closed",
+    "issueStateReason": "completed",
+    "issueClosedAt": "2026-11-07T17:11:55Z",
+    "closureComment": "https://github.com/alexj11324/Mikka/issues/1603#issuecomment-6710483644",
+    "policy": {
+      "pullRequest": 1644,
+      "url": "https://github.com/alexj11324/Mikka/pull/1644",
+      "mergedAt": "2026-11-07T14:28:02Z",
+      "mergeCommit": "0dee82a7737d29297186b77360370832cfcc3f5d",
+      "decisionPath": "docs/design/decisions/2026-11-07-1400-production-acceptance-scope.md",
+      "currentRuleReadAt": "2026-11-08T00:43:19.046Z",
+      "currentRuleMain": "78c3c13d35c2c664113a140bccb3db4ae9606021",
+      "filesIndependentlyRead": [
+        "AGENTS.md",
+        "docs/acceptance.md"
+      ],
+      "applicableRequirement": "UI, interaction, navigation and refresh that can be verified by a local production build are accepted through CI plus real local production-build screenshots; the deployed merge commit must be READY and served. Generic production sign-in is no longer required for this class.",
+      "externalServiceAcceptanceStillRequiredFor": "Real subscriptions, OAuth, model providers, GitHub App, payments, push and other external services"
+    },
+    "actualMerge": "8fffe80c9827913541a3a824b3813326dd1f2ae8",
+    "tree": "fa0d02cab2a760544f4d7d2991f1be0f6585fd70",
+    "formalDeployment": "COMPLETED_SOURCE_AND_OFFICIAL_OVERLAY_VERIFIED",
+    "mainCi": "12_OF_12_JOBS_SUCCESS",
+    "primaryReleaseJobs": "23_OF_23_SUCCESS",
+    "sharedAccountProductionUiReplay": "NOT_PERFORMED_AND_NO_LONGER_REQUIRED_FOR_THIS_UI_SCOPE",
+    "evidence": [
+      "b73-final-main-ci.json",
+      "b73-final-release.json",
+      "final-closeout.json"
+    ],
+    "historicalFieldsRemainOriginalSnapshots": true
   }
 }

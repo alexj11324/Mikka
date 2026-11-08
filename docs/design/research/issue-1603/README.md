@@ -1,5 +1,32 @@
 # Issue #1603：交互连续性验收证据
 
+## 最终完成状态（2026-11-08 复核）
+
+**Issue #1603 已完成：19 项确认缺陷均已修复、合并并上线。** Issue 于 **2026-11-07 17:11:55 UTC** 关闭为 completed；[最终 A–D 关闭判定](https://github.com/alexj11324/Mikka/issues/1603#issuecomment-6710483644)已明确列出组合证据。
+
+[PR #1644](https://github.com/alexj11324/Mikka/pull/1644) 于14:28:02 UTC生效，按 Alex 的决定将 UI／交互／导航／刷新这类本地生产构建可证明的改动，改为 **CI＋本地生产构建真实交互与截图＋正式部署 READY 和版本核对**验收。已独立读取该 PR 的实际 diff，以及当前 main 的 AGENTS.md 和 docs/acceptance.md。**本任务不再要求通用生产登录；没有把未执行的全量共享账号 UI 回放写成通过。** 外部服务仍按独立专项门槛验收。
+
+### 最终交付与证据
+
+| 范围 | 完成结果 | 证据 |
+| --- | --- | --- |
+| 修复与合并 | #1619、#1626、#1637；原 #1607/#1611 祖先保留；共19项缺陷 | [缺陷登记](defect-register.md)、[最终merge回读](b73-final-merge-verification.json) |
+| 最终合并版本 | 8fffe80c9827913541a3a824b3813326dd1f2ae8；tree fa0d02cab2a760544f4d7d2991f1be0f6585fd70 | [合并回执](b73-final-merge-verification.json) |
+| 合并后主CI | 精确8fff，12/12 jobs success | [冻结主CI审计](b73-final-main-ci.json) |
+| 主要发布链 | 主CI／Web／Desktop／daemon／E2B五条push流程成功，共23/23jobs | [最终发布回执](b73-final-release.json) |
+| 正式版本绑定 | 首轮READY及公开域名HTTP／浏览器读取为8fff＋官方ca99；运行组件发布后的同源第二轮Web也READY | [版本与两轮部署回执](b73-final-release.json) |
+| 实际本地UI | 历史5a整合296条操作/23图；最终b73＋e290为149条操作、14张入选图；累计56张图片保留各自版本 | [最终UI摘要](b73-ui-summary.json)、[图库](b73-ui-gallery.json)、[历史整合记录](integration-observations.json) |
+| API与资源收尾 | 最终35项读取通过；租约/隔离fixture清理；原Medium和本任务进程停止 | [API](b73-api-evidence.json)、[资源回执](final5-runtime-cleanup.json) |
+| A–D最终适用判定 | 已按#1644生效规则完成；本地验证与正式部署组合接受，不把Browser占位当实测 | [最终收尾](final-closeout.json) |
+
+**保留边界：** 截图不改标为全部来自最终merge；默认toast折叠栈限制、一次无效LI按键和自动重试的归因均保留；移动端原生TestFlight仍属#1296。首轮生产版本页截图未同步为可下载文件，版本文字、HTTP和部署回执已保留，不计入56张UI图库。
+
+---
+
+## 历史执行快照
+
+以下保留各阶段原始观察。下文的“当前”“OPEN”“PENDING”只表示对应记录时点；后来完成的部署、发布与验收状态，以本节和 [final-closeout.json](final-closeout.json) 为准。
+
 > **2026-11-07 更新：** 主批次 #1619 与第 17 项补修 #1626 已 merge；`26ef4de1` 的历史主干 CI 12/12、Web deploy、Vercel READY、HTTP 200、source/build `26ef4de1` 与官方 overlay `53d30a3` 已独立核实，见[主干 CI](followup-main-ci.json)、[发布证据](followup-release-evidence.json)、[Vercel 绑定](followup-vercel-binding.json)。这些是历史发布事实，生产域名随后随其他 PR 前移，不代表新补修已部署。
 
 > **当前状态：19 项确认缺陷的修复全部已 merge。** 第 18／19 项随 [PR #1637](https://github.com/alexj11324/Mikka/pull/1637) 于 **2026-11-07 12:48:11 UTC** 合并为 `8fffe80c9827913541a3a824b3813326dd1f2ae8`；parents 为最终 main `b5271361bbef8a619e06d472a58a03925dc6489f` 与已测 head `b73e477934f9fa803ea971837e37c6011db15839`，实际 tree `fa0d02cab2a760544f4d7d2991f1be0f6585fd70` 与独立预测一致，见[最终合并回读](b73-final-merge-verification.json)。候选创建时 base 仍是 `1edbeca687119eb0ef71f209ac3d411fbc85b888`；[b527 增量审查](b73-main-b527-advance-audit.json)及旧 dab 快照各自保留。本地构建／API／UI 仍绑定 b73＋e290，**正式部署及指定 SMOKE 生产验收 PENDING**，见[候选与合并状态](followup-1637-candidate.json)。

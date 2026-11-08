@@ -1,5 +1,17 @@
 # Issue 1603 — 已复现问题与修复登记
 
+## 最终状态（2026-11-08复核）
+
+**19项确认缺陷全部已修复、合并并上线，#1603已于2026-11-07 17:11:55 UTC关闭为completed。** 最终merge为8fffe80c，主CI12/12成功，Web及其余主要发布链成功，公开生产版本曾独立核对为8fff＋官方ca99。[最终发布证据](b73-final-release.json)与[完整关闭判定](final-closeout.json)补齐了下方历史快照中的发布待办。
+
+按已合并的[#1644](https://github.com/alexj11324/Mikka/pull/1644)，本任务的UI／交互／导航／刷新范围通过CI、本地正式构建真实交互与截图、生产READY和源码绑定完成验收；通用共享账号生产回放不再是该类任务门槛，未执行也不伪称通过。[A–D最终关闭评论](https://github.com/alexj11324/Mikka/issues/1603#issuecomment-6710483644)保留完整理由。各缺陷发生×影响分数仍是当时工程估计。
+
+---
+
+## 历史缺陷与回归快照
+
+下文原有“当前”“待生产验收”等表述保留为各阶段事实；不把后来的完成状态倒填到旧观察时点。当前结论以上方最终状态为准。
+
 **当前共登记 19 项确认缺陷，全部完成最小修复并已 merge。** 前 17 项分别随 #1619／#1626 合并；第 18／19 项随 [#1637](https://github.com/alexj11324/Mikka/pull/1637) 于 **12:48:11 UTC** merge 为 `8fffe80c9827913541a3a824b3813326dd1f2ae8`，parents 为 `b5271361bbef8a619e06d472a58a03925dc6489f`＋`b73e477934f9fa803ea971837e37c6011db15839`，实际 tree `fa0d02cab2a760544f4d7d2991f1be0f6585fd70` 与预测一致，见[最终合并回读](b73-final-merge-verification.json)。创建时 base 1ed、候选 tree 64f、[b527 增量审查](b73-main-b527-advance-audit.json)和 b73＋e290 的本地运行各自保留。**正式部署及指定 SMOKE 生产验收 PENDING**，详见[候选与合并状态](followup-1637-candidate.json)。
 
 历史主批次候选源码：`156b6a2779d1ee71161b99ab47b3484e2a8b5704`。最终手动 UI 使用本地整合提交 `5a752a50eb74c22681cd7dd8511ff6d2e58fc46f`（main `ad5e5db5` + 候选 `156b6a27`），不是最终 GitHub merge；完整运行与截图状态见 [README.md](README.md)。 主批次 [#1619](https://github.com/alexj11324/Mikka/pull/1619) 已合并为 `efb95d951ddbeca1af04bc80d011ccbc2a9f0188`；第 17 项后续修复 [#1626](https://github.com/alexj11324/Mikka/pull/1626) 已合并为 `26ef4de15129e22503e152258ee9cb2e4aeae8bd`，源码树 `9cec7cc5dee0fe71eff576e3f84136ca51ed3def` 与已通过 CI 的 head `6ccb50d7` 一致。
