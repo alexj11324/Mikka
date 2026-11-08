@@ -76,3 +76,5 @@ export const screenOptions = (background: string) => ({
   contentStyle: { backgroundColor: background },
   ...(Platform.OS === 'ios' ? {} : { animation: 'slide_from_right' as const }),
 })
+
+// Issue #1699 synthetic mobile performance probe; never merge.
