@@ -1,0 +1,5 @@
+--- before
++++ after
+@@
+-        return { ready: prepared.ready, start: final => {
++        return { ready: prepared.ready, start: (final: StartOptions) => {

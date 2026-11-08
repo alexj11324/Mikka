@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Inactive reproduction sources; not a production workflow or an acceptance result",
+  "primarySource": "26ccbfae27b553bc70ab52588368e7eb089fc362",
+  "sourceTree": "a74b54fe14fed0ea34a600f9add9134b99f24c23",
+  "priorLocalSource": "24316ea67f46bfe1a3e7a51fe3459f964582db02",
+  "patches": [
+    {
+      "path": "evidence/1505-startup-timing-20261108/patches/boundary-test.patch",
+      "bytes": 5986,
+      "sha256": "3dd6e53b5982f8393a8b89a707d4708b0d7b1a3c0959460f8c68eddd9d6eea1e",
+      "gitBlob": "5e6616a53173a0d81603b4f58b886ccd96f620c4"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/patches/final.patch",
+      "bytes": 8633,
+      "sha256": "b529d5b25803dca0d4a5c9a64e6189896954d02276cfb6406d7107cb53fd28cf",
+      "gitBlob": "a638c6844191623a15767d659d4d2e322aefb60b"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/patches/product-final.patch",
+      "bytes": 2631,
+      "sha256": "6b4ead729f67dd28c2eca05111765487d9fa5d1c0e07dc3b5dd17753f7d7e708",
+      "gitBlob": "715b13ac07a475455215d9c7e9071ec137a6e5c9"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/patches/product-fixed.patch",
+      "bytes": 2647,
+      "sha256": "365798360b071da2a179b1e6b9938c588b4d6e9637016d4ce98cb8b68dd8ff9c",
+      "gitBlob": "5ff57475f581802a12d67b875067c641f168f3cd"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/patches/product.patch",
+      "bytes": 2666,
+      "sha256": "c22c855ee630a7ad7312885798aa32c96c9927df59a70a8399296d579e856eaa",
+      "gitBlob": "a034d92fe5c48e9fdf5c0f45ffe8d1e15fd9b782"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/patches/red-test.patch",
+      "bytes": 3566,
+      "sha256": "46b33e885292ddeb689cbaf553e33b403328c9a5e7ee08886b3f96ae55e1b339",
+      "gitBlob": "c955eee717598a2051426e7f8eaa8a35eea4e07e"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/patches/type-only-fix.patch",
+      "bytes": 158,
+      "sha256": "851fba8c33d2d1298fe98849507d6ad5427d26480b7997ec6cff99f4c8382eff",
+      "gitBlob": "5497f9766871af5d0d0eb28fa1d52fadc58718f0"
+    }
+  ],
+  "formalRenderer": [
+    {
+      "path": "evidence/1505-startup-timing-20261108/formal-renderer/render.py",
+      "bytes": 12368,
+      "sha256": "bf3afe1e40c5218a9f28cc5980595ba8c04e66e6a0e33f2a73c2780a20dd38c4",
+      "gitBlob": "2db0c65c49306fcfc20ff57f3fb9d45173ed6cfe"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/formal-renderer/base.yml.snapshot",
+      "bytes": 75974,
+      "sha256": "2fc8d8a480a35f0f97011dc4149d3e368bcb45901e604aeb354a1d5d9e2e1d89",
+      "gitBlob": "3c65028b80cee0b983bce68c47843b77e8435481"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/formal-renderer/workflow.template.yml.in",
+      "bytes": 76125,
+      "sha256": "2059caf7dfd907685b3cb201a715f56cbf0ef9f3266636e3571e6504b3ff9209",
+      "gitBlob": "7b362afec496c51a3f8d2d5bfe8ab86ba437762c"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/formal-renderer/pins.unfilled.json",
+      "bytes": 776,
+      "sha256": "694b7488760d8fa971d1dce4cb60203297c9c3a8bdaf8d42c0f331c89f7ff053",
+      "gitBlob": "839747af3be6ba0d1f179499c4b4e529772d3b41"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/formal-renderer/fields.json",
+      "bytes": 9097,
+      "sha256": "342d6d7d2b54ffffe62b40dcbbd70bac1b056443eb5d8bd868888ce8bf9ff1aa",
+      "gitBlob": "02f447c886b547757aacf2b8ba3a0e90bd7bc69f"
+    }
+  ],
+  "historicalFormal": {
+    "commit": "433afa3af70c9b8373f63698d993d1e297ed7a23",
+    "workflowPath": ".github/workflows/issue1505-startup-acceptance.yml",
+    "workflowBlob": "cfef9cb3c0404ee248f4b82609d8417f405c3db1",
+    "neverReferencedOrRun": true,
+    "oldScopeCleaned": true,
+    "archiveTipContainsHistoricalWorkflow": false
+  },
+  "currentPr": 1788,
+  "issue": 1505,
+  "formalSamplesAdded": 0,
+  "restrictions": [
+    "Historical patches describe separate test revisions; follow original validation-source-recipes.json, do not apply all in sequence.",
+    "Future rendering requires fresh actual A/O/R/W/templates/scope and normal release proof.",
+    "Do not recreate the retired bb5 formal ref or scope.",
+    "No workflow is added or enabled in this evidence tree."
+  ]
+}

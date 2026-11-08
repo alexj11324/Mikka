@@ -1,0 +1,48 @@
+diff --git a/packages/daemon/src/subscription-hosted-runner.ts b/packages/daemon/src/subscription-hosted-runner.ts
+index f4ae431e3a..21fa18072e 100644
+--- a/packages/daemon/src/subscription-hosted-runner.ts
++++ b/packages/daemon/src/subscription-hosted-runner.ts
+@@ -368,6 +368,8 @@ export async function createHostedBotRunner(host: {
+       const { anonymous } = anonymousFor(assignment, options)
+       if (assignment.harness === 'codex') {
+         const candidate = anonymous as AnonymousCodexCandidate | undefined
++        const startCodex = (final: StartOptions) => start(assignment, final)
++        let boundStart: typeof startCodex | undefined
+         const prepared = prepareAgentStart(signal, async control => {
+           const stop = () => { void candidate?.close().catch(() => undefined) }
+           control.signal.addEventListener('abort', stop, { once: true })
+@@ -375,10 +377,13 @@ export async function createHostedBotRunner(host: {
+             control.parked()
+             const final = await control.finalOptions
+             control.signal.throwIfAborted()
+-            return await start(assignment, final)
++            return await (boundStart ?? startCodex)(final)
+           } finally { control.signal.removeEventListener('abort', stop) }
+         })
+-        return { ready: prepared.ready, start: prepared.start, cancel: async () => {
++        return { ready: prepared.ready, start: final => {
++          boundStart ??= daemonTracer.bindStartupTiming(startCodex)
++          return prepared.start(final)
++        }, cancel: async () => {
+           await candidate?.close(); await prepared.cancel()
+         }, get preparationTiming() { return candidate?.preparationTiming } }
+       }
+diff --git a/packages/daemon/src/tracing.ts b/packages/daemon/src/tracing.ts
+index 152318cbeb..0eed0277c9 100644
+--- a/packages/daemon/src/tracing.ts
++++ b/packages/daemon/src/tracing.ts
+@@ -358,6 +358,14 @@ export class DaemonTracer {
+     return pending.then(value => { end(); return value }, (error: unknown) => { end(error, true); throw error })
+   }
+ 
++  /** Carry only the opted-in startup recorder across an already parked Promise. */
++  bindStartupTiming<Args extends unknown[], Result>(work: (...args: Args) => Result): (...args: Args) => Result {
++    const scope = this.startupScope.getStore()
++    return (...args) => scope && !scope.closed
++      ? this.startupScope.run(scope, () => work(...args))
++      : this.startupScope.exit(() => work(...args))
++  }
++
+   /** The current span plus validated run/session references, for delayed callbacks. */
+   capture(): RunTraceContext | undefined {
+     try {

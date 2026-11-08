@@ -1,0 +1,251 @@
+{
+  "version": 1,
+  "preparedAt": "2026-11-08T02:35:47.407376+00:00",
+  "status": "unfilled_offline_preparation",
+  "requiredFields": [
+    {
+      "configPath": "pins.ACCEPTANCE_SOURCE_COMMIT",
+      "role": "driver source",
+      "value": null,
+      "retiredBaselineValue": "e33e3a91d4011efbe768b11b428a5d152ede744a",
+      "baseLines": [
+        28
+      ],
+      "meaning": "精确 checkout 的正式 driver Git commit；必须包含 failed-case closing pin，并保留普通 cloud-kind 入口。",
+      "requiredEvidence": "Git commit 对象；独立 review；不得用未发布 WIP SHA 冒充实际 APP/runtime。"
+    },
+    {
+      "configPath": "pins.ACCEPTANCE_SOURCE_TREE",
+      "role": "driver tree",
+      "value": null,
+      "retiredBaselineValue": "b2e36d3351654fceec59fe138a55de31cb155df9",
+      "baseLines": [
+        29
+      ],
+      "meaning": "该 driver commit 的完整 tree。",
+      "requiredEvidence": "本地 Git rev-parse；填充器实际核对。"
+    },
+    {
+      "configPath": "pins.EXPECTED_APP_COMMIT",
+      "role": "APP source",
+      "value": null,
+      "retiredBaselineValue": "78c3c13d35c2c664113a140bccb3db4ae9606021",
+      "baseLines": [
+        30
+      ],
+      "meaning": "将承载正式请求、并捕获本轮 scope 的实际生产 APP source。",
+      "requiredEvidence": "实际 Web/DPL/source/public version；可与 runtime source 不同，须独立兼容性核对。"
+    },
+    {
+      "configPath": "pins.EXPECTED_WORKER_SHA",
+      "role": "runtime fingerprint",
+      "value": null,
+      "retiredBaselineValue": "fe20477b6b42416f6a53fbbd2a7efc1c9cfb1dea",
+      "baseLines": [
+        32
+      ],
+      "meaning": "实际发布的 worker fingerprint。",
+      "requiredEvidence": "完整 immutable release/accepted artifacts、发布 readback；不是 ops helper 或 APP commit。"
+    },
+    {
+      "configPath": "pins.EXPECTED_WORKER_SOURCE",
+      "role": "runtime source",
+      "value": null,
+      "retiredBaselineValue": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+      "baseLines": [
+        33,
+        66
+      ],
+      "meaning": "真实三模板与双订阅发布 source；同时写入 upstream guard 的 sourceCommit。",
+      "requiredEvidence": "exact runtime run/attempt + release artifact source；两处由同一字段生成。"
+    },
+    {
+      "configPath": "pins.EXPECTED_TEMPLATE_DESKTOP",
+      "role": "runtime template",
+      "value": null,
+      "retiredBaselineValue": "p2pjujpb74f7fi53ze7y",
+      "baseLines": [
+        34
+      ],
+      "meaning": "实际公开 desktop template ID。",
+      "requiredEvidence": "同一 release artifact、私有候选双 gate 后公开、实际 production tuple readback。"
+    },
+    {
+      "configPath": "pins.EXPECTED_TEMPLATE_CLAUDE",
+      "role": "runtime template",
+      "value": null,
+      "retiredBaselineValue": "e8853ntj54nfz72gdvia",
+      "baseLines": [
+        35
+      ],
+      "meaning": "实际公开 Claude template ID。",
+      "requiredEvidence": "同上；不能填官方别名或已清理候选。"
+    },
+    {
+      "configPath": "pins.EXPECTED_TEMPLATE_CODEX",
+      "role": "runtime template",
+      "value": null,
+      "retiredBaselineValue": "k34g6jozduq3in302l1j",
+      "baseLines": [
+        36
+      ],
+      "meaning": "实际公开 Codex template ID。",
+      "requiredEvidence": "同上；不能填官方别名或已清理候选。"
+    },
+    {
+      "configPath": "pins.EXPECTED_DIAGNOSTIC_ENV_ID",
+      "role": "diagnostic scope",
+      "value": null,
+      "retiredBaselineValue": "5U3cbUROL36c7e4z",
+      "baseLines": [
+        39
+      ],
+      "meaning": "本轮 fresh scope 的实际 project env ID。",
+      "requiredEvidence": "正常 prepare/rotation raw receipt + exact ID/key/value readback；旧 scope 不复用。"
+    },
+    {
+      "configPath": "pins.EXPECTED_DIAGNOSTIC_VALUE_SHA256",
+      "role": "diagnostic scope",
+      "value": null,
+      "retiredBaselineValue": "4627f203887af0e2e5904e43afca89ebf6241f55ce998aa5200ef65df6b4ce67",
+      "baseLines": [
+        40
+      ],
+      "meaning": "该 env 实际 value 的完整 SHA256。",
+      "requiredEvidence": "原件 receipt / 独立 readback；不把原 value 或秘密写入 workflow。"
+    },
+    {
+      "configPath": "pins.EXPECTED_DIAGNOSTIC_EXPIRES_AT",
+      "role": "diagnostic scope",
+      "value": null,
+      "retiredBaselineValue": "2026-11-08T02:23:36.365Z",
+      "baseLines": [
+        41
+      ],
+      "meaning": "实际创建时固定的 expiresAt。",
+      "requiredEvidence": "原 receipt；不得延长原 TTL。runner 在取账户秘密前仍要求余量 >=45min。"
+    },
+    {
+      "configPath": "pins.DIAGNOSTIC_HELPER_COMMIT",
+      "role": "cleanup helper",
+      "value": null,
+      "retiredBaselineValue": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+      "baseLines": [
+        42
+      ],
+      "meaning": "包含已审 cleanup helper 的实际 Git commit。",
+      "requiredEvidence": "按 raw helper/provenance 审核；不要求等于 APP/runtime/ops 执行 head。"
+    },
+    {
+      "configPath": "pins.DIAGNOSTIC_HELPER_SHA256",
+      "role": "cleanup helper",
+      "value": null,
+      "retiredBaselineValue": "46d8b905518cf480fecdf0a3bce1a3863f4e79c92609b1cd3ec9d4231820898c",
+      "baseLines": [
+        43
+      ],
+      "meaning": "scripts/ops/issue1505-diagnostic-window.mjs 实际文件 SHA256。",
+      "requiredEvidence": "填充器读取该 commit 的完整 bytes 核对；运行时 checkout 再核。"
+    },
+    {
+      "configPath": "executionBranch",
+      "value": null,
+      "retiredBaselineValue": "ops/1505-preflight",
+      "baseLines": [
+        7
+      ],
+      "meaning": "root 决定的唯一新 ops/1505-* 分支；不是 driver/APP/runtime source。",
+      "requiredEvidence": "新 helper 普通 commit/parent/tree 及精确 ref 记录；不复用旧正式 ref。"
+    },
+    {
+      "configPath": "upstreamRelease.runId",
+      "value": null,
+      "retiredBaselineValue": 42423534091,
+      "baseLines": [
+        65
+      ],
+      "meaning": "实际新 runtime release workflow run ID。",
+      "requiredEvidence": "repository/path/event=push/branch=main/head_sha/source/current attempt +7 jobs 实际终态。"
+    },
+    {
+      "configPath": "upstreamRelease.runAttempt",
+      "value": null,
+      "retiredBaselineValue": 1,
+      "baseLines": [
+        65
+      ],
+      "meaning": "该 immutable runtime run 的实际 attempt；不默认猜1。",
+      "requiredEvidence": "精确 run 和 attempt-specific jobs/artifact 绑定；不可用其他 attempt 的私有 gate proof。"
+    }
+  ],
+  "counts": {
+    "requiredFields": 16,
+    "dynamicConfigurationPins": 13,
+    "fixedConfigurationPins": 2,
+    "totalConfigurationPins": 15,
+    "actualVersionChecks": 14,
+    "samples": 6,
+    "serverStages": 39
+  },
+  "fixedConfigurationPins": {
+    "EXPECTED_DEPLOYMENT_ID": "RESOLVE_ONCE_FROM_PRODUCTION_ALIAS",
+    "EXPECTED_DIAGNOSTIC_BOT_ID": "fdeea45f-8cb2-450a-96a4-d9a682f71482"
+  },
+  "derivedBindings": {
+    "UPSTREAM_RELEASE.sourceCommit": "pins.EXPECTED_WORKER_SOURCE",
+    "actualDpl": "resolved once after READY preflight under Web lock; subsequent checks compare only"
+  },
+  "retainedContracts": {
+    "upstreamJobs": [
+      "test",
+      "check",
+      "validate / build",
+      "await-web",
+      "subscriptions",
+      "publish / deploy",
+      "cleanup"
+    ],
+    "runtimeWorkflow": ".github/workflows/e2b-official-runtime.yml",
+    "runtimeEvent": "push",
+    "runtimeBranch": "main",
+    "repository": "alexj11324/Mikka",
+    "strategy": "derived",
+    "outerConcurrency": "production-smoke-owner-acceptance",
+    "jobConcurrency": "web-deploy-production",
+    "jobTimeoutMinutes": 40,
+    "entryScopeBudgetMinutes": 45,
+    "maxStartupMs": 5000,
+    "account": "existing SMOKE shared-team account",
+    "origin": "https://app.aspectlylabs.com",
+    "repositoryUnderTest": "alexj11324/Mikka-handoff",
+    "scopeKey": "MIKKA_CLOUD_DIAGNOSTIC_WINDOW",
+    "actionsAndInfisicalIdentity": "unchanged exact baseline bytes"
+  },
+  "immutableBlocks": {
+    "strict_report": {
+      "bytes": 33782,
+      "sha256": "6ab66ed4f2aaa67a101744522d2954e7669c21e0695f1e2b54d4183c9ba958df"
+    },
+    "scope_pin": {
+      "bytes": 3241,
+      "sha256": "140159e888405482b8fec3c6668af98c3804370d33709c840ae25415f1aa8010"
+    }
+  },
+  "inspectedDriverNotFutureTuple": {
+    "readOnlyInspectedCommit": "a93e168e18fec7096fa56c463548d50f524fa5d2",
+    "tree": "9a0f457f5d2f424c6c009eaf6321771c666423ac",
+    "path": "scripts/acceptance/cloud-startup.mjs",
+    "bytes": 78022,
+    "sha256": "1b6d25cd6e53c22843ba45eb61e91a757337d1dd4925d1e1675cf53d09dc4fb9",
+    "notAFutureFilledPin": true,
+    "observed": [
+      "failed execution closing pin in finally",
+      "version failure stops batch",
+      "formal target depends on options.deviceId; workflow supplies no candidate device or queued callback",
+      "candidate bootstrap callback remains opt-in only"
+    ]
+  },
+  "productionProofVerified": false,
+  "published": false,
+  "triggered": false
+}
