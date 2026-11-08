@@ -33,6 +33,8 @@ import { ChatHeader } from '@/features/chat/components/chat-header'
 import { menuTasks } from '@/features/chat/model/chat-header-menu'
 import { useTasks } from '@/features/tasks/components/task-list'
 import { AttemptIcon } from '@/features/tasks/components/task-icons'
+import { ReviewSummaryRow } from '@/features/review/components/review-summary-row'
+import { reviewHref } from '@/features/review/model/routes'
 import { ATTEMPT_WORD, attemptState } from '@/features/tasks/model/task-groups'
 import { ChatSelectableText } from '@/features/chat/components/chat-selectable-text'
 import { ChatSelectionBar } from '@/features/chat/components/chat-selection-bar'
@@ -300,6 +302,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
               {run.issue && result
                 ? <ThreadCard title={[run.issue.identifier, run.issue.title].filter(Boolean).join(' ')} status={runIcon(run)} onPress={() => open(run)}
                   icon={<AttemptIcon result={result} />}
+                  footer={run.issue.review ? <ReviewSummaryRow compact short summary={run.issue.review} onPress={() => router.push(reviewHref(run.issue!.id))} /> : undefined}
                   info={[ATTEMPT_WORD[result], run.agentName, shortWhen(item.createdAt)].filter(Boolean).join(' · ')} />
                 : <ThreadCard title={runName(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => open(run)} />}
             </TimedRow>

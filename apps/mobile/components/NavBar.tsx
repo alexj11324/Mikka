@@ -74,7 +74,7 @@ const webItem = (item: BarItem) => 'view' in item
  * material or hairline (Comma, Alex 2026-11-08): content fades out under the top
  * edge, by the system's soft scroll edge on iOS 26 and `TopFade` below it.
  */
-export function NavBar({ title, titleView, left, right, back, large, topTitle, search, background = colors.page, fade = true }: {
+export function NavBar({ title, titleView, left, right, back, large, topTitle, search, background = colors.page, fade = true, sheet }: {
   title?: string
   /** A tab's root (Bot, 任务, 建议, 设置, 搜索): one title, the system's, centred in the bar's row; the buttons grouped
    * on the right; nothing on the left (Alex 2026-11-08, after 「Bot」 showed twice). */
@@ -89,6 +89,8 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
   background?: string
   /** False under an opaque header (a form sheet's), where nothing scrolls beneath it. */
   fade?: boolean
+  /** A form sheet: closed by its own ✕ or ✓ and by swiping down, so no back button beside them. */
+  sheet?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -101,7 +103,7 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
       else router.back()
     })
     // The Web router's history availability is not reactive. Keep an exit on pushed/deep-linked pages.
-    const showBack = Platform.OS === 'web' || back !== undefined || router.canGoBack()
+    const showBack = !sheet && (Platform.OS === 'web' || back !== undefined || router.canGoBack())
     if (topTitle) return (
       <>
         <TopRow title={title ?? ''} right={rights.map(webItem)} />
