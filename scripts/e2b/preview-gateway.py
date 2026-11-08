@@ -268,13 +268,12 @@ class Gateway:
         target = None
         discovery_deadline = time.monotonic() + DISCOVERY_SECONDS
         for candidate in candidates:
-            # Binding to loopback does NOT make a server private on E2B: envd
-            # discovers it and launches a public socat forward. Verify both
-            # network families before even probing/minting a preview grant.
+            # Verify the actual pre-worker policy in both families. This
+            # read cannot install rules or turn an older VM into a safe one.
             try:
                 await asyncio.to_thread(self.protect, candidate['port'])
             except FirewallError as cause:
-                raise PreviewFailure(cause.code, 503) from cause
+                raise PreviewFailure(cause.code, 404 if cause.code == 'firewall_unsupported' else 503) from cause
             remaining = discovery_deadline - time.monotonic()
             if remaining <= 0:
                 break
@@ -315,7 +314,14 @@ class Gateway:
         await self.runner.setup()
         for _ in range(16):
             listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            listener.bind(('0.0.0.0', 0))
+            # Matches the early workspace ingress policy; ordinary dev sockets
+            # never inherit public access when this listener closes.
+            try:
+                listener.setsockopt(socket.SOL_SOCKET, socket.SO_MARK, 0x4D4B5056)
+                listener.bind(('0.0.0.0', 0))
+            except BaseException:
+                listener.close()
+                raise
             port = listener.getsockname()[1]
             if valid_port(port) and port not in self.used_ports:
                 break

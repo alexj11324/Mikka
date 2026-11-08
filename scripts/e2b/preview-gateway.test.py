@@ -316,6 +316,7 @@ class PreviewAcceptance(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(gateway_module.PreviewFailure) as error:
             await self.prepare()
         self.assertEqual(error.exception.code, 'firewall_unsupported')
+        self.assertEqual(error.exception.status, 404)
         self.assertIsNone(self.gateway.port)
         self.assertEqual(len(self.gateway.tickets), 0)
 

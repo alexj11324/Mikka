@@ -305,10 +305,11 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cp
             template = template.copy(runtime_file, f'/opt/mikka/{runtime_file}')
         template = (template
                     .run_cmd(f'python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind {kind} --cli-manifest /opt/mikka/original-cli.json', user='root')
-                    .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind}', user='root')
+                    .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind} prebuild', user='root')
                     .run_cmd(NPM_RUNTIME_CHECK, user='user')
                     .run_cmd('python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json', user='root'))
         ready = (ANONYMOUS_WORKER_READY + ' && '
+                 'python3 /opt/mikka/runtime/ingress-v1/guard.py ready "$mikka_preloaded_pid" > /opt/mikka/ingress-ready.json && '
                  'test ! -e /home/user/.mikka/bootstrap.json && '
                  'test ! -e /home/user/.mikka/worker/device.json')
         if kind == 'desktop':

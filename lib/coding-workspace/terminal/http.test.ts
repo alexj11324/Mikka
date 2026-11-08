@@ -92,6 +92,18 @@ test('POST data is forwarded once under an existing lease and cannot create or r
   assert.equal(f.controls.length, 1)
 })
 
+test('an old VM missing ingress capability returns 404 even when durable cleanup stays pending', async () => {
+  const f = fixture()
+  f.deps.prepare = async () => { f.events.push('prepare'); throw new TerminalError('terminal_unsupported', { detail: 'runtime_version' }) }
+  f.deps.revoke = async () => { f.events.push('revoked'); return { closed: 0, pending: 1 } }
+  const response = await reviewTerminalHandlers(f.deps).stream(f.request(), f.scope.taskId)
+  assert.equal(response.status, 404)
+  assert.deepEqual(await response.json(), { error: 'terminal_unsupported', detail: 'runtime_version' })
+  assert.equal(f.events.at(-1), 'revoked')
+  assert.equal(f.events.includes('grant'), false)
+  assert.equal(f.events.includes('request'), false)
+})
+
 test('same-origin, UTF-8 and closed-payload guards reject before any authority or remote call', async () => {
   const f = fixture(), api = reviewTerminalHandlers(f.deps)
   for (const [body, status] of [[{ data: '界'.repeat(5462) }, 413], [{ data: 'pwd\n', sandboxId: 'other' }, 400], [{ data: 1 }, 400]] as const)

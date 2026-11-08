@@ -10,6 +10,7 @@ import type { TaskReviewAuthority } from '../review-authority'
 
 const ROOT = '/run/mikka-preview'
 const SCRIPT = '/opt/mikka/preview/preview-gateway.py'
+const INGRESS = '/opt/mikka/runtime/ingress-v1/guard.py'
 export const PREVIEW_LIFETIME_MS = 5 * 60_000
 export type PreviewFailureDetail = 'configuration' | 'runtime' | 'protocol' | 'scope_changed' | 'limit'
 export class PreviewRuntimeError extends CodedError<'review_preview_unavailable'> {
@@ -47,7 +48,7 @@ function readReply(stdout: string): Json {
     if (!result || typeof result !== 'object' || Array.isArray(result)) throw new PreviewRuntimeError('protocol')
     const reply = result as Json
     if (typeof reply.error === 'string') {
-      const status = typeof reply.status === 'number' && [400, 403, 409, 429, 503].includes(reply.status) ? reply.status : 503
+      const status = typeof reply.status === 'number' && [400, 403, 404, 409, 429, 503].includes(reply.status) ? reply.status : 503
       throw new PreviewRuntimeError(reply.error.endsWith('_limit') ? 'limit'
         : ['invalid_scope', 'scope_changed', 'authorization_revoked', 'authorization_expired'].includes(reply.error) ? 'scope_changed'
           : ['runtime_version_mismatch', 'firewall_unsupported', 'firewall_unavailable'].includes(reply.error) ? 'configuration' : 'runtime', status)
@@ -57,6 +58,28 @@ function readReply(stdout: string): Json {
     if (cause instanceof PreviewRuntimeError) throw cause
     throw new PreviewRuntimeError('protocol', 503, { cause })
   }
+}
+
+async function verifyIngress(sandbox: Sandbox): Promise<void> {
+  // Old VMs must stay unsupported. This command cannot install or repair a
+  // rule after a task has already started listening on a public dev port.
+  const checked = await sandbox.commands.run(`if test -f ${INGRESS}; then python3 ${INGRESS} verify || :; else printf '{"ok":false}'; fi`,
+    { user: 'root', timeoutMs: 30_000 })
+  let value: Json
+  try {
+    if (checked.stdout.length > 4096) throw new PreviewRuntimeError('configuration', 404)
+    value = JSON.parse(checked.stdout) as Json
+  } catch (cause) {
+    if (cause instanceof PreviewRuntimeError) throw cause
+    throw new PreviewRuntimeError('configuration', 404, { cause })
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.ok !== true || value.version !== 1
+    || value.preparedBeforeWorker !== true || typeof value.sourceSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sourceSha256)
+    || typeof value.bootId !== 'string' || !/^[a-f0-9-]{36}$/.test(value.bootId)
+    || !Number.isSafeInteger(value.installedTicks) || Number(value.installedTicks) < 0
+    || !['[49983]', '[49983,50005]'].includes(JSON.stringify(value.providerPorts))
+    || JSON.stringify(value.rulesVerified) !== '{"ipv4":true,"ipv6":true}')
+    throw new PreviewRuntimeError('configuration', 404)
 }
 
 async function install(sandbox: Sandbox): Promise<void> {
@@ -103,6 +126,7 @@ export async function prepareRunPreview(authority: TaskReviewAuthority, options:
     if (await state(authority.workspaceId, authority.sandboxId) !== 'running') throw new PreviewRuntimeError('scope_changed', 409)
     const sandbox = await connect(authority.workspaceId, authority.sandboxId, AbortSignal.timeout(45_000))
     if (sandbox.sandboxId !== authority.sandboxId) throw new PreviewRuntimeError('scope_changed', 409)
+    await verifyIngress(sandbox)
     await install(sandbox)
     const reply = await control(sandbox, { operation: 'prepare', binding, ...(options.port === undefined ? {} : { port: options.port }) })
     if (reply.running === false && reply.code === 'no_loopback_server')

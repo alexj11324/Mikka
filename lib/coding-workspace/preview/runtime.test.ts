@@ -18,19 +18,22 @@ const authority = {
   deviceId: 'device-synthetic', repoId: 'repo-synthetic', sandboxId: 'sandbox-synthetic',
   machineEpoch: 1, worktreePath: '/workspace/project', machineKind: 'cloud', credentialExpiresAt: null,
 } as TaskReviewAuthority
+const ingress = { ok: true, version: 1, sourceSha256: 'a'.repeat(64), bootId: '1'.repeat(36),
+  installedTicks: 1, providerPorts: [49983], preparedBeforeWorker: true, rulesVerified: { ipv4: true, ipv6: true } }
 
 async function fixture() {
   const version = createHash('sha256').update(await readFile('scripts/e2b/preview-gateway.py')).update(await readFile('scripts/e2b/preview_firewall.py')).digest('hex')
   const files = new Map<string, string>()
   const commands: string[] = []
   const messages: Record<string, unknown>[] = []
-  const state = { version, available: true, present: true, revoked: true, ticket: 'a'.repeat(43), expiresAt: 0 }
+  const state = { version, available: true, present: true, revoked: true, ticket: 'a'.repeat(43), expiresAt: 0, ingress: JSON.stringify(ingress) }
   const sandbox = {
     sandboxId: 'sandbox-synthetic',
     getHost: (port: number) => `${port}-sandbox-synthetic.e2b.app`,
     files: { write: async (path: string, data: string) => { files.set(path, data) } },
     commands: { run: async (command: string) => {
       commands.push(command)
+      if (command.includes('ingress-v1/guard.py verify')) return { stdout: state.ingress }
       if (command.endsWith(' ensure')) return { stdout: JSON.stringify({ version: state.version }) }
       if (command.startsWith('if test -S')) return { stdout: state.present ? 'present' : 'absent' }
       if (command.includes(' control ')) {
@@ -51,7 +54,7 @@ async function fixture() {
       return { stdout: '' }
     } },
   } as unknown as Sandbox
-  return { state, sandbox, commands, messages, connect: async () => sandbox }
+  return { state, sandbox, commands, messages, files, connect: async () => sandbox }
 }
 
 test('preview preserves the frontend running discriminant and isolated one-use entry contract', async () => {
@@ -69,10 +72,30 @@ test('preview preserves the frontend running discriminant and isolated one-use e
   assert.equal(result.expiresAt, expiry)
   assert.equal(f.messages[0].operation, 'prepare')
   assert.equal(f.messages[1].operation, 'issue')
+  assert.match(f.commands[0], /ingress-v1\/guard\.py verify/)
+  assert.ok(!f.commands.some(command => /guard\.py (prepare|ready)/.test(command)))
   for (const command of f.commands) {
     assert.ok(!command.includes('owner-synthetic'))
     assert.ok(!command.includes('run-synthetic'))
     assert.ok(!command.includes(f.state.ticket))
+  }
+})
+
+test('old, altered or unproved VM ingress is 404 before any gateway write or capability', async () => {
+  for (const value of ['{"ok":false}', '', 'null', '[]', 'x'.repeat(4097),
+    JSON.stringify({ ...ingress, preparedBeforeWorker: false }),
+    JSON.stringify({ ...ingress, rulesVerified: { ipv4: true, ipv6: false } }),
+    JSON.stringify({ ...ingress, providerPorts: [50005] }),
+    JSON.stringify({ ...ingress, installedTicks: -1 }),
+    JSON.stringify({ ...ingress, sourceSha256: 'stale' }),
+  ]) {
+    const f = await fixture()
+    f.state.ingress = value
+    await assert.rejects(prepareRunPreview(authority, {}, f.connect), (error: unknown) => error instanceof PreviewRuntimeError
+      && error.detail === 'configuration' && error.status === 404)
+    assert.equal(f.files.size, 0)
+    assert.equal(f.messages.length, 0)
+    assert.equal(f.commands.length, 1)
   }
 })
 

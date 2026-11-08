@@ -20,6 +20,7 @@ import pwd
 import re
 import resource
 import signal
+import socket
 import stat
 import struct
 import termios
@@ -728,7 +729,12 @@ async def main():
     finally:
         os.close(fd)
     gateway = Gateway(key)
-    server = await asyncio.start_server(gateway.serve, '0.0.0.0', PORT, limit=16_384)
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_MARK, 0x4D4B5056)
+    listener.bind(('0.0.0.0', PORT))
+    listener.listen(128)
+    server = await asyncio.start_server(gateway.serve, sock=listener, limit=16_384)
     print('terminal-ready', flush=True)
     async with server:
         await server.serve_forever()

@@ -11,6 +11,7 @@ import { terminalKey, signTerminalTicket, terminalResponseError, type TerminalPr
 const PORT = 6084
 const ROOT = '/run/mikka-terminal'
 const INSTALL = '/opt/mikka/terminal'
+const INGRESS = '/opt/mikka/runtime/ingress-v1/guard.py'
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
 
 async function options(ownerId: string, signal?: AbortSignal) {
@@ -67,6 +68,29 @@ async function health(origin: string, key: Buffer, signal?: AbortSignal): Promis
   } catch { signal?.throwIfAborted(); return null }
 }
 
+async function verifyRuntime(sandbox: Sandbox, signal?: AbortSignal) {
+  // Worker refresh may add the execution fence to an old VM without the
+  // pre-worker ingress guard. Verify both in one read-only opening preflight;
+  // never install or repair network rules after user processes have started.
+  const checked = await sandbox.commands.run(`if test -f /run/mikka-review-control/version && test ! -L /run/mikka-review-control/version && test "$(cat /run/mikka-review-control/version)" = 1 && test -f ${INGRESS} && test ! -L ${INGRESS}; then python3 ${INGRESS} verify || :; fi`,
+    { user: 'root', timeoutMs: 30_000, signal })
+  let value: Record<string, unknown>
+  try {
+    if (checked.exitCode !== 0 || checked.stdout.length > 4096) throw new TerminalError('terminal_unsupported', { detail: 'runtime_version' })
+    value = JSON.parse(checked.stdout) as Record<string, unknown>
+  } catch (cause) {
+    if (cause instanceof TerminalError) throw cause
+    throw new TerminalError('terminal_unsupported', { detail: 'runtime_version', cause })
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.ok !== true || value.version !== 1
+    || value.preparedBeforeWorker !== true || typeof value.sourceSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sourceSha256)
+    || typeof value.bootId !== 'string' || !/^[a-f0-9-]{36}$/.test(value.bootId)
+    || !Number.isSafeInteger(value.installedTicks) || Number(value.installedTicks) < 0
+    || !['[49983]', '[49983,50005]'].includes(JSON.stringify(value.providerPorts))
+    || JSON.stringify(value.rulesVerified) !== '{"ipv4":true,"ipv6":true}')
+    throw new TerminalError('terminal_unsupported', { detail: 'runtime_version' })
+}
+
 /** Prepare before the final database fence. No shell or task is started. */
 export async function prepareTerminal(scope: TaskReviewAuthority, signal?: AbortSignal): Promise<TerminalPrepared> {
   cloud(scope)
@@ -77,12 +101,14 @@ export async function prepareTerminal(scope: TaskReviewAuthority, signal?: Abort
     const version = createHash('sha256').update(source).digest('hex')
     const key = terminalKey(target, process.env.BETTER_AUTH_SECRET)
     let current = await health(origin, key, signal)
+    if (current && current.version !== version) throw new TerminalError('terminal_unsupported', { detail: 'runtime_version' })
+    // Only opening/reconnecting performs this root check. Input/resize/close
+    // keep the existing data plane and never issue a per-command SDK RPC.
+    const sandbox = await withE2BErrors(scope.ownerId, false, () => Sandbox.connect(scope.sandboxId, { ...config, timeoutMs: 5 * 60_000 }))
+    await verifyRuntime(sandbox, signal)
     if (!current) {
       // resumeReviewMachine has already acquired the dedicated review lease.
       // The same running sandbox is the only target; never create a VM here.
-      const sandbox = await withE2BErrors(scope.ownerId, false, () => Sandbox.connect(scope.sandboxId, { ...config, timeoutMs: 5 * 60_000 }))
-      const marker = await sandbox.commands.run("if test -f /run/mikka-review-control/version && test ! -L /run/mikka-review-control/version && test \"$(cat /run/mikka-review-control/version)\" = 1; then printf supported; fi", { user: 'root', timeoutMs: 5_000, signal })
-      if (marker.exitCode !== 0 || marker.stdout !== 'supported') throw new TerminalError('terminal_unsupported', { detail: 'runtime_version' })
       await sandbox.commands.run(`install -d -m 700 -o root -g root ${ROOT} && install -d -m 755 -o root -g root ${INSTALL}`, { user: 'root', timeoutMs: 5_000, signal })
       const path = `${INSTALL}/gateway-${version}.py`
       await sandbox.files.write([{ path, data: source }, { path: `${ROOT}/key`, data: Uint8Array.from(key).buffer }], { user: 'root', signal })

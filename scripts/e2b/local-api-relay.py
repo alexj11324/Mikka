@@ -9,6 +9,7 @@ import base64
 import hmac
 import json
 import re
+import socket
 import sys
 import time
 from pathlib import Path
@@ -224,7 +225,14 @@ def main():
         raise ValueError('Private relay configuration required')
     config = json.loads(path.read_text())
     path.unlink()
-    web.run_app(create_app(config), host='0.0.0.0', port=8765, print=None, access_log=None)
+    # Only this authenticated, disposable acceptance listener opts in. Port
+    # 8765 is never an exception in the VM's default-private ingress policy.
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_MARK, 0x4D4B5056)
+    listener.bind(('0.0.0.0', 8765))
+    listener.listen(128)
+    web.run_app(create_app(config), sock=listener, print=None, access_log=None)
 
 if __name__ == '__main__':
     main()

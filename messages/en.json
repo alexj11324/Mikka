@@ -4,6 +4,7 @@
     "interval": "Every {minutes, plural, one {1 minute} other {# minutes}}"
   },
   "Common": {
+    "privacyPolicy": "Privacy policy",
     "appUpdated": "Mikka has been updated",
     "refresh": "Refresh",
     "close": "Close",

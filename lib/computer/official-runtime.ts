@@ -49,7 +49,7 @@ export async function bootstrapOfficialInstance(sandbox: Pick<Sandbox, 'commands
   if (!result.stdout.includes(`mikka-official-instance-ready ${commit} ${sha}`)) {
     // Idempotent creation can return an already-installed instance. Verify its
     // receipt rather than treating command exit alone as successful startup.
-    const receipt = await sandbox.commands.run('cat /opt/mikka/worker-source-sha', { user: 'root', timeoutMs: 5_000 })
+    const receipt = await sandbox.commands.run('python3 /opt/mikka/runtime/ingress-v1/guard.py verify >/dev/null && cat /opt/mikka/worker-source-sha', { user: 'root', timeoutMs: 30_000 })
     if (receipt.stdout.trim() !== sha) throw new Error('Official worker receipt mismatch')
   }
 }

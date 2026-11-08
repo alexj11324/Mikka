@@ -8,7 +8,7 @@ import { terminalFixture } from './test-fixture'
 
 class MissingSandbox extends Error {}
 const state = { machine: 'running', present: true, validProof: true, version: '', boot: randomUUID(),
-  connects: 0, reads: 0, missing: false, status: 204, commands: [] as string[], writes: [] as { path: string; data: string | ArrayBuffer }[] }
+  connects: 0, reads: 0, missing: false, status: 204, ingress: '', commands: [] as string[], writes: [] as { path: string; data: string | ArrayBuffer }[] }
 class SyntheticSandbox {
   constructor(_options: unknown) {}
   static async getInfo() { state.reads++; if (state.missing) throw new MissingSandbox(); return { state: state.machine, envdVersion: 'synthetic', sandboxDomain: 'e2b.app' } }
@@ -16,7 +16,7 @@ class SyntheticSandbox {
   getHost(port: number) { return `${port}-sandbox-synthetic.e2b.app` }
   commands = { run: async (command: string) => {
     state.commands.push(command)
-    if (command.startsWith('if test -f ')) return { exitCode: 0, stdout: 'supported' }
+    if (command.startsWith('if test -f ')) return { exitCode: 0, stdout: state.ingress }
     if (command.startsWith('python3 -I -c ')) state.present = true
     return { exitCode: 0, stdout: '' }
   } }
@@ -35,6 +35,8 @@ async function fixture() {
   const f = terminalFixture(), calls: string[] = []
   Object.assign(state, { machine: 'running', present: true, validProof: true, boot: randomUUID(), connects: 0, reads: 0, missing: false, status: 204, commands: [], writes: [] })
   state.version = createHash('sha256').update(await readFile('scripts/e2b/terminal-gateway.py')).digest('hex')
+  state.ingress = JSON.stringify({ ok: true, version: 1, sourceSha256: 'a'.repeat(64), bootId: randomUUID(),
+    installedTicks: 1, providerPorts: [49983], preparedBeforeWorker: true, rulesVerified: { ipv4: true, ipv6: true } })
   process.env.BETTER_AUTH_SECRET = 'synthetic-control-plane-fixture-'.repeat(2)
   const target = { runId: f.scope.runId, ownerId: f.scope.ownerId, workspaceId: f.scope.workspaceId, sandboxId: f.scope.sandboxId! }
   const key = terminalKey(target, process.env.BETTER_AUTH_SECRET)
@@ -60,7 +62,27 @@ test('existing terminal only reads provider identity and authenticates root heal
   assert.equal(prepared.bindingId, f.scope.bindingId)
   assert.equal(state.connects, 0)
   assert.equal(state.writes.length, 0)
+  assert.equal(state.commands.length, 0, 'input lookup never performs a remote ingress command')
   assert.deepEqual(f.calls, ['/health'])
+})
+
+test('opening even an existing gateway requires the pre-worker dual-stack ingress guard', async () => {
+  for (const present of [false, true]) for (const receipt of ['', 'supported', '{"ok":false}',
+    JSON.stringify({ ok: true, version: 1, preparedBeforeWorker: false, rulesVerified: { ipv4: true, ipv6: true } }),
+    JSON.stringify({ ok: true, version: 1, preparedBeforeWorker: true, rulesVerified: { ipv4: true, ipv6: false } })]) {
+    const f = await fixture(); state.present = present; state.ingress = receipt
+    await assert.rejects(prepareTerminal(f.scope), (error: unknown) => error instanceof TerminalError
+      && error.code === 'terminal_unsupported' && error.status === 404 && error.detail === 'runtime_version')
+    assert.equal(state.writes.length, 0, 'old/staged VMs are never repaired while opening review')
+    assert.equal(state.commands.length, 1)
+    assert.match(state.commands[0]!, /\/ingress-v1\/guard\.py verify/)
+    assert.doesNotMatch(state.commands[0]!, /\/ingress-v1\/guard\.py (?:prepare|install)/)
+  }
+  const f = await fixture()
+  const prepared = await prepareTerminal(f.scope)
+  assert.equal(prepared.boot, state.boot)
+  assert.equal(state.commands.length, 1, 'control and ingress use the same read-only opening preflight')
+  assert.equal(state.writes.length, 0)
 })
 
 test('initial preparation installs one immutable root gateway using a derived key, never a new VM or Agent', async () => {

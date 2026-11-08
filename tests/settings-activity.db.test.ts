@@ -28,7 +28,9 @@ let link: typeof import('../lib/device-link')
 
 before(async () => {
   if (!databaseUrl) return
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false }) } })
+  // Credential mutations are audited in the selected workspace; this suite selects its team explicitly.
+  const workspaceCookie = { name: 'mikka-workspace', value: workspaceId }
+  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === workspaceCookie.name ? workspaceCookie : undefined, getAll: () => [workspaceCookie], has: (key: string) => key === workspaceCookie.name }) } })
   const intl = await import('next-intl/server')
   mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en' } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser, name: sessionUser, email: `${sessionUser}@example.invalid` } } : null } } } })

@@ -1,5 +1,7 @@
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 import unittest
 
@@ -9,42 +11,44 @@ spec.loader.exec_module(firewall)
 
 
 class FirewallPolicy(unittest.TestCase):
-    def test_both_families_reject_every_non_loopback_interface_and_verify(self):
-        calls, installed = [], set()
+    def receipt(self):
+        return {'ok': True, 'version': 1, 'sourceSha256': 'a' * 64, 'bootId': '1' * 36,
+                'installedTicks': 123, 'providerPorts': [49983], 'preparedBeforeWorker': True,
+                'rulesVerified': {'ipv4': True, 'ipv6': True}}
 
+    def test_each_read_only_verifies_existing_pre_worker_rules(self):
+        calls = []
         def run(arguments, **options):
             calls.append(arguments)
-            key = arguments[0]
-            if '--insert' in arguments:
-                installed.add(key)
-                return SimpleNamespace(returncode=0)
-            self.assertIn('--check', arguments)
-            return SimpleNamespace(returncode=0 if key in installed else 1)
+            return SimpleNamespace(returncode=0, stdout=json.dumps(self.receipt()).encode())
+        for port in (3000, 5173):
+            self.assertEqual(firewall.protect_port(port, run=run), {'protected': True, 'ipv4': True, 'ipv6': True, 'port': port})
+        self.assertEqual(calls, [[firewall.sys.executable, firewall.GUARD, 'verify']] * 2)
 
-        result = firewall.protect_port(3000, run=run, which=lambda name: '/sbin/' + name)
-        self.assertTrue(result['protected'])
-        self.assertEqual(installed, {'/sbin/iptables', '/sbin/ip6tables'})
-        self.assertEqual(len(calls), 6)
-        for arguments in calls:
-            self.assertIn('INPUT', arguments)
-            self.assertIn('!', arguments)
-            self.assertIn('lo', arguments)
-            self.assertIn('REJECT', arguments)
-            self.assertIn('tcp-reset', arguments)
-            self.assertNotIn('--delete', arguments)
-        before = len(calls)
-        firewall.protect_port(3000, run=run, which=lambda name: '/sbin/' + name)
-        self.assertEqual(len(calls) - before, 4, 'a reused port still rechecks both live rules')
+    def test_old_vm_stale_partial_or_malformed_proof_never_installs_rules(self):
+        bad = [b'', b'null', b'[]', b'false', b'x' * 4097, b'{"ok":false}']
+        for update in ({'preparedBeforeWorker': False}, {'rulesVerified': {'ipv4': True, 'ipv6': False}},
+                       {'sourceSha256': 'wrong'}, {'providerPorts': [50005]}, {'installedTicks': -1}, {'version': 0}):
+            bad.append(json.dumps(self.receipt() | update).encode())
+        for value in bad:
+            calls = []
+            def run(arguments, **options):
+                calls.append(arguments)
+                return SimpleNamespace(returncode=0, stdout=value)
+            with self.assertRaisesRegex(firewall.FirewallError, 'firewall_unsupported'):
+                firewall.protect_port(3000, run=run)
+            self.assertEqual(calls, [[firewall.sys.executable, firewall.GUARD, 'verify']])
+        for status in (1, 2, 3):
+            with self.assertRaisesRegex(firewall.FirewallError, 'firewall_unsupported'):
+                firewall.protect_port(3000, run=lambda *_a, **_k: SimpleNamespace(returncode=status, stdout=b''))
 
-    def test_missing_ipv6_permission_failure_and_unverified_insert_fail_closed(self):
-        with self.assertRaises(firewall.FirewallError):
-            firewall.protect_port(3000, which=lambda name: '/sbin/iptables' if name == 'iptables' else None)
-        for status in (2, 3, 4):
-            with self.assertRaises(firewall.FirewallError):
-                firewall.protect_port(3000, run=lambda *_args, **_options: SimpleNamespace(returncode=status), which=lambda name: name)
-        sequence = iter((1, 0, 1))
-        with self.assertRaises(firewall.FirewallError):
-            firewall.protect_port(3000, run=lambda *_args, **_options: SimpleNamespace(returncode=next(sequence)), which=lambda name: name)
+    def test_failed_bounded_read_preserves_cause(self):
+        for failure in (OSError('fixture'), subprocess.TimeoutExpired('fixture', 25)):
+            def run(*_a, **_k):
+                raise failure
+            with self.assertRaisesRegex(firewall.FirewallError, 'firewall_unavailable') as caught:
+                firewall.protect_port(3000, run=run)
+            self.assertIs(caught.exception.__cause__, failure)
 
     def test_no_arbitrary_port_or_infrastructure_port_can_be_protected(self):
         for port in ('3000; true', '3000', True, 0, 80, 49983, 50005, 65536):
