@@ -5,10 +5,10 @@
   "workspaceId": "93f38d33-9447-4eaf-8a46-0d8889165bcd",
   "smokeUserId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
   "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
-  "startedAt": "2026-11-07T23:46:48.300Z",
+  "startedAt": "2026-11-08T01:13:32.878Z",
   "status": "passed",
   "changed": true,
-  "inputFixtureSha256": "2d5418a9aa2d3571040595504bbd279de5d842e08db1dcf7d30b9821b280b312",
+  "inputFixtureSha256": "c302f246d6e7d89dc8e19d5b288925e856a88572af30d3e493fb3eef584c4fe2",
   "before": {
     "version": 1,
     "issue": 1503,
@@ -24,8 +24,8 @@
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
     "providerExpiresAt": "2026-11-08T05:11:30.000Z",
-    "connectionExpiresAt": "2026-11-08T01:11:22.762Z",
-    "connectionUpdatedAt": "2026-11-07T21:11:32.763Z",
+    "connectionExpiresAt": "2026-11-08T03:46:40.717Z",
+    "connectionUpdatedAt": "2026-11-07T23:46:50.717Z",
     "tokenSha256": "c6e90ad02df471bf35e9455d02d4bd75a8a8b9a05d35ef2fba6d95a3e70df3a6"
   },
   "activityBefore": {
@@ -73,8 +73,8 @@
     "otherRepositoryMetadataCount": 52,
     "checkTokenScopeConfirmed": false,
     "providerExpiresAt": "2026-11-08T05:11:30.000Z",
-    "connectionExpiresAt": "2026-11-08T03:46:40.717Z",
-    "connectionUpdatedAt": "2026-11-07T23:46:50.717Z",
+    "connectionExpiresAt": "2026-11-08T05:11:19.531Z",
+    "connectionUpdatedAt": "2026-11-08T01:13:35.531Z",
     "tokenSha256": "c6e90ad02df471bf35e9455d02d4bd75a8a8b9a05d35ef2fba6d95a3e70df3a6"
   },
   "sameToken": true,
@@ -90,5 +90,5 @@
   },
   "renewedFixtureStateWritten": true,
   "stage": "readback",
-  "completedAt": "2026-11-07T23:46:50.879Z"
+  "completedAt": "2026-11-08T01:13:35.593Z"
 }
