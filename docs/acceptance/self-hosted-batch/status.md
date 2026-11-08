@@ -30,9 +30,9 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
   RPC, built-in live socket, chat submission and a synthetic-model reply. Its
   receipt and screenshot are retained separately. The first complete image run
   passed the native checks, but its screenshot was obscured by onboarding. The
-  current driver uses the ordinary Skip setup button before taking the image;
-  that revision awaits CI. Neither case claims real Google OAuth or subscription
-  acceptance.
+  corrected driver uses the ordinary Skip setup button; its six native checks
+  and unobscured chat screenshot passed in run 42430159521 (receipt below).
+  Neither case claims real Google OAuth or subscription acceptance.
 - #1593: the report parser now retains nine closed validation booleans before
   refusing a native delivery. The historical artifact lacks the report text and
   the original combined assertion cannot identify which invariant failed.
@@ -69,7 +69,7 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
 | Issue | Still required |
 | --- | --- |
 | #1539 | Connect settings UI to the actions below; real production source toggle/refresh and migration checks. |
-| #1556 | Packaged desktop against the actual community image: email and real Google login, chat/reply and built-in live delivery. Unit transport tests do not replace this. |
+| #1556 | Packaged desktop/community-image email, chat/reply and built-in live passed; real Google OAuth and external-provider acceptance remain. |
 | #1593 | Historical failed invariant identified as missing Limits; rerun both fixed official subscription paths; collect dispatch latency, active keepalive, normal completion/cancellation and remaining external-wait/stage-handoff evidence. |
 | #1212 | Production server-side MCP abort and public/private group Stop receipts, including cleanup. |
 | #1560, #1565 | A real assigned thread completed by the daemon on the self-hosted installation; distinguish it from enrollment and transport. |
@@ -83,6 +83,26 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
 
 No issue is closed solely because its code is on main, a guard job is green,
 a synthetic model responds, or the client stopped waiting.
+
+## Packaged desktop and actual community image
+
+[Run 42430159521](https://github.com/alexj11324/Mikka/actions/runs/42430159521),
+head `bce64f1b68ba1b5360bb0e48d8cc5207f1e41adf`, actual test checkout/image
+`7e614596a926b1ee24333a41123be682c2d3ee3f`. Desktop receipt spans
+2026-11-08 00:45:21.082–00:45:28.003 UTC. All six checks passed: real community
+discovery/selection, normal email login and authenticated RPC, actual built-in
+live ticket/socket, chat submission and fixture reply after live invalidation,
+ordinary onboarding dismissal and visible reply, sign-out/default-server
+return. Session, Electron, daemon and private handoff cleanup all passed.
+
+Artifact [13597546455](https://github.com/alexj11324/Mikka/actions/runs/42430159521/artifacts/13597546455)
+contains `desktop/report.json` and `desktop/self-hosted-chat.png`. Its ZIP SHA256
+is `0522ec542362514dbc208262ee068aaf3171d07212297595afffb7710d202663`.
+The owning agent downloaded and viewed the PNG: it shows the actual bot chat's
+`selfhost_turn_32` and `SELF_HOSTED_REPLY_32`, unobscured by onboarding. Provider:
+explicitly synthetic OpenAI-compatible. Google OAuth and subscription
+acceptance are false in this receipt. It proves the native product transport
+and image flow, not those separate external-service requirements.
 
 ## Local production-build API receipt
 
