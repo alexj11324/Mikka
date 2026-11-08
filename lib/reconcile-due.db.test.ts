@@ -12,7 +12,7 @@ const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Reconcile tests require matching isolated loopback _e2e URLs')
 
-const TABLES = ['coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'agent_runs', 'devices', 'cloud_machines',
+const TABLES = ['coding_review_sessions', 'coordinator_events', 'coordinator_sessions', 'user_schedules', 'schedule_occurrences', 'agent_runs', 'devices', 'cloud_machines',
   'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns', 'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events',
   'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges', 'account_deletion_jobs', 'chat_attachments', 'chat_attachment_retirements',
   'workspace_audit_retention', 'workspace_audit_events', 'workspace_deletions', 'workspace_audit_outbox', 'mobile_push_receipts']

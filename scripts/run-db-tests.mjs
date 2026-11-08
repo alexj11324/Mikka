@@ -12,6 +12,8 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/coding-workspace/review-authority.ts', file: 'lib/coding-workspace/review-authority.db.test.ts', script: 'test:coding-review-db' },
+  { marker: 'lib/coding-workspace/review-sessions.ts', file: 'lib/coding-workspace/review-authority.db.test.ts', script: 'test:coding-review-db' },
   { marker: 'lib/cloud-services/store.ts', file: 'lib/cloud-services/client.db.test.ts', script: 'test:cloud-services-db' },
   { marker: 'app/api/web/exchange/route.ts', file: 'tests/web-auth-handoff.db.test.ts', script: 'test:web-auth-db' },
   { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },

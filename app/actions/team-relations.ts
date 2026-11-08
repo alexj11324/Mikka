@@ -14,6 +14,7 @@ import { WorkspaceError } from '@/lib/workspace-access'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
 import { pool } from '@/lib/db'
 import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
+import { markReviewSessionsRevoked, drainRevokedReviewSessions } from '@/lib/coding-workspace/review-sessions'
 
 async function result<T>(operation: () => Promise<T>) {
   const i18nText = await getTranslations();
@@ -28,7 +29,8 @@ export async function setIssueTeam(input: { issueId: string; teamId: string | nu
   return result(async () => {
     z.object({ issueId: z.uuid(), teamId: z.uuid().nullable(), expectedTeamId: z.uuid().nullable() }).parse(input)
     const { issue, user } = await requireIssueAccess(input.issueId)
-    return workspaceDb.transaction(async tx => {
+    let reviewIds: string[] = []
+    try { return await workspaceDb.transaction(async tx => {
       await lockTeamRelations(tx)
       const [current] = await tx.select().from(teamIssues).where(eq(teamIssues.issueId, issue.id)).limit(1)
       if ((current?.teamId ?? null) !== input.expectedTeamId) throw new WorkspaceError(i18nText("FeatureCopy.c_f07cbdb4"))
@@ -43,13 +45,17 @@ export async function setIssueTeam(input: { issueId: string; teamId: string | nu
       }
       const previousLists = await issueListScopesBeforeChange(issue)
       if ((current?.teamId ?? null) !== (destination?.id ?? null)) {
-        await stopRunsForPolicyChange(pool, { kind: 'task', issueId: issue.id })
+        // The exclusive relation lock also fences grants for an absent link.
+        // Completed Runs have review capabilities although policy stop only
+        // selects executing Runs. Provider close belongs after this COMMIT.
+        reviewIds = await markReviewSessionsRevoked(pool, { taskId: issue.id }, 'task_changed')
+        await stopRunsForPolicyChange(pool, { kind: 'task', issueId: issue.id }, tx)
       }
       if (destination) await tx.insert(teamIssues).values({ issueId: issue.id, teamId: destination.id, workspaceId: destination.workspaceId, userId: issue.userId }).onConflictDoUpdate({ target: teamIssues.issueId, set: { teamId: destination.id, workspaceId: destination.workspaceId } })
       else await tx.delete(teamIssues).where(and(eq(teamIssues.issueId, issue.id), eq(teamIssues.userId, issue.userId)))
       if (current?.teamId !== destination?.id) await issueListScopeChanged(tx, issue.id, previousLists)
       return input.teamId
-    })
+    }) } finally { await drainRevokedReviewSessions(pool, reviewIds) }
   })
 }
 export async function listProjectTeams() {

@@ -9,6 +9,7 @@ import { ServerUnreachableError } from '../src/errors'
 import { Daemon } from '../src/main'
 import { RepositoryCache } from '../src/repositories'
 import { RpcServer, type RpcHandlers, type RpcServerOptions } from '../src/rpc/server'
+import * as workspaceControl from '../src/runs/workspace-control'
 import { MemoryServer } from '../src/server-link'
 import { SessionRejectedError } from '../src/server-link-http'
 import * as service from '../src/service'
@@ -28,6 +29,12 @@ beforeEach(() => {
   vi.spyOn(RpcServer.prototype, 'listen').mockImplementation(async function (this: RpcServer) {
     handlers = (this as unknown as { options: RpcServerOptions }).options.handlers
   })
+  // A cloud hint also enables the host's root-installed execution fence. This
+  // claim/Git suite does not install an E2B host; real flock and supervisor
+  // ordering are covered in runs/workspace-control.test.ts and supervisor.test.ts.
+  vi.spyOn(workspaceControl, 'acquireCloudWorkspaceControl').mockImplementation(async () => ({
+    setWorktree: vi.fn(), release: vi.fn(async () => {}),
+  }))
 })
 afterEach(async () => {
   try { for (const close of cleanups.splice(0)) await close() }
@@ -168,7 +175,7 @@ async function machine(hint = true, options: { delayedClaim?: boolean; cloud?: b
   const started = vi.spyOn(daemon.supervisor, 'start')
   const warnings = vi.spyOn(daemon.log, 'warn')
   cleanups.push(async () => { registration.resolve(); repositories.resolve(); claimResponse.resolve(); await daemon.stop() })
-  return { daemon, runId, link, calls, recipe, started, registration, registerEntered, repositories, reposEntered,
+  return { daemon, deviceId, runId, link, calls, recipe, started, registration, registerEntered, repositories, reposEntered,
     claimEntered, claimResponse, queued, commandsEntered, warnings, claimOptions, revoke: () => { revoked = true; server.requestStop(runId) } }
 }
 
@@ -296,6 +303,7 @@ it('uninstall rejects the repository wait and drains a late claim before closing
 })
 
 it('uses claim repository settings once after the heartbeat barrier, preserving real setup and copyFiles', async () => {
+  const acquire = vi.mocked(workspaceControl.acquireCloudWorkspaceControl)
   const actualBootstrap = WorktreeManager.prototype.bootstrap
   vi.spyOn(WorktreeManager.prototype, 'bootstrap').mockImplementation(async function (this: WorktreeManager, worktree, repo, recipe) {
     writeFileSync(join(repo, '.env.local'), 'CACHE_INPUT=1\n')
@@ -310,8 +318,13 @@ it('uses claim repository settings once after the heartbeat barrier, preserving 
   await f.claimEntered.promise
   await new Promise(resolve => setImmediate(resolve))
   expect(f.started).not.toHaveBeenCalled()
+  expect(acquire).not.toHaveBeenCalled()
   barrier.resolve()
   const options = await waitFor(() => adapter.mock.calls[0]?.[0])
+  expect(acquire).toHaveBeenCalledOnce()
+  expect(acquire.mock.calls[0][0]).toMatchObject({ runId: f.runId, deviceId: f.deviceId })
+  const control = await acquire.mock.results[0].value
+  expect(control.setWorktree).toHaveBeenCalledExactlyOnceWith(options.cwd)
   expect(f.calls.filter(name => name === 'repos')).toHaveLength(0)
   expect(f.claimOptions).toEqual([{ initialRepository: true }])
   expect(f.started.mock.calls[0][0].repo).toBeUndefined()

@@ -1,7 +1,7 @@
 import 'server-only'
 import { sql, and, eq, inArray, ne } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { agentRuns, issues, teamIssueCreateRequests, teamIssuePromotions } from '@/lib/db/schema'
 import { projectEvents, projects } from '@/lib/db/project-schema'
 import { teamIssueCreateReceipts, teamIssuePromotionReceipts, teamIssues, teamMembers, teamProjects, teams } from '@/lib/db/team-schema'
@@ -9,12 +9,15 @@ import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/l
 import { lockTeamRelations } from '@/lib/team-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { ownerListChanged, workspaceListChanged } from '../live/lists'
+import { drainRevokedReviewSessions } from '../coding-workspace/review-sessions'
 
 export interface TeamDeletionImpact { teamId: string; name: string; tasks: number; projects: number }
 
 /** The team, locked, in the workspace the caller administers. */
 async function lockTeam(tx: WorkspaceTransaction, actorId: string, teamId: string) {
   z.uuid().parse(teamId)
+  // Review grants take this shared lock before Workspace/member/Team rows.
+  await lockTeamRelations(tx)
   const [team] = await tx.select({ id: teams.id, name: teams.name, workspaceId: teams.workspaceId }).from(teams).where(eq(teams.id, teamId)).for('update').limit(1)
   if (!team) throw new WorkspaceError('teamNotFound')
   await requireWorkspace(tx, team.workspaceId, actorId, true)
@@ -57,10 +60,10 @@ export interface TeamDeletion { deleted: { tasks: number; projects: number } }
  */
 export async function deleteTeamData(actorId: string, teamId: string, confirmName: string): Promise<TeamDeletion> {
   const typed = z.string().max(200).parse(confirmName).trim()
-  return workspaceDb.transaction(async tx => {
+  const reviewIds: string[] = []
+  try { return await workspaceDb.transaction(async tx => {
     const team = await lockTeam(tx, actorId, teamId)
     if (typed !== team.name) throw new WorkspaceError('teamDeleteNameMismatch')
-    await lockTeamRelations(tx)
     const { issueIds, projectIds } = await teamContents(tx, team.id)
     const tasks = await db.transaction(async main => {
       if (projectIds.length) await main.execute(sql`delete from project_decisions where "projectId" in ${projectIds}`)
@@ -69,6 +72,12 @@ export async function deleteTeamData(actorId: string, teamId: string, confirmNam
       if (!issueIds.length) return 0
       const owners = await main.selectDistinct({ userId: agentRuns.userId }).from(agentRuns).where(inArray(agentRuns.issueId, issueIds))
       const deleted = await main.delete(issues).where(inArray(issues.id, issueIds)).returning({ id: issues.id })
+      if (deleted.length) {
+        // Task DELETE already fenced these rows in this APP transaction.
+        // Keep exact cleanup IDs even if the outer WS transaction fails.
+        const pending = await main.execute<{ id: string }>(sql`select id from coding_review_sessions where "taskId" in ${deleted.map(row => row.id)} and "revokedAt" is not null`)
+        reviewIds.push(...pending.rows.map(row => row.id))
+      }
       for (const { userId } of owners) await ownerListChanged(main, userId, ['thread_list', 'task_run_list', 'bot_chat_list'])
       if (deleted.length) await workspaceListChanged(main, team.workspaceId, ['issue_list'])
       return deleted.length
@@ -86,5 +95,5 @@ export async function deleteTeamData(actorId: string, teamId: string, confirmNam
     await tx.delete(teams).where(and(eq(teams.id, team.id), eq(teams.workspaceId, team.workspaceId)))
     await workspaceListChanged(tx, team.workspaceId, ['workspace_settings', 'issue_list'])
     return { deleted: { tasks, projects: deletedProjects } }
-  })
+  }) } finally { await drainRevokedReviewSessions(pool, reviewIds) }
 }

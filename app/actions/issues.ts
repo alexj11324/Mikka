@@ -38,6 +38,7 @@ import { queryVersion } from '@/lib/db/query-version'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues, teams as localTeams } from '@/lib/db/team-schema'
 import { issueListChanged } from '@/lib/live/lists'
+import { reviewTaskChanged } from '@/lib/coding-workspace/review-sessions'
 import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { beginOwnerListRead } from '@/lib/live/revision-read'
@@ -241,6 +242,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
           statusEvent = true
         }
         if (!issue) return { error: 'issueStale' }
+        reviewTaskChanged(tx, latest, issue)
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: issue.revision, title: issue.title, content: issue.content, status: issue.status, priority: issue.priority, ...activityActor(userId) })
         await issueListChanged(tx, id, latest.title !== issue.title)
         // Title, status and priority show in every connected task's relations panel.
