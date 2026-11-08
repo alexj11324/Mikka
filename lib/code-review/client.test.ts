@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
-import { getReviewDiff, getReviewFile, getReviewSummary, mergeReview, REVIEW_ENDPOINTS, ReviewRequestError, sendToAgent } from './client'
+import { getReviewDiff, getReviewFile, getReviewSummary, mergeReview, openReviewTerminal, REVIEW_ENDPOINTS, ReviewRequestError, sendToAgent, terminalEvent } from './client'
 import type { ReviewSummary } from './contract'
 
 const TASK = '6f1c8a52-1b0e-4c3a-9d2f-0a1b2c3d4e5f'
@@ -104,4 +104,24 @@ test('批准合并 maps 200, 409 and 403 to the merge result', async () => {
   await assert.rejects(mergeReview(TASK, { confirm: false }), ReviewRequestError)
   answer(200, { merged: false })
   await assert.rejects(mergeReview(TASK, { confirm: true }), ReviewRequestError)
+})
+
+test('a terminal event block is read from its event and data lines; anything else is skipped', () => {
+  assert.deepEqual(terminalEvent('event: output\ndata: {"text":"$ pnpm test\\n"}'), { type: 'output', text: '$ pnpm test\n' })
+  assert.deepEqual(terminalEvent('event: ended\ndata: {"exitCode":1}'), { type: 'ended', exitCode: 1 })
+  assert.equal(terminalEvent(': keep-alive'), null)
+  assert.equal(terminalEvent('event: output\ndata: not json'), null)
+})
+
+test('the terminal: 404 is no terminal, 403 a refusal, and a stream yields its events in order', async () => {
+  answer(404, { error: 'not_found' })
+  assert.deepEqual(await openReviewTerminal(TASK, new AbortController().signal), { kind: 'refused', reason: 'no_endpoint' })
+  answer(403, { error: 'not_owner_terminal' })
+  assert.deepEqual(await openReviewTerminal(TASK, new AbortController().signal), { kind: 'refused', reason: 'denied' })
+  globalThis.fetch = (async () => new Response('event: output\ndata: {"text":"a"}\n\nevent: output\ndata: {"text":"b"}\n\nevent: ended\ndata: {"exitCode":0}\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } })) as typeof fetch
+  const opened = await openReviewTerminal(TASK, new AbortController().signal)
+  assert.equal(opened.kind, 'open')
+  const events = []
+  if (opened.kind === 'open') for await (const event of opened.events) events.push(event)
+  assert.deepEqual(events, [{ type: 'output', text: 'a' }, { type: 'output', text: 'b' }, { type: 'ended', exitCode: 0 }])
 })

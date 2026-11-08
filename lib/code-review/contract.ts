@@ -142,3 +142,16 @@ export type SendToAgentResult = { kind: 'sent'; messageId: string; attempt: numb
 
 /** 批准合并: with failing checks the server asks first (R7 「还有 1 项检查失败，确定合并？」); then R8 已合并. */
 export type MergeResult = { kind: 'needs_confirm'; failing: number } | { kind: 'merged' } | ReviewDenial
+
+/**
+ * The review page's terminal (R5, #1723/#1733), one shell on the task's machine. GET …/review/terminal streams it as
+ * server-sent events: `output` with `{ text }`, then `ended` with `{ exitCode }` when the shell exits or the machine
+ * goes. Planned; confirm against the backend before it lands.
+ */
+export type ReviewTerminalEvent = { type: 'output'; text: string } | { type: 'ended'; exitCode: number | null }
+
+/**
+ * Why the terminal did not open: the server has no terminal (404), the viewer may not use it (403, R11), or the machine
+ * was reclaimed (409).
+ */
+export type ReviewTerminalRefusal = 'no_endpoint' | 'denied' | 'reclaimed'
