@@ -72,8 +72,14 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   const [{ createAppIssueFromLinear }, { seal }, { actAs }, actions, { collectIssueEffects }, { processLinearIssueOutbox }, { issueForUser }, { readRun }, { db }, { linearTeamSyncs }, { eq }] = await Promise.all([
     import('../lib/linear-sync/issue-sync'), import('../lib/linear-sync/crypto'), import('../lib/acting-user'), import('../app/actions/issues'), import('../lib/issue-effects'), import('../lib/linear-sync/worker'), import('../lib/issue-access'), import('../lib/agent-runs'), import('../lib/db'), import('../lib/db/schema'), import('drizzle-orm'),
   ])
+  const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
   const owner = 'archive-owner-' + randomUUID(), member = 'archive-member-' + randomUUID()
   const workspace = randomUUID(), teamId = randomUUID(), syncId = randomUUID(), agentId = randomUUID()
+  // Select the seeded Team; acting identity and session trust remain unchanged.
+  const actInWorkspace: typeof actAs = (user, work, actor) => runRequestScope(
+    createRequestScope(new Request('http://localhost/actions/issues', { headers: { 'x-mikka-workspace-id': workspace } })),
+    () => actAs(user, work, actor),
+  )
   for (const id of [owner, member]) await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,\'Fixture\',$2,true,now(),now())', [id, id + '@example.invalid'])
   await pool.query('insert into issue_prefixes("userId",prefix) values($1,\'ALEX\')', [owner])
   await pool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,\'Archive fixture\')', [workspace, owner])
@@ -100,9 +106,9 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
     const effects: import('../lib/issue-effects').IssueEffect[] = []
     const before = (await pool.query('select * from issues where id=$1', [id])).rows[0]
     const original = await (await import('../lib/task-identifier-server')).issueView(before)
-    const preview = confirmed ? await actAs(owner, () => actions.previewIssuePersonalScope(id)) : null
+    const preview = confirmed ? await actInWorkspace(owner, () => actions.previewIssuePersonalScope(id)) : null
     if (confirmed) assert.ok(preview && 'preview' in preview && preview.preview)
-    const result = await collectIssueEffects(effects, () => actAs(owner, () => confirmed && preview && 'preview' in preview && preview.preview
+    const result = await collectIssueEffects(effects, () => actInWorkspace(owner, () => confirmed && preview && 'preview' in preview && preview.preview
       ? actions.confirmIssuePersonalScope({ id, revision: before.revision, confirmation: preview.preview.confirmation })
       : actions.setIssueScope({ id, revision: before.revision, scope: 'personal' })))
     assert.ok('issue' in result && result.issue)
@@ -120,8 +126,8 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status) values($1,$2,$3,$4,\'queued\')', [runId, member, issue, agentId])
   assert.ok(await issueForUser(member, issue))
   assert.ok(await readRun(member, runId))
-  assert.deepEqual(await actAs(member, () => actions.setIssueScope({ id: issue, revision: 1, scope: 'personal' })), { error: 'issueScopeOwnerOnly' })
-  assert.deepEqual(await actAs(owner, () => actions.setIssueScope({ id: issue, revision: 99, scope: 'personal' })), { error: 'issueStale' })
+  assert.deepEqual(await actInWorkspace(member, () => actions.setIssueScope({ id: issue, revision: 1, scope: 'personal' })), { error: 'issueScopeOwnerOnly' })
+  assert.deepEqual(await actInWorkspace(owner, () => actions.setIssueScope({ id: issue, revision: 99, scope: 'personal' })), { error: 'issueStale' })
   await retire(issue)
   assert.equal((await issueForUser(member, issue))?.workspaceId, workspace, 'disabling Linear preserves task tenancy and current collaborators')
   assert.ok(await readRun(member, runId))
