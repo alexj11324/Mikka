@@ -8,12 +8,12 @@ import { pathToFileURL } from 'node:url'
 import { workflowGuard } from './self-hosted-closeout.mjs'
 
 export const PROBE = Object.freeze({
-  source: 'c17b55652b65fb3463edf486fc544ba1c2d0e3ef',
-  tree: '5e4aac51158eaef9d286157f89ee7b1bf8d5a520',
+  source: 'b6fbb3e28102ae3afe7b154d5bad7f67b4186025',
+  tree: 'e5fcbc7c8a723bf91ee43f08de8c103d93f2bfa5',
   files: {
     'scripts/e2b/preview-ingress-probe.py': '53eff11f87b4b6ee0b41619370c0627ace8d782b9e4eb6fe79e553c8f5d6a7f0',
     'scripts/e2b/preview-ingress-acceptance.mjs': '4a30d479ed5c49f761e4af2da24577dcb08dc186579d5b40ce46faf7781ed242',
-    'scripts/e2b/preview-ingress-acceptance.test.mjs': '5411669abc3feab294ebaf0a932df9d3185f04f821e87c8cfb8ae6293f96c6d4',
+    'scripts/e2b/preview-ingress-acceptance.test.mjs': 'd5b7b5cab7aed6bd8dbdf1c405d188ec8059c5f8669744962e4fb7485f7a5f76',
   },
 })
 const PURPOSE = 'mikka-preview-ingress-spike'

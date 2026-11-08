@@ -32,7 +32,7 @@ jobs:
         id: probe_source
         with:
           repository: alexj11324/Mikka
-          ref: c17b55652b65fb3463edf486fc544ba1c2d0e3ef
+          ref: b6fbb3e28102ae3afe7b154d5bad7f67b4186025
           path: preview-ingress-source
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
