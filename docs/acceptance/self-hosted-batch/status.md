@@ -403,3 +403,20 @@ merge-order rule; all open PR migration names were checked for collision.
 The complete source lint,55 migration regressions and the renamed actual-PG17
 enabled-model suite pass. Historical migration SQL and applied receipts are
 unchanged.
+
+Run42452952270 independently confirms that the actual image lacks both public
+runtime pins. Supplying the exact f132/d382 pins progresses through the real
+additive installer, but the browser start still returns503 four times before
+creating a target. Owned-VM read-only capabilities prove private Node exists,
+system Node is absent, Google Chrome exists and Chromium is absent; the real
+gateway itself answers its version check. No login site visit or credential
+access occurred. The launcher had selected the two absent executable paths.
+
+The gateway now uses the installed private Node when present, retaining the
+legacy system-Node fallback. The CDP launcher uses inherited Google Chrome when
+the legacy Chromium path is absent. No original E2B file, HOME or environment
+is replaced. Seven gateway policy tests and the actual isolated HTTPS
+Chromium/signed-gateway broker test pass, including single-use, replay, stale
+document, origin, role, epoch and hidden-page refusals. That test explicitly
+uses no real service authentication; the real candidate-E2B fill is still a
+separate gate. The third owned VM and all other fixtures were cleaned up.
