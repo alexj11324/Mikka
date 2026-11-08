@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { cleanupLifecycleCase, createProviderObserver, isExactNativeCommand, lifecycleHash, MODELS, nativeEvidence, nativeSnapshotCommand,
   readOptions, reviewDeliveryValidation, runLifecycleCase, runThreadLifecycle, safeError } from './thread-lifecycle.mjs'
 import { watchRun } from './cloud-startup.mjs'
@@ -39,6 +41,32 @@ const proofChunks = (record, phase, codex = false, reportText) => {
   const output = 'MIKKA_1593_NATIVE ' + JSON.stringify(proof)
   return nativePair(`${record.runId}:${phase}`, 'bash', { command: nativeSnapshotCommand(record, phase) }, codex ? { exitCode: 0, output } : output)
 }
+
+test('a missing or invalid draft cannot consume the exclusive pre-question marker before a valid retry', () => {
+  for (const invalid of ['missing', 'too-short', 'too-long']) {
+    const root = mkdtempSync(join(tmpdir(), 'mikka-lifecycle-snapshot-'))
+    try {
+      execFileSync('git', ['init', '-q'], { cwd: root })
+      writeFileSync(join(root, 'README.md'), 'Isolated lifecycle snapshot regression.\n')
+      execFileSync('git', ['add', 'README.md'], { cwd: root })
+      execFileSync('git', ['-c', 'user.name=Lifecycle regression', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Initialize isolated fixture'], { cwd: root })
+      const record = fixture(), marker = join(root, `issue-1593-${record.caseId}.marker`)
+      const report = join(root, `issue-1593-${record.caseId}.md`), command = nativeSnapshotCommand(record, 'before_question')
+      if (invalid !== 'missing') writeFileSync(report, invalid === 'too-short' ? 'short' : 'x'.repeat(2401))
+      assert.throws(() => execFileSync('bash', ['-c', command], { cwd: root, stdio: 'pipe' }))
+      assert.equal(existsSync(marker), false, `${invalid} report must not consume the marker`)
+      writeFileSync(report, markerProof(record, 'delivery').reportText)
+      const output = execFileSync('bash', ['-c', command], { cwd: root, encoding: 'utf8', stdio: 'pipe' })
+      const receipt = JSON.parse(output.trim().slice('MIKKA_1593_NATIVE '.length))
+      assert.equal(receipt.caseId, record.caseId)
+      assert.equal(receipt.phase, 'before_question')
+      assert.equal(receipt.markerSha256, record.markerSha256)
+      const original = readFileSync(marker, 'utf8')
+      assert.throws(() => execFileSync('bash', ['-c', command], { cwd: root, stdio: 'pipe' }), 'a second successful snapshot still cannot replace its marker')
+      assert.equal(readFileSync(marker, 'utf8'), original)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  }
+})
 
 test('entry requires main workflow, exact source, runner temp, and the existing smoke identity', () => {
   assert.equal(readOptions(env).reportPath, '/tmp/runner/thread-lifecycle-acceptance/report.json')

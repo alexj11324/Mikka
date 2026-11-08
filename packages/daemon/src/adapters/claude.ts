@@ -170,6 +170,8 @@ export function claudeSettings(
   return {
     sandbox: { enabled: false },
     permissions: claudePermissionRules(runPolicy(workspace)),
+    // Keep the issue marker last in PR bodies without changing commit attribution.
+    attribution: { pr: "" },
   }
 }
 

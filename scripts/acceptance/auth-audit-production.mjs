@@ -91,7 +91,18 @@ export async function runAuthAudit({ env = process.env, fetchImpl = fetch } = {}
       throw new Error('issue_missing')
     }
     const own = await factoryIssue(teamId, 'workspace')
+    const switchWorkspace = async workspaceId => {
+      await client.rpc('workspace.switchWorkspace', [workspaceId])
+      const active = await client.json('/api/workspace')
+      check(active.currentUserId === identity.user.id && active.workspace?.id === workspaceId, 'workspace_missing')
+    }
+    // Read the personal baseline with the human's normal workspace context.
+    // The PAT remains bound to the verified team for every subsequent GET.
+    await switchWorkspace(other.id)
     const foreign = await factoryIssue(other.id, 'personal')
+    await switchWorkspace(teamId)
+    report.checks.humanWorkspaceBaselines = { teamReadConfirmed: true, personalReadConfirmed: true,
+      teamRestoredBeforePat: true }
     const foreignPath = '/api/factory/tasks?issueId=' + foreign.issue.id
     const baseline = foreign.baseline
     token = await client.rpc('tokens.createAccessToken', [{ name: '测试 audit ' + randomUUID(),

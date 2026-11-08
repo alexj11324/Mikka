@@ -1,5 +1,5 @@
 import { readCompactRunFailure, type CompactRunFailure } from './run-failure-view'
-import { runIsActive, runSummaryText } from './issue-run-conversation'
+import { runIsActive, runSummaryView } from './issue-run-conversation'
 import type { RunChain } from './run-chain'
 
 /**
@@ -21,7 +21,7 @@ export interface IssueThread {
   /** Whose thread it is, shown on a teammate's thread instead of its content. */
   ownerName: string | null
   /** `bot`: the dispatching Bot's own bloub look, so every copy of it matches the bot list (R-36); null for the Coordinator's own runs. */
-  detail: { name: string; agentName: string; harness: string; summary: string | null; bot?: { color: string; shape: string } | null } | null
+  detail: { name: string; agentName: string; harness: string; summary: string | null; /** Only full owner reads carry the summary's persisted source. */ summarySource?: 'report' | 'error' | null; bot?: { color: string; shape: string } | null } | null
   /**
    * BE-18 run chain (GitHub Actions run_id + run_attempt): a question continuation is a new
    * run in the same thread. `id` is the root run (attempt 1); stop, status and send act on
@@ -174,7 +174,7 @@ export function projectIssueThreads(rows: readonly (IssueThreadRow | IssueThread
       stopping: runIsActive(row.status) && !!row.stopRequestedAt,
       ownerName: row.userId === viewerId ? null : row.ownerName ?? null,
       detail: canReadThread(row.userId, viewerId, memberIds)
-        ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, summary: 'report' in row ? runSummaryText({ report: row.report, error: row.error }) : row.summary, bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null }
+        ? { name: 'prompt' in row ? threadName(row.prompt, row.agentName) : row.name, agentName: row.agentName, harness: row.harness, ...('report' in row ? runSummaryView({ report: row.report, error: row.error }) : { summary: row.summary }), bot: row.botColor && row.botShape ? { color: row.botColor, shape: row.botShape } : null }
         : null,
       rootRunId: row.id, latestRunId: row.id,
       attempts: [{ runId: row.id, attempt: 1, status: row.status, outcome: row.outcome ?? null, stopping: runIsActive(row.status) && !!row.stopRequestedAt, createdAt: row.createdAt, finishedAt: row.finishedAt }],

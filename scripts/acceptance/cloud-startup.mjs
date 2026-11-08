@@ -409,6 +409,8 @@ export function observeChunks(record, detail, observedAt) {
   // getIssueThread replays the stream. Derive ordering afresh from this read,
   // never from toolCalls retained by an earlier read of the same chunks.
   const toolInputs = new Set()
+  const submittedReplies = new Set()
+  let submittedAt = null
   let started = false, reply = '', completedTool = false, replyAfterTool = '', replyVerifiedAfterTool = false
   for (const item of detail.chunks ?? []) {
     const { chunk } = item
@@ -446,6 +448,9 @@ export function observeChunks(record, detail, observedAt) {
       if (['tool-input-start', 'tool-input-available', 'tool-output-available', 'tool-output-error'].includes(chunk?.type)
         && typeof chunk.toolCallId === 'string' && chunk.toolCallId.length > 0 && chunk.toolCallId.length <= 512) {
         const toolCallHash = sha(chunk.toolCallId).slice(0, 16)
+        if (chunk.type === 'tool-input-available' && completedTool && chunk.toolName === 'mcp__mikka__submit'
+          && typeof chunk.input?.summary === 'string' && chunk.input.summary.includes(`STARTUP_OK_${record.sampleId}`)) submittedReplies.add(toolCallHash)
+        if (chunk.type === 'tool-output-available' && submittedReplies.has(toolCallHash) && Number.isFinite(at)) submittedAt = at
         if (chunk.type.startsWith('tool-input-') && toolInputs.size < 64) toolInputs.add(toolCallHash)
         if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash)) completedTool = true
         let tool = toolCalls.find(call => call.toolCallHash === toolCallHash)
@@ -474,6 +479,20 @@ export function observeChunks(record, detail, observedAt) {
         }
       }
     }
+  }
+  // submit is the normal successful delivery channel. The owner-only summary
+  // comes from the persisted report, not from an arbitrary tool input/output.
+  // Require this exact, uncontinued run and an observed submit after its read.
+  const thread = detail.thread
+  if (submittedAt !== null && thread?.id === record.runId && thread.rootRunId === record.runId && thread.latestRunId === record.runId
+    && thread.ownedByCurrentUser === true && thread.status === 'succeeded' && thread.error === null && !thread.continuation
+    && thread.attempts?.length === 1 && thread.attempts[0].runId === record.runId && thread.attempts[0].status === 'succeeded'
+    && thread.detail?.harness === record.harness && thread.detail.summarySource === 'report' && typeof thread.detail.summary === 'string'
+    && thread.detail.summary.includes(`STARTUP_OK_${record.sampleId}`)
+    && Number.isFinite(dateValue(thread.finishedAt)) && dateValue(thread.finishedAt) >= submittedAt) {
+    record.replyVerified = true
+    replyVerifiedAfterTool = true
+    record.replySource = 'submitted_report'
   }
   record.replyVerifiedAfterTool = replyVerifiedAfterTool
   record.lastStatus = typeof detail.thread?.status === 'string' && /^[a-z_]+$/.test(detail.thread.status) ? detail.thread.status : null
