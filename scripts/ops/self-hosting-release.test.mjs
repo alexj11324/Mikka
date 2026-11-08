@@ -168,3 +168,5 @@ test('Apple API denial preserves action/status without exposing raw provider err
 // PR1692 candidate is identified separately; it cannot claim a published main image.
 
 // Retry only the blocked Claude candidate after the normal authorized source check; final release still requires both.
+
+// Read only the immutable 3c runtime attempt2 closed diagnostic; application secrets are not requested.

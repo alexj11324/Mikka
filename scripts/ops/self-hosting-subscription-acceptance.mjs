@@ -738,3 +738,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
 // Community release pin contains native-auth fix1668; production writers must complete before activation.
 
 // Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.
+
+// Read only the immutable 3c runtime attempt2 closed diagnostic; application secrets are not requested.
