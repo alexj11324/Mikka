@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "enabled": true,
+  "enabled": false,
   "phase": "cache-live",
   "expectedSha": "06173adb3fa75a4b7bfd9274efd873823f06d0ea",
   "fixtureRunKey": "acme-1506-20261106",
