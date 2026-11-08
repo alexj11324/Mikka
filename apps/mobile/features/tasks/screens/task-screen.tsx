@@ -68,7 +68,7 @@ export function TaskScreen() {
               <Chip icon={<TaskStateIcon state={shown?.state ?? null} status={task.status} size={15} />}
                 label={shown?.reason ?? (shown?.state === 'waiting' ? '等待你' : shown?.state ? STATE_LABEL[shown.state] : BOARD_LABEL[task.status] ?? task.status)} />
               <Chip icon={<PriorityIcon priority={task.priority} size={15} />} label={`${priorityLabel(task.priority)}优先级`} />
-              {task.bot ? <Chip icon={<BotAvatar color={task.bot.color} shape={task.bot.shape} size={16} />} label={task.bot.name} /> : null}
+              {task.bot ? <Chip icon={<BotAvatar id={task.bot.id} color={task.bot.color} shape={task.bot.shape} size={16} />} label={task.bot.name} /> : null}
               {task.agent ? <Chip icon={<Sparkles size={14} color={colors.secondary} strokeWidth={2} />} label={[HARNESS[task.agent.harness] ?? task.agent.harness, task.agent.model].filter(Boolean).join(' · ')} /> : null}
               {task.place ? <Chip icon={<MachineIcon machine={task.place.kind} size={15} />} label={task.place.name} /> : null}
               {task.schedule ? <Chip icon={<CalendarClock size={14} color={colors.secondary} strokeWidth={2} />} label={task.schedule.label} /> : null}

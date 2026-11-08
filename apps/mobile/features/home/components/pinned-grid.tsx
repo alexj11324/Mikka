@@ -26,7 +26,7 @@ function PinnedTile({ chat, actions }: { chat: HomeChat; actions: Actions }) {
       <ChatLink chat={chat} actions={actions} accessibilityLabel={name} style={({ pressed }) => [styles.tile, pressed && { opacity: 0.6 }]}>
         <View style={styles.tileInner}>
           <View>
-            {chat.row.kind === 'bot' ? <BotAvatar color={chat.row.bot.color} shape={chat.row.bot.shape} size={64} />
+            {chat.row.kind === 'bot' ? <BotAvatar id={chat.row.bot.id} coordinator={chat.row.bot.coordinator} color={chat.row.bot.color} shape={chat.row.bot.shape} size={64} />
               : <View style={styles.group}><Symbol name="person.2.fill" size={26} color={colors.secondary} web={<Text style={styles.glyph}>群</Text>} /></View>}
             <View style={styles.star} accessibilityElementsHidden importantForAccessibility="no">
               <Symbol name="star.fill" size={14} color={colors.orange} web={<Star size={14} color={colors.orange} fill={colors.orange} strokeWidth={0} />} />
