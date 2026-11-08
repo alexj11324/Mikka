@@ -31,7 +31,7 @@ jobs:
           node --import tsx scripts/ops/self-hosted-vault-closeout.mjs --check
       - name: Prepare immutable image and disposable infrastructure
         run: |
-          docker pull ghcr.io/alexj11324/mikka@sha256:0972e911ae6020f95aaf9fb62ae499f0f6ec67fc63e737cec25334ad48784c51
+          docker pull ghcr.io/alexj11324/mikka@sha256:f189f6dff33fa84e007edd320b42be0ae639d84210b0ef5577256c003268b811
           docker pull postgres:17-alpine
           docker pull axllent/mailpit:v1.27.4
           curl --fail --silent --show-error --location --max-time 60 https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 --output "$RUNNER_TEMP/cloudflared"

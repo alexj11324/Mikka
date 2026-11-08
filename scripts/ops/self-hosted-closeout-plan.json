@@ -1,14 +1,19 @@
 {
   "repository": "alexj11324/Mikka",
   "branch": "ops/self-hosted-vault-closeout-20261108",
-  "source": "f1324dafa296f76289124bb93538f1938cb1597f",
-  "ciRun": 42444488965,
-  "imageRun": 42444488796,
-  "imageDigest": "sha256:0972e911ae6020f95aaf9fb62ae499f0f6ec67fc63e737cec25334ad48784c51",
+  "source": "9e18c6b8122781fe89b1b3a9448bb9b1cec6d15a",
+  "ciRun": 42451707321,
+  "imageRun": 42451707289,
+  "imageDigest": "sha256:f189f6dff33fa84e007edd320b42be0ae639d84210b0ef5577256c003268b811",
   "publicOrigin": "https://app.aspectlylabs.com",
   "cloudDeployment": "dpl_92sdpZWCdDp6rkYNjZyNXkDgeLp5",
   "cloudSource": "d6f0ece2237904e7b5f23cf92a9d6492e123e6c2",
   "cloudProject": "prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc",
   "vercelTeam": "team_C7lwxVVvnUicFli6112mvxpv",
-  "workerHash": "d382cd600e4e72e04282ccaa7de7bcac22e19377"
+  "workerHash": "93a1053a587e9b49dacff68ee5061f3a6a1d2d41",
+  "gatewayCandidateSource": "68bfbe58dacb7f8467554d76d8f5d85bd58536a3",
+  "gatewayCandidateFiles": {
+    "scripts/e2b/subagent-gateway.py": "edf15a4cd60b3b602f245303c6c5d805ba90c81d172b51d0640eb2e4d1d86727",
+    "scripts/e2b/subagent-cdp.mjs": "fc61ad8c24c106d208586f3d4094894ea147f1c6ea3d15427c8aa34f13ab36ef"
+  }
 }

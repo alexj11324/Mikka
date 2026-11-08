@@ -31,8 +31,26 @@ export function loginMatches(body, username, password) {
   return same(form.get('username'), username) && same(form.get('password'), password)
 }
 
+async function candidateGuard(env) {
+  workflowGuard(env)
+  check(/^[a-f0-9]{40}$/.test(plan.gatewayCandidateSource ?? ''), 'CANDIDATE_SOURCE')
+  const paths = ['scripts/e2b/subagent-gateway.py', 'scripts/e2b/subagent-cdp.mjs']
+  check(JSON.stringify(Object.keys(plan.gatewayCandidateFiles ?? {}).sort()) === JSON.stringify(paths.sort()), 'CANDIDATE_PATHS')
+  for (const path of paths) {
+    const response = await fetch(`https://api.github.com/repos/${plan.repository}/contents/${path}?ref=${plan.gatewayCandidateSource}`, {
+      headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+      redirect: 'error', signal: AbortSignal.timeout(20_000) })
+    check(response.ok, 'CANDIDATE_FILE')
+    const file = await response.json()
+    check(file.type === 'file' && file.encoding === 'base64' && file.size > 0 && file.size < 262_144, 'CANDIDATE_FILE')
+    check(digest(Buffer.from(file.content, 'base64')) === plan.gatewayCandidateFiles[path]
+      && digest(await readFile(resolve(path))) === plan.gatewayCandidateFiles[path], 'CANDIDATE_DIGEST')
+  }
+}
+
 async function run(env) {
   await sourceGuard(env)
+  await candidateGuard(env)
   check(/^[a-f0-9]{40}$/.test(plan.workerHash ?? ''), 'WORKER_SOURCE_PIN')
   check(env.E2B_API_KEY && env.RUNNER_TEMP, 'WORKLOAD_KEY')
   const { Sandbox, SandboxNotFoundError } = await import('e2b')
@@ -44,6 +62,8 @@ async function run(env) {
   const report = { source: plan.source, imageDigest: plan.imageDigest, driver: env.GITHUB_SHA,
     started: new Date().toISOString(), stage: 'fixture', checks: {}, cleanup: {}, productionOAuth: false,
     realE2B: true, modelCalls: 0, scope: 'real-subagent-workflow-and-in-process-local-kms-broker' }
+  report.runtimeCandidate = { source: plan.gatewayCandidateSource, files: plan.gatewayCandidateFiles,
+    readOnlyScriptMounts: true, fullFinalImageAcceptance: false }
   const dbPassword = randomBytes(24).toString('hex'), accountPassword = randomBytes(24).toString('base64url')
   const masterKey = randomBytes(32).toString('base64'), secretsKey = randomBytes(32).toString('hex')
   const siteUsername = randomBytes(18).toString('base64url'), sitePassword = randomBytes(32).toString('base64url')
@@ -130,6 +150,7 @@ async function run(env) {
           SMTP_URL: 'smtp://mailpit:1025', MIKKA_EMAIL_FROM: 'Vault acceptance <login@selfhost.example.test>' },
         depends_on: { postgres: { condition: 'service_healthy' }, mailpit: { condition: 'service_started' } } }
     }, volumes: { data: {} } }
+    for (const path of Object.keys(plan.gatewayCandidateFiles)) fixture.services.app.volumes.push(`${resolve(path)}:/app/${path}:ro`)
     await writeFile(composePath, JSON.stringify(fixture), { mode: 0o600 }); fixtureStarted = true
     const image = JSON.parse(docker('image', 'inspect', `ghcr.io/alexj11324/mikka@${plan.imageDigest}`))[0]
     const imageEnv = Object.fromEntries((image.Config?.Env ?? []).map(value => { const at = value.indexOf('='); return [value.slice(0, at), value.slice(at + 1)] }))
@@ -280,6 +301,6 @@ async function run(env) {
   }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv.includes('--check')) { workflowGuard(process.env); await sourceGuard(process.env); console.log('Exact source and workload branch verified before credentials') }
+  if (process.argv.includes('--check')) { workflowGuard(process.env); await sourceGuard(process.env); await candidateGuard(process.env); console.log('Exact image source, public candidate file digests and workload branch verified before credentials') }
   else await run(process.env)
 }
