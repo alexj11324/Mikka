@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
@@ -9,17 +9,19 @@ import { consumeCloudBootstrap } from '../src/cloud-bootstrap'
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+describe.each(['claude', 'codex'] as const)('%s bootstrap sidecar', harness => {
+const field = harness === 'codex' ? 'anonymousCodexHint' : 'anonymousClaudeHint'
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'claude-hint-')); roots.push(root)
   const config = { deviceId: randomUUID(), workspaceId: randomUUID(), credential: 'orv_' + 'a'.repeat(43), server: 'https://mikka.example' }
   const body = JSON.stringify(config), hash = createHash('sha256').update(body).digest('hex'), runId = randomUUID()
   writeFileSync(join(root, 'bootstrap.json'), body, { mode: 0o600 })
   writeFileSync(join(root, 'initial-run.json'), JSON.stringify({ version: 1, runId, bootstrapSha256: hash }), { mode: 0o600 })
-  const hint = { version: 1, runId, bootstrapSha256: hash, profile: 'cloud_repository_claude_v1', model: 'claude-any-explicit-model',
+  const hint = { version: 1, runId, bootstrapSha256: hash, profile: harness === 'codex' ? 'cloud_repository_codex_0166_v1' : 'cloud_repository_claude_v1', model: harness + '-any-explicit-model',
     effort: 'high', github: true, diagnostics: false, kind: 'implement', policy: defaultRunPolicy(), mailboxTools: [],
     decisionCatalogue: { version: 1, tool: { name: 'record_decision', title: 'Record decision', description: 'Fixture',
       inputSchema: { type: 'object', properties: {} }, annotations: { idempotentHint: true } } } }
-  const path = join(root, 'anonymous-claude.json')
+  const path = join(root, 'anonymous-' + harness + '.json')
   const write = (value: unknown) => writeFileSync(path, JSON.stringify(value), { mode: 0o600 })
   return { root, path, hint, write, consume: () => consumeCloudBootstrap(join(root, 'bootstrap.json')) }
 }
@@ -27,7 +29,7 @@ it('consumes only exact bootstrap/run metadata and leaves the original strict bo
   const f = fixture(); f.write(f.hint)
   const result = f.consume()
   expect(result.initialRunId).toBe(f.hint.runId)
-  expect(result.anonymousClaudeHint).toEqual(f.hint)
+  expect(result[field]).toEqual(f.hint)
   expect(existsSync(f.path)).toBe(false)
 })
 it.each(['missing', 'invalid', 'wrong_hash', 'wrong_run', 'unknown_key', 'oversize'])('falls back for optional %s metadata without altering the locator', kind => {
@@ -40,7 +42,7 @@ it.each(['missing', 'invalid', 'wrong_hash', 'wrong_run', 'unknown_key', 'oversi
     ...(kind === 'oversize' ? { extra: 'x'.repeat(32769) } : {}) })
   const result = f.consume()
   expect(result.initialRunId).toBe(f.hint.runId)
-  expect(result.anonymousClaudeHint).toBeUndefined()
+  expect(result[field]).toBeUndefined()
 })
 it.each(['public', 'symlink', 'directory', 'fifo'])('rejects unsafe %s metadata instead of weakening filesystem permission checks', kind => {
   const f = fixture()
@@ -49,4 +51,6 @@ it.each(['public', 'symlink', 'directory', 'fifo'])('rejects unsafe %s metadata 
   else if (kind === 'symlink') symlinkSync(join(f.root, 'initial-run.json'), f.path)
   else { f.write(f.hint); chmodSync(f.path, 0o644) }
   expect(f.consume).toThrow()
+})
+
 })

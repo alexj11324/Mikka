@@ -105,14 +105,21 @@ async function repositoriesForUser(userId: string, headers?: Headers) {
   const appId = (await readGitHubAppConfig()).id
   if (!appId || !/^[1-9]\d*$/.test(appId)) throw new GitHubAccessError('githubNotConfigured', 503)
   const { token, githubAccountId } = await userToken(userId, headers)
-  const identity = (await githubGet(token, '/user')).data
+  // Both reads use the one fresh token. Settle both before validating identity
+  // first: an identity refusal may already have sent the read-only first page.
+  const [identityRead, firstPage] = await Promise.allSettled([
+    githubGet(token, '/user'), githubGet(token, '/user/installations?per_page=100&page=1'),
+  ])
+  if (identityRead.status === 'rejected') throw identityRead.reason
+  const identity = identityRead.value.data
   if (githubId(identity.id) !== githubAccountId) throw new GitHubAccessError('githubReconnectRequired', 401)
+  if (firstPage.status === 'rejected') throw firstPage.reason
   const login = typeof identity.login === 'string' && identity.login ? identity.login : null
   const installationAccounts: string[] = []
   const installations: string[] = []
   const repositories: AuthorizedGitHubRepository[] = []
   for (let page = 1; ; page++) {
-    const result = await githubGet(token, `/user/installations?per_page=100&page=${page}`)
+    const result = page === 1 ? firstPage.value : await githubGet(token, `/user/installations?per_page=100&page=${page}`)
     if (!Array.isArray(result.data.installations)) throw new GitHubAccessError('githubUnavailable', 502)
     for (const value of result.data.installations) {
       const installation = object(value)

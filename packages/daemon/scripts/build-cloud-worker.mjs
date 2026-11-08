@@ -6,6 +6,7 @@ import { copyFile, cp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { WORKER_BOOTSTRAP_BROKER_SOURCE } from '../src/cloud-bootstrap-broker.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 // SDKs with native binaries/relative runtime assets stay installed. Bundle
@@ -25,10 +26,12 @@ export async function buildCloudWorker(out = resolve(root, 'dist/cloud')) {
     await mkdir(dirname(resolve(out, path)), { recursive: true })
     await copyFile(resolve(root, 'src', path), resolve(out, path))
   }
-  for (const path of ['mikka-mcp.mjs', 'mikka-mcp-backend.mjs', 'mikka-mcp-worker.mjs', 'capture-copy.mjs', 'github-credentials.mjs']) {
+  for (const path of ['mikka-mcp.mjs', 'mikka-mcp-context.mjs', 'mikka-mcp-backend.mjs', 'mikka-mcp-worker.mjs', 'capture-copy.mjs', 'github-credentials.mjs']) {
     await copyFile(resolve(root, 'src/agents', path), resolve(out, path))
   }
   await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })
+  await rm(resolve(out, 'bootstrap-broker.mjs'), { force: true })
+  await writeFile(resolve(out, 'bootstrap-broker.mjs'), WORKER_BOOTSTRAP_BROKER_SOURCE, { mode: 0o444 })
   // This declaration belongs to the actual compiled worker source. A newer
   // installer cannot advertise capabilities for an older checkout/build script.
   const workerSha = process.env.MIKKA_CLOUD_WORKER_BUILD_SHA

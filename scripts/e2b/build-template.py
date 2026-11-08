@@ -37,7 +37,7 @@ BOOTSTRAP_FILES = ('official-files.py', 'e2b-finalization-files.json', 'e2b-cert
 INSTANCE_BOOTSTRAP = 'packages/daemon/scripts/official-e2b-instance-bootstrap.sh'
 RECIPE_PATHS = (*(f'scripts/e2b/{name}' for name in BOOTSTRAP_FILES),
                 'scripts/e2b/build-template.py', 'scripts/e2b/template-capabilities.json',
-                'scripts/e2b/acceptance-daemon.mts',
+                'scripts/e2b/acceptance-daemon.mts', 'scripts/e2b/acceptance-bootstrap.mts',
                 *(f'scripts/e2b/{name}' for name in COMPUTER_FILES))
 # Each kind of machine: the official E2B template it starts from, and the
 # CLIs installed on it (packages/daemon/harness/pins.json). The `claude` and
@@ -780,6 +780,44 @@ def observed_mcp_business_evidence(value, run_hash, harness):
     return any(row['operation'] == 'decision_catalogue' and row['outcome'] != 'pending' for row in requests)
 
 
+def observed_bootstrap_adoption(value, run_id_hash, harness):
+    """The actual adopted startup, distinct from ordinary FD3 fallback."""
+    keys = {'version', 'runIdHash', 'harness', 'source', 'bootstrapSha256', 'hintSha256', 'startupTiming', 'preparationTiming'}
+    source = 'bootstrap_claude_start' if harness == 'claude_code' else 'bootstrap_codex_initialize'
+    if (not isinstance(value, dict) or set(value) != keys or type(value.get('version')) is not int or value['version'] != 1
+            or value.get('runIdHash') != run_id_hash or not isinstance(run_id_hash, str) or not re.fullmatch(r'[a-f0-9]{16}', run_id_hash)
+            or value.get('harness') != harness or harness not in ('claude_code', 'codex') or value.get('source') != source
+            or any(not isinstance(value.get(key), str) or not re.fullmatch(r'[a-f0-9]{64}', value[key]) for key in ('bootstrapSha256', 'hintSha256'))):
+        return False
+    names = {'daemon.adapter.model_report', 'daemon.adapter.auth', 'daemon.adapter.auth.gate',
+             'daemon.adapter.auth.context', 'daemon.adapter.auth.access', 'daemon.adapter.auth.token', 'daemon.adapter.auth.native_auth',
+             'daemon.adapter.auth.refresh', 'daemon.adapter.auth.broker', 'daemon.adapter.workspace.shadow_clone',
+             'daemon.adapter.workspace.read_tree', 'daemon.adapter.cli_init', 'daemon.adapter.account_check',
+             'daemon.adapter.account_check.account_info', 'daemon.adapter.account_check.login'}
+    duration = lambda n: type(n) in (int, float) and math.isfinite(n) and 0 <= n <= 3600000
+    epoch = lambda n: type(n) is int and 0 < n <= 9007199254740991
+    def timing(row, permitted):
+        if (not isinstance(row, dict) or type(row.get('version')) is not int or row['version'] != 1
+                or row.get('runIdHash') != run_id_hash or row.get('harness') != harness or row.get('outcome') != 'ok'
+                or row.get('truncated') is not False or not epoch(row.get('startedAt')) or not epoch(row.get('endedAt'))
+                or row['endedAt'] < row['startedAt'] or not duration(row.get('ms'))
+                or not isinstance(row.get('phases'), list) or len(row['phases']) > 64):
+            return False
+        return all(isinstance(phase, dict) and isinstance(phase.get('name'), str) and phase.get('name') in permitted and phase.get('outcome') in ('ok', 'error')
+                   and all(duration(phase.get(key)) for key in ('startMs', 'endMs', 'ms'))
+                   and phase['endMs'] >= phase['startMs'] and phase['endMs'] <= row['ms'] + .01
+                   and abs(phase['ms'] - (phase['endMs'] - phase['startMs'])) <= .01 for phase in row['phases'])
+    stage, prepared = value.get('startupTiming'), value.get('preparationTiming')
+    if (not timing(stage, names) or not timing(prepared, names | {'daemon.adapter.cli_init.prewarm'})
+            or prepared.get('source') != source or prepared['startedAt'] > stage['startedAt'] or prepared['endedAt'] > stage['endedAt']
+            or any(phase['outcome'] != 'ok' for phase in prepared['phases'])
+            or any(sum(phase['name'] == name for phase in prepared['phases']) != 1
+                   for name in ('daemon.adapter.cli_init.prewarm', 'daemon.adapter.cli_init'))):
+        return False
+    return harness == 'codex' or (prepared.get('claimAuthentication') == 'oauth_environment'
+                                 and prepared.get('observedAuthSource') == 'oauth_environment')
+
+
 def verify_release_evidence(report):
     """Publishing cannot substitute a model-list probe for subscription execution."""
     if not re.fullmatch(r'[a-f0-9]{40}', report.get('sourceCommit', '')) or not re.fullmatch(r'[a-f0-9]{40}', report.get('workerSha', '')):
@@ -820,7 +858,8 @@ def verify_release_evidence(report):
                 or authorization.get('basis') != 'host_authorization_census_and_closed_mcp_business_paths'
                 or type(authorization.get('observedProviderEvents')) is not int or authorization['observedProviderEvents'] < 1
                 or authorization.get('officialDelivery') != 'best_effort_not_a_complete_call_count'
-                or not observed_mcp_business_evidence(authorization.get('mcpHttpTiming'), ack.get('runIdHash'), harness)):
+                or not observed_mcp_business_evidence(authorization.get('mcpHttpTiming'), ack.get('runIdHash'), harness)
+                or not observed_bootstrap_adoption(row.get('bootstrapAcceptance'), ack.get('runIdHash'), harness)):
             raise ValueError(f'release_subscription_acceptance_missing {kind}')
     return report
 

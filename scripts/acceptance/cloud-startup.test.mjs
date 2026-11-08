@@ -604,12 +604,13 @@ test('startup intervals retain only closed fields and reject foreign run data or
   }
 })
 
-for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(source + ' keeps its actual earlier origin and requires both real initialization boundaries', () => {
-  const runId = id(98), late = { ...startupTiming(runId, 'claude_code'), phases: [] }
+for (const source of ['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize']) test(source + ' keeps its actual earlier origin and requires both real initialization boundaries', () => {
+  const harness = source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code'
+  const runId = id(98), late = { ...startupTiming(runId, harness), phases: [] }
   const early = { ...late, source, ...(source === 'bootstrap_claude_start' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}), startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
     phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
       { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
-  const record = { runIdHash: late.runIdHash, harness: 'claude_code' }, item = stage('agent_start', 3500)
+  const record = { runIdHash: late.runIdHash, harness }, item = stage('agent_start', 3500)
   item.chunk.data.startupTiming = late
   item.chunk.data.preparationTiming = { ...early, cwd: 'PRIVATE', phases: early.phases.map(phase => ({ ...phase, token: 'PRIVATE' })) }
   observeChunks(record, { chunks: [item] }, epoch + 4000)
@@ -621,26 +622,27 @@ for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(so
   for (const preparation of [...(source === 'bootstrap_claude_start' ? [{ ...early, claimAuthentication: 'unverified' }, { ...early, claimAuthentication: undefined }, { ...early, observedAuthSource: 'unknown' }, { ...early, observedAuthSource: undefined }] : []), { ...early, truncated: true }, { ...early, outcome: 'error' },
     { ...early, phases: [early.phases[0]] }, { ...early, phases: [early.phases[1]] },
     { ...early, phases: [{ ...early.phases[0], outcome: 'error' }, early.phases[1]] }]) {
-    const failed = { runIdHash: late.runIdHash, harness: 'claude_code' }
+    const failed = { runIdHash: late.runIdHash, harness }
     item.chunk.data.preparationTiming = preparation
     observeChunks(failed, { chunks: [item] }, epoch + 4000)
     assert.equal(hasStartupInitialization(failed), false)
   }
 })
 
-for (const source of ['prepared_agent_start', 'bootstrap_claude_start']) test(source + ' invalid evidence cannot hide behind an otherwise valid ordinary initialization', () => {
-  const late = startupTiming(id(97), 'claude_code')
+for (const source of ['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize']) test(source + ' invalid evidence cannot hide behind an otherwise valid ordinary initialization', () => {
+  const harness = source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code'
+  const late = startupTiming(id(97), harness)
   const early = { ...late, source, ...(source === 'bootstrap_claude_start' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}), startedAt: epoch + 1000, endedAt: epoch + 3440, ms: 2440,
     phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 200, endMs: 1200, ms: 1000, outcome: 'ok' },
       { name: 'daemon.adapter.cli_init', startMs: 2200, endMs: 2201, ms: 1, outcome: 'ok' }] }
-  const invalid = [{ ...early, source: 'unknown' }, { ...early, runIdHash: '0'.repeat(16) }, { ...early, harness: 'codex' },
+  const invalid = [{ ...early, source: 'unknown' }, { ...early, runIdHash: '0'.repeat(16) }, { ...early, harness: harness === 'codex' ? 'claude_code' : 'codex' },
     { ...early, startedAt: late.startedAt + 1 }, { ...early, endedAt: late.endedAt + 1 },
     { ...early, phases: [{ ...early.phases[0], startMs: -1 }] },
     { ...early, phases: [{ ...early.phases[0], endMs: early.ms + 1 }] },
     { ...early, phases: [{ ...early.phases[0], name: 'daemon.adapter.PRIVATE' }] },
     { ...early, phases: Array.from({ length: 65 }, () => early.phases[0]) }]
   for (const value of invalid) {
-    const record = { runIdHash: late.runIdHash, harness: 'claude_code' }, item = stage('agent_start', 3500)
+    const record = { runIdHash: late.runIdHash, harness }, item = stage('agent_start', 3500)
     item.chunk.data.startupTiming = late; item.chunk.data.preparationTiming = value
     observeChunks(record, { chunks: [item] }, epoch + 4000)
     assert.equal(record.startupTimingStatus, 'complete')
@@ -1345,4 +1347,157 @@ test('remote authorization after the actual task ACK cannot hide in the preparin
   assert.equal(result.extraRemoteCalls, 1)
   value.agentAccepted.ms = 3200
   assert.equal(runtimeEvidence(readRuntimeTiming(value, { runIdHash: value.runIdHash, harness: value.harness })).status, 'passed')
+})
+
+test('failed execution keeps all six version brackets without changing the failed proof', async () => {
+  for (const failedSample of [-1, 3]) {
+    const io = fixture({ runtime: true })
+    io.onDetail = (sample, detail) => {
+      if (io.samples.indexOf(sample) !== failedSample || sample.reads <= 1) return
+      sample.finished = true
+      detail.thread.status = 'succeeded'
+      detail.thread.attempts[0].status = 'succeeded'
+      detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta')
+      for (const item of detail.chunks) if (item.chunk.type === 'finish') item.chunk.messageMetadata.mikkaRuntimeTiming.providerOutputChunks = 0
+    }
+    const release = { workerSha: 'a'.repeat(40), sourceCommit: 'b'.repeat(40),
+      templates: { desktop: 'desktop-fixture', claude: 'claude-fixture', codex: 'codex-fixture' } }
+    let checks = 0
+    const report = await runCloudStartup(options(['--runs', '6', '--mode', 'acceptance', '--expected-build', 'BUILD1',
+      '--revision', 'c'.repeat(40), '--bot-id', botId, '--runtime-evidence', 'required', '--official-timing', 'enabled',
+      '--expected-worker-sha', release.workerSha, '--expected-worker-source', release.sourceCommit]),
+    { env, ...io, readWorkerRelease: async () => { checks++; return release } })
+    assert.equal(report.samples.length, 6)
+    assert.equal(checks, 14, 'initial, before/after every attempted sample, and final version checks are retained')
+    assert.equal(report.status, failedSample < 0 ? 'awaiting_server_timings' : 'failed')
+    if (failedSample >= 0) {
+      assert.equal(report.samples[failedSample].error, 'startup_ended_before_execution_proof')
+      assert.equal(report.samples[failedSample].replyVerifiedAfterTool, false)
+      assert.equal(report.samples[failedSample].runtimeEvidence.reason, 'execution_cycle_missing')
+    }
+    assert.ok(report.samples.every(sample => sample.cleanup.status === 'passed'))
+    assert.ok(io.samples.every(sample => sample.deleted && sample.machineEnded))
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
+test('a version change after failed execution stops later dispatches and preserves both failures', async () => {
+  const io = fixture({ runtime: true })
+  io.onDetail = (sample, detail) => {
+    if (io.samples.indexOf(sample) !== 3 || sample.reads <= 1) return
+    sample.finished = true
+    detail.thread.status = 'succeeded'
+    detail.thread.attempts[0].status = 'succeeded'
+    detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta')
+  }
+  const release = { workerSha: 'a'.repeat(40), sourceCommit: 'b'.repeat(40),
+    templates: { desktop: 'desktop-fixture', claude: 'claude-fixture', codex: 'codex-fixture' } }
+  let checks = 0
+  const report = await runCloudStartup(options(['--runs', '6', '--mode', 'acceptance', '--expected-build', 'BUILD1',
+    '--revision', 'c'.repeat(40), '--bot-id', botId, '--runtime-evidence', 'required', '--official-timing', 'enabled',
+    '--expected-worker-sha', release.workerSha, '--expected-worker-source', release.sourceCommit]),
+  { env, ...io, readWorkerRelease: async () => { checks++; return checks >= 9 ? { ...release, workerSha: 'd'.repeat(40) } : release } })
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'startup_worker_release_mismatch')
+  assert.equal(report.batchAborted, 'version_pin_changed')
+  assert.equal(report.samples.length, 4, 'version drift closes the failed sample rather than starting a later sample record')
+  assert.equal(report.samples[3].error, 'startup_ended_before_execution_proof')
+  assert.deepEqual(report.samples[3].versionPinFailure, { phase: 'build_pin', code: 'startup_worker_release_mismatch' })
+  assert.ok(report.samples.every(sample => sample.cleanup.status === 'passed'))
+  assert.ok(io.samples.every(sample => sample.deleted && sample.machineEnded))
+})
+
+test('candidate bootstrap callback runs once after owner provenance and before any task stream observation', async () => {
+  const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl, order = []
+  io.fetchImpl = async (url, init) => {
+    if (url.pathname.includes('/api/runs/') && url.pathname.endsWith('/evidence')) order.push('owner-provenance')
+    if (url.pathname.endsWith('/api/live/ticket')) order.push('task-watch')
+    return original(url, init)
+  }
+  let count = 0, published
+  const report = await runCloudStartup(oneCodexCandidate(), { env, ...io, onCandidateRunQueued: async binding => {
+    count++; order.push('bootstrap')
+    assert.equal(binding.deviceId, deviceId); assert.equal(binding.agentId, agentId)
+    assert.equal(binding.harness, 'codex'); assert.equal(binding.model, 'gpt-6-luna')
+    assert.ok(binding.workspaceId && binding.runId && binding.issueId)
+    assert.ok(order.indexOf('owner-provenance') >= 0)
+    assert.equal(order.includes('task-watch'), false)
+    published = { version: 1, runId: binding.runId, harness: binding.harness,
+      bootstrapSha256: 'a'.repeat(64), hintSha256: 'b'.repeat(64) }
+    return published
+  } })
+  assert.equal(count, 1)
+  assert.equal(report.status, 'candidate_subscription_proved', JSON.stringify(report))
+  assert.deepEqual(report.samples[0].bootstrapPublication, published)
+  assert.equal(report.samples[0].cleanup.status, 'passed')
+})
+
+test('candidate bootstrap refuses provenance failure and retains normal cleanup after a publication failure', async () => {
+  let calls = 0
+  const refused = await runCloudStartup(oneCodexCandidate(), { env, ...fixture({ candidate: true, runtime: true, wrongScope: true }),
+    onCandidateRunQueued: async () => { calls++; throw Error('must not start') } })
+  assert.equal(calls, 0)
+  assert.equal(refused.samples[0].status, 'failed')
+  const io = fixture({ candidate: true, runtime: true })
+  const failed = await runCloudStartup(oneCodexCandidate(), { env, ...io, onCandidateRunQueued: async () => {
+    calls++; throw Error('PRIVATE_BOOTSTRAP_SECRET')
+  } })
+  assert.equal(calls, 1)
+  assert.deepEqual(failed.samples[0].failure, { phase: 'bootstrap_publication', code: 'startup_bootstrap_publication_failed' })
+  assert.equal(failed.samples[0].cleanup.status, 'passed')
+  assert.ok(io.samples[0].cancelled && io.samples[0].deleted)
+  assert.doesNotMatch(JSON.stringify(failed), /PRIVATE_BOOTSTRAP_SECRET/)
+})
+
+test('repository Git receipt stays independent and closed', () => {
+  const record = { runIdHash: 'a'.repeat(16), harness: 'claude_code' }
+  const receipt = { version: 1, source: 'prepare_run_repository', clock: 'repository_prepare_monotonic',
+    runIdHash: record.runIdHash, harness: record.harness, startedAt: epoch, endedAt: epoch + 50,
+    ms: 50, outcome: 'ok', truncated: false,
+    phases: [{ name: 'daemon.repository.git.clone', startMs: 2, endMs: 42, ms: 40, outcome: 'ok' }] }
+  const item = stage('repository', 100)
+  item.chunk.data.repositoryTiming = receipt
+  observeChunks(record, { chunks: [item] }, epoch + 100)
+  assert.deepEqual(record.daemonRepositoryTiming, receipt)
+  assert.equal(record.repositoryTimingStatus, 'complete')
+  assert.equal(record.agentStart, undefined)
+  // First valid receipt wins; duplicate status must describe that same object.
+  for (const [firstTruncated, secondTruncated] of [[true, false], [false, true], [true, true], [false, false]]) {
+    const next = { runIdHash: record.runIdHash, harness: record.harness }
+    const first = { ...receipt, truncated: firstTruncated }
+    const second = { ...receipt, truncated: secondTruncated }
+    const event = timing => ({ ...item, chunk: { type: 'data-run-stage', data: { ...item.chunk.data, repositoryTiming: timing } } })
+    observeChunks(next, { chunks: [event(first)] }, epoch + 100)
+    observeChunks(next, { chunks: [event(second)] }, epoch + 101)
+    assert.deepEqual(next.daemonRepositoryTiming, first)
+    assert.equal(next.repositoryTimingStatus, firstTruncated ? 'truncated' : 'complete')
+  }
+  const afterInvalid = { runIdHash: record.runIdHash, harness: record.harness }
+  const invalidEvent = { ...item, chunk: { type: 'data-run-stage', data: { ...item.chunk.data,
+    repositoryTiming: { ...receipt, runIdHash: 'b'.repeat(16) } } } }
+  observeChunks(afterInvalid, { chunks: [invalidEvent] }, epoch + 100)
+  observeChunks(afterInvalid, { chunks: [item] }, epoch + 101)
+  assert.deepEqual(afterInvalid.daemonRepositoryTiming, receipt)
+  assert.equal(afterInvalid.repositoryTimingStatus, 'invalid')
+
+  for (const mutate of [
+    value => { value.runIdHash = 'b'.repeat(16) },
+    value => { value.harness = 'codex' },
+    value => { value.phases[0].name = 'PRIVATE_COMMAND' },
+    value => { value.phases[0].endMs = 51 },
+    value => { value.phases[0].startMs = -1 },
+    value => { value.phases[0].ms = NaN },
+    value => { value.phases = Array(33).fill(value.phases[0]) },
+    value => { value.secret = 'PRIVATE_TOKEN' },
+  ]) {
+    const bad = structuredClone(receipt); mutate(bad)
+    const next = { runIdHash: record.runIdHash, harness: record.harness }
+    observeChunks(next, { chunks: [{ ...item, chunk: { type: 'data-run-stage', data: { ...item.chunk.data, repositoryTiming: bad } } }] }, epoch + 100)
+    assert.equal(next.repositoryTimingStatus, 'invalid')
+    assert.equal(next.daemonRepositoryTiming, undefined)
+  }
+  const ordinary = { runIdHash: record.runIdHash, harness: record.harness }
+  observeChunks(ordinary, { chunks: [stage('repository', 100)] }, epoch + 100)
+  assert.equal(Object.hasOwn(ordinary, 'daemonRepositoryTiming'), false)
+  assert.equal(Object.hasOwn(ordinary, 'repositoryTimingStatus'), false)
 })

@@ -35,6 +35,17 @@ const mcpTiming = (runId, harness) => ({ version: 1, source: 'mikka_mcp_physical
   rejectedEvents: 0, truncated: false,
   children: [{ child: 1, startedAt: 1020, closedAt: null, lastSequence: 3, sent: 1, completed: 1, lost: 0 }],
   requests: [{ child: 1, sequence: 1, operation: 'decision_catalogue', startedAt: 1040, endedAt: 1050, durationMs: 10, status: 200, outcome: 'ok' }] })
+const bootstrapAcceptance = (runId, harness) => {
+  const base = { version: 1, runIdHash: createHash('sha256').update(runId).digest('hex').slice(0, 16), harness,
+    outcome: 'ok', truncated: false }
+  const source = harness === 'codex' ? 'bootstrap_codex_initialize' : 'bootstrap_claude_start'
+  return { version: 1, runIdHash: base.runIdHash, harness, source, bootstrapSha256: '1'.repeat(64), hintSha256: '2'.repeat(64),
+    startupTiming: { ...base, startedAt: 1200, endedAt: 1600, ms: 400, phases: [] },
+    preparationTiming: { ...base, startedAt: 1000, endedAt: 1500, ms: 500, source,
+      ...(harness === 'claude_code' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}),
+      phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 0, endMs: 300, ms: 300, outcome: 'ok' },
+        { name: 'daemon.adapter.cli_init', startMs: 490, endMs: 500, ms: 10, outcome: 'ok' }] } }
+}
 const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { account: 'shared_smoke', workspaceRestored: true,
   requesterHash: SHARED.requesterHash, payerHash: SHARED.payerHash,
   team: { teamWorkspaceConfirmed: true, teamAdminMembershipVerified: true, teamWorkspaceHash: SHARED.workspaceHash } },
@@ -46,6 +57,7 @@ const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { acco
   credentialRoute: 'subscription', replyVerified: true, runId: `run-${kind}`, deviceId: `device-${kind}`,
   replyVerifiedAfterTool: true, toolEvidence: { toolCallHash: 'd'.repeat(16), outcome: 'ok' },
   officialBinarySha256: 'e'.repeat(64), officialCliVersion: 'fixture-version',
+  bootstrapAcceptance: bootstrapAcceptance('run-' + kind, harness),
   agentAcceptance: { runIdHash: createHash('sha256').update(`run-${kind}`).digest('hex').slice(0, 16), harness,
     kind: harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack', at: 1100, ms: 100 },
   runtimeAuthorization: { source: 'http_server_link', scope: 'daemon_http_server_link_and_task_fetch', complete: true, truncated: false, extraRemoteCalls: 0,
@@ -452,5 +464,22 @@ test('publication requires both real subscriptions on these exact candidates bef
     const fake = fixture()
     await assert.rejects(fake.run({ releaseEvidence }), /runtime_release_/)
     assert.equal(fake.calls.length, 0)
+  }
+})
+
+test('publication requires the same bounded bootstrap adoption proof after the native subscription passed', () => {
+  for (const mutate of [
+    row => { delete row.bootstrapAcceptance },
+    row => { row.bootstrapAcceptance.preparationTiming.source = 'prepared_agent_start' },
+    row => { row.bootstrapAcceptance.preparationTiming.claimAuthentication = 'ordinary_path' },
+    row => { row.bootstrapAcceptance.preparationTiming.observedAuthSource = 'oauth_descriptor' },
+    row => { row.bootstrapAcceptance.preparationTiming.phases.push({ ...row.bootstrapAcceptance.preparationTiming.phases[0] }) },
+    row => { row.bootstrapAcceptance.runIdHash = 'f'.repeat(16) },
+    row => { row.bootstrapAcceptance.hintSha256 = '' },
+    row => { row.bootstrapAcceptance.preparationTiming.phases[0].outcome = 'error' },
+  ]) {
+    const value = structuredClone(EVIDENCE); mutate(value.subscriptionAcceptance.claude)
+    assert.throws(() => assertReleaseEvidence({ sourceCommit: COMMIT, sourceSha: SHA, templates: TEMPLATES, models: MODELS,
+      releaseEvidence: value }), /runtime_release_subscription_missing claude/)
   }
 })

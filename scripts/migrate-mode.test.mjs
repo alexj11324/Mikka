@@ -32,6 +32,7 @@ test('explicit MIGRATE=0 exits before filesystem or database work in production'
       })
       assert.equal(result.status, 0, result.stderr)
       assert.match(result.stdout, /explicit MIGRATE=0/)
+      assert.doesNotMatch(result.stdout, /migrate: starting/)
     }
     // Default production and explicit opt-in must not silently skip migration.
     for (const [environment, mode] of [['production', ''], ['preview', '1']]) {
@@ -146,6 +147,7 @@ test('all files preflight before a database connection, even if an earlier file 
     })
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /20261028000002_invalid.sql.*exactly one statement/)
+    assert.match(result.stdout, /^migrate: starting$/m)
     assert.doesNotMatch(result.stderr, /DATABASE_ACCESS/)
   } finally { console.error(`Retained test fixture: ${dir}`) }
 })

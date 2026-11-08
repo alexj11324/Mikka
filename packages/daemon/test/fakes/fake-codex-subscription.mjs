@@ -217,8 +217,13 @@ lines.on("line", async (line) => {
         threadId: "fixture-subscription-thread",
         turnId,
         itemId: "fixture-text",
-        delta: "Subscription fixture completed"
+        delta: prompt.includes("EMPTY_DELTA_THEN_COMPLETED") ? "" : "Subscription fixture completed"
       }
+    })
+    if (prompt.includes("EMPTY_DELTA_THEN_COMPLETED")) send({
+      method: "item/completed",
+      params: { threadId: "fixture-subscription-thread", turnId,
+        item: { id: "fixture-text", type: "agentMessage", phase: "final_answer", text: "Subscription fixture completed" } }
     })
     send({
       method: "turn/completed",
