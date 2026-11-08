@@ -233,6 +233,10 @@ alone: their recorded overlay SHAs may differ.
   compiled Web assets go to Vercel; signed installers go to GitHub Releases.
 - Official compiler diagnostics are captured on the ephemeral runner, because
   errors may quote private source. They are neither printed nor uploaded.
+  A failed build emits only a closed receipt: public and overlay revisions,
+  exit status, allowlisted signal/error codes, the last observed public build
+  phase, and protected-log byte count/SHA256. The phase can be `unknown`, and
+  SIGKILL alone is not an OOM diagnosis. No raw output, message or stack is emitted.
 - The live Web builder is Vite + Nitro, both with `sourcemap: false`;
   `next.config.mjs` is a legacy path, not the production compiler. Before
   upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI
