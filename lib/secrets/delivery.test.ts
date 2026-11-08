@@ -33,6 +33,27 @@ test('direct mode requires explicit acknowledgement and server-authored approval
   assert.deepEqual(approveSecretDelivery({ mode: 'protected' }, 'user', now, approved), { mode: 'protected' }, 'protecting again removes the previous exposure approval')
 })
 
+test('stored-policy normalization ignores JSONB object order but preserves every authority field', () => {
+  const canonical = (value: unknown) => JSON.stringify(effectiveSecretDelivery(value))
+  const protectedPolicy = { mode: 'protected', http }
+  const reordered = { http: { rules: [{ path: '/v1/items', match: 'exact', method: 'GET' }], prefix: 'Bearer ', header: 'authorization', origin: 'https://api.example.com' }, mode: 'protected' }
+  assert.notEqual(JSON.stringify(protectedPolicy), JSON.stringify(reordered))
+  assert.equal(canonical(protectedPolicy), canonical(reordered), 'nested HTTP policy is normalized too')
+  for (const changed of [{ ...http, origin: 'https://other.example.com' }, { ...http, header: 'x-api-key' },
+    { ...http, prefix: '' }, { ...http, rules: [{ ...http.rules[0], method: 'POST' }] },
+    { ...http, rules: [{ ...http.rules[0], path: '/v1/admin' }] }, { ...http, rules: [{ ...http.rules[0], match: 'prefix' }] }]) {
+    assert.equal(secretHttpPolicy.safeParse(changed).success, true)
+    assert.notEqual(canonical(protectedPolicy), canonical({ mode: 'protected', http: changed }))
+  }
+  const direct = approveSecretDelivery({ mode: 'direct', exposeToAgent: true }, 'owner', now)
+  const stored = { approvedAt: now.toISOString(), approvedBy: 'owner', exposeToAgent: true, mode: 'direct' }
+  assert.notEqual(JSON.stringify(direct), JSON.stringify(stored))
+  assert.equal(canonical(direct), canonical(stored))
+  assert.notEqual(canonical(direct), canonical({ ...stored, approvedBy: 'another-owner' }))
+  assert.notEqual(canonical(direct), canonical({ ...stored, approvedAt: new Date(now.getTime() + 1000).toISOString() }))
+  assert.notEqual(canonical(direct), canonical({ ...stored, exposeToAgent: false }))
+})
+
 test('protected policy is constrained to HTTPS origin, safe header and bounded method/path rules', () => {
   assert.deepEqual(secretHttpPolicy.parse({ ...http, origin: 'https://API.example.com/' }), http)
   for (const origin of ['http://api.example.com', 'https://user:pass@api.example.com', 'https://api.example.com/path',

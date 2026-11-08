@@ -392,13 +392,16 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     await store.createWorkspaceSecret(admin, w.id, { name: 'API_TOKEN', kind: 'secret', value: TOKEN })
     await store.createWorkspaceSecret(admin, w.id, { name: 'PLAIN_ENV', kind: 'env', value: 'plain-env-value' })
     const on = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, MIKKA_BYO_E2B_KEY: '1' }, off = {}
-    const device = (await pool.query(`insert into devices (id,name,"ownerId") values (gen_random_uuid(),'cloud',$1) returning id`, [admin])).rows[0].id
+    const device = (await pool.query(`insert into devices (id,name,"ownerId",kind) values (gen_random_uuid(),'cloud',$1,'cloud') returning id`, [admin])).rows[0].id
     const local = (await pool.query(`insert into devices (id,name,"ownerId") values (gen_random_uuid(),'local',$1) returning id`, [admin])).rows[0].id
-    await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId") values (gen_random_uuid(),$1,$2,$3,$4)`, [admin, randomBytes(16).toString('hex'), device, w.id])
+    const claimTokenId = (await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values (gen_random_uuid(),$1,$2,$3,$4,now()+interval '1 hour') returning id`, [admin, randomBytes(16).toString('hex'), device, w.id])).rows[0].id
     const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id
-    const run = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId") values (gen_random_uuid(),$1,$2,$3) returning id`, [agent, admin, device])).rows[0].id
+    const run = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","deviceTokenId") values (gen_random_uuid(),$1,$2,$3,$4) returning id`, [agent, admin, device, claimTokenId])).rows[0].id
     const localRun = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId") values (gen_random_uuid(),$1,$2,$3) returning id`, [agent, admin, local])).rows[0].id
+    const unclaimedCloudRun = (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId") values (gen_random_uuid(),$1,$2,$3) returning id`, [agent, admin, device])).rows[0].id
+    await pool.query(`insert into device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") values (gen_random_uuid(),$1,$2,$3,$4,now()+interval '1 hour')`, [admin, randomBytes(16).toString('hex'), device, other.id])
     assert.equal(await runtime.runWorkspaceId(run), w.id)
+    assert.equal(await runtime.runWorkspaceId(unclaimedCloudRun), null, 'a cloud device token cannot supply authority without the run\'s original claim binding')
     assert.equal(await runtime.runWorkspaceId(localRun), null, 'local device: no injected secrets, nothing to mask')
     const out = { title: `report ${TOKEN}`, content: `b64 ${Buffer.from(TOKEN).toString('base64')} env plain-env-value` }
     assert.deepEqual(await runtime.maskForRun(run, out, off), out, 'no encryption key: identity masker')

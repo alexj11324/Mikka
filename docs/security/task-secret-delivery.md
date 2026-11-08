@@ -63,6 +63,12 @@ headers, capabilities or credential-bearing exception messages.
 Capabilities expire no later than the current run lease (90 seconds). Renewal
 uses the existing authenticated device heartbeat and only a successfully
 renewed, matching claim; no new polling or provider/tool preflight is added.
+The entire heartbeat has a 4 MiB wire limit, checked before device
+authentication or database writes. Each run remains limited to 32 grants and
+256 KiB of serialized access data. This permits 15 maximum-size bundles plus
+ordinary heartbeat metadata; the existing 500-run schema does not promise
+500 maximum-size bundles. An oversized heartbeat returns 413 instead of
+processing a partial set of renewals.
 Stopping or revoking a run prevents renewal. The running task's bridge closes
 when its existing stop signal arrives. **A copied bearer capability can retain
 its already granted authority until that short lease expires.** An in-flight
@@ -72,8 +78,14 @@ this bound instead of claiming instantaneous distributed revocation.
 Changing or deleting a Secret or its delivery policy invalidates the affected
 run authorization, so an old encrypted grant cannot renew indefinitely. A new
 claim re-resolves current values and policy. A retry or a different device must
-not inherit a previous claim's grant. Capabilities and direct-mode values stay
-out of journals, reusable templates, checkpoints, artifacts and diagnostics.
+not inherit a previous claim's grant. The daemon omits `taskEnv` and
+`taskSecrets` from its assignment journal. Existing output, checkpoint and
+artifact masking, including recognized capability patterns, remains defense in
+depth; it cannot guarantee that task-controlled files, transformed values or
+VM snapshots contain no credentials. Protected third-party plaintext is not
+delivered to the task. An opaque capability remains a copyable bearer until
+expiry, and explicitly approved direct-mode values remain readable and
+persistable by the task.
 
 ## Compatibility and remaining authority
 

@@ -190,7 +190,8 @@ export async function replaceWorkspaceSecret(userId: string, workspaceId: string
     const [saved] = await tx.update(workspaceSecrets).set({ scopeType: next.scopeType, scopeRef: next.scopeRef, delivery: approveSecretDelivery(delivery, userId, now, current.delivery), ...(value !== undefined ? seal(value, next) : {}), ...(note !== undefined ? { note } : {}), updatedBy: userId, updatedAt: now }).where(eq(workspaceSecrets.id, id)).returning()
     await audit(tx, { workspaceId, actorId: userId, action: current.kind === 'secret' ? 'secret.replaced' : 'env.updated', target: { type: current.kind, id, label: current.name },
       metadata: { role, ...(value === undefined && delivery === undefined && !moved ? { noteOnly: true } : {}), ...(delivery !== undefined ? { delivery: saved.delivery.mode, previousDelivery: effectiveSecretDelivery(current.delivery).mode } : {}), ...(moved ? { from: [current.scopeType, current.scopeRef], to: [next.scopeType, next.scopeRef] } : {}) } })
-    if (value !== undefined || moved || JSON.stringify(effectiveSecretDelivery(current.delivery)) !== JSON.stringify(saved.delivery)) {
+    // JSONB does not preserve object-key order; normalize both stored policies.
+    if (value !== undefined || moved || JSON.stringify(effectiveSecretDelivery(current.delivery)) !== JSON.stringify(effectiveSecretDelivery(saved.delivery))) {
       await stopRunsForSecretChanges(tx, moved ? [current, saved] : [saved])
     }
     return saved

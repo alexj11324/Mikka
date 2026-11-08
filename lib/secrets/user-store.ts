@@ -76,7 +76,8 @@ export async function replaceUserSecret(userId: string, input: unknown, now = ne
     if (!current) return null
     if (current.kind === 'env' && delivery !== undefined) throw new WorkspaceError('validationGeneric')
     const [row] = await tx.update(userSecrets).set({ delivery: approveSecretDelivery(delivery, userId, now, current.delivery), ...(value !== undefined ? seal(value, current) : {}), ...(note !== undefined ? { note } : {}), updatedAt: now }).where(eq(userSecrets.id, id)).returning()
-    if (value !== undefined || JSON.stringify(effectiveSecretDelivery(current.delivery)) !== JSON.stringify(row.delivery)) {
+    // JSONB does not preserve object-key order; normalize both stored policies.
+    if (value !== undefined || JSON.stringify(effectiveSecretDelivery(current.delivery)) !== JSON.stringify(effectiveSecretDelivery(row.delivery))) {
       await stopRunsForSecretChanges(tx, [{ ownerId: userId, name: current.name }])
     }
     return row

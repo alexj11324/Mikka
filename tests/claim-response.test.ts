@@ -14,6 +14,8 @@ import { policyDistributionContext } from '../lib/agent-tool-approval/policy-dis
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { POST } from '../app/v1/devices/[deviceId]/runs/[runId]/claim/route'
 import { overrideDeploymentSwitch } from '../lib/deployment-switches'
+import { BASE_PATH } from '../lib/base-path'
+import { appOrigin } from '../lib/mcp/resource'
 import { AgentProfileAdmissionError } from '../lib/factory/profile-admission'
 import { AgentProfileError } from '../lib/factory/agent-profile-definition'
 import { openEgressCapability, EGRESS_CAPABILITY_TTL_MS } from '../lib/secrets/egress-capability'
@@ -178,7 +180,11 @@ test('a capable daemon receives the owner GitHub credential once even without op
     const body = await response.json()
     assert.equal(body.github.token, 'fixture-claim-github-token')
     assert.equal(body.github.expiresAt, '2030-01-01T00:00:00.000Z')
-    assert.equal(body.github.endpoint, 'http://127.0.0.1/api/runs/github-token')
+    assert.equal(Boolean(body.mcp), !tokenError)
+    // Successful MCP provisioning uses the configured application origin;
+    // an unavailable MCP token leaves GitHub refresh on the request origin.
+    const refreshOrigin = tokenError ? 'http://127.0.0.1' : appOrigin ?? 'http://127.0.0.1'
+    assert.equal(body.github.endpoint, `${refreshOrigin}${BASE_PATH}/api/runs/github-token`)
     assert.deepEqual(probe.credentialOwners, ['member'])
     assert.equal((probe.run as typeof probe.run & { machineAuthority: boolean }).machineAuthority, true)
   }

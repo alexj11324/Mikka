@@ -20,6 +20,7 @@ import { ownerListChanged } from '@/lib/live/lists'
 import { renewTaskSecretAccess } from '@/lib/secrets/task-renewal'
 import { withBasePath } from '@/lib/base-path'
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
+import { withDeviceHeartbeatBody } from '@/lib/device-heartbeat-body'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,19 +32,19 @@ export const dynamic = 'force-dynamic'
  * Afterwards, runs the owner lost on another device are queued again, and
  * (Factory on) queued Factory runs this device could not take are marked re-dispatched once.
  */
-async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
+async function handlePOST(request: Request, body: unknown, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
   if (caller.removingDeviceId === deviceId) {
-    const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
+    const parsed = deviceHeartbeatSchema.safeParse(body)
     if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
     // No registration, harness refresh, run leases or other commands after removal.
     return NextResponse.json({ leases: {}, deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? []) }, { headers: { 'Cache-Control': 'private, no-store' } })
   }
   // Also records this credential as the device's, so removing it revokes the credential.
   if (!await linkDeviceToken(caller, deviceId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
-  const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
+  const parsed = deviceHeartbeatSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
   if (daemonRequestTooOld(request.headers.get(CLIENT_VERSION_HEADER), Boolean(caller.scopeDeviceId && caller.scopeWorkspaceId))) {
     // No harness provisioning, task dispatch or new Skill work while obsolete.
@@ -106,4 +107,4 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   return NextResponse.json({ ...result, ...(Object.keys(renewedSecrets.taskSecrets).length ? { taskSecrets: renewedSecrets.taskSecrets } : {}), deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? []), ...(cloudCredential ? { cloudCredential } : {}), daemonVersions: await daemonVersions() }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
-export const POST = withDeviceRoute(handlePOST)
+export const POST = withDeviceHeartbeatBody(withDeviceRoute(handlePOST))
