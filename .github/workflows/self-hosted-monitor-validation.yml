@@ -1,0 +1,41 @@
+name: Self-hosted operational monitor boundary validation
+on:
+  push:
+    branches: [ops/self-hosted-monitor-validation-20261108]
+permissions:
+  contents: read
+concurrency:
+  group: isolated-self-hosted-monitor-validation
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-monitor-validation-20261108'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.2
+      - name: Require the exact public patch and validation-only child
+        run: |
+          test "$(git rev-parse HEAD^)" = 0f4536d14f5aaa9489df8fd2c1015e127eb6672d
+          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/self-hosted-monitor-validation.yml
+          git diff --exit-code HEAD^ HEAD -- app/api/cron/ops-monitor/route.ts app/api/cron/ops-monitor/route.test.ts
+      - name: Install the original frozen public workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify community and cloud monitoring outcomes
+        run: node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test app/api/cron/ops-monitor/route.test.ts
+      - name: Check the two changed files and API types
+        run: |
+          pnpm exec oxlint --deny-warnings app/api/cron/ops-monitor/route.ts app/api/cron/ops-monitor/route.test.ts
+          pnpm exec tsrs --noEmit -p apps/api/tsconfig.json
