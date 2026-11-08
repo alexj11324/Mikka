@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
 import { getReviewChecks, getReviewDiff, getReviewFile } from '@/lib/code-review/client'
-import type { ReviewCheck, ReviewFile, ReviewRead } from '@/lib/code-review/contract'
+import type { ReviewCheck, ReviewFile, ReviewFileRead, ReviewRead } from '@/lib/code-review/contract'
 import { reviewKeys, useReviewLive } from './review-keys'
 
 /**
@@ -37,7 +37,7 @@ export function useReviewDiff(taskId: string | null | undefined, options: { comm
 
 /** One file's patch, for a file paged out or too large (R12 「按文件加载」); null path reads nothing. */
 export function useReviewFile(taskId: string | null | undefined, path: string | null, head: string | null) {
-  return useSWR<ReviewFile>(taskId && path && head ? reviewKeys.file(taskId, path, head) : null, ([, id, file]: readonly [string, string, string, string]) => getReviewFile(id, file), {
+  return useSWR<ReviewFileRead>(taskId && path && head ? reviewKeys.file(taskId, path, head) : null, ([, id, file]: readonly [string, string, string, string]) => getReviewFile(id, file), {
     revalidateOnFocus: false, shouldRetryOnError: false,
   })
 }

@@ -70,32 +70,35 @@ test('the review read passes the cursor and commit, and keeps a paged file witho
   await assert.rejects(getReviewDiff(TASK), ReviewRequestError)
 })
 
-test('one file is read by path', async () => {
-  answer(200, { path: 'a b.ts', status: 'added', additions: 1, deletions: 0, patch: '@@ -0,0 +1 @@\n+x' })
-  const file = await getReviewFile(TASK, 'a b.ts')
+test('one file is read by path, with the comments already sent on it', async () => {
+  answer(200, { file: { path: 'a b.ts', status: 'added', additions: 1, deletions: 0, patch: '@@ -0,0 +1 @@\n+x', comments: 1 },
+    comments: [{ id: 'c1', path: 'a b.ts', line: 1, side: 'new', body: '这里加注释', author: 'Test owner', sentAt: '2026-11-08T12:00:00Z' }] })
+  const read = await getReviewFile(TASK, 'a b.ts')
   assert.equal(calls[0].url, `/api/tasks/${TASK}/review/file?path=a+b.ts`)
-  assert.equal(file.patch, '@@ -0,0 +1 @@\n+x')
+  assert.equal(read.file.patch, '@@ -0,0 +1 @@\n+x')
+  assert.equal(read.file.comments, 1)
+  assert.equal(read.comments[0].author, 'Test owner')
 })
 
 test('发给 Agent sends path, line, side and body, never the local id, and maps a 403 to a denial', async () => {
   answer(200, { messageId: 'm1', attempt: 2 })
-  const sent = await sendToAgent(TASK, { comments: [{ id: 'local-1', path: 'a.ts', line: 22, side: 'new', body: '改这里' }], note: '  ', attachedChecks: ['ios-unit'], idempotencyKey: 'k1' })
+  const sent = await sendToAgent(TASK, { comments: [{ id: 'local-1', path: 'a.ts', line: 22, side: 'new', body: '改这里' }], note: '  ', attachedChecks: ['check-ios-unit'], idempotencyKey: 'k1' })
   assert.deepEqual(sent, { kind: 'sent', messageId: 'm1', attempt: 2 })
-  assert.deepEqual(calls[0], { url: `/api/tasks/${TASK}/review/send`, method: 'POST', body: { comments: [{ path: 'a.ts', line: 22, side: 'new', body: '改这里' }], attachedChecks: ['ios-unit'], idempotencyKey: 'k1' } })
-  answer(403, { reason: 'not_owner_send' })
+  assert.deepEqual(calls[0], { url: `/api/tasks/${TASK}/review/send`, method: 'POST', body: { comments: [{ path: 'a.ts', line: 22, side: 'new', body: '改这里' }], attachedChecks: ['check-ios-unit'], idempotencyKey: 'k1' } })
+  answer(403, { error: 'not_owner_send', reason: 'not_owner_send' })
   assert.deepEqual(await sendToAgent(TASK, { comments: [], attachedChecks: [], idempotencyKey: 'k2' }), { kind: 'denied', reason: 'not_owner_send', message: null })
-  answer(403, { reason: 'somebody_else' })
+  answer(403, { error: 'somebody_else', reason: 'somebody_else' })
   await assert.rejects(sendToAgent(TASK, { comments: [], attachedChecks: [], idempotencyKey: 'k3' }), (error: unknown) => error instanceof ReviewRequestError && error.status === 403)
 })
 
 test('批准合并 maps 200, 409 and 403 to the merge result', async () => {
-  answer(409, { needsConfirmation: true, failing: 1 })
+  answer(409, { error: 'needs_confirm', failing: 1 })
   assert.deepEqual(await mergeReview(TASK, { confirm: false }), { kind: 'needs_confirm', failing: 1 })
   assert.deepEqual(calls[0].body, { confirmFailedChecks: false })
   answer(200, { merged: true })
   assert.deepEqual(await mergeReview(TASK, { confirm: true }), { kind: 'merged' })
   assert.deepEqual(calls[1].body, { confirmFailedChecks: true })
-  answer(403, { reason: 'github_permission', message: 'Resource not accessible by integration' })
+  answer(403, { error: 'github_permission', reason: 'github_permission', message: 'Resource not accessible by integration' })
   assert.deepEqual(await mergeReview(TASK, { confirm: true }), { kind: 'denied', reason: 'github_permission', message: 'Resource not accessible by integration' })
   answer(409, { conflict: true })
   await assert.rejects(mergeReview(TASK, { confirm: false }), ReviewRequestError)

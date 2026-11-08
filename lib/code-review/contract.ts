@@ -79,6 +79,8 @@ export type ReviewFile = {
   patch: string | null
   /** Too large to load with the rest (R12). */
   tooLarge?: boolean
+  /** Comments already sent on this file, for the file list (「2 条评论」). Their text comes with the file (ReviewFileRead). */
+  comments: number
 }
 
 /** The whole PR's final diff, base…head (decision 3); no per-attempt switch. 按提交筛选 passes a commit. */
@@ -98,15 +100,24 @@ export type ReviewDiff = {
 /** GET …/review: what the review page opens with. */
 export type ReviewRead = { summary: ReviewSummary; diff: ReviewDiff }
 
+/** A comment already sent to the agent, drawn inline under its line (R3, R8). */
+export type ReviewSentComment = { id: string; path: string; line: number; side: ReviewCommentSide; body: string; author: string; sentAt: string }
+
+/** GET …/review/file?path=: one file with its patch and the comments already sent on it, per file so a big PR does not send them all up front. */
+export type ReviewFileRead = { file: ReviewFile; comments: ReviewSentComment[] }
+
+/** Which side of a diff line a comment is on: the old file (deleted line) or the new one. */
+export type ReviewCommentSide = 'old' | 'new'
+
 /** One check in the expanded check summary (R1b). The excerpt carries no secrets. */
 export type ReviewCheck = {
+  /** Stable id; two checks in different workflows may share a name. 附到评论 uses it. */
+  id: string
   name: string
   status: 'failed' | 'passed' | 'pending'
   logExcerpt?: string
 }
 
-/** Which side of a diff line a comment is on: the old file (deleted line) or the new one. */
-export type ReviewCommentSide = 'old' | 'new'
 
 /** A pending line comment, held on this device until 发给 Agent (编辑 / 删除 on hover). `id` is local. */
 export type ReviewComment = { id: string; path: string; line: number; side: ReviewCommentSide; body: string }
@@ -118,7 +129,7 @@ export type ReviewComment = { id: string; path: string; line: number; side: Revi
 export type ReviewSubmission = {
   comments: ReviewComment[]
   note?: string
-  /** Check names added with 附到评论; a check is never sent alone. */
+  /** Check ids (ReviewCheck.id) added with 附到评论; a check is never sent alone. */
   attachedChecks: string[]
   /** One per batch; a retry of the same batch reuses it. */
   idempotencyKey: string
