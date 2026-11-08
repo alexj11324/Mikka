@@ -272,7 +272,7 @@ test('identifier reads reuse immutable authorized rows across mixed workspace ba
         assert.equal(memberOnly.value.allowed.some(link => link.issueId === theirsLinked), false, 'the private membership fact never widens scope visibility')
         await workspacePool.query('update mikka_teams set "workspaceId"=$2 where id=$1', [driftTeam, workspace])
         await workspacePool.query('update mikka_team_issues set "teamId"=$2 where "issueId"=$1', [theirsLinked, team])
-        await workspacePool.query('update mikka_workspace_members set status=\'revoked\' where "workspaceId"=$1 and "userId"=$2', [workspace, owner])
+        await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspace, owner])
         const revoked = await compare()
         assert.equal(revoked.allowed.length, 0)
         assert.equal(revoked.taskTeams.has(mineLinked), true, 'revocation preserves a private naming fact without granting workspace access')
@@ -389,6 +389,22 @@ test('identifier reads reuse immutable authorized rows across mixed workspace ba
       telegramMixed: readMetrics(telegramMixed), telegramLinked: readMetrics(telegramLinked) }))
 
     console.log('Identifier-read synthetic traffic:', JSON.stringify({ control: readMetrics(control), reused: readMetrics(reused), mixedSearch: readMetrics(mixed), linkedSearch: readMetrics(allLinked) }))
+
+    await t.test('Telegram Personal access rejects Shared UUIDs without changing its conversation', async () => {
+      const conversation = async () => (await pool.query('select * from telegram_conversations where "threadId"=$1', [threadId])).rows[0]
+      const before = await conversation()
+      assert.equal(before.issueId, personalTask)
+      for (const sharedId of [mine, mineLinked, theirsLinked]) {
+        assert.equal(await telegram('/link ' + sharedId), messages.TelegramBot.taskUnavailable)
+        assert.deepEqual(await conversation(), before, 'active Shared membership cannot widen the Personal Coordinator')
+      }
+    })
+    await t.test('Telegram draft confirmation creates a bound Task in its server-resolved Personal Workspace', async () => {
+      await telegram('/new Telegram trusted-workspace fixture')
+      await telegram('/confirm')
+      const created = (await pool.query('select "workspaceId","ownershipState",scope from issues where "userId"=$1 and title=$2', [owner, 'Telegram trusted-workspace fixture'])).rows
+      assert.deepEqual(created, [{ workspaceId: personal, ownershipState: 'bound', scope: 'personal' }])
+    })
   } finally {
     restoreTranslations?.()
     console.log('Identifier-read fixture retention audit:', JSON.stringify({ recordedAt: new Date().toISOString(), retention: 'preserve', owner, other, workspace, team, ids }))

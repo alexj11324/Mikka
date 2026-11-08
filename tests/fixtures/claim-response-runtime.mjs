@@ -21,13 +21,13 @@ function workspaceQuery() {
       assert.equal(table, 'mikka_workspace_members')
       assert.deepEqual(condition.params, [p.workspace.id, p.run.userId, 'active'])
       p.locks.push('workspace_members')
-      return p.memberAllowed ? [{ id: p.run.userId }] : []
+      return p.memberAllowed && p.workspaceMemberAllowed ? [{ id: p.run.userId }] : []
     },
     async orderBy() {
       const p = globalThis.claimResponseProbe
       assert.equal(table, 'mikka_workspaces')
       assert.deepEqual(condition.params, [p.run.userId, 'active', p.workspace.id, 'team', 'personal', p.run.userId])
-      return p.memberAllowed ? [p.workspace] : []
+      return p.memberAllowed && p.workspaceMemberAllowed ? [p.workspace] : []
     },
   }
   return query
@@ -76,8 +76,7 @@ export function remoteRepositoryRef(url){if(!url)return null;const repo=normaliz
 export async function taskSecretInjection(...args){
   const p=globalThis.claimResponseProbe
   assert.equal(args.length,5)
-  const workspace=p.run.agentDefinition?.executionIdentity?p.run.agentDefinition.executionIdentity.workspaceId:p.device.kind==='cloud'?p.caller?.scopeWorkspaceId??null:null
-  assert.equal(args[0],workspace);assert.equal(args[1],remoteRepositoryRef(p.repo.remoteUrl))
+  assert.equal(args[0],p.run.workspaceId);assert.equal(args[1],remoteRepositoryRef(p.repo.remoteUrl))
   assert.ok(args[2]===process.env,'ordinary task secrets use the process environment')
   assert.equal(args[3],undefined);assert.equal(args[4],p.run.userId)
   assert.equal(p.projectAdmission.active,true,'secret preparation requires the live resource lease')
@@ -154,6 +153,7 @@ let checkedOutClient
 export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
 export const pool={async query(sql,args){
   const p=globalThis.claimResponseProbe
+  assert.equal(p.appActive,1,'execution identity remains inside the checked-out APP transaction')
   assert.equal(sql,'SELECT "ownerId",kind,enabled FROM devices WHERE id=$1')
   assert.deepEqual(args,[p.device.id]);return {rows:[p.device]}
 },connect:async()=>{

@@ -271,6 +271,7 @@ test('run result publication commits one owner-scoped result through retries and
       const { admitCloudPush } = await import('../lib/computer/cloud-push')
       const { workspacePool } = await import('../lib/workspace-db')
       const { withTaskWorkspace } = await import('../lib/task-workspace')
+      const { withRunWorkspace } = await import('../lib/run-completion')
       const { ActionFailureError } = await import('../lib/action-error')
       const { seedTeam } = await import('./support/workspace-admin-db')
       const { searchIssues, parseSearchParams } = await import('../lib/issue-search')
@@ -301,14 +302,16 @@ test('run result publication commits one owner-scoped result through retries and
         if (teamState === 'revoked-owner') {
           const before = { task: await task(f), receipt: await receipt(f), counts: await counts(f) }
           let admissions = 0
-          const guardedCloud = () => withTaskWorkspace(f.userId, workspaceId, async () => {
+          const cloudAdmission = async () => {
             admissions++
             const client = await pool.connect()
             try {
               await client.query('BEGIN')
               return await admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, workspaceId, now: new Date() })
             } finally { await client.query('ROLLBACK'); client.release() }
-          })
+          }
+          const guardedCloud = () => withTaskWorkspace(f.userId, workspaceId, cloudAdmission)
+          assert.equal(await withRunWorkspace(f.userId, workspaceId, cloudAdmission), null, 'the normal Run boundary denies revoked membership before APP admission')
           const deniedCloud = async () => {
             await assert.rejects(guardedCloud, error => error instanceof ActionFailureError && error.code === 'workspaceAccessDenied')
             return { error: 'workspaceAccessDenied' }

@@ -120,6 +120,20 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.equal((await issueForUser({ id: owner, [tokenWorkspace]: alpha }, teamless))?.id, teamless)
       await assert.rejects(withTaskWorkspace({ id: owner, [tokenWorkspace]: alpha }, beta, async () => assert.fail('wrong tenant write')), /workspaceAccessDenied/)
     })
+    await t.test('direct task-only citations preserve the reader workspace pin without a run lookup', async () => {
+      const { citationSources } = await import('../lib/coordinator/store')
+      // The owner belongs to both tenants; only the complete reader carries
+      // the selected tenant. Empty run IDs exercise the direct-task prefetch.
+      const citations = [`[[issue:${teamless}]]`]
+      const denied = await citationSources({ id: owner, [tokenWorkspace]: beta }, citations, [])
+      assert.deepEqual(denied, {}, 'a beta-pinned owner must not learn an alpha task through citation prefetch')
+      const allowed = await citationSources({ id: owner, [tokenWorkspace]: alpha }, citations, [])
+      assert.deepEqual(Object.keys(allowed), [teamless])
+      const task = allowed[teamless]
+      assert.ok(task?.kind === 'issue')
+      assert.equal(task.id, teamless)
+      assert.equal(task.title, 'No Team required')
+    })
     await t.test('lists, search and push targets use the tenant even for one account in both workspaces', async () => {
       const { issues: table } = await import('../lib/db/schema')
       const reader = { id: owner, [tokenWorkspace]: alpha }

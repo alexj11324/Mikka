@@ -144,7 +144,14 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   // Preserve the task-access denial before narrower policy parsing or any
   // claim preparation. Publication and the final response recheck it later.
   timings.next('admission')
-  if (!await issueForUser(caller.userId, issueId)) return rejectPublication(new PublicationError('issue_unavailable'))
+  const claimIssue = await issueForUser(caller.userId, issueId)
+  if (!claimIssue) return rejectPublication(new PublicationError('issue_unavailable'))
+  // Task and Run ownership is persisted host data. Neither a claim token nor
+  // an old frozen execution scope can assign the task to another workspace.
+  if (!run.workspaceId || claimIssue.ownershipState !== 'bound' || claimIssue.workspaceId !== run.workspaceId
+    || caller.scopeWorkspaceId && caller.scopeWorkspaceId !== run.workspaceId
+    || run.agentDefinition?.executionIdentity !== undefined && run.agentDefinition.executionIdentity?.workspaceId !== run.workspaceId)
+    return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
@@ -270,8 +277,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
   let taskEnv: Record<string, string> = {}
   let taskSecretNames: string[] = []
-  const taskWorkspaceId = run.agentDefinition?.executionIdentity
-    ? run.agentDefinition.executionIdentity.workspaceId : projectEnvironment ? run.workspaceId : device.kind === 'cloud' ? caller.scopeWorkspaceId ?? null : null
+  const taskWorkspaceId = run.workspaceId
   const taskRepository = remoteRepositoryRef(repo.remoteUrl)
   if (projectEnvironment && (!taskWorkspaceId || taskWorkspaceId !== run.workspaceId
     || run.agentDefinition?.projectExecution?.workspaceId !== taskWorkspaceId)) return NextResponse.json({ error: 'Environment workspace unavailable.', code: 'projectEnvironmentUnavailable' }, { status: 409 })
@@ -517,9 +523,11 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     }, { headers: { 'cache-control': 'private, no-store' } })
   }, async (current, tx) => {
     const currentEnvironment = current.agentDefinition?.projectExecution?.environment
-    const workspaceId = current.agentDefinition?.executionIdentity
-      ? current.agentDefinition.executionIdentity.workspaceId : currentEnvironment ? current.workspaceId : device.kind === 'cloud' ? caller.scopeWorkspaceId ?? null : null
-    if (current.deviceTokenId !== caller.tokenId || current.attempt !== run.attempt || workspaceId !== taskWorkspaceId) return false
+    const workspaceId = current.workspaceId
+    if (!workspaceId || workspaceId !== taskWorkspaceId || current.deviceTokenId !== caller.tokenId || current.attempt !== run.attempt
+      || current.agentDefinition?.executionIdentity?.workspaceId !== run.agentDefinition?.executionIdentity?.workspaceId
+      || current.agentDefinition?.executionIdentity !== undefined && current.agentDefinition.executionIdentity?.workspaceId !== workspaceId
+      || caller.scopeWorkspaceId && caller.scopeWorkspaceId !== workspaceId) return false
     if (Boolean(currentEnvironment) !== Boolean(projectEnvironment) || currentEnvironment &&
       (currentEnvironment.id !== projectEnvironment?.id || currentEnvironment.revision !== projectEnvironment?.revision
         || current.agentDefinition?.projectExecution?.workspaceId !== workspaceId)) return false
@@ -540,8 +548,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
   }
   if (!run.workspaceId) {
-    const error = new PublicationError('issue_unavailable')
-    return NextResponse.json({ error: error.message, code: error.code }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
+    return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
   }
   try {
     return await withRunProjectExecution({ userId: caller.userId, workspaceId: run.workspaceId, issueId: run.issueId,

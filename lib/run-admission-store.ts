@@ -83,7 +83,7 @@ export async function acceptLocalRun(input: {
       }
     }
     const [task] = await tx.select({ id: issues.id, userId: issues.userId, workspaceId: issues.workspaceId, ownershipState: issues.ownershipState, scope: issues.scope, scopeVersion: issues.scopeVersion, title: issues.title, issuedIdentifier: issues.issuedIdentifier, content: issueAttrsContent }).from(issues).where(eq(issues.id, input.issueId)).for('update')
-    if (!task || !await issueForUser(input.userId, task.id)) throw invalid('issueUnavailable')
+    if (!task || task.ownershipState !== 'bound' || !task.workspaceId || !await issueForUser(input.userId, task.id)) throw invalid('issueUnavailable')
     if (JSON.stringify(await lockCliTaskScope(client,input.userId,task.id)) !== JSON.stringify(taskScope)) throw invalid('issueUnavailable')
     const [agent] = await tx.select().from(agents).where(and(eq(agents.id, input.agentId), eq(agents.userId, input.userId))).for('share')
     const [device] = await tx.select().from(devices).where(and(eq(devices.id, input.deviceId), eq(devices.ownerId, input.userId), eq(devices.kind, 'local'))).for('share')

@@ -150,8 +150,8 @@ test('detail and activity revalidate current access while returning only changed
       const { citationSources } = await import('../lib/coordinator/store')
       const citationAgent = randomUUID(), citationRun = randomUUID()
       await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4)', [citationAgent, owner, 'Citation control', 'codex'])
-      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,"agentDefinition") values($1,$2,$3,$4,$5,$6,$7)',
-        [citationRun, owner, id, citationAgent, 'succeeded', 'Citation control', JSON.stringify({ harness: 'codex', executionIdentity: { requester: owner, executionPrincipal: owner, outputOwner: owner } })])
+      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,"agentDefinition","workspaceId") values($1,$2,$3,$4,$5,$6,$7,$8)',
+        [citationRun, owner, id, citationAgent, 'succeeded', 'Citation control', JSON.stringify({ harness: 'codex', executionIdentity: { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId } }), workspaceId])
       const issueCite = `[[issue:${id}]]`, runCite = `[[run:${citationRun}]]`
       await readWorkspace(() => listIssueConnections(id))
       // Initialize both exact read shapes before recording their steady-state
@@ -167,6 +167,7 @@ test('detail and activity revalidate current access while returning only changed
       const linkedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
       const removed = await withActivitySession(owner, () => setIssueTeam({ issueId: id, teamId: null, expectedTeamId: teamId }), workspaceId)
       assert.equal(removed.ok, true)
+      assert.equal((await pool.query('select "workspaceId" from issues where id=$1', [id])).rows[0].workspaceId, workspaceId, 'removing the Team link preserves the Task tenant')
       await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2),($3,$4)', [owner, 'READ', stranger, 'OTHR'])
       const personal = successful(await read(() => saveIssue({ title: 'Personal read control', content: { type: 'doc' }, status: 'todo', priority: 'normal' }))).issue
       const strangerWorkspace = await seedFixtureWorkspace(pool, stranger, 'personal')

@@ -130,7 +130,7 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
     // Coordinator handoff can forward the dispatch's already accepted owner
     // event. It adds no new request and must not stop its current executor.
     if (sourceEventId === task.sourceEventId && !['cancelled', 'revoked'].includes(task.status)) {
-      await tx.query('COMMIT'); return true
+      await tx.query('COMMIT'); return 'replayed' as const
     }
     const id = sourceEventId ? await factoryContinuationSource(tx, task, sourceEventId, runId) : randomUUID()
     if (!sourceEventId) await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt")
@@ -143,6 +143,7 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
   } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
   return true
   })
+  if (changed === 'replayed') return true
   if (!changed) return false
   // A fenced queued run can no longer be claimed, so no executor will acknowledge
   // its stop. Use the ordinary exact-run stop after the epoch commits; its end

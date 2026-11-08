@@ -27,15 +27,9 @@ export async function stopRunsForSecretChanges(tx: SecretsTx, changes: readonly 
   if (!changes.length) return 0
   const ownerIds = [...new Set(changes.flatMap(change => 'ownerId' in change ? [change.ownerId] : []))]
   const workspaceIds = [...new Set(changes.flatMap(change => 'workspaceId' in change ? [change.workspaceId] : []))]
-  // A frozen null identity remains personal. Environment claims without an identity
-  // use the matching canonical Run/Project workspace. Other legacy cloud claims may
-  // use only the original claiming token, never a current Bot or another device token.
-  const workspace = sql`CASE WHEN r."agentDefinition" ? 'executionIdentity'
-    THEN r."agentDefinition"->'executionIdentity'->>'workspaceId'
-    WHEN jsonb_typeof(r."agentDefinition"->'projectExecution'->'environment')='object'
-      THEN CASE WHEN r."agentDefinition"->'projectExecution'->>'workspaceId'=r."workspaceId"::text
-        THEN r."workspaceId"::text ELSE NULL END
-    WHEN d.kind='cloud' THEN token."boundWorkspaceId"::text ELSE NULL END`
+  // Use the same persisted tenant as claim and renewal. Neither an old frozen
+  // null nor a device-token change can move a task's Secret consumption.
+  const workspace = sql`r."workspaceId"::text`
   const { rows: candidates } = await tx.execute<Candidate>(sql`
     SELECT r.id,r."userId",r."deviceId",${workspace} AS "workspaceId",
       CASE WHEN r."agentDefinition" ? 'repositoryAdmission' THEN r."agentDefinition"->'repositoryAdmission'->>'remoteUrl'
@@ -43,7 +37,6 @@ export async function stopRunsForSecretChanges(tx: SecretsTx, changes: readonly 
       COALESCE(jsonb_typeof(r."agentDefinition"->'projectExecution'->'environment')='object',false) AS "hasEnvironment",
       r."agentDefinition"->'projectExecution'->'environment'->'secretIds' AS "environmentSecretIds"
     FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
-    LEFT JOIN device_tokens token ON token.id=r."deviceTokenId" AND token."userId"=r."userId" AND token."boundDeviceId"=r."deviceId"
     LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId" AND repo."deviceId"=r."deviceId"
     WHERE r."stopRequestedAt" IS NULL AND r.status IN ('preparing','running','paused','waiting_input','finishing')
       AND (r."userId"=ANY(${sql.param(ownerIds)}::text[]) OR ${workspace}=ANY(${sql.param(workspaceIds)}::text[]))`)

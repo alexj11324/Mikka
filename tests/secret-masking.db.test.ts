@@ -43,7 +43,7 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.deepEqual(await runtime.taskSecretInjection(ws.id, null, {}), { env: {}, secretNames: [], protectedSecrets: [], unavailable: [] })
   })
 
-  // A legacy cloud run keeps its original claim token's workspace authority.
+  // A cloud run keeps its persisted workspace and its original claim token's authority.
   const device = (await pool.query(`insert into devices (id,name,"ownerId",kind) values (gen_random_uuid(),'cloud',$1,'cloud') returning id`, [admin])).rows[0].id as string
   await pool.query(`insert into cloud_machines ("workspaceId","ownerId","operationId","deviceId") values ($1,$2,gen_random_uuid(),$3)`, [ws.id, admin, device])
   const token = 'dt_' + randomBytes(24).toString('hex')

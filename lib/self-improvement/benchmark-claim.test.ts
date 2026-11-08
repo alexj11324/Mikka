@@ -16,7 +16,7 @@ import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignme
 import { serverRunFailure } from '../run-failure-details'
 import { ModelAdmissionError } from '../model-admission/contract'
 import { ActionFailureError } from '../action-error'
-import { PublicationError, PUBLICATION_ERRORS } from '../run-publication-result'
+import { PublicationError } from '../run-publication-result'
 import * as startupTracing from '../computer/startup-tracing'
 import * as startupDiagnostics from '../computer/startup-diagnostics'
 import * as decisionMcpTool from '../project-map/mcp-tool'
@@ -48,7 +48,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const modules:Record<string,unknown>={
     // This VM owns frozen benchmark composition, not credential admission;
     // the actual route/fence and token revocation have real PostgreSQL tests.
-    '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(projectLease.active,true);assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,workspaceId:run.workspaceId,scope:'personal',content:{type:'doc'}}}},
+    '@/lib/issue-access':{issueForUser:async(userId:string,id:string)=>{assert.equal(projectLease.active,true);assert.equal(userId,'owner');assert.equal(id,'issue');return issueDenied?null:{id,userId,workspaceId:run.workspaceId,ownershipState:'bound',scope:'personal',content:{type:'doc'}}}},
     '@/lib/action-error':{ActionFailureError},
     // Repository/Environment admission has real PostgreSQL coverage. This
     // benchmark fixture authorizes only its exact legacy, no-Environment
@@ -150,7 +150,12 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/personal-policy':{sharedNativeBinding:async()=>null},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
     '@/lib/secrets/runtime':{
-      taskSecretInjection:async()=>({env:{},secretNames:[],protectedSecrets:[],unavailable:[]}),
+      taskSecretInjection:async(workspaceId:string|null,repository:string|null,env:unknown,executor:unknown,ownerId:string)=>{
+        assert.equal(projectLease.active,true)
+        assert.equal(workspaceId,'task-workspace');assert.equal(workspaceId,run.workspaceId)
+        assert.equal(repository,null);assert.equal(env,fixtureEnv);assert.equal(executor,undefined);assert.equal(ownerId,'owner')
+        return {env:{},secretNames:[],protectedSecrets:[],unavailable:[]}
+      },
       taskSecretSnapshot:async()=>{throw Error('This benchmark fixture has no prepared Secret snapshot to revalidate')},
       environmentSecretInjection:async()=>{throw Error('This benchmark fixture has no selected Environment')},
       environmentSecretSnapshot:async()=>{throw Error('This benchmark fixture has no selected Environment snapshot')},
@@ -257,7 +262,7 @@ test('an unbound legacy Run cannot bypass Project admission or receive benchmark
   run.workspaceId=null
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
-  assert.deepEqual(await response.json(),{error:PUBLICATION_ERRORS.issue_unavailable,code:'issue_unavailable'})
+  assert.deepEqual(await response.json(),{error:'Run ownership unavailable.'})
   assert.equal(response.headers.get('cache-control'),'private, no-store')
   assert.deepEqual(calls,[])
   assert.deepEqual(credentialChecks,[])

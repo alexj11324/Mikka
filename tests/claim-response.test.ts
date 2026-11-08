@@ -640,10 +640,17 @@ test('platform cloud claims inject the configured secret assignment with BYO off
       const probe=fixture()
       Object.assign(probe,{caller:denial==='authentication' ? null : {userId:'member',scopeDeviceId:denial==='device-scope' ? 'foreign-device' : 'device',scopeWorkspaceId:'foreign-workspace'},cloud:{subscription:{id:'binding',consumerId:'agent',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:{env:{TASK_SECRET:'must-not-leave'},secretNames:['TASK_SECRET']}})
       Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
-      const response=await claim(probe,denial==='workspace-scope' ? ['skill-preflight','policy'] : [],denial==='workspace-scope')
+      // The persisted ownership gate rejects a conflicting caller before policy or Secret preparation.
+      const response=await claim(probe,[],denial==='workspace-scope')
       assert.equal(response.status,denial==='authentication' ? 401 : denial==='device-scope' ? 404 : 409)
       assert.equal((await response.text()).includes('must-not-leave'),false)
       assert.ok(!probe.preparation.includes('secrets'))
+      assert.equal(probe.run.status,'queued')
+      assert.equal(probe.run.leaseExpiresAt,null)
+      assert.deepEqual(probe.secretReads,[])
+      assert.deepEqual(probe.secretSnapshotReads,[])
+      assert.deepEqual(probe.credentialOwners,[])
+      assert.deepEqual(probe.nativeLeaseCapabilities,[])
     }
   } finally {keys.forEach((key,i)=>{if(saved[i]===undefined)delete process.env[key];else process.env[key]=saved[i]})}
 })
@@ -749,7 +756,7 @@ function protectedFixture() {
   return { probe, canary, secret }
 }
 
-function localExecutionIdentity(workspaceId: string): ExecutionIdentity {
+function localExecutionIdentity(workspaceId: string | null): ExecutionIdentity {
   return { version: 1, requester: 'member', botId: null, botOwner: null, executionPrincipal: 'member', workspaceId,
     outputOwner: 'member', resourceBindings: [{ kind: 'device', id: 'device', ownerId: 'member', access: 'owner' }],
     billingAccount: { model: { kind: 'native_login', ownerId: 'member', resourceId: 'device', amount: 'provider_unknown' },
@@ -776,7 +783,7 @@ test('the actual claim response carries an opaque sealed task grant bound to the
   assert.equal(body.taskSecrets.grants.length, 1)
   const grant = body.taskSecrets.grants[0]
   assert.deepEqual(Object.keys(grant).sort(), ['capability', 'expiresAt', 'name', 'origin'])
-  const binding = { ownerId: 'member', workspaceId: null, repository: 'synthetic/claim-fixture', runId: 'run', deviceId: 'device', deviceTokenId: 'synthetic-device-token', attempt: 1 }
+  const binding = { ownerId: 'member', workspaceId, repository: 'synthetic/claim-fixture', runId: 'run', deviceId: 'device', deviceTokenId: 'synthetic-device-token', attempt: 1 }
   const opened = openEgressCapability(grant.capability, binding)
   assert.equal(opened.secret, canary)
   assert.equal(opened.secretId, secret.id)
@@ -789,8 +796,8 @@ test('the actual claim response carries an opaque sealed task grant bound to the
     assert.throws(() => openEgressCapability(grant.capability, { ...binding, ...mismatch }), { code: 'task_secret_unavailable', detail: 'binding_mismatch' })
   }
   assert.deepEqual(probe.locks, ['workspaces', 'workspace_members', 'issues', 'agent_runs'])
-  assert.deepEqual(probe.secretReads.map(args => [args[0], args[1], args[4]]), [[null, 'synthetic/claim-fixture', 'member']])
-  assert.deepEqual(probe.secretSnapshotReads.map(args => args.slice(0, 3)), [[null, 'synthetic/claim-fixture', 'member']])
+  assert.deepEqual(probe.secretReads.map(args => [args[0], args[1], args[4]]), [[workspaceId, 'synthetic/claim-fixture', 'member']])
+  assert.deepEqual(probe.secretSnapshotReads.map(args => args.slice(0, 3)), [[workspaceId, 'synthetic/claim-fixture', 'member']])
   assert.equal(typeof (probe.secretSnapshotReads[0][3] as { select: unknown }).select, 'function')
 })
 
@@ -874,7 +881,7 @@ test('cloud protected grants preserve native subscription and GitHub credentials
     assert.equal(response.status, revoked ? 409 : 200)
     const wire = await response.text(), body = JSON.parse(wire)
     assert.equal(wire.includes(canary), false)
-    assert.deepEqual(probe.membershipReads, [[workspaceId, ['member']]])
+    assert.deepEqual(probe.membershipReads, revoked ? [] : [[workspaceId, ['member']]])
     assert.deepEqual(probe.nativeLeaseCapabilities, [false])
     assert.deepEqual(probe.credentialOwners, ['member'])
     if (revoked) {
@@ -969,4 +976,44 @@ test('the final Environment fence refuses changed metadata, removed references a
     assert.deepEqual(probe.secretReads, [])
     assert.equal(probe.environmentSnapshotReads.length, change === 'configuration-revision' ? 0 : 1)
   }
+})
+
+test('persisted Task and Run ownership reject missing or conflicting scope before any claim preparation', async () => {
+  for (const mismatch of ['pending-task', 'missing-run-workspace', 'foreign-task-workspace', 'frozen-null', 'frozen-workspace', 'claim-workspace'] as const) {
+    const probe = fixture()
+    if (mismatch === 'pending-task') probe.issue.ownershipState = 'pending'
+    if (mismatch === 'missing-run-workspace') Object.assign(probe.run, { workspaceId: null })
+    if (mismatch === 'foreign-task-workspace') probe.issue.workspaceId = '53100000-0000-4000-8000-000000000003'
+    if (mismatch === 'frozen-null' || mismatch === 'frozen-workspace') Object.assign(probe.run, {
+      agentDefinition: { harness: 'codex', executionIdentity: localExecutionIdentity(mismatch === 'frozen-null' ? null : 'other-workspace') },
+    })
+    if (mismatch === 'claim-workspace') Object.assign(probe, { caller: { userId: 'member', scopeWorkspaceId: 'other-workspace' } })
+    const response = await claim(probe, [], mismatch !== 'missing-run-workspace')
+    assert.equal(response.status, 409, mismatch)
+    assert.deepEqual(await response.json(), { error: 'Run ownership unavailable.' }, mismatch)
+    assert.equal(probe.run.status, 'queued', mismatch)
+    assert.equal(probe.run.leaseExpiresAt, null, mismatch)
+    assert.deepEqual(probe.secretReads, [], mismatch)
+    assert.deepEqual(probe.secretSnapshotReads, [], mismatch)
+    assert.deepEqual(probe.credentialOwners, [], mismatch)
+    assert.deepEqual(probe.nativeLeaseCapabilities, [], mismatch)
+    assert.equal(probe.appCheckouts, 0, mismatch)
+  }
+})
+
+test('removing a frozen identity cannot release a grant prepared under its workspace authority', async t => {
+  const saved = process.env.WORKSPACE_SECRETS_KEY
+  process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
+  t.after(() => { if (saved === undefined) delete process.env.WORKSPACE_SECRETS_KEY; else process.env.WORKSPACE_SECRETS_KEY = saved })
+  const { probe, canary } = protectedFixture()
+  probe.credentialCapability = true
+  Object.assign(probe.run, { agentDefinition: { harness: 'codex', executionIdentity: localExecutionIdentity(workspaceId) } })
+  probe.beforeToken = async () => { Object.assign(probe.run, { agentDefinition: { harness: 'codex' } }) }
+  const response = await claim(probe, preparedClaim)
+  assert.equal(response.status, 409)
+  const wire = await response.text()
+  for (const value of [canary, 'mikka-egress-v1.', 'fixture-claim-github-token', probe.run.prompt]) assert.equal(wire.includes(value), false)
+  assert.deepEqual(probe.secretSnapshotReads, [])
+  assert.deepEqual(probe.membershipReads, [])
+  assert.deepEqual(probe.locks, ['workspaces', 'workspace_members', 'issues', 'agent_runs'])
 })
