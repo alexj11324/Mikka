@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -9,7 +10,7 @@ import { useApi } from '@/lib/useApi'
 import { colors, LIST_INSET } from '@/lib/theme'
 import { ReviewBar } from '../components/review-bar'
 import { useReview } from '../components/use-review'
-import { CANNOT_SEND, lineNumber, lineSide, type DiffLine, type FileDiff, type PendingComment, type SentComment } from '../model/review'
+import { CANNOT_SEND, denial, lineNumber, lineSide, parsePatch, type DiffLine, type PendingComment, type ReviewFileRead, type ReviewSentComment } from '../model/review'
 import { filePath } from '../model/review-api'
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' })
@@ -24,11 +25,13 @@ export function FileScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const r = useReview(id)
-  const read = useApi<FileDiff>(id && path ? filePath(id, path) : null)
-  const file = r.review?.files.find(item => item.path === path)
+  const read = useApi<ReviewFileRead>(id && path ? filePath(id, path) : null)
+  const file = read.data?.file ?? r.review?.diff.files.find(item => item.path === path)
+  const hunks = useMemo(() => parsePatch(read.data?.file.patch ?? null), [read.data])
+  const sentComments = read.data?.comments ?? []
   const name = path?.slice(path.lastIndexOf('/') + 1) ?? ''
   const pending = r.batch.comments.filter(comment => comment.path === path)
-  const canComment = Boolean(r.review?.permissions.canSend) && !r.merged
+  const canComment = Boolean(r.permissions?.canSend) && !r.merged
   const openLine = (line: DiffLine) => {
     if (!canComment) return
     router.push({ pathname: '/task/[id]/comment', params: { id, path, line: String(lineNumber(line)), side: lineSide(line), quote: `${line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ' '} ${line.text}` } })
@@ -42,12 +45,12 @@ export function FileScreen() {
         {file ? <Text style={styles.counts}><Text style={{ color: colors.success }}>+{file.additions}</Text>  <Text style={{ color: colors.danger }}>−{file.deletions}</Text>  <Text style={{ color: colors.secondary }}>{path}</Text></Text> : null}
         <ReadNotice error={read.error} hasData={Boolean(read.data)} label="改动" onRetry={read.reload} />
         {read.loading && !read.data ? <View style={styles.center}><Spinner /></View> : null}
-        {read.data?.hunks.map((hunk, h) => (
+        {hunks.map((hunk, h) => (
           <View key={h}>
             <Text style={styles.hunk} numberOfLines={1}>{hunk.header}</Text>
             {hunk.lines.map((line, index) => {
               const n = lineNumber(line), side = lineSide(line)
-              const sent = read.data!.comments.filter(comment => comment.line === n && comment.side === side)
+              const sent = sentComments.filter(comment => comment.line === n && comment.side === side)
               const mine = pending.filter(comment => comment.line === n && comment.side === side)
               return (
                 <View key={index}>
@@ -64,18 +67,18 @@ export function FileScreen() {
             })}
           </View>
         ))}
-        {read.data && !read.data.hunks.length ? <Text style={styles.empty}>没有改动</Text> : null}
+        {read.data && !hunks.length ? <Text style={styles.empty}>{read.data.file.tooLarge ? '改动太大，没法在手机上显示' : '没有改动'}</Text> : null}
       </ScrollView>
       {r.review && !r.merged ? <ReviewBar line={r.line} canSend={r.canSend} busy={r.sending}
-        blocked={!r.review.permissions.canSend ? CANNOT_SEND : undefined}
+        blocked={r.permissions && !r.permissions.canSend ? denial(r.permissions.reasons.send, CANNOT_SEND) : undefined}
         onOpen={() => router.push({ pathname: '/task/[id]/batch', params: { id } })} onSend={() => void r.send()} /> : null}
     </View>
   )
 }
 
 /** A comment under its line: who, which line and, for a pending one, 待发送; a pending one opens to edit. */
-function CommentCard({ comment, onPress }: { comment: SentComment | PendingComment; onPress?: () => void }) {
-  const sent = 'sent' in comment
+function CommentCard({ comment, onPress }: { comment: ReviewSentComment | PendingComment; onPress?: () => void }) {
+  const sent = 'sentAt' in comment
   const body = (
     <>
       <View style={styles.cardHead}>

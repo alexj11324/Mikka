@@ -17,7 +17,7 @@ export function BatchSheet() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const [batch, setBatch] = useBatch(id)
-  const checks = useReview(id).review?.checks ?? []
+  const checks = useReview(id).checks
   return (
     <>
       <NavBar fade={false} title="待发送" right={{ icon: 'checkmark', label: '完成', web: <Check size={20} color={colors.ink} />, onPress: () => router.back() }} />

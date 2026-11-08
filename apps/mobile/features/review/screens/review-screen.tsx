@@ -14,7 +14,7 @@ import { useRefresh } from '@/lib/useApi'
 import { colors, LIST_INSET, ROW_SURFACE_INSET, SPACE } from '@/lib/theme'
 import { ReviewBar } from '../components/review-bar'
 import { useReview } from '../components/use-review'
-import { CANNOT_MERGE, CANNOT_SEND, checksLine, sourceLine, toggleCheck, type Review, type ReviewCheck } from '../model/review'
+import { CANNOT_MERGE, CANNOT_SEND, checksLine, denial, sourceLine, toggleCheck, type ReviewCheck, type ReviewRead } from '../model/review'
 import { fileHref } from '../model/routes'
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' })
@@ -33,7 +33,7 @@ export function ReviewScreen() {
   const refresh = useRefresh(r.reload)
   const [open, setOpen] = useState(false)
   const review = r.review
-  const blocked = review && !review.permissions.canSend ? CANNOT_SEND : undefined
+  const blocked = r.permissions && !r.permissions.canSend ? denial(r.permissions.reasons.send, CANNOT_SEND) : undefined
 
   return (
     <View style={styles.screen}>
@@ -43,8 +43,8 @@ export function ReviewScreen() {
         {r.loading && !review ? <View style={styles.center}><Spinner /></View> : null}
         {review ? (
           <>
-            {sourceLine(review.source, shortWhen) ? <Text style={styles.source}>{sourceLine(review.source, shortWhen)}</Text> : null}
-            <Top review={review} open={open} onToggle={() => { tap(); setOpen(value => !value) }}
+            {sourceLine(review.diff.source, shortWhen) ? <Text style={styles.source}>{sourceLine(review.diff.source, shortWhen)}</Text> : null}
+            <Top review={review} checks={r.checks} open={open} onToggle={() => { tap(); setOpen(value => !value) }}
               attached={r.batch.checks} onAttach={check => r.setBatch(batch => toggleCheck(batch, check.id))}
               merged={r.merged} merging={r.merging} onMerge={() => void r.approve()} />
             <Files review={review} onOpen={path => router.push(fileHref(id, path))} />
@@ -58,16 +58,17 @@ export function ReviewScreen() {
 }
 
 /** The top rows: the checks, expandable, and 批准合并 (or the running / merged state in its place). */
-function Top({ review, open, onToggle, attached, onAttach, merged, merging, onMerge }: {
-  review: Review; open: boolean; onToggle: () => void; attached: string[]; onAttach: (check: ReviewCheck) => void; merged: boolean; merging: boolean; onMerge: () => void
+function Top({ review, checks: list, open, onToggle, attached, onAttach, merged, merging, onMerge }: {
+  review: ReviewRead; checks: ReviewCheck[]; open: boolean; onToggle: () => void; attached: string[]; onAttach: (check: ReviewCheck) => void; merged: boolean; merging: boolean; onMerge: () => void
 }) {
   const { checks } = review.summary
   const Chevron = open ? ChevronUp : ChevronDown
-  const failed = review.checks.filter(check => check.conclusion === 'failure')
-  const others = review.checks.filter(check => check.conclusion !== 'failure')
+  const { permissions } = review.summary
+  const failed = list.filter(check => check.status === 'failed')
+  const others = list.filter(check => check.status !== 'failed')
   return (
     <View style={styles.top}>
-      {review.checks.length ? (
+      {list.length ? (
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={checksLine(checks)} onPress={onToggle} style={({ pressed }) => [styles.checks, pressed && { opacity: 0.6 }]}>
           {checks.failed ? <TriangleAlert size={18} color={colors.danger} strokeWidth={2} /> : <CircleCheck size={18} color={colors.success} strokeWidth={2} />}
           <Text style={styles.checksText}>{checksLine(checks)}</Text>
@@ -97,12 +98,12 @@ function Top({ review, open, onToggle, attached, onAttach, merged, merging, onMe
       ) : null}
       {merged ? (
         <View style={styles.state}><GitMerge size={18} color={colors.merged} strokeWidth={2} /><Text style={styles.stateText}>已合并</Text></View>
-      ) : !review.files.length ? null : !review.summary.pr ? (
-        <View style={styles.state}><CircleDot size={18} color={colors.orange} strokeWidth={2} /><Text style={styles.stateText}>运行中 · 还没开 PR</Text>{review.source.live ? <Text style={styles.live}>实时</Text> : null}</View>
+      ) : review.diff.empty ? null : !review.summary.pr ? (
+        <View style={styles.state}><CircleDot size={18} color={colors.orange} strokeWidth={2} /><Text style={styles.stateText}>运行中 · 还没开 PR</Text>{review.diff.live ? <Text style={styles.live}>实时</Text> : null}</View>
       ) : (
         <View style={{ gap: 6 }}>
-          <CardButton label="批准合并" primary busy={merging} disabled={!review.permissions.canMerge} onPress={onMerge} />
-          {!review.permissions.canMerge ? <Text style={styles.reason}>{CANNOT_MERGE}</Text> : null}
+          <CardButton label="批准合并" primary busy={merging} disabled={!permissions.canMerge} onPress={onMerge} />
+          {!permissions.canMerge ? <Text style={styles.reason}>{denial(permissions.reasons.merge, CANNOT_MERGE)}</Text> : null}
         </View>
       )}
     </View>
@@ -110,9 +111,9 @@ function Top({ review, open, onToggle, attached, onAttach, merged, merging, onMe
 }
 
 /** The changed files: name, folder and comment count, +/−; a file too big to send at once loads on its own page. */
-function Files({ review, onOpen }: { review: Review; onOpen: (path: string) => void }) {
+function Files({ review, onOpen }: { review: ReviewRead; onOpen: (path: string) => void }) {
   const { summary } = review
-  if (!review.files.length) return <Text style={styles.empty}>没有改动</Text>
+  if (review.diff.empty || !review.diff.files.length) return <Text style={styles.empty}>没有改动</Text>
   return (
     <View>
       <View style={styles.filesHead}>
@@ -120,7 +121,7 @@ function Files({ review, onOpen }: { review: Review; onOpen: (path: string) => v
         <Text style={[styles.filesHeadText, { color: colors.success }]}>+{summary.additions}</Text>
         <Text style={[styles.filesHeadText, { color: colors.danger }]}>−{summary.deletions}</Text>
       </View>
-      {review.files.map(file => {
+      {review.diff.files.map(file => {
         const slash = file.path.lastIndexOf('/')
         const name = file.path.slice(slash + 1)
         const folder = slash > 0 ? file.path.slice(0, slash) : ''

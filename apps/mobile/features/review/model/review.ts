@@ -1,73 +1,62 @@
 /**
  * A coding task's review on iPhone (#1738; decisions/2026-11-08-1230-coding-workspace.md, frames R2a, R2, R3, R3b),
- * as plain data. The server shapes are the proposed #1722 contract; review-api.ts is the only file that calls it.
+ * as plain data over the shared contract (contract.ts, a copy of lib/code-review/contract.ts, #1741). review-api.ts is
+ * the only file that calls the server.
  */
+import type { ReviewCheck, ReviewComment, ReviewCommentSide, ReviewDenialReason, ReviewDiffSource, ReviewSummary } from './contract'
 
-/** The one-line summary a code task carries on its chat card and under its title. Null for a non-code task. */
-export type ReviewSummary = {
-  pr: { number: number; state: 'open' | 'merged' | 'closed'; url?: string } | null
-  files: number
-  additions: number
-  deletions: number
-  checks: { failed: number; passed: number; pending: number }
-  /** The agent is still working; before a PR exists the diff is the machine's, live. */
-  running: boolean
-}
+export type { ReviewCheck, ReviewDiff, ReviewFile, ReviewFileRead, ReviewRead, ReviewSentComment, ReviewSummary } from './contract'
 
-/** Where the diff was read from: the running machine, or after it was reclaimed the last checkpoint or the PR. */
-export type ReviewSource = { kind: 'machine' | 'checkpoint' | 'pr'; at: string; live: boolean }
-
-export type ReviewFile = { path: string; additions: number; deletions: number; comments: number; status: 'added' | 'modified' | 'deleted' | 'renamed'; tooLarge?: boolean }
-
-export type ReviewCheck = { id: string; name: string; conclusion: 'failure' | 'success' | 'pending' | 'skipped'; logExcerpt?: string }
-
-/** What the reader may do: a teammate without permission sees both actions off, each saying why (R11). */
-export type ReviewPermissions = { canSend: boolean; canMerge: boolean }
-
-export const CANNOT_SEND = '只有任务负责人可以发给 Agent'
-export const CANNOT_MERGE = '只有任务负责人可以合并'
-
-export type Review = { summary: ReviewSummary; source: ReviewSource; files: ReviewFile[]; checks: ReviewCheck[]; permissions: ReviewPermissions }
-
+/** One line of a parsed patch, with its old and new numbers. */
 export type DiffLine = { kind: 'add' | 'del' | 'ctx'; old?: number; new?: number; text: string }
 export type DiffHunk = { header: string; lines: DiffLine[] }
-export type SentComment = { id: string; line: number; side: 'new' | 'old'; body: string; author: string; sent: true }
-export type FileDiff = { path: string; hunks: DiffHunk[]; comments: SentComment[] }
 
-/** A comment waiting in the batch, on one line of one file. */
-export type PendingComment = { id: string; path: string; line: number; side: 'new' | 'old'; body: string; quote: string }
+/** A comment waiting in the batch; `quote` is the line it is on, shown in R3b and the batch sheet. */
+export type PendingComment = ReviewComment & { quote: string }
 
-/** The batch 发给 Agent sends: line comments, an optional note and attached failing checks. */
+/** The batch 发给 Agent sends: line comments, an optional note and attached failing checks (their ids). */
 export type Batch = { comments: PendingComment[]; note: string; checks: string[] }
 
 export const EMPTY_BATCH: Batch = { comments: [], note: '', checks: [] }
 
-const plural = (n: number, word: string) => `${n} ${word}`
+/** R11, in the person's words, from the contract's reason codes. */
+export const DENIAL: Record<ReviewDenialReason, string> = {
+  not_owner_merge: '只有任务负责人可以合并',
+  not_owner_send: '只有任务负责人可以发给 Agent',
+  not_owner_terminal: '只有任务负责人可以用终端',
+  github_permission: 'GitHub 权限不足，没能合并',
+}
+export const denial = (reason: string | undefined, fallback: string) => (reason && reason in DENIAL ? DENIAL[reason as ReviewDenialReason] : fallback)
+export const CANNOT_SEND = DENIAL.not_owner_send
+export const CANNOT_MERGE = DENIAL.not_owner_merge
+
+export const isMerged = (summary: ReviewSummary) => summary.pr?.state === 'merged'
 
 /**
  * The summary line (R0, R2a): 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败」 with a PR, 「3 个文件 +42 −7 · 运行中」 before
- * one. The parts are separate so the row can colour +/− and the check mark.
+ * one. The parts are separate so the row can colour +/− and the check mark. `short` is R2a's form under the task
+ * title: no file count once there is a PR, and 「1 项失败」.
  */
 export function summaryParts(summary: ReviewSummary, short = false) {
+  const merged = isMerged(summary)
   return {
     pr: summary.pr ? `PR #${summary.pr.number}` : null,
-    /** The task detail's short form (R2a) leaves out the file count and says 「1 项失败」. */
-    files: short && summary.pr ? null : plural(summary.files, '个文件'),
+    files: short && summary.pr ? null : `${summary.files} 个文件`,
     additions: `+${summary.additions}`,
     deletions: `−${summary.deletions}`,
-    status: summary.pr?.state === 'merged' ? '已合并'
+    status: merged ? '已合并'
       : summary.checks.failed ? `${summary.checks.failed} 项${short ? '' : '检查'}失败`
       : summary.running ? '运行中'
       : summary.checks.pending ? '检查中'
       : summary.checks.passed ? '检查通过' : null,
-    failed: !summary.pr || summary.pr.state !== 'merged' ? summary.checks.failed > 0 : false,
+    failed: !merged && summary.checks.failed > 0,
   }
 }
 
 /** The whole line as one string, for the screen reader. */
 export const summaryLabel = (summary: ReviewSummary) => {
   const p = summaryParts(summary)
-  return [p.pr, `${p.files} ${p.additions} ${p.deletions}`, p.status].filter(Boolean).join('，')
+  return [p.pr, [p.files, p.additions, p.deletions].filter(Boolean).join(' '), p.status].filter(Boolean).join('，')
 }
 
 /** The check row at the top of R2: 「1 项检查失败 · 5 项通过」. */
@@ -76,13 +65,13 @@ export function checksLine(checks: ReviewSummary['checks']) {
     .filter(Boolean).join(' · ') || '没有检查'
 }
 
-/** The source line under the title when the machine is gone (R12), or null while the machine serves it. */
-export function sourceLine(source: ReviewSource, when: (iso: string) => string) {
-  if (source.kind === 'machine') return null
-  return `机器已回收，显示的是${source.kind === 'checkpoint' ? '最后一次检查点' : ' PR '}的改动 · ${when(source.at)}`
+/** The source line when the machine was reclaimed (R12), or null while the machine serves the diff. */
+export function sourceLine(source: ReviewDiffSource, when: (iso: string) => string) {
+  if (!source.reclaimed) return null
+  return `机器已回收，显示的是${source.kind === 'pr' ? ' PR ' : '最后一次检查点'}的改动 · ${when(source.at)}`
 }
 
-/** The floating bar's words: 「2 条评论 · ios-unit 失败」, or 「写修改意见…」 when nothing is in the batch. */
+/** The floating bar's words: 「2 条评论 · ios-unit 失败」, or null when nothing is in the batch (写修改意见…). */
 export function batchLine(batch: Batch, checks: ReviewCheck[]) {
   const attached = checks.filter(check => batch.checks.includes(check.id)).map(check => `${check.name} 失败`)
   return [batch.comments.length ? `${batch.comments.length} 条评论` : null, ...attached].filter(Boolean).join(' · ') || null
@@ -103,16 +92,40 @@ export function toggleCheck(batch: Batch, id: string): Batch {
   return { ...batch, checks: batch.checks.includes(id) ? batch.checks.filter(item => item !== id) : [...batch.checks, id] }
 }
 
-/** The request body of 发给 Agent; the same key for the same batch, so a second tap sends nothing twice. */
+/** The ReviewSubmission 发给 Agent posts; the same key for the same batch, so a second tap sends nothing twice. */
 export function sendBody(batch: Batch, idempotencyKey: string) {
   return {
     idempotencyKey,
-    comments: batch.comments.map(({ path, line, side, body }) => ({ path, line, side, body: body.trim() })).filter(item => item.body),
+    comments: batch.comments.map(({ id, path, line, side, body }) => ({ id, path, line, side, body: body.trim() })).filter(item => item.body),
     ...(batch.note.trim() ? { note: batch.note.trim() } : {}),
-    checks: batch.checks,
+    attachedChecks: batch.checks,
   }
 }
 
 /** A line's number as the sheet titles it (「第 22 行」): the new side's, or the old side's for a removed line. */
 export const lineNumber = (line: DiffLine) => line.kind === 'del' ? line.old ?? 0 : line.new ?? line.old ?? 0
-export const lineSide = (line: DiffLine): 'new' | 'old' => line.kind === 'del' ? 'old' : 'new'
+export const lineSide = (line: DiffLine): ReviewCommentSide => line.kind === 'del' ? 'old' : 'new'
+
+/** A file's unified diff (the contract's `patch`) as hunks of numbered lines. File headers and "\ No newline" are skipped. */
+export function parsePatch(patch: string | null): DiffHunk[] {
+  if (!patch) return []
+  const hunks: DiffHunk[] = []
+  let current: DiffHunk | null = null
+  let oldLine = 0, newLine = 0
+  for (const raw of patch.split('\n')) {
+    const head = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw)
+    if (head) {
+      oldLine = Number(head[1]); newLine = Number(head[2])
+      current = { header: raw, lines: [] }
+      hunks.push(current)
+      continue
+    }
+    if (!current || raw.startsWith('\\')) continue
+    if (raw.startsWith('+')) current.lines.push({ kind: 'add', new: newLine++, text: raw.slice(1) })
+    else if (raw.startsWith('-')) current.lines.push({ kind: 'del', old: oldLine++, text: raw.slice(1) })
+    else if (raw.startsWith(' ') || raw === '') current.lines.push({ kind: 'ctx', old: oldLine++, new: newLine++, text: raw.slice(1) })
+  }
+  // A trailing newline in the patch is not a line of the file.
+  for (const hunk of hunks) while (hunk.lines.length && hunk.lines.at(-1)!.kind === 'ctx' && hunk.lines.at(-1)!.text === '' && patch.endsWith('\n')) { hunk.lines.pop(); break }
+  return hunks
+}

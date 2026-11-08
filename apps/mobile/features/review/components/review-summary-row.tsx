@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 import { ChevronRight, GitPullRequest, GitMerge, TriangleAlert } from 'lucide-react-native'
 import { Text } from '@/components/Text'
 import { colors } from '@/lib/theme'
-import { summaryLabel, summaryParts, type ReviewSummary } from '../model/review'
+import { isMerged, summaryLabel, summaryParts, type ReviewSummary } from '../model/review'
 
 /**
  * A code task's one-line summary (R0, R2a): 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败 ›」, or 「3 个文件 +42 −7 ·
@@ -12,7 +12,7 @@ import { summaryLabel, summaryParts, type ReviewSummary } from '../model/review'
  */
 export function ReviewSummaryRow({ summary, onPress, compact, short }: { summary: ReviewSummary; onPress: () => void; compact?: boolean; short?: boolean }) {
   const p = summaryParts(summary, short)
-  const merged = summary.pr?.state === 'merged'
+  const merged = isMerged(summary)
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`审阅，${summaryLabel(summary)}`} onPress={onPress} hitSlop={4}
       style={({ pressed }) => [styles.row, compact && styles.compact, pressed && { opacity: 0.6 }]}>

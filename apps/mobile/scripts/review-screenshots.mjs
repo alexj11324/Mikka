@@ -1,6 +1,6 @@
 // Expo Web screenshots for #1738, the iPhone code review: a task's summary row (R2a), the review (R2) and its checks,
 // a file's diff (R3), a line comment (R3b) and the states (running, merged, teammate, empty, machine reclaimed).
-// Our own labelled fixtures; the server shapes are the contract proposed for #1722.
+// Our own labelled fixtures; the server shapes are the shared contract (lib/code-review/contract.ts, #1741).
 //
 //   MOBILE_WEB_DIST=/path/to/expo-web-export SCREENSHOT_OUT=/path/to/out node apps/mobile/scripts/review-screenshots.mjs
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
@@ -18,44 +18,51 @@ const FRONTEND = '33333333-3333-4333-8333-333333333331'
 const TASK = '44444444-4444-4444-8444-444444444471'
 const ago = (days, hours = 0) => new Date(Date.now() - days * 86_400_000 - hours * 3_600_000).toISOString()
 
-const summary = { pr: { number: 1471, state: 'open' }, files: 3, additions: 42, deletions: 7, checks: { failed: 1, passed: 5, pending: 0 }, running: false }
+const owner = { canSend: true, canMerge: true, canTerminal: true, reasons: {} }
+const teammate = { canSend: false, canMerge: false, canTerminal: false, reasons: { send: 'not_owner_send', merge: 'not_owner_merge', terminal: 'not_owner_terminal' } }
+const pr = state => ({ number: 1471, state, url: 'https://github.com/example/app/pull/1471' })
+const summary = { taskId: TASK, pr: pr('open'), files: 3, additions: 42, deletions: 7, checks: { failed: 1, passed: 5, pending: 0 }, running: false, branch: 'fix/ios-callback', permissions: owner, live: { workspaceId: WORKSPACE } }
 const checks = [
-  { id: 'ios-unit', name: 'ios-unit', conclusion: 'failure', logExcerpt: 'FAIL apps/mobile/lib/auth/callback.test.ts\n  ✕ returns to the chat after sign-in (31 ms)\n    Expected: "/chats"  Received: "mikka://chat"' },
-  ...['lint', 'typecheck', 'web-unit', 'database', 'build'].map(name => ({ id: name, name, conclusion: 'success' })),
+  { id: 'ios-unit', name: 'ios-unit', status: 'failed', logExcerpt: 'FAIL apps/mobile/lib/auth/callback.test.ts\n  ✕ returns to the chat after sign-in (31 ms)\n    Expected: "/chats"  Received: "mikka://chat"' },
+  ...['lint', 'typecheck', 'web-unit', 'database', 'build'].map(name => ({ id: name, name, status: 'passed' })),
 ]
+const patch = [
+  '@@ -20,7 +20,9 @@ export async function handleCallback',
+  ' export async function handleCallback(url) {',
+  '   const params = new URL(url).searchParams',
+  "-  const redirect = 'mikka://chat'",
+  "+  const redirect = config.authRedirect ?? '/chats'",
+  "+  if (!params.get('code')) return router.replace('/sign-in')",
+  "   await session.exchange(params.get('code'))",
+  '-  router.push(redirect)',
+  '+  router.replace(redirect)',
+  ' }',
+  '',
+].join('\n')
+const file = (path, status, additions, deletions, extra = {}) => ({ path, status, additions, deletions, comments: 0, patch: null, ...extra })
 const files = [
-  { path: 'apps/mobile/lib/auth/callback.ts', additions: 18, deletions: 4, comments: 0, status: 'modified' },
-  { path: 'apps/mobile/lib/auth/callback.test.ts', additions: 21, deletions: 0, comments: 0, status: 'added' },
-  { path: 'apps/mobile/app.config.ts', additions: 3, deletions: 3, comments: 0, status: 'modified' },
+  file('apps/mobile/lib/auth/callback.ts', 'modified', 18, 4, { comments: 1 }),
+  file('apps/mobile/lib/auth/callback.test.ts', 'added', 21, 0),
+  file('apps/mobile/app.config.ts', 'modified', 3, 3),
 ]
-const owner = { canSend: true, canMerge: true }
+const diff = (source, list, extra = {}) => ({ source, live: false, base: 'main', head: 'fix/ios-callback', files: list, empty: !list.length, ...extra })
 const scenarios = {
-  review: { summary, source: { kind: 'machine', at: ago(0, 1), live: false }, files, checks, permissions: owner },
-  running: { summary: { ...summary, pr: null, running: true, checks: { failed: 0, passed: 0, pending: 0 } }, source: { kind: 'machine', at: ago(0), live: true }, files, checks: [], permissions: owner },
-  merged: { summary: { ...summary, pr: { number: 1471, state: 'merged' } }, source: { kind: 'pr', at: ago(0, 1), live: false }, files, checks, permissions: owner },
-  teammate: { summary, source: { kind: 'machine', at: ago(0, 1), live: false }, files, checks, permissions: { canSend: false, canMerge: false } },
-  empty: { summary: { ...summary, files: 0, additions: 0, deletions: 0 }, source: { kind: 'machine', at: ago(0), live: false }, files: [], checks: [], permissions: owner },
-  reclaimed: { summary, source: { kind: 'checkpoint', at: ago(1, 2), live: false }, files: [...files.slice(0, 2), { ...files[2], path: 'apps/mobile/ios/Podfile.lock', additions: 1840, deletions: 1202, tooLarge: true }], checks, permissions: owner },
+  review: { read: { summary, diff: diff({ kind: 'machine', at: ago(0, 1), reclaimed: false }, files) }, checks },
+  running: { read: { summary: { ...summary, pr: null, running: true, checks: { failed: 0, passed: 0, pending: 0 } }, diff: diff({ kind: 'machine', at: ago(0), reclaimed: false }, files, { live: true }) }, checks: [] },
+  merged: { read: { summary: { ...summary, pr: pr('merged') }, diff: diff({ kind: 'pr', at: ago(0, 1), reclaimed: false }, files) }, checks },
+  teammate: { read: { summary: { ...summary, permissions: teammate }, diff: diff({ kind: 'machine', at: ago(0, 1), reclaimed: false }, files) }, checks },
+  empty: { read: { summary: { ...summary, files: 0, additions: 0, deletions: 0 }, diff: diff({ kind: 'machine', at: ago(0), reclaimed: false }, []) }, checks: [] },
+  reclaimed: { read: { summary, diff: diff({ kind: 'checkpoint', at: ago(1, 2), reclaimed: true }, [...files.slice(0, 2), file('apps/mobile/ios/Podfile.lock', 'modified', 1840, 1202, { tooLarge: true })]) }, checks },
 }
 let scenario = 'review'
 /** Each state is its own task, so no read cached under one state answers another. */
 const taskOf = name => `44444444-4444-4444-8444-4444444${String(Object.keys(scenarios).indexOf(name) + 10).padStart(5, '0')}`
 const scenarioOf = path => Object.keys(scenarios).find(name => path.includes(taskOf(name))) ?? scenario
 
-const fileDiff = path => ({
-  path,
-  hunks: [{ header: '@@ -20,7 +20,9 @@ export async function handleCallback', lines: [
-    { kind: 'ctx', old: 20, new: 20, text: 'export async function handleCallback(url) {' },
-    { kind: 'ctx', old: 21, new: 21, text: '  const params = new URL(url).searchParams' },
-    { kind: 'del', old: 22, text: "  const redirect = 'mikka://chat'" },
-    { kind: 'add', new: 22, text: "  const redirect = config.authRedirect ?? '/chats'" },
-    { kind: 'add', new: 23, text: "  if (!params.get('code')) return router.replace('/sign-in')" },
-    { kind: 'ctx', old: 23, new: 24, text: "  await session.exchange(params.get('code'))" },
-    { kind: 'del', old: 24, text: '  router.push(redirect)' },
-    { kind: 'add', new: 25, text: '  router.replace(redirect)' },
-    { kind: 'ctx', old: 25, new: 26, text: '}' },
-  ] }],
-  comments: [{ id: 'c1', line: 25, side: 'new', body: '这里补一个 replace 的测试，确认返回键不会回到回调页。', author: '阿宁', sent: true }],
+/** ReviewFileRead: the file with its patch, and the comments already sent on it. */
+const fileRead = path => ({
+  file: { ...(files.find(item => item.path === path) ?? file(path, 'modified', 2, 2)), patch },
+  comments: [{ id: 'c1', path, line: 25, side: 'new', body: '这里补一个 replace 的测试，确认返回键不会回到回调页。', author: '阿宁', sentAt: ago(0, 2) }],
 })
 
 const detail = {
@@ -80,9 +87,10 @@ function apiResponse(url) {
   if (path === '/api/version') return json({})
   if (path === '/api/mobile/home') return json(home)
   if (path === '/api/mobile/tasks') return json({ tasks: [] })
-  if (path.endsWith('/review/file')) return json(fileDiff(searchParams.get('path')))
-  if (path.endsWith('/review')) return json(scenarios[scenarioOf(path)])
-  if (path.startsWith('/api/mobile/tasks/')) return json({ ...detail, task: { ...detail.task, ...(scenario === 'before' ? {} : { review: scenarios[scenario]?.summary ?? summary }) } })
+  if (path.endsWith('/review/file')) return json(fileRead(searchParams.get('path')))
+  if (path.endsWith('/review/checks')) return json(scenarios[scenarioOf(path)].checks)
+  if (path.endsWith('/review')) return json(scenarios[scenarioOf(path)].read)
+  if (path.startsWith('/api/mobile/tasks/')) return json({ ...detail, task: { ...detail.task, ...(scenario === 'before' ? {} : { review: scenarios[scenario]?.read.summary ?? summary }) } })
   if (path === '/api/pending-actions') return json([])
   if (path.startsWith('/api/live/')) return json({ error: 'offline' }, 404)
   return null
