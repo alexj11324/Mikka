@@ -3865,6 +3865,7 @@
     "states": {
       "online": "Online",
       "offline": "Offline",
+      "never": "Never online",
       "starting": "Starting",
       "running": "Running",
       "paused": "Sleeping",

@@ -3865,6 +3865,7 @@
     "states": {
       "online": "在线",
       "offline": "离线",
+      "never": "从未上线",
       "starting": "启动中",
       "running": "运行中",
       "paused": "休眠",
