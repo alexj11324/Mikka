@@ -77,15 +77,15 @@ The additive response shape is recorded in enabled-models-api.md.
 | --- | --- |
 | #1539 | Connect settings UI to the actions below; real production source toggle/refresh and migration checks. |
 | #1556 | Packaged desktop/community-image email, chat/reply and built-in live passed; real Google OAuth and external-provider acceptance remain. |
-| #1593 | Historical failed invariant identified as missing Limits; rerun both fixed official subscription paths; collect dispatch latency, active keepalive, normal completion/cancellation and remaining external-wait/stage-handoff evidence. |
-| #1212 | Production server-side MCP abort and public/private group Stop receipts, including cleanup. |
+| #1593 | Both official native paths passed on published9e with cleanup; repeat the final complete source and retain the remaining lifecycle/Factory evidence. |
+| #1212 | Production MCP abort is proved by42441779626; public/private group Stop and cleanup still require the final combined source. |
 | #1560, #1565 | A real assigned thread completed by the daemon on the self-hosted installation; distinguish it from enrollment and transport. |
 | #1561 | Local backend and real visible Web idle minutes plus all 10 request-budget cases passed (below); deployed usage and the remaining transport evidence still need their version-bound closeout. |
-| #1562 | Real vault store → Agent autofill, plus plaintext-free logs, on the self-hosted target. |
+| #1562 | Real candidate E2B/Agent autofill passed; require the final baked image without operator script or runtime-pin overrides. |
 | #1563 | Real self-hosted GitHub App clone → push → PR. |
-| #1564 | Screenshots of a genuine cloud-binding flow. |
-| #1566 | iPhone receipt; coordinated Expo enhanced-security production configuration and delivery verification. No production configuration was changed in this batch. |
-| #1567 | Self-hosted cloud-model reply and exhausted-quota refusal. |
+| #1564 | Genuine screenshots and immediate revocation passed; normal native consent still needs the second private-service fix and published replay. |
+| #1566 | Project-only Expo enhanced security is enabled after both sender gates; physical iPhone receipt remains unverified. |
+| #1567 | Real scoped hosted reply/settlement and key-budget refusal passed; normal Coordinator, deployed refusal UI and account exhaustion remain separate checks. |
 | #1568 | TestFlight device: connect, login, chat, return to cloud. |
 
 No issue is closed solely because its code is on main, a guard job is green,
@@ -362,7 +362,8 @@ overlay. No identity, password, key or token is visible. Report SHA256:
 
 All owned servers in those completed binding runs were revoked; Coordinator,
 local/cloud/OAuth sessions, browsers, isolated database volumes and tunnels
-were cleaned up. There is no new polling, identity or production Expo change.
+were cleaned up. There is no new polling or identity. The later project-only
+production Expo change is recorded below.
 The five-minute external PR-status fallback is retained.
 
 The independently read lifecycle artifact 13604971282 from run42448167220
@@ -420,3 +421,36 @@ Chromium/signed-gateway broker test pass, including single-use, replay, stale
 document, origin, role, epoch and hidden-page refusals. That test explicitly
 uses no real service authentication; the real candidate-E2B fill is still a
 separate gate. The third owned VM and all other fixtures were cleaned up.
+
+## Later external evidence, 2026-11-08
+
+Real vault candidate42453917643/artifact13607231247 passes eight checks and
+nine cleanup dimensions. It uses the published9e image and the exact68bf
+read-only browser scripts with explicit runtime pins. The normal Agent
+Workflow, real E2B, signed guard and in-process broker submit the saved login
+once and reach the authenticated success page. Logs contain no plaintext;
+the owned VM is confirmed missing. ZIP SHA256:
+`d78e3f914a58cf12f7b86a894ec213025cdf302842949710998ef641e371952f`.
+This is not the final baked-image acceptance.
+
+Expo run42455790669 enables enhanced push security only for the repository's
+existing project902ffab1-ed16-482e-8b83-2b7535079810 at06:41:57 UTC. The
+existing public sender now resolves the existing private sender credential
+through an Infisical reference and normal Secret Sync, without local secret
+copying or a new token/identity. Fresh production deployment and same-project
+sender checks precede the single mutation. Project security reads back true;
+account security remains false. Zero pushes were sent. Physical iPhone
+delivery and TestFlight acceptance remain unverified.
+
+Normal native-consent run42455896001 uses published public9e/private06127,
+with no protocol fallback or model prompts. The original missing-submit-value
+bug is fixed: approve, request, CSRF and workspace fields are all present, but
+the response is still403; all seven cleanup dimensions pass. Actual Chromium
+with the real React page independently proves a second cause: no-referrer
+turns the native form's Origin into null, which strict CSRF correctly rejects.
+The minimal private candidate7d1e28b retains same-origin provenance on consent
+HTML and still suppresses external callback Referer. Management/API defaults
+and all Origin/session/one-time-CSRF checks remain intact. Allow/Cancel pass
+the real-component/browser regression; six HTTP/policy tests and core types
+pass. Its existing service owner handles full CI and publication; it is not
+normal production consent acceptance and introduces no second public PR.
