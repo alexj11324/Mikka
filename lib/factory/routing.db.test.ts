@@ -89,6 +89,71 @@ test(
         revision: task.revision,
         candidateId: task.candidateId,
       });
+      const snapshotRead = (sql: string) => /^SELECT \* FROM factory_(?:attempts|candidates) WHERE/.test(sql.trim())
+      const sourceRead = (sql: string) => /^SELECT (?:e\.)?id(?:,(?:e\.)?payload)? FROM coordinator_events/.test(sql.trim())
+      const recordedRoute = async (input: Awaited<ReturnType<typeof fixture>>, replace?: (sql: string, result: unknown) => unknown) => {
+        const tx = await pool.connect(), calls: string[] = []
+        try {
+          await tx.query('BEGIN')
+          const observed = new Proxy(tx, { get(target, key) {
+            if (key === 'query') return async (sql: string, ...args: unknown[]) => {
+              calls.push(sql)
+              const result = await Reflect.apply(target.query, target, [sql, ...args])
+              return replace ? replace(sql, result) : result
+            }
+            const value = Reflect.get(target, key)
+            return typeof value === 'function' ? value.bind(target) : value
+          } })
+          const result = await store.route('owner', input, observed)
+          await tx.query('COMMIT')
+          return { result, calls }
+        } catch (error) { await tx.query('ROLLBACK'); throw error }
+        finally { tx.release() }
+      }
+      await t.test('native snapshot batches preserve pg Date, JSON, row order and empty candidates', async () => {
+        const input = await fixture()
+        const { result, calls } = await recordedRoute(input)
+        assert.equal(calls.filter(snapshotRead).length, 1, 'both existing SELECT results use one round trip')
+        const attempts = (await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [result.task.id])).rows
+        const candidates = (await pool.query('SELECT * FROM factory_candidates WHERE "taskId"=$1 ORDER BY "createdAt"', [result.task.id])).rows
+        assert.deepEqual(result, JSON.parse(JSON.stringify({ contractVersion: 1, task: result.task, attempts, candidates })))
+        assert.equal(result.attempts.length, 1)
+        assert.equal(result.candidates.length, 0)
+      })
+      await t.test('routing reads an authorized source and its payload once', async () => {
+        const input = await fixture()
+        const { result, calls } = await recordedRoute(input)
+        assert.equal(result.task.sourceEventId, input.sourceEventId)
+        assert.equal(calls.filter(sourceRead).length, 1)
+      })
+      await t.test('malformed snapshot results roll back the task, attempt and event writes', async () => {
+        const one = { command: 'SELECT', rows: [] }
+        for (const malformed of [one, [one], [one, one, one], [{ command: 'UPDATE', rows: [] }, one], [{ command: 'SELECT', rows: null }, one], [{ command: 'SELECT', rows: [null] }, one]]) {
+          const input = await fixture()
+          await assert.rejects(recordedRoute(input, (sql, result) => snapshotRead(sql) ? malformed : result), /Invalid Factory snapshot/)
+          assert.equal((await pool.query('SELECT count(*)::int n FROM factory_tasks WHERE "issueId"=$1', [input.issueId])).rows[0].n, 0)
+          assert.equal((await pool.query('SELECT count(*)::int n FROM factory_events WHERE "eventId"=$1', [input.eventId])).rows[0].n, 0)
+        }
+      })
+      await t.test('null-Bot source remains row-locked until commit and a changed issue is freshly refused', async () => {
+        const input = await fixture(), foreign = await fixture()
+        const tx = await pool.connect(), writer = await pool.connect()
+        try {
+          await tx.query('BEGIN')
+          await store.route('owner', input, tx)
+          await writer.query('BEGIN')
+          await writer.query("SET LOCAL lock_timeout='50ms'")
+          await assert.rejects(writer.query('UPDATE coordinator_events SET "issueId"=$2 WHERE id=$1', [input.sourceEventId, foreign.issueId]), error => (error as { code?: string }).code === '55P03')
+          await writer.query('ROLLBACK')
+          await tx.query('ROLLBACK')
+          await writer.query('UPDATE coordinator_events SET "issueId"=$2 WHERE id=$1', [input.sourceEventId, foreign.issueId])
+          await denies(() => store.route('owner', input), 'factorySourceMismatch')
+          assert.equal((await pool.query('SELECT count(*)::int n FROM factory_tasks WHERE "issueId"=$1', [input.issueId])).rows[0].n, 0)
+        } finally {
+          await Promise.all([tx.query('ROLLBACK').catch(() => {}), writer.query('ROLLBACK').catch(() => {})])
+          tx.release(); writer.release()
+        }
+      })
       await t.test(
         "two-field mutation fence keeps owner checks, rejects stale revisions and replays legacy context",
         async () => {
