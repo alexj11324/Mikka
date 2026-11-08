@@ -14,6 +14,7 @@ import { ACTION_ERROR_CODES } from '../../../lib/action-result.ts'
 import { explicitNewTaskArguments, explicitNewTaskComplete, explicitNewTaskEvidence, explicitNewTaskCleanupReceipts } from './explicit-submission.mjs'
 import { codexQuestionConfirmation, confirmationQuestionReference, confirmationRunEvidence, confirmationAnswerReceipt } from './question-confirmation.mjs'
 import { createOwnVmDiagnostic } from './own-vm-diagnostic.mjs'
+import { createFixtureGithubReader, collectFixtureCiEvidence, reviewCriteriaEvidence } from './fixture-ci-evidence.mjs'
 
 const uuid = value => typeof value === 'string' && /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(value)
 const sha = value => typeof value === 'string' && /^[a-f\d]{40}$/.test(value)
@@ -27,8 +28,6 @@ const briefOrder = view => ({ location: view.location, preferredHarness: view.pr
 const binding = task => ({ taskId: task.id, issueId: task.issueId, attemptId: task.attemptId, candidateId: task.candidateId, revision: task.revision })
 const nonempty = value => typeof value === 'string' && value.trim().length > 0
 const verificationPath = '/api/integrations/github/repositories/verification'
-const criteriaPassed = criteria => Array.isArray(criteria) && criteria.length > 0 && criteria.every(item => item.passed === true
-  && (item.status ?? 'passed') === 'passed' && nonempty(item.evidence))
 const rpcErrorCodes = new Set([...ACTION_ERROR_CODES, 'desktop_rpc_request_invalid', 'desktop_rpc_action_unknown',
   'desktop_client_update_required', 'desktop_session_expired', 'desktop_rpc_failed'])
 
@@ -70,7 +69,7 @@ export function fileSpecification(marker, harness) {
 }
 
 export function deliveryTaskText(specification) {
-  return `Repository: ${REPOSITORY}. Create only ${specification.path} as UTF-8 text with a final newline.\nInitial contents:\n${specification.initial}\nAcceptance for this initial candidate: the header and Case line must stay exactly as given; State is initially initial. Do not edit any other file. Run a small command that reads the file and verifies these requirements.\nLater workflow instructions: If the human requests changes, update only State to revised and preserve the header, Case line, final newline, and all other files. This later revision is not required for the initial candidate; wait for the actual human change request.\nDelivery instructions: Follow the injected Mikka agent delivery instructions. Keep the current local branch, commit your tested change, and push HEAD via https://github.com/${REPOSITORY}.git to the assigned task branch given in the run instructions. Use the provided owner's own GitHub credential to open or update the task PR with gh, retain the required Mikka issue marker, wait for its checks to pass for the pushed commit, and then call the Mikka submit tool. After opening or updating the PR, an initially empty check list means checks may still be registering; it is neither a pass nor, by itself, an external blocker. Within the existing task deadline, use normal GitHub queries to wait for the "Factory fixture checks" workflow's "verify" job and every other check on the exact pushed commit to complete successfully before submitting. If registration or completion times out, report the actual timeout as blocked. Mikka reads back the delivered commit and PR before Factory review. Leave the PR open for human review. Do not merge it yourself. Do not call any external messaging API.`
+  return `Repository: ${REPOSITORY}. Create only ${specification.path} as UTF-8 text with a final newline.\nInitial contents:\n${specification.initial}\nAcceptance for this initial candidate: the header and Case line must stay exactly as given; State is initially initial. Do not edit any other file. Run a small command that reads the file and verifies these requirements.\nKeep these repository verification criterion labels verbatim in your report: Repository validator accepts the committed fixture. | Validator unit tests pass. | The 'verify' job of the Factory fixture checks and every other check on the pushed commit complete successfully. These require their actual repository-command or exact-commit CI observations; do not infer them from a narrative.\nLater workflow instructions: If the human requests changes, update only State to revised and preserve the header, Case line, final newline, and all other files. This later revision is not required for the initial candidate; wait for the actual human change request.\nDelivery instructions: Follow the injected Mikka agent delivery instructions. Keep the current local branch, commit your tested change, and push HEAD via https://github.com/${REPOSITORY}.git to the assigned task branch given in the run instructions. Use the provided owner's own GitHub credential to open or update the task PR with gh, retain the required Mikka issue marker, wait for its checks to pass for the pushed commit, and then call the Mikka submit tool. After opening or updating the PR, an initially empty check list means checks may still be registering; it is neither a pass nor, by itself, an external blocker. Within the existing task deadline, use normal GitHub queries to wait for the "Factory fixture checks" workflow's "verify" job and every other check on the exact pushed commit to complete successfully before submitting. If registration or completion times out, report the actual timeout as blocked. Mikka reads back the delivered commit and PR before Factory review. Leave the PR open for human review. Do not merge it yourself. Do not call any external messaging API.`
 }
 
 export function deliveryProfileInstructions(specification) {
@@ -89,7 +88,7 @@ export function repositoryVerifyCommand(specifications, requiredPath) {
 }
 
 /** Empty/missing/duplicated projections cannot stand in for completed checks. */
-export function matchedCheckEvidence(state, passed) {
+export function matchedCheckEvidence(state, passed, externalCi = null) {
   check(passed.length > 0 && Array.isArray(state.checks), 'verification_checks_missing')
   const selected = state.checks.filter(item => passed.some(attempt => attempt.id === item.attemptId))
   check(selected.length === passed.length && new Set(selected.map(item => item.attemptId)).size === passed.length, 'verification_checks_missing')
@@ -98,7 +97,9 @@ export function matchedCheckEvidence(state, passed) {
     const candidate = state.candidates.find(value => value.id === attempt.candidateId)
     check(candidate && sha(candidate.sha) && uuid(attempt.runId) && item.status === 'passed' && item.stage === attempt.stage
       && item.runId === attempt.runId && item.candidateId === attempt.candidateId && item.candidateSha === candidate.sha, 'verification_check_binding_mismatch')
-    check(criteriaPassed(item.criteria) && item.criteria.every(criterion => criterion.status === 'passed'), 'verification_criteria_missing')
+    const coverage = reviewCriteriaEvidence(item.criteria, candidate.sha,
+      state.task.route?.flowVersion === 2 && item.stage === 'review' ? externalCi : null, { requireExplicitStatus: true })
+    check(coverage, 'verification_criteria_missing')
     // V2 review permits report-only evidence. A configured repository command
     // may also run; actual artifact observations remain independently required.
     if (!(state.task.route?.flowVersion === 2 && item.stage === 'review')) check(item.verify?.status === 'passed'
@@ -364,6 +365,7 @@ export async function runDeliveryAcceptance(env = process.env) {
   let rpc, json, request
   const stage = async name => { report.stage = name; console.log(JSON.stringify({ phase: name, harness: activeCase?.harness, taskId: activeCase?.taskId })); await checkpoint() }
   try {
+    const readFixtureCi = createFixtureGithubReader(env.ISSUE1503_CI_GITHUB_TOKEN)
     session = await smokeSession()
     request = (path, init = {}) => session.request(path, { ...init, headers: { cookie: `mikka-workspace=${workspaceId}`, 'x-mikka-locale': 'en', ...init.headers } })
     json = async (path, init) => {
@@ -655,7 +657,10 @@ export async function runDeliveryAcceptance(env = process.env) {
         // V2 has one review. A repaired head must not inherit a false claim
         // that its SHA was independently reviewed. Its implementation must
         // instead provide fresh, successful verification of the new content.
-        const verification = matchedCheckEvidence(state, passed)
+        const externalCi = await collectFixtureCiEvidence(readFixtureCi, { candidateSha: candidate.sha,
+          pullRequestUrl: state.delivery.pullRequest.url, expectedBranch: activeCase.expectedBranch })
+        const reviewCi = historicalReview ? activeCase.initial.externalCi : externalCi
+        const verification = matchedCheckEvidence(state, passed, reviewCi)
         for (const runId of [...new Set(state.attempts.map(item => item.runId).filter(uuid))]) {
           if (activeCase.runs.some(item => item.runId === runId)) continue
           const evidence = await json(`/api/runs/${runId}/evidence`)
@@ -687,8 +692,10 @@ export async function runDeliveryAcceptance(env = process.env) {
           const artifactRef = `run-report:${verified.runId}`
           const checked = await json(`/api/factory/tasks/${state.task.id}/approval?artifact=${encodeURIComponent(artifactRef)}`)
           const raw = checked.raw
+          const criteriaEvidence = reviewCriteriaEvidence(raw?.criteria, verified.candidateSha,
+            flowVersion === 2 && verified.stage === 'review' ? reviewCi : null)
           check(raw?.check?.sha === verified.candidateSha && raw.check.readOnly === true && Array.isArray(raw.filesChanged)
-            && raw.filesChanged.length === 0 && criteriaPassed(raw.criteria), 'independent_report_evidence_missing')
+            && raw.filesChanged.length === 0 && criteriaEvidence, 'independent_report_evidence_missing')
           let observations = [], repositoryObservations = []
           if (flowVersion === 2 && verified.stage === 'review') {
             check(raw.reviewVerdict === 'passed', 'independent_review_verdict_missing')
@@ -699,7 +706,10 @@ export async function runDeliveryAcceptance(env = process.env) {
           reviewArtifacts.push({ attemptId: verified.attemptId, runId: verified.runId, stage: verified.stage, candidateId: verified.candidateId,
             candidateSha: verified.candidateSha, artifact: artifactRef, reportSha256: digest(JSON.stringify(raw)),
             reviewVerdict: raw.reviewVerdict ?? null, verifyStatus: raw.verify?.status ?? null, appliesToCurrentCandidate: true, observations, repositoryObservations,
-            criteria: raw.criteria.map(item => ({ criterionId: item.criterionId ?? null, passed: item.passed, status: item.status ?? 'passed', evidenceSha256: digest(item.evidence) })) })
+            criteria: raw.criteria.map(item => ({ criterionId: item.criterionId ?? null, passed: item.passed, status: item.status ?? 'passed',
+              evidenceSha256: nonempty(item.evidence) ? digest(item.evidence) : null,
+              reasonSha256: nonempty(item.reason) ? digest(item.reason) : null })),
+            externalVerification: criteriaEvidence.covered })
         }
         const publish = artifact.raw?.publish
         check(publish?.pushed === true && publish.branch === activeCase.expectedBranch && publish.commit === candidate.sha && publish.remote === 'origin', 'publication_report_mismatch')
@@ -713,13 +723,16 @@ export async function runDeliveryAcceptance(env = process.env) {
         if (file.status === 'added') check(newLines.map(line => line.text).join('\n') + '\n' === expectedText, 'file_content_mismatch')
         const item = { candidateId: candidate.id, candidateSha: candidate.sha, runId: candidate.runId, pullRequestUrl: state.delivery.pullRequest.url,
           branch: publish.branch, expectedFileSha256: digest(expectedText), checkpointSha256: digest(JSON.stringify(file)),
-          flowVersion, actualVerifyCommands, verifiedContent, reviewArtifacts, reviewAppliesToCurrentCandidate: !historicalReview,
+          flowVersion, actualVerifyCommands, verifiedContent, reviewArtifacts, externalCi, reviewAppliesToCurrentCandidate: !historicalReview,
           reviewAttemptCount: state.attempts.filter(item => item.stage === 'review' && item.runId).length,
           verification: verification.map(item => ({ attemptId: item.attemptId, runId: item.runId, stage: item.stage,
             candidateId: item.candidateId, candidateSha: item.candidateSha, status: item.status,
             verifyStatus: item.verify?.status, exitCode: item.verify?.exitCode, commandSha256: nonempty(item.verify?.command) ? digest(item.verify.command) : null,
             criteria: item.criteria.map(criterion => ({ criterionId: criterion.criterionId, passed: criterion.passed, status: criterion.status,
-              evidenceSha256: digest(criterion.evidence), exitCode: criterion.exitCode })) })),
+              evidenceSha256: nonempty(criterion.evidence) ? digest(criterion.evidence) : null,
+              reasonSha256: nonempty(criterion.reason) ? digest(criterion.reason) : null, exitCode: criterion.exitCode })),
+            externalVerification: reviewCriteriaEvidence(item.criteria, item.candidateSha,
+              flowVersion === 2 && item.stage === 'review' ? reviewCi : null, { requireExplicitStatus: true }).covered })),
           checks: passed.map(check => ({ attemptId: check.id, runId: check.runId, stage: check.stage, candidateId: check.candidateId,
             candidateSha: state.candidates.find(item => item.id === check.candidateId)?.sha ?? null })) }
         activeCase[label] = item; await checkpoint(); return item
