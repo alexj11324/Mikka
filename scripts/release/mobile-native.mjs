@@ -77,9 +77,11 @@ export function verifyHostedArchive({ archive, overlay, trackedFiles, sourceSha,
   const visit = directory => {
     for (const name of readdirSync(directory).sort()) {
       const file = join(directory, name), path = relative(archive, file).split('\\').join('/')
-      assert.ok(!excludedFromNativeArchive(path), 'nativeArchiveExcludedFilePresent')
       const stat = lstatSync(file)
       assert.ok(!stat.isSymbolicLink(), 'nativeArchiveSymlinkUnexpected')
+      // EAS preserves empty directory placeholders for excluded contents.
+      if (stat.isDirectory() && readdirSync(file).length === 0) continue
+      assert.ok(!excludedFromNativeArchive(path), 'nativeArchiveExcludedFilePresent')
       if (stat.isDirectory()) { visit(file); continue }
       assert.ok(stat.isFile(), 'nativeArchiveFileRequired')
       const bytes = readFileSync(file)

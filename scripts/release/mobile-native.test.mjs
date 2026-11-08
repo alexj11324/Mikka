@@ -162,6 +162,9 @@ test('archive preserves transitive tracked UI bytes and rejects missing, extra, 
     assert.equal(proof.overlayFiles, 2)
     assert.equal(proof.files, 3)
     assert.match(proof.archiveDigest, /^[a-f0-9]{64}$/)
+    mkdirSync(join(archive, 'docs'), { recursive: true })
+    mkdirSync(join(archive, '.hosted-ui/docs'), { recursive: true })
+    assert.equal(check().archiveDigest, proof.archiveDigest)
     rmSync(join(archive, '.hosted-ui', files[1]))
     assert.throws(check, /nativeArchiveOverlayTrackedSetMismatch/)
     copyFileSync(join(overlay, files[1]), join(archive, '.hosted-ui', files[1]))
@@ -177,8 +180,7 @@ test('archive preserves transitive tracked UI bytes and rejects missing, extra, 
       write(archive, file, 'synthetic blocked file')
       assert.throws(check, /nativeArchiveExcludedFilePresent/)
       rmSync(join(archive, file), { force: true })
-      // Empty excluded directories also fail the upload boundary.
-      if (file.includes('/')) rmSync(join(archive, file.split('/').slice(0, -1).join('/')), { recursive: true, force: true })
+      assert.equal(check().archiveDigest, proof.archiveDigest)
     }
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
