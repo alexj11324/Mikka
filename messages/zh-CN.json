@@ -774,6 +774,7 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
+    "scheduledOffline": "已排期 · 上线后运行",
     "otherDevices": "服务器",
     "menu": "{name} 的更多操作",
     "add": {
@@ -1722,6 +1723,7 @@
   },
   "Settings": {
     "teamOnlyNotice": "成员、团队、团队权限和审计日志只在共享工作区中",
+    "unavailableTitle": "{title}暂时不可用",
     "title": "设置",
     "searchLabel": "搜索设置",
     "searchPlaceholder": "搜索设置…",
@@ -1836,6 +1838,7 @@
       "account": "此账户"
     },
     "memory": {
+      "emptyBody": "Mikka 会从对话和已连接的应用中记下要点，并显示在这里。",
       "enabled": "使用记忆",
       "learn": "从已连接的 App 中学习",
       "error": "无法更新记忆",
@@ -2567,6 +2570,9 @@
       }
     },
     "billing": {
+      "notConfiguredTitle": "此服务器未设置计费",
+      "notConfiguredBody": "套餐、席位和点数需要支付服务，由部署此服务器的人开启。",
+      "notConfiguredAction": "如何设置计费",
       "loading": "正在加载计费",
       "loadFailed": "读不到计费信息",
       "plan": "方案",
@@ -2657,6 +2663,7 @@
       "afterQuotaSection": "额度用完时"
     },
     "modelOrder": {
+      "fallbackNeedsKey": "需先添加 API 密钥并连接订阅。",
       "placesLabel": "派发顺序",
       "placeServers": "服务器",
       "placeComputers": "电脑",
@@ -4917,6 +4924,10 @@
     "mergeConfirm": "合并"
   },
   "ArtifactReview": {
+    "checksRatio": "{passed}/{total} 项通过",
+    "checksFailedNote": "{count} 项失败",
+    "checksPendingNote": "{count} 项进行中",
+    "evidenceRatio": "{passed}/{total} 项有证据",
     "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · 线程完成后生成",

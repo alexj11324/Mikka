@@ -23,6 +23,7 @@ import { CountBadges, isFlowV2 } from './factory-flow'
 import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha } from './short-sha'
 import { Counts, FileSection, useDiffWrap } from './thread-changes'
+import { useReviewSummary } from '@/hooks/code-review/use-review-summary'
 
 const capturePath = (media: ArtifactMedia) => withBasePath(`/api/captures/${media.captureId}`)
 /** The first files of 改动 in the report; 查看改动 opens all of them. */
@@ -69,6 +70,12 @@ export function AcceptanceReport({ artifactId, issueId, runId, detail, flow, res
   const files = ready ? allChanges ? ready.files : ready.files.slice(0, REPORT_FILES) : []
   // One file open by default (the first); all of them in 查看改动.
   const opened = open ?? (allChanges ? files.map(file => file.path) : files.slice(0, 1).map(file => file.path))
+  // One count model with the review page (task-08): Checks are the CI checks on the PR head, Evidence the criteria with
+  // evidence out of all of them; 未验证 is said apart. Without the CI summary the row keeps the review and verify results.
+  const { data: review } = useReviewSummary(issueId)
+  const ci = review?.checks && review.checks.passed + review.checks.failed + review.checks.pending > 0 ? review.checks : null
+  const counts = flow?.acceptance?.counts
+  const evidenceTotal = (counts?.passed ?? 0) + (counts?.failed ?? 0) + (counts?.unverified ?? 0)
   const passed = results.filter(row => row.status === 'passed').length
   const failedChecks = results.filter(row => row.status === 'failed')
   const media = artifact?.media ?? []
@@ -107,12 +114,20 @@ export function AcceptanceReport({ artifactId, issueId, runId, detail, flow, res
         <code className="truncate font-mono text-xs">{delivery.branch.head}</code>
         {delivery.branch.base && <><ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" /><code className="shrink-0 font-mono text-xs">{delivery.branch.base}</code></>}
       </Row>}
-      {(results.length > 0 || sha) && <Row label={t('checks')} end={sha && <ShortSha sha={sha} />}>
-        {results.length > 0 && <>
+      {(ci || results.length > 0 || sha) && <Row label={t('checks')} end={sha && <ShortSha sha={sha} />}>
+        {ci ? <>
+          {ci.failed ? <CircleX aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" /> : ci.pending ? <Spinner className="size-4 shrink-0 text-muted-foreground" /> : <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-success-foreground" />}
+          <span className={cn('shrink-0 text-xs font-medium tabular-nums', ci.failed ? 'text-destructive-foreground' : ci.pending ? 'text-muted-foreground' : 'text-success-foreground')}>{t('checksRatio', { passed: ci.passed, total: ci.passed + ci.failed + ci.pending })}</span>
+          {(ci.failed > 0 || ci.pending > 0) && <span className="min-w-0 truncate text-xs text-muted-foreground">{ci.failed ? t('checksFailedNote', { count: ci.failed }) : t('checksPendingNote', { count: ci.pending })}</span>}
+        </> : results.length > 0 && <>
           {failedChecks.length ? <CircleX aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" /> : results.every(row => row.status === 'passed') ? <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-success-foreground" /> : <Spinner className="size-4 shrink-0 text-muted-foreground" />}
           <span className={cn('shrink-0 text-xs font-medium', failedChecks.length ? 'text-destructive-foreground' : 'text-success-foreground')}>{t('checksPassed', { passed, total: results.length })}</span>
           <span className="min-w-0 truncate text-xs text-muted-foreground">{results.map(row => t(row.stage)).join(' · ')}</span>
         </>}
+      </Row>}
+      {evidenceTotal > 0 && <Row label={t('evidence')}>
+        <span className={cn('shrink-0 text-xs font-medium tabular-nums', counts?.failed ? 'text-destructive-foreground' : (counts?.passed ?? 0) === evidenceTotal ? 'text-success-foreground' : 'text-foreground')}>{t('evidenceRatio', { passed: counts?.passed ?? 0, total: evidenceTotal })}</span>
+        {(counts?.unverified ?? 0) > 0 && <span className="min-w-0 truncate text-xs text-muted-foreground">{t('confirmUnverifiedCount', { count: counts?.unverified ?? 0 })}</span>}
       </Row>}
     </section>
     {(ready || summary) && <section aria-label={t('changes')} className="flex flex-col gap-4">{changesHeader}{summary}{fileList}</section>}
