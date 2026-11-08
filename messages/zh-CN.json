@@ -181,6 +181,12 @@
     "cardPreview": "[卡片]"
   },
   "Plugins": {
+    "ownDescription": {
+      "github": "仓库、PR 和 issue",
+      "linear": "任务和项目",
+      "telegram": "在 Telegram 里和你的 Bot 对话"
+    },
+    "unavailable": "不可用",
     "title": "插件",
     "appsTab": "应用",
     "skillsTab": "技能",
@@ -1715,6 +1721,7 @@
     }
   },
   "Settings": {
+    "teamOnlyNotice": "成员、团队、团队权限和审计日志只在共享工作区中",
     "title": "设置",
     "searchLabel": "搜索设置",
     "searchPlaceholder": "搜索设置…",

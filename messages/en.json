@@ -181,6 +181,12 @@
     "cardPreview": "[Card]"
   },
   "Plugins": {
+    "ownDescription": {
+      "github": "Repositories, pull requests and issues",
+      "linear": "Issues and projects",
+      "telegram": "Talk to your bots in Telegram"
+    },
+    "unavailable": "Unavailable",
     "title": "Plugins",
     "appsTab": "Apps",
     "skillsTab": "Skills",
@@ -1715,6 +1721,7 @@
     }
   },
   "Settings": {
+    "teamOnlyNotice": "Members, Teams, Team permissions and Audit log are in shared workspaces",
     "title": "Settings",
     "searchLabel": "Search settings",
     "searchPlaceholder": "Search settings…",

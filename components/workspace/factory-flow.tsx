@@ -73,11 +73,12 @@ function StageList({ flow }: { flow: FactoryFlow }) {
   const active = flow.stages.indexOf(flow.stage) + 1
   const done = flow.stage === 'completed'
   return <Stepper value={active} role="list" aria-label={t('card.stageList')} indicators={{ completed: <Check aria-hidden="true" /> }}>
-    <StepperNav className="flex-wrap gap-y-2">
+    {/* A phone can wrap the stages: there they go without connectors, so none is left pointing at nothing (UI audit task-24). */}
+    <StepperNav className="flex-wrap gap-x-3 gap-y-2 sm:gap-x-0">
       {flow.stages.map((stage: FlowStage, index) => <StepperItem key={stage} step={index + 1} completed={done} role="listitem" aria-current={index + 1 === active ? 'step' : undefined} className="gap-1.5 not-last:flex-none">
         <StepperIndicator className="size-4">{index + 1 === active && !done ? <span className="size-1.5 rounded-full bg-current" /> : null}</StepperIndicator>
-        <StepperTitle className="text-xs font-normal text-muted-foreground data-[state=active]:font-medium data-[state=active]:text-foreground">{stage === 'completed' && flow.completion === 'accepted' ? acceptance('state.accepted') : t(`stages.${stage}`)}</StepperTitle>
-        {index < flow.stages.length - 1 && <StepperSeparator className="mx-1 w-6 group-data-[orientation=horizontal]/stepper-nav:flex-none" />}
+        <StepperTitle className="text-xs font-normal whitespace-nowrap text-muted-foreground data-[state=active]:font-medium data-[state=active]:text-foreground">{stage === 'completed' && flow.completion === 'accepted' ? acceptance('state.accepted') : t(`stages.${stage}`)}</StepperTitle>
+        {index < flow.stages.length - 1 && <StepperSeparator className="mx-1 w-6 group-data-[orientation=horizontal]/stepper-nav:flex-none max-sm:hidden" />}
       </StepperItem>)}
     </StepperNav>
   </Stepper>
