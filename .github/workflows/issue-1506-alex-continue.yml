@@ -14,7 +14,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: production-smoke-owner-acceptance
+  group: issue-1506-acme-acceptance
   cancel-in-progress: false
   queue: max
 
@@ -44,7 +44,7 @@ jobs:
         if: steps.control.outputs.enabled == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 90f405ee966b9b9d5e31561e899a3c891f831e10
+          ref: 06173adb3fa75a4b7bfd9274efd873823f06d0ea
           path: live-source
           persist-credentials: false
       - name: Verify the continuation and actual-source live harness offline

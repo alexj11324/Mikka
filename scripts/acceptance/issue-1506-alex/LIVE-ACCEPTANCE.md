@@ -5,7 +5,7 @@
 
 ## 源码与禁用边界
 
-应用源码输入：90f405ee966b9b9d5e31561e899a3c891f831e10，tree：3fd2406ea41629ff669a6a5dfc0ef19be7338630。
+应用源码输入：06173adb3fa75a4b7bfd9274efd873823f06d0ea，tree：cca2792838d3ba0ea4fedb049e798a469b8cb833。
 这只是不可变 Git 源码绑定；真实 production alias、READY、公开版本及发布配置需由执行者另行核实。
 
 十二个来源 pin 均按实际应用 Git blob 校验：原十项，加上实际 read-observer 运行时依赖和 components/swr-defaults.tsx 接线来源。保留原已审十二维内容，仅将 channel 更新到 #1665 / afae721f6730434ded6be932a7f9dd585c22ee49 的每 kind watermark；a23b2e0b48dc5cb2dac8bb9ecde734a03537339e 与 f14fc28c199be3c8c85ad26a77ef65222e92bfea 的十二项逐字相同。未知漂移仍拒绝。decoder 固定 490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4。加载器只将相对导入解析到已固定的运行时模块，拒绝未列目标、外部包和越界路径。Hook、Coordinator 组件和 SWR defaults 仅核来源，不在 Node 渲染 React。
