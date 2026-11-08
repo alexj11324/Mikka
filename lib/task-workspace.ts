@@ -21,11 +21,14 @@ export type TaskWorkspace = { id: string; kind: 'personal' | 'team' }
 type HeldTaskWorkspace = {
   userId: string; workspaceId: string; kind: TaskWorkspace['kind']; organizationId: string | null; tx: WorkspaceTransaction; active: boolean;
   changedOrganizationWorkspaces: Set<string> | null;
+  workspaceTransactionKey: object | null;
   parent?: HeldTaskWorkspace;
 }
 const taskWorkspaceLease = new AsyncLocalStorage<HeldTaskWorkspace>()
 function leaseActive(lease: HeldTaskWorkspace): boolean {
-  return lease.active && (!lease.parent || leaseActive(lease.parent))
+  return lease.active
+    && (!lease.workspaceTransactionKey || workspaceDatabase.workspaceTransactionKey?.() === lease.workspaceTransactionKey)
+    && (!lease.parent || leaseActive(lease.parent))
 }
 const organizationChanges = new WeakMap<object, Set<string>>()
 function currentOrganizationChanges(): Set<string> | null {
@@ -142,6 +145,7 @@ export async function withTaskWorkspace<T>(reader: Reader, workspaceId: string, 
     const changedOrganizationWorkspaces = currentOrganizationChanges()
     const lease: HeldTaskWorkspace = { userId: scope.userId, workspaceId, kind: workspace.kind, organizationId: member.organizationId, tx, active: true,
       changedOrganizationWorkspaces,
+      workspaceTransactionKey: workspaceDatabase.workspaceTransactionKey?.() ?? null,
       ...(parent && leaseActive(parent) ? { parent } : {}) }
     try { return await taskWorkspaceLease.run(lease, () => work(workspace, tx)) }
     finally { lease.active = false }

@@ -486,6 +486,33 @@ test('held Task Workspace linkage follows real Org writers, nested rollback and 
       assert.deepEqual(await read(racingWorkspace), visible(racingWorkspace), 'a new read does not inherit the detached Org')
     })
 
+    await t.test('a Task continuation cannot keep authority after its outer WS transaction has committed', async () => {
+      const entered = Promise.withResolvers<void>(), resume = Promise.withResolvers<void>()
+      const result = Promise.withResolvers<Awaited<ReturnType<typeof activeTaskWorkspaces>>>()
+      void result.promise.catch(() => undefined)
+      let settled: Promise<unknown> | undefined
+      try {
+        await workspaceDb.transaction(async () => {
+          const continuation = withTaskWorkspace(plain, racingWorkspace, async () => {
+            entered.resolve()
+            await resume.promise
+            try { result.resolve(await read(racingWorkspace)) }
+            catch (error) { result.reject(error); throw error }
+          })
+          // Deliberately retain the Task ALS beyond its real owner transaction.
+          // Ending its already-committed savepoint may reject; drain that below.
+          settled = continuation.catch(error => { entered.reject(error); result.reject(error) })
+          await bounded(entered.promise)
+        })
+        await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [racingWorkspace, owner.id])
+        resume.resolve()
+        assert.deepEqual(await bounded(result.promise), [], 'an inactive canonical transaction cannot lend its old membership or Org snapshot')
+      } finally {
+        resume.resolve()
+        if (settled) await bounded(settled)
+      }
+    })
+
     await t.test('held linkage never freezes current policy, SCIM, provider verification or the exact session', async () => {
       // These are real persisted bindings. OIDC/SAML protocol validation has its separate HTTP/PG suite.
       await pool.query('insert into enterprise_sso_provider(id,"providerId","organizationScopeId","userId",issuer,domain,"domainVerified","oidcConfig","domainTokenHash") values($1,$2,$3,$4,$5,$6,true,$7,$8)', [randomUUID(), providerId, orgId, owner.id, 'https://held.example.invalid', providerId + '.example.invalid', '{}', hash])

@@ -85,18 +85,28 @@ function workspaceSelect(columns?:Record<string,unknown>){
  const matches=(source:string,column:string,value:unknown)=>filters.some(([name,key,expected])=>name===source&&key===column&&expected===value)
  const query={from(value:Record<symbol,unknown>){table=tableName(value);return query},innerJoin(){return query},
   leftJoin(value:Record<symbol,unknown>,predicate:Parameters<PgDialect['sqlToQuery']>[0]){
-   assert.equal(table,'mikka_workspaces');assert.equal(tableName(value),'mikka_organization_workspaces')
+   assert.equal(tableName(value),'mikka_organization_workspaces')
    const join=new PgDialect().sqlToQuery(predicate)
-   assert.equal(join.sql,'"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"');assert.deepEqual(join.params,[])
-   assert.deepEqual(Object.keys(columns!),['id','kind','organizationId']);organizationJoin=true;return query
+   assert.deepEqual(join.params,[])
+   if(table==='mikka_workspaces'){
+    assert.equal(join.sql,'"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"')
+    assert.deepEqual(Object.keys(columns!),['id','kind','organizationId'])
+   }else{
+    assert.equal(table,'mikka_workspace_members')
+    assert.equal(join.sql,'"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+    assert.deepEqual(Object.keys(columns!),['id','organizationId'])
+   }
+   organizationJoin=true;return query
   },
   where(predicate:SqlChunk){filters=equalities(predicate);condition=new PgDialect().sqlToQuery(predicate as unknown as Parameters<PgDialect['sqlToQuery']>[0]);return query},
-  async for(){
+  async for(strength:string,options?:{of?:Record<symbol,unknown>}){
    lockOrder.push(table)
    if(table==='mikka_workspaces')return matches(table,'id',workspace)?[{id:workspace,kind:'team',ownerId:owner}]:[]
    if(table==='mikka_workspace_members'){
+    assert.equal(organizationJoin,true);assert.equal(strength,'share')
+    assert.ok(options?.of);assert.equal(tableName(options.of),'mikka_workspace_members')
     memberLease=memberActive&&matches(table,'workspaceId',workspace)&&matches(table,'userId',owner)&&matches(table,'status','active')
-    return memberLease?[{id:owner}]:[]
+    return memberLease?[{id:owner,organizationId:null}]:[]
    }
    throw new Error(`Unexpected workspace lock: ${table}`)
   },
