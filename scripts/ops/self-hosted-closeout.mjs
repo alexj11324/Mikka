@@ -67,7 +67,9 @@ async function run(env) {
   const cloudApi = async (path, body) => {
     check(!interrupted || cleaning, 'INTERRUPTED')
     const r = await context.request.fetch(`${plan.publicOrigin}${path}`, { method: body ? 'POST' : 'GET',
-      ...(body ? { data: body, headers: { Origin: plan.publicOrigin, ...(cloudCsrf ? { 'X-CSRF-Token': cloudCsrf } : {}) } } : {}) })
+      ...(body ? { data: body, headers: { Origin: plan.publicOrigin,
+        ...(path === '/mikka/api/rpc' ? { 'x-mikka-rpc': '1' } : {}),
+        ...(cloudCsrf ? { 'X-CSRF-Token': cloudCsrf } : {}) } } : {}) })
     check(r.ok(), `CLOUD_HTTP_${r.status()}`); return r.json()
   }
   const localApi = async (path, body, accepted = [200]) => {
@@ -194,7 +196,8 @@ async function run(env) {
         check(login.ok(), 'OAUTH_SHARED_SIGN_IN')
         await selectTeamWorkspace({ ownerId: cloudUserId, json: async (path, body) => {
           const r = await local.request.fetch(`${plan.publicOrigin}${path}`, { method: body ? 'POST' : 'GET',
-            ...(body ? { data: body, headers: { Origin: plan.publicOrigin } } : {}) })
+            ...(body ? { data: body, headers: { Origin: plan.publicOrigin,
+              ...(path === '/mikka/api/rpc' ? { 'x-mikka-rpc': '1' } : {}) } } : {}) })
           check(r.ok(), 'OAUTH_TEAM'); return r.json()
         } })
         await page.goto(authorize, { waitUntil: 'networkidle' })
@@ -336,7 +339,7 @@ async function run(env) {
     await rm(root, { recursive: true, force: true })
     report.finished = new Date().toISOString()
     await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
-    console.log(JSON.stringify({ stage: report.stage, failure: report.failure, checks: report.checks, cleanup: report.cleanup }))
+    console.log(JSON.stringify({ stage: report.stage, failure: report.failure, failureDetail: report.failureDetail, checks: report.checks, cleanup: report.cleanup }))
   }
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
