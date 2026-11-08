@@ -139,6 +139,24 @@ for (const live of [true, false]) test(`a ${live ? 'current' : 'historical'} API
   assert.equal(submissions, 0)
 })
 
+for (const live of [true, false]) test(`a ${live ? 'current' : 'historical'} cloud quota refusal offers cloud billing without resending`, async () => {
+  chatEnabled = true
+  chatError = live ? 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: cloud_quota_exhausted' : null
+  chatItems = [{ id: 'fixture-cloud-quota', position: 86, from: 'person', text: 'fixture cloud quota', tools: [], threads: [], artifacts: [], createdAt: '2026-11-08T05:07:38Z', failure: { kind: 'failed', cloudCode: 'cloud_quota_exhausted' } }]
+  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  const notice = container.querySelector(`[data-message-failure="${live ? 'live' : 'past'}"]`)!
+  assert.ok(notice)
+  assert.match(notice.textContent ?? '', /RunErrors.cloud_quota_exhausted.default/)
+  assert.doesNotMatch(notice.textContent ?? '', /Coordinator.failedTitle|Common.retry|Coordinator.resend|doStreamStep/)
+  const link = notice.querySelector<HTMLAnchorElement>('a')!
+  assert.equal(link.textContent, 'Settings.cloud.topUp')
+  assert.equal(link.getAttribute('href'), '/api/cloud/models/billing?redirect=1')
+  assert.equal(link.target, '_blank')
+  assert.equal(link.rel, 'noreferrer')
+  assert.equal(calls, 0)
+  assert.equal(submissions, 0)
+})
+
 test('a generic current reply failure retains its explicit retry action', async () => {
   chatEnabled = true
   chatError = 'model timed out'

@@ -319,6 +319,15 @@ non-cancelling shared-account queue; secrets stay inside Actions/OIDC.
   reproduced RED, and the exact error plus positive/negative unit cases are
   GREEN. Publication and rendered candidate evidence remain separate gates.
 
+The first isolated production-build replay at 192d2669 passed the real
+HTTP/Workflow and API cloudCode checks, then correctly failed its visible-copy
+assertion. The newest failure banner still bypassed the shared cloud recovery,
+although historical failures already used it. Current and historical failures
+now share the existing CloudFailureAction; the current notice retains the
+existing Alert and guarded RetryReplyButton for retryable errors. The new
+current/historical quota rendering cases reproduced RED/GREEN; all 34 DOM
+cases pass. No new copy, requests, polling or model fallback is introduced.
+
 All owned servers in those completed binding runs were revoked; Coordinator,
 local/cloud/OAuth sessions, browsers, isolated database volumes and tunnels
 were cleaned up. There is no new polling, identity or production Expo change.
