@@ -167,9 +167,12 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId
       const confirmed = await target.confirm(captured)
       if (confirmed.status === 'mismatch') { composed.current = null; toast.error(t('workspaceChanged')); return }
       if (confirmed.status !== 'ready') { toast.error(t('workspaceUnconfirmed'), { action: { label: tCommon('retry'), onClick: () => { void submit() } } }); return }
-      // The captured id rides the create request as the server-validated workspace selection header.
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, workspaceId: captured })
+      // The captured id goes as expectedWorkspaceId: the server refuses the create if its trusted selection differs.
+      // It is a check, never a selector; the global selection is not changed for this submit.
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, expectedWorkspaceId: captured })
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
+      // The server's trusted selection is no longer the captured one (a switch after the check): the same refusal as a mismatch.
+      if (outcome.kind === 'rejected' && outcome.error === 'workspaceAccessDenied') { composed.current = null; toast.error(t('workspaceChanged')); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
       setPicked(null)

@@ -255,10 +255,6 @@ export class WebServerDirectory {
     const target = `${account.server}${path}${url.search}`
     if (new URL(target).origin !== remote.origin) throw new WebConnectionError('web_connection_origin_refused')
     const source = new Request(input instanceof Request ? input : url, init)
-    // A caller may pin one request to a Workspace (lib/desktop-rpc/workspace-pin.ts) but never
-    // replace the confirmed choice: a different pin is refused, not retargeted.
-    const requested = source.headers.has(WORKSPACE_SELECTION_HEADER) ? selectedWorkspaceId(source.headers.get(WORKSPACE_SELECTION_HEADER)) : undefined
-    if (requested === null || (requested && account.workspaceId && requested !== account.workspaceId)) throw new WebConnectionError('web_connection_workspace_changed')
     const headers = new Headers(source.headers)
     for (const name of ['cookie', 'authorization', 'x-mikka-session-cache', 'x-mikka-session-token', 'x-deployment-id', 'x-mikka-rpc', WORKSPACE_SELECTION_HEADER]) headers.delete(name)
     // A late cloud tracing wrapper can decorate the official URL before this
@@ -267,8 +263,7 @@ export class WebServerDirectory {
       for (const name of ['x-posthog-session-id', 'x-posthog-window-id', 'x-posthog-distinct-id']) headers.delete(name)
     }
     headers.set('authorization', `Bearer ${account.token}`)
-    const selection = account.workspaceId ?? requested
-    if (selection) headers.set(WORKSPACE_SELECTION_HEADER, selection)
+    if (account.workspaceId) headers.set(WORKSPACE_SELECTION_HEADER, account.workspaceId)
     if (path === '/api/desktop/rpc') headers.set('x-mikka-desktop-protocol', '1')
     const version = this.generation, workspace = this.workspaceGeneration, sequence = ++this.requestSequence
     const selecting = path === '/api/desktop/rpc' && source.method === 'POST' ? await selectsWorkspace(source, path) : false

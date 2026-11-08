@@ -1,8 +1,6 @@
 import { withBasePath } from '@/lib/base-path'
 import { decode, encodeArgs, DESKTOP_RPC_VERSION } from '@/lib/desktop-rpc/wire'
 import { isBatchReadAction } from '@/lib/desktop-rpc/read-batch-contract'
-import { pinnedWorkspaceSelection } from '@/lib/desktop-rpc/workspace-pin'
-import { WORKSPACE_SELECTION_HEADER } from '@/lib/workspace-selection'
 import { localeOf, type Locale } from './location'
 import { setTransportState } from './transport-state'
 import { DesktopTransportError, enqueueRead } from './read-batch'
@@ -22,8 +20,6 @@ export function callAction<T = unknown>(action: string, args: unknown[], isCurre
 }
 
 export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale }): Promise<T> {
-  // Read before the first await: only a call started inside withWorkspaceSelection carries it.
-  const workspace = pinnedWorkspaceSelection()
   // Web supplies its existing SDK owner generation; bootstrap also fences
   // retired page phases. Native identity authorization remains in main.
   const assertCurrent = (cause?: unknown, response?: Response) => {
@@ -37,8 +33,7 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
       method: 'POST',
       cache: 'no-store',
       credentials: transport.credentials,
-      headers: { 'content-type': 'application/json', [transport.header]: String(DESKTOP_RPC_VERSION), 'x-mikka-locale': transport.locale ?? localeOf(window.location.pathname),
-        ...(workspace ? { [WORKSPACE_SELECTION_HEADER]: workspace } : {}) },
+      headers: { 'content-type': 'application/json', [transport.header]: String(DESKTOP_RPC_VERSION), 'x-mikka-locale': transport.locale ?? localeOf(window.location.pathname) },
       body: JSON.stringify({ version: DESKTOP_RPC_VERSION, action, args: encoded }),
     })
   } catch (cause) {

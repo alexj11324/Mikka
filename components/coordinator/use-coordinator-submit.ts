@@ -8,7 +8,6 @@ import { createCoordinatorSubmitter, readActionOutcome, type SubmitOutcome } fro
 import type { ArtifactQuote } from '@/lib/artifacts/quote'
 import type { BrowserNote } from '@/lib/browser/note'
 import type { TaskDestination } from '@/lib/task-destination'
-import { withWorkspaceSelection } from '@/lib/desktop-rpc/workspace-pin'
 
 export type CoordinatorMessageContext = {
   quote?: ArtifactQuote | null
@@ -20,12 +19,6 @@ export type CoordinatorMessageContext = {
   notes?: readonly BrowserNote[] | null
   /** 重新发送 on a failed message: its position, so the server retries it in place. */
   retryOf?: number
-  /**
-   * 新建任务: the Workspace captured for this request. It rides the request as the
-   * server-validated `x-mikka-workspace-id` selection, so a switch after the
-   * check cannot move where the task is created.
-   */
-  workspaceId?: string
 }
 
 // The account the next request's cookie belongs to, read fresh from the server
@@ -46,8 +39,7 @@ export function useCoordinatorSubmit() {
     submitter.current ??= createCoordinatorSubmitter({ currentOwner, transport: async submission => {
       const details = submission.context as CoordinatorMessageContext | undefined
       const expectation: [expectedWorkspaceId?: string] = details?.expectedWorkspaceId === undefined ? [] : [details.expectedWorkspaceId]
-      const send = () => sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf, details?.profileId, ...expectation)
-      const result = await (details?.workspaceId ? withWorkspaceSelection(details.workspaceId, send) : send())
+      const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf, details?.profileId, ...expectation)
       return readActionOutcome(result)
     } })
     return submitter.current.submit(text, undefined, context)
