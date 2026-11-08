@@ -852,10 +852,24 @@ ALS SQL/row计数、返回对象、原await位置和query callback/Promise体保
 
 e369+e132现已补齐正式入口的GH和desktop CUA两行：仅换同仓库固定asset API326964816/661455608+Accept，保留各自原retry3/connect20/max120、完整SHA、归档位置/tar/symlink/chmod，不搬旧脚本额外flags，不加凭据/helper/镜像或升级版本。CI两处CUA也只换传输。Linux CUA复用既有37,183,089 B完整核验；本方mac CUA53,208,248 B、GH18,151,686 B均匿名完整下载并与原SHA一致，未执行归档，自有临时文件已删除。真正的模板构建、官方文件守恒和双订阅门槛仍不可省略。
 
-main759 E2B42470724724已真实失败：三种模板完成node phase后各四次HTTP504，没有gh phase。curl未打印URL；按精确759源码两个phase之间唯一GH curl归因至GH下载，CUA尚未到达。三候选删除、两次清理stdout均VM空/三名字absent/errors空，双订阅和新公开runtime为0。Web42470724754另在typecheck失败，公开事件无具体诊断码；私有详细原因和被mask值保持unknown，不推定为ENOSPC或网络问题。
+main759 E2B42470724724已真实失败：三种模板完成node phase后各四次HTTP504，没有gh phase。curl未打印URL；按精确759源码两个phase之间唯一GH curl归因至GH下载，CUA尚未到达。三候选删除、两次清理stdout均VM空/三名字absent/errors空，双订阅和新公开runtime为0。Web42470724754的Build步骤失败，最后观察标记为typecheck，不能据此确定最终失败子命令；公开事件无具体诊断码，私有详细原因和被mask值保持unknown，不推定为ENOSPC或网络问题。
 
 正式安装器通过WORKER_PATHS的packages/daemon递归进入统一指纹，不是独立RECIPE_PATHS条目。a3→e132的470项中469项相同，仅该脚本变化；worker从915cd变为 **9da70595d61ab946a6b4644f7cb1eaeec1bccc3d**。最终a08源码已实际重新build并用原验证器通过2入口/9资源/16fixtures/12syntax；中间产物与失败原件保留。本地Node24.22.1与模板24.19.0仍有差异，不能据本地构建声称生产成功。
 
 main759 CI另有revokedRunCitation：7 SQL/781 B JSON/2890+5657=8547 B>原7700 B，本次unlinked仍8976通过。旧helper无socketTrace，847 B差值不能直接认作握手。a08只给既有test:activity-actor-db加MIKKA_READ_METRICS_TRACE=1，原Node参数和15文件逐字保留；SQL、预算、warmup、起点、await、并发都不变。输出限匿名数字/至多32条interval及已有测试源码caller，不含SQL/params/行值/地址/凭据。同步诊断可能影响调度，启用它不是修复或追认旧失败。根package只投影packageManager/engines/pnpm进指纹，scripts被排除，因此a08的470项canonical inputs与e132相同，worker仍9da。
 
 待发布组合635d9d7f/tree2a5a4719与实际a08构建同树；本节和[机器回执](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)的officialInstanceBootstrapCorrection随同PR更新。下一head仍须自己的完整CI、实际Web/E2B、官方校验和与真实订阅adoption，再做同tuple六次≤5000ms。没有新增正式六次或性能PASS，#1505保持打开。
+
+### 2026-11-08 11:07 UTC：实际 CI 收尾与 CUA 认证下载后继
+
+ae838974/tree45acc 的实际 CI checkout 是 b73168f0（同树，parents main759+ae838）。截至11:05，10个workflow最新attempt均success；43个checks为35 success、7条件skip和1个macOS CUA非blocking failure，不能称所有checks全绿。主CI42472404087、四组PG、Node22、image、Apple Silicon真实打包/三进程Keychain/native及strict汇总均已成功。Cloud42472403980 attempt1两平台下载HTTP5xx仍保留；外部认领的一次失败jobs重试attempt2中，Linux128709991070完整下载、原SHA校验和真实driver成功，mac128709991144仍在下载阶段HTTP403/curl56，未进入原native测试。日志没有失败redirect hop，不能把403推定为限流或鉴权根因。
+
+本次PG4实际保留53条完整数字socketTrace，其中29条detail记录；106个原始提及包括流式预览和收尾重复，不是106次测量。unlinked为9 SQL/932 B JSON/2639+6337=8976 B≤9326，revoked为7 SQL/781 B JSON/2285+5415=7700 B，均无新socket、未归属statement或截断。它们只证明本次原断言通过；旧9823/8547失败和未证实的因果继续保留，不改预算、不归功于pool或诊断调度。
+
+有必要的后继仅改cloud-computer.yml两条CI下载：使用原contents:read的step级github.token，先转非export变量并unset继承环境；curl 7.83+运行时守卫、-q禁用curlrc、仅HTTPS起始和重定向、最多3次跳转，不使用location-trusted。Authorization仅留同origin，下载后清变量再执行原SHA/tar/vendor。固定asset ID、版本、校验和、Linux blocking/macOS nonblocking、真实driver及10分钟job上限不变。原retry2加retry-all-errors、connect20/max-time120、delay2和retry-max-time180；**180秒只是重试准入窗口，不是完整下载硬截止**。凭据转发边界依据[curl官方CVE修复说明](https://curl.se/docs/CVE-2022-27776.html)及[官方手册](https://curl.se/docs/manpage.html)。
+
+本地固定358a7fcf/tree43cc的14项窄验证覆盖YAML/Bash、逆变换完整workflow相等、版本拒绝、子进程环境隔离和合成TLS的同源/跨host/跨port/降级/重试边界；独立peer无新增源码blocker。使用合成token，无真实GitHub资产请求、DB或worker rebuild；仍需新head的真实认证下载CI证明。root正常合并6a9892c9时仅重叠curl行冲突，按已审blob ea4a5825解决，完整结果tree与358a逐字相同。正式模板安装器不变，470项canonical输入不变，worker仍9da70595。
+
+main759五条publisher及主CI均已终态；Desktop42470724706最后因匹配Web等待40分钟超时，macOS打包job跳过。Web只是Build失败且最后观察标记typecheck，终止子命令未知；不同受控私有构建的成功不冒充生产通过。#1505评论6720577633已明确释放11:00–11:30尾段，本节不预占后续共享窗口。本PR后继仍须自己的exact-head CI和fresh发布/消费者协调，实际Web/E2B、官方文件守恒、真实双订阅bootstrap adoption及同tuple六次≤5000ms均未完成，#1505保持打开。
+
+完整失败原件、SHA和边界见[机器回执](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)的authenticatedCuaCiFollowup；发布后的实际commit另回链到#1689，不能把本地提交当远端运行结果。

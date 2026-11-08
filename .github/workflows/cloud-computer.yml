@@ -78,11 +78,21 @@ jobs:
         with:
           node-version: 24
       - name: Install isolated X11 and pinned MIT driver
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
+          declare +x cua_download_token="${GITHUB_TOKEN:?}"
+          unset GITHUB_TOKEN
+          curl_version="$(curl -q --version)"
+          [[ "$curl_version" =~ ^curl\ ([0-9]+)\.([0-9]+)\. ]] && (( BASH_REMATCH[1] > 7 || (BASH_REMATCH[1] == 7 && BASH_REMATCH[2] >= 83) )) || {
+            echo "curl 7.83+ required for redirect credential isolation" >&2
+            exit 1
+          }
           sudo apt-get update -qq
           sudo apt-get install -y xvfb x11-utils x11-apps xdotool libxdo3 xterm
           mkdir -p "$RUNNER_TEMP/cua"
-          curl -fL --retry 2 -H "Accept: application/octet-stream" https://api.github.com/repos/trycua/cua/releases/assets/661455608 -o "$RUNNER_TEMP/cua/driver.tar.gz"
+          curl -q -fL --proto "=https" --proto-redir "=https" --max-redirs 3 --retry 2 --retry-all-errors --retry-delay 2 --retry-max-time 180 --connect-timeout 20 --max-time 120 -H "Accept: application/octet-stream" -H "Authorization: Bearer $cua_download_token" https://api.github.com/repos/trycua/cua/releases/assets/661455608 -o "$RUNNER_TEMP/cua/driver.tar.gz"
+          unset cua_download_token
           echo "31ab9709dd91ce73677e49b9f3e75c6f0d3e4d9625c286c9e58262bfbea698dd  $RUNNER_TEMP/cua/driver.tar.gz" | sha256sum --check --strict
           tar -xzf "$RUNNER_TEMP/cua/driver.tar.gz" -C "$RUNNER_TEMP/cua"
       - name: Real default-allow driver through the run broker
@@ -106,9 +116,19 @@ jobs:
         with:
           node-version: 24
       - name: Install the pinned MIT standalone driver
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
+          declare +x cua_download_token="${GITHUB_TOKEN:?}"
+          unset GITHUB_TOKEN
+          curl_version="$(curl -q --version)"
+          [[ "$curl_version" =~ ^curl\ ([0-9]+)\.([0-9]+)\. ]] && (( BASH_REMATCH[1] > 7 || (BASH_REMATCH[1] == 7 && BASH_REMATCH[2] >= 83) )) || {
+            echo "curl 7.83+ required for redirect credential isolation" >&2
+            exit 1
+          }
           mkdir -p "$RUNNER_TEMP/cua"
-          curl -fL --retry 2 -H "Accept: application/octet-stream" https://api.github.com/repos/trycua/cua/releases/assets/661454894 -o "$RUNNER_TEMP/cua/driver.tar.gz"
+          curl -q -fL --proto "=https" --proto-redir "=https" --max-redirs 3 --retry 2 --retry-all-errors --retry-delay 2 --retry-max-time 180 --connect-timeout 20 --max-time 120 -H "Accept: application/octet-stream" -H "Authorization: Bearer $cua_download_token" https://api.github.com/repos/trycua/cua/releases/assets/661454894 -o "$RUNNER_TEMP/cua/driver.tar.gz"
+          unset cua_download_token
           echo "2bb8dc4a7e69185ffd04c4a9c0eab590bd2c54b72c2c1be13ab675be4f487732  $RUNNER_TEMP/cua/driver.tar.gz" | shasum -a 256 --check
           tar -xzf "$RUNNER_TEMP/cua/driver.tar.gz" -C "$RUNNER_TEMP/cua"
       - name: Observe native screenshot, input and click through the run broker

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "prepublication_candidate_old_ci_failed_production_pending",
+  "status": "ci_authenticated_download_successor_pending_exact_head_and_production",
   "recordedAt": "2026-11-08T09:14:00Z",
   "issue": 1505,
   "pr": 1689,
@@ -687,6 +687,324 @@
       },
       "manifestSha256": "7d30d573343bbaf6ce7a214ff6e9f18a5618925fa762261d8913e76e6a3f83c5",
       "rootProofSha256": "e8d04f5e79cfb6918863faff81a6e23ebeb3feaafd5e0a9a9f23241f23f242a7"
+    },
+    "acceptance": {
+      "nextExactHeadCi": null,
+      "nextWeb": null,
+      "nextE2b": null,
+      "officialFiles": null,
+      "realSubscriptions": null,
+      "formalSix": null,
+      "allSixAtMost5000ms": false,
+      "issueClosed": false
+    }
+  },
+  "updatedAt": "2026-11-08T11:07:00Z",
+  "authenticatedCuaCiFollowup": {
+    "recordedAt": "2026-11-08T11:07:00Z",
+    "sourceBeforeDocumentation": {
+      "head": "6a9892c9621c4314ae7ba33bb23af2cad62c04b9",
+      "tree": "43cc1d3378679e2edf55b975a234589ff3a33efe",
+      "reviewedCommit": "358a7fcf4b0f861e0522bc94389f65cae683bf64",
+      "reviewedParent": "ae838974ad7dab627c29b3eca5fc32083d8ccbb4",
+      "normalMergeReceiptSha256": "4987ed0ba54daaed961dedbe6fcc88c69dc80fc2d2ce8b82855d98eb75d1272f",
+      "oneConflictResolvedToReviewedBlob": "ea4a582550a5b61c222444dd0b67d87a1426dab9",
+      "wholeTreeEqualsReviewedTree": true
+    },
+    "historicalAe838Ci": {
+      "head": "ae838974ad7dab627c29b3eca5fc32083d8ccbb4",
+      "tree": "45accb72021c510e62e5d3e4f00b9f3230e3b7a5",
+      "actualCheckout": "b73168f077bc1cc8321f05fdc76e91e9822081d5",
+      "actualParents": [
+        "75930406dda8708a84786475656ae449f5ffda88",
+        "ae838974ad7dab627c29b3eca5fc32083d8ccbb4"
+      ],
+      "observedAt": "2026-11-08T11:05:32Z",
+      "mainRun": 42472404087,
+      "mainConclusion": "success",
+      "latestWorkflowCounts": {
+        "total": 10,
+        "success": 10
+      },
+      "checks": {
+        "total": 43,
+        "success": 35,
+        "skipped": 7,
+        "failure": 1
+      },
+      "nonblockingFailure": "macOS CUA download",
+      "appleJob": 128707572896,
+      "appleConclusion": "success",
+      "imageJob": 128706414064,
+      "imageConclusion": "success",
+      "strictJob": 128711378380,
+      "strictConclusion": "success",
+      "cloud": {
+        "run": 42472403980,
+        "attempt1": {
+          "conclusion": "failure",
+          "linux": {
+            "job": 128706050083,
+            "errors": [
+              "504",
+              "504",
+              "503"
+            ],
+            "exit": 22,
+            "driverReached": false,
+            "rawSha256": "f83dfe133c7f8fa3e8e90b1bef49969631cb1212005b61f03c0d6b0a7ebcaa17"
+          },
+          "mac": {
+            "job": 128706050276,
+            "error": "504",
+            "exit": 56,
+            "driverReached": false,
+            "rawSha256": "f240a2d6aeaf2fbf79e784e62f5fda599f9b1dd6910dd0a6c7789dac9fe0282d"
+          }
+        },
+        "attempt2": {
+          "triggeringActor": "alexj11324",
+          "retryClaim": "https://github.com/alexj11324/Mikka/pull/1689#issuecomment-6720628159",
+          "conclusion": "success",
+          "linux": {
+            "job": 128709991070,
+            "conclusion": "success",
+            "downloadChecksumAndRealDriverPassed": true,
+            "rawSha256": "28efa978b1d44d5552271ffe17ec38001c55399103e5f216854f4c5b28025004"
+          },
+          "mac": {
+            "job": 128709991144,
+            "conclusion": "failure",
+            "error": "HTTP403",
+            "exit": 56,
+            "checksumOrNativeReached": false,
+            "rawSha256": "8ebdba56d6b045e226e51baae2293e35fac9eb5231c9e9bf131b31f4fc0458f7"
+          },
+          "failedRedirectHopOr403CauseKnown": false,
+          "manifestSha256": "adb10190fa157a85464624f4e2e15b7da0643e9e1bad9d1c6192e0181e64b393"
+        }
+      }
+    },
+    "pg4": {
+      "schemaVersion": 1,
+      "head": "ae838974ad7dab627c29b3eca5fc32083d8ccbb4",
+      "expectedTree": "45accb72021c510e62e5d3e4f00b9f3230e3b7a5",
+      "runId": 42472404087,
+      "jobId": 128706230499,
+      "jobConclusion": "success",
+      "actualExecutedCheckout": "b73168f077bc1cc8321f05fdc76e91e9822081d5",
+      "actualExecutedTree": "45accb72021c510e62e5d3e4f00b9f3230e3b7a5",
+      "actualExecutedParents": [
+        "75930406dda8708a84786475656ae449f5ffda88",
+        "ae838974ad7dab627c29b3eca5fc32083d8ccbb4"
+      ],
+      "postgres": "PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2)",
+      "raw": {
+        "path": "evidence/pg4-128706230499.log",
+        "bytes": 585598,
+        "sha256": "46aaf9e71584718bc317d4891298155462b0a438358178b684779d72626e3a1c"
+      },
+      "targets": [
+        {
+          "line": 3375,
+          "at": "2026-11-08T10:44:29.3822366",
+          "runnerPrefixed": false,
+          "value": {
+            "measurement": 18,
+            "caller": "at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-detail-egress.db.test.ts:190:41)",
+            "databaseStatements": 9,
+            "databaseJsonResultBytes": 932,
+            "databaseSocketBytes": 2639,
+            "databaseSocketBytesWritten": 6337,
+            "actionJsonBytes": 451,
+            "socketTrace": {
+              "beforeCount": 4,
+              "afterCount": 4,
+              "unrepresentedStatements": 0,
+              "truncated": false,
+              "intervals": [
+                {
+                  "socket": 1,
+                  "newInMeasurement": false,
+                  "beforeRead": 2111341,
+                  "afterRead": 2112474,
+                  "readDelta": 1133,
+                  "beforeWritten": 1929717,
+                  "afterWritten": 1933568,
+                  "writtenDelta": 3851,
+                  "statements": 3
+                },
+                {
+                  "socket": 2,
+                  "newInMeasurement": false,
+                  "beforeRead": 19180,
+                  "afterRead": 19517,
+                  "readDelta": 337,
+                  "beforeWritten": 42483,
+                  "afterWritten": 43743,
+                  "writtenDelta": 1260,
+                  "statements": 3
+                },
+                {
+                  "socket": 4,
+                  "newInMeasurement": false,
+                  "beforeRead": 4704,
+                  "afterRead": 5873,
+                  "readDelta": 1169,
+                  "beforeWritten": 8935,
+                  "afterWritten": 10161,
+                  "writtenDelta": 1226,
+                  "statements": 3
+                }
+              ]
+            }
+          },
+          "case": "unlinkedRunCitation",
+          "wireTotal": 8976,
+          "originalWireBudget": 9326,
+          "pass": true
+        },
+        {
+          "line": 3396,
+          "at": "2026-11-08T10:44:29.3869422",
+          "runnerPrefixed": false,
+          "value": {
+            "measurement": 27,
+            "caller": "at TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/read-cache-detail-egress.db.test.ts:301:40)",
+            "databaseStatements": 7,
+            "databaseJsonResultBytes": 781,
+            "databaseSocketBytes": 2285,
+            "databaseSocketBytesWritten": 5415,
+            "actionJsonBytes": 452,
+            "socketTrace": {
+              "beforeCount": 4,
+              "afterCount": 4,
+              "unrepresentedStatements": 0,
+              "truncated": false,
+              "intervals": [
+                {
+                  "socket": 1,
+                  "newInMeasurement": false,
+                  "beforeRead": 2112474,
+                  "afterRead": 2112559,
+                  "readDelta": 85,
+                  "beforeWritten": 1933568,
+                  "afterWritten": 1933824,
+                  "writtenDelta": 256,
+                  "statements": 1
+                },
+                {
+                  "socket": 2,
+                  "newInMeasurement": false,
+                  "beforeRead": 28327,
+                  "afterRead": 28586,
+                  "readDelta": 259,
+                  "beforeWritten": 63824,
+                  "afterWritten": 64485,
+                  "writtenDelta": 661,
+                  "statements": 2
+                },
+                {
+                  "socket": 4,
+                  "newInMeasurement": false,
+                  "beforeRead": 43714,
+                  "afterRead": 45655,
+                  "readDelta": 1941,
+                  "beforeWritten": 43402,
+                  "afterWritten": 47900,
+                  "writtenDelta": 4498,
+                  "statements": 4
+                }
+              ]
+            }
+          },
+          "case": "revokedRunCitation",
+          "wireTotal": 7700,
+          "originalWireBudget": 7700,
+          "pass": true
+        }
+      ],
+      "extraction": {
+        "validCompleteTraceRecords": 53,
+        "distinctDetailTraceRecords": 29,
+        "rawSocketTraceOccurrences": 106,
+        "partialStreamingLinesPreserved": true,
+        "earlyLogTruncationNotACompleteRecord": true,
+        "assertionRepeatedInCollectedStdoutNotNewExecution": true
+      },
+      "limits": [
+        "These two targets used existing sockets in this run only.",
+        "No retrospective frame evidence for old 5c4 unlinked 9823 or main759 revoked 8547 failures.",
+        "Trace is numeric socket interval and statement attribution; no protocol payload or credential data.",
+        "Original SQL, fixture, budgets and measurement origin were not changed by this observation."
+      ]
+    },
+    "ciOnlyChange": {
+      "path": ".github/workflows/cloud-computer.yml",
+      "blob": "ea4a582550a5b61c222444dd0b67d87a1426dab9",
+      "bytes": 7593,
+      "sha256": "5568ae37b01a9a14b6cadad167ab0dbc0c1a1c4057bf24afec41bdf32940ce23",
+      "gitInsertions": 22,
+      "gitDeletions": 2,
+      "netAddedLines": 20,
+      "existingPermissions": "contents: read",
+      "tokenScope": "two install steps only; non-export shell variable; inherited GITHUB_TOKEN unset before children; removed before tar/vendor",
+      "minimumCurl": "7.83.0",
+      "protocols": "https only",
+      "maxRedirects": 3,
+      "locationTrusted": false,
+      "curlrcDisabled": true,
+      "retries": 2,
+      "perAttemptMaxSeconds": 120,
+      "connectMaxSeconds": 20,
+      "retryDelaySeconds": 2,
+      "retryAdmissionMaxSeconds": 180,
+      "retryAdmissionIsNotTotalDeadline": true,
+      "jobTimeoutMinutes": 10,
+      "retained": [
+        "fixed asset IDs and archive SHA256",
+        "Linux required / macOS nonblocking",
+        "checksum and tar",
+        "real driver/broker tests",
+        "formal instance bootstrap and worker"
+      ],
+      "officialDocs": [
+        "https://curl.se/docs/CVE-2022-27776.html",
+        "https://curl.se/docs/manpage.html"
+      ]
+    },
+    "validation": {
+      "targetedChecks": 14,
+      "passed": 14,
+      "offlineSyntheticOnly": true,
+      "realToken": false,
+      "realAssetRequest": false,
+      "dbRun": false,
+      "workerBuildRun": false,
+      "sourceManifestSha256": "01966ae2fcf11999f8d785422aa4b73b4e341f6c82980c3469334ba791c67232",
+      "independentPeerSha256": "bdd44ff17dbf905bc20ee5bbd1cedbc2c3cd2eddd4624243abce2782e7c027af",
+      "rootVerifiedFiles": 15,
+      "rootReviewSha256": "bbe6551b47e60e1a975fcf2de301064d9018f2688d0685f781695be5ebc1fb71",
+      "rootAe838RawVerificationSha256": "cc21038db2639a51807b816488a41a5f44cd5983b333dd3b586dbba8f054333f"
+    },
+    "worker": {
+      "sha": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d",
+      "canonicalInputsUnchanged": true,
+      "actualBuiltSource": "a08f722f2a105f84c99c029216cd73bcf481a05d",
+      "actualBuildEvidenceSha256": "9f04ad2876d644ca8db552efa387281bd9b4929be19aa1be895b8e4c9a70a798"
+    },
+    "main759Closure": {
+      "allFivePublishersAndMainCiTerminal": true,
+      "desktopRun": 42470724706,
+      "desktopConclusion": "failure",
+      "failure": "webDeploy:matchingWebDeploymentTimedOut",
+      "macPackagingSkipped": true,
+      "lastObservedAt": "2026-11-08T10:57:22Z",
+      "manifestSha256": "bbfbea7e6f0c759f18b55f4db7fd34b084bdba642e2323b53f6a2c3bbf366e64",
+      "webFailureLastObservedPhaseOnly": true,
+      "webTerminalCause": null,
+      "ownWindowReleased": "https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6720577633",
+      "globalIdleClaimed": false
     },
     "acceptance": {
       "nextExactHeadCi": null,
