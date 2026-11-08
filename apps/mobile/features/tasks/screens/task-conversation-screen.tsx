@@ -21,6 +21,7 @@ import { composerStops } from '@/lib/stop'
 import { threadSendErrorLine } from '@/lib/thread-send-error'
 import { runErrorLine } from '@/lib/run-error'
 import type { TaskDetail, ThreadDetail, ThreadItem } from '@/lib/types'
+import { readPushedTask } from '@/lib/task-push-app'
 import { useLiveApi } from '@/lib/useApi'
 import { useStop } from '@/lib/useStop'
 import { colors } from '@/lib/theme'
@@ -29,8 +30,9 @@ import { conversationSegments, currentAgent, dividerText, type Attempt } from '.
 type Conversation = { detail: TaskDetail; threads: Record<string, ThreadDetail> }
 
 /** The task's detail, then each attempt's thread: one read per attempt with the existing routes, no new API. */
-async function readConversation(id: string): Promise<Conversation> {
-  const detail = await api<TaskDetail>(`/api/mobile/tasks/${id}`)
+async function readConversation(id: string, workspace?: string): Promise<Conversation> {
+  // Opened from a push: the task's detail only in the workspace it was confirmed in (lib/task-push.ts).
+  const detail = workspace ? await readPushedTask(id, workspace) : await api<TaskDetail>(`/api/mobile/tasks/${id}`)
   const attempts = detail.activity.filter((item): item is Attempt => item.kind === 'attempt')
   const threads = await Promise.all(attempts.map(attempt => api<ThreadDetail>(`/api/mobile/threads/${attempt.runId}`)))
   return { detail, threads: Object.fromEntries(attempts.map((attempt, index) => [attempt.runId, threads[index]!])) }
@@ -43,13 +45,13 @@ async function readConversation(id: string): Promise<Conversation> {
  * attempt's live keys.
  */
 export function TaskConversationScreen() {
-  const { id, attempt } = useLocalSearchParams<{ id: string; attempt?: string }>()
+  const { id, attempt, workspace } = useLocalSearchParams<{ id: string; attempt?: string; workspace?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const home = useHome().data
   // Stable: useLiveApi reads again whenever its reader changes.
-  const read = useCallback(() => readConversation(id), [id])
-  const { data, error, reload } = useLiveApi<Conversation>(`/api/mobile/tasks/${id}/conversation`, current => {
+  const read = useCallback(() => readConversation(id, workspace), [id, workspace])
+  const { data, error, reload } = useLiveApi<Conversation>(`/api/mobile/tasks/${id}/conversation${workspace ? `?workspace=${workspace}` : ''}`, current => {
     const tasks = tasksLive(home?.live?.workspaceId, home?.workspace.id)
     const newest = current ? conversationSegments(current.detail.activity, new Map()).at(-1)?.attempt.runId : undefined
     const thread = newest ? threadLive(current?.threads[newest] ?? null, newest) : null

@@ -105,8 +105,8 @@ function PushSetup({ session }: { session: string | null }) {
     if (Platform.OS === 'web') return
     let cleanup: (() => void) | undefined
     let gone = false
-    void import('@/lib/push').then(push => {
-      if (!gone) cleanup = push.watchPushes(openPush)
+    void Promise.all([import('@/lib/push'), import('@/lib/task-push-app')]).then(([push, task]) => {
+      if (!gone) cleanup = push.watchPushes(openPush, task.openTaskPush)
     })
     return () => { gone = true; cleanup?.() }
   }, [])

@@ -54,9 +54,10 @@ export async function authHeaders(connection: ApiConnection = apiConnection()): 
 /** A request that has not answered by then fails, so nothing waits on it forever (a send shows 重试). */
 export const REQUEST_TIMEOUT_MS = 30_000
 
-export async function api<T>(path: string, init: { method?: string; body?: unknown; timeoutMs?: number } = {}, connection: ApiConnection = apiConnection()): Promise<T> {
+/** `headers` adds request preferences (a task push's x-mikka-workspace-id, lib/task-push.ts); the sign-in headers always win. */
+export async function api<T>(path: string, init: { method?: string; body?: unknown; timeoutMs?: number; headers?: Record<string, string> } = {}, connection: ApiConnection = apiConnection()): Promise<T> {
   const context = apiCache.context()
-  const headers: Record<string, string> = { accept: 'application/json', ...await authHeaders(connection) }
+  const headers: Record<string, string> = { accept: 'application/json', ...init.headers, ...await authHeaders(connection) }
   if (path === '/api/mobile/threads' && (init.method ?? 'GET').toUpperCase() === 'GET' && currentAccount().id === connection.account.id) {
     const proof = presenceScope.token(context)
     if (proof) headers['x-mikka-presence-scope'] = proof

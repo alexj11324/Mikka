@@ -30,3 +30,18 @@ export function pushTarget(data: unknown): string {
   if (run) return `/thread/${run}`
   return chat
 }
+
+/** A task push's target (#1659 item 4): the task, the workspace it lives in and, for a thread, the attempt. */
+export interface TaskPushTarget { workspaceId: string; issueId: string; runId: string | null }
+
+/**
+ * The task a full task push points at, or null. Only a push that names both the task and its workspace has one; a
+ * proposal keeps its chat, and a generic push or a privacy-mode reminder (serverUrl, userId and botId only) keeps
+ * pushTarget's entry. Nothing is guessed: a missing or malformed field means no task target.
+ */
+export function pushTaskTarget(data: unknown): TaskPushTarget | null {
+  const fields = data && typeof data === 'object' ? data as Record<string, unknown> : {}
+  if (id(fields.pendingActionId)) return null
+  const workspaceId = id(fields.workspaceId), issueId = id(fields.issueId)
+  return workspaceId && issueId ? { workspaceId, issueId, runId: id(fields.runId) } : null
+}
