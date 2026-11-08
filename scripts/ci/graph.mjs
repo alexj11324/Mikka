@@ -17,6 +17,10 @@ const testFile = /(?:\.test\.|\.spec\.|\/test[s]?\/)/
 export function buildGraph(root = process.cwd()) {
   const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
   const present = new Set(files.filter(file => existsSync(resolve(root, file))))
+  const tree = readTree(root)
+  const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'))).scripts
+  const db = inventory(tree, scripts)
+  const inventoryPaths = new Set(Object.keys(tree))
   const nodes = {}, dependencies = {}, unresolved = []
   const add = (name, data) => { nodes[name] = { name, type: 'lib', data: { name, ...data } }; dependencies[name] = [] }
   const edge = (source, target) => {
@@ -43,15 +47,21 @@ export function buildGraph(root = process.cwd()) {
     return []
   }
   for (const file of files.filter(f => code.test(f) && present.has(f))) {
+    const outsideInventory = /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) && !inventoryPaths.has(file)
+    if (outsideInventory && /\.db\.test\.|-db\.test\./.test(file)) throw Error(`DB test outside inventory roots: ${file}`)
     const source = readFileSync(resolve(root, file), 'utf8')
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
     if (ast.parseDiagnostics.length) unresolved.push({ file, spec: '<parse error>' })
     function visit(node) {
       if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+        if (outsideInventory && node.moduleSpecifier.text === 'pg' && !node.importClause?.isTypeOnly) throw Error(`DB test outside inventory roots: ${file}`)
         for (const target of resolveImport(file, node.moduleSpecifier.text)) edge(sourceId(file), sourceId(target))
       }
       if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || node.expression.getText(ast) === 'require')) {
-        if (node.arguments[0] && ts.isStringLiteralLike(node.arguments[0])) for (const target of resolveImport(file, node.arguments[0].text)) edge(sourceId(file), sourceId(target))
+        if (node.arguments[0] && ts.isStringLiteralLike(node.arguments[0])) {
+          if (outsideInventory && node.arguments[0].text === 'pg') throw Error(`DB test outside inventory roots: ${file}`)
+          for (const target of resolveImport(file, node.arguments[0].text)) edge(sourceId(file), sourceId(target))
+        }
         else unresolved.push({ file, spec: '<computed import>' })
       }
       // Source-contract and filesystem tests often name their input instead of importing it.
@@ -65,8 +75,6 @@ export function buildGraph(root = process.cwd()) {
     }
     visit(ast)
   }
-  const scripts = JSON.parse(readFileSync(resolve(root, 'package.json'))).scripts
-  const db = inventory(readTree(root), scripts)
   function commandFiles(command, seen = new Set()) {
     const result = new Set()
     for (const match of command.matchAll(/pnpm\s+(?:-s\s+|--silent\s+)?([\w:-]+)/g)) {

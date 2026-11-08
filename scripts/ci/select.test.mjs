@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { select, diffRange, area } from './select.mjs'
 import { buildGraph, dbId, sourceId, strictCommand } from './graph.mjs'
 import { selectScripts, shardScripts } from '../run-db-tests.mjs'
@@ -120,4 +122,21 @@ test('Nx commands retain Actions fail-fast and pipefail, including multiline ste
   assert.equal(result.status,1)
   assert.equal(result.stdout,'literal $HOME')
   assert.equal(spawnSync('sh',['-c',strictCommand('false | cat')]).status,1)
+})
+
+for (const [name, source] of [
+  ['new.db.test.ts', ''],
+  ['new.test.ts', "import {Pool} from 'pg'"],
+  ['dynamic.test.mjs', "const pg = await import('pg')"],
+]) test(`a new DB test outside legacy inventory roots fails before selection: ${name}`, t => {
+  const root = mkdtempSync(join(tmpdir(),'mikka-ci-inventory-'))
+  t.after(()=>rmSync(root,{recursive:true,force:true}))
+  mkdirSync(join(root,'tests'))
+  mkdirSync(join(root,'apps/api'),{recursive:true})
+  writeFileSync(join(root,'package.json'),JSON.stringify({scripts:{'test:fixture-db':'node --test tests/fixture.db.test.ts'}}))
+  writeFileSync(join(root,'tests/fixture.db.test.ts'),'')
+  writeFileSync(join(root,`apps/api/${name}`),source)
+  execFileSync('git',['init','-q'],{cwd:root})
+  execFileSync('git',['add','.'],{cwd:root})
+  assert.throws(()=>buildGraph(root),/DB test outside inventory roots/)
 })
