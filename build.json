@@ -1,0 +1,547 @@
+{
+  "kind": "production-component-composition",
+  "commit": "6695da60f2be15dcd43c40100daf09d1bc0b1b01",
+  "lockfileSha256": "345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054",
+  "inputs": [
+    "apps/desktop/src/renderer/i18n-navigation.tsx",
+    "apps/desktop/src/renderer/location.ts",
+    "apps/desktop/src/renderer/next-link.tsx",
+    "apps/desktop/src/renderer/next-navigation.ts",
+    "apps/desktop/src/renderer/read-batch.ts",
+    "apps/desktop/src/renderer/rpc.ts",
+    "apps/desktop/src/renderer/transport-state.ts",
+    "apps/frontend/src/web/rpc.ts",
+    "apps/frontend/src/web/session-owner.ts",
+    "components/app-shell.tsx",
+    "components/billing/balance-section.tsx",
+    "components/billing/free-allowance-section.tsx",
+    "components/brand/mikka-mark.tsx",
+    "components/credentials/site-icon.tsx",
+    "components/desktop/desktop-server.tsx",
+    "components/devices/agent-marks.tsx",
+    "components/devices/connect-device-dialog.tsx",
+    "components/devices/devices-settings.tsx",
+    "components/devices/local-setup-status.tsx",
+    "components/devices/ssh-add-dialog.tsx",
+    "components/icons/artifact-icon.tsx",
+    "components/icons/brand-icons.tsx",
+    "components/icons/rail-filled-icons.tsx",
+    "components/labels/brand-marks.tsx",
+    "components/labels/entity-labels.tsx",
+    "components/load-error.tsx",
+    "components/nav/bot-avatar.tsx",
+    "components/nav/icon-rail.tsx",
+    "components/plugins/app-icons.tsx",
+    "components/plugins/connected-apps.tsx",
+    "components/plugins/credential-dialog.tsx",
+    "components/plugins/github-app-settings.tsx",
+    "components/plugins/github-settings.tsx",
+    "components/plugins/mcp-connections.tsx",
+    "components/plugins/plugins-view.tsx",
+    "components/reui/badge.tsx",
+    "components/reui/code-block/code-block-highlight.tsx",
+    "components/reui/code-block/code-block.tsx",
+    "components/reui/icon-tile.tsx",
+    "components/reui/kanban.tsx",
+    "components/settings/access-tokens-settings.tsx",
+    "components/settings/account-settings.tsx",
+    "components/settings/api-key-settings.tsx",
+    "components/settings/archived-bots-settings.tsx",
+    "components/settings/audit-log-settings.tsx",
+    "components/settings/billing-settings.tsx",
+    "components/settings/cloud-settings.tsx",
+    "components/settings/computer-policy-settings.tsx",
+    "components/settings/desktop-server-settings.tsx",
+    "components/settings/dispatch-order.tsx",
+    "components/settings/e2b-key-dialog.tsx",
+    "components/settings/factory-profiles-data.ts",
+    "components/settings/factory-profiles-settings.tsx",
+    "components/settings/google-sign-in-settings.tsx",
+    "components/settings/issue-prefix-settings.tsx",
+    "components/settings/linear-settings.tsx",
+    "components/settings/locale-setting.tsx",
+    "components/settings/members-panel.tsx",
+    "components/settings/memory-settings.tsx",
+    "components/settings/model-order-settings.tsx",
+    "components/settings/notifications-settings.tsx",
+    "components/settings/payment-designation-settings.tsx",
+    "components/settings/personal-secrets-settings.tsx",
+    "components/settings/primitives.tsx",
+    "components/settings/privacy-settings.tsx",
+    "components/settings/profile-name.tsx",
+    "components/settings/saved-logins-settings.tsx",
+    "components/settings/secrets-page.tsx",
+    "components/settings/secrets-settings.tsx",
+    "components/settings/security-settings.tsx",
+    "components/settings/settings-data-state.tsx",
+    "components/settings/settings-link.tsx",
+    "components/settings/settings-sidebar.tsx",
+    "components/settings/settings-view.tsx",
+    "components/settings/subscription-settings.tsx",
+    "components/settings/subscription-share-settings.tsx",
+    "components/settings/team-permissions-settings.tsx",
+    "components/settings/telegram-settings.tsx",
+    "components/settings/usage-settings.tsx",
+    "components/settings/workspace-settings.tsx",
+    "components/shortcut-keys.tsx",
+    "components/slots/bot-avatar-contract.ts",
+    "components/slots/bot-avatar.tsx",
+    "components/slots/settings-account.tsx",
+    "components/slots/settings-content.tsx",
+    "components/slots/settings-general.tsx",
+    "components/slots/settings-governance.tsx",
+    "components/slots/settings-memory.tsx",
+    "components/slots/settings-models.tsx",
+    "components/slots/settings-notifications.tsx",
+    "components/slots/settings-preferences.tsx",
+    "components/slots/settings-privacy.tsx",
+    "components/slots/settings-secrets.tsx",
+    "components/slots/settings-security.tsx",
+    "components/slots/settings-sidebar.tsx",
+    "components/ui/alert-dialog.tsx",
+    "components/ui/alert.tsx",
+    "components/ui/avatar.tsx",
+    "components/ui/badge.tsx",
+    "components/ui/breadcrumb.tsx",
+    "components/ui/button.tsx",
+    "components/ui/chart.tsx",
+    "components/ui/checkbox.tsx",
+    "components/ui/collapsible.tsx",
+    "components/ui/dialog.tsx",
+    "components/ui/dropdown-menu.tsx",
+    "components/ui/empty.tsx",
+    "components/ui/field.tsx",
+    "components/ui/hover-card.tsx",
+    "components/ui/input-group.tsx",
+    "components/ui/input.tsx",
+    "components/ui/item.tsx",
+    "components/ui/kbd.tsx",
+    "components/ui/label.tsx",
+    "components/ui/native-select.tsx",
+    "components/ui/popover.tsx",
+    "components/ui/progress.tsx",
+    "components/ui/radio-group.tsx",
+    "components/ui/resizable-pane.tsx",
+    "components/ui/search-input.tsx",
+    "components/ui/segment-indicator.tsx",
+    "components/ui/select.tsx",
+    "components/ui/separator.tsx",
+    "components/ui/settings-layout.tsx",
+    "components/ui/sheet.tsx",
+    "components/ui/sidebar.tsx",
+    "components/ui/skeleton.tsx",
+    "components/ui/spinner.tsx",
+    "components/ui/svgs/claude.tsx",
+    "components/ui/svgs/google.tsx",
+    "components/ui/svgs/openai.tsx",
+    "components/ui/switch.tsx",
+    "components/ui/table.tsx",
+    "components/ui/tabs.tsx",
+    "components/ui/textarea.tsx",
+    "components/ui/toggle-group.tsx",
+    "components/ui/toggle.tsx",
+    "components/ui/tooltip.tsx",
+    "components/user-avatar.tsx",
+    "components/workspace-menu.tsx",
+    "components/workspace/invite-members-dialog.tsx",
+    "components/workspace/members-settings.tsx",
+    "components/workspace/workspace-navigation.ts",
+    "hooks/settings/use-account.ts",
+    "hooks/settings/use-agent-profiles.ts",
+    "hooks/settings/use-api-keys.ts",
+    "hooks/settings/use-dispatch-tiers.ts",
+    "hooks/settings/use-google-sign-in.ts",
+    "hooks/settings/use-memory-settings.ts",
+    "hooks/settings/use-model-order.ts",
+    "hooks/settings/use-notification-settings.ts",
+    "hooks/settings/use-preferences-page.ts",
+    "hooks/settings/use-privacy.ts",
+    "hooks/settings/use-secrets.ts",
+    "hooks/settings/use-security.ts",
+    "hooks/settings/use-subscription-share.ts",
+    "hooks/settings/use-subscriptions.ts",
+    "hooks/settings/use-workspace-general.ts",
+    "hooks/use-feature-availability.ts",
+    "hooks/use-live-key.tsx",
+    "hooks/use-live-wait.ts",
+    "hooks/use-mobile.ts",
+    "hooks/use-resizable-width.ts",
+    "hooks/use-workspace-switcher.ts",
+    "hooks/use-workspace.ts",
+    "i18n/routing.ts",
+    "lib/account/avatar-client.ts",
+    "lib/account/avatar-file.ts",
+    "lib/app-policy/apps.ts",
+    "lib/audit/cursor.ts",
+    "lib/auth-client.ts",
+    "lib/base-path.ts",
+    "lib/billing/hosted-usage.ts",
+    "lib/billing/verification-client.ts",
+    "lib/bot-shapes.ts",
+    "lib/chat-drafts.ts",
+    "lib/cloud-services/errors.ts",
+    "lib/cloud-services/types.ts",
+    "lib/composio-accounts.ts",
+    "lib/computer/client.ts",
+    "lib/computer/mock.ts",
+    "lib/computer/permission.ts",
+    "lib/computer/request-error.ts",
+    "lib/computer/request.ts",
+    "lib/daemon-commands.ts",
+    "lib/default-avatar.ts",
+    "lib/desktop-rpc/read-batch-contract.ts",
+    "lib/desktop-rpc/wire.ts",
+    "lib/device-ssh-view.ts",
+    "lib/ease.ts",
+    "lib/execution-settings-view.ts",
+    "lib/factory/agent-profile-reference.ts",
+    "lib/feature-flags.ts",
+    "lib/github/repository-match.ts",
+    "lib/hooks/use-check-on-return.ts",
+    "lib/hooks/use-reveal-loaded.ts",
+    "lib/hooks/view-state.tsx",
+    "lib/invitation-csv.ts",
+    "lib/live/browser-runtime.ts",
+    "lib/live/channel.ts",
+    "lib/live/channels.ts",
+    "lib/live/events.ts",
+    "lib/live/list-read.ts",
+    "lib/live/presence.ts",
+    "lib/live/revisions.ts",
+    "lib/live/tab-share.ts",
+    "lib/live/telemetry.ts",
+    "lib/local-setup-failure.ts",
+    "lib/model-api-key-providers.ts",
+    "lib/model-order-plan.ts",
+    "lib/platform/client-config.ts",
+    "lib/platform/detect.ts",
+    "lib/platform/open-settings.ts",
+    "lib/platform/public-origin.ts",
+    "lib/platform/use-platform.ts",
+    "lib/plugins/store-state.ts",
+    "lib/profile/kinds.ts",
+    "lib/relative-time.ts",
+    "lib/secrets/delivery.ts",
+    "lib/secrets/dotenv.ts",
+    "lib/secrets/format.ts",
+    "lib/secrets/permissions.ts",
+    "lib/server-pages.ts",
+    "lib/settings-data.ts",
+    "lib/settings-navigation.ts",
+    "lib/settings-prefetch.ts",
+    "lib/settings-read.ts",
+    "lib/settings-sections.ts",
+    "lib/settings-sidebar-search.ts",
+    "lib/status-appearance.ts",
+    "lib/subscription-ui.ts",
+    "lib/swr/cache-policy.ts",
+    "lib/swr/indexed-db.ts",
+    "lib/swr/keys.ts",
+    "lib/swr/live-focus.ts",
+    "lib/swr/persistent-cache.ts",
+    "lib/swr/prefetch.ts",
+    "lib/swr/read-observer.ts",
+    "lib/swr/retry.ts",
+    "lib/touch-target.ts",
+    "lib/usage/month.ts",
+    "lib/use-action-error.ts",
+    "lib/use-presence.ts",
+    "lib/utils.ts",
+    "lib/web-connection/assets.ts",
+    "lib/web-connection/browser.ts",
+    "lib/web-connection/client.ts",
+    "lib/web-connection/discovery.ts",
+    "lib/web-connection/policy.ts",
+    "lib/web-connection/selection.ts",
+    "lib/workspace-selection.ts",
+    "packages/protocol/src/auth.ts",
+    "packages/protocol/src/bridge.ts",
+    "packages/protocol/src/coded-error.ts",
+    "packages/protocol/src/computer.ts",
+    "packages/protocol/src/platform.ts",
+    "scripts/community-settings-ui/entry.tsx"
+  ],
+  "serverModules": [],
+  "assets": [
+    {
+      "file": "assets/GeistMono-Variable-FwokxCXK.woff2",
+      "bytes": 71272,
+      "sha256": "cf5bf55f69e043b1ecf04b0719119b7298e94add67ebcaa709a925b945b46b25"
+    },
+    {
+      "file": "assets/InterVariable-DiVDrmQJ.woff2",
+      "bytes": 352240,
+      "sha256": "693b77d4f32ee9b8bfc995589b5fad5e99adf2832738661f5402f9978429a8e3"
+    },
+    {
+      "file": "assets/InterVariable-Italic-FCBEiFp6.woff2",
+      "bytes": 387976,
+      "sha256": "e564f652916db6c139570fefb9524a77c4d48f30c92928de9db19b6b5c7a262a"
+    },
+    {
+      "file": "assets/bash-CVTB3cr6.js",
+      "bytes": 52,
+      "sha256": "48923a3ffbefedd56ee6600db1afe46c587b035aa9f73e82db4f102059d3d86e"
+    },
+    {
+      "file": "assets/c-Cz4nF6n_.js",
+      "bytes": 42,
+      "sha256": "3792dd7c3bdfbc10efb09ae5221046b5a6d8e4762c2b2d8fd5e0ccfa2ca54c5e"
+    },
+    {
+      "file": "assets/c-SSSlmE39.js",
+      "bytes": 72100,
+      "sha256": "8a47e5202177d44f8fc37125867a0e824ebb8296f173bdba98324de528145a33"
+    },
+    {
+      "file": "assets/core-8klQpHtD.js",
+      "bytes": 112448,
+      "sha256": "92f8dc370db52b29311a39e408542c4ce5a35ce72f26767cd279b8dfadbdb73a"
+    },
+    {
+      "file": "assets/cpp-Cts1PyIS.js",
+      "bytes": 796954,
+      "sha256": "2edb411b24edba87dbcd3759988411ff5e60f5baee0cc05c98a68df874bf7814"
+    },
+    {
+      "file": "assets/cpp-DzjeI0uH.js",
+      "bytes": 44,
+      "sha256": "6a88bfc04e84b22d077c90842e34d027fee7e227224c92e56b2498b34fd6f20b"
+    },
+    {
+      "file": "assets/csharp-dmMxLVLW.js",
+      "bytes": 91435,
+      "sha256": "2cd5a57aed8396c44a57372c0fd84e2f8306a4a19d95b291b3eddab1030c0b2c"
+    },
+    {
+      "file": "assets/css-BGIxQoYs.js",
+      "bytes": 53352,
+      "sha256": "8e762ca7ede2a05f2a0984ffb6cb1f515da8f704f1d39bfc550d6325562967cc"
+    },
+    {
+      "file": "assets/css-DgaLhXQH.js",
+      "bytes": 44,
+      "sha256": "b1dd12b636e645f65871e8ea347f0f8e93979161cbffcef0670b5d27cdddb3dc"
+    },
+    {
+      "file": "assets/diff-woXpYk--.js",
+      "bytes": 2562,
+      "sha256": "80befa61827dedd8e1a37e5521dd2ef55fad173bbbd9f36db966fc0b088079e6"
+    },
+    {
+      "file": "assets/docker-IyjqRm3v.js",
+      "bytes": 1734,
+      "sha256": "fd5a25a8e77b37e179bd8356b2b64e71c02393e2a7a0e68349d2b9d91b1535b8"
+    },
+    {
+      "file": "assets/engine-javascript-C30F4iNc.js",
+      "bytes": 57985,
+      "sha256": "a730e95b314bf69e239c65f3baa3852c2bee5cd766c87474d54ee8425bb32cd2"
+    },
+    {
+      "file": "assets/github-dark-C-LZuMrd.js",
+      "bytes": 11402,
+      "sha256": "4b20a66425669986c784d2f948aab0f38add042b7b167a2245d0c86a781706e1"
+    },
+    {
+      "file": "assets/github-light-EUqPIrTm.js",
+      "bytes": 11181,
+      "sha256": "b41057cac4d9e62754f5d64f241ec9153a0c3d53f5eaa2464d3acf9a644e8852"
+    },
+    {
+      "file": "assets/go-rLFTqkRN.js",
+      "bytes": 46811,
+      "sha256": "ee035f34de70dac3319923bcfa0415cc576769462e60f09183c352f305de335e"
+    },
+    {
+      "file": "assets/graphql-BHtseKAV.js",
+      "bytes": 48,
+      "sha256": "fdad2479a49130849ca9413ae774fa5b541495606cab35cde898780b6f30155a"
+    },
+    {
+      "file": "assets/graphql-f69H1Mm0.js",
+      "bytes": 18008,
+      "sha256": "64f617dcfc6bf1eca5124cdc3506413e38e3e02cd8d941ae42cc599e272b9273"
+    },
+    {
+      "file": "assets/html-BCy9P6D2.js",
+      "bytes": 45,
+      "sha256": "9e2d80604bc3c7deb850f2e4c0b123fe9ced44b79bca889334262d01fb1f18cc"
+    },
+    {
+      "file": "assets/html-DSw1lh5G.js",
+      "bytes": 57243,
+      "sha256": "c10d9377402b981404e379614d8b0abd9434df72fcc02d90bffa9062ac4a2ce8"
+    },
+    {
+      "file": "assets/index-8DyrMxdi.js",
+      "bytes": 2286895,
+      "sha256": "513f62065d4a52bcc2c86b22817afad5ccd541169f25c91340f95d9a7b41e0e1"
+    },
+    {
+      "file": "assets/index-DGE1RCPq.css",
+      "bytes": 464145,
+      "sha256": "311c37a5ecafc330681274917eea139ed9800aca21b05497259972bbb11a8448"
+    },
+    {
+      "file": "assets/java-BtIQNnN0.js",
+      "bytes": 27206,
+      "sha256": "b73f5ca0242e405d0dfe083e33c2b857519ea118720d484ec91896f2a35c0ebd"
+    },
+    {
+      "file": "assets/java-_ATy9zCa.js",
+      "bytes": 45,
+      "sha256": "01ef2e9404b5f6137cde72f9064b8ce05b8fb4a464b5eb0d488283298ff43d67"
+    },
+    {
+      "file": "assets/javascript-BzbQS41l.js",
+      "bytes": 174814,
+      "sha256": "4914f43c4495fd0c8375e5d78993533a679e0579010f602fb75cc33a763e6f1c"
+    },
+    {
+      "file": "assets/javascript-CpIGwZ_Y.js",
+      "bytes": 51,
+      "sha256": "1d2d85c02908c8e7ae2f784bd5b01ae410172ddf30822801c667727cf72465ff"
+    },
+    {
+      "file": "assets/json-B88Oqtu5.js",
+      "bytes": 2811,
+      "sha256": "6d3fc2664a24125736406be52510d22c97636a6fb5233c7cb5b43d5a6485338b"
+    },
+    {
+      "file": "assets/json-C3WlssX3.js",
+      "bytes": 45,
+      "sha256": "514d2793e5942fef4e8f88335cc6e07cf9bb22cad225a48ac27fb931094e1a31"
+    },
+    {
+      "file": "assets/jsx-C4yDKi0A.js",
+      "bytes": 44,
+      "sha256": "aba1e7ba1149bcbc2eb53d070f2be5d8089b6f03b228499ac113d970bb9c8fbe"
+    },
+    {
+      "file": "assets/jsx-D3KKoC5L.js",
+      "bytes": 177779,
+      "sha256": "54fdc05a5d7560d33e045c250da76ec475a1dcd29d4500da1061b3c0ef44e1e7"
+    },
+    {
+      "file": "assets/kotlin-DhhofPvG.js",
+      "bytes": 8778,
+      "sha256": "26daf37ac3c38cb6385e619be24b677a4277d90bb885632d856479c1d6ea95de"
+    },
+    {
+      "file": "assets/markdown-BYOwaDjH.js",
+      "bytes": 59328,
+      "sha256": "024bf1ea6f860d9477d5ef72a2553f1ae4b0ff3d07f5d24d2e270e4f4f5a9b95"
+    },
+    {
+      "file": "assets/package-LEydYDAs.js",
+      "bytes": 33801,
+      "sha256": "0b1df8c90274be79e066a76dfd075ab32574ab7063058a7870522b08d55a6c38"
+    },
+    {
+      "file": "assets/php-WKlfgaoc.js",
+      "bytes": 113124,
+      "sha256": "29d0715081eb431e097966770c730f8baf1dcb3f3ca3f832f39396561a11e422"
+    },
+    {
+      "file": "assets/python-gzcpVVnB.js",
+      "bytes": 69945,
+      "sha256": "be0bae300e9d8dbae905d9faa24b84adc622796c87170848bf0460d01ad4049c"
+    },
+    {
+      "file": "assets/ruby-BRyeSf27.js",
+      "bytes": 70200,
+      "sha256": "e68a909a1c7f225ef2e69ad09134d1e07e123f134393d146f2f22cfe4419ad67"
+    },
+    {
+      "file": "assets/rust-DpiIf5JO.js",
+      "bytes": 15161,
+      "sha256": "88dd74cc635ea7543592a8ac4c291c46f92923a9889fcf0aa3fdba48597845fa"
+    },
+    {
+      "file": "assets/scss-8bKmll0B.js",
+      "bytes": 27206,
+      "sha256": "b457390d0591133703554b5c4947fcfe73722306bd0de809bc8937c9081ce3df"
+    },
+    {
+      "file": "assets/shellscript-CVTB3cr6.js",
+      "bytes": 52,
+      "sha256": "48923a3ffbefedd56ee6600db1afe46c587b035aa9f73e82db4f102059d3d86e"
+    },
+    {
+      "file": "assets/shellscript-CqHdAlCp.js",
+      "bytes": 41466,
+      "sha256": "b277ff21ef7079c7afb321dd2b92375209fa761eaf8f468a29bf978c5984faf8"
+    },
+    {
+      "file": "assets/solid-1gRvTyLa.js",
+      "bytes": 75425,
+      "sha256": "af4557f4c8a706b82a4a43d54ec104d48ad3526204ecd12bec9769b9f46d0f2c"
+    },
+    {
+      "file": "assets/sql-CNu3Or2W.js",
+      "bytes": 23657,
+      "sha256": "8702af114a46afebbc82bf48f16cfe6452b22ecc039186278b0e02c00f777336"
+    },
+    {
+      "file": "assets/sql-CfM2IJm3.js",
+      "bytes": 44,
+      "sha256": "ed69ea9d39069a5705e0e3ccee0f1edae9f42998457ee1630f474d9b9b25812b"
+    },
+    {
+      "file": "assets/swift-CyEgAFGc.js",
+      "bytes": 87224,
+      "sha256": "17c2179fc022acc48683a5cab6feee30b7e482741b57361c817ec6c55fe1b791"
+    },
+    {
+      "file": "assets/toml-CcmNWLt0.js",
+      "bytes": 6419,
+      "sha256": "94ca31c8af75679cb84cc087aaaeb024df25dd9cf20c75e7a4e6b26914ec4c9e"
+    },
+    {
+      "file": "assets/tsx-BOvsFOI6.js",
+      "bytes": 175523,
+      "sha256": "e9fdeb6accaaa20c7b80fd6f19fe85ed456364b31729dcd592e7872962969535"
+    },
+    {
+      "file": "assets/tsx-CGosfAUg.js",
+      "bytes": 44,
+      "sha256": "7b2617d782c63c2b6689fdfe9beec1cc92f1ba3809bad083d97c9f062e8a51d8"
+    },
+    {
+      "file": "assets/typescript-Bb1J8qyy.js",
+      "bytes": 51,
+      "sha256": "6d667ce4f52b1ddfb0c2002f25580852e52e95354e3654529ac3b89b0da2297e"
+    },
+    {
+      "file": "assets/typescript-j_1H8WHN.js",
+      "bytes": 181067,
+      "sha256": "f0257899f1a3a73cfb04623b644621757fc2e62cc29127bf4af46fea7d3861a8"
+    },
+    {
+      "file": "assets/vue-jUI-lpPb.js",
+      "bytes": 25695,
+      "sha256": "e11d8459525eff5e621fe75f183f63ee628f467d922508b156a7aaac4d36b0de"
+    },
+    {
+      "file": "assets/web-g9I4MG3P.js",
+      "bytes": 33262,
+      "sha256": "0412799cd62d2034786cbaff81f6a1e980914716563b8567d81dc553f260c4d4"
+    },
+    {
+      "file": "assets/xml-WY0zc4PG.js",
+      "bytes": 5380,
+      "sha256": "cabb09028991b0b8d4f623751da0931ac0255daedde72996a9063d5ac1b30025"
+    },
+    {
+      "file": "assets/yaml-DDA_XMNu.js",
+      "bytes": 45,
+      "sha256": "8bb937d9440e1a27e49ef37b428cb47901ca298aa76f5232a06da2caa25a3fc0"
+    },
+    {
+      "file": "assets/yaml-DijMHRDA.js",
+      "bytes": 10493,
+      "sha256": "959fff0b1aac1f78535da1469c3d5722937e2e67fb1f1373164b3a26688022ef"
+    }
+  ]
+}
