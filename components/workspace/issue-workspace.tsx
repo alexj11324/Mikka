@@ -40,6 +40,7 @@ import { pendingTaskCount } from '@/hooks/use-bot-tasks'
 import { TaskColumn } from './task-column'
 import { BrowserNotesProvider } from '@/components/browser/browser-notes'
 import { BrowserToggle, useBrowserFits } from '@/components/browser/browser-toggle'
+import { BROWSER_COLUMN_EVENT, type BrowserColumnRequest } from '@/lib/browser/column'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
 import type { BotView } from '@/app/actions/bots'
 import { chatPreview } from '@/lib/agent-history'
@@ -256,6 +257,12 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const browserFits = useBrowserFits()
   const browserShown = browserOpen && browserFits
   function showBrowser(next: boolean) { setBrowserOpen(next); try { window.localStorage.setItem('mikka:browser', next ? '1' : '0') } catch { /* storage unavailable */ } }
+  // The review page's ⋯ 预览 asks for the column (lib/browser/column.ts).
+  useEffect(() => {
+    const request = (event: Event) => showBrowser((event as CustomEvent<BrowserColumnRequest>).detail.open)
+    window.addEventListener(BROWSER_COLUMN_EVENT, request)
+    return () => window.removeEventListener(BROWSER_COLUMN_EVENT, request)
+  }, [])
   const [teamId, setTeamId] = useState<string | null>(() => readLocation(params).team)
   const activeTeam = teams.find(team => team.id === teamId)
   const [section, setSection] = useState<WorkspaceSection>(() => { const at = readLocation(params); return at.team || at.group ? at.section : initialSection })
@@ -535,6 +542,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // The task in front of the person, for ⌘⇧B and ⌘K 「审阅 #N」: the task beside the centre, the open thread's, else the task page.
   const reviewTarget = taskShown ?? shownThread?.issueId ?? selected
   const review = useReviewPage()
+  // The review page covers the card except the browser column (R10b): with the browser open, the page narrows beside it,
+  // and the right of the card is the browser alone; the globe then only opens and closes it.
+  const reviewOpen = reviewEnabled && !!review.taskId
+  const besideReview = reviewOpen && browserShown
   useEffect(() => {
     if (!reviewEnabled || !reviewTarget) return
     const target = reviewTarget
@@ -603,7 +614,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   return <SignOutBoundary pending={signingOut}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
-    bar={<WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
+    bar={<WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && (reviewOpen || !threadsView)} onToggle={settingsShown ? browserFromSettings : reviewOpen ? () => showBrowser(!browserShown) : () => { if (threadsView) { toggleAllThreads(false); showBrowser(true) } else showBrowser(!rightTaken) }} /></>} />}
     rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} />}>
     {settingsShown ? settingsContent
       : <>
@@ -620,10 +631,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={openFromList} onCreate={() => create()} />
       </>}
     </AppShellContent>
-    {browserShown && !threadShown && !threadsView && <BrowserPane onClose={() => showBrowser(false)} />}
-    {threadShown && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
-    {taskShown && !threadShown && <TaskColumn issueId={taskShown} issue={tasks.find(task => task.id === taskShown)} threads={threads} overList={!!threadsView} />}
-    {threadsView && !threadShown && !taskShown && <AllThreadsColumn view={threadsView} threads={threads} issues={tasks} loading={threadsLoading} />}
+    {browserShown && (besideReview || (!threadShown && !threadsView)) && <BrowserPane onClose={() => showBrowser(false)} />}
+    {threadShown && !besideReview && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
+    {taskShown && !threadShown && !besideReview && <TaskColumn issueId={taskShown} issue={tasks.find(task => task.id === taskShown)} threads={threads} overList={!!threadsView} />}
+    {threadsView && !threadShown && !taskShown && !besideReview && <AllThreadsColumn view={threadsView} threads={threads} issues={tasks} loading={threadsLoading} />}
     {/* Opening, closing and handing the column to a thread are instant (R-37). */}
     {isConversation && panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: coordinatorUpdatedAt }} />}
