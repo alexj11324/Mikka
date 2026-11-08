@@ -1,0 +1,395 @@
+name: Issue 1506 remaining Stop matrix v2
+
+# Explicitly enabled for one source-bound Stop cohort. No cache cases or MCP are here.
+on:
+  push:
+    branches: [acceptance/issues-1504-1506]
+    paths:
+      - '.github/workflows/issue-1506-stop-matrix.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: issue-1506-acme-acceptance
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  stop_matrix:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    concurrency:
+      group: web-deploy-production
+      queue: max
+      cancel-in-progress: false
+    env:
+      ACCEPTANCE_SHA: '485d1c9ae6c26598816b17a9cb27cd67da6685d4' # Bind the new prepared acceptance commit, never 668 for the next app.
+      APP_SHA: 'f1324dafa296f76289124bb93538f1938cb1597f' # Root binds once; never resolve a moving branch during this job.
+      MIKKA_LIVE_SOURCE_ROOT: ${{ github.workspace }}/live-source
+    steps:
+      - name: Initialize all ten case receipts before prerequisites
+        run: |
+          node --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync } from 'node:fs'
+          const cases = [{"id":"ordinary-haiku","step":"ordinary_haiku","phase":"ordinary-stop","key":"haiku","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/ordinary-haiku","userSendBudget":1,"automaticRetry":false},{"id":"ordinary-luna","step":"ordinary_luna","phase":"ordinary-stop","key":"luna","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/ordinary-luna","userSendBudget":1,"automaticRetry":false},{"id":"before-tool-haiku","step":"before_tool_haiku","phase":"tool","key":"haiku","boundary":"responding_bot","stop":"before_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/before-tool-haiku","userSendBudget":1,"automaticRetry":false},{"id":"before-tool-luna","step":"before_tool_luna","phase":"tool","key":"luna","boundary":"responding_bot","stop":"before_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/before-tool-luna","userSendBudget":1,"automaticRetry":false},{"id":"during-tool-haiku","step":"during_tool_haiku","phase":"tool","key":"haiku","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/during-tool-haiku","userSendBudget":1,"automaticRetry":false},{"id":"during-tool-luna","step":"during_tool_luna","phase":"tool","key":"luna","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/during-tool-luna","userSendBudget":1,"automaticRetry":false},{"id":"group-public-haiku","step":"group_public_haiku","phase":"group-public","key":"haiku","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/group-public-haiku","userSendBudget":1,"automaticRetry":false},{"id":"group-public-luna","step":"group_public_luna","phase":"group-public","key":"luna","boundary":"responding_bot","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/group-public-luna","userSendBudget":1,"automaticRetry":false},{"id":"group-private-haiku","step":"group_private_haiku","phase":"group-private","key":"haiku","boundary":"private_generation_receipt","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku","cwd":"matrix/group-private-haiku","userSendBudget":1,"automaticRetry":false},{"id":"group-private-luna","step":"group_private_luna","phase":"group-private","key":"luna","boundary":"private_generation_receipt","stop":"during_tool","command":"node scripts/acceptance/issue-1506-alex/continuation.mjs run luna","cwd":"matrix/group-private-luna","userSendBudget":1,"automaticRetry":false}]
+          mkdirSync('matrix', { recursive: true })
+          writeFileSync('matrix/cases.json', JSON.stringify(cases, null, 2) + '\n')
+          writeFileSync('matrix/ledger.json', JSON.stringify({
+            schemaVersion: 1, applicationSha: process.env.APP_SHA || null,
+            acceptanceSourceSha: process.env.ACCEPTANCE_SHA, startedAt: new Date().toISOString(),
+            cases: cases.map(c => ({ ...c, status: 'not_executed', cleanup: 'driver_not_started' }))
+          }, null, 2) + '\n')
+          NODE
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.ACCEPTANCE_SHA }}
+          path: acceptance-source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Prepare isolated byte-preserved drivers and validated temporary controls
+        id: prepare
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto'
+          import { execFileSync } from 'node:child_process'
+          import { cpSync, copyFileSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'node:fs'
+          import { resolve, dirname } from 'node:path'
+          import { pathToFileURL } from 'node:url'
+          const app = process.env.APP_SHA
+          if (!/^[0-9a-f]{40}$/.test(app || '')) throw new Error('root_application_binding_required')
+          const root = resolve('acceptance-source')
+          if (execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== process.env.ACCEPTANCE_SHA) throw new Error('source_binding_mismatch')
+          const rel = 'scripts/acceptance/issue-1506-alex'
+          const { validateContinuation } = await import(pathToFileURL(resolve(root, rel, 'continuation.mjs')))
+          const original = JSON.parse(readFileSync(resolve(root, rel, 'control/continue.json')))
+          const receiptRaw = readFileSync(resolve(root, rel, original.fixtureReceipt))
+          if (createHash('sha256').update(receiptRaw).digest('hex') !== original.fixtureReceiptSha256) throw new Error('fixture_receipt_hash_mismatch')
+          const receipt = JSON.parse(receiptRaw)
+          const cases = JSON.parse(readFileSync('matrix/cases.json'))
+          mkdirSync('matrix/phase-controls', { recursive: true })
+          writeFileSync('matrix/fixture-ready.json', receiptRaw)
+          const tree = []
+          function inventory(base, relative = '') {
+            for (const entry of readdirSync(resolve(base, relative), { withFileTypes: true })) {
+              const path = relative ? relative + '/' + entry.name : entry.name
+              if (entry.isDirectory()) inventory(base, path)
+              else if (entry.isFile()) tree.push({ path, sha256: createHash('sha256').update(readFileSync(resolve(base, path))).digest('hex') })
+              else throw new Error('unexpected_acceptance_source_entry')
+            }
+          }
+          inventory(resolve(root, 'scripts/acceptance'))
+          for (const file of tree) file.path = 'scripts/acceptance/' + file.path
+          const runtimeFiles = ['package.json', 'lib/coordinator-stream-client.ts']
+          for (const path of runtimeFiles) tree.push({ path, sha256: createHash('sha256').update(readFileSync(resolve(root, path))).digest('hex') })
+          writeFileSync('matrix/source-manifest.json', JSON.stringify({ acceptanceSourceSha: process.env.ACCEPTANCE_SHA, applicationSha: app, files: tree }, null, 2) + '\n')
+          for (const c of cases) {
+            mkdirSync(resolve(c.cwd, 'scripts'), { recursive: true })
+            cpSync(resolve(root, 'scripts/acceptance'), resolve(c.cwd, 'scripts/acceptance'), { recursive: true, errorOnExist: true, force: false })
+            for (const path of runtimeFiles) {
+              mkdirSync(dirname(resolve(c.cwd, path)), { recursive: true })
+              copyFileSync(resolve(root, path), resolve(c.cwd, path))
+            }
+            const control = { ...original, enabled: true, expectedSha: app, phase: c.phase, groupBoundary: c.boundary }
+            validateContinuation(control, receipt)
+            const bytes = JSON.stringify(control, null, 2) + '\n'
+            writeFileSync(resolve(c.cwd, rel, 'control/continue.json'), bytes)
+            writeFileSync('matrix/phase-controls/' + c.id + '.json', bytes)
+            mkdirSync(resolve(c.cwd, 'issue-1506-alex-report'), { recursive: true })
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, 'enabled=true\n')
+          NODE
+      - name: Check out the single fixed application source
+        if: steps.prepare.outputs.enabled == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.APP_SHA }}
+          path: live-source
+          persist-credentials: false
+      - name: Import all ten copied drivers and validate controls without network
+        id: module_preflight
+        if: steps.prepare.outputs.enabled == 'true'
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto'
+          import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+          import { resolve } from 'node:path'
+          import { pathToFileURL } from 'node:url'
+          let deniedNetworkAttempts = 0
+          const noNetwork = () => { deniedNetworkAttempts++; throw new Error('offline_network_forbidden') }
+          globalThis.fetch = noNetwork
+          globalThis.WebSocket = class { constructor() { noNetwork() } }
+          const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+          const sourceRoot = resolve('acceptance-source')
+          const appRoot = resolve('live-source')
+          const rel = 'scripts/acceptance/issue-1506-alex'
+          const driverByPhase = {
+            'ordinary-stop': ['coordinator-ordinary-stop.mjs', 'runOrdinaryStop'],
+            tool: ['coordinator-tool-stop.mjs', 'runToolStop'],
+            'group-public': ['group-stop.mjs', 'runGroupStop'],
+            'group-private': ['group-stop.mjs', 'runGroupStop'],
+          }
+          const report = { schemaVersion: 1, phase: 'offline-copied-driver-import', status: 'failed',
+            acceptanceSourceSha: process.env.ACCEPTANCE_SHA, applicationSha: process.env.APP_SHA,
+            nodeVersion: process.version, driverCalls: 0, cliRunCalls: 0, modelSends: 0, productionRequests: 0,
+            cases: [] }
+          try {
+            if (!/^v24\./.test(process.version)) throw new Error('node24_required')
+            const manifest = JSON.parse(readFileSync('matrix/source-manifest.json'))
+            if (manifest.acceptanceSourceSha !== process.env.ACCEPTANCE_SHA || manifest.applicationSha !== process.env.APP_SHA) throw new Error('source_manifest_binding_mismatch')
+            const protocolPath = 'lib/coordinator-stream-client.ts'
+            const originalProtocol = readFileSync(resolve(sourceRoot, protocolPath))
+            const applicationProtocol = readFileSync(resolve(appRoot, protocolPath))
+            report.protocol = { path: protocolPath, acceptanceSha256: hash(originalProtocol),
+              applicationSha256: hash(applicationProtocol), byteIdentical: originalProtocol.equals(applicationProtocol) }
+            if (!report.protocol.byteIdentical) throw new Error('application_protocol_bytes_differ')
+            const cases = JSON.parse(readFileSync('matrix/cases.json'))
+            if (cases.length !== 10 || new Set(cases.map(c => c.id)).size !== 10) throw new Error('case_scope_invalid')
+            for (const c of cases) {
+              const row = { id: c.id, phase: c.phase, key: c.key, status: 'failed',
+                controlValidated: false, driverModuleLoaded: false, driverCalls: 0 }
+              report.cases.push(row)
+              try {
+                if (!driverByPhase[c.phase]) throw new Error('case_phase_invalid')
+                const caseRoot = resolve(c.cwd)
+                let verifiedFiles = 0
+                for (const sourceFile of manifest.files) {
+                  if (sourceFile.path === rel + '/control/continue.json') continue
+                  const actual = readFileSync(resolve(caseRoot, sourceFile.path))
+                  if (hash(actual) !== sourceFile.sha256) throw new Error('copied_source_bytes_differ')
+                  verifiedFiles++
+                }
+                row.copiedSourceFilesVerified = verifiedFiles
+                const controlRaw = readFileSync(resolve(caseRoot, rel, 'control/continue.json'))
+                const control = JSON.parse(controlRaw)
+                const receiptRaw = readFileSync(resolve(caseRoot, rel, control.fixtureReceipt))
+                if (hash(receiptRaw) !== control.fixtureReceiptSha256) throw new Error('fixture_receipt_hash_mismatch')
+                const continuation = await import(pathToFileURL(resolve(caseRoot, rel, 'continuation.mjs')))
+                continuation.validateContinuation(control, JSON.parse(receiptRaw))
+                if (!control.enabled || control.expectedSha !== process.env.APP_SHA || control.phase !== c.phase || control.groupBoundary !== c.boundary) throw new Error('case_control_binding_mismatch')
+                row.controlValidated = true
+                row.controlSha256 = hash(controlRaw)
+                const [file, entry] = driverByPhase[c.phase]
+                const driverModule = await import(pathToFileURL(resolve(caseRoot, rel, file)))
+                if (typeof driverModule[entry] !== 'function') throw new Error('driver_export_missing')
+                row.driverModuleLoaded = true
+                row.driverEntry = file + '#' + entry
+                row.driverSha256 = hash(readFileSync(resolve(caseRoot, rel, file)))
+                row.status = 'passed'
+              } catch (error) {
+                row.error = error?.code || error?.message || 'offline_import_failed'
+              }
+            }
+            if (report.cases.some(c => c.status !== 'passed')) throw new Error('copied_driver_preflight_failed')
+            if (deniedNetworkAttempts !== 0) throw new Error('offline_network_attempt_detected')
+            report.status = 'passed'
+          } catch (error) {
+            report.error = error?.code || error?.message || 'offline_preflight_failed'
+          } finally {
+            report.deniedNetworkAttempts = deniedNetworkAttempts
+            report.finishedAt = new Date().toISOString()
+            writeFileSync('matrix/module-preflight.json', JSON.stringify(report, null, 2) + '\n')
+          }
+          console.log(JSON.stringify({ phase: report.phase, status: report.status, cases: report.cases.length,
+            driverCalls: report.driverCalls, cliRunCalls: report.cliRunCalls, modelSends: report.modelSends,
+            productionRequests: report.productionRequests, deniedNetworkAttempts }))
+          if (report.status !== 'passed') process.exitCode = 1
+          NODE
+      - name: Verify the original offline harness and actual live source
+        if: steps.prepare.outputs.enabled == 'true'
+        working-directory: acceptance-source
+        run: |
+          test "$(git -C ../live-source rev-parse HEAD)" = "$APP_SHA"
+          node --test scripts/acceptance/issue-1506-alex/acceptance.test.mjs scripts/acceptance/issue-1506-alex/selection-canonical.test.mjs scripts/acceptance/issue-1506-alex/continuation.test.mjs scripts/acceptance/issue-1506-alex/live-consumer.test.mjs scripts/acceptance/issue-1506-alex/tool-boundaries.test.mjs scripts/acceptance/issue-1506-alex/stop-completion.test.mjs scripts/acceptance/issue-1506-alex/tool-stop-no-boundary.test.mjs scripts/acceptance/issue-1506-alex/group-stop.test.mjs
+      - name: Read Alex's existing email only
+        if: steps.prepare.outputs.enabled == 'true'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read Alex's existing password only
+        if: steps.prepare.outputs.enabled == 'true'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Gate all cases on successful offline and credential prerequisites
+        id: ready
+        if: steps.prepare.outputs.enabled == 'true' && steps.module_preflight.outcome == 'success'
+        run: |
+          test -n "$ACME_DEMO_EMAIL"
+          test -n "$ACME_DEMO_PASSWORD"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Observe ordinary-haiku exactly once
+        id: ordinary_haiku
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/ordinary-haiku
+        env:
+          MIKKA_STOP_CASE: during_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
+      - name: Observe ordinary-luna exactly once
+        id: ordinary_luna
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/ordinary-luna
+        env:
+          MIKKA_STOP_CASE: during_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
+      - name: Observe before-tool-haiku exactly once
+        id: before_tool_haiku
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/before-tool-haiku
+        env:
+          MIKKA_STOP_CASE: before_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
+      - name: Observe before-tool-luna exactly once
+        id: before_tool_luna
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/before-tool-luna
+        env:
+          MIKKA_STOP_CASE: before_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
+      - name: Observe during-tool-haiku exactly once
+        id: during_tool_haiku
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/during-tool-haiku
+        env:
+          MIKKA_STOP_CASE: during_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
+      - name: Observe during-tool-luna exactly once
+        id: during_tool_luna
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/during-tool-luna
+        env:
+          MIKKA_STOP_CASE: during_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
+      - name: Observe group-public-haiku exactly once
+        id: group_public_haiku
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/group-public-haiku
+        env:
+          MIKKA_STOP_CASE: during_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
+      - name: Observe group-public-luna exactly once
+        id: group_public_luna
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/group-public-luna
+        env:
+          MIKKA_STOP_CASE: during_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
+      - name: Observe group-private-haiku exactly once
+        id: group_private_haiku
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/group-private-haiku
+        env:
+          MIKKA_STOP_CASE: during_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run haiku > issue-1506-alex-report/runner-stdout.json
+      - name: Observe group-private-luna exactly once
+        id: group_private_luna
+        if: always() && !cancelled() && steps.ready.outputs.ready == 'true'
+        continue-on-error: true
+        working-directory: matrix/group-private-luna
+        env:
+          MIKKA_STOP_CASE: during_tool
+        run: |
+          node scripts/acceptance/issue-1506-alex/continuation.mjs control > issue-1506-alex-report/control-validation.json
+          node scripts/acceptance/issue-1506-alex/continuation.mjs run luna > issue-1506-alex-report/runner-stdout.json
+      - name: Preserve outcomes and cleanup evidence for every planned case
+        if: always()
+        env:
+          OUTCOME_ORDINARY_HAIKU: ${{ steps.ordinary_haiku.outcome }}
+          OUTCOME_ORDINARY_LUNA: ${{ steps.ordinary_luna.outcome }}
+          OUTCOME_BEFORE_TOOL_HAIKU: ${{ steps.before_tool_haiku.outcome }}
+          OUTCOME_BEFORE_TOOL_LUNA: ${{ steps.before_tool_luna.outcome }}
+          OUTCOME_DURING_TOOL_HAIKU: ${{ steps.during_tool_haiku.outcome }}
+          OUTCOME_DURING_TOOL_LUNA: ${{ steps.during_tool_luna.outcome }}
+          OUTCOME_GROUP_PUBLIC_HAIKU: ${{ steps.group_public_haiku.outcome }}
+          OUTCOME_GROUP_PUBLIC_LUNA: ${{ steps.group_public_luna.outcome }}
+          OUTCOME_GROUP_PRIVATE_HAIKU: ${{ steps.group_private_haiku.outcome }}
+          OUTCOME_GROUP_PRIVATE_LUNA: ${{ steps.group_private_luna.outcome }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto'
+          import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+          const ledger = JSON.parse(readFileSync('matrix/ledger.json'))
+          ledger.finishedAt = new Date().toISOString()
+          ledger.resultsAreObservationsOnly = true
+          ledger.independentRuntimeCorrelationAndSingleTerminalSqlAudit = 'pending_root'
+          for (const row of ledger.cases) {
+            row.stepOutcome = process.env['OUTCOME_' + row.step.toUpperCase()] || 'skipped'
+            const dir = row.cwd + '/issue-1506-alex-report'
+            const names = existsSync(dir) ? readdirSync(dir) : []
+            row.rawFiles = names.filter(name => name.endsWith('.json')).map(name => {
+              const bytes = readFileSync(dir + '/' + name)
+              return { path: dir + '/' + name, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }
+            })
+            const reportName = names.find(name => name.startsWith('continuation-') && name.endsWith('.json'))
+            const report = reportName ? JSON.parse(readFileSync(dir + '/' + reportName)) : null
+            row.driverAttempted = report?.attempted ?? null
+            row.status = report ? report.status : row.stepOutcome === 'skipped' ? 'not_executed' : 'failed_without_continuation_receipt'
+            row.error = report?.error ?? null
+            row.cleanup = report?.observation?.cleanup ?? (report?.attempted === false || row.stepOutcome === 'skipped' ? 'driver_not_started' : 'inspect_raw_checkpoints')
+            row.applicationVersionStable = report?.applicationVersionStable ?? null
+          }
+          writeFileSync('matrix/ledger.json', JSON.stringify(ledger, null, 2) + '\n')
+          if (ledger.cases.some(c => c.stepOutcome !== 'success' || c.status !== 'observed')) process.exitCode = 1
+          NODE
+      - name: Retain raw success failure unexecuted and driver-finally receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: issue-1506-stop-matrix-${{ github.run_id }}
+          path: |
+            matrix/ledger.json
+            matrix/cases.json
+            matrix/source-manifest.json
+            matrix/module-preflight.json
+            matrix/fixture-ready.json
+            matrix/phase-controls/*.json
+            matrix/*/issue-1506-alex-report/**
+          if-no-files-found: error
+          retention-days: 7
