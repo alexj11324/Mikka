@@ -1,7 +1,7 @@
 # Credential exposure is distinct from execution-machine authority
 
 - Date: 2026-11-08 02:40 UTC
-- Source: Alex's correction to the interpretation of [#1505](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691833153): 「执行机器直接持有的是 GitHub 的 credential，没让他把所有的密钥都给到执行机器。」 This clarifies the scope of credential delivery, not the [removal of repeated remote authorization](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691871552).
+- Source: Alex's correction to the interpretation of [#1505](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691833153): 「我当时是要求，就是说执行机器直接持有的是GitHub的credential，没让他就是说把所有的这个密钥都给到这个执行机器啊。」 This clarifies the scope of credential delivery, not the [removal of repeated remote authorization](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691871552).
 - Rule: Task-machine execution, credentials, user/workspace/repository Secret delivery, cloud and local runners.
 - Replaces: Only the interpretation of [2026-11-06-1800](2026-11-06-1800-machine-is-the-execution-boundary.md) that all task-reachable user/workspace/repository Secrets should be exposed directly to an Agent. Its native execution, GitHub, model-provider direct connection, and no-per-call-control-plane authorization rules remain in force.
 - Status: Effective architecture decision. Runtime migration is **not yet implemented** and requires a separate issue.
