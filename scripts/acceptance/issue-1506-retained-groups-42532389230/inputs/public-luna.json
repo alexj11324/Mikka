@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 1,
+  "issue": 1506,
+  "phase": "alex-group-stop",
+  "applicationSha": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+  "ownerRef": "b86765f1f6d3",
+  "workspaceId": "0a700222-137b-4bca-b86d-a74b8fdffc21",
+  "fixtureRunKey": "acme-1506-20261106",
+  "fixtureKey": "luna",
+  "scenario": "public",
+  "boundary": "responding_bot",
+  "groupId": "945b4a1a-82f5-4f5c-bd4b-655feb8d3490",
+  "messageId": "db0d82e2-ffdb-4298-887f-1d471e0bad80",
+  "createAttempted": true,
+  "messageSendAttempts": 1,
+  "mode": "observe",
+  "status": "stop_evidence_captured",
+  "startedAt": "2026-11-08T22:55:36.274Z",
+  "stop": {
+    "requested": true,
+    "acknowledged": true,
+    "trigger": "public_responding_bot",
+    "stoppedTurns": 1
+  },
+  "metrics": {
+    "sendAcknowledgedMs": 77.9,
+    "stopRequestedMs": 1118.7,
+    "stopAcknowledgedMs": 1243.7,
+    "postStopObservedMs": 1317
+  },
+  "liveReads": [
+    {
+      "revision": 2,
+      "active": true,
+      "status": "running",
+      "respondingBotId": null,
+      "stopped": false,
+      "messageCount": 1,
+      "botReplyCount": 0,
+      "observedMs": 247.7,
+      "triggerRevision": 1
+    },
+    {
+      "revision": 3,
+      "active": true,
+      "status": "running",
+      "respondingBotId": "8ff8b30e-2eb9-48bd-987f-4cbf048944d7",
+      "stopped": false,
+      "messageCount": 1,
+      "botReplyCount": 0,
+      "observedMs": 1115.5,
+      "triggerRevision": 3
+    }
+  ],
+  "postStopReads": 1,
+  "runtimeCancellation": "pending_provider_logs",
+  "lateSideEffects": "pending_provider_terminal_and_one_database_audit",
+  "cleanup": {
+    "status": "retained_for_provider_audit",
+    "removedBotIds": [],
+    "hidden": false,
+    "retainedForProviderAudit": true,
+    "retainedBotIds": [
+      "8ff8b30e-2eb9-48bd-987f-4cbf048944d7",
+      "9df34d90-6db6-407e-a2d2-bfd4ac616c58"
+    ]
+  },
+  "requests": [
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 190,
+      "requestId": "cle1::cle1::hvzhx-1794178536285-eadeb7835f23"
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 50,
+      "requestId": "cle1::cle1::c6p5t-1794178536476-f1d4f9f6a8ce"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 89,
+      "requestId": "cle1::cle1::xh9k5-1794178536560-4500683e85e2"
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 57,
+      "requestId": "cle1::cle1::c6p5t-1794178536619-5ef76b54f1cf"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 42,
+      "requestId": "cle1::cle1::c6p5t-1794178536678-5502a4f7b7e8"
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 103,
+      "requestId": "cle1::cle1::459cz-1794178536725-850d0cd980b9"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 108,
+      "requestId": "cle1::cle1::np966-1794178536777-86ed608fd85d"
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 114,
+      "requestId": "cle1::cle1::t8ksr-1794178536781-8a2f8ca88106"
+    },
+    {
+      "path": "/mikka/api/bots",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 38,
+      "requestId": "cle1::cle1::c6p5t-1794178536837-91cb02689665"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 74,
+      "requestId": "cle1::cle1::xh9k5-1794178536876-15a573ab11e0"
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 72,
+      "requestId": "cle1::cle1::c6p5t-1794178536951-16d7574ecf61"
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 63,
+      "requestId": "cle1::cle1::fl4bj-1794178537024-9d4ac00c1314"
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "POST",
+      "status": 201,
+      "headersMs": 88,
+      "requestId": "cle1::cle1::mhjr5-1794178537091-5a06b9c3dc11"
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 70,
+      "requestId": "cle1::cle1::sdkrf-1794178537181-0d44eac9fcaf"
+    },
+    {
+      "path": "/mikka/api/conversations/945b4a1a-82f5-4f5c-bd4b-655feb8d3490/members",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 77,
+      "requestId": "cle1::cle1::xh9k5-1794178537250-acdd0852778c"
+    },
+    {
+      "path": "/mikka/api/conversations/945b4a1a-82f5-4f5c-bd4b-655feb8d3490/messages",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 254,
+      "requestId": "cle1::cle1::lx5nb-1794178537345-6cb831694244"
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 56,
+      "requestId": "cle1::cle1::lx5nb-1794178537607-0fc028ce7d3a"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 100,
+      "requestId": "cle1::cle1::459cz-1794178537810-e3ada2e28c27"
+    },
+    {
+      "path": "/mikka/api/conversations/945b4a1a-82f5-4f5c-bd4b-655feb8d3490/messages",
+      "method": "POST",
+      "status": 201,
+      "headersMs": 69,
+      "requestId": "cle1::cle1::8dnch-1794178537875-81f9b8d149ac"
+    },
+    {
+      "path": "/mikka/api/conversations/945b4a1a-82f5-4f5c-bd4b-655feb8d3490/messages",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 71,
+      "requestId": "cle1::cle1::mhjr5-1794178538050-13a32d2cf87a"
+    },
+    {
+      "path": "/mikka/api/conversations/945b4a1a-82f5-4f5c-bd4b-655feb8d3490/messages",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 79,
+      "requestId": "cle1::cle1::dpdrv-1794178538910-b65831e2796a"
+    },
+    {
+      "path": "/mikka/api/conversations/945b4a1a-82f5-4f5c-bd4b-655feb8d3490/stop",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 121,
+      "requestId": "cle1::cle1::9w65t-1794178539000-662c04193d2a"
+    },
+    {
+      "path": "/mikka/api/conversations/945b4a1a-82f5-4f5c-bd4b-655feb8d3490/messages",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 72,
+      "requestId": "cle1::cle1::459cz-1794178539123-c21606ff907e"
+    },
+    {
+      "path": "/mikka/api/conversations/945b4a1a-82f5-4f5c-bd4b-655feb8d3490/decisions",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 56,
+      "requestId": "cle1::cle1::hshr2-1794178539192-d846f494c769"
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200,
+      "headersMs": 43,
+      "requestId": "cle1::cle1::9wqp6-1794178539365-a03fd3ef6697"
+    },
+    {
+      "path": "/mikka/api/auth/sign-out",
+      "method": "POST",
+      "status": 200,
+      "headersMs": 66,
+      "requestId": "cle1::cle1::9wqp6-1794178539408-b2718b68cc88"
+    }
+  ],
+  "creationOutcome": "acknowledged",
+  "sentAt": "2026-11-08T22:55:37.865Z",
+  "beforeStop": {
+    "revision": 3,
+    "active": true,
+    "status": "running",
+    "respondingBotId": "8ff8b30e-2eb9-48bd-987f-4cbf048944d7",
+    "stopped": false,
+    "messageCount": 1,
+    "botReplyCount": 0
+  },
+  "afterStop": {
+    "revision": 5,
+    "active": false,
+    "status": "idle",
+    "respondingBotId": null,
+    "stopped": true,
+    "messageCount": 1,
+    "botReplyCount": 0
+  },
+  "turn": {
+    "messageId": "db0d82e2-ffdb-4298-887f-1d471e0bad80",
+    "status": "failed",
+    "stoppedError": true,
+    "traceStatus": "stopped",
+    "generateEntries": 1,
+    "publicPublishes": 0,
+    "privatePublishes": 0,
+    "delegates": 0,
+    "humanCancellationRecorded": true
+  },
+  "live": {
+    "ready": true,
+    "revisionCapable": true,
+    "matchingPushes": 5,
+    "maxRevision": 5,
+    "readsTriggered": 2,
+    "closed": true,
+    "unexpectedDisconnect": false
+  },
+  "sessionSignOut": {
+    "attempted": true,
+    "succeeded": true
+  },
+  "signedOut": true,
+  "finishedAt": "2026-11-08T22:55:39.467Z"
+}

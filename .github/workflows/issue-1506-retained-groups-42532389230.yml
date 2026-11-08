@@ -1,0 +1,107 @@
+name: Issue 1506 four retained groups 42532389230
+on:
+  push:
+    branches: [ops/issue1506-retained-groups-42532389230]
+    paths:
+      - '.github/workflows/issue-1506-retained-groups-42532389230.yml'
+      - 'scripts/acceptance/issue-1506-retained-groups-42532389230/**'
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: issue-1506-acme-acceptance
+  queue: max
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/ops/issue1506-retained-groups-42532389230'
+    runs-on: ubuntu-latest
+    # Operational capacity for up to four serial 220-second original cleanup calls;
+    # no model/Stop acceptance threshold is changed.
+    timeout-minutes: 20
+    concurrency:
+      group: web-deploy-production
+      queue: max
+      cancel-in-progress: false
+    env:
+      DRIVER_SHA: ab2fc19909a83b16c3276b0b2353f6055572283b
+      APP_SHA: bb5d1f9e224aea395b9c45823960e8ad10f1a099
+      MIKKA_FIXTURE_RECEIPT: scripts/acceptance/issue-1506-alex/receipts/fixtures-ready-42286389783.json
+    steps:
+      - name: Check out this immutable carrier and evidence commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check out the immutable original driver source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.DRIVER_SHA }}
+          path: driver-source
+          persist-credentials: false
+      - name: Check out the observation application source for the fixed decoder
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.APP_SHA }}
+          path: application-source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify source identity and unchanged tracked runtime
+        run: |
+          test "$(git -C driver-source rev-parse HEAD)" = "$DRIVER_SHA"
+          test "$(git -C application-source rev-parse HEAD)" = "$APP_SHA"
+          git -C driver-source diff --exit-code HEAD -- scripts/acceptance lib/coordinator-stream-client.ts
+      - name: Copy only the original fixed decoder
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+          import { createHash } from 'node:crypto'
+          const path = 'lib/coordinator-stream-client.ts'
+          const bytes = readFileSync('application-source/' + path)
+          assert.equal(createHash('sha256').update(bytes).digest('hex'), '490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4')
+          mkdirSync('driver-source/lib', { recursive: true })
+          writeFileSync('driver-source/' + path, bytes)
+          NODE
+      - name: Load original validators and verify selected original receipts offline
+        run: node scripts/acceptance/issue-1506-retained-groups-42532389230/carrier.mjs preflight
+      - name: Read the existing ACME email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing ACME password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Invoke only the selected original cleanup CLI
+        run: node scripts/acceptance/issue-1506-retained-groups-42532389230/carrier.mjs run
+      - name: Retain success failure and original cleanup receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1506-retained-groups-42532389230-${{ github.run_id }}
+          path: |
+            group-cleanup-report/**
+            driver-source/issue-1506-alex-report/**
+            scripts/acceptance/issue-1506-retained-groups-42532389230/plan.json
+            scripts/acceptance/issue-1506-retained-groups-42532389230/inputs/*.json
+          if-no-files-found: warn
+          retention-days: 7

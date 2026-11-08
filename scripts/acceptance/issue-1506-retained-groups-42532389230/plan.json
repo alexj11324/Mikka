@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "action": "retained-groups",
+  "driverSha": "ab2fc19909a83b16c3276b0b2353f6055572283b",
+  "applicationSha": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+  "fixture": {
+    "path": "scripts/acceptance/issue-1506-alex/receipts/fixtures-ready-42286389783.json",
+    "sha256": "aa58d54fee5826627696a0d1328cb0acaab2707f1d4254aa15f1b6ae420fb9fe"
+  },
+  "canonicalManifest": null,
+  "groupProgress": null,
+  "workspaceProgress": null,
+  "retainedGroups": [
+    {
+      "path": "inputs/public-haiku.json",
+      "sha256": "257d56b32159d8e6bf0563919d48883059c2464b7c9de8276dc19e644715ba57"
+    },
+    {
+      "path": "inputs/public-luna.json",
+      "sha256": "d4a3d17975816ba4aff05ed671e8450eb85c2099e57809ed147af52569d73aa1"
+    },
+    {
+      "path": "inputs/private-haiku.json",
+      "sha256": "3278cfb0313e8d3abfe04cb71dea0e300890cf90e269fd1d50aa99a1ca73a52e"
+    },
+    {
+      "path": "inputs/private-luna.json",
+      "sha256": "49920c03a8638e72f729ba40e21cffbbccbac86cf4492071fb3c83ea599595f0"
+    }
+  ]
+}
