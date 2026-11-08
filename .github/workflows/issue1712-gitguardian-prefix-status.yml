@@ -1,0 +1,59 @@
+name: Issue 1712 GitGuardian public-prefix false-positive disposition
+on:
+  push:
+    branches: [ops/issue1712-gitguardian-prefix-status]
+    paths:
+      - .github/workflows/issue1712-gitguardian-prefix-status.yml
+      - scripts/ops/issue1712-gitguardian-prefix-status.mjs
+      - scripts/ops/issue1712-gitguardian-prefix-status.test.mjs
+permissions:
+  contents: read
+concurrency:
+  group: issue1712-gitguardian-prefix-false-positive-disposition
+  cancel-in-progress: false
+jobs:
+  disposition:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'alexj11324/Mikka' &&
+      github.ref == 'refs/heads/ops/issue1712-gitguardian-prefix-status'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify exact-scope and refusal guards without credentials
+        run: node --test scripts/ops/issue1712-gitguardian-prefix-status.test.mjs
+      - name: Verify this ops push and immutable public prefix before reading the token
+        run: node scripts/ops/issue1712-gitguardian-prefix-status.mjs --check
+      - name: Read the one existing GitGuardian token
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITGUARDIAN_API_TOKEN
+          recursive: false
+          include-imports: false
+          export-type: env
+      - name: Verify immutable public prefix and dispose only the one exact false positive
+        run: node scripts/ops/issue1712-gitguardian-prefix-status.mjs
+      - name: Retain only the closed aggregate report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1712-gitguardian-prefix-disposition-${{ github.run_id }}-${{ github.run_attempt }}
+          path: gitguardian-status-report/report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
