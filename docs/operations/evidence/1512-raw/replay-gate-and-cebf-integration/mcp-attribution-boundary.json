@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "kind": "mcp-request-attribution-boundary",
+  "source": "1778978c93e3bdac87c13048108720d0f763d821",
+  "reviewer": "daemon_impl",
+  "scope": "Read-only existing authorized Decision MCP call chain",
+  "trustedBusinessIdentity": {
+    "file": "lib/mcp/worker.ts",
+    "fields": [
+      "userId",
+      "runId",
+      "issueId",
+      "agentId",
+      "botId"
+    ],
+    "role": "verified AuthInfo.extra consumed by route and business record; not a span attribute assignment"
+  },
+  "telemetry": {
+    "traceparentPropagated": true,
+    "requestLevelUserAndRunMetadataStampedByMcpAuthorization": false,
+    "remoteSpanContextDoesNotInheritCustomAttributes": true,
+    "requestHeaderAllowlistUnchanged": "x-mikka-trace-* accepted only on /v1/"
+  },
+  "lookup": {
+    "definition": "docs/operations/tracing.md",
+    "method": "Select trace IDs using a span with actual run/thread/task metadata, then enumerate all spans/logs in those traces.",
+    "daemonRunCarriesRunId": true,
+    "completeTraceStillRequiresProductionEvidence": true
+  },
+  "userAttribution": "Missing MCP request-level user hash remains unattributed. Never infer a request's user from another span's trace-level identity.",
+  "issueInterpretation": "Comment6697400007 specifically adds Desktop RPC user/action attribution; it does not require every MCP child to duplicate all identifiers.",
+  "mutations": false
+}

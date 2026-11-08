@@ -1,0 +1,92 @@
+✔ one actual UI submit stays open, uses no API submission, and closes its own session once (24.702669ms)
+✔ refuses actions before launching or typing credentials (0.929426ms)
+✔ refuses event before launching or typing credentials (0.310191ms)
+✔ refuses repository before launching or typing credentials (0.272968ms)
+✔ refuses ref before launching or typing credentials (0.62595ms)
+✔ refuses sha before launching or typing credentials (0.27141ms)
+✔ refuses expiry before launching or typing credentials (0.544187ms)
+✔ refuses fixture before launching or typing credentials (0.485233ms)
+✔ refuses extra-ready before launching or typing credentials (0.868526ms)
+✔ refuses debug before launching or typing credentials (0.797471ms)
+✔ workspace switch waits for the new HOME document, not the old HOME URL or hidden menu (20.628468ms)
+✔ rejects ambiguousWorkspace without submitting and closes allocated resources (2.338671ms)
+✔ rejects otherOwner without submitting and closes allocated resources (1.230148ms)
+✔ rejects ambiguousProfile without submitting and closes allocated resources (3.418637ms)
+✔ rejects disabledSubmit without submitting and closes allocated resources (7.925049ms)
+✔ rejects buildChange without submitting and closes allocated resources (2.321639ms)
+✔ rejects foreignSignIn without submitting and closes allocated resources (0.652424ms)
+✔ rejects foreignBusiness without submitting and closes allocated resources (1.043105ms)
+✔ checks expireBeforeSubmit after filling but before the paid side effect (3.801319ms)
+✔ checks abortBeforeSubmit after filling but before the paid side effect (8.63467ms)
+✔ no renderer business response cannot be replaced by the independent version API check (16.249712ms)
+✔ an already aborted signal creates no browser or session (1.695672ms)
+✔ never retries a submission with submitThrows and retains its unknown outcome (5.666777ms)
+✔ never retries a submission with submitUnknown and retains its unknown outcome (4.046654ms)
+✔ abort cancels a pending actionable click before any logout await (2.904933ms)
+✔ logout failure still closes every owned resource and makes idempotent close fail (3.051665ms)
+✔ report sink failure does not leak a page, context or browser (2.29103ms)
+✔ a resource that arrives after bounded abort cleanup is closed, never reported as already closed (7.923651ms)
+✔ a page-close failure stops the browser before any further cleanup wait can release a late click (15.256756ms)
+✔ the actual workflow awaits actual actor session cleanup with no progress token in its environment (11.210474ms)
+✔ Replay becomes ready before the one paid click and reports no upload acknowledgement (4.938589ms)
+✔ Replay missing bridge fails closed before paid submission and cleans owned resources (9.284082ms)
+✔ Replay SDK exception fails closed before paid submission and cleans owned resources (3.540743ms)
+✔ Replay no SDK fails closed before paid submission and cleans owned resources (12.263725ms)
+✔ Replay unstarted recording fails closed before paid submission and cleans owned resources (3.530573ms)
+✔ Replay no snapshot fails closed before paid submission and cleans owned resources (2.231009ms)
+✔ Replay malformed true fails closed before paid submission and cleans owned resources (2.306001ms)
+✔ Replay invalid session fails closed before paid submission and cleans owned resources (3.775996ms)
+✔ Replay last-moment session change fails closed before paid submission and cleans owned resources (2.221898ms)
+✔ Replay pending abort cannot submit after a late ready result (2.240623ms)
+✔ Replay pending timeout cannot submit after a late ready result (13.310795ms)
+✔ pageviews strip query strings, hashes, document identifiers and unapproved properties (2.278153ms)
+✔ automatic top-level person mutations are stripped without losing ingestion metadata (0.204511ms)
+✔ unknown events and raw exception events never pass the allowlist (0.191324ms)
+✔ masked replay keeps only its transport payload and cannot mutate a person (0.519642ms)
+✔ all upcoming features fail closed, even if the remote switch is accidentally enabled (0.406003ms)
+✔ gated features are on only when the remote flag is exactly true (0.205124ms)
+✔ the 电脑 tab has its own kill switch, apart from the cloud computer rollout flag (0.52142ms)
+✔ the active Vite web entry initializes PostHog and the shared application mounts its pageview tracker (0.7242ms)
+✔ analytics acceptance preserves the three real anonymous routes and isolated database restriction (7.065472ms)
+✔ all non-local browser HTTP and WebSocket requests are blocked before sending analytics (0.90886ms)
+✔ analytics build proof checks actual packaged bytes, public Vite entry and the synthetic key (36.173404ms)
+✔ artifact verification rejects escaping and symlinked files instead of accepting their filenames (10.679707ms)
+✔ runtime separates the desktop shell and still drops other client details (0.348611ms)
+✔ smoke accounts are recognised only by their +mikka-smoke tag, and the tag survives sanitizing (1.527579ms)
+✔ the CI AppArmor attachment authorizes only the actual installed headless Chromium path (4.000029ms)
+✔ the CI AppArmor helper rejects missing and ambiguous installed browser revisions (2.625201ms)
+✔ the CI AppArmor helper rejects glob syntax, path aliases, and executable symlinks (4.048696ms)
+✔ the CI AppArmor helper refuses non-executable or non-ELF files (2.329796ms)
+✔ only a natural session, live SDK state and same-session snapshot form readiness (1.258569ms)
+✔ snapshot-before-loaded ordering works and natural session changes invalidate old evidence (0.302179ms)
+✔ observer never reads snapshot payload and exposes only frozen metadata (1.058608ms)
+✔ duplicate entry replaces subscriptions; unavailable or failing SDK remains unknown without throwing (0.31093ms)
+✖ real bootstrap preserves sanitizer return/drop behavior and masking while publishing only a reader (2.27128ms)
+ℹ tests 64
+ℹ suites 0
+ℹ pass 63
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 655.782425
+
+✖ failing tests:
+
+test at tests/replay-readiness.test.mjs:96:1
+✖ real bootstrap preserves sanitizer return/drop behavior and masking while publishing only a reader (2.27128ms)
+  evalmachine.<anonymous>:39
+      maskCapturedNetworkRequestFn: redactReplayRequest,
+                                    ^
+  
+  ReferenceError: redactReplayRequest is not defined
+      at evalmachine.<anonymous>:39:35
+      at Script.runInContext (node:vm:149:12)
+      at Script.runInNewContext (node:vm:154:17)
+      at runInNewContext (node:vm:310:38)
+      at TestContext.<anonymous> (file:///vercel/sandbox/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/tests/replay-readiness.test.mjs:103:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)

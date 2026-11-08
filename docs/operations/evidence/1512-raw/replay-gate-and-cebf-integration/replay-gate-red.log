@@ -1,0 +1,122 @@
+✖ Replay missing bridge fails closed before paid submission and cleans owned resources (18.9847ms)
+✖ Replay SDK exception fails closed before paid submission and cleans owned resources (4.208626ms)
+✖ Replay no SDK fails closed before paid submission and cleans owned resources (4.023151ms)
+✖ Replay unstarted recording fails closed before paid submission and cleans owned resources (3.494334ms)
+✖ Replay no snapshot fails closed before paid submission and cleans owned resources (2.95056ms)
+✖ Replay malformed true fails closed before paid submission and cleans owned resources (2.940088ms)
+✖ Replay invalid session fails closed before paid submission and cleans owned resources (7.041559ms)
+✖ Replay last-moment session change fails closed before paid submission and cleans owned resources (5.775342ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 0
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 220.613813
+
+✖ failing tests:
+
+test at scripts/acceptance/run-observability-browser.test.mjs:436:3
+✖ Replay missing bridge fails closed before paid submission and cleans owned resources (18.9847ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///vercel/sandbox/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/scripts/acceptance/run-observability-browser.test.mjs:444:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability-browser.test.mjs:436:3
+✖ Replay SDK exception fails closed before paid submission and cleans owned resources (4.208626ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///vercel/sandbox/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/scripts/acceptance/run-observability-browser.test.mjs:444:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability-browser.test.mjs:436:3
+✖ Replay no SDK fails closed before paid submission and cleans owned resources (4.023151ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///vercel/sandbox/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/scripts/acceptance/run-observability-browser.test.mjs:444:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability-browser.test.mjs:436:3
+✖ Replay unstarted recording fails closed before paid submission and cleans owned resources (3.494334ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///vercel/sandbox/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/scripts/acceptance/run-observability-browser.test.mjs:444:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability-browser.test.mjs:436:3
+✖ Replay no snapshot fails closed before paid submission and cleans owned resources (2.95056ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///vercel/sandbox/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/scripts/acceptance/run-observability-browser.test.mjs:444:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability-browser.test.mjs:436:3
+✖ Replay malformed true fails closed before paid submission and cleans owned resources (2.940088ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///vercel/sandbox/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/scripts/acceptance/run-observability-browser.test.mjs:444:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability-browser.test.mjs:436:3
+✖ Replay invalid session fails closed before paid submission and cleans owned resources (7.041559ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///vercel/sandbox/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/scripts/acceptance/run-observability-browser.test.mjs:444:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability-browser.test.mjs:436:3
+✖ Replay last-moment session change fails closed before paid submission and cleans owned resources (5.775342ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///vercel/sandbox/Mikka-fa2830e0576233d8de54f72eec56ec74b4ca95d1/scripts/acceptance/run-observability-browser.test.mjs:444:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }

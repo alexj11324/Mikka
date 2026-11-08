@@ -1,0 +1,266 @@
+{
+  "schema_version": 1,
+  "kind": "issue1512_minimal_replay_presubmit_gate_implementation",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "base_commit": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "source_manifest_blob": "6289706a6b278977940958f0f67fe4f3c37a5287",
+  "source_files": [
+    {
+      "path": "lib/replay-readiness.ts",
+      "git_blob_sha": "899a9dcf33af282913c3e25c99b0826566b2c56b",
+      "utf8_bytes": 3291,
+      "sha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "git_blob_sha": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+      "utf8_bytes": 2360,
+      "sha256": "f306b61971a1cc3c7501ca4623d733fa5cbd60e3a586d7b2f3a91190af07b854"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "git_blob_sha": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+      "utf8_bytes": 24958,
+      "sha256": "c859d81c3dcac798efee6d9d89dd5a5412d72c1b85b9737568aaac73cefb89cf"
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "git_blob_sha": "2c67bead9d3d211e58dd6a7a684d60139d7df16c",
+      "utf8_bytes": 6214,
+      "sha256": "17fd9075fce07d1be5beaf0ce8049e04251c5ae618d878ad684e7b466ffbd053"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "git_blob_sha": "58170f27b9586752ca966e377c9255ac6e6174a9",
+      "utf8_bytes": 26414,
+      "sha256": "48acfc7dfeba2c9bf673f1d4765578f59dda00f50307978d4f11d0dedcfe25ff"
+    }
+  ],
+  "changes": [
+    "The existing browser bootstrap installs a bounded metadata-only reader. The SDK, observer callbacks and writable state remain private.",
+    "onSessionId observes natural IDs without allocating or injecting them; a natural session change or invalid ID clears stale snapshot evidence.",
+    "After the unchanged sanitizer runs, observe only $snapshot and its $session_id, then return the identical sanitized result. Never inspect the snapshot body or alter drop/masking behavior.",
+    "The reader rechecks real sessionRecordingStarted each time; no SDK/global window.posthog assumption, forced recording, opt-in, capture, reset or storage mutation.",
+    "The actor waits once under its existing deadline/abort using requestAnimationFrame polling, disposes the JS handle, then immediately rechecks the same current session/live state before its existing sole click.",
+    "Missing config/bridge, unknown or false SDK state, no same-session snapshot, malformed metadata, SDK errors, cancellation and timeout fail before submitClicks=1 and use existing page-first cleanup.",
+    "Only opaque session ID, closed booleans and timestamps enter the receipt. uploadAcknowledged remains null. Product code adds no timer or server polling."
+  ],
+  "public_readiness_boundary": "Started plus a naturally captured same-session snapshot reaching the sanitize path; not storage, ingestion, complete snapshot coverage, playable Replay or masking acceptance.",
+  "validation": {
+    "baseline_regression": {
+      "command": "node --test --test-name-pattern=Replay .*fails closed scripts/acceptance/run-observability-browser.test.mjs",
+      "base_product_unmodified": true,
+      "new_tests_only": true,
+      "passed": 0,
+      "failed": 8,
+      "exit": 1,
+      "meaning": "Each unready condition reached the old actor's mocked paid submission instead of being rejected."
+    },
+    "initial_candidate": {
+      "passed": 63,
+      "failed": 1,
+      "exit": 1,
+      "reason": "Test harness omitted redactReplayRequest from the VM bootstrap bindings; raw failed output preserved. Product code unchanged when fixing the harness."
+    },
+    "final_candidate": {
+      "command": "node --test scripts/acceptance/run-observability-browser.test.mjs tests/replay-readiness.test.mjs tests/analytics-policy.test.mjs",
+      "passed": 64,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit": 0,
+      "duration_ms": 656.503385
+    },
+    "new_actor_cases": 11,
+    "new_helper_bootstrap_cases": 5,
+    "coverage": [
+      "Delayed readiness before exactly one click.",
+      "Absent bridge, SDK exception, unloaded SDK, stopped recording, missing snapshot, malformed true and invalid opaque ID.",
+      "Session changes at the final check.",
+      "Abort/timeout followed by late readiness never submits; page closes before logout.",
+      "Snapshot-before-loaded ordering, session changes and invalid-ID resets.",
+      "Duplicate/HMR entry, subscription replacement and unavailable bridge.",
+      "Observer payload getters are never read; public result is closed/frozen.",
+      "The actual bootstrap preserves sanitizer drops and masking configuration."
+    ],
+    "sdk_type_contract": {
+      "version": "posthog-js@1.438.13",
+      "typescript": "5.9.3",
+      "exit": 0,
+      "scope": "Strict isolated helper-to-PostHog declaration compatibility, not full-repository typecheck."
+    },
+    "syntax_checks": {
+      "files": [
+        "scripts/acceptance/run-observability-browser.mjs",
+        "scripts/acceptance/run-observability-browser.test.mjs",
+        "tests/replay-readiness.test.mjs"
+      ],
+      "exit": 0
+    },
+    "independent_source_review": {
+      "agent": "replay_gate_review",
+      "all_five_blobs_read": true,
+      "must_fix_findings": 0
+    },
+    "tested_source_integrity": "All five tested Sandbox source SHA256/bytes equal the frozen Git blobs; all source/evidence blobs read back exactly.",
+    "normal_ci_registration": "Root will append the new helper test to test:analytics as a sixth package.json change; this source-only registration is outside these five verified product/test files.",
+    "not_run": [
+      "Full-repository typecheck/lint/CI.",
+      "git apply check: diff tool unavailable in the isolated image; source blobs were used directly.",
+      "Real browser playback, real PostHog recording or ingestion, real model work, production acceptance."
+    ]
+  },
+  "observer_overhead": {
+    "source_sha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd",
+    "node": "v24.22.1",
+    "vcpus": 1,
+    "memory_mb": 2048,
+    "warmup_per_path": 5000,
+    "measurements": [
+      {
+        "name": "ordinary_event_fast_return",
+        "samples": 1000,
+        "observations_per_sample": 128,
+        "p50_ms": 9.296875e-7,
+        "p95_ms": 0.000021359375,
+        "p99_ms": 0.0000243046875,
+        "max_ms": 0.0044335546875
+      },
+      {
+        "name": "snapshot_same_session",
+        "samples": 1000,
+        "observations_per_sample": 128,
+        "p50_ms": 0.000098921875,
+        "p95_ms": 0.00019740625,
+        "p99_ms": 0.000342109375,
+        "max_ms": 0.0315726328125
+      },
+      {
+        "name": "snapshot_session_changes",
+        "samples": 1000,
+        "observations_per_sample": 128,
+        "p50_ms": 0.0001491015625,
+        "p95_ms": 0.000171875,
+        "p99_ms": 0.000294546875,
+        "max_ms": 0.0315694296875
+      }
+    ],
+    "scope": "Percentiles of amortized elapsed time per observer call within batches of 128 calls (1000 batches/path). Only added observer code; warmed JIT/loop effects are included. No SDK transport, network, real browser, end-to-end or production latency inference."
+  },
+  "workflow_compatibility": {
+    "evidence_blob": "6d95a46c5fa9a0d4fa17bdd4f4b68e578be83992",
+    "new_allowlist_changes_needed": false
+  },
+  "sdk_contract_blob": "06eb42dcadee87d00f1d6d70dfda5e215daf48c1",
+  "cleanup": {
+    "kind": "sandbox_cleanup_receipt",
+    "session_id": "sbx_VelfoGJ9nEksEExueBgD9eP4PRUM",
+    "started_at_utc": "2026-11-07T23:46:39.176Z",
+    "timeout_ms": 900000,
+    "automatic_deadline_utc": "2026-11-08T00:01:39.176Z",
+    "requested_stop_at_utc": "2026-11-08T00:00:28.899Z",
+    "stopped_at_utc": "2026-11-08T00:00:29.213Z",
+    "verified_status": "stopped",
+    "routes": [],
+    "persistent": false,
+    "vcpus": 1,
+    "memory_mb": 2048,
+    "network_policy": {
+      "mode": "deny-all"
+    },
+    "active_cpu_ms": 18513,
+    "duration_ms": 830037,
+    "transport": {
+      "ingress": 71718229,
+      "egress": 637642
+    },
+    "evidence_transfer": "All seven raw UTF-8 evidence files reconstructed from 31 <=1000-byte chunks and verified against in-sandbox SHA256 and byte counts before archival.",
+    "created_running_sessions": 1,
+    "no_more_resources_open": true,
+    "non_acceptance_setup_events": [
+      "v4 create returned 500 with unknown outcome; named GET returned 404 before the v2 node24 creation succeeded.",
+      "First rg source read found rg unavailable; fallback fs source reads succeeded.",
+      "The generic update_sandbox networkPolicy form was rejected before mutation; dedicated update_session_network_policy with mode=deny-all succeeded.",
+      "diff executable was unavailable, so no git apply check is claimed by this subtask. No extra resource was opened for it.",
+      "This subagent's local exec remained unavailable even after root's environment recovered."
+    ]
+  },
+  "evidence_files": [
+    {
+      "name": "replay-gate-red.log",
+      "utf8_bytes": 6393,
+      "sha256": "96653eb13fbfe6fb59d2ddfd7005ab5e68f92059daa0972462654635ff33966a",
+      "git_blob_sha": "8020294be883d77a810fa7783f0168ccf8c95f6f"
+    },
+    {
+      "name": "replay-gate-green-initial.log",
+      "utf8_bytes": 7138,
+      "sha256": "7a07393fd807426c631588736a3a14604dbc2b25420765ae1b57f5bf79999c35",
+      "git_blob_sha": "365f1b4e5563d089e214647633db0f5e05eacce0"
+    },
+    {
+      "name": "replay-gate-green.log",
+      "utf8_bytes": 6146,
+      "sha256": "7f93c28cf488a35bfb9229ab3c9ffde0c899df18c55fe242d0555b795a35ef39",
+      "git_blob_sha": "c95370ba3863df74544ea9662b2aaacdb9aeb1f7"
+    },
+    {
+      "name": "replay-gate-types.log",
+      "utf8_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "name": "replay-gate-benchmark.json",
+      "utf8_bytes": 1386,
+      "sha256": "f45ecd0deecc1a136ca65d62d47b01f64c51cf55575b6c98227a0fff7d14f48b",
+      "git_blob_sha": "9638f496609db7ca448911f1df6e0d21842c98c2"
+    },
+    {
+      "name": "replay-gate-benchmark.mjs",
+      "utf8_bytes": 2500,
+      "sha256": "fc047363c9f815368f72cb222d314f33646c4f97a2020d653258f114b0a4fa46",
+      "git_blob_sha": "73cb762e6caecce37760c5587665dc71e3f5872b"
+    },
+    {
+      "name": "replay-gate-source-check.json",
+      "utf8_bytes": 3004,
+      "sha256": "0e233d169e019dc96ef1f98a6e3e2b0827171693e20c28eedb78c47ee9389112",
+      "git_blob_sha": "e54aafca89f4465bf678bd72eb1f2178c0485183"
+    },
+    {
+      "name": "replay-gate-sdk-contract.json",
+      "git_blob_sha": "06eb42dcadee87d00f1d6d70dfda5e215daf48c1",
+      "utf8_bytes": 3918,
+      "sha256": "7ae83820b7e5074397680983bc2a02a4bfd36e7bb2a3987181161ef40b9ad7a6"
+    },
+    {
+      "name": "replay-gate-workflow-compatibility.json",
+      "git_blob_sha": "6d95a46c5fa9a0d4fa17bdd4f4b68e578be83992",
+      "utf8_bytes": 1688,
+      "sha256": "1afc790339c76c2e2bae37ac8a402d6580308126d8e759650af54d266c688c57"
+    },
+    {
+      "name": "replay-gate-cleanup.json",
+      "git_blob_sha": "803b5ec1118ab79400b6ae43a7d3574a5eb018b6",
+      "utf8_bytes": 1456,
+      "sha256": "f56831be2067c5477a52dc2e16f5a7d976f5f542caa8ce6e9f2ed3dc6a6c0a2e"
+    }
+  ],
+  "evidence_provenance": "Raw logs retained verbatim, including the 8 expected old-source failures and the one corrected VM fixture binding failure. Long Vercel base64 file responses were rejected as truncated; 31 complete small chunks were reconstructed and checked against independent in-Sandbox SHA256/bytes.",
+  "mutations": {
+    "git_refs": 0,
+    "prs": 0,
+    "production": 0,
+    "posthog_configuration": 0,
+    "models": 0,
+    "recording_start": 0,
+    "source_blobs_only": true
+  },
+  "production_acceptance": {
+    "overallAcceptance": null,
+    "actual_sessions": [],
+    "real_cases_executed_by_this_subtask": 0
+  }
+}

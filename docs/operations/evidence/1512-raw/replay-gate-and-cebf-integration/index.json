@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "kind": "issue1512-frozen-replay-gate-and-cebf-publication",
+  "createdAt": "2026-11-08 00:13:06 UTC",
+  "parentEvidence": "b20c9c0582281710773b5509a68c54a0be8e8116",
+  "product": {
+    "head": "cebf41d4a6b114371964af044372aa8192c08526",
+    "tree": "c50f74f3efd0a090a86074e6d0600897701ea182",
+    "main": "ad7f0d0434e7d4a2527d868c4830d009b28a9d7f",
+    "synthetic": {
+      "sha": "e125317c375e73c5282430eb739b1552114e8c3f",
+      "tree": "c50f74f3efd0a090a86074e6d0600897701ea182",
+      "parents": [
+        "ad7f0d0434e7d4a2527d868c4830d009b28a9d7f",
+        "cebf41d4a6b114371964af044372aa8192c08526"
+      ]
+    },
+    "normalRefUpdate": true,
+    "ownFiles": 32,
+    "wholeCiPending": true
+  },
+  "replay": {
+    "sources": 5,
+    "additionalCanonicalRegistrationFiles": 1,
+    "oldRefusalTests": {
+      "passed": 0,
+      "failed": 8
+    },
+    "finalTargetedTests": {
+      "passed": 64,
+      "failed": 0,
+      "skipped": 0
+    },
+    "realRecordingAndUploadProven": false,
+    "allRawAndSourceHashesVerified": true,
+    "onlySandboxStopped": true,
+    "sameNameInventoryCount": 1
+  },
+  "mcp": {
+    "repairPublished": true,
+    "focusedTests": "43 daemon + 2 actual HTTP extraction passed; canonical CI pending",
+    "requestUserAttribution": "No inference from trace; missing request user fields remain unattributed."
+  },
+  "priorNative": {
+    "source": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "login": [
+      210,
+      210
+    ],
+    "firstStartup": [
+      181,
+      194
+    ],
+    "notTransferredToNewHead": true
+  },
+  "productionModelCalls": 0,
+  "productionAccepted": false,
+  "issueClosed": false,
+  "files": [
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-source-manifest.json",
+      "bytes": 1916,
+      "sha256": "7753e7909566d68159353da8b7dd8e9e2ba2b51b107092b534aa72e3eb6522d5",
+      "gitBlob": "6289706a6b278977940958f0f67fe4f3c37a5287"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/lib/replay-readiness.ts",
+      "bytes": 3291,
+      "sha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd",
+      "gitBlob": "899a9dcf33af282913c3e25c99b0826566b2c56b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/instrumentation-client.ts",
+      "bytes": 2360,
+      "sha256": "f306b61971a1cc3c7501ca4623d733fa5cbd60e3a586d7b2f3a91190af07b854",
+      "gitBlob": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/scripts/acceptance/run-observability-browser.mjs",
+      "bytes": 24958,
+      "sha256": "c859d81c3dcac798efee6d9d89dd5a5412d72c1b85b9737568aaac73cefb89cf",
+      "gitBlob": "0ed07cf1751a0fc2885109201caf89cda71f704b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/tests/replay-readiness.test.mjs",
+      "bytes": 6214,
+      "sha256": "17fd9075fce07d1be5beaf0ce8049e04251c5ae618d878ad684e7b466ffbd053",
+      "gitBlob": "2c67bead9d3d211e58dd6a7a684d60139d7df16c"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/scripts/acceptance/run-observability-browser.test.mjs",
+      "bytes": 26414,
+      "sha256": "48acfc7dfeba2c9bf673f1d4765578f59dda00f50307978d4f11d0dedcfe25ff",
+      "gitBlob": "58170f27b9586752ca966e377c9255ac6e6174a9"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-red.log",
+      "bytes": 6393,
+      "sha256": "96653eb13fbfe6fb59d2ddfd7005ab5e68f92059daa0972462654635ff33966a",
+      "gitBlob": "8020294be883d77a810fa7783f0168ccf8c95f6f"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-green-initial.log",
+      "bytes": 7138,
+      "sha256": "7a07393fd807426c631588736a3a14604dbc2b25420765ae1b57f5bf79999c35",
+      "gitBlob": "365f1b4e5563d089e214647633db0f5e05eacce0"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-green.log",
+      "bytes": 6146,
+      "sha256": "7f93c28cf488a35bfb9229ab3c9ffde0c899df18c55fe242d0555b795a35ef39",
+      "gitBlob": "c95370ba3863df74544ea9662b2aaacdb9aeb1f7"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-benchmark.json",
+      "bytes": 1386,
+      "sha256": "f45ecd0deecc1a136ca65d62d47b01f64c51cf55575b6c98227a0fff7d14f48b",
+      "gitBlob": "9638f496609db7ca448911f1df6e0d21842c98c2"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-benchmark.mjs",
+      "bytes": 2500,
+      "sha256": "fc047363c9f815368f72cb222d314f33646c4f97a2020d653258f114b0a4fa46",
+      "gitBlob": "73cb762e6caecce37760c5587665dc71e3f5872b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-source-check.json",
+      "bytes": 3004,
+      "sha256": "0e233d169e019dc96ef1f98a6e3e2b0827171693e20c28eedb78c47ee9389112",
+      "gitBlob": "e54aafca89f4465bf678bd72eb1f2178c0485183"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-sdk-contract.json",
+      "bytes": 3918,
+      "sha256": "7ae83820b7e5074397680983bc2a02a4bfd36e7bb2a3987181161ef40b9ad7a6",
+      "gitBlob": "06eb42dcadee87d00f1d6d70dfda5e215daf48c1"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-workflow-compatibility.json",
+      "bytes": 1688,
+      "sha256": "1afc790339c76c2e2bae37ac8a402d6580308126d8e759650af54d266c688c57",
+      "gitBlob": "6d95a46c5fa9a0d4fa17bdd4f4b68e578be83992"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-cleanup.json",
+      "bytes": 1456,
+      "sha256": "f56831be2067c5477a52dc2e16f5a7d976f5f542caa8ce6e9f2ed3dc6a6c0a2e",
+      "gitBlob": "803b5ec1118ab79400b6ae43a7d3574a5eb018b6"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-gate-final-receipt.json",
+      "bytes": 11958,
+      "sha256": "74e646dd789dfadf69fab4bec4d675bbb1788d460dcec38526f28c895a2a1dfd",
+      "gitBlob": "83f229593fd61d376bcc9ec66c7b455004e49e03"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/replay-evidence-index.json",
+      "bytes": 4427,
+      "sha256": "8017d959183cd42d004cd1cfdf4901b1f2fec92246bb113b46eb260ac399ae26",
+      "gitBlob": "679fa785f6116aa715710ce9b927c812a9d1e57a"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/package.json",
+      "bytes": 77859,
+      "sha256": "55d18a801e68e1ea92a12ecccda54d14e05c6bd63ca716e3faa5a1ad31b5eb1a",
+      "gitBlob": "89050f8b787d469b11ea26813e0404aa088a40ef"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/main-ad7-compatibility-review.json",
+      "bytes": 6800,
+      "sha256": "3c4d0f9de4fdbde247151b005a968f484a1e71386a5323d436e4fe0d7ac46a9b",
+      "gitBlob": "a3754c201fca4b3e8287dbaf3b542229429ad71e"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/root-replay-review.json",
+      "bytes": 6038,
+      "sha256": "12ff1f079a9c1b22377b363fab93fdacead1b738ef6ab7ed2baa7116c0bc29e8",
+      "gitBlob": "41836ce1d94d2fb5c3ed5491e9d2170b74e40e0b"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/cebf-publication.json",
+      "bytes": 15606,
+      "sha256": "1c41d4cf1fbd3792b38afb046cd0fd18e62be6528aa8d062202b894be6227701",
+      "gitBlob": "c1850e014a8b92524d5b3a83a8e6a311c2f2d093"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/replay-gate-and-cebf-integration/mcp-attribution-boundary.json",
+      "bytes": 1398,
+      "sha256": "13007e7ba4de1a35f643857989cec2963192c858c22c010344136b36e2fa278d",
+      "gitBlob": "d038f872d9ca0a90569b11b192d968d4f1ec21db"
+    }
+  ],
+  "totalFilesWithoutIndex": 23,
+  "totalBytesWithoutIndex": 222868
+}

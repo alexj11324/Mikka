@@ -1,0 +1,33 @@
+{
+  "kind": "sandbox_cleanup_receipt",
+  "session_id": "sbx_VelfoGJ9nEksEExueBgD9eP4PRUM",
+  "started_at_utc": "2026-11-07T23:46:39.176Z",
+  "timeout_ms": 900000,
+  "automatic_deadline_utc": "2026-11-08T00:01:39.176Z",
+  "requested_stop_at_utc": "2026-11-08T00:00:28.899Z",
+  "stopped_at_utc": "2026-11-08T00:00:29.213Z",
+  "verified_status": "stopped",
+  "routes": [],
+  "persistent": false,
+  "vcpus": 1,
+  "memory_mb": 2048,
+  "network_policy": {
+    "mode": "deny-all"
+  },
+  "active_cpu_ms": 18513,
+  "duration_ms": 830037,
+  "transport": {
+    "ingress": 71718229,
+    "egress": 637642
+  },
+  "evidence_transfer": "All seven raw UTF-8 evidence files reconstructed from 31 <=1000-byte chunks and verified against in-sandbox SHA256 and byte counts before archival.",
+  "created_running_sessions": 1,
+  "no_more_resources_open": true,
+  "non_acceptance_setup_events": [
+    "v4 create returned 500 with unknown outcome; named GET returned 404 before the v2 node24 creation succeeded.",
+    "First rg source read found rg unavailable; fallback fs source reads succeeded.",
+    "The generic update_sandbox networkPolicy form was rejected before mutation; dedicated update_session_network_policy with mode=deny-all succeeded.",
+    "diff executable was unavailable, so no git apply check is claimed by this subtask. No extra resource was opened for it.",
+    "This subagent's local exec remained unavailable even after root's environment recovered."
+  ]
+}

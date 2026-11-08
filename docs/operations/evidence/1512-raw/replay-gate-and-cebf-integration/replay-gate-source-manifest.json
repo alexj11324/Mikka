@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "base": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "kind": "minimal_readonly_replay_presubmit_gate",
+  "files": [
+    {
+      "path": "lib/replay-readiness.ts",
+      "git_blob_sha": "899a9dcf33af282913c3e25c99b0826566b2c56b",
+      "utf8_bytes": 3291,
+      "sha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "git_blob_sha": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+      "utf8_bytes": 2360,
+      "sha256": "f306b61971a1cc3c7501ca4623d733fa5cbd60e3a586d7b2f3a91190af07b854"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "git_blob_sha": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+      "utf8_bytes": 24958,
+      "sha256": "c859d81c3dcac798efee6d9d89dd5a5412d72c1b85b9737568aaac73cefb89cf"
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "git_blob_sha": "2c67bead9d3d211e58dd6a7a684d60139d7df16c",
+      "utf8_bytes": 6214,
+      "sha256": "17fd9075fce07d1be5beaf0ce8049e04251c5ae618d878ad684e7b466ffbd053"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "git_blob_sha": "58170f27b9586752ca966e377c9255ac6e6174a9",
+      "utf8_bytes": 26414,
+      "sha256": "48acfc7dfeba2c9bf673f1d4765578f59dda00f50307978d4f11d0dedcfe25ff"
+    }
+  ],
+  "validation": {
+    "baseline_new_rejection_tests": {
+      "passed": 0,
+      "failed": 8
+    },
+    "candidate_targeted_suite": {
+      "passed": 64,
+      "failed": 0
+    },
+    "sdk_type_compatibility": "posthog-js@1.438.13; exit 0",
+    "mjs_syntax_checks": 3,
+    "independent_final_source_review": "No must-fix issue reported after all 5 blobs were read",
+    "scope": "Synthetic source/unit fixtures and pinned SDK source/type verification; no real browser or production capture"
+  },
+  "refs_changed": false
+}

@@ -1,0 +1,503 @@
+{
+  "version": 1,
+  "kind": "cebf-integration-and-publication",
+  "publication": {
+    "checkedAt": "2026-11-08 00:04:23 UTC",
+    "head": "cebf41d4a6b114371964af044372aa8192c08526",
+    "tree": "c50f74f3efd0a090a86074e6d0600897701ea182",
+    "parents": [
+      "d5a30ce73b839c01ec01b25a2bc534ce6214c76b",
+      "ad7f0d0434e7d4a2527d868c4830d009b28a9d7f"
+    ],
+    "ownFiles": 32,
+    "upstreamFiles": 4,
+    "allFrozenBlobsMatched": true,
+    "main": "ad7f0d0434e7d4a2527d868c4830d009b28a9d7f",
+    "prLease": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+    "prState": "open",
+    "prodWritersGuard": "not used for PR push; still mandatory before main merge",
+    "publishedAt": "2026-11-08 00:05:01 UTC",
+    "refReadback": true,
+    "prHeadReadback": true,
+    "force": false,
+    "firstImmediatePrSnapshotStale": true
+  },
+  "mcpCommit": {
+    "sha": "1778978c93e3bdac87c13048108720d0f763d821",
+    "tree": "4080683e646f22a46c4e0d488d5ba04b98311025",
+    "parent": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+    "sources": [
+      {
+        "path": "packages/daemon/src/agents/run-apps.ts",
+        "bytes": 2419,
+        "sha256": "d2d45f84b533e1f5e9ca2ca923909db5151fff6197577532e316feaf4a82b5cb",
+        "blob": "d8e80f54dd7e24999ea3038f6d645023e5135d7b"
+      },
+      {
+        "path": "packages/daemon/src/runs/supervisor.ts",
+        "bytes": 100337,
+        "sha256": "d4eb4e7695e117b3df4230957e52fbe3cc0cf9dd2af279b2ab1abd957a52529d",
+        "blob": "be6dfe96d511232ca4d758b432ca7045df4be65e"
+      },
+      {
+        "path": "packages/daemon/src/agents/run-context.ts",
+        "bytes": 30602,
+        "sha256": "3948a2e3dcdef7b5bf8614de738665bf8a639c6a2ba1d36719988cf0802e19b3",
+        "blob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f"
+      },
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp.mjs",
+        "bytes": 2621,
+        "sha256": "1b73d39ba0a9705b2ac2e85d730dbc7f838b6a4c968c77bfcd1f194847445a21",
+        "blob": "e314a1c43ac0749a5a773bcef2be02a976fc166f"
+      },
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+        "bytes": 50533,
+        "sha256": "96a0c7551fffd1d6bdd0386f9aa2ea8d37613dd969a244d2caf562a0594b13a9",
+        "blob": "308c9ed7ab78b636876fd661b55d36dd61b478d2"
+      },
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-backend.d.mts",
+        "bytes": 2313,
+        "sha256": "823a45716a7ef2afd86ac5b6e8fc6d3bc7ec61f932e2566e44481727a85a0fa9",
+        "blob": "02cf186cbe1fa97af6f673123e78ddfb920823fa"
+      },
+      {
+        "path": "packages/daemon/test/project-decisions.test.ts",
+        "bytes": 10477,
+        "sha256": "8b7df551d1a194a358c24fa3f83a9a9c225fbbab9891752bfb01e1566c0d2c8a",
+        "blob": "8f3c58b4adaf8698428a4caf38e11288907110dc"
+      },
+      {
+        "path": "packages/daemon/test/mikka-mcp-bridge.test.ts",
+        "bytes": 11020,
+        "sha256": "2b988d110fc38fba5324f67edda588dac54511609ecf9e3aaaab4f4c49ca5c51",
+        "blob": "81dc17cc151b67b155ab062148d3639112f3ed39"
+      },
+      {
+        "path": "apps/api/runtime/request-trace.test.ts",
+        "bytes": 4338,
+        "sha256": "18f00c59d779e192a814ab18fad5c8c8ba870e5671194bd627f051526d2bd359",
+        "blob": "e20f58e68b374845b2f72af02706a668f52728f8"
+      }
+    ],
+    "refUpdated": false
+  },
+  "replayCommit": {
+    "sha": "d5a30ce73b839c01ec01b25a2bc534ce6214c76b",
+    "tree": "1dc888a6b03cecf1a366ab622c06ae718d50945d",
+    "parent": "1778978c93e3bdac87c13048108720d0f763d821",
+    "files": [
+      {
+        "path": "lib/replay-readiness.ts",
+        "gitBlob": "899a9dcf33af282913c3e25c99b0826566b2c56b",
+        "bytes": 3291,
+        "sha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd"
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "gitBlob": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+        "bytes": 2360,
+        "sha256": "f306b61971a1cc3c7501ca4623d733fa5cbd60e3a586d7b2f3a91190af07b854"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "gitBlob": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+        "bytes": 24958,
+        "sha256": "c859d81c3dcac798efee6d9d89dd5a5412d72c1b85b9737568aaac73cefb89cf"
+      },
+      {
+        "path": "tests/replay-readiness.test.mjs",
+        "gitBlob": "2c67bead9d3d211e58dd6a7a684d60139d7df16c",
+        "bytes": 6214,
+        "sha256": "17fd9075fce07d1be5beaf0ce8049e04251c5ae618d878ad684e7b466ffbd053"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "gitBlob": "58170f27b9586752ca966e377c9255ac6e6174a9",
+        "bytes": 26414,
+        "sha256": "48acfc7dfeba2c9bf673f1d4765578f59dda00f50307978d4f11d0dedcfe25ff"
+      },
+      {
+        "path": "package.json",
+        "gitBlob": "89050f8b787d469b11ea26813e0404aa088a40ef",
+        "bytes": 77859,
+        "sha256": "55d18a801e68e1ea92a12ecccda54d14e05c6bd63ca716e3faa5a1ad31b5eb1a"
+      }
+    ],
+    "refUpdated": false
+  },
+  "merge": {
+    "sha": "cebf41d4a6b114371964af044372aa8192c08526",
+    "tree": "c50f74f3efd0a090a86074e6d0600897701ea182",
+    "parents": [
+      "d5a30ce73b839c01ec01b25a2bc534ce6214c76b",
+      "ad7f0d0434e7d4a2527d868c4830d009b28a9d7f"
+    ],
+    "mcp": "1778978c93e3bdac87c13048108720d0f763d821",
+    "replay": "d5a30ce73b839c01ec01b25a2bc534ce6214c76b",
+    "sourceFiles": [
+      {
+        "path": "app/api/mobile/model/route.ts",
+        "sha": "3dafb8efb5792af91aaa26a386e9426a9a2478a6",
+        "status": "modified",
+        "additions": 17,
+        "deletions": 1
+      },
+      {
+        "path": "apps/api/runtime/request-trace.test.ts",
+        "sha": "e20f58e68b374845b2f72af02706a668f52728f8",
+        "status": "added",
+        "additions": 66,
+        "deletions": 0
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "sha": "e9e60ee1555658b49cc4336b426c07156e96bfbe",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "sha": "5856e85262e22354ffafb88d7cd60e4a94d1a29c",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 1
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.test.mjs",
+        "sha": "034972a235975d43eb2e002a7556c79dc120bc99",
+        "status": "modified",
+        "additions": 21,
+        "deletions": 4
+      },
+      {
+        "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+        "sha": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 0
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "sha": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+        "status": "modified",
+        "additions": 8,
+        "deletions": 1
+      },
+      {
+        "path": "lib/bot-model-menu.db.test.ts",
+        "sha": "f3d04df0373b052ec72d64aacb1b945959e07ef6",
+        "status": "modified",
+        "additions": 82,
+        "deletions": 0
+      },
+      {
+        "path": "lib/bot-model-menu.ts",
+        "sha": "aff4957d4e8f07898a9dfba505a5fc439ac0d757",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 3
+      },
+      {
+        "path": "lib/execution-settings.db.test.ts",
+        "sha": "196306ec7fbe25a8b4ffb8a1b8da9ceace8ee679",
+        "status": "modified",
+        "additions": 57,
+        "deletions": 2
+      },
+      {
+        "path": "lib/execution-settings.ts",
+        "sha": "4d90d7038808bdf8c119fbf65c416eb94b0152a9",
+        "status": "modified",
+        "additions": 38,
+        "deletions": 2
+      },
+      {
+        "path": "lib/live/list-read.ts",
+        "sha": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1
+      },
+      {
+        "path": "lib/preferences.ts",
+        "sha": "0a01960901e60bd66cf86e1a6733e2dc0e953c15",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 7
+      },
+      {
+        "path": "lib/replay-readiness.ts",
+        "sha": "899a9dcf33af282913c3e25c99b0826566b2c56b",
+        "status": "added",
+        "additions": 69,
+        "deletions": 0
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "sha": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+        "status": "modified",
+        "additions": 24,
+        "deletions": 0
+      },
+      {
+        "path": "package.json",
+        "sha": "89050f8b787d469b11ea26813e0404aa088a40ef",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-backend.d.mts",
+        "sha": "02cf186cbe1fa97af6f673123e78ddfb920823fa",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0
+      },
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+        "sha": "308c9ed7ab78b636876fd661b55d36dd61b478d2",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 1
+      },
+      {
+        "path": "packages/daemon/src/agents/mikka-mcp.mjs",
+        "sha": "e314a1c43ac0749a5a773bcef2be02a976fc166f",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 0
+      },
+      {
+        "path": "packages/daemon/src/agents/run-apps.ts",
+        "sha": "d8e80f54dd7e24999ea3038f6d645023e5135d7b",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 3
+      },
+      {
+        "path": "packages/daemon/src/agents/run-context.ts",
+        "sha": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 3
+      },
+      {
+        "path": "packages/daemon/src/runs/supervisor.ts",
+        "sha": "be6dfe96d511232ca4d758b432ca7045df4be65e",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 2
+      },
+      {
+        "path": "packages/daemon/test/mikka-mcp-bridge.test.ts",
+        "sha": "81dc17cc151b67b155ab062148d3639112f3ed39",
+        "status": "modified",
+        "additions": 67,
+        "deletions": 0
+      },
+      {
+        "path": "packages/daemon/test/project-decisions.test.ts",
+        "sha": "8f3c58b4adaf8698428a4caf38e11288907110dc",
+        "status": "modified",
+        "additions": 61,
+        "deletions": 6
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "sha": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+        "status": "modified",
+        "additions": 42,
+        "deletions": 1
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "sha": "58170f27b9586752ca966e377c9255ac6e6174a9",
+        "status": "modified",
+        "additions": 95,
+        "deletions": 1
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "sha": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+        "status": "modified",
+        "additions": 58,
+        "deletions": 15
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "sha": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d",
+        "status": "modified",
+        "additions": 153,
+        "deletions": 5
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "sha": "a01974956bc21284a3ec0319cd20cdddbf0df420",
+        "status": "modified",
+        "additions": 97,
+        "deletions": 6
+      },
+      {
+        "path": "tests/desktop-session-cache.db.test.ts",
+        "sha": "8325fadbe9f3ba5f942f67dcfdb857c1ee0eeb1f",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2
+      },
+      {
+        "path": "tests/replay-readiness.test.mjs",
+        "sha": "2c67bead9d3d211e58dd6a7a684d60139d7df16c",
+        "status": "added",
+        "additions": 120,
+        "deletions": 0
+      },
+      {
+        "path": "tests/settings-preferences.db.test.ts",
+        "sha": "3b54cf58a62eccae2517426e87a52e40336f9f00",
+        "status": "modified",
+        "additions": 59,
+        "deletions": 0
+      }
+    ],
+    "upstreamFiles": [
+      {
+        "path": "apps/mobile/README.md",
+        "sha": "92483dba4c583c393b2a7cebc010d94ea3671434"
+      },
+      {
+        "path": "apps/mobile/app/_layout.tsx",
+        "sha": "a71a4df451d8364e8fb3b52f47160af15e73138c"
+      },
+      {
+        "path": "apps/mobile/lib/push.ts",
+        "sha": "7661e83dfea252d1d63bc4004b9fa2f47b7f62fc"
+      },
+      {
+        "path": "apps/mobile/tests/server-push.test.mts",
+        "sha": "69f06d14f3b1ff58354a98821f3f59ceb6214d90"
+      }
+    ],
+    "refUpdated": false
+  },
+  "initialWorkflows": [
+    {
+      "id": 42428110625,
+      "name": "Local device Node 22",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110634,
+      "name": "Self-hosted image",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110618,
+      "name": "E2B additive runtime release",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110600,
+      "name": "CI",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110594,
+      "name": "Browser gate",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110592,
+      "name": "Unattended sandbox acceptance",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110595,
+      "name": "Desktop shell",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110590,
+      "name": "Cloud computer backend",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110650,
+      "name": "Site search read contract",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110617,
+      "name": "Device gateway",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110598,
+      "name": "E2B subscription custody",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110607,
+      "name": "SSH device backend",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110622,
+      "name": "Analytics SSR",
+      "status": "queued",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    },
+    {
+      "id": 42428110597,
+      "name": "Read cache API acceptance",
+      "status": "in_progress",
+      "conclusion": null,
+      "createdAt": "2026-11-08T00:04:50Z"
+    }
+  ],
+  "pr": 1675,
+  "productionMerged": false,
+  "productionModelCalls": 0,
+  "priorNative": {
+    "source": "b7a4f22fde3107471ba8ff68b121ee87c18682d9",
+    "login": [
+      210,
+      210
+    ],
+    "firstStartup": [
+      181,
+      194
+    ],
+    "evidence": "https://github.com/alexj11324/Mikka/blob/b20c9c0582281710773b5509a68c54a0be8e8116/docs/operations/evidence/1512-raw/desktop-fa2830/index.json",
+    "notTransferredToCebf": true
+  },
+  "dataSource": "Exact Git object comparisons and authoritative ref readback; the first immediate PR GET was stale and was read again, without repeating the ref mutation."
+}

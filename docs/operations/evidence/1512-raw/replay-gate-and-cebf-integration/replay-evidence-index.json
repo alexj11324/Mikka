@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "base_commit": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "source_manifest": {
+    "name": "replay-gate-source-manifest.json",
+    "git_blob_sha": "6289706a6b278977940958f0f67fe4f3c37a5287",
+    "utf8_bytes": 1916,
+    "sha256": "7753e7909566d68159353da8b7dd8e9e2ba2b51b107092b534aa72e3eb6522d5"
+  },
+  "source_files": [
+    {
+      "path": "lib/replay-readiness.ts",
+      "git_blob_sha": "899a9dcf33af282913c3e25c99b0826566b2c56b",
+      "utf8_bytes": 3291,
+      "sha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "git_blob_sha": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+      "utf8_bytes": 2360,
+      "sha256": "f306b61971a1cc3c7501ca4623d733fa5cbd60e3a586d7b2f3a91190af07b854"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "git_blob_sha": "0ed07cf1751a0fc2885109201caf89cda71f704b",
+      "utf8_bytes": 24958,
+      "sha256": "c859d81c3dcac798efee6d9d89dd5a5412d72c1b85b9737568aaac73cefb89cf"
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "git_blob_sha": "2c67bead9d3d211e58dd6a7a684d60139d7df16c",
+      "utf8_bytes": 6214,
+      "sha256": "17fd9075fce07d1be5beaf0ce8049e04251c5ae618d878ad684e7b466ffbd053"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "git_blob_sha": "58170f27b9586752ca966e377c9255ac6e6174a9",
+      "utf8_bytes": 26414,
+      "sha256": "48acfc7dfeba2c9bf673f1d4765578f59dda00f50307978d4f11d0dedcfe25ff"
+    }
+  ],
+  "evidence_files": [
+    {
+      "name": "replay-gate-red.log",
+      "utf8_bytes": 6393,
+      "sha256": "96653eb13fbfe6fb59d2ddfd7005ab5e68f92059daa0972462654635ff33966a",
+      "git_blob_sha": "8020294be883d77a810fa7783f0168ccf8c95f6f"
+    },
+    {
+      "name": "replay-gate-green-initial.log",
+      "utf8_bytes": 7138,
+      "sha256": "7a07393fd807426c631588736a3a14604dbc2b25420765ae1b57f5bf79999c35",
+      "git_blob_sha": "365f1b4e5563d089e214647633db0f5e05eacce0"
+    },
+    {
+      "name": "replay-gate-green.log",
+      "utf8_bytes": 6146,
+      "sha256": "7f93c28cf488a35bfb9229ab3c9ffde0c899df18c55fe242d0555b795a35ef39",
+      "git_blob_sha": "c95370ba3863df74544ea9662b2aaacdb9aeb1f7"
+    },
+    {
+      "name": "replay-gate-types.log",
+      "utf8_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "name": "replay-gate-benchmark.json",
+      "utf8_bytes": 1386,
+      "sha256": "f45ecd0deecc1a136ca65d62d47b01f64c51cf55575b6c98227a0fff7d14f48b",
+      "git_blob_sha": "9638f496609db7ca448911f1df6e0d21842c98c2"
+    },
+    {
+      "name": "replay-gate-benchmark.mjs",
+      "utf8_bytes": 2500,
+      "sha256": "fc047363c9f815368f72cb222d314f33646c4f97a2020d653258f114b0a4fa46",
+      "git_blob_sha": "73cb762e6caecce37760c5587665dc71e3f5872b"
+    },
+    {
+      "name": "replay-gate-source-check.json",
+      "utf8_bytes": 3004,
+      "sha256": "0e233d169e019dc96ef1f98a6e3e2b0827171693e20c28eedb78c47ee9389112",
+      "git_blob_sha": "e54aafca89f4465bf678bd72eb1f2178c0485183"
+    },
+    {
+      "name": "replay-gate-sdk-contract.json",
+      "git_blob_sha": "06eb42dcadee87d00f1d6d70dfda5e215daf48c1",
+      "utf8_bytes": 3918,
+      "sha256": "7ae83820b7e5074397680983bc2a02a4bfd36e7bb2a3987181161ef40b9ad7a6"
+    },
+    {
+      "name": "replay-gate-workflow-compatibility.json",
+      "git_blob_sha": "6d95a46c5fa9a0d4fa17bdd4f4b68e578be83992",
+      "utf8_bytes": 1688,
+      "sha256": "1afc790339c76c2e2bae37ac8a402d6580308126d8e759650af54d266c688c57"
+    },
+    {
+      "name": "replay-gate-cleanup.json",
+      "git_blob_sha": "803b5ec1118ab79400b6ae43a7d3574a5eb018b6",
+      "utf8_bytes": 1456,
+      "sha256": "f56831be2067c5477a52dc2e16f5a7d976f5f542caa8ce6e9f2ed3dc6a6c0a2e"
+    },
+    {
+      "name": "replay-gate-final-receipt.json",
+      "git_blob_sha": "83f229593fd61d376bcc9ec66c7b455004e49e03",
+      "utf8_bytes": 11958,
+      "sha256": "74e646dd789dfadf69fab4bec4d675bbb1788d460dcec38526f28c895a2a1dfd"
+    }
+  ],
+  "related_preparation": {
+    "readiness_receipt_blob": "811d3b3e5dbe01cf1bc43e57e619f80ab72c4453",
+    "presubmit_source_review_blob": "d02a92698954b885649454e6814b626a86662d6d"
+  },
+  "archive_owner": "root; no ref updated by this subtask",
+  "all_resources_stopped": true
+}

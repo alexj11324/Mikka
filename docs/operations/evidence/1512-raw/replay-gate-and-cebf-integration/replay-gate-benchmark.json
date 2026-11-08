@@ -1,0 +1,43 @@
+{
+  "kind": "readonly_replay_observer_microbenchmark",
+  "source_revision": "fa2830e0576233d8de54f72eec56ec74b4ca95d1_plus_frozen_patch",
+  "source_sha256": "631dd02d31a88cf879b4f4ed919ca0b6210347ef8aab6a9c67ec93bd1b2352fd",
+  "node": "v24.22.1",
+  "platform": "linux",
+  "vcpus": 1,
+  "memory_mb": 2048,
+  "network": "deny-all",
+  "fixture": "closed synthetic metadata only; no snapshot body",
+  "warmup_per_path": 5000,
+  "measurements": [
+    {
+      "name": "ordinary_event_fast_return",
+      "samples": 1000,
+      "observations_per_sample": 128,
+      "p50_ms": 9.296875e-7,
+      "p95_ms": 0.000021359375,
+      "p99_ms": 0.0000243046875,
+      "max_ms": 0.0044335546875
+    },
+    {
+      "name": "snapshot_same_session",
+      "samples": 1000,
+      "observations_per_sample": 128,
+      "p50_ms": 0.000098921875,
+      "p95_ms": 0.00019740625,
+      "p99_ms": 0.000342109375,
+      "max_ms": 0.0315726328125
+    },
+    {
+      "name": "snapshot_session_changes",
+      "samples": 1000,
+      "observations_per_sample": 128,
+      "p50_ms": 0.0001491015625,
+      "p95_ms": 0.000171875,
+      "p99_ms": 0.000294546875,
+      "max_ms": 0.0315694296875
+    }
+  ],
+  "measured_at_utc": "2026-11-07T23:56:29.653Z",
+  "scope": "Only added observer function calls; batch timer amortization, no network, SDK transport, real browser, model, end-to-end or production latency claim."
+}

@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-main-ad7-readonly-integration-review",
+  "reviewedAt": "2026-11-08 00:02:32 UTC",
+  "repository": "alexj11324/Mikka",
+  "base": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+  "main": "ad7f0d0434e7d4a2527d868c4830d009b28a9d7f",
+  "mainTree": "edd45728cc7316610725dd986639864475f8e929",
+  "mainParents": [
+    "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "47c0d17fcb6311d7f2f5037a988d39422d4b3a83"
+  ],
+  "pullRequest": {
+    "number": 1685,
+    "title": "iOS：每个新会话都重新登记推送 token（#1659）",
+    "head": "47c0d17fcb6311d7f2f5037a988d39422d4b3a83",
+    "mergedAt": "2026-11-07T23:52:37Z"
+  },
+  "completeComparison": {
+    "status": "ahead",
+    "mergeBase": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "commits": [
+      {
+        "sha": "47c0d17fcb6311d7f2f5037a988d39422d4b3a83",
+        "parents": [
+          "9ea7b2cd61deb724f20330906f86df6df2cd9828"
+        ],
+        "subject": "fix(mobile): register the push token again for each new session (#1659)"
+      },
+      {
+        "sha": "ad7f0d0434e7d4a2527d868c4830d009b28a9d7f",
+        "parents": [
+          "0479675e188efeac341b207d8616c4d7b9d4ee23",
+          "47c0d17fcb6311d7f2f5037a988d39422d4b3a83"
+        ],
+        "subject": "Merge pull request #1685 from alexj11324/fix/1659-push-session"
+      }
+    ],
+    "totalCommits": 2,
+    "fileCount": 4,
+    "additions": 116,
+    "deletions": 11,
+    "files": [
+      {
+        "path": "apps/mobile/README.md",
+        "status": "modified",
+        "blob": "92483dba4c583c393b2a7cebc010d94ea3671434",
+        "additions": 8,
+        "deletions": 0
+      },
+      {
+        "path": "apps/mobile/app/_layout.tsx",
+        "status": "modified",
+        "blob": "a71a4df451d8364e8fb3b52f47160af15e73138c",
+        "additions": 10,
+        "deletions": 2
+      },
+      {
+        "path": "apps/mobile/lib/push.ts",
+        "status": "modified",
+        "blob": "7661e83dfea252d1d63bc4004b9fa2f47b7f62fc",
+        "additions": 30,
+        "deletions": 8
+      },
+      {
+        "path": "apps/mobile/tests/server-push.test.mts",
+        "status": "modified",
+        "blob": "69f06d14f3b1ff58354a98821f3f59ceb6214d90",
+        "additions": 68,
+        "deletions": 1
+      }
+    ]
+  },
+  "currentCandidate": {
+    "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+    "ownFiles": 17,
+    "mcpHead": "1778978c93e3bdac87c13048108720d0f763d821",
+    "mcpTree": "4080683e646f22a46c4e0d488d5ba04b98311025",
+    "mcpParents": [
+      "fa2830e0576233d8de54f72eec56ec74b4ca95d1"
+    ],
+    "mcpFiles": 9,
+    "totalCandidatePaths": 26
+  },
+  "intersections": {
+    "mainChanges": 4,
+    "faFiles": 17,
+    "mcpFiles": 9,
+    "intersections": [],
+    "renamesOrDeletes": [],
+    "candidateNetFiles": 26
+  },
+  "compatibility": [
+    {
+      "scope": "Native query measurement and renderer",
+      "conclusion": "unchanged_by_ad7",
+      "evidence": "Complete four-file delta changes only apps/mobile; no desktop lifecycle, counter, 17-operation, 78-source, batch dispatch or SWR/Live source changes."
+    },
+    {
+      "scope": "Authentication",
+      "conclusion": "mobile_push_confirmation_only",
+      "evidence": "PushSetup observes the mobile session ID in memory. Existing POST body is unchanged; no Desktop auth/PKCE/shared server session or owner-authority source changes. Mobile web platform returns before native push effects."
+    },
+    {
+      "scope": "Runtime and worker",
+      "conclusion": "worker_hash_inputs_identical_between_047_and_ad7",
+      "evidence": "worker_hash consumes WORKER_PATHS and RECIPE_PATHS. Both exclude apps/mobile; package and lock projections are unchanged. Equality follows from identical selected input blobs; no build or hash command was run."
+    },
+    {
+      "scope": "Telemetry",
+      "conclusion": "unchanged_by_ad7",
+      "evidence": "No tracing, AI analytics, request scope, Replay, log or W3C carrier code changed."
+    },
+    {
+      "scope": "New network behavior",
+      "conclusion": "mobile_events_only",
+      "evidence": "A successful native phone push registration is confirmed per account/session/token for 12 hours. Sign-in, changed session or return-to-front may repeat the existing POST; no timer or polling is introduced."
+    }
+  ],
+  "mergePlan": {
+    "firstParent": "1778978c93e3bdac87c13048108720d0f763d821",
+    "secondParent": "ad7f0d0434e7d4a2527d868c4830d009b28a9d7f",
+    "mergeBase": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "textualPathConflict": false,
+    "renamesOrDeletes": false,
+    "preserveMcpCandidatePaths": 26,
+    "applyExactUpstreamMobileBlobs": 4,
+    "expectedNetPathsAgainstAd7BeforeReplay": 26,
+    "refsOrObjectsCreated": false,
+    "remaining": "Replay five-file candidate was not supplied; include its exact frozen paths/blobs in the final overlay review."
+  },
+  "gates": {
+    "ad7AloneDoesNotRequireAnAdditionalNativeRun": true,
+    "historicalNativeBudgetBinding": "fa283 / b7a4f22 only; no result transplanted into an unexecuted merge tree",
+    "mcpChangesWorkerSource": true,
+    "mcpAndReplayValidation": "decide from the final candidate source and normal CI; no reruns were started",
+    "mainPublishersMustReachTerminalBeforeMerge": true,
+    "old047E2B": {
+      "runId": 42423534091,
+      "status": "queued",
+      "conclusion": null,
+      "updatedAt": "2026-11-07T23:59:02Z"
+    }
+  },
+  "cachedPullRequestMetadata": {
+    "head": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+    "base": "0479675e188efeac341b207d8616c4d7b9d4ee23",
+    "mergeable": true,
+    "mergeState": "clean",
+    "note": "Returned base still 047; not used as proof of the unpublished MCP/ad7 merge."
+  },
+  "sourceReadback": [
+    {
+      "path": "scripts/e2b/build-template.py",
+      "bytes": 52122,
+      "sha256": "506a779375e088a62b3a795862228f9e606443e09d468efd4a2047c8e1c72dae",
+      "gitBlob": "9364dae974bb74ec636e87795670a8cd4d30b415"
+    },
+    {
+      "path": ".github/workflows/e2b-template.yml",
+      "bytes": 5492,
+      "sha256": "b7ddc06e28f0bc09ec0a01d2c7f01793bc6ccff66f63f204ac064596e0c2d676",
+      "gitBlob": "bb948480beac3370335dd4b8ce59a01e6becf1f0"
+    },
+    {
+      "path": "apps/mobile/lib/push.ts",
+      "bytes": 7864,
+      "sha256": "ae2114a5b00eb50f7f68f831f50864bc646bf882aac97f461a684eaff2863a67",
+      "gitBlob": "7661e83dfea252d1d63bc4004b9fa2f47b7f62fc"
+    },
+    {
+      "path": "apps/mobile/app/_layout.tsx",
+      "bytes": 6100,
+      "sha256": "41911897f113a3bc1ebff8a672ae66fca7b1906f4c325e189243d29867104c47",
+      "gitBlob": "a71a4df451d8364e8fb3b52f47160af15e73138c"
+    }
+  ],
+  "actualWork": {
+    "readOnly": true,
+    "gitRefsChanged": false,
+    "gitObjectsCreated": false,
+    "testsRun": 0,
+    "NativeRunsStarted": 0,
+    "modelsCalled": 0,
+    "newResources": 0
+  }
+}

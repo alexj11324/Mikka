@@ -1,0 +1,36 @@
+{
+  "kind": "browser_receipt_compatibility_review",
+  "base": "fa2830e0576233d8de54f72eec56ec74b4ca95d1",
+  "new_fields": [
+    "stage=replay",
+    "replay"
+  ],
+  "sources": [
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "blob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+      "bytes": 11693,
+      "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "blob": "f83fe9042319ae5d3db6fc98a584fa46e51c83c5",
+      "bytes": 9483,
+      "sha256": "651759b28ff4275074ebc4a68a5fd3fbb043bc51608aa491f7ebb211c1cf6fa4"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "blob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01"
+    }
+  ],
+  "findings": [
+    "The workflow wrapper validates only the driver's READY IPC payload and uses the actor's close handle; it does not parse the actor receipt or restrict actor stages.",
+    "The GitHub workflow uploads browser-actor.receipt.json directly; no JSON field projection or stage whitelist is applied.",
+    "The business driver's taskStages and receipt constraints concern Factory/business evidence, not the browser actor receipt."
+  ],
+  "additional_allowlist_changes_needed": false,
+  "scope_limit": "No assertion about a repository-external custom artifact reader.",
+  "test_registration": "Root identified and will append tests/replay-readiness.test.mjs to the existing test:analytics script as a separate sixth file. This subtask's five tested source blobs remain unchanged."
+}

@@ -1,0 +1,93 @@
+{
+  "kind": "pinned_sdk_source_and_type_contract",
+  "sdk": "posthog-js",
+  "version": "1.438.13",
+  "source_files": [
+    {
+      "file": "posthog-core.js",
+      "bytes": 237661,
+      "sha256": "c86f90a4f27932e87d59fccb0ab321e23c64c4e957cf5a1c1ccbfc6e810a5757"
+    },
+    {
+      "file": "posthog-core.d.ts",
+      "bytes": 77410,
+      "sha256": "b90278e984092779f5c50df62007fa38968de685a98f5ce769a2237ef1694983"
+    },
+    {
+      "file": "sessionid.js",
+      "bytes": 29518,
+      "sha256": "91674a860818b76769759555ce8f3d1e53986a578aba541e9593459b819d3bef"
+    },
+    {
+      "file": "extensions/replay/session-recording.js",
+      "bytes": 28557,
+      "sha256": "5edd376a583ce3138651fccb91fbca14afd08052c23ad3f15ddd1dc8aa533e4e"
+    },
+    {
+      "file": "extensions/replay/external/lazy-loaded-session-recorder.js",
+      "bytes": 155410,
+      "sha256": "b7c5ecb37684f6134e4e258708ddfb3ec0a256f27c34d11fea53658ee4d6c7c3"
+    }
+  ],
+  "official_skill": "posthog:diagnosing-missing-recordings",
+  "official_docs": [
+    "https://posthog.com/docs/references/posthog-js/types/PostHogInterface",
+    "https://posthog.com/docs/libraries/js/usage#session-replay",
+    "https://posthog.com/docs/libraries/js/usage#amending-or-sampling-events",
+    "https://posthog.com/docs/session-replay/troubleshooting"
+  ],
+  "verified_source_contracts": [
+    {
+      "file": "sessionid.js",
+      "line": 130,
+      "claim": "onSessionId appends an observer, immediately invokes it with an existing _sessionId/_windowId, and returns unsubscribe. It does not allocate a session ID."
+    },
+    {
+      "file": "posthog-core.js",
+      "line": 2577,
+      "claim": "Public onSessionId delegates to the existing session manager, returning a noop unsubscribe when absent."
+    },
+    {
+      "file": "posthog-core.js",
+      "line": 3906,
+      "claim": "sessionRecordingStarted returns the boolean state of sessionRecording.started without starting or changing it."
+    },
+    {
+      "file": "extensions/replay/session-recording.js",
+      "line": 99,
+      "claim": "The started getter reads the lazy recorder's isStarted."
+    },
+    {
+      "file": "extensions/replay/external/lazy-loaded-session-recorder.js",
+      "line": 2223,
+      "claim": "The recorder submits $snapshot through the normal instance.capture path with a Replay endpoint and batch key."
+    },
+    {
+      "file": "posthog-core.js",
+      "line": 1663,
+      "claim": "capture runs _runBeforeSend on event data; null drops the event, otherwise it continues with that returned value."
+    },
+    {
+      "file": "posthog-core.js",
+      "line": 4607,
+      "claim": "_runBeforeSend invokes configured hooks in order and honors null. The application still returns its existing sanitizer's result unchanged after observing only event name/session ID."
+    },
+    {
+      "file": "posthog-core.js",
+      "line": 3620,
+      "claim": "get_session_id delegates to checkAndGetSessionAndWindowId(true); the patch does not call it, relying on naturally observed IDs."
+    }
+  ],
+  "types": {
+    "command": "node <sdk>/node_modules/typescript/bin/tsc --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions --lib ES2022,DOM <sdk>/replay-sdk-contract.ts",
+    "test_shape": "declare client: PostHog; installReplayReadiness({}).bind(client)",
+    "typescript": "5.9.3",
+    "exit": 0,
+    "full_repo_typecheck": false
+  },
+  "upload_acknowledgement": {
+    "value": null,
+    "reason": "No inspected public response contract reliably binds a /s/ acknowledgement to the current opaque session without reading body. A response merely close in time is not used as proof."
+  },
+  "test_scope": "Real installed SDK sources and declaration compatibility; fake SDK/DOM unit fixtures execute the actual bridge/serialized actor callback. No real browser recorder or upstream ingestion was exercised."
+}
