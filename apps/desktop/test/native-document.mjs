@@ -21,6 +21,19 @@ export async function waitForBundledDocument(page, { timeout = 60_000 } = {}) {
   await page.waitForFunction(() => Boolean(window.mikka?.bundled), undefined, { timeout })
 }
 
+/** Switching workspace deliberately reloads the same route after its RPC and
+ * cache cleanup. The old URL and visible composer can already match readiness.
+ * Arm the new document's event before clicking; inherit the existing page
+ * timeout and keep the ordinary no-op when this menu item is already current. */
+export async function selectWorkspaceMenuItem(page, item) {
+  await page.waitForLoadState('domcontentloaded')
+  if (await item.getAttribute('aria-current') === 'true') {
+    await item.click()
+    return
+  }
+  await Promise.all([page.waitForEvent('domcontentloaded'), item.click()])
+}
+
 const route = value => {
   if (value === 'about:blank') return 'blank'
   try {

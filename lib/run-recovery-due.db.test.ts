@@ -14,7 +14,7 @@ const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Run recovery tests require matching isolated loopback _e2e URLs')
 
-const TABLES = ['agent_runs', 'devices', 'cloud_machines', 'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns',
+const TABLES = ['coding_review_sessions', 'agent_runs', 'devices', 'cloud_machines', 'thread_machines', 'issues', 'sandbox_kill_retries', 'group_turns',
   'group_task_bindings', 'factory_tasks', 'factory_attempts', 'factory_events', 'factory_deliverable_acceptances', 'factory_candidates', 'factory_merges']
 
 test('run-recovery due times match what each sweep selects', { skip: !valid }, async t => {
@@ -39,6 +39,21 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
 
   await t.test('an idle database has nothing due, so no timer runs', async () => {
     assert.equal(await due(), null)
+  })
+
+  await t.test('review absolute expiry and unacknowledged close use the existing earliest due time', async () => {
+    const deadline = new Date(Date.now() + 120_000), id = randomUUID()
+    await pool.query(`INSERT INTO coding_review_sessions (id,kind,"taskId","runId","ownerId","workspaceId","deviceId","repoId","deviceTokenId",
+      "bindingId","sandboxId","machineEpoch","machineOperationId","credentialKind","credentialId","expiresAt")
+      VALUES($1,'preview',$2,$3,'owner',$4,$5,$6,$7,$8,'review-vm',1,$9,'session','fixture-session',$10)`,
+    [id, randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID(), 'a'.repeat(64), randomUUID(), deadline])
+    assert.equal(await due(), deadline.getTime())
+    const retry = new Date(Date.now() - 1_000)
+    await pool.query('UPDATE coding_review_sessions SET "revokedAt"=clock_timestamp(),reason=\'credential_revoked\',"retryAt"=$2 WHERE id=$1', [id, retry])
+    assert.equal(await due(), retry.getTime())
+    assert.deepEqual([...(await runRecoveryDueSweeps(pool, { factoryLifecycle: false })).due], ['reviewSessions'])
+    await clear()
+    assert.equal(await due(), null, 'no review row leaves an idle polling deadline')
   })
 
   await t.test('a leased run is due one millisecond after its lease (the sweep selects leaseExpiresAt < now)', async () => {

@@ -3,6 +3,18 @@ import { lstat, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
+import { selectWorkspaceMenuItem } from './native-document.mjs'
+
+export async function selectParityWorkspace(page, { menuName, workspaceName, basePath }) {
+  await page.getByRole('button', { name: menuName, exact: true }).first().click()
+  const item = page.getByRole('menuitem', { name: workspaceName, exact: false })
+  // A switch assigns the same /en URL after its action finishes. The old URL
+  // and ready DOM are not proof that the new document has loaded. An already
+  // selected item is a product no-op and only closes its menu.
+  await selectWorkspaceMenuItem(page, item)
+  await page.waitForURL(url => url.pathname === `${basePath}/en` || url.pathname === `${basePath}/en/`)
+  await page.getByRole('button', { name: menuName, exact: true }).first().waitFor()
+}
 
 // The build publishes the exact action name beside its ID. Observe that real
 // transport only for reads whose successful empty state has no DOM of its own.
@@ -91,7 +103,7 @@ export function pageReadRequirements(name) {
   return []
 }
 
-export async function pageReady(page, name, fixture, messages, observed = {}) {
+export async function pageReady(page, name, fixture, messages, _observed = {}) {
   const text = value => page.getByText(value, { exact: true }).first().waitFor()
   const threadRows = async root => {
     const resolved = root.getByRole('button', { name: messages.Shell.threads.group.resolved.replace('{count}', '1'), exact: true })

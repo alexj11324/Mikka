@@ -1,0 +1,619 @@
+"""Build/clean two private review candidates; never publish a template.
+
+The checkout source and GitHub/OIDC carrier identity are distinct. Reuse the
+release builder without changing either context or its eventual release gate.
+The trusted runner's 0600 journal precedes creation; no Secret or SDK error
+text is retained. Successful templates remain for the subsequent acceptance
+driver, whose always step invokes cleanup with the same source/output.
+"""
+import argparse
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+from urllib.error import HTTPError
+from uuid import uuid4
+
+HERE = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location('workspace_candidate_builder', HERE / 'build-template.py')
+builder = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(builder)
+KINDS = ('claude', 'codex')
+JOURNAL = 'creation-journal.json'
+MAX_JOURNAL_BYTES = 65_536
+ID = re.compile(r'[A-Za-z0-9_-]{1,128}')
+BUILD_CREATED = re.compile(r'Template created with ID: ([A-Za-z0-9_-]{1,128}), Build ID: ([A-Za-z0-9_-]{1,128})')
+PROVIDER_OUTPUT = re.compile(r'\[(?:builder ([1-9][0-9]?)/([1-9][0-9]?)|start|ready)\] \[(?:stdout|stderr)\]: (.*)')
+BOOTSTRAP_PHASES = frozenset(('validation', 'source', 'node', 'gh', 'dependencies', 'build', 'cli',
+                             'journal', 'desktop', 'finalize'))
+INGRESS_DETAILS = frozenset(('listener', 'boot', 'identity', 'state', 'receipt', 'provider', 'command', 'tool',
+                             'backend', 'rule_order', 'late_install', 'worker', 'worker_order', 'operation', 'runtime'))
+HOST_ERRORS = frozenset(('official_cli_kind_invalid', 'official_cli_path_invalid', 'official_cli_baseline_mismatch',
+    'official_cli_missing', 'official_cli_manifest_invalid', 'runtime_cli_missing', 'cli_relocation_invalid',
+    'added_cli_paths_invalid', 'official_cli_changed', 'added_cli_path_invalid', 'official_cli_manifest_untrusted',
+    'runtime_cli_changed', 'runtime_cli_unavailable', 'official_cli_manifest_changed', 'e2b_finalization_policy_invalid',
+    'e2b_certificate_policy_invalid', 'official_conservation_invalid', 'official_manifest_invalid',
+    'official_files_removed', 'official_files_changed', 'e2b_certificate_target_invalid', 'terminal_control_install_refused'))
+ERROR_TYPES = frozenset(('CandidateError', 'Exception', 'RuntimeError', 'ValueError', 'TypeError', 'AssertionError',
+    'OSError', 'FileNotFoundError', 'PermissionError', 'FileExistsError', 'JSONDecodeError', 'TimeoutError',
+    'KeyboardInterrupt', 'SystemExit', 'CalledProcessError', 'TimeoutExpired', 'HTTPError', 'URLError',
+    'BuildException', 'FileUploadException', 'SandboxException', 'TemplateException', 'AuthenticationException',
+    'InvalidArgumentException', 'NotEnoughSpaceException', 'NotFoundException', 'TimeoutException',
+    'RateLimitException', 'ServiceBusyException', 'HTTPStatusError', 'RequestError', 'ConnectError', 'ReadError',
+    'WriteError', 'RemoteProtocolError', 'ConnectTimeout', 'ReadTimeout', 'WriteTimeout', 'PoolTimeout', 'UnexpectedStatus'))
+SDK_CODES = {'BuildException': 'template_build_failed', 'FileUploadException': 'template_upload_failed',
+             'AuthenticationException': 'provider_authentication_failed', 'RateLimitException': 'provider_rate_limited',
+             'ServiceBusyException': 'provider_busy', 'NotEnoughSpaceException': 'provider_disk_space',
+             'HTTPStatusError': 'provider_http_error', 'UnexpectedStatus': 'provider_http_error',
+             **dict.fromkeys(('TimeoutException', 'ConnectTimeout', 'ReadTimeout', 'WriteTimeout', 'PoolTimeout'), 'operation_timeout')}
+CANDIDATE_CODES = frozenset(('resource_identity_invalid', 'source_ref_invalid', 'source_ref_not_checkout_head',
+    'source_checkout_modified', 'workflow_identity_required', 'worker_identity_invalid', 'output_directory_invalid',
+    'output_file_invalid', 'creation_journal_invalid', 'creation_journal_missing', 'candidate_not_exact_private_template',
+    'candidate_name_mismatch', 'candidate_build_not_ready', 'probe_scope_mismatch', 'probe_identity_reused',
+    'probe_deletion_unconfirmed', 'sandbox_listing_limit', 'sandbox_scope_mismatch', 'sandbox_deletion_unconfirmed',
+    'candidate_attempt_already_recorded', 'candidate_preflight_failed', 'candidate_identity_mismatch',
+    'candidate_build_identity_missing', 'candidate_build_status_invalid', 'probe_cleanup_incomplete', 'candidate_build_failed', 'api_key_missing'))
+MAX_LOG_MESSAGE = 65_536
+MAX_LOG_EVENTS = 64
+
+
+class CandidateError(Exception):
+    """Only these host-authored codes cross the SDK boundary."""
+
+
+class Discard:
+    def write(self, value):
+        return len(value)
+
+    def flush(self):
+        pass
+
+
+@contextmanager
+def quiet_sdk():
+    with redirect_stdout(Discard()), redirect_stderr(Discard()):
+        yield
+
+
+def error_code(error):
+    if isinstance(error, CandidateError):
+        return error.args[0] if len(error.args) == 1 and isinstance(error.args[0], str) and error.args[0] in CANDIDATE_CODES else 'operation_failed'
+    if isinstance(error, HTTPError):
+        return 'provider_http_error'
+    if isinstance(error, (TimeoutError, KeyboardInterrupt)):
+        return 'operation_interrupted'
+    return SDK_CODES.get(type(error).__name__, 'operation_failed')
+
+
+def exception_diagnostic(error):
+    """Only fixed type names, codes and numeric statuses leave an exception."""
+    rows, seen = [], set()
+    while error is not None and id(error) not in seen and len(rows) < 8:
+        seen.add(id(error))
+        name = type(error).__name__
+        row = {'type': name if name in ERROR_TYPES else 'other', 'code': error_code(error)}
+        status = error.code if isinstance(error, HTTPError) else getattr(error, 'status_code', None)
+        if status is None:
+            status = getattr(getattr(error, 'response', None), 'status_code', None)
+        if isinstance(status, int) and not isinstance(status, bool) and 100 <= status <= 599:
+            row['httpStatus'] = int(status)
+        exit_code = getattr(error, 'exit_code', getattr(error, 'returncode', None))
+        if type(exit_code) is int and -255 <= exit_code <= 255:
+            row['exitCode'] = exit_code
+        rows.append(row)
+        error = error.__cause__ or (None if error.__suppress_context__ else error.__context__)
+    return {'exceptionChain': rows, 'exceptionChainTruncated': error is not None}
+
+
+class BuildDiagnostics:
+    """Consume the pinned SDK's public callback; retain no raw log messages.
+
+    Python E2B 2.62.0 emits its creation event before uploading/triggering the
+    build. Its background API returns later, and it has no public wait API.
+    Keeping Template.build therefore records IDs earlier without replacing
+    the SDK's existing wait/log-drain behavior or adding a polling loop.
+    """
+    def __init__(self, journal, output, kind):
+        self.journal, self.output, self.kind = journal, output, kind
+        self.value = {'entries': 0, 'ignoredLines': 0, 'oversizedEntries': 0, 'events': [], 'truncated': False}
+
+    def event(self, value):
+        if len(self.value['events']) < MAX_LOG_EVENTS:
+            self.value['events'].append(value)
+        else:
+            self.value['truncated'] = True
+
+    def __call__(self, entry):
+        self.value['entries'] += 1
+        message = getattr(entry, 'message', None)
+        if not isinstance(message, str) or len(message) > MAX_LOG_MESSAGE:
+            self.value['oversizedEntries'] += 1
+            return
+        created = BUILD_CREATED.fullmatch(message)
+        if created and getattr(entry, 'level', None) == 'info':
+            row = self.journal['templates'][self.kind]
+            identifiers = {'templateId': resource_id(created[1]), 'buildId': resource_id(created[2])}
+            if any(row.get(key, value) != value for key, value in identifiers.items()):
+                raise CandidateError('candidate_identity_mismatch')
+            # A single atomic 0600 write precedes the SDK's next upload or wait.
+            row.update(identifiers)
+            write_private(self.output / JOURNAL, self.journal)
+            self.event({'phase': 'template_created'})
+            return
+        for line in message.splitlines():
+            line = line.strip()
+            # runtime@438a79cf sandboxtools/command.go wraps process output in
+            # this fixed envelope. Strip it only after the SDK control-event
+            # check: guest stdout can never supply creation identities.
+            wrapped = PROVIDER_OUTPUT.fullmatch(line)
+            if wrapped and (wrapped[1] is None or int(wrapped[1]) <= int(wrapped[2])):
+                line = wrapped[3]
+            phase = re.fullmatch(r'mikka-bootstrap-phase ([a-z]+) ([0-9]{1,9})', line)
+            if phase and phase[1] in BOOTSTRAP_PHASES:
+                self.event({'phase': 'bootstrap', 'detail': phase[1], 'elapsedMs': int(phase[2])})
+                continue
+            failure = re.match(r'(?:ValueError|RuntimeError): ([a-z_]+)(?: |$)', line)
+            host_error = failure[1] if failure else line
+            if host_error in HOST_ERRORS:
+                self.event({'phase': 'host_failure', 'detail': host_error})
+                continue
+            # These receipts are emitted by the pinned ingress/conservation
+            # scripts. Extra fields, arbitrary paths and hashes are discarded.
+            try:
+                value = json.loads(line) if line.startswith('{') else None
+            except (ValueError, RecursionError):
+                value = None
+            if (isinstance(value, dict) and set(value) == {'ok', 'detail'} and value['ok'] is False
+                    and isinstance(value['detail'], str) and value['detail'] in INGRESS_DETAILS):
+                self.event({'phase': 'ingress', 'detail': value['detail']})
+            elif (isinstance(value, dict) and set(value) == {'entries', 'sha256'}
+                  and type(value['entries']) is int and 0 <= value['entries'] <= 10_000_000
+                  and isinstance(value['sha256'], str) and re.fullmatch(r'[a-f0-9]{64}', value['sha256'])):
+                self.event({'phase': 'official_capture', 'entries': value['entries']})
+            else:
+                self.value['ignoredLines'] += 1
+
+
+def build_diagnostic(error, logs):
+    return {**exception_diagnostic(error), 'buildLogs': {kind: log.value for kind, log in logs.items()}}
+
+
+def read_build_status(row, api_key):
+    """One bounded public SDK read, never a replacement for its build wait."""
+    from e2b import Template
+    from e2b.template.types import BuildInfo
+    build = BuildInfo(template_id=row['templateId'], build_id=row['buildId'], name=row['name'], alias=row['name'])
+    return Template.get_build_status(build, api_key=api_key, request_timeout=15)
+
+
+def source_step(step):
+    # runtime@438a79cf phases/steps/factory.go numbers Config.Steps with i+1;
+    # phases/utils.go serializes that number. SDK 2.62.0 uses it unchanged.
+    # Base/finalize have named steps, outside the numeric instruction range.
+    phases = ('base', 'workdir', 'private_directory', *(['copy_runtime'] * (len(builder.BOOTSTRAP_FILES) + 1)),
+              'official_capture', 'bootstrap', 'npm_runtime', 'official_verify', 'worker_user', 'finalize')
+    if step in ('base', 'finalize'):
+        return {'phase': step, 'index': None}
+    if isinstance(step, str) and re.fullmatch(r'[1-9][0-9]?', step) and int(step) < len(phases) - 1:
+        return {'phase': phases[int(step)], 'index': int(step)}
+    return {'phase': 'unknown', 'index': None}
+
+
+def reason_exit_code(message):
+    """Retain a single unambiguous numeric exit, never the reason/command."""
+    if not isinstance(message, str) or len(message) > MAX_LOG_MESSAGE:
+        return None
+    values = {int(value) for value in re.findall(r'\bexit (?:status|code):?\s+(-?[0-9]{1,3})(?=$|[\s,;)])', message, re.IGNORECASE)}
+    return next(iter(values)) if len(values) == 1 and all(-255 <= value <= 255 for value in values) else None
+
+
+def failed_build_status(row, api_key, log):
+    result = {'attempted': True, 'identityMatched': False}
+    try:
+        with quiet_sdk():
+            status = read_build_status(row, api_key)
+        if (getattr(status, 'template_id', None), getattr(status, 'build_id', None)) != (row['templateId'], row['buildId']):
+            raise CandidateError('candidate_identity_mismatch')
+        result['identityMatched'] = True
+        state = getattr(status, 'status', None)
+        state = getattr(state, 'value', state)
+        if state not in ('building', 'waiting', 'ready', 'error'):
+            raise CandidateError('candidate_build_status_invalid')
+        reason = getattr(status, 'reason', None)
+        entries = getattr(reason, 'log_entries', None)
+        entries = entries if isinstance(entries, list) else []
+        for entry in entries[:100]:
+            log(entry)
+        code = reason_exit_code(getattr(reason, 'message', None))
+        result.update(status=state, step=source_step(getattr(reason, 'step', None)), exitCode=code,
+                      exitCodeSource='provider_reason' if code is not None else None,
+                      reasonLogEntries=len(entries), reasonLogEntriesTruncated=len(entries) > 100)
+    except BaseException as error:
+        # This read must neither replace the original failure nor skip cleanup.
+        result['failure'] = exception_diagnostic(error)
+    return result
+
+
+def resource_id(value):
+    if not isinstance(value, str) or not ID.fullmatch(value):
+        raise CandidateError('resource_identity_invalid')
+    return value
+
+
+def identity(source_ref, environ):
+    if not re.fullmatch(r'[a-f0-9]{40}', source_ref or ''):
+        raise CandidateError('source_ref_invalid')
+    if builder.commit(source_ref) != source_ref or builder.commit('HEAD') != source_ref:
+        raise CandidateError('source_ref_not_checkout_head')
+    if subprocess.run(['git', 'diff', '--quiet', 'HEAD', '--'], cwd=builder.ROOT, check=False).returncode:
+        raise CandidateError('source_checkout_modified')
+    metadata = builder.release_metadata(environ)
+    if len(metadata) != 4 or any(len(metadata[key]) > 20 for key in ('runId', 'runAttempt')):
+        raise CandidateError('workflow_identity_required')
+    worker = builder.worker_hash(source_ref)
+    if not re.fullmatch(r'[a-f0-9]{40}', worker):
+        raise CandidateError('worker_identity_invalid')
+    return {'sourceCommit': source_ref, 'workerSha': worker,
+            'workflowCommit': metadata['sourceCommit'], 'runId': metadata['runId'], 'runAttempt': metadata['runAttempt']}
+
+
+def metadata_for(scope):
+    return {'application': 'mikka-template-release', 'sourceCommit': scope['workflowCommit'],
+            'runId': scope['runId'], 'runAttempt': scope['runAttempt']}
+
+
+def candidate_name(scope, kind):
+    return f"mikka-preview-{scope['sourceCommit'][:12]}-{scope['runId']}-{scope['runAttempt']}-{kind}"
+
+
+def output_directory(path):
+    path = Path(path)
+    if path.is_symlink():
+        raise CandidateError('output_directory_invalid')
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if not path.is_dir() or path.stat().st_uid != os.geteuid():
+        raise CandidateError('output_directory_invalid')
+    path.chmod(0o700)
+    return path
+
+
+def write_private(path, value, *, exclusive=False):
+    """Atomic, owner-only writes; exclusive reports preserve original failures."""
+    raw = (json.dumps(value, indent=2) + '\n').encode()
+    if path.is_symlink():
+        raise CandidateError('output_file_invalid')
+    target = path if exclusive else path.with_name('.' + path.name + '-' + uuid4().hex)
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if not exclusive:
+            os.replace(target, path)
+    finally:
+        if not exclusive:
+            target.unlink(missing_ok=True)
+
+
+def read_private(path):
+    if path.is_symlink():
+        raise CandidateError('creation_journal_invalid')
+    details = path.stat()
+    if not stat.S_ISREG(details.st_mode) or details.st_uid != os.geteuid() or details.st_mode & 0o077 or details.st_size > MAX_JOURNAL_BYTES:
+        raise CandidateError('creation_journal_invalid')
+    return json.loads(path.read_bytes())
+
+
+def read_journal(output, scope):
+    value = read_private(output / JOURNAL)
+    if (not isinstance(value, dict) or set(value) != {'version', 'identity', 'templates', 'sandboxes', 'pendingSandbox'}
+            or type(value['version']) is not int or value['version'] != 1 or value['identity'] != scope
+            or not isinstance(value['templates'], dict) or set(value['templates']) != set(KINDS)
+            or not isinstance(value['sandboxes'], list) or len(value['sandboxes']) > 16):
+        raise CandidateError('creation_journal_invalid')
+    for kind, row in value['templates'].items():
+        if (not isinstance(row, dict) or set(row) - {'kind', 'name', 'creationStarted', 'collision', 'templateId', 'buildId'}
+                or row.get('kind') != kind or row.get('name') != candidate_name(scope, kind)
+                or type(row.get('creationStarted')) is not bool or type(row.get('collision')) is not bool
+                or ('templateId' in row and (not row['creationStarted'] or row['collision']))
+                or ('buildId' in row and 'templateId' not in row)):
+            raise CandidateError('creation_journal_invalid')
+        for field in ('templateId', 'buildId'):
+            if field in row:
+                resource_id(row[field])
+    seen = set()
+    for row in value['sandboxes']:
+        if (not isinstance(row, dict) or set(row) != {'sandboxId', 'templateId', 'kind', 'deletedConfirmed'}
+                or row['kind'] not in KINDS or row['templateId'] != value['templates'][row['kind']].get('templateId')
+                or type(row['deletedConfirmed']) is not bool or row['sandboxId'] in seen):
+            raise CandidateError('creation_journal_invalid')
+        seen.add(resource_id(row['sandboxId']))
+    pending = value['pendingSandbox']
+    if pending is not None and (not isinstance(pending, dict) or set(pending) != {'kind', 'templateId'}
+            or pending['kind'] not in KINDS or pending['templateId'] != value['templates'][pending['kind']].get('templateId')):
+        raise CandidateError('creation_journal_invalid')
+    return value
+
+
+def private_ready(row, api_key, request):
+    info = request('GET', '/templates/' + row['templateId'], api_key)
+    alias = request('GET', '/templates/aliases/' + row['name'], api_key)
+    if (not isinstance(info, dict) or not isinstance(alias, dict) or info.get('templateID') != row['templateId']
+            or alias.get('templateID') != row['templateId'] or info.get('isDefault') is True
+            or info.get('public') is not False or alias.get('public') is not False):
+        raise CandidateError('candidate_not_exact_private_template')
+    names = (info.get('names') or []) + (info.get('aliases') or [])
+    if not any(isinstance(name, str) and re.fullmatch(r'(?:[^/]+/)?' + re.escape(row['name']), name) for name in names):
+        raise CandidateError('candidate_name_mismatch')
+    matches = [build for build in info.get('builds', []) if isinstance(build, dict) and build.get('buildID') == row['buildId']]
+    if len(matches) != 1 or matches[0].get('status') != 'ready':
+        raise CandidateError('candidate_build_not_ready')
+
+
+def absent_sandbox(sandbox_id, api_key, request):
+    try:
+        request('GET', '/sandboxes/' + sandbox_id, api_key)
+    except HTTPError as error:
+        if error.code == 404:
+            return True
+        raise
+    return False
+
+
+def tracked_factory(journal, output, kind, api_key, sdk, request):
+    expected = journal['templates'][kind]['templateId']
+
+    def create(template_id, **kwargs):
+        if template_id != expected or kwargs.get('metadata') != metadata_for(journal['identity']) or kwargs.get('api_key') != api_key:
+            raise CandidateError('probe_scope_mismatch')
+        journal['pendingSandbox'] = {'kind': kind, 'templateId': expected}
+        write_private(output / JOURNAL, journal)
+        sandbox = sdk[0].create(template_id, **kwargs)
+        row = {'sandboxId': resource_id(sandbox.sandbox_id), 'templateId': expected, 'kind': kind, 'deletedConfirmed': False}
+        if any(item['sandboxId'] == row['sandboxId'] for item in journal['sandboxes']):
+            raise CandidateError('probe_identity_reused')
+        journal['sandboxes'].append(row)
+        journal['pendingSandbox'] = None
+        write_private(output / JOURNAL, journal)
+
+        class TrackedSandbox:
+            def __getattr__(self, name):
+                return getattr(sandbox, name)
+
+            def kill(self):
+                sandbox.kill()
+                if not absent_sandbox(row['sandboxId'], api_key, request):
+                    raise CandidateError('probe_deletion_unconfirmed')
+                row['deletedConfirmed'] = True
+                write_private(output / JOURNAL, journal)
+
+        return TrackedSandbox()
+    return create
+
+
+def sandbox_cleanup(journal, output, api_key, sdk, request):
+    Sandbox, SandboxQuery, SandboxState = sdk
+    metadata = metadata_for(journal['identity'])
+    by_id = {row['sandboxId']: row for row in journal['sandboxes']}
+    templates = {row.get('templateId'): kind for kind, row in journal['templates'].items() if row.get('templateId')}
+    errors, receipts = [], []
+    pending = journal['pendingSandbox']
+    pending_found = False
+    try:
+        pages = Sandbox.list(query=SandboxQuery(metadata=metadata, state=[SandboxState.RUNNING, SandboxState.PAUSED]), api_key=api_key)
+        count = 0
+        while pages.has_next:
+            count += 1
+            if count > 20:
+                raise CandidateError('sandbox_listing_limit')
+            for row in pages.next_items():
+                sandbox_id = resource_id(row.sandbox_id)
+                if row.metadata != metadata or row.template_id not in templates:
+                    errors.append({'stage': 'sandbox_list', 'code': 'sandbox_scope_mismatch'})
+                    continue
+                if sandbox_id not in by_id:
+                    if pending and row.template_id == pending['templateId']:
+                        pending_found = True
+                    by_id[sandbox_id] = {'sandboxId': sandbox_id, 'templateId': row.template_id,
+                                        'kind': templates[row.template_id], 'deletedConfirmed': False}
+                if len(by_id) > 16:
+                    raise CandidateError('sandbox_listing_limit')
+    except BaseException as error:
+        errors.append({'stage': 'sandbox_list', 'code': error_code(error)})
+    if pending_found:
+        journal['pendingSandbox'] = None
+    elif pending:
+        # A create timeout may finish after this list response. An empty list
+        # cannot attest the outcome of an acknowledged-but-unidentified create.
+        errors.append({'stage': 'sandbox_create', 'code': 'sandbox_creation_unconfirmed'})
+    journal['sandboxes'] = list(by_id.values())
+    write_private(output / JOURNAL, journal)
+    for sandbox_id, row in by_id.items():
+        result = {'sandboxId': sandbox_id, 'status': 'failed'}
+        try:
+            try:
+                info = request('GET', '/sandboxes/' + sandbox_id, api_key)
+            except HTTPError as error:
+                if error.code != 404:
+                    raise
+                info = None
+            if info is None:
+                result['status'] = 'absent'
+            else:
+                if (not isinstance(info, dict) or info.get('sandboxID') != sandbox_id
+                        or info.get('templateID') != row['templateId'] or info.get('metadata') != metadata):
+                    raise CandidateError('sandbox_scope_mismatch')
+                Sandbox.kill(sandbox_id, api_key=api_key)
+                if not absent_sandbox(sandbox_id, api_key, request):
+                    raise CandidateError('sandbox_deletion_unconfirmed')
+                result['status'] = 'deleted'
+            row['deletedConfirmed'] = True
+        except BaseException as error:
+            result['code'] = error_code(error)
+        receipts.append(result)
+    write_private(output / JOURNAL, journal)
+    return receipts, errors
+
+
+def cleanup(scope, output, api_key, sdk, request=None):
+    request = request or builder._request
+    if not (output / JOURNAL).exists():
+        # A durable preflight refusal happens before journal creation or any
+        # mutating SDK call. A missing journal in every other case stays red.
+        refused = read_private(output / 'build-report.json')
+        if (not isinstance(refused, dict) or not {'identity', 'status', 'stage', 'code'}.issubset(refused)
+                or set(refused) - {'identity', 'status', 'stage', 'code', 'diagnostic'}
+                or refused['identity'] != scope or refused['status'] != 'failed' or refused['stage'] != 'preflight'):
+            raise CandidateError('creation_journal_missing')
+        sandboxes, templates, errors = [], [], []
+    else:
+        journal = read_journal(output, scope)
+        with quiet_sdk():
+            sandboxes, errors = sandbox_cleanup(journal, output, api_key, sdk, request)
+            owned = [row for row in journal['templates'].values() if row['creationStarted'] and not row['collision']]
+            raw = builder.cleanup_templates(owned, api_key, request)
+        templates = []
+        for candidate, receipt in zip(owned, raw, strict=True):
+            row = {'name': candidate['name'], 'kind': candidate['kind'], 'status': receipt['status']}
+            if row['status'] not in ('absent', 'deleted', 'retained_public', 'failed'):
+                row.update(status='failed', code='template_cleanup_failed')
+            if 'templateId' in receipt:
+                row['templateId'] = resource_id(receipt['templateId'])
+            if row['status'] == 'failed':
+                row['code'] = 'template_cleanup_failed'
+            templates.append(row)
+    # A public/ambiguous resource is retained, and this attempt remains red.
+    confirmed = not errors and all(row['status'] in ('absent', 'deleted') for row in sandboxes + templates)
+    result = {'identity': scope, 'confirmed': confirmed, 'templates': templates, 'sandboxes': sandboxes, 'errors': errors}
+    number = 1
+    while True:
+        path = output / ('cleanup.json' if number == 1 else f'cleanup-{number}.json')
+        try:
+            write_private(path, result, exclusive=True)
+            return result, path.name
+        except FileExistsError:
+            number += 1
+
+
+def build_candidates(scope, output, api_key, sdk, request=None):
+    request = request or builder._request
+    if any((output / name).exists() for name in (JOURNAL, 'build-report.json', 'candidates.json')):
+        raise CandidateError('candidate_attempt_already_recorded')
+    journal = {'version': 1, 'identity': scope, 'templates': {
+        kind: {'kind': kind, 'name': candidate_name(scope, kind), 'creationStarted': False, 'collision': False} for kind in KINDS},
+        'sandboxes': [], 'pendingSandbox': None}
+    # Never claim an existing alias as this attempt's cleanup responsibility.
+    try:
+        for row in journal['templates'].values():
+            with quiet_sdk():
+                builder.assert_new_template(row['name'], api_key)
+    except BaseException as error:
+        write_private(output / 'build-report.json', {'identity': scope, 'status': 'failed',
+            'stage': 'preflight', 'code': error_code(error), 'diagnostic': build_diagnostic(error, {})}, exclusive=True)
+        raise CandidateError('candidate_preflight_failed') from error
+    write_private(output / JOURNAL, journal, exclusive=True)
+    templates, logs, stage = {}, {}, 'build'
+    try:
+        for kind in KINDS:
+            row = journal['templates'][kind]
+            row['creationStarted'] = True
+            write_private(output / JOURNAL, journal)
+            stage = 'build_' + kind
+            logs[kind] = BuildDiagnostics(journal, output, kind)
+            try:
+                with quiet_sdk():
+                    source, result = builder.build(row['name'], scope['sourceCommit'], api_key=api_key,
+                        on_build_logs=logs[kind], kind=kind, cpu_count=2, memory_mb=4096)
+            except ValueError as error:
+                if error.args == ('template_name_already_exists',):
+                    row['collision'] = True
+                    write_private(output / JOURNAL, journal)
+                raise
+            if not row.get('templateId') or not row.get('buildId'):
+                raise CandidateError('candidate_build_identity_missing')
+            if (row['templateId'], row['buildId']) != (resource_id(result.template_id), resource_id(result.build_id)):
+                raise CandidateError('candidate_identity_mismatch')
+            if source != scope['sourceCommit'] or any(item['templateId'] == row['templateId'] for item in templates.values()):
+                raise CandidateError('candidate_identity_mismatch')
+            stage = 'private_' + kind
+            private_ready(row, api_key, request)
+            entry = {key: row[key] for key in ('name', 'templateId', 'buildId')}
+            entry.update(baseTemplate=kind, preinstalled=True)
+            factory = tracked_factory(journal, output, kind, api_key, sdk, request)
+            stage = 'models_' + kind
+            with quiet_sdk():
+                entry['models'] = builder.probe_models(row['templateId'], kind, api_key, scope['sourceCommit'], scope['workerSha'], factory)
+            stage = 'conservation_' + kind
+            with quiet_sdk():
+                entry['conservation'] = builder.probe_conservation(row['templateId'], api_key, kind, factory)
+            private_ready(row, api_key, request)
+            entry['privateVerified'] = True
+            templates[kind] = entry
+        stage = 'probe_cleanup'
+        with quiet_sdk():
+            sandboxes, errors = sandbox_cleanup(journal, output, api_key, sdk, request)
+        if errors or any(row['status'] not in ('absent', 'deleted') for row in sandboxes):
+            raise CandidateError('probe_cleanup_incomplete')
+        result = {'sourceCommit': scope['sourceCommit'], 'workerSha': scope['workerSha'], 'templates': templates}
+        write_private(output / 'candidates.json', result, exclusive=True)
+        write_private(output / 'build-report.json', {'identity': scope, 'status': 'passed', 'stage': 'complete',
+            'diagnostic': build_diagnostic(None, logs)}, exclusive=True)
+        return result
+    except BaseException as error:
+        diagnostic = build_diagnostic(error, logs)
+        if stage in ('build_claude', 'build_codex'):
+            kind = stage.removeprefix('build_')
+            row = journal['templates'][kind]
+            if row.get('templateId') and row.get('buildId'):
+                diagnostic['statusLookup'] = failed_build_status(row, api_key, logs[kind])
+        write_private(output / 'build-report.json', {'identity': scope, 'status': 'failed', 'stage': stage,
+            'code': error_code(error), 'diagnostic': diagnostic}, exclusive=True)
+        try:
+            cleanup(scope, output, api_key, sdk, request)
+        except BaseException as cleanup_error:
+            # Keep the original build failure; always-cleanup can retry using
+            # the durable journal. No SDK text or key enters this report.
+            write_private(output / 'cleanup-error.json', {'identity': scope, 'confirmed': False,
+                'stage': 'cleanup', 'code': error_code(cleanup_error), 'diagnostic': exception_diagnostic(cleanup_error)}, exclusive=True)
+        raise CandidateError('candidate_build_failed') from error
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('operation', choices=('build', 'cleanup'))
+    parser.add_argument('--source-ref', required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    args = parser.parse_args(argv)
+    stage = 'identity'
+    try:
+        scope = identity(args.source_ref, os.environ)
+        output = output_directory(args.output)
+        stage = 'credential'
+        api_key = os.environ.get('E2B_API_KEY')
+        if not api_key:
+            raise CandidateError('api_key_missing')
+        from e2b import Sandbox, SandboxQuery, SandboxState
+        sdk = (Sandbox, SandboxQuery, SandboxState)
+        stage = args.operation
+        if args.operation == 'build':
+            build_candidates(scope, output, api_key, sdk)
+            report, passed = 'candidates.json', True
+        else:
+            result, report = cleanup(scope, output, api_key, sdk)
+            passed = result['confirmed']
+        print(json.dumps({'operation': args.operation, 'status': 'passed' if passed else 'failed', 'report': report}))
+        return 0 if passed else 1
+    except BaseException as error:
+        print(json.dumps({'operation': args.operation, 'status': 'failed', 'stage': stage, 'code': error_code(error),
+                          'diagnostic': exception_diagnostic(error)}))
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

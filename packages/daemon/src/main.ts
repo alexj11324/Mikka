@@ -73,6 +73,7 @@ import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprin
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
 import { writeCloudRegistration } from "./cloud-registration"
+import { acquireCloudWorkspaceControl } from './runs/workspace-control'
 import { reusableHostedModels, type HostedModelProbe } from "./cloud-model-probe"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
@@ -503,6 +504,9 @@ export class Daemon {
         : this.realAdapters()),
     ]))
     this.supervisor = new RunSupervisor({
+      acquireWorkspaceControl: this.options.e2bContainerRuntime
+        ? (assignment, signal, onLost) => acquireCloudWorkspaceControl({ runId: assignment.runId, deviceId: assignment.deviceId, signal, onLost })
+        : undefined,
       collectCliTiming: this.options.collectCliTiming,
       journal: this.journal,
       adapterStateDir: this.paths.adapterState,

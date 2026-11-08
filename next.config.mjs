@@ -43,6 +43,7 @@ const nextConfig = {
     '/*': ['./lib/abuse/data/disposable-email-domains.txt', './packages/daemon/scripts/official-e2b-instance-bootstrap.sh', './packages/daemon/scripts/refresh-cloud-worker.py'],
     '/api/bots/*/subagents/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/api/threads/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
+    '/api/tasks/*/review/**': ['./scripts/e2b/*.py'],
     '/api/factory/tasks/**': ['./scripts/e2b/inspect-retained-deliverable.mjs'],
     '/.well-known/workflow/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py', './scripts/e2b/lease-driver.py'],

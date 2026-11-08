@@ -19,7 +19,7 @@ import { captureNativeResources } from './native-resources.mjs'
 import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { authDiagnosticRoute, nativeDiagnosticFailure, readNativeAuthDiagnostics, startNativeAuthDiagnostics, stopNativeAuthDiagnostics } from './native-auth-diagnostics.mjs'
-import { observeReads, pageReadRequirements, pageReady, readActionIds } from './parity-page-ready.mjs'
+import { observeReads, pageReadRequirements, pageReady, readActionIds, selectParityWorkspace } from './parity-page-ready.mjs'
 import { settingsReadRequirements, settingsReady } from './parity-settings-ready.mjs'
 import { waitForNativeDevice } from './native-device-ready.mjs'
 import { continueInSystemBrowser } from './browser-handoff.mjs'
@@ -39,7 +39,7 @@ const initialWorkspaceMenuNames = [messages.Nav.workspaceMenu, JSON.parse(await 
 const actionIds = await readActionIds(resolve(process.env.MIKKA_TEST_APP_DIR ?? process.cwd()))
 const report = {
   version: 1, mode, appRevision: environment.deploymentSha, harnessRevision: revision,
-  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./generated-workspace-name.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./parity-clock.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).update(await readFile(new URL('./parity-page-ready.mjs', import.meta.url))).update(await readFile(new URL('./parity-settings-ready.mjs', import.meta.url))).update(await readFile(new URL('./native-device-ready.mjs', import.meta.url))).update(await readFile(new URL('../../../scripts/acceptance/read-action-transport.mjs', import.meta.url))).digest('hex'),
+  harnessSha256: createHash('sha256').update(await readFile(fileURLToPath(import.meta.url))).update(await readFile(new URL('./parity-fixtures.mjs', import.meta.url))).update(await readFile(new URL('./generated-workspace-name.mjs', import.meta.url))).update(await readFile(new URL('./parity-images.mjs', import.meta.url))).update(await readFile(new URL('./parity-clock.mjs', import.meta.url))).update(await readFile(new URL('./native-viewport.mjs', import.meta.url))).update(await readFile(new URL('./native-auth-diagnostics.mjs', import.meta.url))).update(await readFile(new URL('./parity-reader-defaults.mjs', import.meta.url))).update(await readFile(new URL('./parity-page-ready.mjs', import.meta.url))).update(await readFile(new URL('./parity-settings-ready.mjs', import.meta.url))).update(await readFile(new URL('./native-device-ready.mjs', import.meta.url))).update(await readFile(new URL('./native-document.mjs', import.meta.url))).update(await readFile(new URL('../../../scripts/acceptance/read-action-transport.mjs', import.meta.url))).digest('hex'),
   environmentId: environment.id, database: environment.database.name, origin: environment.origin,
   viewport: { width: 1440, height: 900 }, colorThreshold: 0, maximumChangedRatio: 0.001,
   timeZone: 'UTC',
@@ -270,10 +270,7 @@ async function authenticateBundled(bundled) {
 
 async function selectFixtureWorkspace(target) {
   await go(target)
-  await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().click()
-  await target.page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: false }).click()
-  await target.page.waitForURL(url => url.pathname === `${environment.basePath}/en` || url.pathname === `${environment.basePath}/en/`)
-  await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().waitFor()
+  await selectParityWorkspace(target.page, { menuName: messages.Nav.workspaceMenu, workspaceName: fixtures.fixture.workspaceName, basePath: environment.basePath })
   await coordinatorReady(target.page)
 }
 

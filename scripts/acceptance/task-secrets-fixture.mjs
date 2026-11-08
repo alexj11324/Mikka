@@ -13,6 +13,9 @@ export async function buildFixtureBundles(buildImpl) {
   const bundle = async entry => {
     const result = await build({ absWorkingDir: ROOT, entryPoints: [entry], bundle: true,
       platform: 'node', format: 'esm', target: 'node22', write: false, metafile: true,
+      // The ordinary SDK has bundled CommonJS dependencies that require Node
+      // built-ins. Keep that standard Node loader available in the ESM file.
+      banner: { js: "import { createRequire as __mikkaCreateRequire } from 'node:module'; const require = __mikkaCreateRequire(import.meta.url);" },
       logLevel: 'silent', sourcemap: false })
     const inputs = Object.keys(result.metafile.inputs)
     check(!inputs.some(path => /(?:^|\/)(?:lib\/db|lib\/auth|pg|postgres|drizzle-orm)(?:\/|\.)/.test(path)), 'fixture_control_plane_import')
@@ -48,11 +51,11 @@ export async function createIsolatedFixture({ fixtureId, sourceCommit, apiKey, b
     cleanup: { stopped: false, outcome: 'not_yet_attempted' } }
   onEvidence(evidence)
   let closed = false
-  const control = async value => {
+  const control = async (value, timeoutMs = 25_000) => {
     check(!closed, 'fixture_closed')
     const response = await fetchImpl(`${fixtureOrigin}/control`, { method: 'POST', redirect: 'error',
       headers: { authorization: `Bearer ${controlToken}`, 'content-type': 'application/json' },
-      body: JSON.stringify(value), signal: AbortSignal.timeout(25_000) })
+      body: JSON.stringify(value), signal: AbortSignal.timeout(timeoutMs) })
     check(response.ok, 'fixture_control_refused')
     return response.json()
   }
@@ -98,14 +101,29 @@ export async function createIsolatedFixture({ fixtureId, sourceCommit, apiKey, b
           && /^[a-f0-9]{64}$/.test(value.responseSha256 ?? ''), 'fixture_case_invalid')
         return { caseId, bootstrapToken, canarySha256: value.canarySha256, responseSha256: value.responseSha256 }
       },
+      createProductionCase: async (caseId, canary) => {
+        check(UUID.test(caseId ?? '') && /^mikka1712s_[a-f0-9]{64}$/.test(canary ?? ''), 'fixture_case_invalid')
+        const value = await control({ action: 'create_production', caseId, canary })
+        check(value.caseId === caseId && value.canarySha256 === hash(canary)
+          && /^[a-f0-9]{64}$/.test(value.responseSha256 ?? '') && /^[a-f0-9]{64}$/.test(value.sdkResponseSha256 ?? ''), 'fixture_case_invalid')
+        return { caseId, canarySha256: value.canarySha256, responseSha256: value.responseSha256, sdkResponseSha256: value.sdkResponseSha256 }
+      },
+      waitForProtected: async caseId => {
+        const value = await control({ action: 'wait_protected', caseId }, 245_000)
+        check(value.caseId === caseId && UUID.test(value.runId ?? '') && Number.isSafeInteger(value.protectedRequests)
+          && value.protectedRequests >= 1 && value.protectedRequests <= 100, 'fixture_receipt')
+        return { caseId, runId: value.runId, protectedRequests: value.protectedRequests }
+      },
       bind: async (caseId, runId) => check((await control({ action: 'bind', caseId, runId })).bound === true, 'fixture_bind'),
       receipt: async caseId => {
         const value = await control({ action: 'receipt', caseId })
         check(value.caseId === caseId && UUID.test(value.runId ?? '') && typeof value.issued === 'boolean'
           && typeof value.rotated === 'boolean' && ['public', 'protected', 'echo', 'redirect'].every(name =>
             Number.isSafeInteger(value.counts?.[name]) && value.counts[name] >= 0 && value.counts[name] <= 100), 'fixture_receipt')
+        check(value.mode !== 'production_claim' || Number.isSafeInteger(value.counts.sdk) && value.counts.sdk >= 0 && value.counts.sdk <= 100, 'fixture_receipt')
         return { caseId, runId: value.runId, issued: value.issued, rotated: value.rotated,
-          counts: Object.fromEntries(['public', 'protected', 'echo', 'redirect'].map(name => [name, value.counts[name]])) }
+          ...(value.mode === 'production_claim' ? { mode: value.mode } : {}),
+          counts: Object.fromEntries(['public', 'protected', 'echo', 'redirect', ...(value.mode === 'production_claim' ? ['sdk'] : [])].map(name => [name, value.counts[name]])) }
       },
       deleteCase: async caseId => check((await control({ action: 'delete', caseId })).deleted === true, 'fixture_delete'),
       close,

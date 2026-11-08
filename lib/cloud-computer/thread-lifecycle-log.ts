@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto'
 
 const PHASES = new Set(['create_requested', 'created', 'resume_requested', 'resumed', 'provisioning', 'active', 'waiting', 'handoff',
-  'pause_requested', 'paused', 'pause_failed', 'retire_requested', 'retire_failed', 'retired', 'needs_reconciliation'])
+  'pause_requested', 'paused', 'pause_failed', 'retire_requested', 'retire_failed', 'retired', 'needs_reconciliation',
+  'review_resume_requested', 'review_resumed', 'review_resume_failed'])
 const REASONS = new Set(['created', 'resumed', 'manual_pause', 'manual_end', 'stage_handoff', 'run_ended', 'unclaimed_idle', 'active_run',
   'provisioning', 'retirement', 'retention_elapsed', 'paused_retention', 'checkpoint_unverified', 'native_archive_unverified', 'retirement_guard_refused',
   'creation_cleanup_unconfirmed', 'creation_recovered', 'provider_missing', 'provider_paused', 'execution_budget', 'execution_lease_lost', 'execution_condition_changed', 'task_closed',
-  'stop_pending', 'stop_unacknowledged', 'queued_stop', 'quota_wait', 'quota_safe_point_unverified', 'operation_failed'])
+  'stop_pending', 'stop_unacknowledged', 'queued_stop', 'quota_wait', 'quota_safe_point_unverified', 'operation_failed',
+  'human_review', 'human_review_resume', 'review_authority_changed'])
 const PROVIDERS = new Set(['running', 'paused', 'missing', 'pause_ack', 'kill_ack', 'timeout_renewed', 'unavailable', 'not_observed'])
 const COMPUTE_SOURCES = new Set(['database_estimate', 'provider_started_at_estimate', 'unconfirmed_creation_interval'])
 const ERROR_KINDS = new Set(['Error', 'AbortError', 'TimeoutError', 'ComputerError', 'CodedError', 'RetryableError', 'SandboxNotFoundError', 'NotFoundError'])

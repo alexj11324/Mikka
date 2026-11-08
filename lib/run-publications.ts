@@ -24,7 +24,7 @@ import { openRunPullRequest, PublicationError, type PublicationErrorCode, type P
 import { matchesRepositoryAdmission } from './repository-admission'
 import { mayCompleteIssue } from './run-completion'
 import type { QuotaPlan } from './run-quota'
-import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects } from './run-completion-effects'
+import { afterRunEnded, lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, settleRunCompletionEffects } from './run-completion-effects'
 import { launchProviderContinuation, pendingProviderFallback, providerCompletion, recoverProviderFailure } from './run-provider-fallback'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -137,8 +137,9 @@ export async function persistRunCompletion(userId: string, runId: string, comple
       // the result, so it never spends the task's code repair budget. Replays
       // resume this idempotent step after a process interruption.
       const continuation = result?.providerRunId ? await recoverProviderFailure(pool, userId, result.providerRunId) : null
-      // After commit: hand the completed run to Factory review (BE-9).
-      if (result) await reconcileFactoryAfterCompletion(pool, userId, runId)
+      // After commit: reconcile review capabilities and Factory progress (BE-9)
+      // through the same run-end hook as stop and lease-loss paths.
+      if (result) await afterRunEnded(userId, runId)
       await launchProviderContinuation(userId, continuation)
       return result
     }

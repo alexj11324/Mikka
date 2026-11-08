@@ -4,6 +4,12 @@
 set -euo pipefail
 [[ ! -e /home/user/.mikka/bootstrap.json && ! -e /home/user/.mikka/worker/device.json ]]
 [[ ! -e /home/user/.mikka/preloaded.pid && ! -e /run/mikka-viewer/key ]]
+# No viewer, anonymous worker, task or native process starts until both
+# effective OUTPUT rules have been verified on this boot.
+python3 /opt/mikka/runtime/ingress-v1/guard.py prepare >/dev/null
+# E2B recreates /run after the install layer. Restore the root-owned fixed
+# execution fence before the anonymous daemon or any native child can run.
+python3 /opt/mikka/worker/packages/daemon/scripts/workspace-control-install.py
 if [[ -f /opt/mikka/computer/viewer-gateway.py ]]; then
   # /run is recreated by E2B's final boot; the install-layer directory is gone.
   install -d -m 710 -o root -g user /run/mikka-viewer

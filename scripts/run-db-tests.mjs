@@ -12,6 +12,8 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/coding-workspace/review-authority.ts', file: 'lib/coding-workspace/review-authority.db.test.ts', script: 'test:coding-review-db' },
+  { marker: 'lib/coding-workspace/review-sessions.ts', file: 'lib/coding-workspace/review-authority.db.test.ts', script: 'test:coding-review-db' },
   { marker: 'lib/cloud-services/store.ts', file: 'lib/cloud-services/client.db.test.ts', script: 'test:cloud-services-db' },
   { marker: 'app/api/web/exchange/route.ts', file: 'tests/web-auth-handoff.db.test.ts', script: 'test:web-auth-db' },
   { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },
@@ -35,6 +37,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/factory/questions/queue-local-continuation.ts', file: 'tests/factory-local-question.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/coordinator/coordinator-bot.ts', file: 'tests/coordinator-bot.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-credential-source.ts', file: 'tests/api-key-runs.db.test.ts', script: 'test:bot-threads-db' },
+  { marker: 'lib/secrets/task-access.ts', file: 'tests/task-secret-local-claim.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/model-order.ts', file: 'tests/model-order.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/model-provider-health.ts', file: 'tests/model-provider-health.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-provider-fallback.ts', file: 'tests/run-provider-fallback.db.test.ts', script: 'test:bot-threads-db' },

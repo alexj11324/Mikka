@@ -1,3 +1,4 @@
+import { carryReadDispatch } from '@/lib/swr/read-observer'
 import { MAX_READ_BATCH, READ_BATCH_ACTION, type BatchReadAction, type ReadBatchItem } from '@/lib/desktop-rpc/read-batch-contract'
 import type { Locale } from './location'
 
@@ -62,7 +63,7 @@ async function batch(items: Pending[]) {
     for (let index = 0; index < items.length; index++) {
       const item = items[index], value = result[index]
       if (!current(item)) item.reject(changed())
-      else if (value.ok) item.resolve(value.result)
+      else if (value.ok) item.resolve(item.action === 'task-runs.pollTaskRuns' ? carryReadDispatch(result, value.result) : value.result)
       else item.reject(new DesktopTransportError(value.error.code, { status: value.status }))
     }
   } catch (cause) {
