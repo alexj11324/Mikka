@@ -24,7 +24,7 @@ import type { TaskDetail, ThreadDetail, ThreadItem } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { useStop } from '@/lib/useStop'
 import { colors } from '@/lib/theme'
-import { conversationSegments, currentAgent, dividerText, type Attempt } from '../model/task-conversation'
+import { boundary, conversationSegments, currentAgent, type Attempt } from '../model/task-conversation'
 
 type Conversation = { detail: TaskDetail; threads: Record<string, ThreadDetail> }
 
@@ -37,8 +37,9 @@ async function readConversation(id: string): Promise<Conversation> {
 }
 
 /**
- * A task's one conversation (Alex 2026-11-07): every attempt's messages in order, oldest at the top, with a line
- * between attempts (「第 1 次尝试失败 · 换 Claude Code 再试」). The bar is ← and the task's title over the current
+ * A task's one conversation (Alex 2026-11-07, 2026-11-08): every run's messages in order, oldest at the top. A line
+ * only where the task switched Agent (「换 Claude Code 继续」, 「第 1 次尝试失败 · 换 Claude Code 再试」); a small marker
+ * where a factory stage started (「独立审查」); same-Agent runs otherwise read as one. The bar is ← and the task's title over the current
  * Agent; the composer, 停止 and a quota pause act on the newest attempt. It updates on the task's and the newest
  * attempt's live keys.
  */
@@ -112,7 +113,7 @@ export function TaskConversationScreen() {
         {segments.map((segment, index) => (
           <View key={segment.attempt.runId} style={styles.segment}
             onLayout={event => { offsets.current.set(segment.attempt.runId, event.nativeEvent.layout.y); place() }}>
-            {index > 0 ? <Divider text={dividerText(segments[index - 1]!.attempt, segment.attempt)} /> : null}
+            {index > 0 ? <Boundary at={boundary(data?.detail.activity ?? [], segments[index - 1]!.attempt, segment.attempt)} /> : null}
             {segment.items.map((item, at) => <Item key={item.id} item={item} live={Boolean(live?.active) && index === segments.length - 1 && at === segment.items.length - 1} />)}
             {/* A failed attempt's cause stays inside it, in words, with the raw code under 详情 (2026-11-05-0330). */}
             {segment.error && !(index === segments.length - 1 && live?.active) && !segment.items.some(item => item.kind === 'error') ? <AttemptError raw={segment.error} /> : null}
@@ -160,7 +161,16 @@ function AttemptError({ raw }: { raw: string }) {
   )
 }
 
-/** The line between two attempts, as the chat's event lines are drawn: centred grey words between hairlines. */
+/**
+ * Between two runs of the task's one conversation: a centred line where the task switched Agent (「换 Claude Code 继续」),
+ * a small marker where a factory stage started (「独立审查」), nothing otherwise.
+ */
+function Boundary({ at }: { at: ReturnType<typeof boundary> }) {
+  if (!at) return null
+  return at.kind === 'switch' ? <Divider text={at.text} /> : <Text style={styles.stage}>{at.text}</Text>
+}
+
+/** The line where the Agent changed, as the chat's event lines are drawn: centred grey words between hairlines. */
 function Divider({ text }: { text: string }) {
   return (
     <View style={styles.divider} accessibilityRole="header">
@@ -172,6 +182,7 @@ function Divider({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
+  stage: { alignSelf: 'center', fontSize: 12, fontWeight: '500', color: colors.secondary, paddingHorizontal: 10, paddingVertical: 3, marginVertical: 4 },
   screen: { flex: 1, backgroundColor: colors.page },
   titleBox: { alignItems: 'center', maxWidth: 260 },
   title: { fontSize: 16, fontWeight: '600' },

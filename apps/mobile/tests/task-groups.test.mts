@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { attemptState, groupOf, groupOfThread, rowState, taskListRows } from '../features/tasks/model/task-groups.ts'
-import { conversationSegments, dividerText } from '../features/tasks/model/task-conversation.ts'
+import { activityEntries, agentRunTitle, boundary, conversationSegments } from '../features/tasks/model/task-conversation.ts'
 
 test('a task\'s current thread decides its group, by R-52\'s judgement', () => {
   assert.equal(groupOfThread('waiting'), 'pending')
@@ -97,7 +97,37 @@ test('a task\'s attempts read as one conversation, oldest first, each keeping on
   const threads = new Map([['r1', { items: [item('a'), item('b'), item('c')], error: 'E_TOOL_FAILED' }], ['r2', { items: [item('c')], error: null }]])
   const segments = conversationSegments(activity, threads)
   assert.deepEqual(segments.map(segment => [segment.attempt.runId, segment.items.map(entry => entry.id), segment.error]), [['r1', ['a', 'b'], 'E_TOOL_FAILED'], ['r2', ['c'], null]])
-  assert.equal(dividerText(segments[0]!.attempt, segments[1]!.attempt), '第 1 次尝试失败 · 换 Claude Code 再试')
-  assert.equal(dividerText(attempt('r1', 1, 'codex', { group: 'blocked' }), attempt('r2', 2, 'codex')), '第 1 次尝试受阻 · 再试')
   assert.deepEqual(conversationSegments([{ kind: 'created', by: null, createdAt: '' }], new Map()), [])
+})
+
+// Alex 2026-11-08: a task is one conversation; 「尝试」 only where the task switched Agent.
+test('runs with the same Agent read as one; a divider only where the Agent changed, counting switches only', () => {
+  const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness, createdAt: '', failed: false, ...extra })
+  const r1 = run('r1', 1, 'codex'), r2 = run('r2', 2, 'codex'), r3 = run('r3', 3, 'codex', { failed: true, state: 'failed' }), r4 = run('r4', 4, 'claude_code'), r5 = run('r5', 5, 'cursor')
+  const activity = [r5, r4, r3, r2, r1, { kind: 'created' as const, by: null, createdAt: '' }]
+  // Same Agent: nothing between them, however many runs (follow-ups, waiting for a reply).
+  assert.equal(boundary(activity, r1, r2), null)
+  // The Agent changed after a failure: counted by Agent switches, so the first stretch is 第 1 次 although it held three runs.
+  assert.deepEqual(boundary(activity, r3, r4), { kind: 'switch', text: '第 1 次尝试失败 · 换 Claude Code 再试' })
+  // The Agent changed without a failure.
+  assert.deepEqual(boundary(activity, r4, r5), { kind: 'switch', text: '换 Cursor 继续' })
+})
+
+test('a factory stage starting with the same Agent is a small marker; with no stage, no marker', () => {
+  const run = (runId: string, n: number, stage?: string | null) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness: 'codex', createdAt: '', failed: false, ...(stage === undefined ? {} : { stage }) }) as never
+  const activity = [run('r4', 4, 'fix'), run('r3', 3, 'verify'), run('r2', 2, 'review'), run('r1', 1, 'implement')]
+  assert.deepEqual(boundary(activity, run('r1', 1, 'implement'), run('r2', 2, 'review')), { kind: 'stage', text: '独立审查' })
+  assert.deepEqual(boundary(activity, run('r2', 2, 'review'), run('r3', 3, 'verify')), { kind: 'stage', text: '验证' })
+  assert.deepEqual(boundary(activity, run('r3', 3, 'verify'), run('r4', 4, 'fix')), { kind: 'stage', text: '修复' })
+  assert.equal(boundary(activity, run('r1', 1), run('r2', 2, 'implement')), null)
+  assert.equal(boundary(activity, run('r1', 1), run('r2', 2)), null)
+  assert.equal(boundary(activity, run('r1', 1), run('r2', 2, null)), null)
+})
+
+test('活动 merges an Agent\'s runs in a row into one row; a switch starts 「换 X」', () => {
+  const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'waiting' as const, harness, createdAt: '2026-11-05T10:00:00.000Z', failed: false, ...extra })
+  // The server sends 活动 newest first.
+  const activity = [run('r4', 4, 'claude_code'), run('r3', 3, 'codex'), run('r2', 2, 'codex'), run('r1', 1, 'codex'), { kind: 'created' as const, by: 'Coordinator', createdAt: '2026-11-05T09:00:00.000Z' }]
+  const entries = activityEntries(activity)
+  assert.deepEqual(entries.map(entry => entry.kind === 'agent' ? [agentRunTitle(entry), entry.run.attempts.map(item => item.runId)] : entry.kind), ['created', ['Codex', ['r1', 'r2', 'r3']], ['换 Claude Code', ['r4']]])
 })

@@ -1,4 +1,5 @@
-// Expo Web screenshots for #1671's iOS part: lists show tasks only, threads open inside their task.
+// Expo Web screenshots for #1671's iOS part: lists show tasks only, threads open inside their task, and a task is
+// one conversation with 「尝试」 only where it switched Agent (2026-11-08).
 // Our own labelled fixtures; no other product's source or wording.
 //
 //   MOBILE_WEB_DIST=/path/to/expo-web-export SCREENSHOT_OUT=/path/to/out node apps/mobile/scripts/tasks-screenshots.mjs
@@ -23,6 +24,8 @@ const RESEARCH = '33333333-3333-4333-8333-333333333333'
 const TASK = '44444444-4444-4444-8444-444444444471'
 const RUN1 = '55555555-5555-4555-8555-555555555551'
 const RUN2 = '55555555-5555-4555-8555-555555555552'
+const RUN0 = '55555555-5555-4555-8555-555555555550'
+const RUN3 = '55555555-5555-4555-8555-555555555553'
 
 const ago = (days, hours = 0) => new Date(Date.now() - days * 86_400_000 - hours * 3_600_000).toISOString()
 const bot = (id, name, color, shape) => ({ id, name, color, shape })
@@ -48,10 +51,14 @@ const detail = {
     agent: { harness: 'claude_code', model: 'Sonnet 5.5' },
     place: { kind: 'laptop', name: 'MacBook' },
   },
+  // A task is one conversation (2026-11-08): two Codex runs read as one, the failure switches to Claude Code, whose
+  // implementation is then reviewed independently by the factory (stage).
   activity: [
-    { kind: 'attempt', runId: RUN2, n: 2, group: 'waiting', state: 'done', pullRequest: { number: 1471 }, harness: 'claude_code', createdAt: ago(0, 3), failed: false },
-    { kind: 'attempt', runId: RUN1, n: 1, group: 'blocked', state: 'failed', harness: 'codex', createdAt: ago(1), failed: true },
-    { kind: 'created', by: 'Coordinator', createdAt: ago(1, 1) },
+    { kind: 'attempt', runId: RUN3, n: 4, group: 'waiting', state: 'waiting', harness: 'claude_code', stage: 'review', createdAt: ago(0, 2), failed: false },
+    { kind: 'attempt', runId: RUN2, n: 3, group: 'resolved', state: 'done', pullRequest: { number: 1471 }, harness: 'claude_code', stage: 'implement', createdAt: ago(0, 3), failed: false },
+    { kind: 'attempt', runId: RUN1, n: 2, group: 'blocked', state: 'failed', harness: 'codex', createdAt: ago(1), failed: true },
+    { kind: 'attempt', runId: RUN0, n: 1, group: 'resolved', state: 'waiting', harness: 'codex', createdAt: ago(1, 1), failed: false },
+    { kind: 'created', by: 'Coordinator', createdAt: ago(1, 2) },
   ],
 }
 
@@ -62,10 +69,17 @@ const threadOf = (id, harness, status, items, error) => ({
   active: false, working: false, paused: null, summary: null, error, items,
 })
 const threads = {
+  [RUN0]: threadOf(RUN0, 'codex', 'waiting', [
+    { kind: 'person', id: 'p0', text: '先看看 iOS 登录回调停在哪一步', mine: true, at: Date.now() - 95_000_000 },
+    { kind: 'agent', id: 'a0', text: '回调回到了 app，但没有带上会话。要我直接改回调地址吗？', at: Date.now() - 94_000_000 },
+  ], null),
   [RUN1]: threadOf(RUN1, 'codex', 'failed', [
     { kind: 'person', id: 'p1', text: 'iOS 上 Google 登录回来以后停在空白页，修一下', mine: true, at: Date.now() - 90_000_000 },
     { kind: 'steps', id: 's1', count: 4, at: Date.now() - 89_000_000 },
   ], 'agent_exited: codex exited with code 1 (E_SANDBOX_NETWORK)'),
+  [RUN3]: threadOf(RUN3, 'claude_code', 'waiting', [
+    { kind: 'agent', id: 'a3', text: '独立审查：回调地址和测试都对得上；还差一处：返回键会回到回调页。', at: Date.now() - 7_000_000 },
+  ], null),
   [RUN2]: threadOf(RUN2, 'claude_code', 'waiting', [
     { kind: 'steps', id: 's2', count: 9, at: Date.now() - 9_000_000 },
     { kind: 'agent', id: 'a2', text: '回调地址少了 `mikka://` 的信任来源，加上以后在模拟器里登录能回到聊天列表。PR #1471 已开，等你审阅。', at: Date.now() - 8_000_000 },
@@ -169,7 +183,7 @@ async function run() {
       await page.getByText('活动').waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-3-task.png`) })
-      await page.getByText('第 2 次尝试').first().click()
+      await page.getByText('换 Claude Code', { exact: true }).first().click()
       await page.getByText('第 1 次尝试失败 · 换 Claude Code 再试').waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-4-conversation.png`) })

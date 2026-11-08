@@ -208,7 +208,9 @@ export type TaskActivity =
     /** Its own result (2026-11-07-2230); absent from an older server. */
     state?: 'running' | 'waiting' | 'failed' | 'blocked' | 'done'
     /** The pull request it opened; absent from an older server. */
-    pullRequest?: { number: number; url?: string | null } | null }
+    pullRequest?: { number: number; url?: string | null } | null
+    /** The factory stage this run did (lib/mobile-tasks.ts, coming); absent or null when it was not a factory stage. */
+    stage?: 'implement' | 'fix' | 'review' | 'verify' | null }
   | { kind: 'replaced'; runId: string; createdAt: string }
   | { kind: 'created'; by: string | null; createdAt: string }
 
