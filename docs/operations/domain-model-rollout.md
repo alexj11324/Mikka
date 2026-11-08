@@ -40,11 +40,11 @@ migrate: projects bound=<本轮绑定数> tasks=<本轮建关系数> pending=<�
 
 本次迁移文件的目标如下；以后若新增修复迁移，保留原记录，在发布证据中追加新文件。
 
-本 Epic 的九个文件已按协调分配移至 `20261108120300`–`20261108120308`，SQL 内容及相对顺序保持不变，排在先行的 Secret delivery 与 enabled-models 迁移之后。P0 四个 `20261107180000`–`20261107180003` 文件仍保留当前原 owner 交付的名称；须先合入其顺序修复的新 SHA，再同步下文 P0 名称与 runner 入口，不提前引用尚不存在的文件。
+本次集成版本将尚未发布的 P0 四个文件按原有顺序改名为 `20261108120200`–`20261108120203`，本 Epic 九个文件改名为 `20261108120300`–`20261108120308`，排在先行的 Secret delivery 与 enabled-models 迁移之后。所有 SQL 内容逐字不变；P0 ownership 外层 guard、下游回填入口与历史 fixture 边界同时使用新文件名，避免改名后静默跳过回填。这是本 PR 的合流兼容，P0 原 PR 仍由其负责人完成源码对齐并自行合并。上述区间是当前公开协调候选，不表示原 owner 已确认；若 P0 以另一组名称先进入 main 或部署账本，本 PR 必须继承实际已发布的名称，不能把同一 SQL 再次作为新迁移执行。已进入 main 或部署账本的迁移不参与改名。
 
 | 文件 | 目标 |
 | --- | --- |
-| `20261107180000_task_workspace_ownership.sql`（P0 前置） | APP |
+| `20261108120200_task_workspace_ownership.sql`（P0 前置） | APP |
 | `20261108120300_project_v2.sql` | WS |
 | `20261108120301_task_identity.sql` | APP |
 | `20261108120302_task_identity_aliases.sql` | WS |
@@ -90,7 +90,7 @@ PGDATABASE="$MIKKA_DATABASE_URL" PGOPTIONS='-c default_transaction_read_only=on 
   psql -X --set=ON_ERROR_STOP=1 <<'SQL'
 SELECT name, "appliedAt" FROM schema_migrations
 WHERE name IN (
-  '20261107180000_task_workspace_ownership.sql',
+  '20261108120200_task_workspace_ownership.sql',
   '20261108120301_task_identity.sql',
   '20261108120306_project_history_retention.sql',
   '20261108120307_task_alias_tenant.sql'
