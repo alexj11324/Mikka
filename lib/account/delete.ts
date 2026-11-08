@@ -74,7 +74,7 @@ const KEPT_FACTORY_TABLES = ['factory_evidence_reads', 'factory_approvals', 'fac
 
 /** Kept tenant history is independent of a Bot or a former membership.
  * These ids retain data only; every credential and execution lease still goes. */
-export interface KeptThreads { bots: string[]; runs: string[]; agents: string[]; artifacts: string[]; factoryTasks: string[]; events: string[] }
+export interface KeptThreads { bots: string[]; runs: string[]; agents: string[]; artifacts: string[]; factoryTasks: string[]; events: string[]; mailboxes: string[] }
 type TaskRetention = Pick<Plan, 'solo' | 'shared' | 'keptIssueIds'>
 
 export async function keptThreads(client: Pick<PoolClient, 'query'>, userId: string, plan: TaskRetention): Promise<KeptThreads> {
@@ -106,7 +106,15 @@ export async function keptThreads(client: Pick<PoolClient, 'query'>, userId: str
        or e.id in (select "sourceEventId" from factory_tasks where id=any($3::uuid[]))
        or e.id in (select unnest(array["sourceEventId","escalationEventId","answerSourceEventId"])
          from factory_questions where "taskId"=any($3::uuid[]))) order by e.id`, [userId, runIds, factoryTasks])).rows.map(row => row.id) : []
-  return { bots, runs: runIds, agents: [...new Set(runs.map(row => row.agentId))], artifacts, factoryTasks, events }
+  // A mailbox is a history parent, not an execution credential. Preserve the
+  // parents referenced by retained runs/messages, then disable their wake path.
+  const mailboxes = runIds.length ? (await client.query<{ id: string }>(
+    `select m.id from session_mailboxes m where m."userId"=$1 and (
+       m."latestRunId"=any($2::uuid[])
+       or m.id in (select "mailboxId" from agent_runs where id=any($2::uuid[]))
+       or m.id in (select unnest(array["mailboxId","senderMailboxId"]) from run_messages where "runId"=any($2::uuid[])))
+     order by m.id for update of m`, [userId, runIds])).rows.map(row => row.id) : []
+  return { bots, runs: runIds, agents: [...new Set(runs.map(row => row.agentId))], artifacts, factoryTasks, events, mailboxes }
 }
 
 /** The rows of `table` that stay, as a condition on $2. */
@@ -119,6 +127,7 @@ function keptCondition(table: string, kept: KeptThreads): { sql: string; ids: st
   if (table === 'factory_tasks') return { sql: 'id = any($2::uuid[])', ids: kept.factoryTasks }
   if ((KEPT_FACTORY_TABLES as readonly string[]).includes(table)) return { sql: '"taskId" = any($2::uuid[])', ids: kept.factoryTasks }
   if (table === 'coordinator_events') return { sql: 'id = any($2::uuid[])', ids: kept.events }
+  if (table === 'session_mailboxes') return { sql: 'id = any($2::uuid[])', ids: kept.mailboxes }
   if (table === 'operation_ledger') return { sql: '"runId"::text = any($2::text[]) or binding->>\'executionRunId\' = any($2::text[])', ids: kept.runs }
   if ((KEPT_THREAD_TABLES as readonly string[]).includes(table)) return { sql: '"runId" is not null and "runId" = any($2::uuid[])', ids: kept.runs }
   return null
@@ -257,6 +266,7 @@ export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, user
 
 export async function deleteMainAccountData(client: PoolClient, userId: string, plan: Plan): Promise<void> {
   const kept = await keptThreads(client, userId, plan)
+  if (kept.mailboxes.length) await client.query('update session_mailboxes set disabled=true,"wakeBudget"=0 where id=any($1::uuid[]) and "userId"=$2', [kept.mailboxes, userId])
   // Nobody is left to run their unfinished threads; they stay as stopped.
   if (kept.runs.length) await client.query(`update agent_runs set status = 'stopped', "stopRequestedAt" = coalesce("stopRequestedAt", now()), "finishedAt" = coalesce("finishedAt", now()), "leaseExpiresAt" = null, "updatedAt" = now()
     where id = any($1::uuid[]) and "userId" = $2 and status = any($3::text[])`, [kept.runs, userId, [...UNFINISHED_RUN_STATUSES]])
@@ -297,7 +307,15 @@ export async function deleteMainAccountData(client: PoolClient, userId: string, 
     "botId"=case when "botId" in (select id from bots where "ownerId"=$1 and not (id=any($3::uuid[]))) then null else "botId" end,
     "deliveredAt"=coalesce("deliveredAt",now()),"wakeLeaseUntil"=null
     where id=any($2::uuid[]) and "userId"=$1`, [userId, kept.events, kept.bots])
-  await runToFixpoint(client, await deletionStatements(client, userId, plan, kept))
+  const statements = await deletionStatements(client, userId, plan, kept)
+  // Complete child deletes before attempting their execution/task parents.
+  // A guarded workspace also rejects the implicit UPDATE from SET NULL FKs
+  // (Artifact/decision/mailbox -> Run, decision -> Factory/Task, machine -> device).
+  // Keep the existing row predicates; this changes dependency order only.
+  const parentOrder = ['factory_tasks', 'agent_runs', 'agents', 'bots', 'device_repos', 'devices', 'issues']
+  await runToFixpoint(client, statements.filter(statement => !parentOrder.includes(statement.table)))
+  await runToFixpoint(client, statements.filter(statement => parentOrder.includes(statement.table))
+    .sort((left, right) => parentOrder.indexOf(left.table) - parentOrder.indexOf(right.table)))
   // As when a member leaves (releaseDepartingMember): paused until an admin takes the bot over, now with no owner (「待接管」).
   // After the sweep: the owner-bound rows that reference (id, workspaceId, ownerId) are gone. Their shares and card designation went with it.
   if (kept.bots.length) await client.query('update bots set "ownerId" = null, "archivedAt" = coalesce("archivedAt", now()), "updatedAt" = now() where id = any($1::uuid[])', [kept.bots])
@@ -348,6 +366,17 @@ export async function deletionStatements(client: Pick<PoolClient, 'query'>, user
   }
   for (const { table, column } of ownedTables) {
     const rows = ownedRows(table, column)
+    // Run.mailboxId is NO ACTION while mailbox.latestRunId is SET NULL.
+    // Remove only the already eligible rows together, so the statement-end FK
+    // check sees both gone without an UPDATE to either guarded parent.
+    if (table === 'session_mailboxes' && ownerColumn.has('agent_runs')) continue
+    if (table === 'agent_runs' && ownerColumn.has('session_mailboxes')) {
+      const mailbox = ownedRows('session_mailboxes', ownerColumn.get('session_mailboxes')!)
+      statements.push({ table, values: [...rows.values, keptRows.mailboxes],
+        text: `with removed_mailboxes as (delete from session_mailboxes where ${mailbox.where.replaceAll('$2', '$3')} returning id)
+          delete from ${ident(table)} where ${rows.where}` })
+      continue
+    }
     statements.push({ table, values: rows.values, text: `delete from ${ident(table)} where ${rows.where}` })
   }
   const kept = plan.keptIssueIds
