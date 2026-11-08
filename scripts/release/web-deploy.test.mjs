@@ -147,7 +147,7 @@ function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(
         return Response.json({ workflow_runs: runs(elapsed) })
       }
       assert.equal(url.pathname, '/repos/alexj11324/Mikka/actions/runs/70/attempts/2/jobs')
-      return Response.json({ total_count: 1, jobs: [job] })
+      return Response.json({ total_count: 1, jobs: [typeof job === 'function' ? job(elapsed, value => { elapsed = value }) : job] })
     }
     assert.equal(input, PRODUCTION_VERSION_URL)
     assert.equal(init.headers.authorization, undefined)
@@ -170,6 +170,100 @@ test('waits for a GitHub build while Vercel still only serves the older READY so
   assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at), [200, 300])
   assert.ok(fixture.calls.every(call => call.method === 'GET'))
   assert.ok(fixture.calls.every(call => call.origin !== 'https://api.vercel.com'), 'the lock-free wait does not inspect Vercel build states or mutate configuration')
+})
+
+
+test('waits for completed Web step metadata to converge before accepting the public build', async () => {
+  // 3c32675c run 42439514995 completed successfully while its attempt jobs API
+  // still reported Upload in_progress and Verify pending (2026-11-08).
+  for (const event of ['push', 'workflow_dispatch']) {
+    const fixture = webFixture({ runs: () => [webRun({ event })], job: elapsed => {
+      const job = buildJob()
+      if (elapsed < 100) {
+        Object.assign(job.steps[1], { status: 'in_progress', conclusion: null })
+        Object.assign(job.steps[2], { status: 'pending', conclusion: null })
+      } else if (elapsed < 200) {
+        Object.assign(job.steps[2], { status: 'queued', conclusion: null })
+      }
+      return job
+    } })
+    const result = await fixture.run()
+    assert.equal(result.webRunId, 70)
+    assert.equal(result.webAttempt, 2)
+    assert.equal(result.publicBuild, SHA)
+    assert.equal(fixture.elapsed(), 200)
+    assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com')
+      .map(call => call.at), [200], 'public READY cannot replace pending step evidence')
+    assert.ok(fixture.calls.every(call => call.method === 'GET'))
+  }
+})
+
+
+test('pending Web step metadata shares the original deadline without reading the public build', async () => {
+  const job = buildJob()
+  Object.assign(job.steps[1], { status: 'in_progress', conclusion: null })
+  Object.assign(job.steps[2], { status: 'pending', conclusion: null })
+  const fixture = webFixture({ job, budget: 250 })
+  await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
+  assert.equal(fixture.elapsed(), 250)
+  assert.equal(fixture.calls.filter(call => call.path.endsWith('/jobs')).length, 3)
+  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+})
+
+test('main advancing during step metadata convergence stops before another evidence read', async () => {
+  const job = buildJob()
+  Object.assign(job.steps[2], { status: 'pending', conclusion: null })
+  const fixture = webFixture({ job, main: elapsed => elapsed >= 100 ? OTHER : SHA })
+  await assert.rejects(fixture.run(), /mainChanged/)
+  assert.equal(fixture.calls.filter(call => call.path.endsWith('/jobs')).length, 1)
+  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+})
+
+test('step metadata that completes after the original deadline cannot admit a release', async () => {
+  const fixture = webFixture({ job: (elapsed, advance) => {
+    const job = buildJob()
+    if (!elapsed) Object.assign(job.steps[2], { status: 'pending', conclusion: null })
+    else advance(501)
+    return job
+  } })
+  await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
+  assert.equal(fixture.elapsed(), 501)
+  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+})
+
+test('pending step metadata never hides a failed, cancelled or skipped required step', async () => {
+  for (const conclusion of ['failure', 'cancelled', 'skipped', 'timed_out']) {
+    const job = buildJob()
+    job.steps[1].conclusion = conclusion
+    Object.assign(job.steps[2], { status: 'pending', conclusion: null })
+    const fixture = webFixture({ job })
+    await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/, conclusion)
+    assert.equal(fixture.elapsed(), 0)
+    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+  }
+})
+
+test('duplicate, missing or contradictory step evidence fails instead of waiting or accepting public READY', async () => {
+  const cases = [
+    ['duplicate success', job => { job.steps.push({ ...job.steps[1] }) }],
+    ['success plus pending duplicate', job => { job.steps.push({ ...job.steps[1], status: 'pending', conclusion: null }) }],
+    ['missing required step', job => { job.steps.splice(1, 1) }],
+    ['missing steps', job => { delete job.steps }],
+    ['non-array steps', job => { job.steps = {} }],
+    ['unknown status', job => { Object.assign(job.steps[1], { status: 'waiting', conclusion: null }) }],
+    ['completed without result', job => { job.steps[1].conclusion = null }],
+    ['pending with failure', job => { Object.assign(job.steps[1], { status: 'pending', conclusion: 'failure' }) }],
+    ['in-progress with success', job => { job.steps[1].status = 'in_progress' }],
+    ['pending without conclusion', job => { job.steps[1].status = 'pending'; delete job.steps[1].conclusion }],
+  ]
+  for (const [label, change] of cases) {
+    const job = buildJob()
+    change(job)
+    const fixture = webFixture({ job })
+    await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/, label)
+    assert.equal(fixture.elapsed(), 0, label)
+    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0, label)
+  }
 })
 
 test('main advancing while waiting rejects the obsolete source before another workflow or public read', async () => {

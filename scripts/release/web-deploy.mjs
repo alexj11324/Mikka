@@ -181,12 +181,19 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
         { token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
       const builds = (jobs.jobs ?? []).filter(job => job.name === 'deploy' && job.head_sha === webBuild)
       const job = builds[0]
+      const requiredSteps = BUILD_STEPS.map(name => Array.isArray(job?.steps) ? job.steps.filter(step => step.name === name) : [])
       if (jobs.total_count !== jobs.jobs?.length || builds.length !== 1 || job.status !== 'completed' || job.conclusion !== 'success'
-        || !BUILD_STEPS.every(name => job.steps?.filter(step => step.name === name && step.status === 'completed' && step.conclusion === 'success').length === 1)) {
+        || requiredSteps.some(steps => steps.length !== 1 || !(
+          steps[0].status === 'completed' && steps[0].conclusion === 'success'
+          || ['pending', 'queued', 'in_progress'].includes(steps[0].status) && steps[0].conclusion === null
+        ))) {
         throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
       }
       if (remaining() <= 0) break
-      if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay) === webBuild && remaining() > 0) {
+      // GitHub can finish the run/job before its required step metadata catches up.
+      // Only pending metadata reuses the bounded wait below; no public read can replace it.
+      if (requiredSteps.every(([step]) => step.status === 'completed')
+        && await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay) === webBuild && remaining() > 0) {
         if (allowDescendant !== true) await assertCurrentMain({ expectedBuild, token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
         if (remaining() > 0) return { sourceCommit: expectedBuild, webRunId: run.id, webAttempt: run.run_attempt,
           publicBuild: webBuild, verifiedAt: new Date().toISOString() }
