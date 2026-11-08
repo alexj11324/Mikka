@@ -2,6 +2,7 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { extname, join, sep } from 'node:path'
 import { allowedApiPath, normalizedRendererPath, RENDERER_CSP, RENDERER_ORIGIN, rendererAssetPath } from './bundled-policy'
 import type { BundledAuth } from './bundled-auth'
+import { selectedWorkspaceId, WORKSPACE_SELECTION_HEADER } from '../../../../lib/workspace-selection'
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -68,6 +69,10 @@ export function bundledProtocol(root: string, auth: Pick<BundledAuth, 'request'>
         request.headers.forEach((value, key) => { if (REQUEST_HEADERS.has(key)) headers.set(key, value) })
         const locale = request.headers.get('x-mikka-locale')
         if (locale === 'en' || locale === 'zh-CN') headers.set('x-mikka-locale', locale)
+        // A per-request Workspace selection (#1661) is a preference the server checks against
+        // fresh membership; only a well-formed id crosses.
+        const workspace = selectedWorkspaceId(request.headers.get(WORKSPACE_SELECTION_HEADER))
+        if (workspace) headers.set(WORKSPACE_SELECTION_HEADER, workspace)
         const body = await boundedRequestBody(request)
         const response = await auth.request(`${path}${url.search}`, { method: request.method, headers, body, signal: request.signal })
         if (response.status >= 300 && response.status < 400 && response.status !== 304) return failure(502, 'desktop_redirect_denied')
