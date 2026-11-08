@@ -44,28 +44,34 @@ const STALE = new Error('taskPushStale')
  * 2. the workspace selection is read fresh and, when it is another workspace, switched through the existing switch
  *    (lib/workspace-switch.ts), which reads the selection back and restores the old one when the server refuses;
  * 3. only a confirmed selection opens the task.
- * Every stage is bound to the account and context the action owns. It starts with the ones current at the tap; its
- * own save hands it the exact context that save produced, and nothing else does. A read that answers, or fails, after
+ * Every stage is bound to the account and context the action owns. They are captured when the tap is accepted, not
+ * when the queue reaches it, so a tap that waited behind another while the account or context moved stops before its
+ * first read; its own save hands it the exact context that save produced, and nothing else does. A read that answers, or fails, after
  * the account or context moved (the person picked a workspace, another account was selected, a sign-out) stops the
  * action ('stale') before any save or rollback, so a stale action never writes a selection, never restores an old
  * `previous` into a new context and never opens. A refusal within the owned context still restores the previous pick.
  * A refused or unreadable confirmation stops: nothing opens and no other workspace is tried; the person sees
- * `unconfirmed` with a retry. A newer tap supersedes an older one still waiting. `invalid` refuses a push whose task
- * target is malformed.
+ * `unconfirmed` with a retry. A newer tap supersedes an older one, waiting or under way: the older one stops before
+ * its next read, save or rollback and opens nothing. `invalid` refuses a push whose task target is malformed.
  */
 export function taskPushOpener(deps: TaskPushDeps) {
   let latest = 0
   let queue: Promise<unknown> = Promise.resolve()
-  const confirm = async (target: TaskPushTarget, ticket: number): Promise<TaskPushResult> => {
+  const confirm = async (target: TaskPushTarget, ticket: number, tapped: TaskPushOwner): Promise<TaskPushResult> => {
     if (ticket !== latest) return 'superseded'
-    let owned = deps.owner()
-    let stale = false, signedOut = false
-    const owns = () => !stale && same(deps.owner(), owned)
+    if (!same(deps.owner(), tapped)) return 'stale'
+    let owned = tapped
+    let stale = false, signedOut = false, superseded = false
+    const owns = () => {
+      if (ticket !== latest) superseded = true
+      return !stale && !superseded && same(deps.owner(), owned)
+    }
     const current = async () => {
       const asked = owned
+      if (!owns()) { stale = !superseded; throw STALE }
       try {
         const value = await deps.current()
-        if (!owns() || !same(owned, asked)) { stale = true; throw STALE }
+        if (!owns() || !same(owned, asked)) { stale = !superseded; throw STALE }
         return value
       } catch (error) {
         if (error !== STALE) {
@@ -77,27 +83,28 @@ export function taskPushOpener(deps: TaskPushDeps) {
     }
     // The save and the switch's rollback alike: written only in the owned context, which then becomes the one it made.
     const save = async (id: string) => {
-      if (!owns()) { stale = true; throw STALE }
+      if (!owns()) { stale = !superseded; throw STALE }
       const produced = await deps.save(id, owned)
       if (produced === null) { stale = true; throw STALE }
       owned = { account: owned.account, context: produced }
     }
     let selected: string
-    try { selected = await current() } catch { return stale ? 'stale' : signedOut ? 'signedOut' : 'refused' }
+    try { selected = await current() } catch { return superseded ? 'superseded' : stale ? 'stale' : signedOut ? 'signedOut' : 'refused' }
     if (selected !== target.workspaceId) {
       const failed = await switchWorkspace({ id: target.workspaceId, name: '' }, selected, { save, current })
+      if (superseded) return 'superseded'
       if (stale) return 'stale'
       if (signedOut) return 'signedOut'
       if (failed) return 'refused'
     }
-    if (!owns()) return 'stale'
-    if (ticket !== latest) return 'superseded'
+    if (!owns()) return superseded ? 'superseded' : 'stale'
     deps.open(taskPushHref(target))
     return 'opened'
   }
   const open = (target: TaskPushTarget): Promise<TaskPushResult> => {
     const ticket = ++latest
-    const next = queue.then(() => confirm(target, ticket)).then(result => {
+    const tapped = deps.owner()
+    const next = queue.then(() => confirm(target, ticket, tapped)).then(result => {
       // The feedback is after the stop and changes nothing about it.
       if (result === 'refused') deps.unconfirmed(() => { void open(target) })
       return result

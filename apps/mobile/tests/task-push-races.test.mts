@@ -27,7 +27,7 @@ const { openTaskPush } = await import('../lib/task-push-app.ts')
 const alpha = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 const beta = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const gamma = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
-const task = '22222222-2222-4222-8222-222222222222'
+const task = '22222222-2222-4222-8222-222222222222', other = '33333333-3333-4333-8333-333333333333'
 const keyA = accountStorageKey('legacy', 'workspace'), keyB = accountStorageKey('1', 'workspace')
 
 // Every screen's cache is dropped on a switch, as lib/useApi.ts does once it is loaded.
@@ -130,5 +130,39 @@ test('race 3: A → B while the second confirmation is pending, then it fails; n
   assert.equal(stored.has(keyB), false, 'A\'s Beta is never rolled back into B')
   assert.deepEqual(pushed, [])
   assert.equal(requests.length, 2)
+  assert.deepEqual(alerts, [])
+})
+
+test('race 4: a second push queued in A, then A → B before it runs; it stops on the account it was tapped in', async () => {
+  await reset()
+  const first = deferred<Response>()
+  replies = [() => first.promise]
+  openTaskPush({ workspaceId: alpha, issueId: task, runId: null })
+  await until(() => requests.length === 1)
+  // Accepted while the first is still waiting: it queues behind it, in A.
+  openTaskPush({ workspaceId: alpha, issueId: other, runId: null })
+  await servers.select('1')
+  apiCache.setIdentity('1:user-b', 'user-b')
+  first.resolve(settings(beta))
+  await settle()
+  assert.equal(stored.has(keyB), false, 'no read, save or rollback for the queued push in B')
+  assert.equal(stored.get(keyA), beta)
+  assert.deepEqual(pushed, [])
+  assert.equal(requests.length, 1, 'the queued push sends nothing once A is no longer current')
+  assert.deepEqual(alerts, [])
+})
+
+test('a newer push in the same account supersedes the waiting one before it writes, then opens itself', async () => {
+  await reset()
+  const first = deferred<Response>()
+  replies = [() => first.promise]
+  openTaskPush({ workspaceId: gamma, issueId: task, runId: null })
+  await until(() => requests.length === 1)
+  openTaskPush({ workspaceId: alpha, issueId: other, runId: null })
+  first.resolve(settings(beta))
+  await until(() => pushed.length > 0)
+  await settle()
+  assert.deepEqual(pushed, [`/task/${other}?workspace=${alpha}`], 'only the newer push opens')
+  assert.equal(stored.get(keyA), alpha, 'the older push never saved Gamma')
   assert.deepEqual(alerts, [])
 })
