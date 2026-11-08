@@ -44,6 +44,16 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
     mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') }),
     mock.module('next-intl/server', { namedExports: await import('../apps/api/compat/intl') }),
   ]
+  // Keep authentication, Workspace/Bot resolution and message persistence
+  // real; capture only the external Coordinator dispatch after its commit.
+  const background = await import('../lib/background')
+  const coordinatorWakes: Array<() => unknown> = []
+  framework.push(mock.module(new URL('../lib/background.ts', import.meta.url).href, { namedExports: { ...background,
+    afterJob: (...args: Parameters<typeof background.afterJob>) => {
+      if (args[0] === 'after:coordinator-wake') { coordinatorWakes.push(args[1]); return }
+      return background.afterJob(...args)
+    },
+  } }))
   let payloadBarrier: PayloadBarrier | undefined
   const query = pg.Client.prototype.query
   const queryProbe = mock.method(pg.Client.prototype, 'query', function (this: pg.Client, ...args: unknown[]) {
@@ -183,6 +193,46 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
       (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1) AS runs,
       (SELECT jsonb_agg(jsonb_build_array(id,"workspaceId",revision,status,stage) ORDER BY id) FROM factory_tasks WHERE "userId"=$1) AS tasks,
       (SELECT count(*)::int FROM factory_events e JOIN factory_tasks t ON t.id=e."taskId" WHERE t."userId"=$1) AS events`, [owner.userId])).rows[0]
+    await t.test('a captured Coordinator workspace is checked before ensuring a Bot or writing an inbox event', async () => {
+      const fresh = await seedFixtureWorkspace(workspacePool, owner.userId, 'team')
+      tenants.push(fresh)
+      const stored = async () => ({ ...await snapshot(), ...(await pool.query(`SELECT
+        (SELECT jsonb_agg(jsonb_build_array(id,"workspaceId",name) ORDER BY id) FROM bots WHERE "ownerId"=$1) AS bots,
+        (SELECT jsonb_agg(jsonb_build_array("workspaceId","botId") ORDER BY "workspaceId") FROM coordinator_bots WHERE "ownerId"=$1) AS coordinators,
+        (SELECT jsonb_agg(jsonb_build_array(id,"botId","dedupeKey",payload,"issueId","runId") ORDER BY id) FROM coordinator_events WHERE "userId"=$1) AS inbox`, [owner.userId])).rows[0] })
+      const before = await stored(), wakes = coordinatorWakes.length
+      const submissionId = randomUUID(), text = 'Synthetic captured Workspace submission'
+      const args = (expected: string, botId: string | null = null) => [text, null, botId, submissionId, undefined, undefined, undefined, undefined, undefined, expected]
+      for (const [selected, expected] of [[beta, alpha], [fresh, alpha], [alpha, foreign]]) {
+        const refused = await rpc<{ error?: string }>('coordinator.sendCoordinatorMessage', args(expected), selected)
+        assert.equal(refused.response.status, 200); assert.equal(refused.ok, true)
+        assert.equal(refused.result?.error, 'workspaceAccessDenied')
+        assert.deepEqual(await stored(), before, 'the expectation never retargets or creates the selected Coordinator')
+        assert.equal(coordinatorWakes.length, wakes)
+      }
+      assert.equal((await pool.query('SELECT 1 FROM coordinator_bots WHERE "ownerId"=$1 AND "workspaceId"=$2', [owner.userId, fresh])).rowCount, 0)
+
+      const accepted = await rpc<{ queued?: boolean }>('coordinator.sendCoordinatorMessage', args(alpha.toUpperCase()), alpha)
+      assert.equal(accepted.response.status, 200); assert.equal(accepted.result?.queued, true)
+      const source = await pool.query(`SELECT e.id,e."botId",b."workspaceId",e.payload FROM coordinator_events e
+        JOIN bots b ON b.id=e."botId" WHERE e."userId"=$1 AND e.payload->>'text'=$2`, [owner.userId, text])
+      assert.equal(source.rowCount, 1); assert.equal(source.rows[0].workspaceId, alpha)
+      const session = await auth.api.getSession({ headers: new Headers({ authorization: `Bearer ${owner.token}` }), query: { disableCookieCache: true } })
+      assert.ok(session); assert.equal(session.user.id, owner.userId)
+      assert.deepEqual(source.rows[0].payload, { text, humanSessionId: session.session.id }, 'the message retains authenticated session provenance, not the client Workspace expectation')
+      assert.equal(coordinatorWakes.length, wakes + 1)
+      const recorded = await stored()
+      const retryElsewhere = await rpc<{ error?: string }>('coordinator.sendCoordinatorMessage', args(alpha), beta)
+      assert.equal(retryElsewhere.result?.error, 'workspaceAccessDenied')
+      assert.deepEqual(await stored(), recorded); assert.equal(coordinatorWakes.length, wakes + 1)
+      const retryOriginal = await rpc<{ queued?: boolean }>('coordinator.sendCoordinatorMessage', args(alpha), alpha)
+      assert.equal(retryOriginal.result?.queued, true)
+      assert.deepEqual(await stored(), recorded, 'retrying in the captured Workspace keeps the original event and Bot')
+      const afterRetryWakes = coordinatorWakes.length
+      const otherBot = await rpc<{ error?: string }>('coordinator.sendCoordinatorMessage', args(beta, source.rows[0].botId), beta)
+      assert.equal(otherBot.result?.error, 'botNotFound', 'a matching expectation does not grant a same-owner foreign Bot')
+      assert.deepEqual(await stored(), recorded); assert.equal(coordinatorWakes.length, afterRetryWakes)
+    })
     await t.test('invalid, foreign and foreign-Personal choices fail closed; a query target cannot hide an invalid selection', async () => {
       const before = await snapshot()
       for (const workspaceId of ['', 'invalid', `${alpha}, ${beta}`, randomUUID(), foreign, foreignPersonal]) {
