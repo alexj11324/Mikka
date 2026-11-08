@@ -237,6 +237,89 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
     assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
   })
 
+  await t.test('protected Secret renewal rechecks current Enterprise authority on the same admitted run with pools of one', async () => {
+    const { createWorkspaceSecret } = await import('../secrets/store')
+    const { taskSecretInjection } = await import('../secrets/runtime')
+    const { issueEgressCapability, openEgressCapability } = await import('../secrets/egress-capability')
+    const { renewTaskSecretAccess } = await import('../secrets/task-renewal')
+    const connectionId = randomUUID(), directoryId = randomUUID(), providerId = 'secret-renewal-' + randomUUID()
+    const runId = await queuedRun(), canary = 'synthetic-enterprise-secret-' + randomBytes(24).toString('hex')
+    const name = 'ENTERPRISE_RENEWAL_TOKEN'
+    const http = { origin: 'https://api.example.invalid', header: 'authorization' as const, prefix: 'Bearer ',
+      rules: [{ method: 'GET' as const, path: '/v1/items', match: 'exact' as const }] }
+    const state = async () => (await control.query(`SELECT "workspaceId",status,"leaseExpiresAt","stopRequestedAt",attempt,"deviceTokenId","machineAuthority"
+      FROM agent_runs WHERE id=$1`, [runId])).rows[0]
+    assert.deepEqual((await control.query('SELECT "enforceSso","allowMachineCredentials" FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])).rows[0],
+      { enforceSso: true, allowMachineCredentials: true })
+    await control.query(`INSERT INTO enterprise_sso_provider(id,"providerId","organizationScopeId","userId",issuer,domain,"domainVerified","oidcConfig","domainTokenHash")
+      VALUES($1,$2,$3,$4,'https://secret-renewal.example.invalid',$5,true,'{}',$6)`,
+    [randomUUID(), providerId, organizationId, userId, randomUUID() + '.example.invalid', randomBytes(32).toString('hex')])
+    await control.query('INSERT INTO enterprise_scim_connection(id,"organizationId","providerId","tokenHash") VALUES($1,$2,$3,$4)',
+      [connectionId, organizationId, providerId, randomBytes(32).toString('hex')])
+    await control.query(`INSERT INTO enterprise_scim_user(id,"connectionId","organizationId","externalId","userName","userId",active,document)
+      VALUES($1,$2,$3,$4,$5,$6,true,'{}')`, [directoryId, connectionId, organizationId, randomUUID(), userId + '@example.invalid', userId])
+    try {
+      const created = await native(() => createWorkspaceSecret(userId, alpha, { name, kind: 'secret', value: canary,
+        delivery: { mode: 'protected', http } }), { runId })
+      assert.equal(created.status, 200)
+      const secretId = (await created.json()).value.id as string
+      const lease = new Date(Date.now() + 120_000)
+      const claimed = await native(() => claimLocalRun(pool, runId, deviceId, lease, undefined, undefined, async tx => {
+        // Match the original claim's host-written token lineage; no authority
+        // constructor or membership bypass is added to the renewal under test.
+        await tx.query('UPDATE agent_runs SET "deviceTokenId"=$2,"machineAuthority"=$4 WHERE id=$1 AND "userId"=$3',
+          [runId, tokenId, userId, true])
+      }), { runId })
+      assert.equal(claimed.status, 200); assert.equal((await claimed.json()).value, 'claimed')
+      const admitted = await state()
+      assert.equal(admitted.workspaceId, alpha); assert.equal(admitted.deviceTokenId, tokenId)
+      assert.equal(admitted.leaseExpiresAt.toISOString(), lease.toISOString())
+      const injection = await taskSecretInjection(alpha, null, process.env, undefined, userId)
+      const secret = injection.protectedSecrets.find(value => value.id === secretId)
+      assert.ok(secret?.revision)
+      const binding = { ownerId: userId, workspaceId: alpha, repository: null, runId, deviceId, deviceTokenId: tokenId, attempt: admitted.attempt }
+      const grant = issueEgressCapability({ ...binding, name, secret: canary, secretId, revision: secret.revision, http, leaseExpiresAt: lease })
+      const renew = () => renewTaskSecretAccess({ caller: { userId, tokenId }, deviceId,
+        runs: [{ runId, secretCapabilities: [grant.capability] }], leases: { [runId]: lease.toISOString() },
+        endpoint: id => `https://mikka.example.invalid/v1/task-secrets/${id}` })
+      const checkRenewal = async (authorized: boolean) => {
+        const response = await native(renew, { runId })
+        assert.equal(response.status, 200)
+        const wire = await response.text(), result = JSON.parse(wire).value
+        for (const value of [canary, Buffer.from(canary).toString('base64')]) assert.equal(wire.includes(value), false)
+        if (authorized) {
+          assert.deepEqual(result.revoked, [])
+          assert.equal(result.taskSecrets[runId].grants.length, 1)
+          const claims = openEgressCapability(result.taskSecrets[runId].grants[0].capability, binding)
+          assert.equal(claims.secret, canary); assert.equal(claims.secretId, secretId)
+          assert.ok(claims.expiresAt <= lease.getTime())
+        } else {
+          assert.deepEqual(result, { taskSecrets: {}, revoked: [runId] })
+          assert.equal(wire.includes('mikka-egress-v1.'), false, 'refused authority returns no sealed capability')
+        }
+        assert.deepEqual(await state(), admitted, 'renewal does not extend or rewrite the admitted run lease, attempt or token')
+        assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
+      }
+      await checkRenewal(true)
+      await control.query('UPDATE enterprise_org_policy SET "allowMachineCredentials"=false WHERE "organizationId"=$1', [organizationId])
+      await checkRenewal(false)
+      await control.query('UPDATE enterprise_org_policy SET "allowMachineCredentials"=true WHERE "organizationId"=$1', [organizationId])
+      await checkRenewal(true)
+      await control.query('UPDATE enterprise_scim_user SET active=false WHERE id=$1', [directoryId])
+      assert.equal((await control.query('SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, userId])).rows[0].status,
+        'active', 'SCIM authority alone must refuse even before Workspace membership delivery')
+      await checkRenewal(false)
+      await control.query('UPDATE enterprise_scim_user SET active=true WHERE id=$1', [directoryId])
+      await checkRenewal(true)
+    } finally {
+      await control.query('UPDATE enterprise_org_policy SET "allowMachineCredentials"=true WHERE "organizationId"=$1', [organizationId])
+      await control.query('DELETE FROM enterprise_scim_user WHERE id=$1', [directoryId])
+      await control.query('DELETE FROM enterprise_scim_connection WHERE id=$1', [connectionId])
+      await control.query('DELETE FROM enterprise_sso_provider WHERE "providerId"=$1', [providerId])
+      await control.query(`UPDATE agent_runs SET status='cancelled' WHERE id=$1`, [runId])
+    }
+  })
+
   await t.test('original human/PAT authority always wins and absence or forged fields cannot inherit server authority', async () => {
     const { getApiSession } = await import('../api-auth')
     const request = new Request('http://localhost:3100/mikka/api/factory/tasks', { headers: { authorization: 'Bearer ' + plain.token } })

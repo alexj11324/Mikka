@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
-import { PgDialect } from 'drizzle-orm/pg-core'
+import { PgDialect, QueryBuilder, type PgTable, type SelectedFields } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
 import { agentRuns, issueMembers, runChunks, runMessages } from './db/schema'
 import { workspaceMembers, workspaces } from './db/workspace-schema'
-import { organizationWorkspaces } from './db/governance-schema'
 import { factoryEventId } from './factory/event-id'
 import { FactoryError } from './factory/contract'
 
@@ -14,6 +13,7 @@ const issueId = '31300000-0000-4000-8000-000000000002'
 const botId = '31300000-0000-4000-8000-000000000003'
 const workspaceId = '31300000-0000-4000-8000-000000000004'
 const dialect = new PgDialect()
+const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
 let viewer: string | null = 'owner'
 let requestHeaders = new Headers({cookie: 'synthetic-session'})
 let sessionUser: string | null = null
@@ -158,29 +158,51 @@ before(async () => {
   } } } })
   mock.module('@/lib/workspace-db', { namedExports: {
     workspacePool: { query: () => { throw new Error('Unexpected raw workspace read') } },
-    workspaceDb: { select: (projection?: Record<string, unknown>) => ({ from: (table: unknown) => {
-      let organizationJoined = false
-      const query = { innerJoin: () => query, leftJoin: (joined: unknown, condition: SQL) => {
-        assert.equal(table, workspaces)
-        assert.equal(joined, organizationWorkspaces)
-        assert.deepEqual(projection, { id: workspaces.id, kind: workspaces.kind, organizationId: organizationWorkspaces.organizationId })
-        const sql = dialect.sqlToQuery(condition)
-        assert.match(sql.sql, /"mikka_organization_workspaces"\."workspaceId" = "mikka_workspaces"\."id"/)
-        assert.deepEqual(sql.params, [])
-        organizationJoined = true
-        return query
-      }, where: (condition: SQL) => {
-        const sql = dialect.sqlToQuery(condition)
-        assert.ok(sql.params.includes(workspaceId)); assert.ok(sql.params.includes('active'))
-        assert.ok(table === workspaceMembers || table === workspaces)
-        if (projection?.organizationId) assert.equal(organizationJoined, true)
-        // This fixture has no organization link. A LEFT JOIN projects SQL NULL;
-        // it must still resolve membership from the fixture's current members.
-        const rows = table === workspaceMembers ? [...current.members].map(id => ({ id }))
-          : current.members.has(String(sql.params[0])) ? [{ id: workspaceId, kind: 'team', ...(organizationJoined ? { organizationId: null } : {}) }] : []
-        const result = Promise.resolve(rows)
-        return Object.assign(result, { orderBy: () => result })
-      } }
+    workspaceDb: { select: (projection?: Record<string, unknown>) => ({ from: (table: PgTable) => {
+      let member: PgTable | undefined, organization: PgTable | undefined
+      let memberJoin: SQL | undefined, organizationJoin: SQL | undefined
+      const query = {
+        innerJoin: (joined: PgTable, predicate: SQL) => {
+          assert.equal(member, undefined); member = joined; memberJoin = predicate
+          return query
+        },
+        leftJoin: (joined: PgTable, predicate: SQL) => {
+          assert.ok(member); assert.equal(organization, undefined)
+          organization = joined; organizationJoin = predicate
+          return query
+        },
+        where: (condition: SQL) => {
+          if (projection?.organizationId) {
+            assert.deepEqual(Object.keys(projection), ['id', 'kind', 'organizationId'])
+            assert.ok(member && organization && memberJoin && organizationJoin)
+            const selected = new QueryBuilder().select(projection as SelectedFields).from(table)
+              .innerJoin(member, memberJoin).leftJoin(organization, organizationJoin).where(condition)
+            return { orderBy: async (order: SQL) => {
+              const compiled = selected.orderBy(order).toSQL()
+              let actualSql = compiled.sql
+              // Expand only fixed aliases; compare every base table, column,
+              // join, predicate and parameter against the original query.
+              for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
+                actualSql = actualSql.replaceAll('"' + table + '" "' + name + '"', '"' + table + '"')
+                  .replaceAll('"' + name + '".', '"' + table + '".')
+              }
+              assert.equal(actualSql, expectedMembershipSql)
+              assert.deepEqual(compiled.params, [viewer, 'active', workspaceId, 'team', 'personal', viewer])
+              // SQL NULL keeps the real Enterprise filter on the ordinary
+              // Shared path; membership still follows this fixture's state.
+              return current.members.has(String(viewer)) ? [{ id: workspaceId, kind: 'team', organizationId: null }] : []
+            } }
+          }
+          const sql = dialect.sqlToQuery(condition)
+          assert.ok(sql.params.includes(workspaceId)); assert.ok(sql.params.includes('active'))
+          assert.ok(table === workspaceMembers || table === workspaces)
+          assert.equal(member, undefined); assert.equal(organization, undefined)
+          const rows = table === workspaceMembers ? [...current.members].map(id => ({ id }))
+            : current.members.has(String(sql.params[0])) ? [{ id: workspaceId, kind: 'team' }] : []
+          const result = Promise.resolve(rows)
+          return Object.assign(result, { orderBy: () => result })
+        },
+      }
       return query
     } }) },
   } })

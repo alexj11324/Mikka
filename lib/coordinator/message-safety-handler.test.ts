@@ -3,10 +3,8 @@ import { after, before, mock, test } from 'node:test'
 import { createHash } from 'node:crypto'
 import net from 'node:net'
 import type { SQL } from 'drizzle-orm'
-import { PgDialect } from 'drizzle-orm/pg-core'
+import { PgDialect, QueryBuilder, type PgTable, type SelectedFields } from 'drizzle-orm/pg-core'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, runMessages } from '../db/schema'
-import { workspaces, workspaceMembers } from '../db/workspace-schema'
-import { organizationWorkspaces } from '../db/governance-schema'
 import { sourcedEventMessage } from './message-safety'
 import { createApiHandler } from '../../apps/api/src/application'
 import * as apiServer from '../../apps/api/compat/server'
@@ -98,25 +96,40 @@ stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () =
 // The person's Coordinator is an ordinary bot row; MCP resolves it for the authenticated owner.
 const coordinator = '28700000-0000-4000-8000-0000000c0de1'
 const workspace = '28700000-0000-4000-8000-0000000000a1'
+const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
 stub('../workspace-db.ts', { workspaceDb: { select: (fields?: Record<string, unknown>) => {
-  assert.deepEqual(fields, { id: workspaces.id, kind: workspaces.kind, organizationId: organizationWorkspaces.organizationId })
+  assert.ok(fields)
+  assert.deepEqual(Object.keys(fields), ['id', 'kind', 'organizationId'])
+  let source: PgTable | undefined, member: PgTable | undefined, organization: PgTable | undefined
+  let memberJoin: SQL | undefined, organizationJoin: SQL | undefined, condition: SQL | undefined
   const selection = {
-    from: (table: unknown) => { assert.equal(table, workspaces); return selection },
-    innerJoin: (table: unknown) => { assert.equal(table, workspaceMembers); return selection },
-    leftJoin: (table: unknown, condition: SQL) => {
-      assert.equal(table, organizationWorkspaces)
-      const query = dialect.sqlToQuery(condition)
-      assert.equal(query.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"')
-      assert.deepEqual(query.params, [])
+    from: (table: PgTable) => { assert.equal(source, undefined); source = table; return selection },
+    innerJoin: (table: PgTable, predicate: SQL) => {
+      assert.ok(source); assert.equal(member, undefined)
+      member = table; memberJoin = predicate
       return selection
     },
-    where: (condition: SQL) => {
-      const query = dialect.sqlToQuery(condition)
-      assert.ok(query.params.includes(owner)); assert.ok(query.params.includes(workspace))
-      assert.ok(query.params.includes('active')); assert.ok(query.params.includes('team')); assert.ok(query.params.includes('personal'))
+    leftJoin: (table: PgTable, predicate: SQL) => {
+      assert.ok(member); assert.equal(organization, undefined)
+      organization = table; organizationJoin = predicate
       return selection
     },
-    orderBy: async () => [{ id: workspace, kind: 'team', organizationId: null }],
+    where: (predicate: SQL) => { assert.equal(condition, undefined); condition = predicate; return selection },
+    orderBy: async (order: SQL) => {
+      assert.ok(source && member && organization && memberJoin && organizationJoin && condition)
+      const compiled = new QueryBuilder().select(fields as SelectedFields).from(source)
+        .innerJoin(member, memberJoin).leftJoin(organization, organizationJoin).where(condition).orderBy(order).toSQL()
+      let actualSql = compiled.sql
+      // Preserve the complete authenticated owner/Workspace query while
+      // allowing only its three fixed declaration/qualifier aliases.
+      for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
+        actualSql = actualSql.replaceAll('"' + table + '" "' + name + '"', '"' + table + '"')
+          .replaceAll('"' + name + '".', '"' + table + '".')
+      }
+      assert.equal(actualSql, expectedMembershipSql)
+      assert.deepEqual(compiled.params, [owner, 'active', workspace, 'team', 'personal', owner])
+      return [{ id: workspace, kind: 'team', organizationId: null }]
+    },
   }
   return selection
 } }, workspacePool: { query: async (sql: string, params: unknown[]) => {

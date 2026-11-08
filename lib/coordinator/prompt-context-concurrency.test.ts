@@ -38,7 +38,7 @@ stub('./personal-instructions.ts', { withPersonalInstructions: async (...args: u
   if (denied) throw denied
   return instructionsWithPersonal(args[1] as string, personal)
 } })
-stub('./github-context.ts', { githubContext: async (...args: unknown[]) => { await enter('github', args); return github } })
+stub('./github-context.ts', { githubPromptContext: async (...args: unknown[]) => { await enter('github', args); return github } })
 stub('./execution-context.ts', { executionContextParts: async (...args: unknown[]) => { await enter('execution', args); return facts } })
 stub('./summary-model.ts', { summarizeConversation: forbidden })
 stub('../personal-mailbox-config.ts', { personalMailboxEnabled: () => false })
@@ -87,7 +87,7 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
     // The old serial code starts only execution here. No sleeps or timing threshold.
     assert.deepEqual(calls.map(call => call.reader), ['execution', 'personal', 'github'])
     assert.deepEqual(calls.find(call => call.reader === 'execution')?.args, [owner, bot])
-    assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, undefined, undefined, bot])
+    assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, undefined, undefined, undefined, bot])
     assert.deepEqual(calls.find(call => call.reader === 'personal')?.args, [owner, withCoordinatorPresentation(executionInstructions(snapshot)), { servers: [], skills: [] }])
   } finally {
     // Complete in reverse order; assembly order and the cache boundary must not change.
@@ -124,4 +124,18 @@ test('prepareTurn returns only fixed numeric context timings beside the unchange
   assert.deepEqual(calls.map(call => call.reader), ['execution', 'personal', 'github'])
   assert.doesNotMatch(JSON.stringify(prepared.contextMs), /Synthetic|owner|request|instruction|repositories/)
   assert.ok(!('contextMs' in prepared.prompt) && !('phaseMs' in prepared.prompt), 'diagnostics never become model options or cached text')
+})
+
+test('hosted preparation forwards only its frozen discovery grant and scheduled-read restriction', async () => {
+  for (const input of [
+    { snapshot, runtime: {} },
+    { snapshot: { ...snapshot, effectiveTools: [] }, runtime: {} },
+    { snapshot, runtime: null },
+  ]) {
+    calls.length = 0
+    await prepareTurn(owner, bot, 'synthetic-holder', { ...input, mailboxEnabled: false })
+    assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [
+      owner, { hosted: true, readOnly: input.runtime === null, effectiveTools: input.snapshot.effectiveTools }, undefined, undefined, bot,
+    ])
+  }
 })

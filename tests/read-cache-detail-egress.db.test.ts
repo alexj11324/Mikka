@@ -17,10 +17,11 @@ function successful<T>(result: ActionResult<T>): T {
 }
 
 test('detail and activity revalidate current access while returning only changed content and history summaries', { skip: !enabled }, async t => {
-  const { pool } = await import('../lib/db')
+  const { db, pool } = await import('../lib/db')
   const { actAs } = await import('../lib/acting-user')
   const { getIssue, saveIssue, listIssueVersions, pollIssue, pollIssueVersionSummaries, promoteIssueToTeam } = await import('../app/actions/issues')
   const { syncCoordinatorChat } = await import('../app/actions/coordinator')
+  const { setIssueTeam } = await import('../app/actions/team-relations')
   const owner = `detail-cache-${randomUUID()}`, stranger = `detail-stranger-${randomUUID()}`
   const workspaceId = randomUUID(), personalWorkspaceId = randomUUID(), teamId = randomUUID(), botId = randomUUID()
   const read = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), personalWorkspaceId) as Promise<T>
@@ -139,6 +140,277 @@ test('detail and activity revalidate current access while returning only changed
     await pool.query('delete from bots where id=$1', [botId])
     assert.equal((await readChat(botId, previousChat.version, continuation)).error, 'botNotFound')
 
+    await t.test('unlinked workspace details reuse current negative ACL reads and refresh their identifier after relinking', async t => {
+      const { listIssueConnections } = await import('../app/actions/issue-operations')
+      const { citationSources } = await import('../lib/coordinator/store')
+      const { runAction } = await import('../lib/action-error')
+      // Team links only name this already-bound shared task. The Personal task
+      // above remains a separate control; unlinking never transfers ownership.
+      const id = sharedId
+      const readWorkspace = <T>(work: () => Promise<T>) => withActivitySession(owner, () => actAs(owner, work), workspaceId) as Promise<T>
+      const sharedNumber = successful(await readWorkspace(() => getIssue(id))).issue.metadata.number
+      assert.equal(sharedNumber, 2, 'the shared task keeps its owner-allocated number')
+      const citationAgent = randomUUID(), citationRun = randomUUID()
+      await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4)', [citationAgent, owner, 'Citation control', 'codex'])
+      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,"agentDefinition","workspaceId") values($1,$2,$3,$4,$5,$6,$7,$8)',
+        [citationRun, owner, id, citationAgent, 'succeeded', 'Citation control', JSON.stringify({ harness: 'codex', executionIdentity: { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId } }), workspaceId])
+      const issueCite = `[[issue:${id}]]`, runCite = `[[run:${citationRun}]]`
+      await readWorkspace(() => listIssueConnections(id))
+      // Initialize both exact read shapes before recording their steady-state
+      // budgets. Keep the warm-up socket costs visible, including any new
+      // connections opened by concurrent run and team reads.
+      const linkedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const linkedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
+      t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'linked',
+        scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(linkedDirectWarm),
+        runOnlyCitation: readMetrics(linkedRunWarm) }))
+      const linkedConnections = await measured(() => readWorkspace(() => listIssueConnections(id)))
+      const linkedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const linkedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
+      const removed = await withActivitySession(owner, () => setIssueTeam({ issueId: id, teamId: null, expectedTeamId: teamId }), workspaceId)
+      assert.equal(removed.ok, true)
+      assert.equal((await pool.query('select "workspaceId" from issues where id=$1', [id])).rows[0].workspaceId, workspaceId, 'removing the team link preserves the task tenant')
+      await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2),($3,$4)', [owner, 'READ', stranger, 'OTHR'])
+      const personal = successful(await read(() => saveIssue({ title: 'Personal read control', content: { type: 'doc' }, status: 'todo', priority: 'normal' }))).issue
+      const otherPersonal = successful(await actAs(stranger, () => saveIssue({ title: 'Other prefix control', content: { type: 'doc' }, status: 'todo', priority: 'normal' }))).issue
+      assert.ok(personal && otherPersonal)
+      assert.equal((successful(await actAs(stranger, () => getIssue(otherPersonal.id)))).issue.identifier, 'OTHR-1')
+      // Warm both paths before measuring; both use the same owner and have no
+      // team link. The workspace detail retains its existing Linear check.
+      await read(() => getIssue(personal.id))
+      const ownerView = successful(await readWorkspace(() => getIssue(id))).issue
+      assert.equal(ownerView.scope, 'workspace')
+      assert.equal(ownerView.identifier, `READ-${sharedNumber}`)
+      // The write response also calls issueView without a known team map.
+      // Compare the same-owner, no-link controls through the real save action.
+      const personalSave = await measured(() => read(async () => successful(await saveIssue({
+        id: personal.id, revision: personal.revision, title: personal.title, content: personal.content,
+        status: personal.status, priority: personal.priority,
+      }))))
+      const unlinkedSave = await measured(() => readWorkspace(async () => successful(await saveIssue({
+        id, revision: ownerView.revision, title: ownerView.title, content: ownerView.content,
+        status: ownerView.status, priority: ownerView.priority,
+      }))))
+      await t.test('default issueView in saveIssue reuses the verification read for owner prefix', () => {
+        assert.equal(unlinkedSave.value.issue?.identifier, `READ-${sharedNumber}`)
+        assert.equal(unlinkedSave.value.issue?.scope, 'workspace')
+        assert.equal(unlinkedSave.value.issue?.linearTargetVerified, false)
+        assert.deepEqual(unlinkedSave.value.issue?.content, ownerView.content, 'identifier resolution does not rewrite the task body')
+        assert.ok(unlinkedSave.statements <= personalSave.statements + 1,
+          `default issueView statements ${unlinkedSave.statements} vs personal ${personalSave.statements} plus one team read`)
+      })
+      const unlinkedDirectWarm = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const unlinkedRunWarm = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
+      t.diagnostic(JSON.stringify({ event: 'identifier_reader_warmup', teamState: 'unlinked',
+        scope: 'data-read-path_including_connection_startup', directCitation: readMetrics(unlinkedDirectWarm),
+        runOnlyCitation: readMetrics(unlinkedRunWarm) }))
+      const unlinkedConnections = await measured(() => readWorkspace(() => listIssueConnections(id)))
+      const unlinkedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const unlinkedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
+
+      // Frozen same-fixture measurements on main 3c32675c: a changed linked
+      // control cannot make an upstream SQL/payload regression pass.
+      const originalIdentifierReadMetrics = {
+        linkedConnections: { statements: 14, read: 3490, written: 5497 },
+        unlinkedConnections: { statements: 14, read: 3192, written: 5346 },
+        linkedCitation: { statements: 4, read: 955, written: 1875 },
+        unlinkedCitation: { statements: 5, read: 1083, written: 2140 },
+        linkedRunCitation: { statements: 9, read: 3157, written: 6581 },
+        unlinkedRunCitation: { statements: 10, read: 2762, written: 6564 },
+      } as const
+      for (const [label, result, statementLimit] of [
+        ['linkedConnections', linkedConnections, 14],
+        ['unlinkedConnections', unlinkedConnections, 13],
+        ['linkedCitation', linkedCitation, 4],
+        ['unlinkedCitation', unlinkedCitation, 4],
+        ['linkedRunCitation', linkedRunCitation, 9],
+        ['unlinkedRunCitation', unlinkedRunCitation, 9],
+      ] as const) {
+        await t.test(label + ' stays within the frozen statement and total-wire budget', () => {
+          const before = originalIdentifierReadMetrics[label]
+          const total = result.bytes + result.bytesWritten
+          const originalTotal = before.read + before.written
+          t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'identifier-reader-fixed-baseline',
+            reader: label, scope: 'data-read-path_not_page_http', original: before, current: readMetrics(result) }))
+          assert.ok(result.statements <= statementLimit,
+            label + ' statements ' + result.statements + ' exceed ' + statementLimit + ' (old ' + before.statements + ')')
+          assert.ok(total <= originalTotal,
+            label + ' total socket bytes ' + total + ' exceed frozen old ' + originalTotal
+              + ' (read ' + result.bytes + ', written ' + result.bytesWritten + ')')
+        })
+      }
+      await t.test('connection identifiers reuse one owner input in the existing metadata query', () => {
+        const connection = unlinkedConnections.value.find(row => row.id === id)
+        assert.ok(connection)
+        assert.equal(connection.identifier, `READ-${sharedNumber}`)
+        assert.ok(connection.createdAt instanceof Date, 'connection timestamps retain their Date shape')
+        assert.deepEqual(connection.metadata, unlinkedSave.value.issue?.metadata, 'connection metadata retains every original field')
+        assert.equal(connection.scopeVersion, unlinkedSave.value.issue?.scopeVersion)
+      })
+      await t.test('direct and run-only citations keep the linked read budget and private input boundary', async () => {
+        const citation = unlinkedCitation.value[id], run = unlinkedRunCitation.value[citationRun]
+        assert.ok(citation?.kind === 'issue')
+        assert.ok(run?.kind === 'run')
+        assert.equal(citation.identifier, `READ-${sharedNumber}`)
+        assert.equal(run.issue?.identifier, `READ-${sharedNumber}`)
+        assert.doesNotMatch(JSON.stringify([unlinkedConnections.value, unlinkedCitation.value, unlinkedRunCitation.value]), /prefixInput|__mikkaIdentifierPrefix|identifierTeams?|@example\.invalid/)
+        const { issuesForUser } = await import('../lib/issues-for-user')
+        const defaults = await issuesForUser(owner, [id], false, db, { withoutBody: true })
+        assert.ok(defaults.has(id))
+        assert.equal(Object.hasOwn(defaults.get(id)!, 'prefixInput'), false, 'default readers retain their original object shape')
+      })
+      await t.test('an authorized Linear import verifies its target until the link is removed', async () => {
+        const { linearTeamSyncs } = await import('../lib/db/schema')
+        const { createAppIssueFromLinear } = await import('../lib/linear-sync/issue-sync')
+        const [sync] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner, workspaceId,
+          linearTeamId: randomUUID(), linearTeamKey: 'ALIS', linearTeamName: 'Verified read fixture', active: true }).returning()
+        const imported = await createAppIssueFromLinear(sync, { id: randomUUID(), identifier: 'ALIS-1',
+          title: 'Verified read fixture', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture',
+          updatedAt: new Date().toISOString(), state: null, team: { id: sync.linearTeamId, key: sync.linearTeamKey, name: sync.linearTeamName },
+          assignee: null, labels: [] })
+        assert.ok(imported)
+        const verified = successful(await readWorkspace(() => pollIssue(imported.id)))
+        assert.equal(verified.issue?.linearTargetVerified, true)
+        assert.equal(verified.issue?.scope, 'workspace')
+        assert.match(verified.issue?.identifier ?? '', /^READ-\d+$/)
+        await pool.query('delete from linear_issue_links where "issueId"=$1 and "ownerId"=$2', [imported.id, owner])
+        const removed = successful(await readWorkspace(() => pollIssue(imported.id, verified.version)))
+        assert.equal(removed.issue?.linearTargetVerified, false)
+        assert.equal(removed.issue?.identifier, verified.issue?.identifier)
+        assert.notEqual(removed.version, verified.version)
+      })
+      const personalGet = await measured(() => read(() => getIssue(personal.id)))
+      const unlinkedGet = await measured(() => readWorkspace(() => getIssue(id)))
+      assert.equal(successful(unlinkedGet.value).issue.identifier, `READ-${sharedNumber}`)
+      await t.test('unlinked getIssue keeps its existing verification-read budget', () => {
+        assert.ok(unlinkedGet.statements <= personalGet.statements + 1,
+          'an unlinked workspace detail adds at most its existing Linear check, not a repeated empty team read')
+      })
+      const personalCold = await measured(() => read(async () => successful(await pollIssue(personal.id))))
+      const unlinkedCold = await measured(() => readWorkspace(async () => successful(await pollIssue(id))))
+      assert.equal(unlinkedCold.value.issue?.identifier, `READ-${sharedNumber}`)
+      await t.test('unlinked cold poll keeps its existing verification-read budget', () => {
+        assert.ok(unlinkedCold.statements <= personalCold.statements + 1)
+      })
+      const personalWarm = await measured(() => read(async () => successful(await pollIssue(personal.id, personalCold.value.version))))
+      const unlinkedWarm = await measured(() => readWorkspace(async () => successful(await pollIssue(id, unlinkedCold.value.version))))
+      assert.equal(personalWarm.value.unchanged, true)
+      assert.equal(unlinkedWarm.value.unchanged, true)
+      await t.test('unlinked warm poll keeps its existing verification-read budget', () => {
+        assert.ok(unlinkedWarm.statements <= personalWarm.statements + 1)
+      })
+      await pool.query('update issue_prefixes set prefix=$2 where "userId"=$1', [owner, 'NEXT'])
+      const renamed = successful(await readWorkspace(() => pollIssue(id, unlinkedCold.value.version)))
+      assert.equal(renamed.issue?.identifier, `NEXT-${sharedNumber}`)
+      assert.notEqual(renamed.version, unlinkedCold.value.version)
+      assert.equal((await actAs(stranger, () => getIssue(id))).error, 'issueNotFound')
+      assert.equal((await actAs(stranger, () => pollIssue(id, renamed.version))).error, 'issueNotFound')
+      const linked = await withActivitySession(owner, () => setIssueTeam({ issueId: id, teamId, expectedTeamId: null }), workspaceId)
+      assert.equal(linked.ok, true)
+      const relinked = successful(await readWorkspace(() => pollIssue(id, renamed.version)))
+      assert.match(relinked.issue?.identifier ?? '', /^CACHE-\d+$/)
+      assert.notEqual(relinked.version, renamed.version, 'a negative team result is never kept across operations')
+      assert.match((await readWorkspace(() => listIssueConnections(id))).find(row => row.id === id)?.identifier ?? '', /^CACHE-\d+$/,
+        'a one-task connection read never retains its earlier missing link')
+      const relinkedSources = await readWorkspace(() => citationSources(owner, [issueCite, runCite]))
+      const relinkedTask = relinkedSources[id], relinkedRun = relinkedSources[citationRun]
+      assert.ok(relinkedTask?.kind === 'issue' && relinkedRun?.kind === 'run')
+      assert.match(relinkedTask.identifier ?? '', /^CACHE-\d+$/)
+      assert.match(relinkedRun.issue?.identifier ?? '', /^CACHE-\d+$/)
+      // A creator loses this shared task with their current membership. The
+      // saved team label and cached detail/citation cursors grant no authority.
+      await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, owner, 'suspended'])
+      assert.equal((await readWorkspace(() => getIssue(id))).error, 'issueNotFound')
+      assert.equal((await readWorkspace(() => pollIssue(id, relinked.version))).error, 'issueNotFound')
+      const revokedConnections = await measured(() => readWorkspace(() => runAction(() => listIssueConnections(id))))
+      const revokedCitation = await measured(() => readWorkspace(() => citationSources(owner, [issueCite])))
+      const revokedRunCitation = await measured(() => readWorkspace(() => citationSources(owner, [runCite])))
+      await t.test('revoked owners lose connections and both citation readers despite cached identifiers', () => {
+        t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'revoked-owner-identifier-readers',
+          scope: 'data-read-path_not_page_http', connections: readMetrics(revokedConnections),
+          directCitation: readMetrics(revokedCitation), runOnlyCitation: readMetrics(revokedRunCitation) }))
+        assert.equal(revokedConnections.value.error, 'issueNotFound')
+        assert.deepEqual(revokedCitation.value, {})
+        assert.deepEqual(revokedRunCitation.value, {})
+        assert.doesNotMatch(JSON.stringify([revokedConnections.value, revokedCitation.value, revokedRunCitation.value]),
+          /CACHE-|prefixInput|__mikkaIdentifierPrefix|identifierTeams?|@example\.invalid/)
+      })
+      // Captured on the same fixture against old main 3c32675c; these are
+      // actual revoked-owner measurements, not inferred from the linked case.
+      for (const [label, result, statementLimit, originalTotal] of [
+        ['revokedConnections', revokedConnections, 12, 7464],
+        ['revokedCitation', revokedCitation, 3, 2097],
+        ['revokedRunCitation', revokedRunCitation, 7, 7700],
+      ] as const) {
+        await t.test(label + ' stays within its frozen old-source budget', () => {
+          assert.ok(result.statements <= statementLimit,
+            label + ' statements ' + result.statements + ' exceed frozen old ' + statementLimit)
+          assert.ok(result.bytes + result.bytesWritten <= originalTotal,
+            label + ' total socket bytes ' + (result.bytes + result.bytesWritten) + ' exceed frozen old ' + originalTotal)
+        })
+      }
+      await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, owner, 'active'])
+      t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'unlinked-task-detail', scope: 'data-read-path_not_page_http',
+        personalSave: readMetrics(personalSave), unlinkedSave: readMetrics(unlinkedSave),
+        linkedConnections: readMetrics(linkedConnections), unlinkedConnections: readMetrics(unlinkedConnections),
+        linkedCitation: readMetrics(linkedCitation), unlinkedCitation: readMetrics(unlinkedCitation),
+        linkedRunCitation: readMetrics(linkedRunCitation), unlinkedRunCitation: readMetrics(unlinkedRunCitation),
+        personalGet: readMetrics(personalGet), unlinkedGet: readMetrics(unlinkedGet), personalCold: readMetrics(personalCold),
+        unlinkedCold: readMetrics(unlinkedCold), personalWarm: readMetrics(personalWarm), unlinkedWarm: readMetrics(unlinkedWarm) }))
+    })
+
+    await t.test('copying a subtree preserves source tasks and allocates distinct numbered copies', async t => {
+      const { createLinkedIssue, listIssueConnections } = await import('../app/actions/issue-operations')
+      const parent = successful(await read(() => saveIssue({
+        title: 'Copy fixture root', content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Copy body' }] }] },
+        status: 'todo', priority: 'normal',
+      }))).issue
+      assert.ok(parent)
+      const child = successful(await read(() => createLinkedIssue({
+        id: parent.id, revision: parent.revision, kind: 'child', title: 'Copy fixture child',
+      }))).issue
+      assert.ok(child)
+      const sourceParent = successful(await read(() => getIssue(parent.id))).issue
+      const sourceChild = successful(await read(() => getIssue(child.id))).issue
+      assert.equal(sourceChild.metadata.parentId, sourceParent.id)
+      const copied = await measured(() => read(() => createLinkedIssue({
+        id: sourceParent.id, revision: sourceParent.revision, kind: 'duplicate', includeSubissues: true,
+      })))
+      t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'copy-subtree',
+        scope: 'data-read-path_not_page_http', copy: readMetrics(copied) }))
+      const copy = successful(copied.value).issue
+      assert.ok(copy)
+      assert.ok(typeof copy.identifier === 'string' && copy.identifier.length > 0)
+      assert.deepEqual(copy.content.content, sourceParent.content.content, 'copy retains the original description body')
+      const copiedChildren = (await read(() => listIssueConnections(copy.id))).filter(row => row.metadata.parentId === copy.id)
+      assert.equal(copiedChildren.length, 1, 'the child is copied beneath the new root')
+      const copiedChild = copiedChildren[0]
+      assert.equal(new Set([sourceParent.id, sourceChild.id, copy.id, copiedChild.id]).size, 4)
+      assert.equal(copy.metadata.parentId, null)
+      assert.equal(copiedChild.metadata.parentId, copy.id)
+      const numbers = [copy.metadata.number, copiedChild.metadata.number]
+      assert.ok(numbers.every(number => typeof number === 'number' && Number.isInteger(number) && number > 0))
+      assert.equal(new Set(numbers).size, 2)
+      assert.ok(numbers.every(number => number !== sourceParent.metadata.number && number !== sourceChild.metadata.number))
+      for (const original of [sourceParent, sourceChild]) {
+        const after = successful(await read(() => getIssue(original.id))).issue
+        assert.equal(after.title, original.title)
+        assert.equal(after.revision, original.revision)
+        assert.equal(after.scope, original.scope)
+        assert.equal(after.scopeVersion, original.scopeVersion)
+        assert.equal(after.status, original.status)
+        assert.equal(after.priority, original.priority)
+        assert.deepEqual(after.content, original.content)
+        assert.deepEqual(after.metadata, original.metadata)
+      }
+      await t.test('copying a subtree stays within its frozen old-source budget', () => {
+        assert.ok(copied.statements <= 30,
+          'copy-subtree statements ' + copied.statements + ' exceed frozen old 30')
+        assert.ok(copied.bytes + copied.bytesWritten <= 25158,
+          'copy-subtree total socket bytes ' + (copied.bytes + copied.bytesWritten) + ' exceed frozen old 25158')
+      })
+    })
+
     await pool.query('update issues set content=jsonb_set(content,\'{attrs}\',$2::jsonb) where id=$1', [id, JSON.stringify({ mikka: { deletedAt: new Date().toISOString() } })])
     const deletion = await measured(() => read(async () => ({ detail: await pollIssue(id, bodyChanged.version), history: await pollIssueVersionSummaries(id, snapshot.version, snapshot.positions) })))
     assert.equal(deletion.value.detail.error, 'issueNotFound')
@@ -146,6 +418,10 @@ test('detail and activity revalidate current access while returning only changed
     t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'task-detail-and-activity', scope: 'data-read-path_not_page_http', historyRows: 50,
       legacyReload: readMetrics(legacy), cold: readMetrics(cold), warmKnown: readMetrics(warm), reloadRestored: readMetrics(restored), oneRowDelta: readMetrics(delta), detailChange: readMetrics(changed), deletion: readMetrics(deletion) }))
   } finally {
+    await pool.query('delete from agent_runs where "userId"=any($1::text[])', [[owner, stranger]])
+    await pool.query('delete from agents where "userId"=any($1::text[])', [[owner, stranger]])
+    await pool.query('delete from linear_issue_links where "ownerId"=any($1::text[])', [[owner, stranger]])
+    await pool.query('delete from linear_team_syncs where "ownerId"=any($1::text[])', [[owner, stranger]])
     await pool.query('delete from coordinator_messages where "userId"=$1', [stranger])
     await pool.query('delete from bots where id=$1', [botId])
     await pool.query('delete from team_issue_promotion_receipts where "ownerId"=$1', [owner])
@@ -154,9 +430,10 @@ test('detail and activity revalidate current access while returning only changed
     await pool.query('delete from mikka_teams where id=$1', [teamId])
     await pool.query('delete from mikka_workspace_members where "workspaceId"=$1', [workspaceId])
     await pool.query('delete from mikka_workspaces where id=$1', [workspaceId])
-    await pool.query('delete from issue_versions where "userId"=$1', [owner])
-    await pool.query('delete from issue_documents where "userId"=$1', [owner])
-    await pool.query('delete from issues where "userId"=$1', [owner])
+    await pool.query('delete from issue_versions where "userId"=any($1::text[])', [[owner, stranger]])
+    await pool.query('delete from issue_documents where "userId"=any($1::text[])', [[owner, stranger]])
+    await pool.query('delete from issues where "userId"=any($1::text[])', [[owner, stranger]])
+    await pool.query('delete from issue_prefixes where "userId"=any($1::text[])', [[owner, stranger]])
     await pool.query('delete from "user" where id=any($1::text[])', [[owner, stranger]])
   }
 })

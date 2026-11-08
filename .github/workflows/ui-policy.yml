@@ -147,6 +147,9 @@ jobs:
       - name: Verify all production release credentials use existing Infisical OIDC
         run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
         if: always()
+      - name: Verify production auth and lease acceptance drivers without credentials
+        run: node --test scripts/acceptance/auth-audit-production.test.mjs scripts/acceptance/cloud-lease-audit.test.mjs scripts/acceptance/cloud-lease-recovery.test.mjs scripts/acceptance/shared-account-queue.test.mjs scripts/ops/production-smoke.test.mjs
+        if: always()
       - run: pnpm lint:code
         if: always()
       - run: node apps/api/scripts/generate-routes.mjs --check
@@ -292,6 +295,7 @@ jobs:
           echo 'All selected source/unit/daemon jobs succeeded.' >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: always()
       - name: Record actual completed job timings
         if: always()
         run: node scripts/ci/summary.mjs
@@ -441,6 +445,7 @@ jobs:
           esac
           echo "Database gate: $DB_RESULT; complete inventory validated in Changed files." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: always()
       - name: Record actual completed job timings
         if: always()
         run: node scripts/ci/summary.mjs

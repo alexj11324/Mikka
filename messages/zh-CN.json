@@ -5248,6 +5248,18 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
+    "task_secret_unavailable": {
+      "default": "任务密钥不可用。请检查使用方式后重试任务。",
+      "invalid_capability": "任务密钥的授权无效，请重试任务以重新授权。",
+      "expired_capability": "任务密钥的授权已到期或未获续期，请重试任务。",
+      "binding_mismatch": "密钥授权不属于当前任务或设备。",
+      "invalid_request": "密钥请求的方法、路径或请求头不受支持。",
+      "destination_denied": "该密钥的规则不允许访问此目标或执行此操作。",
+      "upstream_unavailable": "无法连接已授权的服务，请检查服务状态后重试。",
+      "response_blocked": "服务响应可能暴露认证信息或格式不受支持，已阻止返回。",
+      "limit_exceeded": "密钥请求超出支持的数据大小或授权数量。",
+      "configuration": "请配置该密钥的受保护 HTTP 规则，或明确允许 Agent 直接读取此密钥。"
+    },
     "run_subscription_expired": { "default": "模型订阅需要重新连接。" },
     "run_api_key_invalid": { "default": "服务商拒绝了 API 密钥，请在模型设置中检查密钥。" },
     "run_quota_exceeded": { "default": "服务商用量额度或余额已用尽，请查看用量。" },

@@ -27,6 +27,7 @@ import { skillAssignmentReceiptSchema } from './skill-artifact'
 import { sanitizeTraceContext } from './trace-context'
 import { nativeLeaseSchema } from './subscription'
 import { mailboxCatalogueSchema } from './mailbox'
+import { taskSecretAccessSchema, taskSecretRenewalSchema } from './task-secrets'
 
 const id = z.string().min(1).max(64)
 const isoTime = z.iso.datetime({ offset: true })
@@ -190,6 +191,8 @@ export const heartbeatRunSchema = z.object({
   runId: id,
   /** Last tool call, turn boundary or file change (not raw output). */
   lastProgressAt: isoTime,
+  /** Opaque third-party capabilities, refreshed only with the existing run lease. */
+  secretCapabilities: taskSecretRenewalSchema.optional(),
 })
 export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
 
@@ -234,6 +237,8 @@ export const heartbeatResultSchema = z.object({
   deviceCommands: z.array(deviceManagementCommand).max(1).optional(),
   /** Renewed lease expiry per run id; a run missing here is not renewed. */
   leases: z.record(z.string(), isoTime),
+  /** No plaintext: only grants for current owner/device/run/claim bindings. */
+  taskSecrets: z.record(z.string(), taskSecretAccessSchema).optional(),
   /**
    * Runs the device reported that it no longer holds: they ended on the
    * server, or went to another attempt after the lease ran out. The daemon
@@ -442,6 +447,8 @@ export const runAssignmentSchema = z.object({
    * masks again. Older daemons strip this field and rely on server-side masking only.
    */
   taskSecretNames: z.array(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/)).max(500).optional(),
+  /** Third-party HTTP capabilities. Never persisted in the daemon journal. */
+  taskSecrets: taskSecretAccessSchema.optional(),
   /** Mock harness only: fixture name under `packages/daemon/fixtures`. */
   fixture: z.string().max(200).optional(),
   /**

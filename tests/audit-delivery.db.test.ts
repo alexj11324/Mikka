@@ -41,9 +41,9 @@ async function prepareWorkspace(database: Pool) {
   }
   if (!(await database.query("SELECT to_regclass('workspace_audit_outbox') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261031060512_workspace_audit_outbox.sql', import.meta.url), 'utf8'))
   // Member writes use the actual Team grant/seat guard in this separate WS DB.
-  if (!(await database.query("SELECT to_regclass('mikka_workspace_entitlements') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261107180100_team_entitlements.sql', import.meta.url), 'utf8'))
+  if (!(await database.query("SELECT to_regclass('mikka_workspace_entitlements') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261108120210_team_entitlements.sql', import.meta.url), 'utf8'))
   // Canonical access reads the real Organization link table even for unattached Workspaces.
-  if (!(await database.query("SELECT to_regclass('mikka_organization_workspaces') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261107180200_organization_governance.sql', import.meta.url), 'utf8'))
+  if (!(await database.query("SELECT to_regclass('mikka_organization_workspaces') relation")).rows[0].relation) await database.query(await readFile(new URL('../drizzle/20261108120220_organization_governance.sql', import.meta.url), 'utf8'))
 }
 
 test('workspace mutations retain and idempotently deliver audit intent across two logical PostgreSQL stores', { skip: !mainURL }, async t => {

@@ -3,15 +3,17 @@ import { deploymentSwitch } from '../deployment-switches'
 /** Versioned prompts, changed by reviewed code releases only. Feedback never
  * rewrites these. The deployment kill flag selects the incident baseline;
  * explicit host-selected replay versions bypass live deployment settings. */
-export const GROUP_POLICY_VERSION = 'group-contribution-v3' as const
+export const GROUP_POLICY_VERSION = 'group-contribution-v4' as const
 /** Historical candidate receipts and explicitly selected offline replays stay interpretable. */
 export const GROUP_PREVIOUS_POLICY_VERSION = 'group-contribution-v1' as const
 /** The staged v2 candidate remains available for historical request replay. */
 export const GROUP_V2_POLICY_VERSION = 'group-contribution-v2' as const
+/** v3 request contracts remain available for historical replay. */
+export const GROUP_V3_POLICY_VERSION = 'group-contribution-v3' as const
 /** The live policy is promoted by a reviewed release after its fixed-case comparison. */
 export const GROUP_LIVE_POLICY_VERSION = GROUP_POLICY_VERSION
 export const GROUP_BASELINE_VERSION = 'group-route-v0' as const
-export const GROUP_POLICY_VERSIONS = [GROUP_BASELINE_VERSION,GROUP_PREVIOUS_POLICY_VERSION,GROUP_V2_POLICY_VERSION,GROUP_POLICY_VERSION] as const
+export const GROUP_POLICY_VERSIONS = [GROUP_BASELINE_VERSION,GROUP_PREVIOUS_POLICY_VERSION,GROUP_V2_POLICY_VERSION,GROUP_V3_POLICY_VERSION,GROUP_POLICY_VERSION] as const
 export type GroupPolicyVersion = typeof GROUP_POLICY_VERSIONS[number]
 
 export function getGroupDecisionPolicy(value?: string) {

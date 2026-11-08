@@ -265,17 +265,12 @@ it('does not send a prompt when the real native account guard refuses API-key mo
   expect(f.never).not.toHaveBeenCalled()
 })
 
-it('honors the installed official CLI model report before spawning', async () => {
-  const f = await fixture()
-  let report: { models: string[] } | null = null
-  const runner = await createHostedBotRunner({ stateDir: f.stateDir, link: f.link, binaries: { claude_code: f.binary }, reportedModels: async () => report })
-  for (const value of [null, { models: ['other-model'] }]) {
-    report = value
-    await expect(runner.start(f.assignment, f.options)).rejects.toThrow()
-    expect(existsSync(join(f.config, 'fixture-process.json'))).toBe(false)
-  }
-  report = { models: ['fixture-model'] }
+it.each(['claude_code', 'codex'] as const)('the %s native runner accepts its exact credential model without consulting the CLI model probe', async harness => {
+  const f = await fixture(harness)
+  const probe = vi.fn(async () => { throw Error('shortcut probe must not gate a run') })
+  const runner = await createHostedBotRunner({ stateDir: f.stateDir, link: f.link, binaries: { [harness]: f.binary }, reportedModels: probe })
   expect((await collect(await runner.start(f.assignment, f.options))).at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+  expect(probe).not.toHaveBeenCalled()
   expect(f.never).not.toHaveBeenCalled()
 })
 
@@ -296,14 +291,13 @@ it.each(['missing', 'shortcuts', 'failed'] as const)('Claude admits its exact pr
   expect(JSON.parse(readFileSync(join(f.stateDir, 'native-ledgers', f.assignment.runId + '.json'), 'utf8')).scope.modelId).toBe(model)
 })
 
-it.each(['codex', 'different-model'] as const)('catalogue evidence cannot admit %s outside the selected model and Claude route', async reason => {
-  const harness = reason === 'codex' ? 'codex' : 'claude_code'
+it.each(['codex', 'claude_code'] as const)('the %s runner still refuses a model different from its prepared credential lease', async harness => {
   const f = await fixture(harness)
   f.assignment.subscriptionLease!.modelCatalogueVerified = true
   const runner = await createHostedBotRunner({ stateDir: f.stateDir, link: f.link, binaries: { [harness]: f.binary },
     reportedModels: async () => ({ models: [] }),
   })
-  await expect(runner.start(f.assignment, { ...f.options, ...(reason === 'different-model' ? { model: 'another-model' } : {}) })).rejects.toThrow()
+  await expect(runner.start(f.assignment, { ...f.options, model: 'another-model' })).rejects.toThrow()
   expect(existsSync(join(f.config, 'fixture-process.json'))).toBe(false)
   expect(f.never).not.toHaveBeenCalled()
 })

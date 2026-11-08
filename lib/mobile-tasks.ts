@@ -2,7 +2,7 @@ import 'server-only'
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { agents, agentRuns, bots, devices, issues, issueVersions, users } from '@/lib/db/schema'
-import { issueForUser } from '@/lib/issue-access'
+import { issueAccessForUser } from '@/lib/issue-access'
 import { withIssueWorkspace } from '@/lib/issue-scope-authorization'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
@@ -26,13 +26,15 @@ export async function mobileTask(user: Exclude<IssueReader, string>, workspace: 
 }
 
 async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: string, id: string) {
-  const issue = await issueForUser(user, id)
-  if (!issue || issue.ownershipState !== 'bound' || issue.workspaceId !== workspaceId) return null
+  const access = await issueAccessForUser(user, id)
+  if (!access) return null
+  const { issue, teamId } = access
+  if (issue.ownershipState !== 'bound' || issue.workspaceId !== workspaceId) return null
   const metadata = readIssueMetadata(issue.content)
   const blockerIds = metadata.blockedByIds ?? []
   const visibleBlockers = blockerIds.length ? await issueVisibility(user, false, workspaceId, db, { onlyIssueIds: blockerIds }) : null
   const [identifiers, runs, [decoration], versions, labels, blockers] = await Promise.all([
-    taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number }]),
+    taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number }], db, teamId === null ? new Map() : undefined),
     db.select({ runId: agentRuns.id, status: agentRuns.status, outcome: agentRuns.outcome,
       createdAt: agentRuns.createdAt, threadReplacedBy: agentRuns.threadReplacedBy,
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`,

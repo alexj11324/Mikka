@@ -8,7 +8,8 @@ const BALANCE_CODES = [
 ] as const
 const AUTH_CODES = ["authentication_failed", "invalid_api_key"] as const
 const UNAVAILABLE_CODES = ["rate_limit", "overloaded", "server_error", "timeout", "connection_error"] as const
-export const PROVIDER_FAILURE_CODES = [...BALANCE_CODES, ...AUTH_CODES, ...UNAVAILABLE_CODES] as const
+const MODEL_CODES = ["model_not_found", "model_not_available", "model_unavailable", "model_deprecated", "model_retired", "unsupported_model"] as const
+export const PROVIDER_FAILURE_CODES = [...BALANCE_CODES, ...AUTH_CODES, ...UNAVAILABLE_CODES, ...MODEL_CODES] as const
 export type ProviderFailureCode = typeof PROVIDER_FAILURE_CODES[number]
 
 const status = z.number().int().min(100).max(599).optional()
@@ -16,6 +17,7 @@ export const providerFailureSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("balance"), retryable: z.literal(false), status, code: z.enum(BALANCE_CODES).optional() }).strict(),
   z.object({ kind: z.literal("auth"), retryable: z.literal(false), status, code: z.enum(AUTH_CODES).optional() }).strict(),
   z.object({ kind: z.literal("unavailable"), retryable: z.literal(true), status, code: z.enum(UNAVAILABLE_CODES).optional() }).strict(),
+  z.object({ kind: z.literal("model"), retryable: z.literal(false), status, code: z.enum(MODEL_CODES) }).strict(),
 ])
 export type ProviderFailure = z.infer<typeof providerFailureSchema>
 
@@ -84,6 +86,8 @@ export function classifyProviderFailure(error: unknown): ProviderFailure | undef
   for (const code of codes) if (Object.hasOwn(AUTH_ALIASES, code))
     return { kind: "auth", retryable: false, ...statusField, code: AUTH_ALIASES[code] }
   if (foundStatus === 401) return { kind: "auth", retryable: false, ...statusField, code: "authentication_failed" }
+  for (const code of MODEL_CODES) if (codes.includes(code))
+    return { kind: "model", retryable: false, ...statusField, code }
   if (foundStatus === 429) return { kind: "unavailable", retryable: true, ...statusField, code: "rate_limit" }
   if (foundStatus === 529) return { kind: "unavailable", retryable: true, ...statusField, code: "overloaded" }
   if (foundStatus !== undefined && foundStatus >= 500 && foundStatus <= 599)
