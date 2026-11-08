@@ -308,6 +308,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   each row has 删除, shown on hover or focus, and confirms first (Alex,
   2026-11-01: 「自己上传的文件，在资料库里可以删除」;
   [decision](decisions/2026-11-01-2255-library-delete-own-files.md)).
+  Exception: a coding task's review page ([2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)) carries
+  actions (line comments, 发给 Agent, 附到评论, 批准合并). On a coding
+  task, the task panel's ⋯ menu also lists the code tools 改动 · 文件 · 终端 ·
+  预览, and its PR summary line opens the review page; these only open the
+  review page, and the rest of the panel stays read-only.
 - **R-52** Since 2026-11-07 every list is a task list, grouped 等待你 · 进行中 ·
   待办 · 已完成 ([decision](decisions/2026-11-07-2045-tasks-only-threads-inside.md)), and each row
   carries its own state's icon, never its group's: the raised hand only for 等你处理, an
@@ -680,6 +685,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   what it holds. A list row's hover and selected fill cover the whole row edge
   to edge; buttons and switches inside it stay separately clickable.
   `pnpm lint:ui` fails a frame inside a frame as `style/nested-frame`.
+- **R-91** Top rows carry the important things. The first row of a panel,
+  page or screen holds the object's state (for a coding task: PR and failed checks right
+  under the title). Tools and secondary actions go into the header's 「⋯」
+  menu, tools first (for a coding task: 改动 +N −M, 文件, 终端, 预览, with
+  their shortcuts), then a divider and items such as the branch name, copy
+  link and permissions; shortcut hints go into tooltips. They are not visible
+  buttons on the header row (Alex: 「只要求你把这些东西放进省略号里边…不是放在
+  省略号的外边」). Secondary
+  actions, branch names, counts and shortcut hints go into 「⋯」 or a
+  tooltip, not a row of their own (Alex, 2026-11-08; [2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)).
 
 ## Design review
 
