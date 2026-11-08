@@ -12,7 +12,11 @@ concurrency:
   group: self-hosted-image-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
+  changes:
+    uses: ./.github/workflows/ci-selection.yml
   image:
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:

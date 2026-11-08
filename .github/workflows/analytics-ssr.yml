@@ -17,32 +17,12 @@ env:
 
 jobs:
   changes:
-    name: Changed files
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      docs_only: ${{ steps.docs.outputs.docs_only }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-      - id: docs
-        run: |
-          git fetch origin main --no-tags
-          trusted_dir="$(mktemp -d)"
-          trusted="$trusted_dir/ci-docs-only.mjs"
-          if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
-            echo 'docs_only=false' >> "$GITHUB_OUTPUT"
-          elif ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
-            echo 'docs_only=false' >> "$GITHUB_OUTPUT"
-          else
-            node "$trusted"
-          fi
+    uses: ./.github/workflows/ci-selection.yml
 
   analytics-ssr-full:
     name: Analytics SSR (full)
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.result == 'success' && needs.changes.outputs.analytics == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -109,12 +89,14 @@ jobs:
       - name: Require classification and full regression unless docs-only
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
-          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          RUN_ANALYTICS: ${{ needs.changes.outputs.analytics }}
           FULL_RESULT: ${{ needs.analytics-ssr-full.result }}
         run: |
           if [ "$CHANGES_RESULT" != 'success' ]; then exit 1; fi
-          if [ "$DOCS_ONLY" = 'true' ]; then
+          if [ "$RUN_ANALYTICS" = 'false' ]; then
             test "$FULL_RESULT" = 'skipped'
-          else
+          elif [ "$RUN_ANALYTICS" = 'true' ]; then
             test "$FULL_RESULT" = 'success'
+          else
+            exit 1
           fi

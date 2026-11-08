@@ -10,8 +10,8 @@ its existing protected status names and real acceptance coverage.
   synthetic merge commit, including the PR together with its target branch at
   the time of the check. A changed PR head gets a new check run.
 - Keep `UI policy (strict)` and `Production build and browser interactions`
-  successful for non-documentation PRs; the latter is the gate over the four
-  isolated PostgreSQL DB/migration integration shards. Despite its name, CI
+  successful for non-documentation PRs; the latter gates the selected isolated PostgreSQL suites across 1–4 dynamic
+  shards. Full inventory validation runs even when DB execution is skipped. Despite its name, CI
   runs no production build (decision 2026-11-01-0230); Vercel builds `main`.
 - CI runs no browser tests, not even by hand (decision 2026-11-01-1520).
   `browser-gate.yml` only keeps the protected check name
@@ -113,8 +113,8 @@ Verify it in `Settings > Branches > main > Edit`, and do not claim that the
 repository is already in loose mode without verifying its effective settings.
 
 Do not skip the required gates, silently accept failed/skipped dependencies or
-publish from a red PR. The workflows run the trusted docs/CI classifier from
-`origin/main`; documentation-only PRs still publish their required gate names.
+publish from a red PR. The workflows bootstrap the trusted Nx selector from
+`origin/main` and the immutable base; documentation-only PRs still publish their required gate names.
 CI source changes are not classified as documentation-only.
 
 ## Official UI overlay
@@ -143,3 +143,17 @@ Official compiler logs stay on the ephemeral runner, and both distributable
 static output and the complete signed ASAR are audited for source maps.
 See [the deployment runbook](../../docs/operations/web-deploy.md#official-private-ui-overlay)
 for identities, rollout, source exposure boundaries and recovery.
+
+## Dependency-aware selection
+
+`ci-selection.yml` supplies the same trusted decision to CI, Analytics SSR,
+Desktop and Self-hosted image. Nx Core follows explicit root-file, workspace,
+source-contract and DB feature-marker edges; candidate code is parsed, not
+executed during classification. Source/security policies stay enabled, and
+unmapped/unsafe/global inputs expand coverage. Core/integration commands are
+scheduled by Nx; the existing strict database runner owns selected PG17 suites.
+The first introduction uses full blocking coverage plus shadow selection;
+selectors absent from the immutable base never authorize a skip. Manual dispatch
+and Monday 03:23 UTC run complete CI. No Nx Cloud, remote test cache, browser E2E
+or release credentials are added. See [policy and commands](../../docs/ci/incremental.md)
+and [measured results](../../docs/ci/1699-results.md).

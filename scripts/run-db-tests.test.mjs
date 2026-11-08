@@ -497,13 +497,14 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(plan.scripts.includes('test:factory'))
   assert.ok(plan.files.includes('lib/self-improvement/wiring-postgres.test.ts'))
   const workflow = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
+  const taskCommands = Object.values(JSON.parse(readFileSync('scripts/ci/tasks.json'))).map(task => task.command)
   const custodyWorkflow = readFileSync('.github/workflows/e2b-byos.yml', 'utf8')
   for (const { runner, local } of SELF_MANAGED) {
     const dedicatedScript = Object.entries(pkg).find(([, command]) => command === `node ${runner}`)?.[0]
     // Decision 2026-11-01-1520: the one runner that needs a production build left CI with the
     // browser job; it must stay runnable locally through its own package script.
     if (local) { assert.equal(runner, 'scripts/test-accounts/run-http.mjs'); assert.ok(dedicatedScript, `${runner} has a package script`); continue }
-    assert.ok(workflow.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
+    assert.ok(taskCommands.includes(`node ${runner}`) || workflow.includes(`run: node ${runner}`) || (dedicatedScript && custodyWorkflow.includes(`run: pnpm ${dedicatedScript}`)), `${runner} runs in CI`)
   }
   // Pure gates also run without a database in the fast job; their DB run is still only through pnpm test:db.
   const pureGates = ['test:groups', 'test:active-agents', 'test:group-turns', 'test:issue-search']
@@ -515,7 +516,7 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.deepEqual(pinned, plan.scripts, 'workflow explicitly pins every suite expected on this tree')
   for (const script of pureGates.slice(1)) {
     if (pkg[script]) {
-      assert.ok(workflow.includes(`pnpm ${script}`), `${script} strict pure gate retained`)
+      assert.ok(taskCommands.some(command => command.includes(`pnpm ${script}`)) || workflow.includes(`pnpm ${script}`), `${script} strict pure gate retained`)
       assert.ok(pkg.check.includes(`pnpm ${script}`), `${script} pure gate in check`)
     }
   }
@@ -532,7 +533,7 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
   assert.ok(tree['tests/mvp/core-loop.spec.ts']?.includes('@playwright/test'), 'the real-daemon browser spec remains present')
   assert.match(workflow, /image: postgres:17/)
   for (const name of ['test:agent', 'test:suggestions', 'test:integrations', 'test:issues', 'test:db-runner']) {
-    assert.ok(workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)
+    assert.ok(taskCommands.some(command => command.includes(`pnpm ${name}`)) || workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)
     assert.ok(pkg.check.includes(`pnpm ${name}`), `${name} in check`)
   }
 })
