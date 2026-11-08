@@ -250,6 +250,12 @@ alone: their recorded overlay SHAs may differ.
   when the child exits nonzero without a launch error. It is an observation, not
   proof of the terminating cause; absent or unrecognized codes remain `null`.
   No associated message, path or source line is included.
+  `lastTypecheckCommand` observes only the fixed root/API combined command or
+  frontend command; it does not distinguish which root/API compiler failed.
+  `typescriptCodes` contains at most 16 unique diagnostic identifiers, without
+  filenames, source or error messages. The fixed `migrate: starting` marker
+  observes entry into a requested migration command before its guards; it does
+  not prove any SQL ran. An explicit `MIGRATE=0` skip does not emit that marker.
 - The live Web builder is Vite + Nitro, both with `sourcemap: false`;
   `next.config.mjs` is a legacy path, not the production compiler. Before
   upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI

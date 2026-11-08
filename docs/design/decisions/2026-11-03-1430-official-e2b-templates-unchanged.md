@@ -873,3 +873,15 @@ ae838974/tree45acc 的实际 CI checkout 是 b73168f0（同树，parents main759
 main759五条publisher及主CI均已终态；Desktop42470724706最后因匹配Web等待40分钟超时，macOS打包job跳过。Web只是Build失败且最后观察标记typecheck，终止子命令未知；不同受控私有构建的成功不冒充生产通过。#1505评论6720577633已明确释放11:00–11:30尾段，本节不预占后续共享窗口。本PR后继仍须自己的exact-head CI和fresh发布/消费者协调，实际Web/E2B、官方文件守恒、真实双订阅bootstrap adoption及同tuple六次≤5000ms均未完成，#1505保持打开。
 
 完整失败原件、SHA和边界见[机器回执](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)的authenticatedCuaCiFollowup；发布后的实际commit另回链到#1689，不能把本地提交当远端运行结果。
+
+### 2026-11-08 11:43 UTC：完整 CI、生产环境对照与有限诊断修补
+
+4d1a868a/tree472748 已完成自己的真实CI：实际checkout1e4d4ac4与PR同树、parents main759+4d1；10个workflow首轮成功，43checks为36 success/7条件skip、0 failure。Linux/macOS认证下载、原SHA和真实driver，四PG、Node22、Apple打包/Keychain/native、image及strict都通过。PG两项原预算仍8976≤9326和7700=7700，旧失败没有冲销。PR当时mergeable=true/clean只属于4d1，不能借给以下必要后继，更不能作为生产五秒结果。
+
+生产排查已区分三种证据：c6ed/42473203908在隔离两库以production flags和真实overlay完成完整构建/254迁移；858/42474639858按正式Vercel文件与非空job优先规则，对实际两个DB只读检查连接、部分权限与history；e676/42475278958则用实际生产build-env和原wrapper，但显式MIGRATE0。最后一轮公开闭式回执为compilerWrapperExit=0、lastTypecheckCommand=frontend、typescriptCodes=[]、migrationSuppressed=true、deployed=false；producer没有单独报告pnpm child exit，不能补造该值，被mask的字节/hash/文本不复原。原owner另外报告原pending JSON表达式的纯SELECT成功，也不等于ALTER/trigger/真实迁移通过。受控检查没有复现旧759失败，原根因仍unknown。
+
+正常合入公开554ad12e（parent ae838）的五文件有限诊断：固定root/API组合或frontend子命令分类，日志顺序前16个unique、格式受限4–5位TS编号后排序，以及migrate固定入口marker。编号并非官方注册表；marker在target解析及MIGRATE0早退之后、guard/SQL之前，既不证明SQL执行，也不覆盖更早的target解析异常。原build执行尾部3633 B逐字保留，guard/target/DDL/退出与私有日志规则不变；复用原作者24/24与两次独立源码peer，没有为此重跑DB。
+
+随后真实TypeScript5.9.3语义错误和彩色formatter证明554会漏掉夹有ANSI的TS2322。7a4d4937仅对扫描行使用Node内建stripVTControlCharacters：旧函数实际RED（[]），同一新回归GREEN（TS2322）；原build-vercel单文件14/14及两个文件语法/lint通过。原Buffer、长度/SHA、枚举/16上限和执行尾部保持不变，测试还核彩色命令/marker与私有片段不外泄。这个诊断缺口不是旧759根因证明。
+
+本地正常合流282497f5/tree4b43425b，470项canonical输入未改，worker仍9da70595；实际worker构建证据仍绑定a08，不冒称重建。上述后继同本节和[机器回执](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)合批后必须完成自己的exact-head CI。#1503已实际启动42475556837/994、消费7e/0aef，至其C清理释放前保持main/生产publisher/共享账号稳定；分支源码与隔离CI继续。正式新APP/DPL/runtime/模板配对、官方文件守恒、真实双订阅采用及同tuple六次≤5000ms仍待实测，#1505保持打开。

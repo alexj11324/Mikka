@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "ci_authenticated_download_successor_pending_exact_head_and_production",
+  "status": "prepublication_web_boundary_successor_exact_ci_and_production_pending",
   "recordedAt": "2026-11-08T09:14:00Z",
   "issue": 1505,
   "pr": 1689,
@@ -699,7 +699,7 @@
       "issueClosed": false
     }
   },
-  "updatedAt": "2026-11-08T11:07:00Z",
+  "updatedAt": "2026-11-08T11:43:32Z",
   "authenticatedCuaCiFollowup": {
     "recordedAt": "2026-11-08T11:07:00Z",
     "sourceBeforeDocumentation": {
@@ -1005,6 +1005,230 @@
       "webTerminalCause": null,
       "ownWindowReleased": "https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6720577633",
       "globalIdleClaimed": false
+    },
+    "acceptance": {
+      "nextExactHeadCi": null,
+      "nextWeb": null,
+      "nextE2b": null,
+      "officialFiles": null,
+      "realSubscriptions": null,
+      "formalSix": null,
+      "allSixAtMost5000ms": false,
+      "issueClosed": false
+    }
+  },
+  "webBoundaryAndProductionInputFollowup": {
+    "recordedAt": "2026-11-08T11:43:32Z",
+    "sourceBeforeDocumentation": {
+      "head": "282497f555a8ce74b3d1e8ac1f71aee650c732fc",
+      "tree": "4b43425b8570558540df7acb98051614f2b208e5",
+      "fullUpstream": "554ad12e56ca59452876cbbf88c28ddbe435f100",
+      "upstreamParent": "ae838974ad7dab627c29b3eca5fc32083d8ccbb4",
+      "localAnsiSource": "7a4d49375c4f0f8a119def6a0840f17f375f41f5",
+      "localAnsiParent": "05e42c2b059121e3f84dc19c20cb54de831273ef",
+      "normalMergeProofSha256": "9e2291c253a365320f4399501cbd2e5871c44e4579b734408de0ddc5bfd108ac"
+    },
+    "fourD1Ci": {
+      "head": "4d1a868a02e10319040f6073414ff2d79a7926aa",
+      "tree": "47274867b96c089cb23a19c5ec7da6cd2113357a",
+      "actualCheckout": "1e4d4ac467f136318ab8bf957d1fa4ffa774a84b",
+      "actualParents": [
+        "75930406dda8708a84786475656ae449f5ffda88",
+        "4d1a868a02e10319040f6073414ff2d79a7926aa"
+      ],
+      "mainRun": 42474388061,
+      "cloudRun": 42474388013,
+      "attempt": 1,
+      "workflows": {
+        "total": 10,
+        "success": 10
+      },
+      "checks": {
+        "total": 43,
+        "success": 36,
+        "skipped": 7,
+        "failure": 0
+      },
+      "observedAt": "2026-11-08T11:29:03Z",
+      "pr": {
+        "mergeable": true,
+        "mergeableState": "clean",
+        "merged": false
+      },
+      "linux": {
+        "job": 128712324878,
+        "rawSha256": "fe7168dc4d48f4e399f0810d02cfd2699259b3a809ba0dc0853bc3946cb2b384",
+        "downloadChecksumAndRealDriverPassed": true
+      },
+      "mac": {
+        "job": 128712324637,
+        "rawSha256": "57bfb71f13d8d625ec790a31f93ff4bf294e78c07530d410fb01082b72bf0bd4",
+        "downloadChecksumAndRealDriverPassed": true
+      },
+      "pg4": {
+        "job": 128712529053,
+        "rawSha256": "09bc0029215da61b46bddbe47aa104369416aa8c7389da899b53fca01297b640",
+        "unlinked": {
+          "sql": 9,
+          "rowJsonBytes": 932,
+          "wireBytes": 8976,
+          "budgetBytes": 9326
+        },
+        "revoked": {
+          "sql": 7,
+          "rowJsonBytes": 781,
+          "wireBytes": 7700,
+          "budgetBytes": 7700
+        },
+        "targetNewSockets": 0,
+        "unrepresentedStatements": 0,
+        "truncated": false
+      },
+      "apple": {
+        "job": 128713909534,
+        "conclusion": "success",
+        "rawSha256": "8ca18a032d2b001b27ea7e2059865b627135417360e662b4f88a80b24de655f0"
+      },
+      "image": {
+        "job": 128712722594,
+        "conclusion": "success",
+        "rawSha256": "e4735060a9c4b82ffed5af2d4fb2b530a560787b4fa1add10b69fbe6a9d9dc9a"
+      },
+      "manifestSha256": "30a06fc894b6e7d4ff8f71cfea58bf168d3405297bb17d808c0e4392edab519f",
+      "finalResultSha256": "db3d4bbe70a125c9ac83787cb97fdb9aabbeaaab7865f98e37dbf80d47f053f7",
+      "newProductionClaimed": false
+    },
+    "controlledInput": {
+      "publicSource": "75930406dda8708a84786475656ae449f5ffda88",
+      "privateOverlay": "0aef26958544fb9579c4d2b01dd1d34cfa22c051",
+      "isolatedProductionFlags": {
+        "run": 42473203908,
+        "scope": "synthetic auth and two loopback databases; real production flags and overlay",
+        "migrations": 254,
+        "success": true,
+        "publicReceipt": "https://github.com/alexj11324/Mikka/pull/1719#issuecomment-6720699458"
+      },
+      "realReadOnlyDatabaseInputs": {
+        "run": 42474639858,
+        "head": "85815106154cf6875872bb9e97f5c2ee33b37bcb",
+        "success": true,
+        "sourcePrecedence": "nonempty job first, Vercel pull file fallback",
+        "appPending": "20261108120101_enabled_models",
+        "workspacePending": 0,
+        "migrationsOrDdl": 0,
+        "publicReceipt": "https://github.com/alexj11324/Mikka/pull/1719#issuecomment-6720779465",
+        "limits": "Connection, selected table ownership, selected schema privileges and current history only; not pending DDL or every search_path/function condition."
+      },
+      "realProductionCompiler": {
+        "run": 42475278958,
+        "job": 128715109625,
+        "head": "e676918397ff546d8b2c749946975906d397b477",
+        "jobConclusion": "success",
+        "compilerWrapperExit": 0,
+        "originalPnPmChildExitSeparatelyReported": false,
+        "lastTypecheckCommand": "frontend",
+        "typescriptCodes": [],
+        "migrationSuppressed": true,
+        "deployed": false,
+        "publicReceipt": "https://github.com/alexj11324/Mikka/pull/1719#issuecomment-6720960216",
+        "rootPublicProjectionSha256": "8ee85a5c14d2d7243878626fbc15f01234a4e5a8e5073e2aea9ac9cb51a96910",
+        "protectedCompilerLogReadByThisRoot": false,
+        "maskedValuesNotReconstructed": true
+      },
+      "pendingExpressionReport": {
+        "source": "owner public receipt 6720960216",
+        "operation": "pure SELECT projection",
+        "actualMigrationOrTriggerProved": false
+      },
+      "oldProductionCauseStillUnknown": true
+    },
+    "upstream554": {
+      "commit": "554ad12e56ca59452876cbbf88c28ddbe435f100",
+      "tree": "31031a9babdc4ad72bde8c74fb31051634d5bad1",
+      "paths": [
+        "docs/operations/web-deploy.md",
+        "scripts/migrate-mode.test.mjs",
+        "scripts/migrate.mjs",
+        "scripts/release/build-vercel.mjs",
+        "scripts/release/build-vercel.test.mjs"
+      ],
+      "typescriptCodePolicy": "first 16 unique format-matching TS plus 4-5 digits, first digit nonzero, then sort; not an official registry",
+      "lastTypecheckCommands": [
+        null,
+        "root-and-api",
+        "frontend"
+      ],
+      "migrationMarker": "after target parsing and requested-mode early return; before guard and SQL",
+      "executionTailBytes": 3633,
+      "executionTailSha256": "e7ca8100c11e074016da77a45f9f04fe43555f1f4a1f4a8b3c18c2c3e8430ee9",
+      "executionTailByteEqual": true,
+      "ownerReportedTests": {
+        "total": 24,
+        "passed": 24,
+        "skipped": 0,
+        "source": "https://github.com/alexj11324/Mikka/pull/1689#issuecomment-6720549622",
+        "rerunByThisRoot": false
+      },
+      "publicPeer": "https://github.com/alexj11324/Mikka/pull/1689#issuecomment-6720591136",
+      "localPeerManifestSha256": "c7335639b887a5d9dbdf0631b6baa6f8b18cc3219c133f96a635164e5d6f9451",
+      "rootNormalMergeSha256": "5c22370c323551c8ac03f6e31d11895d7785a5569fd04826138c28893cc4c4ef"
+    },
+    "ansiFix": {
+      "source": "7a4d49375c4f0f8a119def6a0840f17f375f41f5",
+      "scope": "node:util stripVTControlCharacters on scan lines only",
+      "paths": [
+        "scripts/release/build-vercel.mjs",
+        "scripts/release/build-vercel.test.mjs"
+      ],
+      "productBlob": "1d770a8eae9e71c28b0be8f6fe6370dda8f9b2d5",
+      "testBlob": "670a9dcbc361e12dddb5028e7a5ba53e1a0981cb",
+      "typescript": "5.9.3",
+      "realCreateProgramAndColoredFormatter": true,
+      "red": {
+        "source": "05e42c2b059121e3f84dc19c20cb54de831273ef",
+        "expected": [
+          "TS2322"
+        ],
+        "observed": [],
+        "exit": 1,
+        "rawSha256": "8a61300438fe78e7ff04d5638c450f815a034c0e17badbbddb2c43cbacf297ca"
+      },
+      "sameRegressionGreen": true,
+      "singleFileSuite": {
+        "passed": 14,
+        "failed": 0,
+        "skipped": 0,
+        "rawSha256": "875a442de860cd2d0a4c32113ca9fd96f241d2b385aec9c86fcff8a3e214099a"
+      },
+      "syntaxFiles": 2,
+      "lintFiles": 2,
+      "rawBufferLengthDigestUnchanged": true,
+      "enumsAnd16UniqueLimitUnchanged": true,
+      "executionTailUnchanged": true,
+      "manifestSha256": "11b0e3f42e02581d3c8b8e4b9b2a6380066acda70b731e38a36e8f7536d0b803",
+      "rootVerifiedManifestFiles": 16,
+      "historicalProductionFailureAttributedToAnsi": false,
+      "newDatabaseTestsOrWorkerBuild": false,
+      "independentPeerSha256": "49c536f23bc3e574b6c76afee18f13280c84375659d4d7842017ce74ee1365c1"
+    },
+    "worker": {
+      "sha": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d",
+      "canonicalInputs": 470,
+      "unchanged": true,
+      "actualBuiltSource": "a08f722f2a105f84c99c029216cd73bcf481a05d",
+      "newBuildClaimed": false
+    },
+    "activeConsumer": {
+      "issue": 1503,
+      "run": 42475556837,
+      "attempt": 1,
+      "head": "994407e0d2098dc5012ad16c66721f7e51f2d502",
+      "deployedSource": "7e34d869aa80266494cb2e2eefeee5d8e7ff7d4d",
+      "privateOverlay": "0aef26958544fb9579c4d2b01dd1d34cfa22c051",
+      "publicClaim": "https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6720867418",
+      "cleanupReleased": false,
+      "mainAndPublishersHeldUntilActualCleanup": true,
+      "ourProductionConsumerStarted": false
     },
     "acceptance": {
       "nextExactHeadCi": null,
