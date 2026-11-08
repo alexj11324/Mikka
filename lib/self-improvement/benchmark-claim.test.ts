@@ -15,6 +15,7 @@ import { constrainedAssignmentPolicy, intersectRunPolicy } from '../run-assignme
 import { serverRunFailure } from '../run-failure-details'
 import { ModelAdmissionError } from '../model-admission/contract'
 import { ActionFailureError } from '../action-error'
+import { PublicationError, PUBLICATION_ERRORS } from '../run-publication-result'
 import * as startupTracing from '../computer/startup-tracing'
 import * as startupDiagnostics from '../computer/startup-diagnostics'
 import * as decisionMcpTool from '../project-map/mcp-tool'
@@ -98,7 +99,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/run-failure-details':{serverRunFailure},
     '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response)=>{assert.equal(projectLease.active,true);return respond(run)}},
     '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{assert.equal(issueDenied,true);calls.push('rejectPublication')}},
-    '@/lib/run-publication-result':{PublicationError:class extends Error {}},
+    '@/lib/run-publication-result':{PublicationError},
     // No linked GitHub account in this fixture: the claim attaches no GitHub credential endpoint.
     '@/lib/github/machine-credential':{
       githubMachineConfigured:async(userId:string)=>{assert.equal(userId,'owner');credentialChecks.push('configured');return false},
@@ -236,7 +237,8 @@ test('an unbound legacy Run cannot bypass Project admission or receive benchmark
   run.workspaceId=null
   const response=await post(claimRequest(),{params:Promise.resolve({deviceId:'device',runId:'run'})})
   assert.equal(response.status,409)
-  assert.deepEqual(await response.json(),{error:'Run workspace unavailable.',code:'workspaceAccessDenied'})
+  assert.deepEqual(await response.json(),{error:PUBLICATION_ERRORS.issue_unavailable,code:'issue_unavailable'})
+  assert.equal(response.headers.get('cache-control'),'private, no-store')
   assert.deepEqual(calls,[])
   assert.deepEqual(credentialChecks,[])
   assert.deepEqual(projectLease,{active:false,guards:0,releases:0})

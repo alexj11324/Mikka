@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { REGISTRATION_COMPLETE } from '../../lib/computer/registration-command'
 import { CLOUD_WORKER_COMMAND } from '../../lib/computer/worker-command'
 import { templateModelsFixture } from './template-models'
 // A cloud run's own thread machine, as production provisions it, with only E2B
@@ -52,14 +53,15 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
       },
       commands: { run: async (command: string) => {
         // Desktop/Git/runtime commands cannot impersonate an authenticated worker.
-        if (command.includes(CLOUD_WORKER_COMMAND)) {
+        const registering = command.includes(REGISTRATION_COMPLETE)
+        if (registering || command.includes(CLOUD_WORKER_COMMAND)) {
           if (!handoff) throw new Error('Fixture worker started without a bootstrap')
           const { deviceId, credential } = handoff
           const used = await pool.query('UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id', [deviceId, createHash('sha256').update(credential).digest('hex')])
           if (used.rowCount !== 1) throw new Error('Fixture worker credential unavailable')
           await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp(),enabled=true,harnesses=$2 WHERE id=$1', [deviceId, JSON.stringify(harnesses)])
         }
-        return { stdout: '', stderr: '', exitCode: 0 }
+        return { stdout: registering ? REGISTRATION_COMPLETE + '\n' : '', stderr: '', exitCode: 0 }
       } },
     }
   }

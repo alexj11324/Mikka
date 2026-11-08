@@ -1,5 +1,6 @@
 'use client'
 
+import * as taskConversationSlot from '@ui-slot/task-conversation'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -50,9 +51,13 @@ export function ThreadColumn({ runId, issueId: known, overList = false, name }: 
   // A thread the viewer may not read is not a place: show what is there instead.
   useEffect(() => { if (!known && !isLoading && looked === null) navigate({ thread: null }, 'replace') }, [known, isLoading, looked])
   const issueId = thread?.issueId ?? null
+  const TaskConversation = taskConversationSlot.TaskConversation ?? null
   return <RightColumn slot="thread-column">
     {thread
-      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} name={name} onBack={closeThread} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null }) : undefined} />
+      ? TaskConversation && issueId
+        // A layer that keeps a task's attempts in one conversation (task-conversation slot) opens the task's, at this attempt.
+        ? <TaskConversation key={issueId} issueId={issueId} runId={runId} name={name} onBack={closeThread} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} onOpenTask={() => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null })} />
+        : <IssueThreadPanel key={runId} issueId={issueId} runId={runId} name={name} onBack={closeThread} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null }) : undefined} />
       : error ? <div className="p-4"><InlineLoadError message={readFailedMessage} retryLabel={retryLabel} onRetry={() => { void mutate() }} /></div>
       : <div role="status" aria-label={t('loading')} className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>}
   </RightColumn>

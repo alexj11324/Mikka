@@ -14,7 +14,7 @@ const keyOf = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.group.id
 
 /**
  * The home list's chats with the person's own state, and what the list can do to one: pin, hide, mark read or
- * unread, reorder. A change shows at once and is written to the server; a write that fails puts it back.
+ * unread. A change shows at once and is written to the server; a write that fails puts it back.
  */
 export function useHomeChats(needle = '') {
   const home = useHome()
@@ -70,25 +70,7 @@ export function useHomeChats(needle = '') {
     return chat.markedUnread ? write(chat, { markedUnread: false }) : (await reload(), true)
   }, [reload, write])
 
-  /** A drag's result (home-list.ts dropOrder), written as the whole order. */
-  const reorder = useCallback(async (order: { pinned: string[]; list: string[] }) => {
-    const byKey = new Map(chats.map(chat => [chat.key, chat]))
-    const shown: typeof pending = {}
-    order.pinned.forEach((key, index) => { shown[key] = { pinned: true, pinOrder: index + 1, listOrder: null } })
-    order.list.forEach((key, index) => { shown[key] = { pinned: false, pinOrder: null, listOrder: index + 1 } })
-    setPending(current => ({ ...current, ...shown }))
-    const ref = (key: string) => ({ kind: byKey.get(key)?.kind ?? 'bot', id: key })
-    try {
-      await api('/api/mobile/chat-order', { method: 'PUT', body: { pinned: order.pinned.map(ref), list: order.list.map(ref) } })
-      await reload()
-    } catch {
-      // The order shown goes back to the server's.
-    } finally {
-      setPending(current => Object.fromEntries(Object.entries(current).filter(([key]) => !(key in shown))))
-    }
-  }, [chats, reload])
-
   const copyId = useCallback((chat: HomeChat) => { void Clipboard.setStringAsync(chat.key); tap() }, [])
 
-  return { chats, loading, error, reload, togglePin, setHidden, setUnread, reorder, copyId, pinsFull: pinnedCount >= MAX_PINS }
+  return { chats, loading, error, reload, togglePin, setHidden, setUnread, copyId, pinsFull: pinnedCount >= MAX_PINS }
 }

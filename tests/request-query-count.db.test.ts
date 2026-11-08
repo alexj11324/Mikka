@@ -94,6 +94,9 @@ test('the polled routes read with a fixed number of queries, whatever the number
     assert.equal(fourProfiles.value.profiles.length, 4)
     assert.equal(Object.keys(fourProfiles.value.availability).length, 4)
     // Each Profile adds only its own dispatch plan (its Agent's models), not another candidate/policy/device read.
+    if (fourProfiles.queries - oneProfile.queries > 6 || fourProfiles.queries > 28) {
+      t.diagnostic(JSON.stringify({ profiles: { one: oneProfile.queryShapes, four: fourProfiles.queryShapes } }))
+    }
     assert.ok(fourProfiles.queries - oneProfile.queries <= 6, `agent-profiles: ${oneProfile.queries} queries for one Profile, ${fourProfiles.queries} for four`)
     assert.ok(fourProfiles.queries <= 28, `agent-profiles: ${fourProfiles.queries} queries`)
 

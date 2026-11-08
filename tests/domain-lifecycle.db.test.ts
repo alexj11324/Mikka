@@ -1,21 +1,79 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
+import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
+import { Pool } from 'pg'
+import { orderMigrations } from '../scripts/migration-order.mjs'
+import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
+import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
+import { dropTestDatabase } from './support/drop-test-database'
 import { count, dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedTeam, seedTeamIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
-test('account and workspace deletion preserve the canonical Project history boundary', { skip: !dbUrl }, async t => {
-  const { Pool } = await import('pg')
-  const connection = new Pool({ connectionString: dbUrl, max: 3 })
+test('account and workspace deletion preserve the canonical Project history boundary', { skip: !dbUrl, timeout: 180_000 }, async t => {
+  const admin = new Pool({ connectionString: dbUrl, max: 1 })
+  const database = 'domain_lifecycle_' + randomUUID().replaceAll('-', '') + '_e2e'
+  const isolated = new URL(dbUrl!); isolated.pathname = '/' + database
+  const connection = new Pool({ connectionString: isolated.toString(), max: 3 })
+  const modulePools: Pool[] = []
+  const previousEnv = { E2E_DATABASE_URL: process.env.E2E_DATABASE_URL,
+    MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL }
+  t.after(async () => {
+    try { await dropTestDatabase(admin, database, connection, ...modulePools) }
+    finally {
+      for (const [key, value] of Object.entries(previousEnv)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+      await admin.end()
+    }
+  })
+  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  Object.assign(process.env, { E2E_DATABASE_URL: isolated.toString(), MIKKA_DATABASE_URL: isolated.toString(), DATABASE_URL: isolated.toString() })
+  await connection.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
+  const directory = new URL('../drizzle/', import.meta.url)
+  const names = orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))
+  const boundary = '20261107230008_project_writer_fence.sql'
+  const migrate = async (files: string[]) => {
+    for (const name of files) {
+      const source = await readFile(new URL(name, directory), 'utf8')
+      const plan = planMigration(name, source)
+      const client = await connection.connect()
+      try {
+        const scope = scopeMigrationBeforeCommit(name, source)
+        await applyMigration(client, name, scope === null ? plan : { ...plan, sql: scope })
+        if (scope !== null) await client.query('COMMIT')
+      } finally { client.release() }
+    }
+  }
+  await migrate(names.filter(name => name < boundary))
+  // These are historical unbound rows, created under the real pre-fence
+  // schema. Current writers must never fabricate new quarantined Projects.
+  const legacyProjectSql = `insert into workspace_projects(id,"userId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+    values($1,$2,'Legacy lifecycle project','','','planned','none','','','','','[]',1)`
+  const legacyPending: Array<{ departing: string; pendingProject: string }> = []
+  for (const label of ['domain-old-receipt', 'domain-empty-project-journal']) {
+    const departing = await seedUser(connection, label), pendingProject = randomUUID()
+    await connection.query(legacyProjectSql, [pendingProject, departing])
+    legacyPending.push({ departing, pendingProject })
+  }
+  const [oldReceipt, oldJournal] = legacyPending
+  await migrate(names.filter(name => name >= boundary))
+  assert.equal(await count(connection, 'schema_migrations where name=$1', [boundary]), 1)
+  await assert.rejects(connection.query(legacyProjectSql, [randomUUID(), oldReceipt.departing]), { code: '23514', message: 'projectWorkspaceRequired' })
+  assert.equal(await count(connection, 'workspace_projects where id=any($1::uuid[]) and "workspaceId" is null', [legacyPending.map(row => row.pendingProject)]), 2)
+  assert.equal(await count(connection, 'workspace_project_v2_migrations where "projectId"=any($1::uuid[])', [legacyPending.map(row => row.pendingProject)]), 0)
+
   const { observePoolCommits } = await import('../lib/db/commit-effects')
   observePoolCommits(connection)
   const { workspaceDb, workspacePool } = await import('../lib/workspace-db')
+  modulePools.push(workspacePool)
   const { pool: appPool } = await import('../lib/db')
+  modulePools.push(appPool)
   const account = await import('../lib/account/delete')
   const teamLifecycle = await import('../lib/workspace-admin/teams')
   const general = await import('../lib/workspace-admin/general')
-  t.after(async () => { await Promise.all([connection.end(), workspacePool.end(), appPool.end()]) })
 
-  const seedUngroupedProject = async (creator: string, workspaceId: string | null) => {
+  const seedUngroupedProject = async (creator: string, workspaceId: string) => {
     const id = randomUUID()
     await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
       values($1,$2,$3,'Lifecycle project','','','planned','none','','','','','[]',1)`, [id, creator, workspaceId])
@@ -128,12 +186,12 @@ test('account and workspace deletion preserve the canonical Project history boun
   })
 
   await t.test('old deletion receipts retain shared history and quarantined Project repair evidence', async () => {
-    const departing = await seedUser(connection, 'domain-old-receipt'), admin = await seedUser(connection, 'domain-old-admin')
+    const { departing, pendingProject } = oldReceipt
+    const admin = await seedUser(connection, 'domain-old-admin')
     const personal = await seedPersonalWorkspace(connection, departing)
     const shared = await seedWorkspace(connection, admin, [{ userId: admin, role: 'admin' }, { userId: departing, role: 'member' }])
     const sharedProject = await seedUngroupedProject(departing, shared.id)
     const privateProject = await seedProject(connection, departing, [])
-    const pendingProject = await seedUngroupedProject(departing, null)
     await connection.query('insert into workspace_project_repairs("projectId",reason,evidence) values($1,\'workspace_evidence_missing\',$2)', [pendingProject, JSON.stringify([{ reason: 'legacy_without_trusted_workspace' }])])
     const pendingEvent = randomUUID()
     await connection.query('insert into workspace_project_events(id,"projectId","userId",message) values($1,$2,$3,\'Pending evidence\')', [pendingEvent, pendingProject, departing])
@@ -165,13 +223,14 @@ test('account and workspace deletion preserve the canonical Project history boun
   await t.test('replaying an old journal with an explicit empty Project set freezes surviving canonical history and prior receipts', async () => {
     const { applyAccountDeletionManifest, exportAccountDeletionManifest } = await import('../lib/account/deletion-jobs')
     const { auditDigest } = await import('../lib/audit/integrity')
-    const departing = await seedUser(connection, 'domain-empty-project-journal'), admin = await seedUser(connection, 'domain-replay-admin')
+    const { departing, pendingProject } = oldJournal
+    const admin = await seedUser(connection, 'domain-replay-admin')
     const personal = await seedPersonalWorkspace(connection, departing)
     const shared = await seedWorkspace(connection, admin, [{ userId: admin, role: 'admin' }, { userId: departing, role: 'member' }])
     const former = await seedWorkspace(connection, admin, [{ userId: admin, role: 'admin' }])
     const sharedTask = await seedIssue(connection, departing, shared.id), privateTask = await seedIssue(connection, departing, personal)
     const sharedProject = await seedUngroupedProject(departing, shared.id), formerProject = await seedUngroupedProject(departing, former.id)
-    const privateProject = await seedUngroupedProject(departing, personal), pendingProject = await seedUngroupedProject(departing, null)
+    const privateProject = await seedUngroupedProject(departing, personal)
     await seedProjectTasks(connection, sharedProject, [sharedTask])
     await seedProjectTasks(connection, privateProject, [privateTask])
     const sharedDecision = await seedDecision(departing, shared.id, sharedProject, sharedTask)

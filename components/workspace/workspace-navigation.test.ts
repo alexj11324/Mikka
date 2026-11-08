@@ -13,7 +13,7 @@ const PROJECT = '9e8d7c6b-5a49-4382-9716-05f4e3d2c1b0'
 const ARTIFACT = '2b3c4d5e-6f70-4182-93a4-b5c6d7e8f901'
 const SESSION = '4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8'
 const at = (path: string) => new URL(`https://app.example${path}`)
-const NOWHERE = { bot: null, group: null, session: null, team: null, project: null, issue: null, thread: null, artifact: null, threads: null }
+const NOWHERE = { bot: null, group: null, session: null, team: null, project: null, issue: null, task: null, thread: null, artifact: null, threads: null }
 /** A full place from the keys that are set. */
 const place = (keys: Partial<WorkspaceLocation> & Pick<WorkspaceLocation, 'section'>): WorkspaceLocation => ({ ...NOWHERE, ...keys })
 
@@ -288,4 +288,13 @@ test('a thread opened from a null history state still records where it came from
   assert.notEqual(browser.history.state, null)
   closeThread()
   assert.equal(browser.path(), '/')
+})
+
+test('a task opened beside the centre stays with its thread and closes when the centre moves', () => {
+  const task = '11111111-1111-4111-8111-111111111111', run = '22222222-2222-4222-8222-222222222222', bot = '33333333-3333-4333-8333-333333333333'
+  const withTask = workspaceHref(at(`/?bot=${bot}`), { task })
+  assert.equal(readLocation(at(withTask).searchParams).task, task)
+  const withThread = workspaceHref(at(withTask), { thread: run })
+  assert.deepEqual([readLocation(at(withThread).searchParams).task, readLocation(at(withThread).searchParams).thread], [task, run])
+  assert.equal(readLocation(at(workspaceHref(at(withThread), { section: 'all-issues' })).searchParams).task, null)
 })

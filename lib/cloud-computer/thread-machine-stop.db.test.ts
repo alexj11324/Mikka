@@ -52,9 +52,13 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
     await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,'Fixture Bot')`, [botId, workspaceId, owner]);
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES ($1,$2,'sandbox-bot',$3,true,'running',$4)`, [workspaceId, owner, randomUUID(), botDevice]);
     const actor = { userId: owner, workspaceId } as Parameters<typeof ensureThreadMachine>[1];
-    const queuedRun = async () => {
+    const queuedRun = async (withTask = true) => {
       const runId = randomUUID();
-      await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","botId","deviceId","deviceRepoId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6,'queued','Fixture')`, [runId, owner, agentId, botId, botDevice, repoId]);
+      const issueId = withTask ? randomUUID() : null;
+      if (issueId) await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority)
+        VALUES ($1,$2,$3,'Stop lifecycle fixture','{"type":"doc","content":[]}'::jsonb,'todo','normal')`, [issueId, owner, workspaceId]);
+      await pool.query(`INSERT INTO agent_runs (id,"userId","workspaceId","issueId","agentId","botId","deviceId","deviceRepoId",status,prompt)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued','Fixture')`, [runId, owner, workspaceId, issueId, agentId, botId, botDevice, repoId]);
       await pool.query(`INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [runId, botId, workspaceId, owner]);
       return runId;
     };
@@ -73,8 +77,8 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       tokens: (await pool.query('SELECT count(*)::int AS n FROM device_tokens t JOIN thread_machines m ON m."deviceId"=t."boundDeviceId" WHERE m."runId"=$1', [runId])).rows[0].n,
     });
 
-    const retainedUnclaimedRun = async () => {
-      const runId = await queuedRun();
+    const retainedUnclaimedRun = async (withTask = true) => {
+      const runId = await queuedRun(withTask);
       const deviceId = randomUUID(), machineRepoId = randomUUID();
       await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'unclaimed task','cloud')`, [deviceId, owner]);
       await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/fixture/task')`, [machineRepoId, deviceId, owner]);
@@ -96,6 +100,24 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       assert.deepEqual(current.run, { status: "stopped", stop: true, finished: true });
       assert.equal(current.machine.state, "ended");
       assert.deepEqual(kills, [`sandbox-stop-${runId}`]);
+    });
+
+    await t.test("normal Owner Stop still cleans a historical Run without Task execution authority", async (t) => {
+      const runId = await retainedUnclaimedRun(false);
+      const original = (await pool.query('SELECT "workspaceId","issueId","agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0];
+      assert.equal(original.workspaceId, workspaceId);
+      assert.equal(original.issueId, null);
+      const kills: string[] = [];
+      t.mock.method(threadMachineProvider, "kill", async (sandboxId: string, userId: string) => {
+        assert.equal(userId, owner); kills.push(sandboxId);
+      });
+      const { requestRunStop } = await import("../agent-runs");
+      assert.deepEqual(await requestRunStop(owner, runId), { stoppedRunIds: [runId] });
+      assert.deepEqual((await state(runId)).run, { status: "stopped", stop: true, finished: true });
+      assert.equal((await state(runId)).machine.state, "ended");
+      assert.deepEqual(kills, [`sandbox-stop-${runId}`]);
+      assert.deepEqual((await pool.query('SELECT "workspaceId","issueId","agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0], original,
+        'cleanup neither assigns a Task nor manufactures execution authority for the old Run');
     });
 
     await t.test("the existing maintenance pass acknowledges a host stop on an unclaimed bound run", async (t) => {
