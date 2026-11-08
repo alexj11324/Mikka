@@ -310,9 +310,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   [decision](decisions/2026-11-01-2255-library-delete-own-files.md)).
   Exception: a coding task's review page ([2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)) carries
   actions (line comments, 发给 Agent, 附到评论, 要求修改, 批准合并). On a coding
-  task, the task panel's header row also carries the code tool buttons
-  改动 · 文件 · 终端 · 预览, which open the review page; the rest of the panel
-  stays read-only.
+  task, the task panel's ⋯ menu also lists the code tools 改动 · 文件 · 终端 ·
+  预览, and its PR summary line opens the review page; these only open the
+  review page, and the rest of the panel stays read-only.
 - **R-52** Every thread list, web and phone, groups its rows in this order:
   等待你（N）, 进行中（N）, 受阻（N）, 空闲（N）, 已解决（N）
   (Waiting for you, Running, Blocked, Idle, Resolved;
@@ -675,9 +675,13 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   to edge; buttons and switches inside it stay separately clickable.
   `pnpm lint:ui` fails a frame inside a frame as `style/nested-frame`.
 - **R-91** Top rows carry the important things. The first row of a panel,
-  page or screen holds the object's state and its main actions (for a coding
-  task: the tool buttons 改动 +N −M · 文件 · 终端 · 预览 in the header row, and
-  PR and failed checks right under the title). Secondary
+  page or screen holds the object's state (for a coding task: PR and failed checks right
+  under the title). Tools and secondary actions go into the header's 「⋯」
+  menu, tools first (for a coding task: 改动 +N −M, 文件, 终端, 预览, with
+  their shortcuts), then a divider and items such as the branch name, copy
+  link and permissions; shortcut hints go into tooltips. They are not visible
+  buttons on the header row (Alex: 「只要求你把这些东西放进省略号里边…不是放在
+  省略号的外边」). Secondary
   actions, branch names, counts and shortcut hints go into 「⋯」 or a
   tooltip, not a row of their own (Alex, 2026-11-08; [2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)).
 
