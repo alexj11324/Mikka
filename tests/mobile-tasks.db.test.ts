@@ -107,10 +107,10 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const cookie = authContext.authCookies.sessionToken.name + '=' + encodeURIComponent(native.token + '.' + signature)
   const { createPersonalAccessToken, revokePersonalAccessToken } = await import('../lib/tokens/store')
   const pat = await createPersonalAccessToken(owner, teamWorkspace.id, { name: 'Mobile task isolated fixture', expiresAt: null })
-  const selectedWorkspace = teamWorkspace.id
+  const teamSelection = { workspaceId: teamWorkspace.id }
   const run = async <T>(path: string, handler: (request: Request) => Promise<T>, options: ReadOptions = {}) => {
     const bearer = options.bearer === undefined ? native.token : options.bearer
-    const selection = options.workspaceId === undefined ? selectedWorkspace : options.workspaceId
+    const selection = options.workspaceId
     const req = new Request(origin + '/mikka' + path, { headers: {
       'x-mikka-locale': 'en', ...(bearer ? { authorization: 'Bearer ' + bearer } : {}),
       ...(selection ? { 'x-mikka-workspace-id': selection } : {}), ...(options.cookie ? { cookie: options.cookie } : {}),
@@ -152,7 +152,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const measurement = await measured(() => newestTaskRuns(owner, [issueId, noRun], teamWorkspace.id))
     assert.equal(measurement.statements, 1)
     assert.equal(measurement.value.find(row => row.issueId === noRun)?.runId, null)
-    const body = await (await listRequest()).json()
+    const body = await (await listRequest(teamSelection)).json()
     const row = body.tasks.find((item: { id: string }) => item.id === issueId)
     assert.equal(row.group, 'pending'); assert.equal(row.bot.id, bot); assert.ok(row.createdAt)
     assert.ok(Object.hasOwn(row, 'blocked'))
@@ -161,13 +161,13 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(scheduled.schedule.label, 'Every day at 09:00')
     assert.equal(Date.parse(scheduled.schedule.nextAt), Date.parse('2030-01-01T09:00:00Z'))
     await pool.query(`update issues set status='done' where id=$1`, [issueId])
-    const closed = await (await listRequest()).json()
+    const closed = await (await listRequest(teamSelection)).json()
     assert.equal(closed.tasks.find((item: { id: string }) => item.id === issueId).group, 'done')
     assert.equal((await (await request(issueId)).json()).task.group, 'done')
   })
   await t.test('without a thread, board flags and open dependencies put both list and detail in pending', async () => {
     const groups = async () => {
-      const listBody = await (await listRequest()).json()
+      const listBody = await (await listRequest(teamSelection)).json()
       const row = listBody.tasks.find((item: { id: string }) => item.id === noRun)
       const detail = await (await request(noRun)).json()
       return [row.group, detail.task.group]
@@ -187,7 +187,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     await metadata({ blockedByIds: [blocker], block: { blocked: false, runId: null } })
     assert.deepEqual(await groups(), ['todo', 'todo'], 'an explicitly cleared board block stays clear')
   })
-  await t.test('without a cookie or header, an older team does not hide personal task detail or its decorations', async () => {
+  await t.test('without a cookie or header, the Personal list and authorized task tenants keep their own decorations', async () => {
     const unselected = { workspaceId: null }
     const response = await listRequest(unselected)
     assert.equal(response.status, 200)
@@ -207,7 +207,16 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(defaultContext.workspace.id, own.id)
     const explicit = await run('/api/workspace', () => loadWorkspaceContext(teamWorkspace.id), unselected)
     assert.equal(explicit.workspace.id, teamWorkspace.id, 'an explicit business target still wins')
-    assert.equal((await request(issueId, unselected)).status, 404, 'a task id cannot retarget the Personal default to Shared')
+    const unselectedTeam = await request(issueId, unselected)
+    assert.equal(unselectedTeam.status, 200, 'a native session reads the task in its persisted Workspace, independent of the Personal default')
+    const teamBody = await unselectedTeam.json()
+    assert.equal(teamBody.task.bot.id, bot)
+    assert.deepEqual(teamBody.live, { workspaceId: teamWorkspace.id })
+    const unselectedSchedule = await request(noRun, unselected)
+    assert.equal(unselectedSchedule.status, 200)
+    const scheduleBody = await unselectedSchedule.json()
+    assert.equal(scheduleBody.task.schedule.label, 'Every day at 09:00')
+    assert.deepEqual(scheduleBody.live, { workspaceId: teamWorkspace.id })
     const selectedTeam = await request(issueId, { workspaceId: teamWorkspace.id })
     assert.equal(selectedTeam.status, 200)
     assert.deepEqual((await selectedTeam.json()).live, { workspaceId: teamWorkspace.id })
@@ -216,7 +225,20 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const savedContext = await run('/api/workspace', () => loadWorkspaceContext(), savedTeam)
     assert.equal(savedContext.workspace.id, teamWorkspace.id, 'a valid workspace cookie still wins')
     assert.equal((await request(issueId, savedTeam)).status, 200)
-    assert.equal((await request(personalTask, savedTeam)).status, 404)
+    const personalFromTeamCookie = await request(personalTask, savedTeam)
+    assert.equal(personalFromTeamCookie.status, 200, 'a normal session cookie is a preference, not an authentication pin')
+    const personalBody = await personalFromTeamCookie.json()
+    assert.equal(personalBody.task.bot.id, personalBot)
+    assert.deepEqual(personalBody.live, { workspaceId: own.id })
+    const savedPersonal = { bearer: null, workspaceId: null, cookie: cookie + '; mikka-workspace=' + own.id }
+    const teamFromPersonalCookie = await request(issueId, savedPersonal)
+    assert.equal(teamFromPersonalCookie.status, 200)
+    const cookieTeamBody = await teamFromPersonalCookie.json()
+    assert.equal(cookieTeamBody.task.bot.id, bot)
+    assert.deepEqual(cookieTeamBody.live, { workspaceId: teamWorkspace.id })
+    const scheduleFromPersonalCookie = await request(noRun, savedPersonal)
+    assert.equal(scheduleFromPersonalCookie.status, 200)
+    assert.equal((await scheduleFromPersonalCookie.json()).task.schedule.label, 'Every day at 09:00')
     for (const workspaceId of ['not-a-workspace', randomUUID()]) {
       assert.equal((await request(personalTask, { workspaceId })).status, 404, 'an invalid or inaccessible header never falls back to Personal')
       assert.equal((await listRequest({ workspaceId })).status, 403)
@@ -239,7 +261,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
 
   await t.test('an unlinked workspace task keeps its owner number without a repeated empty team read', async () => {
     const { setIssueTeam } = await import('../app/actions/team-relations')
-    const changeTeam = (input: Parameters<typeof setIssueTeam>[0]) => run('/actions/team-relations', () => setIssueTeam(input))
+    const changeTeam = (input: Parameters<typeof setIssueTeam>[0]) => run('/actions/team-relations', () => setIssueTeam(input), teamSelection)
     const unlinkedId = await workspaceTask()
     const { rows: [localTeam] } = await workspace.query('select identifier from mikka_teams where id=$1', [team.id])
     const removed = await changeTeam({ issueId: unlinkedId, teamId: null, expectedTeamId: team.id })
@@ -282,13 +304,13 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       personal: readMetrics(personalRead), unlinked: readMetrics(unlinkedRead) }))
   })
 
-  await t.test('cross-workspace reads return 404 even for the same owner, and workspace tokens stay scoped', async () => {
+  await t.test('explicit workspace selections return 404 across tenants, and workspace tokens stay scoped', async () => {
     const personalPat = await createPersonalAccessToken(owner, own.id, { name: 'Mobile personal pin fixture', expiresAt: null })
     const ownerMember = (await workspace.query('select name,email,role from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [teamWorkspace.id, owner])).rows[0]
     assert.ok(ownerMember)
     try {
       assert.equal((await request(issueId, { workspaceId: own.id })).status, 404)
-      assert.equal((await request(personalTask)).status, 404)
+      assert.equal((await request(personalTask, teamSelection)).status, 404)
       assert.equal((await request(issueId, { bearer: personalPat.token })).status, 404)
       assert.equal((await request(personalTask, { bearer: personalPat.token, workspaceId: own.id })).status, 200)
       assert.equal((await request(issueId, { bearer: pat.token })).status, 200)
@@ -352,7 +374,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(response.status, 200)
     assert.equal((await response.json()).task.id, unlinkedTask)
     assert.equal((await request(unlinkedTask, { bearer: peer.token })).status, 200, 'an active workspace peer can read without Team membership')
-    const listed = await (await listRequest()).json()
+    const listed = await (await listRequest(teamSelection)).json()
     assert.ok(listed.tasks.some((row: { id: string }) => row.id === unlinkedTask))
   })
 
@@ -379,7 +401,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       assert.equal(unscoped.value.find(row => row.issueId === secondTask)?.runId, secondRun)
       assert.equal(unscoped.value.find(row => row.issueId === secondTask)?.bot?.id, secondBot)
       assert.equal((await request(pending)).status, 404)
-      const listBody = await (await listRequest()).json()
+      const listBody = await (await listRequest(teamSelection)).json()
       assert.ok(!listBody.tasks.some((row: { id: string }) => row.id === pending))
       assert.equal(listBody.tasks.find((row: { id: string }) => row.id === noRun).schedule.label, 'Every day at 09:00')
       assert.equal((await (await request(noRun)).json()).task.schedule.label, 'Every day at 09:00')
@@ -415,27 +437,71 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.deepEqual(await persisted(), before)
   })
 
+  await t.test('a native detail waiting for a membership lock rechecks a committed suspension before reading projections', async () => {
+    const unselected = { workspaceId: null }
+    assert.equal((await request(issueId, unselected)).status, 200)
+    const blocker = await pool.connect()
+    let reading: Promise<Response> | undefined
+    let waiting: Promise<{ query: string }> | undefined
+    try {
+      const pid = Number((await blocker.query('select pg_backend_pid() as pid')).rows[0].pid)
+      await blocker.query('BEGIN')
+      await blocker.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [teamWorkspace.id, owner])
+      reading = request(issueId, unselected)
+      const waitBlockedBy = async () => {
+        for (let attempt = 0; attempt < 300; attempt++) {
+          const { rows } = await pool.query<{ query: string }>(`select query from pg_stat_activity
+            where datname=current_database() and $1::int=any(pg_blocking_pids(pid))`, [pid])
+          if (rows.length) return rows[0]
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+        assert.fail('the real detail request must wait for the held membership update')
+      }
+      waiting = waitBlockedBy()
+      const blocked = await Promise.race([
+        waiting,
+        reading.then(() => { throw new Error('Task detail escaped the held membership lock') }),
+      ])
+      assert.match(blocked.query, /mikka_workspace_members/)
+      assert.match(blocked.query, /for share/i)
+      await blocker.query('COMMIT')
+      const denied = await reading
+      assert.equal(denied.status, 404)
+      assert.deepEqual(await denied.json(), { error: 'issueNotFound' })
+    } finally {
+      await blocker.query('ROLLBACK').catch(() => undefined)
+      blocker.release()
+      await Promise.allSettled([reading, waiting])
+      await workspace.query(`update mikka_workspace_members set status='active' where "workspaceId"=$1 and "userId"=$2`, [teamWorkspace.id, owner])
+    }
+    assert.equal((await request(issueId, unselected)).status, 200)
+  })
+
   await t.test('suspension and removal deny the creator while another active member retains access', async () => {
     const before = await persisted()
+    const unselected = { workspaceId: null }
     const ownerMember = (await workspace.query(`select name,email,role from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2`, [teamWorkspace.id, owner])).rows[0]
     assert.ok(ownerMember)
     try {
+      assert.equal((await request(issueId, unselected)).status, 200)
       await workspace.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [teamWorkspace.id, owner])
-      assert.equal((await request(issueId)).status, 404)
+      assert.equal((await request(issueId, unselected)).status, 404)
       assert.equal((await request(unlinkedTask)).status, 404)
-      assert.equal((await listRequest()).status, 403)
+      assert.equal((await listRequest(teamSelection)).status, 403)
       assert.equal((await request(unlinkedTask, { bearer: peer.token })).status, 200)
       assert.equal((await request(secondTask, { workspaceId: secondWorkspace.id })).status, 200)
+      await workspace.query(`update mikka_workspace_members set status='active' where "workspaceId"=$1 and "userId"=$2`, [teamWorkspace.id, owner])
+      assert.equal((await request(issueId, unselected)).status, 200)
       await workspace.query('delete from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [teamWorkspace.id, owner])
-      assert.equal((await request(issueId)).status, 404)
-      assert.equal((await listRequest()).status, 403)
+      assert.equal((await request(issueId, unselected)).status, 404)
+      assert.equal((await listRequest(teamSelection)).status, 403)
       assert.deepEqual(await persisted(), before)
     } finally {
       await workspace.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role,status)
         values($1,$2,$3,$4,$5,'active') on conflict("workspaceId","userId") do update set status='active'`,
       [teamWorkspace.id, owner, ownerMember.name, ownerMember.email, ownerMember.role])
     }
-    assert.equal((await request(issueId)).status, 200)
+    assert.equal((await request(issueId, unselected)).status, 200)
   })
 
   await t.test('invalid/missing IDs are 404; unauthenticated and expired native requests are 401', async () => {
