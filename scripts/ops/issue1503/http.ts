@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { decode, encode } from '../../../lib/desktop-rpc/wire'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
@@ -9,7 +10,7 @@ export const fail = (code: string): never => { throw new Error(`issue1503_${code
 export async function smokeSession() {
   const email = process.env.SMOKE_OWNER_EMAIL
   const password = process.env.SMOKE_OWNER_PASSWORD
-  if (email !== 'alexjiang20232024+mikka-smoke-owner@gmail.com' || !password) fail('smoke_credentials_required')
+  if (typeof email !== 'string' || createHash('sha256').update(email, 'utf8').digest('hex') !== 'a20ddbf2c101381c3de802e5e546365caf46bc80b69f3526cd967331cf9bb20d' || !password) fail('smoke_credentials_required')
   let cookie = '', token = ''
   async function request(path: string, init: RequestInit = {}) {
     if (!path.startsWith('/api/') || path.includes('://')) fail('request_path_invalid')

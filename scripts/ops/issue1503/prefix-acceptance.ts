@@ -1,4 +1,5 @@
 /** #1492 production regression: two real owners' prefixes around one normal list request. */
+import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pool } from '../../../lib/db'
 import { workspacePool } from '../../../lib/workspace-db'
@@ -8,9 +9,12 @@ import { smokeSession, SMOKE_ID, OWNER_ID, fail } from './http'
 
 const WORKSPACE_ID = '93f38d33-9447-4eaf-8a46-0d8889165bcd'
 const OWNERS = [OWNER_ID, SMOKE_ID]
+const emailHash = (value: unknown) => typeof value === 'string' ? createHash('sha256').update(value, 'utf8').digest('hex') : null
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 type PrefixRow = { userId: string; prefix: string; updatedAt: string }
 type OwnerRow = { id: string; email: string; keys: string[] | null }
+type DeliveryTargetRow = { id: string; userId: string; scope: string; delivered: boolean }
+type TaskNumberRow = { issueId: string; number: number | string; identifier: string }
 const inserted: PrefixRow[] = []
 let before: PrefixRow[] | undefined
 let session: Awaited<ReturnType<typeof smokeSession>> | undefined
@@ -60,25 +64,34 @@ try {
   const owners = (await pool.query<OwnerRow>(`SELECT u.id,u.email,
     (SELECT array_agg(s."linearTeamKey") FROM linear_team_syncs s WHERE s."ownerId"=u.id) AS keys
     FROM "user" u WHERE u.id=ANY($1::text[])`, [OWNERS])).rows
-  if (owners.length !== 2 || owners.find(owner => owner.id === OWNER_ID)?.email !== 'alexjiang20232024@gmail.com'
-    || owners.find(owner => owner.id === SMOKE_ID)?.email !== 'alexjiang20232024+mikka-smoke-owner@gmail.com')
+  if (owners.length !== 2 || emailHash(owners.find(owner => owner.id === OWNER_ID)?.email) !== 'c6032681fcca35e9a45d042dc67def8773bf58b68cc42392d2ce643c79765a42'
+    || emailHash(owners.find(owner => owner.id === SMOKE_ID)?.email) !== 'a20ddbf2c101381c3de802e5e546365caf46bc80b69f3526cd967331cf9bb20d')
     fail('prefix_existing_owner_identity_mismatch')
   const { rows: [workspace] } = await workspacePool.query(`SELECT w.id FROM mikka_workspaces w
     WHERE w.id=$1 AND w."userId"=$2 AND w.kind='team' AND w.slug='issue-1503-factory-smoke-20261106'
       AND (SELECT count(*) FROM mikka_workspace_members m WHERE m."workspaceId"=w.id
         AND m."userId"=ANY($3::text[]) AND m.status='active')=2`, [WORKSPACE_ID, SMOKE_ID, OWNERS])
   if (!workspace) fail('prefix_workspace_access_mismatch')
-  const targets = (await pool.query(`SELECT i.id,i."userId",i.scope,l.number,t.identifier,
+  const targets = (await pool.query<DeliveryTargetRow>(`SELECT i.id,i."userId",i.scope,
     EXISTS(SELECT 1 FROM factory_tasks f JOIN factory_merges m ON m."taskId"=f.id AND m."candidateId"=f."candidateId"
-      WHERE f."issueId"=i.id AND f."userId"=$3 AND f.stage='publish' AND f.status='passed'
+      WHERE f."issueId"=i.id AND f."userId"=$2 AND f.stage='publish' AND f.status='passed'
         AND m.status='merged' AND m."mergeCommitSha" IS NOT NULL) AS delivered
-    FROM issues i JOIN mikka_team_issues l ON l."issueId"=i.id AND l."workspaceId"=$2
-    JOIN mikka_teams t ON t.id=l."teamId" AND t."workspaceId"=l."workspaceId"
-    WHERE i.id=ANY($1::uuid[])`, [ids, WORKSPACE_ID, SMOKE_ID])).rows
-  if (targets.length !== 2 || targets.some(target => target.userId !== SMOKE_ID || target.scope !== 'workspace'
-    || target.identifier !== 'F1503' || !target.delivered || !/^[1-9][0-9]*$/.test(String(target.number))))
-    fail('prefix_completed_delivery_targets_required')
-  const expected = new Map(targets.map(target => [target.id, `${target.identifier}-${target.number}`]))
+    FROM issues i WHERE i.id=ANY($1::uuid[])`, [ids, SMOKE_ID])).rows
+  // Task numbers and teams belong to the workspace database, not the application database.
+  const numberRows = (await workspacePool.query<TaskNumberRow>(`SELECT l."issueId",l.number,t.identifier
+    FROM mikka_team_issues l JOIN mikka_teams t ON t.id=l."teamId" AND t."workspaceId"=l."workspaceId"
+    WHERE l."issueId"=ANY($1::uuid[]) AND l."workspaceId"=$2`, [ids, WORKSPACE_ID])).rows
+  const numberByIssue = new Map(numberRows.map(row => [row.issueId, row]))
+  if (targets.length !== 2 || numberRows.length !== 2 || numberByIssue.size !== 2
+    || targets.some(target => {
+      const number = numberByIssue.get(target.id)
+      return target.userId !== SMOKE_ID || target.scope !== 'workspace' || !target.delivered
+        || number?.identifier !== 'F1503' || !/^[1-9][0-9]*$/.test(String(number?.number))
+    })) fail('prefix_completed_delivery_targets_required')
+  const expected = new Map(targets.map(target => {
+    const number = numberByIssue.get(target.id)!
+    return [target.id, `${number.identifier}-${number.number}`]
+  }))
   before = await readPrefixes()
   for (const row of before) {
     if (normalizePersonalPrefix(row.prefix) !== row.prefix || prefixCollides(row.prefix, owners.find(owner => owner.id === row.userId)!.keys ?? []))
