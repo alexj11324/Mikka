@@ -100,12 +100,12 @@ export const UI_SWEEP_PENDING = new Map([
   ['components/plugins/plugins-skills-view.tsx', 'style/search-input'],
   ['components/settings/secrets-settings.tsx', 'style/nested-frame'],
 ])
-const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx']
+const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx', 'components/slots/thread-header.tsx']
 
 export function auditSource(file, text, policy) {
   const ruleExempt = HORIZONTAL_RULE_EXEMPT_FILES.includes(file)
   // R-61/R-63 (Alex 2026-10-25): the issue page's header line and the lines inside a comment card.
-  // Settings slots (components/slots/settings-*, docs/ui-overlay.md) are the settings pages' own markup, moved.
+  // The thread-header slot is issue-thread-panel's header, moved. Settings slots (components/slots/settings-*, docs/ui-overlay.md) are the settings pages' own markup, moved.
   const allowHorizontalRule = file.startsWith('components/settings/') || file.startsWith('components/slots/settings-') || ISSUE_PAGE_RULES.includes(file) || ruleExempt
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.jsx?$/.test(file) ? ts.ScriptKind.JSX : ts.ScriptKind.TSX)
   const diagnostics = [], imports = new Map(), variables = new Map(), seen = new Set()

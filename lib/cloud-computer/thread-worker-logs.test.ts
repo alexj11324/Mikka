@@ -1,3 +1,4 @@
+import { REGISTRATION_COMPLETE, REGISTRATION_WAITING, REGISTRATION_LEGACY } from '../computer/registration-command'
 import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -268,7 +269,7 @@ test('runtime guard diagnostics keep their closed phase and never emit a provide
 
 // Exercise the real provisioning orchestration. The SQL/provider boundaries
 // are synthetic here; thread-machine-task.db.test.ts retains real PG coverage.
-async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'publish_failed' | 'revoked' | 'old_registration' | 'lease_lost') {
+async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 'publish_failed' | 'revoked' | 'old_registration' | 'lease_lost') {
   const { ensureThreadMachine } = await import('./thread-machines')
   const id = (n: number) => `41700000-0000-4000-8000-${String(n).padStart(12, '0')}`
   const actor = { userId: 'bootstrap-fixture-owner', workspaceId: id(2) }
@@ -287,20 +288,20 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'publish_fa
     if (sql === 'SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2') return result([{ issueId: run.issueId }])
     if (sql.startsWith('SELECT r.*') || sql.startsWith('SELECT * FROM agent_runs') || sql.startsWith('SELECT status,"stopRequestedAt"')) return result([{ ...run }])
     if (sql.startsWith('SELECT * FROM thread_machines')) return result([{ ...machine }])
+    if (sql.startsWith('SELECT 1 FROM devices d JOIN device_tokens')) return result(authenticated ? [{}] : [])
+    if (sql.startsWith('SELECT 1 FROM agent_runs r JOIN thread_machines')) return result([{}])
     if (sql.startsWith('SELECT 1 FROM thread_machines')) return result(scenario === 'lease_lost' ? [] : [{}])
     if (sql === 'SELECT clock_timestamp() AS now') return result([{ now: floor }])
     if (sql.startsWith('INSERT INTO device_tokens')) {
       tokenHash = values[3] as string; credentialDeviceId = values[4] as string
       assert.equal(values[1], actor.userId); assert.equal(values[5], actor.workspaceId)
-      return result([])
+      return result([{ now: floor }])
     }
-    if (sql.startsWith('SELECT 1 FROM devices d JOIN device_tokens')) {
-      assert.deepEqual(values, [credentialDeviceId, actor.userId, floor, tokenHash])
-      assert.match(sql, /t\."revokedAt" IS NULL AND t\."lastUsedAt">=\$3/)
-      if (!authenticated) clockAdvance = 31_000
-      return result(authenticated ? [{}] : [])
-    }
-    if (sql.startsWith("UPDATE thread_machines SET state='running'")) {
+    if (sql.startsWith("UPDATE thread_machines m SET state='running'")) {
+      assert.deepEqual(values, [run.id,values[1],credentialDeviceId,tokenHash,floor])
+      assert.match(sql, /t\."revokedAt" IS NULL/)
+      assert.match(sql, /t\."lastUsedAt">=\$5/)
+      if (!authenticated) return result([])
       finished = true
       return result([{ ...machine, epoch: 1, lifecycle: { phase: 'created' }, computeSeconds: 0 }])
     }
@@ -313,7 +314,7 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'publish_fa
     read: async () => 'a'.repeat(40),
     write: async (files: { path: string; data: string }[], options: unknown) => {
       assert.deepEqual(options, { user: 'root', useOctetStream: false })
-      assert.equal(queries.at(-1), 'SELECT clock_timestamp() AS now')
+      assert.equal(queries.at(-1), 'COMMIT')
       assert.ok(queries.includes('COMMIT'))
       uploads.push(files)
     },
@@ -324,8 +325,13 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'publish_fa
       assert.equal(options.user, 'root'); assert.notEqual(options.background, true)
       assert.ok(command.indexOf('mv /home/user/.mikka/initial-run.next') < command.indexOf('mv /home/user/.mikka/bootstrap.next'))
       if (scenario === 'publish_failed') throw fault
-      authenticated = scenario === 'preloaded'
-      return { stdout: scenario === 'fallback' ? '' : 'mikka-preloaded-worker-woken\n', stderr: '', exitCode: 0 }
+      authenticated = scenario === 'preloaded' || scenario === 'fallback' || scenario === 'legacy'
+      if (!authenticated) {
+        const onStdout = options.onStdout as ((chunk:string)=>void) | undefined
+        onStdout?.(REGISTRATION_WAITING + '\n')
+        throw new Error('cloud_registration_timeout')
+      }
+      return { stdout: (scenario === 'legacy' ? REGISTRATION_LEGACY : REGISTRATION_COMPLETE) + '\n', stderr: '', exitCode: 0 }
     }
     assert.match(command, /node dist\/cloud\/cloud-worker\.js/)
     assert.equal(options.user, 'user'); assert.equal(options.background, true)
@@ -357,15 +363,25 @@ test('bootstrap publication wakes the preloader without another remote start com
   assert.equal(f.commands.length, 1, 'one atomic publish/wake command replaces publish then redundant start')
   assert.match(f.commands[0].command, /runuser -u user -- sh -c/)
   assert.ok(f.finished); assert.ok(f.released)
-  assert.equal(f.queries.filter(sql => sql.startsWith('SELECT 1 FROM devices d JOIN device_tokens')).length, 1, 'a wake receipt does not replace credential registration')
+  assert.equal(f.queries.filter(sql => sql.startsWith('SELECT 1 FROM devices d JOIN device_tokens')).length, 0)
+  assert.equal(f.queries.filter(sql => sql.startsWith("UPDATE thread_machines m SET state='running'")).length, 1, 'the final fenced update proves live credential registration')
   const bootstrap = JSON.parse(f.uploads[0][0].data)
   assert.ok(!JSON.stringify(f.commands).includes(bootstrap.credential), 'credentials stay in the file upload, never command text or options')
+})
+
+test('a legitimate legacy release keeps its database registration proof without a new RPC or eager masker', async()=>{
+  const current=await bootstrapFixture('preloaded'), legacy=await bootstrapFixture('legacy')
+  assert.ifError(legacy.error)
+  assert.equal(legacy.commands.length,1)
+  assert.ok(legacy.finished)
+  assert.equal(legacy.queries.filter(sql=>sql.startsWith('SELECT 1 FROM devices d JOIN device_tokens')).length,1)
+  assert.equal(legacy.queries.length,current.queries.length+1)
 })
 
 test('an unavailable preloader retains the existing user background fallback and registration proof', async () => {
   const fast = await bootstrapFixture('preloaded'), fallback = await bootstrapFixture('fallback')
   assert.ifError(fallback.error)
-  assert.equal(fallback.uploads.length, 1); assert.equal(fallback.commands.length, 2)
+  assert.equal(fallback.uploads.length, 1); assert.equal(fallback.commands.length, 1)
   assert.deepEqual(fallback.queries, fast.queries, 'the fast path adds no SQL or authorization work')
   assert.ok(fallback.finished); assert.ok(fallback.released)
 })

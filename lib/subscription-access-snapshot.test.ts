@@ -73,3 +73,26 @@ test('identity stage observation preserves the original authority and projection
   assert.equal(rejectedWorker.snapshot().identityLoginCalls, 0)
   assert.equal(rejectedWorker.snapshot().identityLoginMs, null)
 })
+
+
+test('only an authorized connected row without a projection is an explicit preparation hint', async () => {
+  const { AccessProjectionMissing } = await import('./subscription-access-snapshot')
+  const scope = { ownerId: 'owner', workspaceId: 'space', connectionId: 'connection', provider: 'codex' as const }
+  const use = { bindingId: 'binding', consumerId: 'consumer', runId: 'run' }
+  const members: string[] = []
+  let queries = 0
+  const database = { query: async () => { queries++; return { rows: [{ state: 'connected', accessSecretName: null, workspaceId: 'space', runOwner: 'member' }] } } }
+  await assert.rejects(authorizedAccessName(database as never, scope, use, 2, async user => { members.push(user) }, true), AccessProjectionMissing)
+  assert.equal(queries, 1)
+  assert.deepEqual(members, ['member', 'owner'])
+  for (const rows of [[], [{ state: 'refreshing', accessSecretName: null }], [{ state: 'connected', accessSecretName: 42 }]]) {
+    const failure = await authorizedAccessName({ query: async () => ({ rows }) } as never, scope, use, 2, undefined, true).then(() => null, error => error)
+    assert.ok(failure instanceof Error)
+    assert.equal(failure instanceof AccessProjectionMissing, false)
+  }
+  const denied = await authorizedAccessName(database as never, scope, use, 2, async () => { throw new Error('member_inactive') }, true).then(() => null, error => error)
+  assert.equal(denied instanceof AccessProjectionMissing, false)
+  assert.equal(denied.detail, 'member_inactive')
+  const network = new Error('database unavailable')
+  await assert.rejects(authorizedAccessName({ query: async () => { throw network } } as never, scope, use, 2), error => error === network)
+})

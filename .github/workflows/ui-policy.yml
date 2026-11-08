@@ -13,6 +13,9 @@ on:
     branches: [main]
   pull_request:
   merge_group:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 3 * * 1'
 
 permissions:
   contents: read
@@ -40,37 +43,7 @@ env:
 
 jobs:
   changes:
-    name: Changed files
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      docs_only: ${{ steps.docs.outputs.docs_only }}
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-      - id: docs
-        # Run the classifier from main, never from this checkout: a pull
-        # request must not be able to rewrite the script that skips its own
-        # required checks.
-        run: |
-          git fetch origin main --no-tags
-          trusted_dir="$(mktemp -d)"
-          trusted="$trusted_dir/ci-docs-only.mjs"
-          echo "Retained trusted classifier: $trusted"
-          if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
-            echo "docs_only=false (classifier is not on main yet)"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
-            echo "docs_only=false (classifier differs from main)"
-            echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          node "$trusted"
+    uses: ./.github/workflows/ci-selection.yml
 
   cloud-secret-access:
     name: Cloud credential access (OIDC)
@@ -112,7 +85,7 @@ jobs:
   ui-policy-full:
     name: Core unit checks
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.result == 'success' && needs.changes.outputs.core == 'true'
     # Fixed standard Linux image; host namespace/security policy stays unchanged.
     runs-on: ubuntu-22.04
     timeout-minutes: 20
@@ -124,74 +97,19 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
-      - run: pnpm test:factory-check-independence
-      - run: pnpm test:factory-check-recovery
-      - run: pnpm test:factory-routing
-      - run: pnpm test:self-improvement-semantic-source
-      - run: node --test scripts/ci-docs-only.test.mjs
-      - run: pnpm test:ui-policy
-      - name: Idle request budget (main pages, no browser)
-        run: pnpm test:idle-budget
-      - run: pnpm test:motion
-      - run: pnpm test:i18n
-      - run: pnpm i18n:check
-      - run: pnpm test:ssh-target
-      - run: pnpm test:linear-sync
-      - run: pnpm check:agent-definitions
-      - name: Release identity, vulnerability policy and artifact tamper regressions
-        run: pnpm test:release-security
-      - run: pnpm test:mailbox-verification
-      - run: pnpm test:factory-approval
-      - run: pnpm test:personal-mailbox-core
-      - run: pnpm test:factory-monitor
-      - run: pnpm test:execution-rules
-      - run: pnpm test:abuse
-      - run: pnpm test:governance
-      - run: pnpm test:self-hosting
-      - run: pnpm test:self-hosted-byok
-      - run: pnpm test:cloud-services
-      - run: pnpm test:hosted-usage
-      - run: pnpm test:model-admission
-      - run: pnpm test:audit
-      - run: pnpm test:agent-kit
-      - run: pnpm test:agent-kit-compat
-      - run: pnpm test:approved-writes
-      - run: pnpm test:coordinator-events
-      - run: pnpm test:schedules
-      - run: pnpm test:run-recovery
-      - run: pnpm test:mvp-fixtures
-      - run: pnpm test:credentials
-      - run: pnpm test:run-publication
-      - run: pnpm test:workflow-wakes
-      - name: Factory daemon check regressions and shared report contract
-        run: |
-          pnpm --filter @mikka/protocol exec vitest run src/run.test.ts
-          pnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts
-      - run: pnpm test:mobile-push
-      - run: pnpm test:mobile
-      - run: pnpm test:coordinator-native-relay
-      - run: pnpm test:coordinator-native-scope
-      - run: pnpm test:coordinator-issue-tools
-      # pnpm check scripts and test files that ran in no workflow (mattpocock/skills tdd audit).
-      - run: pnpm test:signup-turnstile
-      - run: pnpm test:cloud-limits
-      - run: pnpm test:analytics
-      - run: pnpm test:artifacts
-      - run: pnpm test:factory-config
-      - run: pnpm test:user-message-text
-      - run: pnpm test:run-info
-      - run: pnpm test:thread-changes
-      - run: pnpm check:agent-ui
-      - run: pnpm test:dev-local
-      - run: pnpm test:lib-units
-      - run: pnpm test:project-decisions
-      - run: pnpm test:unread
-      - run: pnpm test:issue-readonly-dom
+      - name: Run selected core tasks through Nx Core
+        run: node scripts/ci/run-units.mjs core
+        env:
+          CI_UNITS: ${{ needs.changes.outputs.units }}
+      # A first full run can use the main registry from before governance enrollment.
+      - name: Governance unit while trusted policy predates enrollment
+        if: always() && needs.changes.outputs.full == 'true' && !contains(fromJSON(needs.changes.outputs.units), 'ci-core-governance') && !contains(fromJSON(needs.changes.outputs.units), '*')
+        run: pnpm test:governance
 
   ui-policy-integrations:
     name: Integration unit checks
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.result == 'success' && needs.changes.outputs.integration == 'true'
     # Fixed standard Linux image; host namespace/security policy stays unchanged.
     runs-on: ubuntu-22.04
     timeout-minutes: 20
@@ -203,43 +121,49 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
-      - run: pnpm test:active-agents
+      - name: Run selected integration tasks through Nx Core
+        run: node scripts/ci/run-units.mjs integration
         env:
-          # Database regressions run against ephemeral Postgres in browser-tests-full below.
-          MIKKA_DATABASE_URL: ""
-      - run: pnpm test:auth-composio
-      - name: Test environment binding and fail-closed guards
-        run: pnpm test:test-accounts
-      - name: Authentication email integration tests (isolated Postgres)
-        run: node scripts/test-auth-email.mjs
-      - run: pnpm test:groups
-      - run: pnpm test:live-lists
-      - run: pnpm test:group-turns
-      - run: pnpm test:integrations
-      - run: pnpm test:github
-      - run: pnpm test:request-log
-      # Legacy read routes; previously only in legacy-read-compat.yml, which ran on merged branches.
-      - run: pnpm test:legacy-reads
-      - run: pnpm test:slack
-      - run: pnpm test:telegram
-      - run: pnpm test:agent
-      - run: pnpm test:acceptance
-      - run: pnpm test:suggestions
-      - run: pnpm test:captures
-      - run: pnpm test:db-runner
-      - run: pnpm test:csv
-      - run: pnpm test:settings
-      - run: pnpm test:settings-backend
-      - run: pnpm test:workspace-settings
-      - run: pnpm test:settings-prefs
-      - run: pnpm test:account
-      - run: pnpm test:issues
-      - run: pnpm test:issue-search
-      # Tests that ran in no workflow; they need nothing outside the runner.
-      - name: Shared protocol unit tests
-        run: pnpm --filter @mikka/protocol test
-      - name: E2B local API relay
-        run: node --test scripts/e2b/local-api-relay.test.mjs
+          CI_UNITS: ${{ needs.changes.outputs.units }}
+
+  source-checks:
+    name: Source checks
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.source == 'true'
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
+      - name: Shadow selection against full baseline scenarios
+        run: node scripts/ci/shadow.mjs
+      - run: pnpm check:cloud-boundary
+      - name: Verify all production release credentials use existing Infisical OIDC
+        run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
+        if: always()
+      - run: pnpm lint:code
+        if: always()
+      - run: node apps/api/scripts/generate-routes.mjs --check
+        if: always()
+      - run: pnpm lint:runtime
+        if: always()
+      - run: pnpm test:api
+        if: always()
+      - run: pnpm --filter @mikka/frontend test
+        if: always()
+      - run: pnpm typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        if: always()
+      - run: pnpm --filter @mikka/protocol typecheck
+      - run: pnpm --filter @mikka/mobile typecheck
+
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
       - name: Show audit summary
@@ -262,47 +186,10 @@ jobs:
           path: ui-audit.json
           if-no-files-found: ignore
 
-
-  source-checks:
-    name: Source checks
-    needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
-    # Fixed standard Linux image; host namespace/security policy stays unchanged.
-    runs-on: ubuntu-22.04
-    timeout-minutes: 20
-    env:
-      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
-      BETTER_AUTH_URL: http://localhost:3000
-      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
-      NEXT_TELEMETRY_DISABLED: '1'
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: ./.github/actions/pnpm-install
-      - run: pnpm check:cloud-boundary
-      - name: Verify all production release credentials use existing Infisical OIDC
-        run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
-        if: always()
-      - run: pnpm lint:code
-        if: always()
-      - run: node apps/api/scripts/generate-routes.mjs --check
-        if: always()
-      - run: pnpm lint:runtime
-        if: always()
-      - run: pnpm test:api
-        if: always()
-      - run: pnpm --filter @mikka/frontend test
-        if: always()
-      - run: pnpm typecheck
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-        if: always()
-      - run: pnpm --filter @mikka/protocol typecheck
-      - run: pnpm --filter @mikka/mobile typecheck
-
   daemon-checks:
     name: Daemon checks
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.result == 'success' && needs.changes.outputs.daemon == 'true'
     # Fixed standard Linux image; host namespace/security policy stays unchanged.
     runs-on: ubuntu-22.04
     timeout-minutes: 20
@@ -343,51 +230,85 @@ jobs:
         env:
           MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
 
+  # PR specializations are reusable jobs so the stable gate can require their
+  # actual conclusions. Main retains its existing independent release workflows.
+  image-checks:
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.image == 'true'
+    uses: ./.github/workflows/self-hosted-image.yml
+    permissions:
+      contents: read
+      packages: write
+
+  desktop-checks:
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.desktop == 'true'
+    uses: ./.github/workflows/desktop.yml
+
+  analytics-checks:
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.analytics == 'true'
+    uses: ./.github/workflows/analytics-ssr.yml
+
   ui-policy:
     # The required check name. It reports success when only documentation
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
-    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks]
+    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, image-checks, desktop-checks, analytics-checks]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
-      - name: Require the full suite unless only documentation changed
+      - name: Require every selected source, unit and daemon job
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
-          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
-          FULL_RESULT: ${{ needs.ui-policy-full.result }}
-          INTEGRATIONS_RESULT: ${{ needs.ui-policy-integrations.result }}
-          SOURCE_RESULT: ${{ needs.source-checks.result }}
-          DAEMON_RESULT: ${{ needs.daemon-checks.result }}
+          EXPECT_CORE: ${{ needs.changes.outputs.core }}
+          EXPECT_INTEGRATION: ${{ needs.changes.outputs.integration }}
+          EXPECT_SOURCE: ${{ needs.changes.outputs.source }}
+          EXPECT_DAEMON: ${{ needs.changes.outputs.daemon }}
+          EXPECT_IMAGE: ${{ github.event_name != 'push' && needs.changes.outputs.image == 'true' }}
+          EXPECT_DESKTOP: ${{ github.event_name != 'push' && needs.changes.outputs.desktop == 'true' }}
+          EXPECT_ANALYTICS: ${{ github.event_name != 'push' && needs.changes.outputs.analytics == 'true' }}
+          IMAGE: ${{ needs.image-checks.result }}
+          DESKTOP: ${{ needs.desktop-checks.result }}
+          ANALYTICS: ${{ needs.analytics-checks.result }}
+          CORE: ${{ needs.ui-policy-full.result }}
+          INTEGRATION: ${{ needs.ui-policy-integrations.result }}
+          SOURCE: ${{ needs.source-checks.result }}
+          DAEMON: ${{ needs.daemon-checks.result }}
         run: |
-          if [ "$CHANGES_RESULT" != "success" ]; then
-            echo "Changed files job did not succeed: $CHANGES_RESULT"
-            exit 1
-          fi
-          if [ "$DOCS_ONLY" = "true" ]; then
-            echo "Documentation-only change; the full UI policy suite is skipped."
-            exit 0
-          fi
-          for result in "$FULL_RESULT" "$INTEGRATIONS_RESULT" "$SOURCE_RESULT" "$DAEMON_RESULT"; do
-            if [ "$result" != "success" ]; then
-              echo "A required source, unit or daemon job did not succeed: $result"
-              exit 1
-            fi
+          test "$CHANGES_RESULT" = success
+          for name in CORE INTEGRATION SOURCE DAEMON IMAGE DESKTOP ANALYTICS; do
+            expected="EXPECT_$name"
+            case "${!expected}" in
+              true) test "${!name}" = success ;;
+              false) test "${!name}" = skipped ;;
+              *) exit 1 ;;
+            esac
           done
+          echo 'All selected source/unit/daemon jobs succeeded.' >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Record actual completed job timings
+        if: always()
+        run: node scripts/ci/summary.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
   browser-tests-full:
     # CI runs no browser tests (decision 2026-11-01-1520); this job keeps the
     # database suites that the required check names cover.
-    name: Database checks (${{ matrix.shard }}/4)
+    name: Database checks (${{ matrix.shard }})
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.result == 'success' && needs.changes.outputs.db == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
+      matrix: ${{ fromJSON(needs.changes.outputs.db_matrix) }}
     services:
       postgres:
         image: postgres:17
@@ -405,7 +326,8 @@ jobs:
     env:
       CI: 'true'
       REQUIRE_DB: '1'
-      DB_TEST_SHARD: ${{ matrix.shard }}/4
+      DB_TEST_SHARD: ${{ matrix.shard }}
+      DB_TEST_SELECTED: ${{ needs.changes.outputs.db_suites }}
       MIKKA_TEST_DB_PORT: '5432'
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
@@ -469,10 +391,10 @@ jobs:
       - name: Bind the disposable test environment to the exact checkout
         run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
       - name: Verify local execution identities and repository records (isolated Postgres)
-        if: matrix.shard == 1
+        if: startsWith(matrix.shard, '1/')
         run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/local-runtime.integration.ts
       - name: Verify thread sharing, membership and privacy against isolated database
-        if: matrix.shard == 1
+        if: startsWith(matrix.shard, '1/')
         run: node --experimental-test-module-mocks --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
       - name: Required DB suites (temporary Postgres 17, no skips)
         run: pnpm test:db
@@ -486,7 +408,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: pr13-http-cli-approval-${{ github.sha }}-${{ matrix.shard }}
+          name: pr13-http-cli-approval-${{ github.sha }}-${{ strategy.job-index }}
           path: |
             /tmp/mikka-http-network-approval-*/evidence.json
             /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
@@ -501,22 +423,26 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
-      - name: Require the full suite unless only documentation changed
+      - name: Require every selected database shard
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
-          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
-          FULL_RESULT: ${{ needs.browser-tests-full.result }}
+          EXPECT_DB: ${{ needs.changes.outputs.db }}
+          DB_RESULT: ${{ needs.browser-tests-full.result }}
         run: |
-          if [ "$CHANGES_RESULT" != "success" ]; then
-            echo "Changed files job did not succeed: $CHANGES_RESULT"
-            exit 1
-          fi
-          if [ "$DOCS_ONLY" = "true" ]; then
-            echo "Documentation-only change; the production build and database suites are skipped."
-            exit 0
-          fi
-          if [ "$FULL_RESULT" != "success" ]; then
-            echo "The production build and database suites did not succeed: $FULL_RESULT"
-            exit 1
-          fi
+          test "$CHANGES_RESULT" = success
+          case "$EXPECT_DB" in
+            true) test "$DB_RESULT" = success ;;
+            false) test "$DB_RESULT" = skipped ;;
+            *) exit 1 ;;
+          esac
+          echo "Database gate: $DB_RESULT; complete inventory validated in Changed files." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Record actual completed job timings
+        if: always()
+        run: node scripts/ci/summary.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

@@ -32,7 +32,7 @@ import { CollapsibleMessage } from '@/components/chat/collapsible-message'
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { ReplyAnswer } from '@/components/workspace/agent-decision'
 import { AgentThemeProvider } from '@/components/workspace/agent-theme'
-import { openThread } from '@/components/workspace/workspace-navigation'
+import { openTask, openThread } from '@/components/workspace/workspace-navigation'
 import { CoordinatorReply } from './coordinator-reply'
 import { ChatComposer } from './chat-composer'
 import { BotModelPicker, botModelMenuKey, openModelPicker } from './bot-model-picker'
@@ -517,7 +517,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     </div>}
                     {cardsOf(item, Boolean(live)).map(id => {
                       const run = sources?.[id]
-                      return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} /> : null
+                      return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} onOpenTask={openTask} /> : null
                     })}</>}
                     // Copy and the pages it cites, on one line under the reply, only while it is hovered or tapped (R-83).
                     actions={item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1 items-start', REPLY_ACTIONS, item.position === lastReplyAt && 'pointer-coarse:opacity-100')}>

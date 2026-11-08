@@ -1,7 +1,7 @@
 // Node-only numeric observation. Never retain a request, credential or identity.
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-const METHODS = ['status', 'oauthStart', 'oauthResume', 'oauthComplete', 'oauthPoll', 'oauthHandoff', 'refresh', 'recover', 'disconnect', 'nativeAuth', 'nativeContext', 'prepare', 'quota', 'usage', 'models', 'cleanup', 'execute', 'executeStream', 'nativeStream', 'acquire'] as const
+const METHODS = ['status', 'oauthStart', 'oauthResume', 'oauthComplete', 'oauthPoll', 'oauthHandoff', 'refresh', 'recover', 'disconnect', 'nativeAuth', 'nativeContext', 'prepare', 'prepareStream', 'quota', 'usage', 'models', 'cleanup', 'execute', 'executeStream', 'nativeStream', 'acquire'] as const
 type Method = typeof METHODS[number] | 'unobserved'
 type IdentityMode = 'static' | 'custody_token' | 'access_token' | 'parent_snapshot' | 'unobserved'
 type IdentityPhase = 'identityLogin' | 'parentAccessAuthority' | 'parentProjectionRead'
@@ -48,9 +48,11 @@ type WorkerRow = {
   parentProjectionReadCalls: number | null; parentProjectionReadMs: number | null
   goState: 'reported' | 'missing' | 'invalid'; go?: WorkerGoTiming
 }
+type PreReadOutcome = 'pending' | 'ready' | 'prepare_missing' | 'prepare_expiring' | 'error' | 'cancelled' | 'timeout'
+type StreamPreRead = Pick<WorkerRow, 'startedMs' | 'settledMs' | 'identityMs' | 'identityLoginCalls' | 'identityLoginMs' | 'parentAccessAuthorityCalls' | 'parentAccessAuthorityMs' | 'parentProjectionReadCalls' | 'parentProjectionReadMs'> & { outcome: PreReadOutcome }
 export type SubscriptionStages = {
   version: 1; streamEntryMs: number | null; firstIpcChunkMs: number | null; firstSdkTextMs: number | null
-  workers: WorkerRow[]; overflow: number
+  workers: WorkerRow[]; overflow: number; streamPreRead?: StreamPreRead
 }
 const elapsed = (end: number | null, start: number | null) => end !== null && start !== null && end >= start ? Math.round((end - start) * 1_000) / 1_000 : null
 
@@ -58,6 +60,7 @@ export class SubscriptionCallTiming {
   private readonly origin: number | null
   private readonly workers: SubscriptionWorkerTiming[] = []
   private overflow = 0
+  private preRead?: { worker: SubscriptionWorkerTiming; outcome: PreReadOutcome }
   private streamEntryMs: number | null = null
   private firstIpcChunkMs: number | null = null
   private firstSdkTextMs: number | null = null
@@ -73,8 +76,25 @@ export class SubscriptionCallTiming {
     this.workers.push(row)
     return row
   }
+  startStreamPreRead() {
+    if (this.preRead) return undefined
+    const preRead = { worker: new SubscriptionWorkerTiming(this, 0, 'unobserved'), outcome: 'pending' as PreReadOutcome }
+    this.preRead = preRead
+    return { worker: preRead.worker, finish: (outcome: Exclude<PreReadOutcome, 'pending'>) => {
+      if (preRead.outcome !== 'pending') return
+      preRead.outcome = outcome
+      preRead.worker.settle(outcome === 'cancelled' ? 'cancelled' : outcome === 'error' || outcome === 'timeout' ? 'error' : 'result')
+    } }
+  }
   snapshot(): SubscriptionStages {
-    return { version: 1, streamEntryMs: this.streamEntryMs, firstIpcChunkMs: this.firstIpcChunkMs, firstSdkTextMs: this.firstSdkTextMs, workers: this.workers.map(worker => worker.snapshot()), overflow: this.overflow }
+    const row = this.preRead?.worker.snapshot()
+    const streamPreRead: StreamPreRead | undefined = row && this.preRead ? {
+      startedMs: row.startedMs, settledMs: row.settledMs, outcome: this.preRead.outcome, identityMs: row.identityMs,
+      identityLoginCalls: row.identityLoginCalls, identityLoginMs: row.identityLoginMs,
+      parentAccessAuthorityCalls: row.parentAccessAuthorityCalls, parentAccessAuthorityMs: row.parentAccessAuthorityMs,
+      parentProjectionReadCalls: row.parentProjectionReadCalls, parentProjectionReadMs: row.parentProjectionReadMs,
+    } : undefined
+    return { version: 1, streamEntryMs: this.streamEntryMs, firstIpcChunkMs: this.firstIpcChunkMs, firstSdkTextMs: this.firstSdkTextMs, workers: this.workers.map(worker => worker.snapshot()), overflow: this.overflow, ...(streamPreRead ? { streamPreRead } : {}) }
   }
 }
 
