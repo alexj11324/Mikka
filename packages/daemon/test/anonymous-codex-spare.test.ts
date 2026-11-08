@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi, type MockInstance } from 'vitest'
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -9,6 +9,10 @@ import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
 import type { AnonymousCodexHint } from '@mikka/protocol/codex-startup'
 import { startAnonymousCodex } from '../src/anonymous-codex-spare'
 import { buildChildEnv } from '../src/env'
+import { daemonTracer } from '../src/tracing'
+import * as generationTelemetry from '../src/codex-generation-telemetry'
+import type { GenerationMetrics } from '../src/tracing-ai'
+import type { RunTraceContext } from '@mikka/protocol/trace-context'
 
 const cleanups: Array<() => unknown | Promise<unknown>> = []
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })
@@ -126,5 +130,102 @@ it.each(['project', 'environment', 'identity'] as const)('does not publish boots
   expect(f.candidate.preparationTiming).toBeUndefined()
   expect(f.candidate.state).toBe('closed'); expect(f.candidate.nativeExitObserved).toBe(true)
   expect(f.events().filter(method => method === 'initialize')).toHaveLength(1)
+  expect(f.events().every(method => ['initialize', 'initialized'].includes(method))).toBe(true)
+})
+
+type NativeCollector = Awaited<ReturnType<typeof generationTelemetry.startCodexGenerationCollector>>
+function tracingFixture(enabled = true) {
+  const start = generationTelemetry.startCodexGenerationCollector
+  const receivers: Array<{ receiver: NativeCollector; emit: (metrics: GenerationMetrics) => void; close: MockInstance<NativeCollector['close']> }> = []
+  vi.spyOn(daemonTracer, 'generationsEnabled', 'get').mockReturnValue(enabled)
+  vi.spyOn(daemonTracer, 'capture').mockReturnValue(undefined)
+  const published = vi.spyOn(daemonTracer, 'generation').mockImplementation(() => {})
+  vi.spyOn(generationTelemetry, 'startCodexGenerationCollector').mockImplementation(async emit => {
+    const receiver = await start(emit), close = vi.spyOn(receiver, 'close')
+    receivers.push({ receiver, emit, close })
+    return receiver
+  })
+  cleanups.push(async () => {
+    try { await Promise.all(receivers.map(({ receiver }) => receiver.close())) }
+    finally { vi.restoreAllMocks() }
+  })
+  return { receivers, published }
+}
+const nativeMetrics: GenerationMetrics = { harness: 'codex', provider: 'openai', inputTokens: 1, outputTokens: 1 }
+const finalTrace = (runId: string): RunTraceContext => ({
+  traceparent: '00-11111111111111111111111111111111-2222222222222222-01', runId,
+})
+
+it('adopts a native collector with fresh trace context after bootstrap had no context', async () => {
+  const observed = tracingFixture(), f = fixture()
+  await f.candidate.ready; f.checkout()
+  expect(daemonTracer.capture()).toBeUndefined()
+  observed.receivers[0]?.emit(nativeMetrics)
+  expect(observed.published).not.toHaveBeenCalled()
+  const traceContext = finalTrace(f.hint.runId)
+  const adopted = await f.candidate.adopt({ ...await f.binding(), traceContext })
+  expect(adopted).toBeDefined()
+  expect(observed.receivers).toHaveLength(1)
+  expect(adopted!.nativeGenerations).toBe(observed.receivers[0].receiver)
+  observed.receivers[0].emit(nativeMetrics)
+  expect(observed.published).toHaveBeenCalledExactlyOnceWith(nativeMetrics, traceContext)
+  expect(f.events().filter(method => method === 'initialize')).toHaveLength(1)
+  expect(f.events().every(method => ['initialize', 'initialized'].includes(method))).toBe(true)
+  await f.candidate.close()
+  expect(f.candidate.nativeExitObserved).toBe(true)
+  expect(observed.receivers[0].close).toHaveBeenCalledWith(true)
+})
+
+it('drains the unbound native collector when fresh trace context is still absent', async () => {
+  const observed = tracingFixture(), f = fixture()
+  await f.candidate.ready; f.checkout()
+  expect(await f.candidate.adopt(await f.binding())).toBeUndefined()
+  expect(f.candidate.state).toBe('closed')
+  expect(f.candidate.nativeExitObserved).toBe(true)
+  expect(observed.receivers).toHaveLength(1)
+  observed.receivers[0].emit(nativeMetrics)
+  expect(observed.published).not.toHaveBeenCalled()
+  expect(observed.receivers[0].close).toHaveBeenCalledWith(true)
+})
+
+it('retains the collector-free path when generation tracing is disabled', async () => {
+  const observed = tracingFixture(false), f = fixture()
+  await f.candidate.ready; f.checkout()
+  const adopted = await f.candidate.adopt(await f.binding())
+  expect(adopted).toBeDefined()
+  expect(adopted!.nativeGenerations).toBeUndefined()
+  expect(observed.receivers).toHaveLength(0)
+  expect(observed.published).not.toHaveBeenCalled()
+})
+
+it('cancels the unbound native collector and owned child without publishing', async () => {
+  const observed = tracingFixture(), f = fixture()
+  await f.candidate.ready
+  f.lifetime.abort(); await f.candidate.close()
+  expect(f.candidate.state).toBe('closed')
+  expect(f.candidate.nativeExitObserved).toBe(true)
+  expect(observed.receivers).toHaveLength(1)
+  observed.receivers[0].emit(nativeMetrics)
+  expect(observed.published).not.toHaveBeenCalled()
+  expect(observed.receivers[0].close).toHaveBeenCalledWith(true)
+  expect(f.events().every(method => ['initialize', 'initialized'].includes(method))).toBe(true)
+})
+
+it('revokes an adopted collector through the existing authority and drains it once', async () => {
+  const observed = tracingFixture(), f = fixture(), authority = new AbortController()
+  await f.candidate.ready; f.checkout()
+  const adopted = await f.candidate.adopt({ ...await f.binding(), traceContext: finalTrace(f.hint.runId),
+    assertLive: () => authority.signal.throwIfAborted(),
+    onRevoke(callback) {
+      authority.signal.addEventListener('abort', callback, { once: true })
+      return () => authority.signal.removeEventListener('abort', callback)
+    },
+  })
+  expect(adopted).toBeDefined()
+  authority.abort(); await f.candidate.close(); await f.candidate.close()
+  expect(f.candidate.state).toBe('closed')
+  expect(f.candidate.nativeExitObserved).toBe(true)
+  expect(observed.receivers).toHaveLength(1)
+  expect(observed.receivers[0].close).toHaveBeenCalledExactlyOnceWith(true)
   expect(f.events().every(method => ['initialize', 'initialized'].includes(method))).toBe(true)
 })
