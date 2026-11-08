@@ -177,7 +177,7 @@
     "openBotChat": "Open Bot chat",
     "archivedConversation": "Archived: {title}",
     "suggestions": "Suggestions",
-    "artifacts": "Artifact",
+    "artifacts": "Artifacts",
     "cardPreview": "[Card]"
   },
   "Plugins": {
@@ -3398,6 +3398,12 @@
       "checking": "Checking"
     },
     "empty": "Tell {name} what you need",
+    "starters": {
+      "fixBug": "Fix a bug in my repo",
+      "reviewPullRequests": "Review my open pull requests",
+      "summarizeToday": "Summarize what needs me today",
+      "dailyBriefing": "Set up a daily briefing"
+    },
     "events": {
       "aThread": "A thread",
       "aTask": "A task",
@@ -4556,7 +4562,7 @@
     "refreshFailed": "Couldn’t refresh suggestions. Try again later."
   },
   "ArtifactsPage": {
-    "title": "Artifact",
+    "title": "Artifacts",
     "category": {
       "all": "All",
       "documents": "Documents",

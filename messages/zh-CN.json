@@ -3398,6 +3398,12 @@
       "checking": "待检查"
     },
     "empty": "告诉 {name} 你要做什么",
+    "starters": {
+      "fixBug": "修复我仓库里的一个 bug",
+      "reviewPullRequests": "审阅我未合并的 PR",
+      "summarizeToday": "总结今天需要我处理的事",
+      "dailyBriefing": "设置每日简报"
+    },
     "events": {
       "aThread": "一个线程",
       "aTask": "一个任务",
