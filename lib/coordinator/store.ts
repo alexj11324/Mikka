@@ -498,12 +498,15 @@ export async function citationSources(userId: string, texts: readonly string[], 
   const runIds = [...new Set([...cited.runIds, ...threads])]
   const sources: Record<string, CitationSource> = {}
   if (!issueIds.length && !runIds.length) return sources
-  // One membership read for every visibility check of this call (never kept past it).
-  // Loaded here, not at module load: team-access brings in the workspace resolver, which the store's other callers never need.
-  const teams = await (await import('@/lib/team-access')).accessibleTeamScopes(userId)
+  // Runs reuse one membership read. A direct task-only citation folds its
+  // membership check into the bounded identifier visibility query.
+  const teams = runIds.length ? await (await import('@/lib/team-access')).accessibleTeamScopes(userId) : undefined
+  const visibility = issueIds.length
+    ? await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams, withIdentifierTeams: true }) : null
+  const identifierTeams = new Map<string, { key: string; number: number }>(visibility?.taskTeams)
   const issueRows = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate)) : []
+    .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
   const runs = runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length, brief: true, teams }) : []
   // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
@@ -515,13 +518,13 @@ export async function citationSources(userId: string, texts: readonly string[], 
     ownIds.length ? db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
       .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId)
       .then(rows => new Map(rows.map(row => [row.runId, Number(row.count)]))) : new Map<string, number>(),
-    issuesForUser(userId, runIssueIds, false, db, { withoutBody: true, teams }),
+    issuesForUser(userId, runIssueIds, false, db, { withoutBody: true, teams, identifierTeams }),
   ])
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
     ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })),
     ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number })),
-  ])
+  ], db, identifierTeams)
   for (const { content, ownerId: _owner, scope: _scope, ...row } of issueRows) {
     const metadata = readIssueMetadata(content)
     if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null }

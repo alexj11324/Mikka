@@ -2,6 +2,7 @@
 import { registerHooks } from 'node:module'
 const nextServer = import.meta.resolve('next/server')
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
+const repositoryContract = import.meta.resolve('@mikka/protocol/repository')
 const dbSource = `import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
 
 function query(columns){
@@ -34,12 +35,22 @@ function update(value){
   }}}}
 }
 export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
-export const pool={}
+export const pool={async query(sql,args){
+  const p=globalThis.claimResponseProbe
+  if(sql==='SELECT "ownerId",kind,enabled FROM devices WHERE id=$1'&&args[0]===p.device.id)return {rows:[p.device]}
+  throw new Error('unsupported claim identity query: '+sql)
+}}
 `
 const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],
   ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
   ['/lib/db/index.ts', dbSource],
+  ['/lib/workspace-db.ts', `export const workspacePool={async query(sql,args){
+    const p=globalThis.claimResponseProbe
+    if(sql.replace(/\\s+/g,' ').trim()!==${JSON.stringify('SELECT "userId" FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[]) AND status=\'active\'')})throw new Error('unsupported claim membership query')
+    ;(p.membershipReads??=[]).push(args)
+    return {rows:p.workspaceMemberAllowed===false?[]:args[1].map(userId=>({userId}))}
+  }}`],
   ['/lib/device-link.ts', 'export async function authenticateDevice(){const p=globalThis.claimResponseProbe;return Object.hasOwn(p,"caller") ? (p.caller && {tokenId:"synthetic-device-token",...p.caller}) : {userId:"member",tokenId:"synthetic-device-token"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device};export async function ownedDeviceWithReport(){return globalThis.claimResponseProbe.device}'],
   ['/lib/device-repositories.ts', 'export async function readRepositorySettings(...args){const p=globalThis.claimResponseProbe;p.preparation.push("settings");(p.settingsReads??=[]).push(args);return p.repositorySettings??null}'],
   ['/lib/agent-tool-approval/policy-store.ts', 'export async function readCliRunPolicy(){const p=globalThis.claimResponseProbe;p.preparation.push("policy");return structuredClone(p.cliPolicy)}'],
@@ -78,13 +89,27 @@ const sources = new Map([
     }
   `],
   ['/lib/computer/native-run-binding.ts', 'export async function nativeRunBinding(){return globalThis.claimResponseProbe.cloud.subscription}'],
-  ['/lib/secrets/runtime.ts', 'export function remoteRepositoryRef(url){return url};export async function taskSecretInjection(...args){const p=globalThis.claimResponseProbe;p.preparation.push("secrets");(p.secretReads??=[]).push(args);return p.secretInjection??{env:{},secretNames:[]}}'],
+  ['/lib/secrets/runtime.ts', `
+    import {normalizeRepository} from ${JSON.stringify(repositoryContract)}
+    export function remoteRepositoryRef(url){if(!url)return null;const repo=normalizeRepository(url);const prefix="v2/github.com/";return repo.key.startsWith(prefix)?repo.key.slice(prefix.length):null}
+    export async function taskSecretInjection(...args){
+      const p=globalThis.claimResponseProbe;p.preparation.push("secrets");(p.secretReads??=[]).push(args)
+      return structuredClone({env:{},secretNames:[],protectedSecrets:[],unavailable:[],...p.secretInjection})
+    }
+    export async function taskSecretSnapshot(...args){
+      const p=globalThis.claimResponseProbe;p.preparation.push("secret-snapshot");(p.secretSnapshotReads??=[]).push(args)
+      return p.secretSnapshot??p.secretInjection?.snapshot
+    }
+  `],
   ['/lib/run-completion-effects.ts', 'export async function afterRunEnded(ownerId,runId){const p=globalThis.claimResponseProbe;(p.endedRuns??=[]).push({ownerId,runId})}'],
-  ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(){throw new Error("unexpected daemon upgrade refusal")};export async function failQueuedSubscriptionRuntime(...args){const p=globalThis.claimResponseProbe;p.preparation.push("subscription-preflight");p.runtimeRefusal=args;p.run.status="failed";return true}'],
+  ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(...args){const p=globalThis.claimResponseProbe;p.preparation.push("daemon-upgrade");(p.upgradeRefusals??=[]).push(args);p.run.status="failed";p.run.stopReason="error";return true};export async function failQueuedSubscriptionRuntime(...args){const p=globalThis.claimResponseProbe;p.preparation.push("subscription-preflight");p.runtimeRefusal=args;p.run.status="failed";return true}'],
+  ['/lib/daemon-release.ts', 'export function daemonTooOld(){return false};export async function daemonVersions(){return {min:"0.0.1",latest:"0.0.1"}}'],
   ['/lib/app-tools-server.ts', 'export async function runAppToolkits(){return []}'],
+  ['/lib/personal-mailbox-runtime.ts', 'export async function personalWorkerMailboxAdvertised(){return []}'],
+  ['/lib/github/cloud.ts', 'export async function useCloudGitHub(){return false};export async function cloudGitHubCredential(){return null}'],
   ['/lib/github/repository-installation.ts', 'export async function linkedGitHubAccountId(userId){const p=globalThis.claimResponseProbe;(p.githubLookups??=[]).push(userId);return p.githubAccountId===undefined?"123":p.githubAccountId}'],
   ['/lib/github/user-access.ts', 'export async function githubTokenForUser(owner){const p=globalThis.claimResponseProbe;p.credentialOwners.push(owner);await p.beforeCredential?.();if(p.credentialFailure)throw p.credentialFailure;return {token:"fixture-claim-github-token",githubAccountId:"123",expiresAt:new Date("2030-01-01T00:00:00.000Z")}}'],
-  ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){const p=globalThis.claimResponseProbe;if(!p.nativeLease)throw new Error("unexpected subscription access");return {async nativeRun(owner,device,run){(p.nativeRunCalls??=[]).push([owner,device,run]);return {ownerId:owner,runId:run}},async nativeLease(use,_signal,includeCatalogue){(p.nativeLeaseCalls??=[]).push(use);p.nativeLeaseCapabilities.push(includeCatalogue);return p.nativeLease}}}'],
+  ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){const p=globalThis.claimResponseProbe;return {repository:{async nativeBinding(){return p.cloud?.subscription??null}},async nativeRun(owner,device,run){if(!p.nativeLease)throw new Error("unexpected subscription access");(p.nativeRunCalls??=[]).push([owner,device,run]);return {ownerId:owner,runId:run}},async nativeLease(use,_signal,includeCatalogue){(p.nativeLeaseCalls??=[]).push(use);p.nativeLeaseCapabilities.push(includeCatalogue);return p.nativeLease}}}'],
 ])
 registerHooks({
   resolve(specifier,context,next){
