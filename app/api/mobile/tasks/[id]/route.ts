@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
+import { workspaceSelection } from '@/lib/workspace-selection'
 import { mobileTask } from '@/lib/mobile-tasks'
 import { ActionFailureError } from '@/lib/action-error'
 
@@ -16,7 +17,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ id: s
   if (!id.success) return json({ error: 'issueNotFound' }, 404)
   try {
     const { workspace } = await loadWorkspaceContext(undefined, user)
-    const detail = await mobileTask(user, workspace, id.data)
+    const detail = await mobileTask(user, id.data, workspaceSelection(request.headers).present ? workspace.id : undefined)
     return detail ? json(detail) : json({ error: 'issueNotFound' }, 404)
   } catch (error) {
     if (error instanceof WorkspaceError || (error instanceof ActionFailureError && ['issueNotFound', 'workspaceAccessDenied'].includes(error.code)))
