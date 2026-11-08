@@ -98,7 +98,8 @@ export async function settingsReady(page, id, fixture, messages, observed = { li
     case 'connections':
       // A disabled or unreadable Linear rollout is an explicit paused row, even
       // when the account has no connections. The required reads also cover empty MCP.
-      await either(text('Plugins.noConnections'), section('plugin-apps').getByText(t('Plugins.state.paused'), { exact: true }))
+      // The app list's card has no title, so it is not a labelled section: look in the page body.
+      await either(text('Plugins.noConnections'), text('Plugins.state.paused'))
       break
     case 'models': {
       const subscriptions = section('subscriptions-heading')
