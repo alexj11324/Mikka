@@ -31,14 +31,16 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   await store.createWorkspaceSecret(admin, ws.id, { name: 'API_TOKEN', kind: 'secret', value: SECRET })
   await e2b.setE2BKey(admin, ws.id, { apiKey: E2B_KEY }, { verify: async () => ({ ok: true }) })
 
-  await t.test('platform E2B billing still injects task secrets and masks outputs', async () => {
+  await t.test('platform E2B billing preserves default secret isolation and masks outputs', async () => {
     const env = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY, MIKKA_BYO_E2B_KEY: '0' }
     const injected = await runtime.taskSecretInjection(ws.id, null, env)
-    assert.equal(injected.env.API_TOKEN, SECRET)
-    assert.deepEqual(injected.secretNames, ['API_TOKEN'])
+    assert.equal(injected.env.API_TOKEN, undefined)
+    assert.deepEqual(injected.secretNames, [])
+    assert.deepEqual(injected.unavailable, ['API_TOKEN'])
+    assert.deepEqual(injected.protectedSecrets, [])
     const mask = await runtime.workspaceSecretMasker(ws.id, env)
     assert.ok(!mask(SECRET).includes(SECRET))
-    assert.deepEqual(await runtime.taskSecretInjection(ws.id, null, {}), { env: {}, secretNames: [] })
+    assert.deepEqual(await runtime.taskSecretInjection(ws.id, null, {}), { env: {}, secretNames: [], protectedSecrets: [], unavailable: [] })
   })
 
   // A cloud device whose token is bound to the workspace (the only callers that get masked).

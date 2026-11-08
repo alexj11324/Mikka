@@ -13,15 +13,17 @@ import { sealSecret, userSecretAad, SecretsKeyMissingError } from './crypto'
 import { parseDotenv } from './dotenv'
 import { createUserSecretInput, deleteSecretInput, importUserSecretsInput, isReservedEnvName, replaceUserSecretInput, USER_SECRETS_LIMIT } from './format'
 import { guardSecretsDb, isShortSecretValue, type ImportErrorReason, type ImportResult } from './store'
+import { approveSecretDelivery, effectiveSecretDelivery, type SecretDelivery } from './delivery'
+import { stopRunsForSecretChanges, type SecretChange } from './run-invalidation'
 
-export interface UserSecretView { id: string; name: string; kind: 'secret' | 'env'; note: string; updatedAt: string }
+export interface UserSecretView { id: string; name: string; kind: 'secret' | 'env'; note: string; updatedAt: string; delivery?: SecretDelivery }
 export type SavedUserSecretView = UserSecretView & { warning: 'shortValueNotMasked' | null }
 export type UserImportResult = Omit<ImportResult, 'errors'> & { errors: Array<{ line: number; name?: string; reason: ImportErrorReason | 'shadowsWorkspace' }> }
 /** The workspace whose secret names a new personal name is checked against (the page the person is on). */
 export interface ShadowContext { workspaceId?: string }
 
 type Row = typeof userSecrets.$inferSelect
-const view = (row: Row): UserSecretView => ({ id: row.id, name: row.name, kind: row.kind, note: row.note, updatedAt: row.updatedAt.toISOString() })
+const view = (row: Row): UserSecretView => ({ id: row.id, name: row.name, kind: row.kind, note: row.note, ...(row.kind === 'secret' ? { delivery: effectiveSecretDelivery(row.delivery) } : {}), updatedAt: row.updatedAt.toISOString() })
 const saved = (row: Row, value: string | undefined): SavedUserSecretView => ({ ...view(row), warning: value !== undefined && isShortSecretValue(value) ? 'shortValueNotMasked' : null })
 
 function seal(value: string, row: { userId: string; kind: string; name: string }) {
@@ -50,7 +52,7 @@ export async function listUserSecrets(userId: string): Promise<UserSecretView[]>
 
 /** Errors: secretNameReserved, secretNameTaken, secretNameShadowsWorkspace (unless confirmed), secretLimitReached, secretsUnavailable. */
 export async function createUserSecret(userId: string, input: unknown, context: ShadowContext): Promise<SavedUserSecretView> {
-  const { name, kind, value, note, overrideWorkspace } = createUserSecretInput.parse(input)
+  const { name, kind, value, note, overrideWorkspace, delivery } = createUserSecretInput.parse(input)
   if (isReservedEnvName(name)) throw new WorkspaceError('secretNameReserved')
   if (!overrideWorkspace && (await workspaceNames(userId, context.workspaceId, [name])).has(name)) throw new WorkspaceError('secretNameShadowsWorkspace')
   const id = crypto.randomUUID(), columns = { userId, kind, name }
@@ -59,7 +61,8 @@ export async function createUserSecret(userId: string, input: unknown, context: 
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`user-secrets:${userId}`}, 0))`)
     const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(userSecrets).where(eq(userSecrets.userId, userId))
     if (n >= USER_SECRETS_LIMIT) throw new WorkspaceError('secretLimitReached')
-    const [row] = await tx.insert(userSecrets).values({ id, ...columns, note, ...sealed }).returning()
+    const [row] = await tx.insert(userSecrets).values({ id, ...columns, note, delivery: approveSecretDelivery(delivery, userId), ...sealed }).returning()
+    await stopRunsForSecretChanges(tx, [{ ownerId: userId, name }])
     return row
   }), () => new WorkspaceError('secretNameTaken'))
   return saved(row, value)
@@ -67,11 +70,15 @@ export async function createUserSecret(userId: string, input: unknown, context: 
 
 /** A new value and/or note for one of the person's own secrets. Name and kind are fixed. */
 export async function replaceUserSecret(userId: string, input: unknown, now = new Date()): Promise<SavedUserSecretView> {
-  const { id, value, note } = replaceUserSecretInput.parse(input)
+  const { id, value, note, delivery } = replaceUserSecretInput.parse(input)
   const row = await guardSecretsDb(() => db.transaction(async tx => {
     const [current] = await tx.select().from(userSecrets).where(and(eq(userSecrets.id, id), eq(userSecrets.userId, userId))).for('update')
     if (!current) return null
-    const [row] = await tx.update(userSecrets).set({ ...(value !== undefined ? seal(value, current) : {}), ...(note !== undefined ? { note } : {}), updatedAt: now }).where(eq(userSecrets.id, id)).returning()
+    if (current.kind === 'env' && delivery !== undefined) throw new WorkspaceError('validationGeneric')
+    const [row] = await tx.update(userSecrets).set({ delivery: approveSecretDelivery(delivery, userId, now, current.delivery), ...(value !== undefined ? seal(value, current) : {}), ...(note !== undefined ? { note } : {}), updatedAt: now }).where(eq(userSecrets.id, id)).returning()
+    if (value !== undefined || JSON.stringify(effectiveSecretDelivery(current.delivery)) !== JSON.stringify(row.delivery)) {
+      await stopRunsForSecretChanges(tx, [{ ownerId: userId, name: current.name }])
+    }
     return row
   }))
   if (!row) throw new WorkspaceError('secretNotFound')
@@ -80,9 +87,12 @@ export async function replaceUserSecret(userId: string, input: unknown, now = ne
 
 export async function deleteUserSecret(userId: string, input: unknown): Promise<{ id: string }> {
   const { id } = deleteSecretInput.parse(input)
-  const [gone] = await guardSecretsDb(() => db.delete(userSecrets).where(and(eq(userSecrets.id, id), eq(userSecrets.userId, userId))).returning({ id: userSecrets.id }))
-  if (!gone) throw new WorkspaceError('secretNotFound')
-  return { id }
+  return guardSecretsDb(() => db.transaction(async tx => {
+    const [gone] = await tx.delete(userSecrets).where(and(eq(userSecrets.id, id), eq(userSecrets.userId, userId))).returning({ id: userSecrets.id, name: userSecrets.name })
+    if (!gone) throw new WorkspaceError('secretNotFound')
+    await stopRunsForSecretChanges(tx, [{ ownerId: userId, name: gone.name }])
+    return { id }
+  }))
 }
 
 /**
@@ -111,17 +121,21 @@ export async function importUserSecrets(userId: string, input: unknown, context:
     const byName = new Map(existing.map(row => [row.name, row]))
     const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(userSecrets).where(eq(userSecrets.userId, userId))
     if (n + entries.filter(entry => !byName.has(entry.name)).length > USER_SECRETS_LIMIT) throw new WorkspaceError('secretLimitReached')
+    const changes: SecretChange[] = []
     for (const entry of entries) {
       const current = byName.get(entry.name)
       if (!current) {
         const columns = { userId, kind, name: entry.name }
         await tx.insert(userSecrets).values({ id: crypto.randomUUID(), ...columns, note: entry.note, ...seal(entry.value, columns) })
         result.created.push(entry.name)
+        changes.push({ ownerId: userId, name: entry.name })
       } else if (onConflict === 'replace') {
         await tx.update(userSecrets).set({ ...seal(entry.value, current), ...(entry.note ? { note: entry.note } : {}), updatedAt: now }).where(eq(userSecrets.id, current.id))
         result.replaced.push(entry.name)
+        changes.push({ ownerId: userId, name: entry.name })
       } else result.kept.push(entry.name)
     }
+    await stopRunsForSecretChanges(tx, changes)
     return result
   }))
 }

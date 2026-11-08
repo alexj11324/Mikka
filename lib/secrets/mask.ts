@@ -3,6 +3,8 @@
 // replaced by [secret:NAME], as is its standard (padded) base64 form. Shorter values are left alone
 // (saving one returns shortValueNotMasked). Other encodings (url-safe/unpadded base64, URL, hex,
 // JSON escapes, decoded Basic/Bearer credentials) are deliberately not matched.
+import { maskTaskSecretCapabilities, taskSecretCapabilityHoldback } from '@mikka/protocol/task-secrets'
+
 export const MASK_MIN_LENGTH = 8
 
 export interface MaskableSecret { name: string; value: string }
@@ -71,7 +73,7 @@ const CREDENTIAL_HOLDBACK_MAX = 4096
 
 /** Replaces every credential pattern match whole: with its `[secret:…]` label, or with `replacement` when given. */
 export function maskCredentials(text: string, replacement?: string) {
-  let out = text
+  let out = maskTaskSecretCapabilities(text, replacement)
   for (const [pattern, label] of CREDENTIAL_PATTERNS) out = out.replace(pattern, replacement ?? label)
   return out
 }
@@ -80,20 +82,26 @@ export const credentialMasker: Masker = text => (typeof text !== 'string' || !te
 
 /** Characters at the end of `text` that could still grow into a credential with the next delta. */
 const credentialHoldback = (text: string) => {
-  const tail = /[A-Za-z0-9_.-]+$/.exec(text)?.[0]
+  let startOfTail = text.length
+  while (startOfTail > 0 && /[A-Za-z0-9_.-]/.test(text[startOfTail - 1])) startOfTail--
+  const tail = text.slice(startOfTail)
   if (!tail) return 0
-  for (let i = 0; i < tail.length; i++) {
-    const rest = tail.slice(i)
-    if (CREDENTIAL_STARTS.some(start => rest.startsWith(start) || start.startsWith(rest))) return Math.min(rest.length, CREDENTIAL_HOLDBACK_MAX)
+  let hold = 0
+  for (const prefix of CREDENTIAL_STARTS) {
+    const start = tail.indexOf(prefix)
+    if (start >= 0) hold = Math.max(hold, Math.min(tail.length - start, CREDENTIAL_HOLDBACK_MAX))
+    for (let length = Math.min(prefix.length - 1, tail.length); length > hold; length--) {
+      if (prefix.startsWith(tail.slice(-length))) { hold = length; break }
+    }
   }
-  return 0
+  return hold
 }
 
 /** `mask`, then credential patterns: what persisted run output always gets, with or without saved secrets. */
 export function withCredentialMasking(mask: Masker): Masker {
   const masked: Masker = text => (typeof text !== 'string' || !text ? text : maskCredentials(mask(text)))
   if (mask.holdback) masked.holdback = mask.holdback
-  masked.rawHoldback = credentialHoldback
+  masked.rawHoldback = text => Math.max(credentialHoldback(text), taskSecretCapabilityHoldback(text))
   return masked
 }
 

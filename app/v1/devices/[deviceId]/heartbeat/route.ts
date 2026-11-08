@@ -17,6 +17,9 @@ import { factoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-server'
 import { factoryDeviceOnline } from '@/lib/factory/dispatch-recovery'
 import { daemonVersions, daemonRequestTooOld } from '@/lib/daemon-release'
 import { ownerListChanged } from '@/lib/live/lists'
+import { renewTaskSecretAccess } from '@/lib/secrets/task-renewal'
+import { withBasePath } from '@/lib/base-path'
+import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,8 +55,14 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     const ids = owned.rows.map(run => run.id)
     const selected = ids.length ? await skillAssignments.renewHeartbeat(caller.userId, deviceId, ids, request.headers.get(SKILL_ARTIFACT_HEADER) === '1', request.headers.get(TEAM_SKILL_HEADER) === '1') : { legacy: [], leases: {}, revoked: [] }
     const result = await renewRunLeases(deviceId, selected.legacy)
+    result.leases = { ...result.leases, ...selected.leases }
+    const renewedSecrets = request.headers.get(TASK_SECRETS_HEADER) === TASK_SECRETS_VERSION
+      ? await renewTaskSecretAccess({ caller, deviceId, runs: parsed.data.runs, leases: result.leases,
+        endpoint: runId => new URL(withBasePath(`/v1/task-secrets/${runId}`), request.url).toString() })
+      : { taskSecrets: {}, revoked: [] }
+    for (const runId of renewedSecrets.revoked) delete result.leases[runId]
     const deviceCommands = (await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? [])).filter(command => command.kind === 'update' || command.kind === 'restart')
-    return NextResponse.json({ ...result, leases: { ...result.leases, ...selected.leases }, revoked: [...new Set([...(result.revoked ?? []), ...selected.revoked, ...reported.filter(id => !ids.includes(id))])], deviceCommands, daemonVersions: await daemonVersions() }, { headers: { 'Cache-Control': 'private, no-store' } })
+    return NextResponse.json({ ...result, ...(Object.keys(renewedSecrets.taskSecrets).length ? { taskSecrets: renewedSecrets.taskSecrets } : {}), revoked: [...new Set([...(result.revoked ?? []), ...selected.revoked, ...renewedSecrets.revoked, ...reported.filter(id => !ids.includes(id))])], deviceCommands, daemonVersions: await daemonVersions() }, { headers: { 'Cache-Control': 'private, no-store' } })
   }
   const factoryOn = factoryLifecycleEnabled()
   const { harnesses, deviceType, updateFailure } = parsed.data
@@ -84,11 +93,17 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const result = await renewRunLeases(deviceId, selected.legacy)
   result.leases = { ...result.leases, ...selected.leases }
   result.revoked = [...new Set([...(result.revoked ?? []), ...selected.revoked])]
+  const renewedSecrets = request.headers.get(TASK_SECRETS_HEADER) === TASK_SECRETS_VERSION
+    ? await renewTaskSecretAccess({ caller, deviceId, runs: parsed.data.runs, leases: result.leases,
+      endpoint: runId => new URL(withBasePath(`/v1/task-secrets/${runId}`), request.url).toString() }, now)
+    : { taskSecrets: {}, revoked: [] }
+  for (const runId of renewedSecrets.revoked) delete result.leases[runId]
+  result.revoked = [...new Set([...result.revoked, ...renewedSecrets.revoked])]
   const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId
     ? await renewCloudDeviceToken(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId, deviceId, tokenId: caller.tokenId }).catch(() => null)
     : null
   if (factoryOn) afterJob('after:factory-dispatch-recovery', () => factoryDispatchRecovery.deviceOnline(caller.userId, deviceId, !prior || !factoryDeviceOnline(prior)).catch((error: unknown) => console.error('Could not resume Factory dispatch', error instanceof Error ? error.message : error)))
-  return NextResponse.json({ ...result, deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? []), ...(cloudCredential ? { cloudCredential } : {}), daemonVersions: await daemonVersions() }, { headers: { 'Cache-Control': 'private, no-store' } })
+  return NextResponse.json({ ...result, ...(Object.keys(renewedSecrets.taskSecrets).length ? { taskSecrets: renewedSecrets.taskSecrets } : {}), deviceCommands: await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? []), ...(cloudCredential ? { cloudCredential } : {}), daemonVersions: await daemonVersions() }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 export const POST = withDeviceRoute(handlePOST)
