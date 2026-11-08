@@ -26,7 +26,7 @@ import { colors } from '@/lib/theme'
 
 const STATUS_WORD = { running: '运行中', waiting: '等待你', paused: '已暂停', failed: '失败', done: '完成', stopped: '已停止' } as const
 
-/** A thread's own page, pushed from a thread card or the 线程 list; back returns (mobile.md). */
+/** A thread without a task, pushed from its card; a task's threads open as the task's one conversation (app/task/[id]/conversation.tsx). */
 export default function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
@@ -62,7 +62,7 @@ export default function ThreadScreen() {
   return (
     <View style={styles.screen}>
       <NavBar
-        back={() => (router.canGoBack() ? router.back() : router.replace('/threads'))}
+        back={() => (router.canGoBack() ? router.back() : router.replace('/tasks'))}
         titleView={thread ? (
           <View style={styles.titleRow}>
             <StatusIcon status={thread.status} size={18} />

@@ -180,7 +180,7 @@ Mikka 自己的部分是页面上「Mikka 本地组件」框里的组件：bloub
 - **聊天列表虚拟化：** `features/chat/components/chat-message-list.tsx`（`@legendapp/list`）。
 - **发送动效和新消息上浮：** `lib/springs.ts`（`ENTER`、`SNAP_BACK`）及其 Reduce Motion 分支。
 - **气泡手势：** `components/chat.tsx` 的 `TimedRow`（右滑引用）和 `useTimeReveal`（左滑看时间）。
-- **首页行交互的后端：** `features/home/model/use-home-chats.ts`（置顶、隐藏、已读/未读、复制 ID、置顶上限）、`home-list.ts`、`pin-swipe.ts`、`chat-drag.tsx`（置顶区拖动排序），以及 `chat-menu.tsx` 的菜单项。
+- **首页行交互的后端：** `features/home/model/use-home-chats.ts`（置顶、隐藏、已读/未读、复制 ID、置顶上限）、`home-list.ts`、`pin-swipe.ts`，以及 `chat-menu.tsx` 的菜单项。
 - 消息菜单 `MessageMenu.ios.tsx`、OpenUI 卡片 `components/OpenUI.tsx`、`cards.tsx`、输入框里的模型菜单 `ModelMenu.ios.tsx`、所有 `app/api/mobile/*` 接口。
 - 要删的只有抽屉：`features/shell/components/app-drawer.tsx`、`drawer-content.tsx` 和 `drawerDim` / `drawerLift` / `drawer` / `drawerRow` token（#1470、Phase 5 已删）。
 
