@@ -220,7 +220,7 @@
     "lint:runtime": "oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs",
     "test:cloud-services": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.test.ts lib/cloud-services/model.test.ts lib/cloud-services/model-billing.test.ts components/settings/cloud-settings.test.tsx",
     "test:cloud-services-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.db.test.ts lib/mobile-push-delivery.db.test.ts",
-    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts"
+    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test hooks/settings/use-workspace-governance.test.tsx"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.121",

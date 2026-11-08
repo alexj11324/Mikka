@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import useSWR from 'swr'
+import { useCallback, useState } from 'react'
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { withBasePath } from '@/lib/base-path'
 
@@ -68,6 +68,19 @@ export function useGovernanceErrorText() {
 }
 
 export const governanceKey = (workspaceId: string) => ['governance', workspaceId] as const
+/** The summary's key as the live layer names it: SettingsDataPreloader revalidates it on the
+ * existing `workspace_settings` invalidation, with the member list (no polling of its own). */
+export const governanceLiveKey = (workspaceId: string) => unstable_serialize(governanceKey(workspaceId))
+
+/**
+ * Re-reads a mounted plan / seat / role summary after a member action
+ * (suspend, restore, role change, invite, revoke) changed what it counts.
+ * Nothing is fetched when no summary for that workspace is mounted or cached.
+ */
+export function useRevalidateGovernance() {
+  const { mutate } = useSWRConfig()
+  return useCallback((workspaceId: string) => mutate(governanceKey(workspaceId)), [mutate])
+}
 
 /** The workspace's governance summary; templates come back only to admins whose plan has them. */
 export function useGovernanceSummary(workspaceId: string | undefined) {

@@ -72,6 +72,7 @@ import { useActionError } from "@/lib/use-action-error";
 import { SettingsDataState } from "@/components/settings/settings-data-state";
 import { cn } from "@/lib/utils";
 import { FieldError } from '@/components/ui/field'
+import { useRevalidateGovernance } from "@/hooks/settings/use-workspace-governance";
 
 type Change = {
   userId: string;
@@ -117,6 +118,12 @@ export function MembersSettings({
     members: [],
     invitations: [],
   };
+  // A member action changes the seats and roles the governance cards count (#1662).
+  const revalidateGovernance = useRevalidateGovernance();
+  async function refreshAfterChange() {
+    await mutate();
+    if (data.workspace.id) void revalidateGovernance(data.workspace.id);
+  }
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [ascending, setAscending] = useState(true);
@@ -196,7 +203,7 @@ export function MembersSettings({
       }
       setChange(null);
       setNotice(t("memberUpdated"));
-      await mutate();
+      await refreshAfterChange();
     } catch {
       setError(t("updateFailed"));
     } finally {
@@ -215,7 +222,7 @@ export function MembersSettings({
         return;
       }
       setNotice(t("invitationRevoked"));
-      await mutate();
+      await refreshAfterChange();
     } catch {
       setError(t("revokeFailed"));
     } finally {
@@ -638,7 +645,7 @@ export function MembersSettings({
         onOpenChange={setInviteOpen}
         onCreated={async () => {
           setFilter("invited");
-          await mutate();
+          await refreshAfterChange();
         }}
       />
       <AlertDialog
