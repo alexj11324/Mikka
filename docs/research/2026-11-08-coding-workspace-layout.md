@@ -14,6 +14,7 @@
 
 1. 四个产品都以对话为主。改动、文件、终端、浏览器都是对话旁边的标签或面板，放在右侧栏或底部抽屉里。没有哪家为代码另开一个导航入口或页面。协调会话「不加新导航项、不加新页面」的方向是对的。
 2. 对话旁总有一个改动摘要（`+42 −18` 或文件列表），点开才是完整 diff。Claude Code 的 Changes 卡片、Conductor 的 Changes 标签都是这样做的。Mikka 可以在任务详情里放「改动」入口（草图 D1）。
+   - 审阅入口要在第一层。从首屏到审阅只要 1 次点击：聊天里的任务卡片（D0、M0）、窗口栏「等待你」列表（D0b）、⌘⇧B、⌘K「审阅 #1471」。先例是 Claude Code Desktop：会话卡片上的 `+N −M` 直接打开 diff。原来的路径（任务卡片 → 右栏任务 → 改动 → ⤢，3 次点击）保留，作为次要路径。
    - 检查和 PR 是否单独放：4 家里有 3 家给它们单独的位置（Conductor 的 Checks 标签、Cursor 的 PR 标签、Codex Code Review 里的 Checks），只有 Claude Code 放在 Changes 卡片上。所以 Mikka 把检查和 PR 放进现有的「验收」标签（D5），改动顶部只留一行状态。
 3. 都有「铺满」模式：Codex 有 full view / split view / hidden tabs（⌘⇧B 循环切换），Conductor 的 diff 是主区标签，Claude Code 能把面板弹出成独立窗口。审阅模式可以做，但要配快捷键，不能只靠 Esc。
 4. 行内评论在每家都是**先攒一批，再一起发**：
@@ -102,12 +103,15 @@ Figma 页面 `1110:2`。每张都有浅色和深色版，深色是同一结构�
 
 | 帧 | 浅色 | 深色 | 图 |
 |---|---|---|---|
+| D0 首屏 · 聊天任务卡片：代码任务卡片多一行「3 个文件 +42 −7 · ⚠ 1 项检查失败」和「审阅」按钮（提示「审阅 ⌘⇧B」），**1 次点击**直达 D3 | `1118:2` | `1118:214` | [浅](assets/2026-11-08-ws-d0-chat-card-review-light.png) · [深](assets/2026-11-08-ws-d0-chat-card-review-dark.png) |
+| D0b 首屏 · 窗口栏「等待你」列表：待审阅任务带同样的摘要和「审阅」，**1 次点击**直达 D3；底部提示 ⌘⇧B 和 ⌘K「审阅 #1471」 | `1118:353` | `1118:618` | [浅](assets/2026-11-08-ws-d0b-waiting-list-review-light.png) · [深](assets/2026-11-08-ws-d0b-waiting-list-review-dark.png) |
 | D1 平常：图标栏、Bot 列表、聊天、右栏任务详情（带「改动」入口） | `1110:4` | `1110:195` | [浅](assets/2026-11-08-ws-d1-normal-light.png) · [深](assets/2026-11-08-ws-d1-normal-dark.png) |
 | D2 代码任务：右栏是工作区（对话 · 改动 · 文件 · 验收 · 预览）；改动顶部是范围切换和一行状态「⚠ 1 项检查失败 · PR #1471 待审阅 ›」（点开到验收）；⤢ 的提示是「审阅模式 ⌘⇧B」 | `1110:386` | `1110:652` | [浅](assets/2026-11-08-ws-d2-workspace-light.png) · [深](assets/2026-11-08-ws-d2-workspace-dark.png) |
 | D3 审阅模式：左窄条是任务对话，里面能看到已发送的「你：2 条评论」（带 `文件:行` 引用）；改动铺满、范围切换（全部 / 第 2 次尝试 / 某个提交）、状态行、并排 diff、行内评论、底部批次条「2 条评论 · ios-unit 失败 · 发给 Agent」；退出提示「退出审阅 ⌘⇧B」，Esc 只做次要提示 | `1111:2` | `1111:336` | [浅](assets/2026-11-08-ws-d3-review-light.png) · [深](assets/2026-11-08-ws-d3-review-dark.png) |
 | D4 审阅模式 · 文件与终端：仓库文件树、只读源码、终端抽屉打开 | `1111:670` | `1111:978` | [浅](assets/2026-11-08-ws-d4-files-terminal-light.png) · [深](assets/2026-11-08-ws-d4-files-terminal-dark.png) |
 | D4b 队友看终端（只读）：终端抽屉写「只有任务负责人可以操作」，没有运行按钮和输入行；对话输入框写「只有任务负责人可以回复」 | `1117:613` | `1117:923` | [浅](assets/2026-11-08-ws-d4b-teammate-terminal-light.png) · [深](assets/2026-11-08-ws-d4b-teammate-terminal-dark.png) |
 | D5 验收标签：PR（状态、要求修改 / 批准合并）、检查和日志摘要、失败检查的「附到评论」（加进改动的批次）、验收报告 | `1117:2` | `1117:370` | [浅](assets/2026-11-08-ws-d5-acceptance-light.png) · [深](assets/2026-11-08-ws-d5-acceptance-dark.png) |
+| M0 iPhone 聊天任务卡片：摘要行「3 个文件 +42 −7 · ⚠ 1 项检查失败 ›」，**1 次点击**进 M1 | `1118:810` | `1118:920` | [浅](assets/2026-11-08-ws-m0-chat-card-light.png) · [深](assets/2026-11-08-ws-m0-chat-card-dark.png) |
 | M1 iPhone 任务的改动：一行「1 项检查失败 · PR #1471 待审阅 · 验收」，文件列表，悬浮条「2 条评论 · ios-unit 失败 · 发给 Agent」 | `1112:2` | `1112:109` | [浅](assets/2026-11-08-ws-m1-changes-light.png) · [深](assets/2026-11-08-ws-m1-changes-dark.png) |
 | M2 iPhone 文件 diff 和行内评论 | `1112:216` | `1112:301` | [浅](assets/2026-11-08-ws-m2-diff-comment-light.png) · [深](assets/2026-11-08-ws-m2-diff-comment-dark.png) |
 | M3 iPhone 评论 sheet，按钮「发给 Agent」 | `1112:386` | `1112:508` | [浅](assets/2026-11-08-ws-m3-comment-sheet-light.png) · [深](assets/2026-11-08-ws-m3-comment-sheet-dark.png) |
