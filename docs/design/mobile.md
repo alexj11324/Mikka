@@ -49,8 +49,9 @@ their counts as the system's tab badges.
   time (a working bot says 进行中), newest first (the web bot list, R-01; R-06).
   Rows have no separators; the pressed surface sits 10 pt in from each side.
 - Each chat row taps open with the system's link transition. A long press opens its menu over a live preview. A
-  swipe left shows two capsules, 置顶 and 隐藏, and a full swipe pins. Holding then moving drags it among the pins or the list
-  ([decision](decisions/2026-11-05-2010-ios-home-list-interactions.md)). Sections fold. The unread count or waiting
+  swipe left shows two capsules, 置顶 and 隐藏, and a full swipe pins
+  ([decision](decisions/2026-11-05-2010-ios-home-list-interactions.md)). Chats and pins are not dragged: the list
+  stays newest first (Alex 2026-11-07, which supersedes that decision's drag). Sections fold. The unread count or waiting
   mark sits on the right under the time. Hidden chats are listed under 隐藏的聊天 at the foot.
 - 「重启以更新」 shows above the list once an update has downloaded
   ([decision](decisions/2026-10-31-2010-ota-updates.md)).
