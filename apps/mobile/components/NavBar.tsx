@@ -75,8 +75,8 @@ const webItem = (item: BarItem) => 'view' in item
 export function NavBar({ title, titleView, left, right, back, large, topTitle, search, material }: {
   title?: string
   /** A tab's root (Bot, 任务, 建议, 设置, 搜索): the title sits in the bar's own row on the left, the buttons on the
-   * right, and stays there on scroll (Alex 2026-11-07, decisions/2026-11-07-2045). Not iOS's large title, which
-   * puts the title on a second row under the buttons. */
+   * right, and stays there on scroll on the `material` bar (Alex 2026-11-07, decisions/2026-11-07-2045). Not iOS's
+   * large title, which puts the title on a second row under the buttons. */
   topTitle?: boolean
   titleView?: ReactNode
   left?: BarItem | BarItem[]
@@ -131,7 +131,9 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
         // A top-row title is the leading bar item below, so the centre stays empty.
         headerTitle: topTitle ? () => null : titleView ? () => titleView : undefined,
         headerLargeTitle: large && !topTitle,
-        ...(material ? { headerBlurEffect: 'systemChromeMaterial' as const, headerShadowVisible: true, scrollEdgeEffects: { top: 'hidden' as const, bottom: 'soft' as const } } : {}),
+        // A tab's root keeps its row over the list on the same chrome material as the tab bar, so rows scrolled under it
+        // never show through the title or its buttons (Alex 2026-11-07, TestFlight: rows ran into 对话 and the + button).
+        ...(material || topTitle ? { headerBlurEffect: 'systemChromeMaterial' as const, headerShadowVisible: true, scrollEdgeEffects: { top: 'hidden' as const, bottom: 'soft' as const } } : {}),
         ...(search ? { headerSearchBarOptions: { placeholder: search.placeholder, hideWhenScrolling: false, onChangeText: event => search.onChange(event.nativeEvent.text), onCancelButtonPress: () => search.onChange('') } } : {}),
       }} />
       {topTitle ? (

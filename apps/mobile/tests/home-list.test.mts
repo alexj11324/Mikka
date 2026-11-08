@@ -23,16 +23,16 @@ const chat = (key: string, extra: Partial<import('../features/home/model/home-li
   coordinator: false, working: false, unread: 0, markedUnread: false, waiting: 0, ...extra,
 })
 
-test('home: pins in their order, the Coordinator first among unplaced; sections; hidden chats leave the list', async () => {
+test('home: pins in their order, the Coordinator first among unplaced; the list newest first, a stored order ignored; sections; hidden chats leave the list', async () => {
   const { homeList } = await import('../features/home/model/home-list.ts')
   const chats = [
     chat('a', { pinned: true, pinOrder: 2 }), chat('c', { pinned: true, coordinator: true }), chat('z', { pinned: true, pinOrder: 1 }),
-    chat('g', { kind: 'group', unread: 3 }), chat('w', { working: true }), chat('b', { listOrder: 2 }), chat('n', { at: '2026-11-05T12:00:00Z' }),
+    chat('g', { kind: 'group', unread: 3 }), chat('w', { working: true }), chat('b', { listOrder: 2, at: '2026-11-05T11:00:00Z' }), chat('n', { at: '2026-11-05T12:00:00Z' }),
     chat('h', { hidden: true }), chat('b2', { listOrder: 1 }),
   ]
   const { pinned, items, hidden } = homeList(chats, { searching: false, collapsed: new Set() })
   assert.deepEqual(pinned.map(c => c.key), ['c', 'z', 'a'])
-  assert.deepEqual(items.map(i => i.kind === 'section' ? `[${i.title} ${i.count}]` : i.chat.key), ['[正在工作 1]', 'w', '[Bot 3]', 'n', 'b2', 'b', '[群聊 1]', 'g'])
+  assert.deepEqual(items.map(i => i.kind === 'section' ? `[${i.title} ${i.count}]` : i.chat.key), ['[正在工作 1]', 'w', '[Bot 3]', 'n', 'b', 'b2', '[群聊 1]', 'g'])
   assert.equal(hidden, 1)
   const closed = homeList(chats, { searching: false, collapsed: new Set(['groups']) })
   assert.deepEqual(closed.items.slice(-1), [{ kind: 'section', id: 'groups', title: '群聊', count: 1, collapsed: true, unread: 3 }])
@@ -52,18 +52,6 @@ test('the avatar mark: waiting outranks unread, a hand-marked chat shows a dot',
   assert.deepEqual(badgeOf(chat('x', { unread: 5 })), { kind: 'count', count: 5 })
   assert.deepEqual(badgeOf(chat('x', { markedUnread: true })), { kind: 'dot' })
   assert.equal(badgeOf(chat('x')), null)
-})
-
-test('a drop pins, moves a pin, or places a chat in its own section and unpins it', async () => {
-  const { dropOrder, MAX_PINS } = await import('../features/home/model/home-list.ts')
-  const chats = [chat('p1', { pinned: true, pinOrder: 1 }), chat('p2', { pinned: true, pinOrder: 2 }), chat('b1', { listOrder: 1 }), chat('b2', { listOrder: 2 }), chat('g1', { kind: 'group', listOrder: 3 })]
-  assert.deepEqual(dropOrder(chats, 'b2', { area: 'pins', index: 1 }), { pinned: ['p1', 'b2', 'p2'], list: ['b1', 'g1'] })
-  assert.deepEqual(dropOrder(chats, 'p2', { area: 'pins', index: 0 }), { pinned: ['p2', 'p1'], list: ['b1', 'b2', 'g1'] })
-  assert.deepEqual(dropOrder(chats, 'p1', { area: 'list', before: 'b2' }), { pinned: ['p2'], list: ['b1', 'p1', 'b2', 'g1'] })
-  assert.deepEqual(dropOrder(chats, 'b1', { area: 'list', before: 'g1' }), { pinned: ['p1', 'p2'], list: ['b2', 'b1', 'g1'] }, 'beside a later section: the end of its own')
-  assert.deepEqual(dropOrder(chats, 'g1', { area: 'list', before: 'b1' }), { pinned: ['p1', 'p2'], list: ['b1', 'b2', 'g1'] }, 'beside an earlier section: the top of its own')
-  const full = [...Array.from({ length: MAX_PINS }, (_, i) => chat(`p${i}`, { pinned: true, pinOrder: i })), chat('x')]
-  assert.equal(dropOrder(full, 'x', { area: 'pins', index: 0 }), null, 'no room among the pins')
 })
 
 test('the row swipe: armed past 144 pt until back under 128; released, it pins, opens at 88 or closes', async () => {
