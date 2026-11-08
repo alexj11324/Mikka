@@ -256,3 +256,5 @@ export async function businessAcceptance({ env = process.env, fetcher = fetch, r
 // Retry only the blocked Claude candidate after the normal authorized source check; final release still requires both.
 
 // Final receipt uses both original subscriptions on the exact formally released main image and served control plane.
+
+// Formal-source pin follows the verified no-credential final-controller preflight.

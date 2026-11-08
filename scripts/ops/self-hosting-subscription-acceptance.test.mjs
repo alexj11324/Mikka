@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, readCheckedSourceMetadata, safeThreadFailure, safeRepositoryFailure, safeSourceFailures } from './self-hosting-subscription-acceptance.mjs'
+import { accessFixture, cleanupScope, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, readCheckedSourceMetadata, safeThreadFailure, safeRepositoryFailure, safeSourceFailures, selectSharedTeam } from './self-hosting-subscription-acceptance.mjs'
 const target = { ownerId: 'owned-local-user', workspaceId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222' }
 const row = { id: '33333333-3333-4333-8333-333333333333', ownerId: 'authorized-owner', workspaceId: '44444444-4444-4444-8444-444444444444', provider: 'codex' }
 const bundle = () => ({ schema: 1, connectionId: row.id, ownerId: row.ownerId, workspaceId: row.workspaceId, provider: row.provider,
@@ -186,3 +186,35 @@ test('the authorized normal source check precedes the immutable credential snaps
 })
 
 // Final receipt uses both original subscriptions on the exact formally released main image and served control plane.
+
+// Formal-source pin follows the verified no-credential final-controller preflight.
+
+test('the shared workspace selector uses the existing normal session transport and verified callback', async () => {
+  const calls = [], workspaceId = target.workspaceId
+  const proof = { teamWorkspaceConfirmed: true, teamAdminMembershipVerified: true,
+    teamSelectionBasis: 'unique-active-admin-identity-match', teamWorkspaceHash: 'a'.repeat(64) }
+  const client = { json: async (path, options) => { calls.push({ path, options }); return { normalSession: true } } }
+  const selected = await selectSharedTeam(client, 'synthetic-smoke-owner', async options => {
+    assert.equal(options.ownerId, 'synthetic-smoke-owner')
+    assert.deepEqual(await options.json('/mikka/api/workspace'), { normalSession: true })
+    await options.json('/mikka/api/rpc', { version: 1, action: 'workspace.switchWorkspace', args: [workspaceId] })
+    await options.onSelected({ workspaceId, adminId: 'private-policy-admin' })
+    return proof
+  })
+  assert.deepEqual(selected, { workspaceId, proof })
+  assert.equal(calls[0].path, '/api/workspace'); assert.equal(calls[0].options, undefined)
+  assert.equal(calls[1].path, '/api/rpc'); assert.equal(calls[1].options.method, 'POST')
+  assert.deepEqual(calls[1].options.headers, { 'content-type': 'application/json', 'x-mikka-rpc': '1' })
+  assert.deepEqual(JSON.parse(calls[1].options.body).args, [workspaceId])
+  assert.equal(JSON.stringify(selected).includes('private-policy-admin'), false)
+})
+test('a claimed team proof without its verified callback or policy identity cannot start source access', async () => {
+  const client = { json: async () => { throw Error('unexpected transport') } }
+  const proof = { teamWorkspaceConfirmed: true, teamAdminMembershipVerified: true, teamSelectionBasis: 'unique-active-admin-identity-match' }
+  await assert.rejects(() => selectSharedTeam(client, 'synthetic-smoke-owner', async () => proof), /COMMUNITY_TEAM_SCOPE/)
+  for (const bad of [{ ...proof, teamWorkspaceConfirmed: false }, { ...proof, teamAdminMembershipVerified: false }, { ...proof, teamSelectionBasis: 'first-visible-team' }]) {
+    await assert.rejects(() => selectSharedTeam(client, 'synthetic-smoke-owner', async options => {
+      await options.onSelected({ workspaceId: target.workspaceId }); return bad
+    }), /COMMUNITY_TEAM_SCOPE/)
+  }
+})

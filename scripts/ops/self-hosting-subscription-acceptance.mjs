@@ -81,6 +81,21 @@ export async function readCheckedSourceMetadata(client, connectionId, workspaceI
   return readMetadata()
 }
 
+// Reuse the repository policy selector and this session's normal cookie jar.
+// Only its verified private callback determines the subscription workspace.
+export async function selectSharedTeam(client, ownerId, selector) {
+  let workspaceId
+  const proof = await selector({ ownerId,
+    onSelected: selection => { workspaceId = selection.workspaceId },
+    json: (path, body) => client.json(path.slice('/mikka'.length), body ? {
+      ...post(body), headers: { 'content-type': 'application/json', 'x-mikka-rpc': '1' },
+    } : undefined),
+  })
+  check(UUID.test(workspaceId ?? '') && proof?.teamWorkspaceConfirmed === true
+    && proof.teamAdminMembershipVerified === true && proof.teamSelectionBasis === 'unique-active-admin-identity-match', 'TEAM_SCOPE')
+  return { workspaceId, proof }
+}
+
 export async function configureBoundSubscription(client, workspaceId, selected, receipt = {}) {
   const change = async (step, value) => { receipt.modelSelectionStep = step; return client.rpc('model-order.changeModelOrder', [value, workspaceId]) }
   await change('location', { kind: 'location', location: 'local' })
@@ -275,11 +290,14 @@ export async function runCommunity(env = process.env) {
     const sharedBuilds = [revision]
     check(env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION === '9ea7b2cd61deb724f20330906f86df6df2cd9828' && sharedBuilds.includes(report.publicBuild), 'PUBLIC_VERSION')
     report.sharedControlPlaneCompatibility = env.MIKKA_COMMUNITY_CANDIDATE === '1' ? 'candidate18199_shared047_mobile_docs_only' : 'exact_release_image_and_served_control_plane'
+    const { selectTeamWorkspace } = await import(pathToFileURL(source + '/scripts/acceptance/team-workspace.mjs'))
+    const team = await selectSharedTeam(cloud, identity.user.id, selectTeamWorkspace)
+    report.team = team.proof
     privatePool = new Pool({ connectionString: database, max: 1, ssl: { rejectUnauthorized: true } })
     await privatePool.query('BEGIN READ ONLY')
     // The normal account API must expose the source before its exact metadata
     // can be read. No production row is inserted or modified.
-    const choices = (await cloud.json('/api/workspace')).choices
+    const choices = [{ id: team.workspaceId, kind: 'team' }]
     check(Array.isArray(choices), 'WORKSPACES')
     const { api: vercelApi } = await import(pathToFileURL(source + '/scripts/e2b/publish-template-env.mjs'))
     const productionLocation = await readProductionAccessLocation(path => vercelApi(path, { token: env.VERCEL_TEAM_TOKEN }), key => secret('/vercel', key), report)
@@ -739,3 +757,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
 // Community release pin contains native-auth fix1668; production writers must complete before activation.
 
 // Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.
+
+// Formal-source pin follows the verified no-credential final-controller preflight.
