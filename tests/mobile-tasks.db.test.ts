@@ -178,6 +178,11 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     await compare('waiting', 'approval')
     await pool.query(`update agent_tool_approvals set "expiresAt"=now()-interval '1 hour' where "runId"=$1`, [runId])
     await compare('running', null)
+    await pool.query(`insert into local_computer_reviews (id,"runId","deviceId","userId",target,call,digest,"expiresAt","seenAt") values ($1,$2,$3,$4,'fixture','{}','digest',now()+interval '1 hour',now())`, [randomUUID(), runId, device, owner])
+    await compare('waiting', 'approval')
+    await pool.query('update local_computer_reviews set decision=true where "runId"=$1', [runId])
+    await compare('running', null)
+
     await pool.query(`update issues set status='todo' where id=$1`, [id])
     await pool.query(`update agent_runs set status='succeeded',outcome='done',"stopReason"=null where id=$1`, [runId])
     await pool.query(`insert into run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status) values ($1,$2,$3,'https://github.com/acme/app','github.com/acme/app','awaiting_approval')`, [runId, owner, id])
