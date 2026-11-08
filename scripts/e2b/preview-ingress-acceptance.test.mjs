@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { cleanupOwnedProbe, probeMarkedIngress } from './preview-ingress-acceptance.mjs'
 
 const SOURCE = 'a'.repeat(40)
 const MARKER = 'mikka-synthetic-socket-mark-probe-v1'
+const PROBE_PATH = fileURLToPath(new URL('./preview-ingress-probe.py', import.meta.url))
 
 function fixture({ unavailable = false, reusedPortExposed = false, ruleUnavailable = false,
   outboundFailed = false, providerFailed = false, ipv6PositiveFailed = false } = {}) {
@@ -109,8 +111,8 @@ test('a rejected reply rule preserves the actual kernel/backend and only closed 
 
 test('Python diagnostics classify fixed kernel errors without exporting raw command output', () => {
   const program = String.raw`
-import importlib.util,json
-spec=importlib.util.spec_from_file_location('probe','scripts/e2b/preview-ingress-probe.py')
+import importlib.util,json,sys
+spec=importlib.util.spec_from_file_location('probe',sys.argv[1])
 probe=importlib.util.module_from_spec(spec);spec.loader.exec_module(probe)
 cases=[probe.rule_failure(2,b"Warning: Extension socket revision 3 not supported, missing kernel module?\niptables: Couldn't load match socket. PRIVATE_DETAIL"),
        probe.rule_failure(1,b'Operation not supported. PRIVATE_DETAIL'),
@@ -118,7 +120,7 @@ cases=[probe.rule_failure(2,b"Warning: Extension socket revision 3 not supported
        probe.rule_failure(-9,b'PRIVATE_DETAIL')]
 print(json.dumps(cases))
 `
-  const output = execFileSync('python3', ['-c', program], { encoding: 'utf8' })
+  const output = execFileSync('python3', ['-c', program, PROBE_PATH], { encoding: 'utf8' })
   assert.ok(!output.includes('PRIVATE_DETAIL'))
   const [missing, unsupported, forbidden, unknown] = JSON.parse(output)
   assert.equal(missing.unsupportedRevision, true)
@@ -131,9 +133,9 @@ print(json.dumps(cases))
 
 test('the Python policy confines rules to owned OUTPUT source ports and refuses legacy/provider scope', () => {
   const program = String.raw`
-import importlib.util,json,types
+import importlib.util,json,sys,types
 from unittest.mock import patch
-spec=importlib.util.spec_from_file_location('probe','scripts/e2b/preview-ingress-probe.py')
+spec=importlib.util.spec_from_file_location('probe',sys.argv[1])
 probe=importlib.util.module_from_spec(spec);spec.loader.exec_module(probe)
 for ports in ([49983],[50005],[True],[0],[],list(range(41000,41016))):
  try: probe.Policy(ports)
@@ -159,7 +161,7 @@ with patch.object(probe.shutil,'which',return_value='/usr/sbin/iptables'),patch.
  assert mocked.call_count==1
 print(json.dumps({'scopeChecked':True,'families':2,'kernelExecuted':False}))
 `
-  const output = JSON.parse(execFileSync('python3', ['-c', program], { encoding: 'utf8' }))
+  const output = JSON.parse(execFileSync('python3', ['-c', program, PROBE_PATH], { encoding: 'utf8' }))
   assert.deepEqual(output, { scopeChecked: true, families: 2, kernelExecuted: false })
 })
 
