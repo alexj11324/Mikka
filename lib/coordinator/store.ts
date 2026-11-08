@@ -523,14 +523,17 @@ export async function citationSources(reader: IssueReader, texts: readonly strin
   // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
   const ownIds = runs.filter(row => row.agentId).map(row => row.id)
   const runIssueIds = [...new Set(runs.flatMap(row => row.issueId ? [row.issueId] : []))]
-  const [prompts, steps, tasks] = await Promise.all([
-    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt }).from(agentRuns)
-      .where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))).then(rows => new Map(rows.map(row => [row.id, row.prompt]))) : new Map<string, string>(),
-    ownIds.length ? db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
-      .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId)
-      .then(rows => new Map(rows.map(row => [row.runId, Number(row.count)]))) : new Map<string, number>(),
-    issuesForUser(reader, runIssueIds, false, db, { withoutBody: true }),
+  // The prompt and tool count belong to the same authorized owner runs. One
+  // bounded projection avoids opening a third APP connection beside tasks.
+  const [ownedRuns, tasks] = await Promise.all([
+    ownIds.length ? db.select({ id: agentRuns.id, prompt: threadNamePrompt,
+      steps: sql<number>`(select count(*) from ${runChunks} c where c."runId" = agent_runs.id
+        and c.chunk->>'type' = 'tool-input-available')`.mapWith(Number),
+    }).from(agentRuns).where(and(inArray(agentRuns.id, ownIds), eq(agentRuns.userId, userId))) : [],
+    issuesForUser(reader, runIssueIds, false, db, { projection: 'citation', withTeamLinks: false }),
   ])
+  const prompts = new Map(ownedRuns.map(row => [row.id, row.prompt]))
+  const steps = new Map(ownedRuns.map(row => [row.id, row.steps]))
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
     ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number, issuedIdentifier: row.issuedIdentifier })),

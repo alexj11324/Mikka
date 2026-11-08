@@ -18,6 +18,9 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
   const { issueVisibility } = await import('../lib/issue-visibility')
   const { issueTeamScope } = await import('../lib/issue-team-access')
   const { issueForUser } = await import('../lib/issue-access')
+  const { issuesForUser } = await import('../lib/issues-for-user')
+  const { tokenWorkspace } = await import('../lib/tokens/principal')
+  const { enterprisePrincipal } = await import('../lib/enterprise/principal')
   const { visibleRuns } = await import('../lib/agent-runs')
   const { citationSources } = await import('../lib/coordinator/store')
 
@@ -81,6 +84,28 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
     }
 
     await checkAll('active')
+    const pinned = { id: owner, [tokenWorkspace]: workspace,
+      [enterprisePrincipal]: { kind: 'pat' as const, tokenId: randomUUID(), workspaceId: workspace } }
+    const batch = () => issuesForUser(pinned, [issue.shared, issue.unlinked, issue.personal, issue.foreign], false, db,
+      { withoutBody: true, withTeamLinks: false })
+    assert.deepEqual([...await batch()].map(([id]) => id).sort(), [issue.shared, issue.unlinked].sort(), 'pure authorization retains the reader tenant and permits genuinely unlinked tenant tasks')
+    try {
+      // A historical/foreign Team link cannot replace the persisted task
+      // tenant or bypass the batch reader's independent token mismatch fence.
+      assert.equal((await pool.query('update mikka_team_issues set "teamId"=$2,"workspaceId"=$3 where "issueId"=$1',
+        [issue.shared, foreignTeam, otherWorkspace])).rowCount, 1)
+      const defaults = await issuesForUser(pinned, [issue.shared], false, db, { withoutBody: true })
+      assert.equal(defaults.has(issue.shared), false)
+      assert.equal((await batch()).has(issue.shared), false, 'omitting grouping links must still read the exact token/link mismatch')
+      const sources = await citationSources(pinned, [`[[run:${runs.shared}]]`])
+      const run = sources[runs.shared]
+      assert.ok(run?.kind === 'run')
+      assert.equal(run.issue, null, 'the optimized run citation retains the same task denial')
+    } finally {
+      assert.equal((await pool.query('update mikka_team_issues set "teamId"=$2,"workspaceId"=$3 where "issueId"=$1',
+        [issue.shared, team, workspace])).rowCount, 1)
+    }
+    assert.equal((await batch()).has(issue.shared), true, 'another operation sees the restored current link')
     assert.deepEqual(await visibleWith(member, [issue.shared, issue.secondTeam, issue.foreign, issue.personal, issue.unlinked], true), [issue.secondTeam, issue.shared, issue.unlinked].sort(), 'a teammate sees every task in the tenant, including tasks without a Team')
     assert.deepEqual(await visibleWith(member, [issue.foreign], true), [], 'another workspace\'s task stays hidden')
     assert.deepEqual(await issueTeamScope(member, [], { onlyIssueIds: [] }), [], 'no tasks asked about reads nothing')
@@ -89,6 +114,8 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspace, removed])
     assert.deepEqual(await visibleWith(removed, allIssues, true), [], 'a removed member sees nothing at once')
     assert.equal(await issueForUser(removed, issue.shared), null)
+    assert.equal((await issuesForUser({ id: removed, [tokenWorkspace]: workspace }, [issue.shared, issue.unlinked], false, db,
+      { withoutBody: true, withTeamLinks: false })).size, 0, 'pure authorization rechecks revoked membership')
     await checkAll('after removal')
   } finally {
     await pool.query('delete from agent_runs where "agentId"=$1', [agent])

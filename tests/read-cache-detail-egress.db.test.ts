@@ -315,6 +315,15 @@ test('detail and activity revalidate current access while returning only changed
       const relinked = successful(await readWorkspace(() => pollIssue(id, renamed.version)))
       assert.equal(relinked.unchanged, true, 'a grouping-only change does not change the Task identity or detail DTO')
       assert.equal(relinked.version, renamed.version)
+      assert.equal((await readWorkspace(() => listIssueConnections(id))).find(row => row.id === id)?.identifier, identifier,
+        'a connection read retains the issued Task identity after its grouping changes')
+      const relinkedSources = await readWorkspace(() => citationSources(owner, [issueCite, runCite]))
+      const relinkedTask = relinkedSources[id], relinkedRun = relinkedSources[citationRun]
+      assert.ok(relinkedTask?.kind === 'issue' && relinkedRun?.kind === 'run')
+      assert.equal(relinkedTask.identifier, identifier)
+      assert.equal(relinkedRun.issue?.identifier, identifier)
+      // A creator loses this shared task with their current membership. The
+      // issued identifier and cached detail/citation cursors grant no authority.
       const beforeRevocation = (await pool.query('select "issuedIdentifier",content from issues where id=$1', [id])).rows[0]
       await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, owner, 'suspended'])
       assert.equal((await readWorkspace(() => getIssue(id))).error, 'issueNotFound')

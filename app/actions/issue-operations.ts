@@ -1,6 +1,6 @@
 'use server'
 
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
@@ -47,7 +47,7 @@ async function issueConnections(id: string, reach: 'linked' | 'all', authorized?
   const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   await requireCurrentIssueWorkspace(user, issue.workspaceId)
-  let candidates: string[] | undefined
+  let related: SQL | undefined
   if (reach === 'linked') {
     const own = readIssueMetadata(locked.content)
     const named = [...new Set([own.parentId, own.duplicateOfId, ...own.blockedByIds, ...own.relatedIds].filter((value): value is string => !!value))]
@@ -56,12 +56,11 @@ async function issueConnections(id: string, reach: 'linked' | 'all', authorized?
       const metadata = sql`${issues.content}->'attrs'->${sql.raw(`'${key}'`)}`
       return sql`(${metadata}->>'parentId' = ${id} or ${metadata}->'blockedByIds' ? ${id} or ${metadata}->'relatedIds' ? ${id})`
     }
-    candidates = (await tx.select({ id: issues.id }).from(issues).where(and(eq(issues.userId, issue.userId),
-      or(eq(issues.id, id), named.length ? inArray(issues.id, named) : undefined, namesTask('mikka'), namesTask('orvilo'))))).map(row => row.id)
+    related = or(eq(issues.id, id), named.length ? inArray(issues.id, named) : undefined, namesTask('mikka'), namesTask('orvilo'))
   }
   // Only each row's metadata is used: read the body's attrs, never every task's whole body.
   const rows = await tx.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
-    .where(and(eq(issues.userId, issue.userId), candidates ? inArray(issues.id, candidates) : undefined, issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [issue.workspaceId!] }))).orderBy(desc(issues.updatedAt))
+    .where(and(eq(issues.userId, issue.userId), related, issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [issue.workspaceId!] }))).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
   // Whole-tree copying consumes structure only. The public linked view reuses
   // identifiers from the same authorized rows and transaction.
