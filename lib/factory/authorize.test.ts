@@ -8,7 +8,12 @@ let active: unknown
 let found: unknown = { id: 'issue' }
 let rejection: Error | undefined
 let workspaceRejection: Error | undefined
-const reader = { id: 'owner', [tokenWorkspace]: 'selected-workspace' }
+const principal = Symbol('fixture native session proof')
+const sessionProof = Object.freeze({ kind: 'session', sessionId: 'native-session' })
+const reader = Object.freeze(Object.defineProperties({ id: 'owner' }, {
+  [principal]: { value: sessionProof },
+  [tokenWorkspace]: { value: 'selected-workspace' },
+}))
 let workspaceReads = 0
 const calls: unknown[][] = []
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: {
@@ -42,6 +47,9 @@ beforeEach(() => { calls.length = 0; found = { id: 'issue' }; rejection = undefi
 test('Factory authorization asks canonical issue access for metadata without its body', async () => {
   assert.equal(await factoryAuthorize('owner', 'issue', tx), true)
   assert.deepEqual(calls, [[reader, 'issue', false, undefined, { withoutBody: true }]])
+  assert.equal(calls[0][0], reader, 'do not replace or spread away the canonical reader')
+  assert.equal(Object.getOwnPropertyDescriptor(calls[0][0], principal)?.value, sessionProof)
+  assert.equal(Object.getOwnPropertyDescriptor(calls[0][0], tokenWorkspace)?.value, 'selected-workspace')
   assert.equal(workspaceReads, 1)
   assert.equal(active, undefined)
 })
