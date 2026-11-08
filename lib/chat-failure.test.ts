@@ -1,5 +1,5 @@
 import { captureRunFailure } from '@mikka/protocol/run-failure'
-import { CloudServiceError } from './cloud-services/errors'
+import { CLOUD_ERROR_CODES, CloudServiceError } from './cloud-services/errors'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { chatFailure, failureMessageKey } from './chat-failure'
@@ -105,4 +105,43 @@ test('optional cloud recovery and main structured failure details survive the co
   assert.deepEqual(failureMessageKey(failure!), { namespace: 'RunErrors', key: 'cloud_quota_exhausted.default' })
   assert.equal(failureLine(failure!).recovery, 'cloudBilling')
   assert.equal(chatFailure({ working: true, error: 'cloud_quota_exhausted', failureDetails }), null)
+})
+
+test('a cloud refusal crossing the model streaming step keeps its code and billing recovery', () => {
+  // Exact safely exported error from real run42449447361.
+  const observed = 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: cloud_quota_exhausted'
+  assert.deepEqual(chatFailure({ working: false, error: observed }),
+    { kind: 'failed', cloudCode: 'cloud_quota_exhausted', raw: 'cloud_quota_exhausted' })
+  for (const version of ['2.0.80', '2.1.0', '3.0.0-beta.1']) {
+    for (const code of CLOUD_ERROR_CODES) {
+      const error = `Step "step//@ai-sdk/workflow@${version}//doStreamStep" failed after 0 retries: ${code} (response)`
+      const failure = chatFailure({ working: false, error })!
+      assert.deepEqual(failure, { kind: 'failed', cloudCode: code, raw: `${code} (response)` })
+      assert.deepEqual(failureMessageKey(failure), { namespace: 'RunErrors', key: `${code}.default` })
+      assert.equal(chatFailure({ working: true, error }), null)
+      if (code === 'cloud_quota_exhausted') {
+        assert.equal(failureLine(failure).recovery, 'cloudBilling')
+        assert.equal(failureLine(failure).retry, false)
+      }
+    }
+  }
+})
+
+test('quoted cloud codes, tool bodies and other steps never become cloud recovery', () => {
+  const stream = 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: '
+  for (const error of [
+    'Tool output: cloud_quota_exhausted',
+    'Step "step//tools//doStreamStep" failed after 0 retries: cloud_quota_exhausted',
+    stream.replace('doStreamStep', 'runToolStep') + 'cloud_quota_exhausted',
+    stream + 'Provider says cloud_quota_exhausted',
+    stream + 'cloud_quota_exhausted extra diagnostic text',
+    stream + 'cloud_quota_exhausted (request_id: secret)',
+    stream + 'cloud_not_a_known_code',
+    'Error: ' + stream + 'cloud_quota_exhausted',
+  ]) {
+    const failure = chatFailure({ working: false, error })!
+    assert.equal(failure.kind, 'failed', error)
+    assert.equal(failure.kind === 'failed' ? failure.cloudCode : undefined, undefined, error)
+    assert.notEqual(failureLine(failure).recovery, 'cloudBilling', error)
+  }
 })

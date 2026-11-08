@@ -242,3 +242,95 @@ Main 3c32675c subsequently changed shared CI selection and its image workflow;
 its normal merge is being validated separately. The older green a4 results
 are not relabeled as that new head's CI. Production credentials remain inside
 existing Actions/OIDC delivery; identity/configuration discovery is metadata-only.
+
+## Exact-head and real-cloud evidence (2026-11-08 05:00 UTC)
+
+Implementation head `839d43546bf7e113d58eecdfa604962ca2cea8f6` passed CI
+42441716968: 36 successful checks and seven expected conditional skips.
+The actual checkout `7c5808acc7ee1bcbe7aefd5c7860de9016ba426a` has tree
+`0a16ba3a827cf6b67c68b53b33c9d9d24a92b3af`, exactly equal to that head.
+Image artifact 13601863068 was independently downloaded, its reports read
+and native chat screenshot viewed. Six packaged Electron checks, the 31-turn
+synthetic-provider service flow, two-replica live and MinIO passed. Daemon
+enrollment, heartbeat and gateway checks passed; taskCompletion and actual
+subscription execution remain false. ZIP SHA256:
+`ffb898fbce8fc8283aff3d4aa2ccc81f45d3110e3ee31f8b56acf0a5805c4058`.
+Apple Silicon artifact 13602143008 proves an ad-hoc acceptance package,
+not a signed/notarized stable release.
+
+The following later production probes use public source
+`f1324dafa296f76289124bb93538f1938cb1597f`, its published image digest
+`sha256:0972e911ae6020f95aaf9fb62ae499f0f6ec67fc63e737cec25334ad48784c51`,
+and private cloud source `d6f0ece2237904e7b5f23cf92a9d6492e123e6c2`.
+They are not tests of unpublished #1688 code. Operations run in the existing
+non-cancelling shared-account queue; secrets stay inside Actions/OIDC.
+
+- Run 42443657957 proves native consent POST omits the clicked submitter's
+  approve value and returns 403. The real request retains CSRF, request ID
+  and selected workspace. A candidate private fix preserves submit values
+  with aria-disabled plus a repeat-submit guard; old/new actual-component
+  native submissions reproduced RED/GREEN for both Allow and Cancel.
+- Run 42447328652 proves the normal Coordinator sends 66 valid function
+  declarations, rejected by the private API's 64-declaration limit before
+  provider work. A private candidate accepts 66 and 128, rejects 129, and
+  retains the distinct per-message 64 tool-call limit.
+- Complete private candidate `f6ab81a63eebcebdce5e387fdbdc08000f79c435`
+  passed candidate-only CI42447693173: 7+59 core and 6 real-PG/HTTP tests,
+  no failures or skips within those suites. UI/models typechecks and a real
+  UI production build passed. It is a reviewable branch only: no second PR,
+  no private main write and no deployment. Neither production defect is
+  relabeled as fixed in production.
+- Run 42448009597, 04:45:55–04:47:24 UTC, received real CLOUD_CLOSEOUT_OK
+  through self-hosted live v2. This independent billing fixture explicitly
+  uses an owner-configured zero-tool profile with audit retained, not the
+  failing general 66-tool Coordinator. Normal backend PKCE HTTP approval is
+  separately marked; native browser consent still failed. Fixture-only
+  fetch instrumentation makes this unsuitable for clean latency comparison.
+  A read-only join bounded by the owned server ID, exact name, origin and
+  time window proves settled 27 microUSD for
+  deepseek/deepseek-v4.1-flash and 27 microUSD for
+  openai/gpt-6-luna-decisions. Both payers equal the selected personal grant
+  workspace and public ledger workspace. Decision's stored zero token
+  counts do not establish actual zero token use. The old driver's settlement
+  assertion incorrectly excluded a legitimate Decision row; its failure is
+  retained, while the specific reply and settlement facts stand.
+- Run 42448559953 is not a valid exhausted-credit sample: its team had
+  zero own balance but an existing active, opted-in credit sharer. Scoped
+  read-only relations prove the normal credit-sharing fallback paid the
+  default/Decision calls. No shared configuration was changed. The driver
+  timed out expecting a refusal and remains failed; no quota/UI pass is
+  inferred. Subsequent refusal probes use only a disposable server key's
+  own small limit and must name that boundary explicitly.
+- Run42449083440 completes registration, independent protocol approval,
+  personal revocation, separate-team key creation/binding/revocation and
+  server disconnect, with 35 actual full-page 1440-wide masked screenshots.
+  Native consent still fails and the overall run remains failed. Its owned
+  USD0.01 key limit rejects a larger model reservation before provider I/O;
+  a scoped read-only ledger query proves zero model calls and zero charges.
+  The API loses cloudCode and the UI shows generic Reply failed instead of
+  the quota copy/recharge action. Run42449447361 exports only the exact safe
+  stored error grammar, confirming the root cause:
+  `Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: cloud_quota_exhausted`.
+  The strict bare-code parser did not recognize that model-step envelope.
+  This batch now unwraps only that specific SDK streaming-step grammar for
+  presentation and retains the closed cloud-code allowlist. Tool bodies,
+  other steps, quoted codes and arbitrary provider text stay generic; model
+  fallback, credential health and authorization do not change. The old code
+  reproduced RED, and the exact error plus positive/negative unit cases are
+  GREEN. Publication and rendered candidate evidence remain separate gates.
+
+All owned servers in those completed binding runs were revoked; Coordinator,
+local/cloud/OAuth sessions, browsers, isolated database volumes and tunnels
+were cleaned up. There is no new polling, identity or production Expo change.
+The five-minute external PR-status fallback is retained.
+
+The independently read lifecycle artifact 13604971282 from run42448167220
+has ZIP SHA256
+`f1a398d791fc1375adc8be828c865bcaa494e02ff5f17c71b867b10d9508601b`.
+On f132, Claude Haiku 5.5 proves original VM/SID, normal Owner answer,
+marker/draft continuity, native report and all nine delivery checks including
+Limits. It deliberately stops before unpinned next-stage model selection;
+full Factory completion is unproven. Codex GPT-6 Luna fails before the native
+question with lifecycle_pre_question_marker_missing. Both owned VMs were
+confirmed missing and sessions/workspace restored. The overall run remains
+failed and #1593 remains incomplete.
