@@ -1,0 +1,45 @@
+name: Warm CI dependencies
+
+# Ordinary main CI populates the full Linux tree. Desktop runs only on PRs,
+# so populate its two platform keys when installation inputs change on main.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/package.json'
+      - '**/.npmrc'
+      - '**/.pnpmfile.*'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - '.github/actions/pnpm-install/**'
+      - 'scripts/ci/dependency-cache.mjs'
+      - '.github/workflows/ci-dependencies.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-dependencies-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+
+jobs:
+  desktop-dependencies:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
+        with:
+          profile: desktop
+          skip-electron: 'true'
+      - name: Verify the restored native and compiler dependencies load
+        run: node -e "require('sharp'); require('typescript'); require('nx/package.json')"

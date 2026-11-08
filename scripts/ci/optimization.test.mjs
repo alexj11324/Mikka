@@ -8,6 +8,17 @@ import yaml from 'js-yaml'
 const workflow = name => yaml.load(readFileSync(`.github/workflows/${name}.yml`, 'utf8'))
 const evaluate = (expression, context) => runInNewContext(expression.replace(/^\$\{\{|\}\}$/g, '').replace(/\.([\w-]+)/g, '[$1]').replace(/\[([\w-]+)\]/g, '["$1"]'), { always: () => true, cancelled: () => false, ...context })
 
+test('Desktop platform caches warm on changed main install inputs without duplicating acceptance on main', () => {
+  const warmer = workflow('ci-dependencies')
+  assert.deepEqual(warmer.on.push.branches, ['main'])
+  assert(!warmer.on.pull_request)
+  for (const path of ['pnpm-lock.yaml', 'pnpm-workspace.yaml', '**/package.json', '.github/actions/pnpm-install/**', 'scripts/ci/dependency-cache.mjs']) assert(warmer.on.push.paths.includes(path), path)
+  assert.deepEqual(warmer.jobs['desktop-dependencies'].strategy.matrix.os, ['ubuntu-latest', 'macos-26'])
+  assert.deepEqual(warmer.permissions, { contents: 'read' })
+  const setup = warmer.jobs['desktop-dependencies'].steps.find(step => step.uses === './.github/actions/pnpm-install')
+  assert.deepEqual(setup.with, { profile: 'desktop', 'skip-electron': 'true' })
+})
+
 test('selected specialty calls reuse the parent decision; direct dispatch still runs trusted selection', () => {
   const parent = workflow('ui-policy')
   for (const [name, lane] of [['desktop', 'desktop'], ['analytics-ssr', 'analytics'], ['self-hosted-image', 'image']]) {

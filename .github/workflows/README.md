@@ -176,3 +176,5 @@ compilation shares the Apple Silicon runner. Both acceptance results remain
 required. The shared pnpm action restores exact installed dependencies or runs
 a frozen install on a miss. PRs do not upload dependency caches. See
 [cache boundaries and performance evidence](../../docs/ci/1765-optimizations.md).
+`ci-dependencies.yml` warms Desktop's Linux/macOS dependency keys when install
+inputs change on main; dispatch it to repopulate evicted or changed-image keys.

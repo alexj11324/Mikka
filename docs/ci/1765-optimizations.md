@@ -50,9 +50,11 @@ during pnpm setup. Runtime lanes still run the pinned, checksum-verifying
 Electron installer on every job. Tests, signed packages, database state and
 acceptance results are not cached. Release workflows and their gates are unchanged.
 
-The first main run for a new key pays installation and cache-upload costs. A
-standalone Desktop dispatch on main populates the macOS and Desktop Linux keys;
-later PRs can restore those default-branch entries. Cache eviction or a changed
+The first main run for a new key pays installation and cache-upload costs.
+`ci-dependencies.yml` warms the macOS and Desktop Linux keys on main when
+installation inputs change; ordinary main CI populates the full Linux tree.
+Manual dispatch can repopulate evicted keys or warm a changed runner/tool image.
+Later PRs restore those default-branch entries. Cache eviction or a changed
 runtime returns to the frozen-install path. Monitor cache transfer time and
 size against installation savings; package-store hits alone still rebuild the
 installed dependency tree. Each install saves at most one archive: reusable
