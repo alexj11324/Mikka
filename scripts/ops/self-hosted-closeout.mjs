@@ -410,13 +410,17 @@ async function run(env) {
     check(teams.length === 1 && teams[0].id !== cloudWorkspaceId, 'ADMIN_BILLING_TEAM_UNAMBIGUOUS')
     const billingTeam = teams[0].id
     const keyName = `Closeout key ${env.GITHUB_RUN_ID}`
+    // Own disposable limit only. A team's zero cash balance does not imply
+    // exhausted credit: active members may already share funded balances.
+    const quotaProbe = env.CLOSEOUT_MODELS === 'quota-only'
+    const monthlyLimitMicroUsd = quotaProbe ? 10_000 : 1_000_000
     await both(cloud, manage, 'team-key-configuration', async p => {
       await p.locator('select[name=workspace_id]').selectOption(billingTeam)
       await p.getByRole('button', { name: /^(New server key|新建服务器密钥)$/ }).first().click()
       const dialog = p.getByRole('dialog')
       await dialog.locator('#cloud-server-id').fill(serverId)
       await dialog.locator('#cloud-server-key-name').fill(keyName)
-      await dialog.locator('#cloud-server-key-limit').fill('1')
+      await dialog.locator('#cloud-server-key-limit').fill(quotaProbe ? '0.01' : '1')
       for (const name of [/^(Official GitHub App|官方 GitHub App)$/, /^(iOS notifications|iOS 推送)$/]) {
         const checkbox = dialog.getByRole('checkbox', { name })
         if (await checkbox.isChecked()) await checkbox.uncheck()
@@ -439,14 +443,14 @@ async function run(env) {
     check((await localApi('/api/cloud/status')).team.connected, 'TEAM_KEY_BOUND')
     await both(page, `${localOrigin}/mikka/en/settings?section=cloud`, 'team-key-bound')
     if (['1', 'quota-only'].includes(env.CLOSEOUT_MODELS)) {
-      report.stage = 'zero-balance-quota'
+      report.stage = 'server-key-quota'
       const { decode } = await import('../../lib/desktop-rpc/wire.ts')
       const rpc = await cloudApi('/mikka/api/rpc', { version: 1, action: 'billing.getHostedUsage', args: [billingTeam] })
       check(rpc.version === 1 && rpc.ok === true, 'TEAM_BILLING_RPC')
       const teamUsage = decode(rpc.result)
       check(!teamUsage.error && teamUsage.workspaceId === billingTeam && teamUsage.personal === false, 'TEAM_BILLING_SCOPE')
       const balance = Number(teamUsage.balance?.free) + Number(teamUsage.balance?.purchased)
-      if (balance === 0) {
+      if (quotaProbe || balance === 0) {
         if (!modelBotId) await replyBot()
         const workspace = await localApi('/api/workspace')
         const { socketEvents } = await import('../acceptance/self-hosted-services.mjs')
@@ -460,7 +464,7 @@ async function run(env) {
         const deadline = Date.now() + 90_000
         for (;;) {
           const chat = await localApi(`/api/mobile/chat?bot=${modelBotId}`)
-          if (!chat.working && chat.failure) { refused = chat; break }
+          if (!chat.working && (chat.failure || chat.items?.some(item => item.from === 'coordinator'))) { refused = chat; break }
           check(Date.now() < deadline, 'QUOTA_REFUSAL_TIMEOUT')
           await modelLive.next(event => event.kind === 'bot_chat' && event.id === modelBotId, deadline - Date.now())
         }
@@ -485,9 +489,11 @@ async function run(env) {
         const failed = await localApi(`/api/mobile/chat?bot=${modelBotId}`)
         const exposed = !failed.working && failed.failure?.cloudCode === 'cloud_quota_exhausted'
         if (!exposed) process.exitCode = 1
-        report.checks.zeroBalanceQuota = { balanceZeroBefore: true, verifiedBefore: teamUsage.balance.verified === true,
+        report.checks.quotaRefusal = { boundary: quotaProbe ? 'owned_server_key_reservation_limit' : 'workspace_balance',
+          monthlyLimitMicroUsd, balanceZeroBefore: balance === 0, verifiedBefore: teamUsage.balance.verified === true,
           storedQuotaCodePresent: report.quotaObservation.safeRawQuotaCodePresent || report.quotaObservation.exactStoredCode || report.quotaObservation.fatalWrapper,
-          apiCodeExposed: exposed, englishVisible: visible.en, chineseVisible: visible['zh-CN'], balanceMutatedByTest: false }
+          apiCodeExposed: exposed, englishVisible: visible.en, chineseVisible: visible['zh-CN'], balanceMutatedByTest: false,
+          accountBalanceExhaustionVerified: false }
       } else {
         report.checks.zeroBalanceQuota = { verified: false, reason: 'existing_team_has_nonzero_balance', balanceMutatedByTest: false }
         process.exitCode = 1
@@ -499,14 +505,14 @@ async function run(env) {
     })
     const teamConnections = await cloudApi(`/mikka/cloud/v1/management/connections?workspace_id=${encodeURIComponent(billingTeam)}`)
     const ownTeam = teamConnections.servers?.find(s => s.serverId === serverId)
-    check(ownTeam?.keys?.length === 1 && ownTeam.keys[0].name === keyName && Number(ownTeam.keys[0].monthlyLimitMicroUsd) === 1_000_000,
+    check(ownTeam?.keys?.length === 1 && ownTeam.keys[0].name === keyName && Number(ownTeam.keys[0].monthlyLimitMicroUsd) === monthlyLimitMicroUsd,
       'OWN_TEAM_KEY_IDENTITY')
     await both(cloud, manage, 'team-key-revoke-confirm', prepareRevoke(billingTeam))
     await cloud.getByRole('dialog').getByRole('button', { name: /^(Revoke|撤销)$/ }).click()
     await cloud.getByRole('dialog').waitFor({ state: 'hidden' })
     const teamRejected = await local.request.get(`${localOrigin}/mikka/api/cloud/models/billing`)
     check(teamRejected.status() === 403 && (await teamRejected.json()).error === 'cloud_server_revoked', 'NEXT_TEAM_REQUEST_REVOCATION')
-    report.checks.teamKey = { verified: true, separateTeam: true, nextRequestRevoked: true, monthlyLimitMicroUsd: 1_000_000 }
+    report.checks.teamKey = { verified: true, separateTeam: true, nextRequestRevoked: true, monthlyLimitMicroUsd }
     await both(cloud, manage, 'team-key-authorization-revoked', async p => {
       await p.locator('select[name=workspace_id]').selectOption(billingTeam)
       await p.locator(`section[aria-labelledby="server-${serverId}"]`).waitFor({ state: 'hidden' })
