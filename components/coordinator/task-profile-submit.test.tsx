@@ -29,7 +29,12 @@ let data: AgentProfilesView | undefined, readError: Error | undefined
 const submitted: { text: string; context?: CoordinatorMessageContext }[] = []
 let refreshes = 0
 const mutate = async () => { refreshes++ }
+// The account menu's read: what the server shows as the current workspace, and how often the create action re-read it.
+type Shown = { id: string; name: string; kind: string } | null
+let shown: Shown = null, nextShown: Shown = null, switcherReads = 0
+const switcher = (workspace: Shown) => workspace ? { workspace, accounts: [{ choices: [workspace] }] } : undefined
 mock.module('swr', { defaultExport: (key: unknown) => {
+  if (key === '/api/workspace/switcher') return { data: switcher(shown), mutate: async () => { switcherReads++; shown = nextShown ?? shown; return switcher(shown) } }
   if (Array.isArray(key) && key[0] === 'factory-agent-profiles') return { data, error: readError, mutate }
   if (Array.isArray(key) && key[0] === 'settings:model-order') return { data: { location: 'cloud', first: { kind: 'cloud' }, entries: [], readyDeviceIds: [] }, mutate }
   return { data: key === 'issue-creation-available' ? true : [], mutate }
@@ -53,6 +58,9 @@ mock.module(new URL('../chat/use-chat-files.ts', import.meta.url).href, { namedE
   useChatFiles: (text: string, edit: (text: string) => void) => ({ text, edit, add: () => {}, locked: false, files: [], pending: [] }),
 } })
 mock.module(new URL('../chat/chat-file-cards.tsx', import.meta.url).href, { namedExports: { ChatFileCards: () => null } })
+mock.module(new URL('../slots/task-workspace.tsx', import.meta.url).href, { namedExports: {
+  TaskWorkspace: ({ state }: { state: { status: string } }) => <span data-task-workspace={state.status} />,
+} })
 
 const customId = '12250000-0000-4000-8000-000000000001'
 const workspaceId = '12250000-0000-4000-8000-000000000002'
@@ -76,6 +84,7 @@ before(async () => {
 })
 beforeEach(() => {
   submitted.length = 0; refreshes = 0; readError = undefined
+  shown = { id: workspaceId, name: 'Fixture workspace', kind: 'team' }; nextShown = null; switcherReads = 0
   data = { profiles: [{
     id: customId, name: 'Fixture role', description: '', roles: ['review'], enabled: true, harness: 'claude_code',
     model: { mode: 'inherit' }, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64),
@@ -172,4 +181,32 @@ test('an enabled custom Profile submits only its structured reference while allo
   assert.equal(submitted.length, 1); assert.equal(submitted[0].context?.profileId, customId)
   assert.deepEqual(data!.availability[customId], { available: false, reason: 'checking' })
   assert.equal(refreshes, 0)
+})
+
+const otherWorkspace = { id: '12250000-0000-4000-8000-000000000003', name: 'Other workspace', kind: 'personal' }
+const slotState = () => container.querySelector('[data-task-workspace]')?.getAttribute('data-task-workspace')
+
+test('the create action confirms the captured workspace once and submits while it is still the one shown', async () => {
+  await render(dialog())
+  assert.equal(slotState(), 'ready')
+  await act(async () => create().click())
+  assert.equal(submitted.length, 1)
+  assert.equal(switcherReads, 1, 'one fresh read right before submitting, no polling')
+})
+
+test('a switch in another tab between opening and submitting is a mismatch, and nothing is submitted', async () => {
+  await render(dialog())
+  nextShown = otherWorkspace
+  await act(async () => create().click())
+  assert.equal(submitted.length, 0, 'the task is never created in a workspace other than the captured one')
+  await render(dialog())
+  assert.equal(slotState(), 'mismatch')
+  assert.equal(create().disabled, true)
+})
+
+test('loading and a failed workspace read are their own states and keep the existing create behaviour', async () => {
+  shown = null
+  await render(dialog())
+  assert.equal(slotState(), 'loading')
+  assert.equal(create().disabled, false)
 })

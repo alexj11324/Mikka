@@ -4388,6 +4388,7 @@
       "noneToday": "No new suggestions today."
     },
     "newTaskDialog": {
+      "workspaceChanged": "The workspace changed after this dialog opened. Nothing was created; reopen New task to create it in the workspace shown now.",
       "title": "New task",
       "description": "Describe what needs doing and the task is created for you.",
       "label": "Task description",
@@ -5562,7 +5563,14 @@
     "label": "Workspace",
     "createIn": "Create in {name}",
     "fixed": "Fixed when the task was created. A task can't move to another workspace.",
-    "otherWorkspace": "Another workspace"
+    "otherWorkspace": "Another workspace",
+    "loading": "Loading workspace",
+    "error": "Couldn't load the workspace",
+    "retry": "Try again",
+    "mismatchCreate": "Now in {current}",
+    "mismatchCreateHint": "This dialog was opened for {target}. Reopen New task to create it in {current}.",
+    "mismatchDetail": "Not the workspace shown now ({current}). Switch to {target} to work on this task.",
+    "unknownWorkspace": "another workspace"
   },
   "MobileServer": {
     "title": "Choose a server",

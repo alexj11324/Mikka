@@ -29,7 +29,7 @@ export function installWebServerTransport(target: Window) {
     clearChatDrafts()
     await clearPersistentReadCaches()
   } })
-  installWebSelection(directory.getSnapshot)
+  installWebSelection(directory.getSnapshot, () => directory?.getConfirmedWorkspaceId() ?? null)
   state[installed] = true
   target.fetch = directory.fetch
 }

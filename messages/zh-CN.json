@@ -4388,6 +4388,7 @@
       "noneToday": "今天还没有新的建议。"
     },
     "newTaskDialog": {
+      "workspaceChanged": "打开此对话框后工作区已切换，任务没有创建。请重新打开新建任务，在当前显示的工作区创建。",
       "title": "新建任务",
       "description": "用一句话描述要做的事，会自动建好任务。",
       "label": "任务描述",
@@ -5562,7 +5563,14 @@
     "label": "工作区",
     "createIn": "创建到 {name}",
     "fixed": "任务创建时已确定归属，不能转到其他工作区。",
-    "otherWorkspace": "其他工作区"
+    "otherWorkspace": "其他工作区",
+    "loading": "正在读取工作区",
+    "error": "无法读取工作区",
+    "retry": "重试",
+    "mismatchCreate": "现在是 {current}",
+    "mismatchCreateHint": "此对话框是在 {target} 打开的。重新打开新建任务，才会创建到 {current}。",
+    "mismatchDetail": "不是当前显示的工作区（{current}）。切换到 {target} 后再处理此任务。",
+    "unknownWorkspace": "其他工作区"
   },
   "MobileServer": {
     "title": "选择服务器",
