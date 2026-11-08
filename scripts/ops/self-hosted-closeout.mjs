@@ -100,6 +100,7 @@ async function run(env) {
       mailpit: { image: 'axllent/mailpit:v1.27.4', ports: ['127.0.0.1:8025:8025'], environment: { MP_DISABLE_VERSION_CHECK: 'true', MP_QUIET: 'true' } },
       app: { image: `ghcr.io/alexj11324/mikka@${plan.imageDigest}`, init: true, ports: ['127.0.0.1:3000:3000'], volumes: ['data:/data'],
         environment: { DATABASE_URL: db, MIKKA_DATABASE_URL: db, BETTER_AUTH_URL: localOrigin, MIKKA_COMMUNITY_UI: '1',
+          MIKKA_EXTERNAL_CRON: '1',
           SMTP_URL: 'smtp://mailpit:1025', MIKKA_EMAIL_FROM: 'Closeout <login@selfhost.example.test>' },
         depends_on: { postgres: { condition: 'service_healthy' }, mailpit: { condition: 'service_started' } } }
     }, volumes: { data: {} } }
@@ -141,7 +142,7 @@ async function run(env) {
       check(/^[a-z0-9-]+$/.test(name), 'ARTIFACT_NAME')
       const path = join(output, `${name}.png`)
       await target.screenshot({ path, fullPage: true, mask: [target.locator('input[type=password],input[type=email],input[readonly]'),
-        ...(serverId ? [target.locator(`section[id^="server-"]:not([id="server-${serverId}"])`)] : []),
+        ...(serverId ? [target.locator(`section[aria-labelledby^="server-"]:not([aria-labelledby="server-${serverId}"])`)] : []),
         target.getByText(env.SMOKE_OWNER_EMAIL, { exact: false })] })
       report.screenshots.push({ name, sha256: digest(await readFile(path)) })
     }
@@ -310,8 +311,12 @@ async function run(env) {
         await modelLive.next(event => event.kind === 'bot_chat' && event.id === bot.id, deadline - Date.now())
       }
       await modelLive.close(); modelLive = null
-      const after = await usage()
-      const fresh = after.recent.filter(row => !priorUsage.has(row.id))
+      let after, fresh
+      for (let i = 0; i < 10; i++) {
+        after = await usage(); fresh = after.recent.filter(row => !priorUsage.has(row.id))
+        if (fresh.length && fresh.every(row => row.state === 'settled')) break
+        await delay(1000)
+      }
       check(fresh.length > 0 && fresh.length <= 8 && fresh.every(row => row.model === 'deepseek/deepseek-v4.1-flash'
         && row.state === 'settled' && Number.isSafeInteger(Number(row.costMicroUsd)) && Number(row.costMicroUsd) > 0), 'HOSTED_SETTLEMENT')
       report.checks.hostedCoordinator = { replied: true, model: 'deepseek/deepseek-v4.1-flash', billingWorkspaceMatchesBinding: true,
@@ -319,6 +324,8 @@ async function run(env) {
         settledMicroUsd: fresh.reduce((sum, row) => sum + Number(row.costMicroUsd), 0),
         inputTokens: fresh.reduce((sum, row) => sum + Number(row.inputTokens), 0),
         outputTokens: fresh.reduce((sum, row) => sum + Number(row.outputTokens), 0) }
+      await both(page, `${localOrigin}/mikka/en/?bot=${bot.id}`, 'hosted-reply',
+        p => p.getByText('CLOUD_CLOSEOUT_OK', { exact: true }).waitFor())
       const billing = await localApi('/api/cloud/models/billing')
       const billingURL = new URL(billing.url)
       check(billingURL.origin === plan.publicOrigin && billingURL.searchParams.get('workspace') === cloudWorkspaceId
@@ -330,7 +337,7 @@ async function run(env) {
     const manage = `${plan.publicOrigin}/mikka/cloud/manage?serverId=${encodeURIComponent(serverId)}`
     await both(cloud, manage, 'connections', async p => {
       await p.locator('select[name=workspace_id]').selectOption(cloudWorkspaceId)
-      await p.locator(`#server-${serverId}`).waitFor()
+      await p.locator(`section[aria-labelledby="server-${serverId}"]`).waitFor()
     })
     const connections = await cloudApi(`/mikka/cloud/v1/management/connections?workspace_id=${encodeURIComponent(cloudWorkspaceId)}`)
     const own = connections.servers?.find(s => s.id === serverId || s.serverId === serverId)
@@ -339,7 +346,7 @@ async function run(env) {
     // The exact server card and selected personal workspace constrain the action.
     const prepareRevoke = workspaceId => async p => {
       await p.locator('select[name=workspace_id]').selectOption(workspaceId)
-      const card = p.locator(`#server-${serverId}`)
+      const card = p.locator(`section[aria-labelledby="server-${serverId}"]`)
       await card.waitFor()
       const revoke = card.getByRole('button', { name: /^(Revoke|撤销)$/ })
       check(await revoke.count() === 1, 'OWN_REVOCATION_UNAMBIGUOUS')
@@ -353,7 +360,7 @@ async function run(env) {
     report.checks.nextRequestRevoked = true
     await both(cloud, manage, 'personal-authorization-revoked', async p => {
       await p.locator('select[name=workspace_id]').selectOption(cloudWorkspaceId)
-      await p.locator(`#server-${serverId}`).waitFor({ state: 'hidden' })
+      await p.locator(`section[aria-labelledby="server-${serverId}"]`).waitFor({ state: 'hidden' })
     })
     await both(page, `${localOrigin}/mikka/en/settings?section=account`, 'personal-revoked')
     await localApi('/api/cloud/disconnect', { action: 'personal' })
@@ -393,9 +400,35 @@ async function run(env) {
     await localApi('/api/cloud/connect', { action: 'key', key: serverKey })
     check((await localApi('/api/cloud/status')).team.connected, 'TEAM_KEY_BOUND')
     await both(page, `${localOrigin}/mikka/en/settings?section=cloud`, 'team-key-bound')
+    if (env.CLOSEOUT_MODELS === '1' && modelBotId) {
+      report.stage = 'zero-balance-quota'
+      const { decode } = await import('../../lib/desktop-rpc/wire.ts')
+      const rpc = await cloudApi('/mikka/api/rpc', { version: 1, action: 'billing.getHostedUsage', args: [billingTeam] })
+      check(rpc.version === 1 && rpc.ok === true, 'TEAM_BILLING_RPC')
+      const teamUsage = decode(rpc.result)
+      check(!teamUsage.error && teamUsage.workspaceId === billingTeam && teamUsage.personal === false, 'TEAM_BILLING_SCOPE')
+      const balance = Number(teamUsage.balance?.free) + Number(teamUsage.balance?.purchased)
+      if (balance === 0) {
+        await localApi('/api/mobile/chat', { botId: modelBotId, text: 'Reply only QUOTA_PROBE_OK. Do not use tools.', submissionId: randomUUID() }, [202])
+        for (const [locale, route] of [['en', 'en/'], ['zh-CN', '']]) {
+          const messages = JSON.parse(await readFile(resolve('messages', `${locale}.json`), 'utf8'))
+          const text = messages.RunErrors.cloud_quota_exhausted.default
+          check(typeof text === 'string' && text.length > 0, 'QUOTA_COPY')
+          await both(page, `${localOrigin}/mikka/${route}?bot=${modelBotId}`, `zero-balance-${locale.toLowerCase()}`,
+            p => p.getByText(text, { exact: false }).first().waitFor({ timeout: 90_000 }))
+        }
+        const failed = await localApi(`/api/mobile/chat?bot=${modelBotId}`)
+        check(!failed.working && failed.failure?.cloudCode === 'cloud_quota_exhausted', 'QUOTA_FAILURE_CODE')
+        report.checks.zeroBalanceQuota = { balanceZeroBefore: true, verifiedBefore: teamUsage.balance.verified === true,
+          actualFailureCode: 'cloud_quota_exhausted', englishVisible: true, chineseVisible: true, balanceMutatedByTest: false }
+      } else {
+        report.checks.zeroBalanceQuota = { verified: false, reason: 'existing_team_has_nonzero_balance', balanceMutatedByTest: false }
+        process.exitCode = 1
+      }
+    }
     await both(cloud, manage, 'team-key-created', async p => {
       await p.locator('select[name=workspace_id]').selectOption(billingTeam)
-      await p.locator(`#server-${serverId}`).getByText(keyName, { exact: true }).waitFor()
+      await p.locator(`section[aria-labelledby="server-${serverId}"]`).getByText(keyName, { exact: true }).waitFor()
     })
     const teamConnections = await cloudApi(`/mikka/cloud/v1/management/connections?workspace_id=${encodeURIComponent(billingTeam)}`)
     const ownTeam = teamConnections.servers?.find(s => s.serverId === serverId)
@@ -409,7 +442,7 @@ async function run(env) {
     report.checks.teamKey = { verified: true, separateTeam: true, nextRequestRevoked: true, monthlyLimitMicroUsd: 10_000 }
     await both(cloud, manage, 'team-key-authorization-revoked', async p => {
       await p.locator('select[name=workspace_id]').selectOption(billingTeam)
-      await p.locator(`#server-${serverId}`).waitFor({ state: 'hidden' })
+      await p.locator(`section[aria-labelledby="server-${serverId}"]`).waitFor({ state: 'hidden' })
     })
     await both(page, `${localOrigin}/mikka/en/settings?section=cloud`, 'team-key-revoked')
     await localApi('/api/cloud/disconnect', { action: 'key' })
