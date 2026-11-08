@@ -147,7 +147,7 @@ function webFixture({ main = () => SHA, runs = () => [webRun()], job = buildJob(
         return Response.json({ workflow_runs: runs(elapsed) })
       }
       assert.equal(url.pathname, '/repos/alexj11324/Mikka/actions/runs/70/attempts/2/jobs')
-      return Response.json({ total_count: 1, jobs: [job] })
+      return Response.json({ total_count: 1, jobs: [typeof job === 'function' ? job(elapsed) : job] })
     }
     assert.equal(input, PRODUCTION_VERSION_URL)
     assert.equal(init.headers.authorization, undefined)
@@ -604,4 +604,52 @@ test('large runtime reports cross jobs only as immutable artifact files', () => 
     'cleanup uses independently bounded known IDs even when the full report download fails')
   assert.match(web, /name: Require one immutable runtime release artifact reference\n        if: inputs\.runtime-refresh == true/)
   assert.match(web, /name: Download the complete verified runtime release report\n        if: inputs\.runtime-refresh == true/)
+})
+
+test('successful job waits for each missing or nonterminal required step before reading public success', async () => {
+  for (const state of ['pending', 'in_progress', 'missing']) {
+    for (const index of [0, 1, 2]) {
+      const pending = buildJob()
+      if (state === 'missing') pending.steps.splice(index, 1)
+      else Object.assign(pending.steps[index], { status: state, conclusion: null })
+      const fixture = webFixture({ job: elapsed => elapsed < 100 ? pending : buildJob() })
+      const result = await fixture.run()
+      assert.equal(result.webRunId, 70)
+      assert.equal(result.webAttempt, 2)
+      assert.equal(fixture.elapsed(), 100)
+      assert.equal(fixture.calls.filter(call => call.path.endsWith('/jobs')).length, 2)
+      assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at), [100])
+    }
+  }
+})
+
+test('unpublished required steps remain bounded and cannot release on public READY alone', async () => {
+  for (const missing of [false, true]) {
+    const pending = buildJob()
+    if (missing) pending.steps = []
+    else Object.assign(pending.steps[1], { status: 'in_progress', conclusion: null })
+    const fixture = webFixture({ job: pending, budget: 250 })
+    await assert.rejects(fixture.run(), /matchingWebDeploymentTimedOut/)
+    assert.equal(fixture.elapsed(), 250)
+    assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+  }
+})
+
+test('waiting for step publication retains main fencing and terminal step refusal', async () => {
+  for (const conclusion of ['skipped', 'failure', 'cancelled', 'timed_out']) {
+    for (const status of ['completed', 'in_progress']) {
+      const failed = buildJob()
+      Object.assign(failed.steps[1], { status, conclusion })
+      const fixture = webFixture({ job: failed })
+      await assert.rejects(fixture.run(), /matchingWebBuildSkippedOrIncomplete/)
+      assert.equal(fixture.elapsed(), 0)
+      assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
+    }
+  }
+  const pending = buildJob()
+  Object.assign(pending.steps[1], { status: 'pending', conclusion: null })
+  const fixture = webFixture({ main: elapsed => elapsed < 100 ? SHA : OTHER, job: pending })
+  await assert.rejects(fixture.run(), /mainChanged/)
+  assert.equal(fixture.calls.filter(call => call.path.endsWith('/jobs')).length, 1)
+  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0)
 })

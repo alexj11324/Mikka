@@ -181,9 +181,20 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
         { token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
       const builds = (jobs.jobs ?? []).filter(job => job.name === 'deploy' && job.head_sha === webBuild)
       const job = builds[0]
-      if (jobs.total_count !== jobs.jobs?.length || builds.length !== 1 || job.status !== 'completed' || job.conclusion !== 'success'
-        || !BUILD_STEPS.every(name => job.steps?.filter(step => step.name === name && step.status === 'completed' && step.conclusion === 'success').length === 1)) {
+      if (jobs.total_count !== jobs.jobs?.length || builds.length !== 1 || job.status !== 'completed' || job.conclusion !== 'success') {
         throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+      }
+      const incomplete = BUILD_STEPS.filter(name => job.steps?.filter(step => step.name === name && step.status === 'completed' && step.conclusion === 'success').length !== 1)
+      if (incomplete.length) {
+        // Job completion can arrive before its step details. Keep every success
+        // gate, but wait within the existing deadline for missing/pending steps.
+        const awaitingSteps = incomplete.every(name => {
+          const steps = job.steps?.filter(step => step.name === name) ?? []
+          return steps.length === 0 || (steps.length === 1 && ['pending', 'in_progress'].includes(steps[0].status) && steps[0].conclusion == null)
+        })
+        if (!awaitingSteps) throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+        if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))
+        continue
       }
       if (remaining() <= 0) break
       if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay) === webBuild && remaining() > 0) {
