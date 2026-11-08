@@ -1,7 +1,7 @@
 name: Issue 1503 R8 same-child local expiry maintenance
 on:
   push:
-    branches: [ops/issue1503-r8-child-expiry-20261108]
+    branches: [ops/1505-r8-same-child-expiry-20261108]
     paths:
       - .github/workflows/issue1503-r8-child-expiry.yml
       - scripts/ops/issue1503/renew-github-expiry.mjs
