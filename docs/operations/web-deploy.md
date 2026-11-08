@@ -244,6 +244,12 @@ alone: their recorded overlay SHAs may differ.
   exit status, allowlisted signal/error codes, the last observed public build
   phase, and protected-log byte count/SHA256. The phase can be `unknown`, and
   SIGKILL alone is not an OOM diagnosis. No raw output, message or stack is emitted.
+  `processErrorCode` describes only a process-launch error. The independent
+  `observedSystemCode` records the last allowlisted system-code candidate in a
+  protected child-log `code` property or standard `Error: CODE:` header, including
+  when the child exits nonzero without a launch error. It is an observation, not
+  proof of the terminating cause; absent or unrecognized codes remain `null`.
+  No associated message, path or source line is included.
 - The live Web builder is Vite + Nitro, both with `sourcemap: false`;
   `next.config.mjs` is a legacy path, not the production compiler. Before
   upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI

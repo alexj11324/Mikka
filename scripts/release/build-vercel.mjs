@@ -18,7 +18,7 @@ export function buildFailureEvidence({ result, sourceSha, overlaySha, log }) {
   const codes = ['EACCES', 'EAGAIN', 'E2BIG', 'ENOENT', 'ENOMEM', 'ENOSPC', 'ETIMEDOUT']
   const databaseCodes = ['22023', '22P02', '23502', '23503', '23505', '23514', '25006', '40001', '40P01', '42501', '42703', '42804', '42883', '42P01', '53300', '53400', '57014', '57P01']
   const networkCodes = ['ECONNREFUSED', 'ECONNRESET', 'EAI_AGAIN', 'ENETUNREACH', 'ENOTFOUND', 'ETIMEDOUT']
-  let lastObservedPhase = 'unknown', databaseCode = null, networkCode = null
+  let lastObservedPhase = 'unknown', databaseCode = null, networkCode = null, observedSystemCode = null
   for (const line of (log?.toString('utf8') ?? '').split('\n')) {
     if (/^> node scripts\/build-subscription-worker\.mjs(?: &&|$)/.test(line)) lastObservedPhase = 'subscription-worker'
     if (/^> \S+ generate:agent-ui(?:\s|$)/.test(line)) lastObservedPhase = 'generate-agent-ui'
@@ -26,13 +26,15 @@ export function buildFailureEvidence({ result, sourceSha, overlaySha, log }) {
     if (/^> \S+ typecheck(?:\s|$)/.test(line)) lastObservedPhase = 'typecheck'
     if (!line.includes('.hosted-ui/') && /^\s+at .*\/scripts\/migrate\.mjs:\d+:\d+\)?$/.test(line)) lastObservedPhase = 'migrate'
     const code = /\bcode:\s*['"]([A-Z0-9_]+)['"]/.exec(line)?.[1]
+    const systemCode = codes.includes(code) ? code : /\bError:\s*([A-Z0-9_]+):/.exec(line)?.[1]
+    if (codes.includes(systemCode)) observedSystemCode = systemCode
     if (databaseCodes.includes(code)) databaseCode = code
     if (networkCodes.includes(code)) networkCode = code
   }
   return { event: 'official_build_failure', sourceSha: sha(sourceSha), overlaySha: sha(overlaySha),
     exitStatus: Number.isInteger(result.status) && result.status >= 0 && result.status <= 255 ? result.status : null,
     signal, processErrorCode: codes.includes(result.error?.code) ? result.error.code : null,
-    lastObservedPhase, databaseCode, networkCode,
+    lastObservedPhase, databaseCode, networkCode, observedSystemCode,
     logBytes: log?.length ?? null, logSha256: log ? createHash('sha256').update(log).digest('hex') : null }
 }
 

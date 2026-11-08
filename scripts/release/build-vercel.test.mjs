@@ -11,11 +11,49 @@ test('official failure evidence retains codes and digests without private source
   assert.equal(result.lastObservedPhase, 'migrate')
   assert.equal(result.databaseCode, '22023')
   assert.equal(result.processErrorCode, 'ENOSPC')
+  assert.equal(result.observedSystemCode, null)
   assert.equal(result.logBytes, log.length)
   assert.match(result.logSha256, /^[a-f0-9]{64}$/)
   assert.equal(JSON.stringify(result).includes('secret-fixture-value'), false)
   assert.equal(JSON.stringify(result).includes('private-renderer-source'), false)
   assert.equal(JSON.stringify(result).includes('/work'), false)
+})
+
+test('child failure observes a closed system-code candidate without a spawn error or private details', () => {
+  for (const line of [
+    "  code: 'ENOSPC', path: '/private/renderer-source'",
+    '  code: "ENOSPC", private-marker',
+    'Error: ENOSPC: no space left on device, write /private/renderer-source',
+  ]) {
+    const log = Buffer.from('private-marker secret-fixture-value\n' + line + '\n')
+    const value = buildFailureEvidence({ result: { status: 1, signal: null },
+      sourceSha: 'a'.repeat(40), overlaySha: 'b'.repeat(40), log })
+    assert.equal(value.exitStatus, 1)
+    assert.equal(value.processErrorCode, null)
+    assert.equal(value.observedSystemCode, 'ENOSPC')
+    assert.equal(value.lastObservedPhase, 'unknown')
+    for (const marker of ['private-marker', 'secret-fixture-value', '/private/', 'renderer-source', 'no space left']) {
+      assert.equal(JSON.stringify(value).includes(marker), false)
+    }
+  }
+})
+
+test('unrecognized or unstructured child text does not become an observed system code', () => {
+  for (const line of [
+    "code: 'PRIVATE_MARKER'",
+    'Error: PRIVATE_MARKER: secret-fixture-value',
+    "code: 'ENOSPC_PRIVATE_MARKER'",
+    'Error: ENOSPC_PRIVATE_MARKER: secret-fixture-value',
+    'private-marker ENOSPC secret-fixture-value',
+  ]) {
+    const value = buildFailureEvidence({ result: { status: 1, signal: null },
+      log: Buffer.from(line) })
+    assert.equal(value.observedSystemCode, null)
+    assert.equal(value.processErrorCode, null)
+    assert.equal(value.lastObservedPhase, 'unknown')
+    assert.equal(JSON.stringify(value).includes('PRIVATE_MARKER'), false)
+    assert.equal(JSON.stringify(value).includes('secret-fixture-value'), false)
+  }
 })
 
 test('unknown failure details remain unknown and a kill signal is not labeled as OOM', () => {
@@ -24,7 +62,7 @@ test('unknown failure details remain unknown and a kill signal is not labeled as
   assert.equal(value.signal, 'SIGKILL')
   assert.equal(value.exitStatus, null)
   assert.equal(value.lastObservedPhase, 'unknown')
-  for (const key of ['sourceSha', 'overlaySha', 'processErrorCode', 'databaseCode', 'networkCode']) assert.equal(value[key], null)
+  for (const key of ['sourceSha', 'overlaySha', 'processErrorCode', 'observedSystemCode', 'databaseCode', 'networkCode']) assert.equal(value[key], null)
   assert.equal(JSON.stringify(value).includes('OOM'), false)
   const absent = buildFailureEvidence({ result: { status: 300, signal: 'SECRET' } })
   assert.equal(absent.logBytes, null)
