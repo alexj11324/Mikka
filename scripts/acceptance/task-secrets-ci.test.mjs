@@ -244,12 +244,17 @@ test('every OIDC read is directly preceded by source/attempt/public-build attest
   assert.doesNotMatch(workflowText, /actions: write|contents: write|pull-requests: write|issues: write|workflow_dispatch:\s+workflows/)
   const steps = workflowText.slice(workflowText.indexOf('  acceptance:')).split('\n  factory:')[0].split('      - name:')
   const credentials = steps.map((step, index) => ({ step, index })).filter(({ step }) => step.includes('Infisical/secrets-action'))
-  assert.equal(credentials.length, 3)
+  assert.equal(credentials.length, 4)
   for (const { step, index } of credentials) {
     assert.match(steps[index - 1], /Recheck main, upstream attempt and public build immediately before/)
     assert.match(step, /identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac/)
     assert.match(step, /recursive: false/); assert.match(step, /include-imports: false/)
   }
+  const database = credentials.find(({ step }) => step.includes('secret-name: MIKKA_DATABASE_URL'))
+  assert.ok(database)
+  assert.match(database.step, /if: env.PRODUCTION_CANARY == 'true'/)
+  assert.match(steps[database.index - 1], /if: env.PRODUCTION_CANARY == 'true'/)
+  assert.match(workflowText, /PRODUCTION_CANARY: \$\{\{ github.event_name == 'workflow_dispatch' && inputs.production_canary && 'true' \|\| 'false' \}\}/)
   assert.match(workflowText, /group: production-smoke-owner-acceptance/)
   assert.ok(!JSON.stringify(safeCIFailure(Error('PRIVATE_SECRET_URL'))).includes('PRIVATE'))
 })
