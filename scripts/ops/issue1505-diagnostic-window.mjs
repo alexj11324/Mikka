@@ -5,24 +5,26 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
-export const SOURCE = 'e33e3a91d4011efbe768b11b428a5d152ede744a'
-export const TREE = 'b2e36d3351654fceec59fe138a55de31cb155df9'
-export const BRANCH = 'ops/1505-renew-window-e33-0018'
-export const HELPER_PARENT = 'a9c61594f8294f748cb23130f61779d03f1f2080'
-export const HELPER_PARENT_TREE = 'ca473df506cafc97e627bfca8bd0426624e23b2e'
+export const SOURCE = 'bb5d1f9e224aea395b9c45823960e8ad10f1a099'
+export const TREE = 'f70f40367331b6408c5b68b6f7be6483cc7cbc0d'
+export const BRANCH = 'ops/1505-scope-web-bb5d1f9e-20261108'
+export const HELPER_PARENT = '5958dea38437de20512bbbdf60b940ccc83f00ff'
+export const HELPER_PARENT_TREE = 'af895d6418b1b1d960b2884aec91a2078bb37d96'
 export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
 export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
 export const KEY = 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW'
 export const ORIGIN = 'https://app.aspectlylabs.com'
-export const GO = 'root-reviewed-1505-renew-window-e33-0018'
+export const GO = 'root-reviewed-1505-scope-web-bb5d1f9e-20261108'
 export const ORIGINAL = Object.freeze({
   receiptSha256: '12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5',
   helperCommit: '5cd039213a531476cde35500a2498bd3a5089556', helperTree: 'a841f19b0bab028bc386d6c768cce35496ca306b',
   runId: '42366750743', attempt: '1', fixtureId: '620a3647-b039-4909-8562-e3ff867d7324',
   botId: 'fdeea45f-8cb2-450a-96a4-d9a682f71482', botName: '测试1505 620a3647',
 })
-export const PREVIOUS_RECEIPT_SHA256 = 'cf2628f478a4a91746e9368637dac0e54f3f28bbdf7456bc2d62388aeee39590'
-const PREVIOUS_RECEIPT_BASE64 = 'ewogICJ2ZXJzaW9uIjogMSwKICAiaXNzdWUiOiAxNTA1LAogICJzb3VyY2VDb21taXQiOiAiZTMzZTNhOTFkNDAxMWVmYmU3NjhiMTFiNDI4YTVkMTUyZWRlNzQ0YSIsCiAgInNvdXJjZVRyZWUiOiAiYjJlMzZkMzM1MTY1NGZjZWVjNTlmZTEzOGE1NWRlMzFjYjE1NWRmOSIsCiAgInByb2plY3RJZCI6ICJwcmpfVmROejNQMEZtdVJiWktlSTQwaGJDcXdSME5WSCIsCiAgInRlYW1JZCI6ICJ0ZWFtX0M3bHd4VlZ2blVpY0ZsaTYxMTJtdnhwdiIsCiAgIndvcmtmbG93UnVuSWQiOiAiNDI0MjUxMDExNjUiLAogICJhdHRlbXB0IjogIjEiLAogICJ3b3JrZmxvd0hlYWQiOiAiYTljNjE1OTRmODI5NGY3NDhjYjIzMTMwZjYxNzc5ZDAzZjFmMjA4MCIsCiAgImhlbHBlckJyYW5jaCI6ICJvcHMvMTUwNS1yZW5ldy13aW5kb3ctZTMzLTIzMDgiLAogICJmaXh0dXJlSWQiOiAiZThlZGMyYmEtNjdiNi00ZmU2LWEyMDEtOGEzNTkwMjAzNzgzIiwKICAic3RhcnRlZEF0IjogIjIwMjYtMTEtMDdUMjM6MjU6MTkuNDIyWiIsCiAgInN0YXR1cyI6ICJwcmVwYXJlZCIsCiAgInNjb3BlIjogImRlZGljYXRlZF9ib3RfcmVwb3NpdG9yeV93aW5kb3ciLAogICJtb2RlbHNEaXNwYXRjaGVkIjogMCwKICAidmlydHVhbE1hY2hpbmVzQ3JlYXRlZCI6IDAsCiAgInByb2ZpbGVzQ3JlYXRlZCI6IDAsCiAgImJvdENyZWF0aW9uQXR0ZW1wdGVkIjogZmFsc2UsCiAgImJvdFN0b3BBdHRlbXB0ZWQiOiBmYWxzZSwKICAicmV1c2VkRnJvbSI6IHsKICAgICJyZWNlaXB0U2hhMjU2IjogIjEyZjZmMzc1OGMzODJkZDU1YzkwNTViM2FiMzJmOWQ3ODVjNjIwNTk0YzY2YWQ0ZDQ5YTIwMzBiM2NjZGE4ZDUiLAogICAgIndvcmtmbG93UnVuSWQiOiAiNDIzNjY3NTA3NDMiLAogICAgImZpeHR1cmVJZCI6ICI2MjBhMzY0Ny1iMDM5LTQ5MDktODU2Mi1lM2ZmODY3ZDczMjQiCiAgfSwKICAiY2xlYW51cCI6IHsKICAgICJib3RJZGxlVmVyaWZpZWQiOiB0cnVlLAogICAgIndvcmtzcGFjZVJlc3RvcmVkIjogdHJ1ZSwKICAgICJzaWduZWRPdXQiOiB0cnVlLAogICAgImVycm9ycyI6IFtdCiAgfSwKICAid2luZG93IjogewogICAgImtleSI6ICJNSUtLQV9DTE9VRF9ESUFHTk9TVElDX1dJTkRPVyIsCiAgICAidmFsdWVTaGEyNTYiOiAiNjI0MmM0YzM2OGY1ODA1ZjZiY2IzNTM4NTU5YjViMzBiODUxYzRlZTA2MjI4MjNmMTZjMDNiZjgwNDQ4MTRiMyIsCiAgICAiZXhwaXJlc0F0IjogIjIwMjYtMTEtMDhUMDE6MjU6MjMuNDIyWiIsCiAgICAiZHVyYXRpb25NaW51dGVzIjogMTIwLAogICAgIndyaXRlQXR0ZW1wdGVkIjogdHJ1ZSwKICAgICJjcmVhdGlvbkFja25vd2xlZGdlZCI6IHRydWUsCiAgICAicmVhZGJhY2tWZXJpZmllZCI6IHRydWUsCiAgICAicmVxdWlyZXNTdWJzZXF1ZW50V2ViQnVpbGQiOiB0cnVlLAogICAgImFjdGl2ZURlcGxveW1lbnRSZXZva2VkIjogZmFsc2UsCiAgICAiaWQiOiAiWkxwdDBpN0NUTmxrNVhGUiIKICB9LAogICJ3aW5kb3dLZXlBYnNlbnRCZWZvcmUiOiB0cnVlLAogICJyZXF1ZXN0ZXJIYXNoIjogImI4MjNiYTFjNTcyOTc2OGIxZGE1YzM2MTVhYmE5MWFjMzk3MjNiZDRjNTRlOWYzODJiM2VkMTM2OGQ1OGVjNmUiLAogICJhcHBsaWNhdGlvbkF0UHJlcGFyYXRpb24iOiAiNDIyMWQ5YzA2ZGEwNzkzMjFkNGZlMjgwMzg3OWJhODIwNDNkN2ExZiIsCiAgIndvcmtzcGFjZUhhc2giOiAiYTM4MzA3Zjc1NjIwZGU0YmZlM2IzNzRlZDJkNTEwMDQxZGE4MDdhZjA5NGM1NzFlYWZiMDMxOGNlMjFmMzUzNSIsCiAgIm5vcm1hbFNlc3Npb25WZXJpZmllZCI6IHRydWUsCiAgInNoYXJlZFRlYW1WZXJpZmllZCI6IHRydWUsCiAgImJvdElkIjogImZkZWVhNDVmLThjYjItNDUwYS05NmE0LWQ5YTY4MmY3MTQ4MiIsCiAgImJvdE5hbWUiOiAi5rWL6K+VMTUwNSA2MjBhMzY0NyIsCiAgImJvdFJldGVudGlvbiI6ICJyZXVzZWRfZXhpc3Rpbmdfbm9fZGVsZXRlX2FwaSIsCiAgImJvdE93bmVkQW5kTmFtZWQiOiB0cnVlLAogICJib3RJZGxlSGlzdG9yeSI6IHsKICAgICJpdGVtcyI6IDE4LAogICAgImN1cnNvciI6IDQ0LAogICAgInBlcnNpc3RlZFN0cmVhbXMiOiAxMiwKICAgICJwZW5kaW5nSXRlbXMiOiAwCiAgfSwKICAiYm90SWRsZU9ic2VydmVkQXQiOiAiMjAyNi0xMS0wN1QyMzoyNToyMi41MzNaIiwKICAiZmluaXNoZWRBdCI6ICIyMDI2LTExLTA3VDIzOjI1OjI0LjA1M1oiCn0K'
+export const PREVIOUS_SOURCE = 'e33e3a91d4011efbe768b11b428a5d152ede744a'
+export const PREVIOUS_TREE = 'b2e36d3351654fceec59fe138a55de31cb155df9'
+export const PREVIOUS_RECEIPT_SHA256 = '1df3b998e209bf127f3a159f5a1a19ef246bedb357c81a08c2fe0b331312745b'
+const PREVIOUS_RECEIPT_BASE64 = 'ewogICJ2ZXJzaW9uIjogMSwKICAiaXNzdWUiOiAxNTA1LAogICJzb3VyY2VDb21taXQiOiAiZTMzZTNhOTFkNDAxMWVmYmU3NjhiMTFiNDI4YTVkMTUyZWRlNzQ0YSIsCiAgInNvdXJjZVRyZWUiOiAiYjJlMzZkMzM1MTY1NGZjZWVjNTlmZTEzOGE1NWRlMzFjYjE1NWRmOSIsCiAgInByb2plY3RJZCI6ICJwcmpfVmROejNQMEZtdVJiWktlSTQwaGJDcXdSME5WSCIsCiAgInRlYW1JZCI6ICJ0ZWFtX0M3bHd4VlZ2blVpY0ZsaTYxMTJtdnhwdiIsCiAgIndvcmtmbG93UnVuSWQiOiAiNDI0Mjk0ODg0OTkiLAogICJhdHRlbXB0IjogIjEiLAogICJ3b3JrZmxvd0hlYWQiOiAiNTk1OGRlYTM4NDM3ZGUyMDUxMmJiYmRmNjBiOTQwY2NjODNmMDBmZiIsCiAgImhlbHBlckJyYW5jaCI6ICJvcHMvMTUwNS1yZW5ldy13aW5kb3ctZTMzLTAwMTgiLAogICJmaXh0dXJlSWQiOiAiZTIxNGNiNjEtODdmMy00MzQ1LWFiZWEtMTgwZGVkMjIwOTYyIiwKICAic3RhcnRlZEF0IjogIjIwMjYtMTEtMDhUMDA6MjM6MjYuODgxWiIsCiAgInN0YXR1cyI6ICJwcmVwYXJlZCIsCiAgInNjb3BlIjogImRlZGljYXRlZF9ib3RfcmVwb3NpdG9yeV93aW5kb3ciLAogICJtb2RlbHNEaXNwYXRjaGVkIjogMCwKICAidmlydHVhbE1hY2hpbmVzQ3JlYXRlZCI6IDAsCiAgInByb2ZpbGVzQ3JlYXRlZCI6IDAsCiAgImJvdENyZWF0aW9uQXR0ZW1wdGVkIjogZmFsc2UsCiAgImJvdFN0b3BBdHRlbXB0ZWQiOiBmYWxzZSwKICAicmV1c2VkRnJvbSI6IHsKICAgICJyZWNlaXB0U2hhMjU2IjogIjEyZjZmMzc1OGMzODJkZDU1YzkwNTViM2FiMzJmOWQ3ODVjNjIwNTk0YzY2YWQ0ZDQ5YTIwMzBiM2NjZGE4ZDUiLAogICAgIndvcmtmbG93UnVuSWQiOiAiNDIzNjY3NTA3NDMiLAogICAgImZpeHR1cmVJZCI6ICI2MjBhMzY0Ny1iMDM5LTQ5MDktODU2Mi1lM2ZmODY3ZDczMjQiCiAgfSwKICAiY2xlYW51cCI6IHsKICAgICJib3RJZGxlVmVyaWZpZWQiOiB0cnVlLAogICAgIndvcmtzcGFjZVJlc3RvcmVkIjogdHJ1ZSwKICAgICJzaWduZWRPdXQiOiB0cnVlLAogICAgImVycm9ycyI6IFtdCiAgfSwKICAid2luZG93IjogewogICAgImtleSI6ICJNSUtLQV9DTE9VRF9ESUFHTk9TVElDX1dJTkRPVyIsCiAgICAidmFsdWVTaGEyNTYiOiAiNDYyN2YyMDM4ODdhZjBlMmU1OTA0ZTQzYWZjYTg5ZWJmNjI0MWY1NWNlOTk4YWE1MjAwZWY2NWRmNmI0Y2U2NyIsCiAgICAiZXhwaXJlc0F0IjogIjIwMjYtMTEtMDhUMDI6MjM6MzYuMzY1WiIsCiAgICAiZHVyYXRpb25NaW51dGVzIjogMTIwLAogICAgIndyaXRlQXR0ZW1wdGVkIjogdHJ1ZSwKICAgICJjcmVhdGlvbkFja25vd2xlZGdlZCI6IHRydWUsCiAgICAicmVhZGJhY2tWZXJpZmllZCI6IHRydWUsCiAgICAicmVxdWlyZXNTdWJzZXF1ZW50V2ViQnVpbGQiOiB0cnVlLAogICAgImFjdGl2ZURlcGxveW1lbnRSZXZva2VkIjogZmFsc2UsCiAgICAiaWQiOiAiNVUzY2JVUk9MMzZjN2U0eiIKICB9LAogICJ3aW5kb3dLZXlBYnNlbnRCZWZvcmUiOiB0cnVlLAogICJyZXF1ZXN0ZXJIYXNoIjogImI4MjNiYTFjNTcyOTc2OGIxZGE1YzM2MTVhYmE5MWFjMzk3MjNiZDRjNTRlOWYzODJiM2VkMTM2OGQ1OGVjNmUiLAogICJhcHBsaWNhdGlvbkF0UHJlcGFyYXRpb24iOiAiYWQ3ZjBkMDQzNGU3ZDRhMjUyN2Q4NjhjNDgzMGQwMDliMjhhOWQ3ZiIsCiAgIndvcmtzcGFjZUhhc2giOiAiYTM4MzA3Zjc1NjIwZGU0YmZlM2IzNzRlZDJkNTEwMDQxZGE4MDdhZjA5NGM1NzFlYWZiMDMxOGNlMjFmMzUzNSIsCiAgIm5vcm1hbFNlc3Npb25WZXJpZmllZCI6IHRydWUsCiAgInNoYXJlZFRlYW1WZXJpZmllZCI6IHRydWUsCiAgImJvdElkIjogImZkZWVhNDVmLThjYjItNDUwYS05NmE0LWQ5YTY4MmY3MTQ4MiIsCiAgImJvdE5hbWUiOiAi5rWL6K+VMTUwNSA2MjBhMzY0NyIsCiAgImJvdFJldGVudGlvbiI6ICJyZXVzZWRfZXhpc3Rpbmdfbm9fZGVsZXRlX2FwaSIsCiAgImJvdE93bmVkQW5kTmFtZWQiOiB0cnVlLAogICJib3RJZGxlSGlzdG9yeSI6IHsKICAgICJpdGVtcyI6IDE4LAogICAgImN1cnNvciI6IDQ0LAogICAgInBlcnNpc3RlZFN0cmVhbXMiOiAxMiwKICAgICJwZW5kaW5nSXRlbXMiOiAwCiAgfSwKICAiYm90SWRsZU9ic2VydmVkQXQiOiAiMjAyNi0xMS0wOFQwMDoyMzozNS4zODNaIiwKICAiZmluaXNoZWRBdCI6ICIyMDI2LTExLTA4VDAwOjIzOjM3LjM4NVoiCn0K'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SHA = /^[0-9a-f]{64}$/
@@ -186,7 +188,10 @@ export async function prepareWindow({ env, helpers, reuse, fetchImpl = fetch, no
 }
 
 /** Optional later cleanup entry. Exact ID+value, never key-wide removal or immutable-deployment revocation. */
-export async function removeOwnedWindow(report, { token, fetchImpl = fetch, now = Date.now }) {
+// Each entry keeps the original exact-source cleanup guard. The historical
+// receipt is never relabeled as the future source, and callers cannot select it.
+function ownedWindowRemover(SOURCE, TREE) {
+  return async function removeOwnedWindow(report, { token, fetchImpl = fetch, now = Date.now }) {
   check(report?.version === 1 && report.issue === 1505 && report.sourceCommit === SOURCE && report.sourceTree === TREE
     && report.projectId === PROJECT && report.teamId === TEAM && report.window?.key === KEY
     && ID.test(report.window.id ?? '') && SHA.test(report.window.valueSha256 ?? '')
@@ -209,6 +214,9 @@ export async function removeOwnedWindow(report, { token, fetchImpl = fetch, now 
     activeDeploymentRevoked: false, originalExpiresAt: report.window.expiresAt,
     expirationDeadlinePassedAtObservation: now() >= Date.parse(report.window.expiresAt), observedAt: new Date(now()).toISOString() }
 }
+}
+export const removeOwnedWindow = ownedWindowRemover(SOURCE, TREE)
+const removePreviousOwnedWindow = ownedWindowRemover(PREVIOUS_SOURCE, PREVIOUS_TREE)
 
 
 /** The preceding owned receipt is immutable public recovery metadata, never a credential. */
@@ -216,15 +224,15 @@ export function readPreviousWindow(bytes = Buffer.from(PREVIOUS_RECEIPT_BASE64, 
   check(hash(bytes) === PREVIOUS_RECEIPT_SHA256, 'previous_receipt_changed')
   const report = JSON.parse(bytes.toString('utf8'))
   check(report.version === 1 && report.issue === 1505 && report.status === 'prepared'
-    && report.sourceCommit === SOURCE && report.sourceTree === TREE
-    && report.workflowHead === HELPER_PARENT && report.workflowRunId === '42425101165' && report.attempt === '1'
+    && report.sourceCommit === PREVIOUS_SOURCE && report.sourceTree === PREVIOUS_TREE
+    && report.workflowHead === HELPER_PARENT && report.workflowRunId === '42429488499' && report.attempt === '1'
     && report.projectId === PROJECT && report.teamId === TEAM
     && report.botId === ORIGINAL.botId && report.botName === ORIGINAL.botName
     && report.requesterHash === 'b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e'
     && report.workspaceHash === 'a38307f75620de4bfe3b374ed2d510041da807af094c571eafb0318ce21f3535'
-    && report.window?.key === KEY && report.window.id === 'ZLpt0i7CTNlk5XFR'
-    && report.window.valueSha256 === '6242c4c368f5805f6bcb3538559b5b30b851c4ee0622823f16c03bf8044814b3'
-    && report.window.expiresAt === '2026-11-08T01:25:23.422Z' && report.window.durationMinutes === 120
+    && report.window?.key === KEY && report.window.id === '5U3cbUROL36c7e4z'
+    && report.window.valueSha256 === '4627f203887af0e2e5904e43afca89ebf6241f55ce998aa5200ef65df6b4ce67'
+    && report.window.expiresAt === '2026-11-08T02:23:36.365Z' && report.window.durationMinutes === 120
     && report.window.readbackVerified === true && report.window.creationAcknowledged === true
     && report.cleanup?.botIdleVerified === true && report.cleanup.workspaceRestored === true && report.cleanup.signedOut === true
     && Array.isArray(report.cleanup.errors) && report.cleanup.errors.length === 0
@@ -252,7 +260,7 @@ export async function renewWindow({ previous, env, helpers, reuse, fetchImpl = f
   try {
     await persist()
     stage = 'remove_previous_window'
-    report.removal = await removeOwnedWindow(previous, { token: env.VERCEL_TEAM_TOKEN, fetchImpl, now })
+    report.removal = await removePreviousOwnedWindow(previous, { token: env.VERCEL_TEAM_TOKEN, fetchImpl, now })
     stage = 'persist_previous_removal'
     await persist()
     stage = 'prepare_fresh_window'
@@ -277,7 +285,13 @@ export async function renewWindow({ previous, env, helpers, reuse, fetchImpl = f
   return report
 }
 
+export function assertReviewedConfiguration() {
+  check(/^[a-f0-9]{40}$/.test(SOURCE) && /^[a-f0-9]{40}$/.test(TREE)
+    && /^ops\/1505-[a-z0-9-]+$/.test(BRANCH) && /^root-reviewed-1505-[a-z0-9-]+$/.test(GO), 'draft_not_reviewed')
+}
+
 async function main() {
+  assertReviewedConfiguration()
   const [mode, output, input] = process.argv.slice(2)
   check(process.env.DIAGNOSTIC_WINDOW_GO === GO && process.env.GITHUB_REPOSITORY === 'alexj11324/Mikka'
     && process.env.GITHUB_RUN_ATTEMPT === '1'
