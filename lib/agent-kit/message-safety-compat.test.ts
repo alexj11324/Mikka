@@ -34,7 +34,7 @@ stub('../composio.ts', { runComposioAction: () => {} })
 // Factory issue-link registration is imported by the tool graph; prompt tests never authorize GitHub reads.
 stub('../github/user-access.ts', { readAuthorizedIssue: () => { throw Error('No GitHub authorization or provider I/O in prompt fixture') } })
 stub('../pending-action-store.ts', { proposeAction: () => {}, writeAccountAction: () => {}, proposeRepositoryPush: () => {} })
-stub('../issue-access.ts', { issueForUser: () => {} })
+stub('../issue-access.ts', { issueForUser: () => {}, requireUser: () => { throw new Error('User access unavailable in prompt fixture') } })
 stub('../telegram/client.ts', { postTelegramText: () => {} })
 stub('../attention/store.ts', { recordDecision: () => {}, settleTurn: () => {} })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: async () => {} })

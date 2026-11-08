@@ -92,9 +92,10 @@ test('real PG: lists retain their reader scope and publish only the originating 
     for (const [id, owner, kind] of [[home, 'owner', 'personal'], [team, 'owner', 'team'], [foreignHome, 'foreign', 'personal'], [inactiveHome, 'inactive', 'personal']]) {
       await database.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,'Fixture',$3)`, [id, owner, kind])
     }
-    for (const [workspace, owner, status] of [[home, 'owner', 'active'], [home, 'peer', 'active'], [team, 'owner', 'active'], [team, 'peer', 'active'], [team, 'foreign', 'active'], [team, 'inactive', 'suspended'], [team, 'no-home', 'active'], [foreignHome, 'foreign', 'active'], [inactiveHome, 'inactive', 'suspended']]) {
+    for (const [workspace, owner, status] of [[home, 'owner', 'active'], [team, 'owner', 'active'], [team, 'peer', 'active'], [team, 'foreign', 'active'], [team, 'inactive', 'suspended'], [team, 'no-home', 'active'], [foreignHome, 'foreign', 'active'], [inactiveHome, 'inactive', 'suspended']]) {
       await database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member',$3)`, [workspace, owner, status])
     }
+    await assert.rejects(database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'peer','peer','peer','member','active')`, [home]), { code: '23514' }, 'a Personal workspace cannot admit another owner')
     const ownerAgent = randomUUID(), foreignAgent = randomUUID()
     await database.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,'owner','Fixture','codex'),($2,'foreign','Fixture','codex')`, [ownerAgent, foreignAgent])
     await foreign.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,'foreign','Other source','codex')`, [foreignAgent])
@@ -122,7 +123,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       const before = (await database.query('SELECT count(*)::integer AS n FROM mikka_workspaces')).rows[0].n
       assert.deepEqual(await ownerListTargets(database, 'no-home', ['thread_list']), [])
       assert.deepEqual(await ownerListTargets(database, 'inactive', ['bot_chat_list']), [])
-      assert.deepEqual(await ownerListTargets(database, 'peer', ['thread_list']), [], 'membership in another owner home never substitutes for an owned home')
+      assert.deepEqual(await ownerListTargets(database, 'peer', ['thread_list']), [], 'Shared workspace membership never substitutes for an owned Personal workspace')
       assert.equal((await database.query('SELECT count(*)::integer AS n FROM mikka_workspaces')).rows[0].n, before, 'notifications never create a workspace')
     })
 
@@ -142,7 +143,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       const audience = async () => (await ownerSettingsTargets(database, database, 'owner')).map(value => `${value.scope.ownerId}@${value.scope.workspaceId === home ? 'home' : 'team'}:${value.events.map(event => event.kind).join(',')}`).sort()
       // Not shared: only the account itself, in each workspace it is an active member of; never the app-wide workspace_settings.
       assert.deepEqual(await audience(), ['owner@home:model_settings', 'owner@team:model_settings'])
-      // 分享我的订阅给团队成员 on in the team: its active members too (not the suspended one, not the home's peer).
+      // 分享我的订阅给团队成员 on in the team: its active members too, excluding the suspended member.
       await database.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ('owner',$1,true)`, [team])
       assert.deepEqual(await audience(), ['foreign@team:model_settings', 'no-home@team:model_settings', 'owner@home:model_settings', 'owner@team:model_settings', 'peer@team:model_settings'])
       // An admin who does not allow sharing subscriptions: back to the account alone.
@@ -386,7 +387,7 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.equal(denied.status, 404); await drain(); assert.equal(received.length, 0)
     })
 
-    await t.test('the actual workspace member removal rolls back without notification and clears only previously known scopes after commit', async () => {
+    await t.test('the actual workspace member removal rolls back without notification and refreshes only authorized scopes after commit', async () => {
       await clear()
       const { removeMember } = await import('../workspace-admin/members')
       await database.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"='owner'`, [team])
@@ -411,8 +412,13 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.equal((await database.query(`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"='foreign'`, [team])).rowCount, 0)
       await wrongScope.run(drain)
       const old = received.filter(value => value.scope.ownerId === 'foreign')
-      assert.equal(old.length, 2)
-      assert.deepEqual(new Set(old.map(value => value.scope.workspaceId)), new Set([team, foreignHome]))
+      // Capturing a former scope never grants post-removal delivery. The
+      // source barrier drops that channel; the still-active Personal home
+      // remains authorized to refresh this account's workspace directory.
+      assert.equal(old.length, 1)
+      assert.deepEqual(new Set(old.map(value => value.scope.workspaceId)), new Set([foreignHome]))
+      assert.ok(!received.some(value => value.scope.ownerId === 'foreign' && value.scope.workspaceId === team), 'removed members receive no former-workspace metadata')
+      assert.ok(received.some(value => value.scope.ownerId === 'owner' && value.scope.workspaceId === team && value.events.some(event => event.kind === 'workspace_settings')), 'active members still receive the committed workspace change')
       assert.ok(old.every(value => value.events.every(event => event.id === value.scope.workspaceId)))
       assert.ok(old.find(value => value.scope.workspaceId === foreignHome)!.events.some(event => event.kind === 'workspace_settings'))
       assert.ok(!received.some(value => value.scope.ownerId === 'inactive'))

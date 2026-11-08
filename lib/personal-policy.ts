@@ -24,8 +24,11 @@ export async function memberSubscriptionsAllowed(query: Query, workspaceId: stri
 
 /** 分享给团队成员: the owner also lets other members' bots here use it (Alex, 「B」). */
 export async function othersMayUse(query: Query, ownerId: string, workspaceId: string): Promise<boolean> {
-  const { rows: [row] } = await query.query<{ allowOthers: boolean }>('SELECT "allowOthers" FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])
-  return Boolean(row?.allowOthers) && (await memberSubscriptionsAllowed(query, workspaceId)) && await organizationResourceAllowed(workspaceId, 'subscription', ownerId, ownerId)
+  const { rows: [row] } = await query.query<{ allowOthers: boolean }>(`SELECT CASE WHEN sh."allowOthers" THEN NOT EXISTS (
+    SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"=$2 AND NOT p.subscriptions
+  ) ELSE false END AS "allowOthers" FROM workspace_subscription_shares sh
+    WHERE sh."ownerId"=$1 AND sh."workspaceId"=$2`, [ownerId, workspaceId])
+  return Boolean(row?.allowOthers) && await organizationResourceAllowed(workspaceId, 'subscription', ownerId, ownerId)
 }
 
 /**
@@ -33,8 +36,10 @@ export async function othersMayUse(query: Query, ownerId: string, workspaceId: s
  * share first: the deterministic order a bot without its own subscription uses.
  */
 export async function pooledOwners(query: Query, runOwnerId: string, workspaceId: string): Promise<string[]> {
-  if (!(await memberSubscriptionsAllowed(query, workspaceId))) return []
   const owners = (await query.query<{ ownerId: string }>('SELECT "ownerId" FROM workspace_subscription_shares WHERE "workspaceId"=$1 AND "allowOthers" AND "ownerId"<>$2 ORDER BY "createdAt","ownerId"', [workspaceId, runOwnerId])).rows.map(row => row.ownerId)
+  // No borrowed source means no sharing decision. Actual lenders still pass
+  // the current Workspace policy and each Organization approval below.
+  if (!owners.length || !(await memberSubscriptionsAllowed(query, workspaceId))) return []
   const allowed = await Promise.all(owners.map(ownerId => organizationResourceAllowed(workspaceId, 'subscription', ownerId, ownerId)))
   return owners.filter((_, index) => allowed[index])
 }

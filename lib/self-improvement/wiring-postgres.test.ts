@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database'
 import { isolatedPostgresURL } from '../../tests/helpers/isolated-postgres.mjs'
 import { factoryTestLifecycle } from '../../tests/helpers/factory-test-authority'
 import assert from 'node:assert/strict'
@@ -41,7 +42,8 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
   const admin=new Pool({connectionString:target.toString(),max:1}),schema=`skill_wiring_${randomUUID().replaceAll('-','')}`
   await admin.query(`CREATE SCHEMA "${schema}"`);target.searchParams.set('options',`-c search_path=${schema}`)
   const pool=new Pool({connectionString:target.toString(),max:12})
-  t.after(async()=>{await pool.end();await admin.end()})
+  const closeWorkspace=await bindFixtureWorkspaceDatabase(pool)
+  t.after(async()=>{await closeWorkspace();await pool.end();await admin.end()})
   const dir=new URL('../../drizzle/',import.meta.url)
   for(const name of orderMigrations((await readdir(dir)).filter(n=>n.endsWith('.sql')))) await pool.query(await readFile(new URL(name,dir),'utf8'))
   await pool.query(await readFile(new URL('20261029044008_improvement_skill_assignments.sql',dir),'utf8'))

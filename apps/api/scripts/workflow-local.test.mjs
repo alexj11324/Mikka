@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
-import test from 'node:test'
+import test, { after } from 'node:test'
 import { build, createNitro, prepare } from 'nitro/builder'
 import { nodeRuntimePackages, workflowNodeExternals } from '../build-contract.mjs'
 
@@ -18,6 +18,17 @@ const applicationPackage = JSON.parse(await readFile(join(repository, 'package.j
 const applicationRequire = createRequire(join(repository, 'package.json'))
 const localPackage = dirname(dirname(applicationRequire.resolve('@workflow/world-local')))
 const manifest = JSON.parse(await readFile(join(localPackage, 'package.json'), 'utf8'))
+
+// The SDK uses cwd/.swc for its native plugin cache, not rootDir/workspaceDir.
+// Each Node test worker needs its own cache; parallel writers can truncate a
+// cache file while another process is loading it. Keep this for the whole file.
+const previousCwd = process.cwd()
+const compilerCwd = await mkdtemp(join(tmpdir(), 'mikka-workflow-local-compiler-'))
+process.chdir(compilerCwd)
+after(async () => {
+  process.chdir(previousCwd)
+  await rm(compilerCwd, { recursive: true, force: true })
+})
 
 // A fresh Node process matters: the SDK caches package metadata on globalThis.
 // Loading an unbundled copy first would hide the actual bundling regression.

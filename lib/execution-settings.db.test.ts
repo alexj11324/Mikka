@@ -26,10 +26,19 @@ test(
       options: `-c search_path=${schema}`,
     });
     try {
+      // Install the real scoped PG handle before the first model/resource read.
+      mock.module(new URL("./workspace-db.ts", import.meta.url).href, {
+        namedExports: { workspaceDb: drizzle(pool), workspacePool: pool },
+      });
+      // Install the existing points fixture before the first model menu read.
+      // Points admission has its own DB tests; resource authorization below remains real.
+      mock.module(new URL("./points-fallback.ts", import.meta.url).href, {
+        namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) },
+      });
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
-      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY);
+      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL DEFAULT 'team' CHECK (kind IN ('personal','team')));
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now());
@@ -72,10 +81,13 @@ test(
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");
       await pool.query(personalPolicyMigration); await pool.query(personalPolicyMigration);
+      await pool.query(await readFile(new URL("../drizzle/20261107180200_organization_governance.sql", import.meta.url), "utf8"));
       const settings = new ExecutionSettings(pool),
         alice = { ownerId: "alice", workspaceId: randomUUID() },
         bob = { ...alice, ownerId: "bob" },
         other = { ...alice, workspaceId: randomUUID() };
+      await pool.query('INSERT INTO mikka_workspaces(id) VALUES ($1),($2)', [alice.workspaceId, other.workspaceId]);
+      await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'alice','Alice','active'),($1,'bob','Bob','active'),($2,'alice','Alice','active')`, [alice.workspaceId, other.workspaceId]);
       // As the migration does for existing connections: each person's subscriptions stay shared where they were connected.
       for (const scope of [alice, bob]) await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)', [scope.ownerId, scope.workspaceId]);
       const own = randomUUID(),
@@ -183,9 +195,6 @@ test(
         }),
       });
       stub("./db/index.ts", { pool });
-      stub("./workspace-db.ts", { workspaceDb: drizzle(pool) });
-      // Points and their fallback have their own tests (lib/bot-model-selection.test.ts, lib/points-fallback.db.test.ts): here Mikka 默认 has points.
-      stub("./points-fallback.ts", { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) });
       const actions = await import("../app/actions/execution-settings");
       const { freezeBotModel } = await import('./bot-model-selection');
       const { SubscriptionRepository } = await import('./subscription-repository');
@@ -199,6 +208,8 @@ test(
       assert.equal((await (await import('./bot-model-menu')).botModelMenu(pool,settings,alice,secondBot)).current.id,catalogue.bindingId,'the picker shows the visible option for a saved copied binding');
       const { COORDINATOR_MODEL } = await import('./coordinator/model');
       const unbound = {ownerId:'bob',workspaceId:randomUUID(),botId:randomUUID()};
+      await pool.query('INSERT INTO mikka_workspaces(id) VALUES ($1)', [unbound.workspaceId]);
+      await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'bob','Bob','active')`, [unbound.workspaceId]);
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3)',[unbound.botId,unbound.ownerId,unbound.workspaceId]);
       assert.deepEqual(await freezeBotModel(unbound,dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'a bot with no choice and no subscription runs on the hosted default');
       const revokedBot = randomUUID();
@@ -214,7 +225,7 @@ test(
       // with no share row and no switch; 分享给团队成员 and the admin switch decide only other members' use.
       const teamB = { ownerId: alice.ownerId, workspaceId: randomUUID() };
       const teamBot = randomUUID(), bobBot = randomUUID();
-      await pool.query('INSERT INTO mikka_workspaces VALUES ($1)', [teamB.workspaceId]);
+      await pool.query('INSERT INTO mikka_workspaces(id) VALUES ($1)', [teamB.workspaceId]);
       await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'alice','Alice','active'),($1,'bob','Bob','active')`, [teamB.workspaceId]);
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3),($4,$5,$3)',[teamBot,alice.ownerId,teamB.workspaceId,bobBot,'bob']);
       assert.equal((await pool.query('SELECT 1 FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2',[alice.ownerId,teamB.workspaceId])).rowCount,0,'nothing shared into team B');

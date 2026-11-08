@@ -9,11 +9,13 @@ import { ScimStore, type DirectoryChange, type ScimConnection } from './scim-sto
 import { enqueueMemberLifecycle, drainMemberLifecycleOutbox } from '@/lib/governance/member-outbox'
 import type { EnterpriseLoginProof } from './sso-plugin'
 import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
+import { assertOrganizationAccountWritable } from '@/lib/governance/organization-ownership'
 
 export async function synchronizeEnterpriseLogin(proof: EnterpriseLoginProof, audit?: { sessionId: string; correlationId: string }) {
   const { rows } = await pool.query<{ name: string; email: string }>('select name,email from "user" where id=$1', [proof.userId])
   if (!rows[0]) throw new Error('enterprise_identity_missing')
   await workspaceDb.transaction(async tx => {
+    await assertOrganizationAccountWritable(tx, proof.userId)
     const [organization] = await tx.select({ archivedAt: organizations.archivedAt }).from(organizations).where(eq(organizations.id, proof.organizationId)).for('share').limit(1)
     if (!organization || organization.archivedAt) throw new Error('enterprise_organization_unavailable')
     await tx.insert(organizationMembers).values({ organizationId: proof.organizationId, userId: proof.userId, role: 'member', status: 'active', ...rows[0] }).onConflictDoNothing()
@@ -37,6 +39,7 @@ export async function synchronizeDirectoryUser({ connection, user, action, event
     return
   }
   const workspaceIds = await workspaceDb.transaction(async tx => {
+    await assertOrganizationAccountWritable(tx, user.userId!)
     const links = await tx.select({ id: organizationWorkspaces.workspaceId }).from(organizationWorkspaces)
       .where(eq(organizationWorkspaces.organizationId, connection.organizationId)).orderBy(asc(organizationWorkspaces.workspaceId))
     const ids = links.map(link => link.id)

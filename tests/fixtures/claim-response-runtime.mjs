@@ -4,13 +4,39 @@ import assert from 'node:assert/strict'
 import { PgDialect } from 'drizzle-orm/pg-core'
 
 const dialect = new PgDialect()
-function workspaceQuery() {
-  let table, condition
+function workspaceQuery(columns) {
+  let table, condition, organizationJoin = false
+  const organizations = () => {
+    const p = globalThis.claimResponseProbe
+    assert.equal(table, 'mikka_organization_workspaces')
+    assert.deepEqual(condition.params, [p.workspace.id])
+    assert.ok(condition.sql === '"mikka_organization_workspaces"."workspaceId" = $1'
+      || condition.sql === '"mikka_organization_workspaces"."workspaceId" in ($1)')
+    if (columns !== undefined) assert.deepEqual(Object.keys(columns), ['organizationId'])
+    // This claim-composition fixture has no Organization-link row. The real
+    // Enterprise gate consumes that exact projection; unknown queries fail.
+    return []
+  }
   const query = {
     from(value) { table = value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')]; return query },
     innerJoin() { return query },
+    leftJoin(value, predicate) {
+      assert.equal(value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')], 'mikka_organization_workspaces')
+      const join = dialect.sqlToQuery(predicate)
+      assert.deepEqual(join.params, [])
+      if (table === 'mikka_workspaces') {
+        assert.equal(join.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"')
+        assert.deepEqual(Object.keys(columns), ['id', 'kind', 'organizationId'])
+      } else {
+        assert.equal(table, 'mikka_workspace_members')
+        assert.equal(join.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+        assert.deepEqual(Object.keys(columns), ['id', 'organizationId'])
+      }
+      organizationJoin = true
+      return query
+    },
     where(value) { condition = dialect.sqlToQuery(value); return query },
-    async for(mode) {
+    async for(mode, options) {
       const p = globalThis.claimResponseProbe
       assert.equal(mode, 'share')
       if (table === 'mikka_workspaces') {
@@ -19,15 +45,21 @@ function workspaceQuery() {
         return [p.workspace]
       }
       assert.equal(table, 'mikka_workspace_members')
+      assert.equal(organizationJoin, true)
+      assert.ok(options?.of)
+      assert.equal(options.of[Object.getOwnPropertySymbols(options.of).find(s => s.description === 'drizzle:Name')], 'mikka_workspace_members')
       assert.deepEqual(condition.params, [p.workspace.id, p.run.userId, 'active'])
       p.locks.push('workspace_members')
-      return p.memberAllowed ? [{ id: p.run.userId }] : []
+      return p.memberAllowed ? [{ id: p.run.userId, organizationId: null }] : []
     },
+    async limit(value) { assert.equal(value, 1); return organizations() },
+    // oxlint-disable-next-line unicorn/no-thenable -- Match the awaited Org-link SELECT.
+    then(resolve, reject) { return Promise.resolve().then(organizations).then(resolve, reject) },
     async orderBy() {
       const p = globalThis.claimResponseProbe
       assert.equal(table, 'mikka_workspaces')
       assert.deepEqual(condition.params, [p.run.userId, 'active', p.workspace.id, 'team', 'personal', p.run.userId])
-      return p.memberAllowed ? [p.workspace] : []
+      return p.memberAllowed ? [{ ...p.workspace, ...(organizationJoin ? { organizationId: null } : {}) }] : []
     },
   }
   return query
@@ -38,7 +70,8 @@ export const claimWorkspaceDatabase = { select: workspaceQuery, transaction: cal
 export const claimWorkspacePool = { query() { throw new Error('unexpected raw workspace query in claim fixture') } }
 const nextServer = import.meta.resolve('next/server')
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
-const dbSource = `import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
+const dbSource = `import assert from 'node:assert/strict'
+import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-core'))}
 
 function query(columns){
   let table
@@ -69,8 +102,26 @@ function update(value){
     return {then(resolve,reject){return once().then(()=>undefined).then(resolve,reject)},returning(){return once()}}
   }}}}
 }
-export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
-export const pool={}
+let checkedOutClient
+export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
+export const pool={connect:async()=>{
+  const p=globalThis.claimResponseProbe
+  assert.equal(checkedOutClient,undefined,'claim cannot acquire a second APP client')
+  assert.equal(p.appActive,0)
+  assert.equal(p.locks.at(-1),'workspace_members','Workspace admission precedes APP checkout')
+  p.appActive=1;p.appCheckouts++
+  const client={release(){
+    assert.equal(checkedOutClient,client,'release the exact owning APP client')
+    assert.equal(p.appActive,1)
+    checkedOutClient=undefined;p.appActive=0;p.appReleases++
+  }}
+  checkedOutClient=client
+  return client
+}}
+export async function withDatabaseClient(client,operation){
+  assert.equal(client,checkedOutClient,'bind the exact checked-out APP client')
+  return operation()
+}
 `
 const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],

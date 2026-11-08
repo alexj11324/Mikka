@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {randomUUID} from 'node:crypto'
-import {before, beforeEach, mock, test} from 'node:test'
+import {afterEach, before, beforeEach, mock, test} from 'node:test'
 import {defaultRunPolicy} from '@mikka/protocol/agent-policy'
 import {REPO_ORIGIN_HEADER} from '@mikka/protocol/device'
 import {freezeWorkerDefinition, retryWorkerDefinition} from './worker'
@@ -8,6 +8,7 @@ import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
 import { overrideDeploymentSwitch } from '../deployment-switches'
+import { PgDialect } from 'drizzle-orm/pg-core'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
 const otherWorkspace=randomUUID()
@@ -46,7 +47,7 @@ let selectIndex=0
 let mismatch: string|undefined
 let currentRun: {id:string;userId:string;workspaceId:string|null;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;baseBranch:null;kind:string;prompt:string;agentDefinition:ReturnType<typeof frozen>|null;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}
 let requestedRunId=randomUUID()
-let stopDuringToken=false,revokeDuringToken=false,memberActive=true,memberLease=false
+let stopDuringToken=false,revokeDuringToken=false,memberActive=true,memberLease=false,applicationLease=false
 const lockOrder:string[]=[]
 const tableName=(value:Record<symbol,unknown>)=>String(value[Object.getOwnPropertySymbols(value).find(key=>key.description==='drizzle:Name')!])
 const issueFixture=()=>({id:issueId,userId:owner,workspaceId:mismatch==='issue-workspace'?otherWorkspace:workspace,ownershipState:mismatch==='unresolved-issue'?'unresolved':'bound',scope:'personal',content:{type:'doc'}})
@@ -57,7 +58,7 @@ const db={select:()=>{let table='';const query={from(value:Record<symbol,unknown
  if(table==='agents')return [{id:agentId,userId:mismatch==='agent'?'other-owner':owner,deviceId:randomUUID(),harness:'claude_code'}]
  if(table==='device_repos')return [{id:repoId,userId:mismatch==='repo'?'other-owner':owner,deviceId:mismatch==='device'?randomUUID():deviceId,baseBranch:'main',repoPath:mismatch==='legacy-key'?'github.com/example/repo':'v2/github.com/example/repo',remoteUrl:mismatch==='repo-url'?'https://github.com:8443/example/repo.git':'https://github.com/example/repo.git'}]
  throw new Error(`Unexpected compatibility read: ${table}`)
- }};return query},update:()=>({set:()=>({where:async()=>undefined})}),transaction:async<T>(run:(value:typeof tx)=>Promise<T>)=>{assert.equal(memberLease,true,'claim response locks workspace/member before APP rows');return run(tx)}}
+ }};return query},update:()=>({set:()=>({where:async()=>undefined})}),transaction:async<T>(run:(value:typeof tx)=>Promise<T>)=>{assert.equal(memberLease,true,'claim response locks workspace/member before APP rows');assert.equal(applicationLease,true,'claim response uses its checked-out APP client');return run(tx)}}
 // Keep the real withTaskWorkspace/requireTaskWorkspace/claim-response code.
 // This fixture supplies their small DB projections and checks selected ids;
 // PostgreSQL row-lock and revocation behavior belongs to the DB suites.
@@ -70,29 +71,71 @@ function equalities(node:SqlChunk,found:[string,string,unknown][]=[]){
  })
  return found
 }
-function workspaceSelect(){
- let table='',filters:[string,string,unknown][]=[]
+function workspaceSelect(columns?:Record<string,unknown>){
+ let table='',filters:[string,string,unknown][]=[],organizationJoin=false
+ let condition:ReturnType<PgDialect['sqlToQuery']>|undefined
+ const organizations=()=>{
+  assert.equal(table,'mikka_organization_workspaces')
+  assert.deepEqual(condition?.params,[workspace])
+  assert.ok(condition?.sql==='"mikka_organization_workspaces"."workspaceId" = $1'||condition?.sql==='"mikka_organization_workspaces"."workspaceId" in ($1)')
+  if(columns!==undefined)assert.deepEqual(Object.keys(columns),['organizationId'])
+  // An exact non-Organization projection, not a replacement authorization.
+  return []
+ }
  const matches=(source:string,column:string,value:unknown)=>filters.some(([name,key,expected])=>name===source&&key===column&&expected===value)
- const query={from(value:Record<symbol,unknown>){table=tableName(value);return query},innerJoin(){return query},where(predicate:SqlChunk){filters=equalities(predicate);return query},
-  async for(){
+ const query={from(value:Record<symbol,unknown>){table=tableName(value);return query},innerJoin(){return query},
+  leftJoin(value:Record<symbol,unknown>,predicate:Parameters<PgDialect['sqlToQuery']>[0]){
+   assert.equal(tableName(value),'mikka_organization_workspaces')
+   const join=new PgDialect().sqlToQuery(predicate)
+   assert.deepEqual(join.params,[])
+   if(table==='mikka_workspaces'){
+    assert.equal(join.sql,'"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"')
+    assert.deepEqual(Object.keys(columns!),['id','kind','organizationId'])
+   }else{
+    assert.equal(table,'mikka_workspace_members')
+    assert.equal(join.sql,'"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+    assert.deepEqual(Object.keys(columns!),['id','organizationId'])
+   }
+   organizationJoin=true;return query
+  },
+  where(predicate:SqlChunk){filters=equalities(predicate);condition=new PgDialect().sqlToQuery(predicate as unknown as Parameters<PgDialect['sqlToQuery']>[0]);return query},
+  async for(strength:string,options?:{of?:Record<symbol,unknown>}){
    lockOrder.push(table)
    if(table==='mikka_workspaces')return matches(table,'id',workspace)?[{id:workspace,kind:'team',ownerId:owner}]:[]
    if(table==='mikka_workspace_members'){
+    assert.equal(organizationJoin,true);assert.equal(strength,'share')
+    assert.ok(options?.of);assert.equal(tableName(options.of),'mikka_workspace_members')
     memberLease=memberActive&&matches(table,'workspaceId',workspace)&&matches(table,'userId',owner)&&matches(table,'status','active')
-    return memberLease?[{id:owner}]:[]
+    return memberLease?[{id:owner,organizationId:null}]:[]
    }
    throw new Error(`Unexpected workspace lock: ${table}`)
   },
-  async orderBy(){return memberActive&&matches('mikka_workspaces','id',workspace)&&matches('mikka_workspace_members','userId',owner)&&matches('mikka_workspace_members','status','active')?[{id:workspace,kind:'team'}]:[]},
+  async limit(value:number){assert.equal(value,1);return organizations()},
+  async orderBy(){return memberActive&&matches('mikka_workspaces','id',workspace)&&matches('mikka_workspace_members','userId',owner)&&matches('mikka_workspace_members','status','active')?[{id:workspace,kind:'team',...(organizationJoin?{organizationId:null}:{})}]:[]},
   // oxlint-disable-next-line unicorn/no-thenable -- Match an awaited Drizzle selection.
-  then(resolve:(rows:unknown)=>unknown,reject:(error:unknown)=>unknown){return query.orderBy().then(resolve,reject)},
+  then(resolve:(rows:unknown)=>unknown,reject:(error:unknown)=>unknown){return (table==='mikka_organization_workspaces'?Promise.resolve().then(organizations):query.orderBy()).then(resolve,reject)},
  }
  return query
 }
 const workspaceFixture={select:workspaceSelect,transaction:async<T>(operation:(value:{select:typeof workspaceSelect})=>Promise<T>)=>{try{return await operation({select:workspaceSelect})}finally{memberLease=false}}}
 let cloud=false,localCapable=false
 let protocolVersion=3
-stub('../db/index.ts',{db,pool:{}})
+const applicationClient={release(){assert.equal(applicationLease,true,'release the checked-out claim client exactly once');applicationLease=false}}
+stub('../db/index.ts',{
+ db,
+ pool:{connect:async()=>{
+  assert.equal(memberLease,true,'claim checks out APP only after the Workspace lease')
+  assert.equal(applicationLease,false,'claim cannot check out a second APP client')
+  applicationLease=true
+  return applicationClient
+ }},
+ withDatabaseClient:async<T>(client:typeof applicationClient,operation:()=>Promise<T>)=>{
+  assert.equal(client,applicationClient)
+  assert.equal(applicationLease,true,'bind only the checked-out claim client')
+  return operation()
+ },
+})
+afterEach(()=>assert.equal(applicationLease,false,'claim always releases its APP client'))
 const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,network:'deny',install_dependency:'deny',git_push:'deny'},networkAllow:['cli-policy.invalid']}
 let cliReadOnly=false
 stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})

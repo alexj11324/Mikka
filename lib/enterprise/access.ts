@@ -95,15 +95,27 @@ export async function requireEnterpriseOrganization(userId: string, organization
 export async function requireEnterpriseWorkspace(userId: string, workspaceId: string, principal?: EnterprisePrincipal, executor?: WorkspaceLinkExecutor, appExecutor?: EnterpriseAuthExecutor) {
   if (!await enterpriseWorkspaceAllowed(userId, workspaceId, principal, executor, appExecutor)) throw new WorkspaceError('workspaceAccessDenied')
 }
-export async function filterEnterpriseWorkspaces<T extends { id: string }>(reader: string | EnterpriseReader, workspaces: T[]): Promise<T[]> {
+async function filterWorkspaceOrganizations<T extends { id: string }>(reader: string | EnterpriseReader, workspaces: T[], organizations: ReadonlyMap<string, string | null>): Promise<T[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   const principal = typeof reader === 'string' ? undefined : reader[enterprisePrincipal]
-  if (!workspaces.length) return workspaces
-  const links = await workspaceDb.select().from(organizationWorkspaces).where(inArray(organizationWorkspaces.workspaceId, workspaces.map(workspace => workspace.id)))
-  const organizations = new Map(links.map(link => [link.workspaceId, link.organizationId]))
   const checks = await Promise.all(workspaces.map(workspace => {
     const organizationId = organizations.get(workspace.id)
     return organizationId ? organizationAccess(userId, workspace.id, organizationId, principal) : true
   }))
   return workspaces.filter((_, index) => checks[index])
 }
+
+/** Canonical linkage comes from a fresh membership SELECT or an active
+ * Workspace lock whose same-transaction link writes invalidate its projection.
+ * Never pass request-supplied links. Session, directory and organization policy
+ * are checked on every call, including reads under the same lock. */
+export function filterEnterpriseWorkspaceLinks<T extends { id: string; organizationId: string | null }>(reader: string | EnterpriseReader, workspaces: T[]): Promise<T[]> {
+  return filterWorkspaceOrganizations(reader, workspaces, new Map(workspaces.map(workspace => [workspace.id, workspace.organizationId])))
+}
+
+export async function filterEnterpriseWorkspaces<T extends { id: string }>(reader: string | EnterpriseReader, workspaces: T[]): Promise<T[]> {
+  if (!workspaces.length) return workspaces
+  const links = await workspaceDb.select().from(organizationWorkspaces).where(inArray(organizationWorkspaces.workspaceId, workspaces.map(workspace => workspace.id)))
+  return filterWorkspaceOrganizations(reader, workspaces, new Map(links.map(link => [link.workspaceId, link.organizationId])))
+}
+

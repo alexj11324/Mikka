@@ -448,7 +448,8 @@ export const githubRepositoryInstallations = pgTable('github_repository_installa
 /** Server-issued publication assignment and durable completion receipt (ADR 0024). */
 export const runPublications = pgTable('run_publications', {
   runId: uuid('runId').primaryKey().references(() => agentRuns.id, { onDelete: 'cascade' }),
-  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** Historical actor, as on agent_runs; deleting an account cannot erase a kept task's publication receipt. */
+  userId: text('userId').notNull(),
   issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   scopeVersion: integer('scopeVersion'), issueTitle: text('issueTitle'),
   remoteUrl: text('remoteUrl').notNull(), remoteKey: text('remoteKey').notNull(),

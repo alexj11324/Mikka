@@ -66,7 +66,7 @@ dbTest('full and compact chat reads use one snapshot across a concurrent inbox c
     try {
       for (const kind of ['full', 'compact'] as const) await t.test(kind, async () => {
         const botId = randomUUID(), holder = `wrun_snapshot_${kind}`
-        await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: 'Snapshot bot' })
+        await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: await seedFixtureWorkspace(pool, owner), name: `Snapshot bot ${kind}` })
         // Insert only a durable pending event. The test owns the actual claim;
         // no unrelated background Workflow competes with this interleaving.
         await db.insert(schema.coordinatorEvents).values({ id: randomUUID(), ...userMessageEvent(owner, 'Snapshot request', { botId }) })

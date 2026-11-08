@@ -40,12 +40,20 @@ function workspaceQuery() {
   const query={
     from(value){table=value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')];return query},
     innerJoin(){return query},
+    leftJoin(value){assert.equal(value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')],'mikka_organization_workspaces');return query},
     where(value){condition=dialect.sqlToQuery(value);return query},
     async orderBy(){
       const p=globalThis.scopeStoreProbe,userId=condition.params[0]
       assert.equal(table,'mikka_workspaces')
       assert.deepEqual(condition.params,[userId,'active','team','personal',userId])
-      return p.activeMembers.has(userId)?[p.workspace]:[]
+      return p.activeMembers.has(userId)?[{...p.workspace,organizationId:null}]:[]
+    },
+    async limit(count){
+      // This scope-store fixture has no Organization link; its real gate still runs.
+      assert.equal(table,'mikka_organization_workspaces')
+      assert.deepEqual(condition.params,[globalThis.scopeStoreProbe.workspace.id])
+      assert.equal(count,1)
+      return []
     },
     async for(mode){
       const p=globalThis.scopeStoreProbe

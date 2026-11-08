@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { fstatSync, realpathSync, writeFileSync } from 'node:fs'
+import { realpathSync, writeFileSync } from 'node:fs'
 import * as fs from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -11,13 +11,16 @@ import { RpcServer, type RpcHandlers, type RpcServerOptions } from '../src/rpc/s
 import { MemoryServer } from '../src/server-link'
 import { cleanupTempDirs, tempDir } from './helpers'
 
+const nativeStart = vi.hoisted(() => vi.fn(async () => {
+  throw Error('No native task is authorized in this scheduling test')
+}))
 // These are daemon I/O scheduling tests, not execution/host admission tests.
-// The real resolver and file reads run; no native adapter is ever started.
+// Keep the real resolver. A refused claim must never start a native adapter.
 vi.mock('../src/subscription-hosted-runner', async original => {
   const actual = await original<typeof import('../src/subscription-hosted-runner')>()
-  const refused = async () => { throw Error('No native task is authorized in this scheduling test') }
   return { ...actual, createHostedBotRunner: async (host: Parameters<typeof actual.createHostedBotRunner>[0]) => ({
-    binaries: hostedBinaries(host.binaries), harnesses: ['claude_code'], start: refused, prepare: refused, command: refused,
+    binaries: hostedBinaries(host.binaries), harnesses: ['claude_code'],
+    start: nativeStart, prepare: nativeStart, command: nativeStart,
   }) }
 })
 vi.mock('../src/hosted-cli-prefetch', async original => {
@@ -34,6 +37,7 @@ const cleanups: (() => Promise<void>)[] = []
 beforeEach(() => {
   vi.mocked(fs.open).mockReset().mockImplementation(actualFs.open)
   vi.mocked(prefetchHostedCliFiles).mockClear()
+  nativeStart.mockClear()
   // The UI socket is unrelated to the server registration/claim ordering.
   vi.spyOn(RpcServer.prototype, 'listen').mockImplementation(async function (this: RpcServer) {
     handlers = (this as unknown as { options: RpcServerOptions }).options.handlers
@@ -48,23 +52,13 @@ function deferred() {
   const promise = new Promise<void>(yes => { resolve = yes })
   return { promise, resolve }
 }
-function machine(cloud = true, blockRead = true) {
+function machine(cloud = true) {
   const binary = join(realpathSync(tempDir()), 'claude')
   writeFileSync(binary, Buffer.alloc(400_007, 61), { mode: 0o755 })
-  const entered = deferred(), release = deferred(), descriptors: number[] = []
+  const softwareReads: string[] = []
   vi.mocked(fs.open).mockImplementation(async (...args) => {
-    const file = await actualFs.open(...args)
-    if (String(args[0]) === binary) {
-      descriptors.push(file.fd)
-      const read = file.read.bind(file)
-      vi.spyOn(file, 'read').mockImplementation(async (...values) => {
-        const value = await Reflect.apply(read, file, values)
-        entered.resolve()
-        if (blockRead) await release.promise
-        return value
-      })
-    }
-    return file
+    if (String(args[0]) === binary) softwareReads.push(binary)
+    return actualFs.open(...args)
   })
   const link = new MemoryServer(randomUUID()).link()
   const claim = vi.spyOn(link, 'claimRun').mockRejectedValue(Error('Fixture claim refused'))
@@ -74,62 +68,80 @@ function machine(cloud = true, blockRead = true) {
     harnessBinaries: { claude_code: binary }, modelProbe: false, quotaSource: null,
     heartbeatMs: 60_000, log: createLogger({ level: 'silent' }),
   })
-  cleanups.push(async () => { release.resolve(); await daemon.stop() })
-  return { daemon, claim, register, entered, release, descriptors }
+  cleanups.push(async () => { await daemon.stop() })
+  return { daemon, claim, register, softwareReads }
 }
 
-it('does not wait for prefetch to register or claim, and credential rotation does not start another pass', async () => {
+it('registers and claims directly without prefetch, including repeated sync and credential rotation', async () => {
   const f = machine()
   await f.daemon.start()
-  expect(prefetchHostedCliFiles).toHaveBeenCalledTimes(1)
-  await f.entered.promise
   await f.daemon.syncWithServer()
-  expect(f.register).toHaveBeenCalled()
+  expect(f.register).toHaveBeenCalledTimes(1)
   expect(f.claim).toHaveBeenCalledTimes(1)
-  const prefetch = vi.mocked(prefetchHostedCliFiles).mock.results[0]!.value
-  let completed = false
-  void prefetch.done.then(() => { completed = true })
   await handlers['device.setCredential']({ credential: 'rotated-fixture-device' })
   await f.daemon.syncWithServer()
-  expect(completed).toBe(false)
-  expect(prefetchHostedCliFiles).toHaveBeenCalledTimes(1)
-  const stopped = f.daemon.stop()
-  let stopCompleted = false
-  void stopped.then(() => { stopCompleted = true })
-  await Promise.resolve()
-  expect(stopCompleted).toBe(false)
-  f.release.resolve()
-  await stopped
-  expect(await prefetch.done).toMatchObject({ status: 'aborted', files: 0 })
-  for (const fd of f.descriptors) expect(() => fstatSync(fd)).toThrow()
+  await f.daemon.syncWithServer()
+  expect(f.register).toHaveBeenCalledTimes(2)
+  expect(f.claim).toHaveBeenCalledTimes(1)
+  await f.daemon.stop()
+  expect(prefetchHostedCliFiles).not.toHaveBeenCalled()
+  expect(f.softwareReads).toEqual([])
+  expect(nativeStart).not.toHaveBeenCalled()
 })
 
-it('does not add prefetch to a normal local or candidate daemon', async () => {
-  const f = machine(false, false)
+it('does not add background software reads to a normal local or candidate daemon', async () => {
+  const f = machine(false)
   await f.daemon.start()
   await f.daemon.syncWithServer()
   expect(f.register).toHaveBeenCalled()
+  await f.daemon.stop()
   expect(prefetchHostedCliFiles).not.toHaveBeenCalled()
-  expect(f.descriptors).toEqual([])
+  expect(f.softwareReads).toEqual([])
+  expect(nativeStart).not.toHaveBeenCalled()
 })
 
-it('drains pending file I/O when daemon startup itself fails', async () => {
-  const f = machine(), failure = Error('Fixture UI startup failure'), fail = deferred(), aborted = deferred()
+it('preserves startup failure cleanup without starting background software reads or claiming', async () => {
+  const f = machine(), failure = Error('Fixture UI startup failure')
+  const entered = deferred(), fail = deferred()
   vi.mocked(RpcServer.prototype.listen).mockImplementation(async () => {
-    await f.entered.promise
+    entered.resolve()
     await fail.promise
     throw failure
   })
   const starting = f.daemon.start().catch(error => error)
-  await f.entered.promise
-  const prefetch = vi.mocked(prefetchHostedCliFiles).mock.results[0]!.value
-  const abort = prefetch.abort.bind(prefetch)
-  vi.spyOn(prefetch, 'abort').mockImplementation(() => { abort(); aborted.resolve() })
+  await entered.promise
   fail.resolve()
-  await aborted.promise
-  f.release.resolve()
   expect(await starting).toBe(failure)
-  expect(await prefetch.done).toMatchObject({ status: 'aborted' })
+  await f.daemon.stop()
   expect(f.register).not.toHaveBeenCalled()
-  for (const fd of f.descriptors) expect(() => fstatSync(fd)).toThrow()
+  expect(f.claim).not.toHaveBeenCalled()
+  expect(prefetchHostedCliFiles).not.toHaveBeenCalled()
+  expect(f.softwareReads).toEqual([])
+  expect(nativeStart).not.toHaveBeenCalled()
+})
+
+it('still aborts and drains an in-flight claim before completing daemon stop', async () => {
+  const f = machine(), entered = deferred(), aborted = deferred(), released = deferred()
+  f.claim.mockImplementation(async (_deviceId, _runId, signal) => {
+    if (!signal) throw Error('Claim cancellation signal is required')
+    if (signal.aborted) aborted.resolve()
+    else signal.addEventListener('abort', aborted.resolve, { once: true })
+    entered.resolve()
+    await released.promise
+    throw Error('Fixture claim refused after drain')
+  })
+  cleanups.unshift(async () => { released.resolve() })
+  await f.daemon.start()
+  await f.daemon.syncWithServer()
+  await entered.promise
+  let stopped = false
+  const stopping = f.daemon.stop().then(() => { stopped = true })
+  await aborted.promise
+  expect(stopped).toBe(false)
+  released.resolve()
+  await stopping
+  expect(f.claim).toHaveBeenCalledTimes(1)
+  expect(prefetchHostedCliFiles).not.toHaveBeenCalled()
+  expect(f.softwareReads).toEqual([])
+  expect(nativeStart).not.toHaveBeenCalled()
 })

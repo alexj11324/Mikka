@@ -5,6 +5,7 @@ import type { SQL } from 'drizzle-orm'
 import { ActionFailureError } from './action-error'
 import { agentRuns, issueMembers, runChunks, runMessages } from './db/schema'
 import { workspaceMembers, workspaces } from './db/workspace-schema'
+import { organizationWorkspaces } from './db/governance-schema'
 import { factoryEventId } from './factory/event-id'
 import { FactoryError } from './factory/contract'
 
@@ -157,13 +158,26 @@ before(async () => {
   } } } })
   mock.module('@/lib/workspace-db', { namedExports: {
     workspacePool: { query: () => { throw new Error('Unexpected raw workspace read') } },
-    workspaceDb: { select: () => ({ from: (table: unknown) => {
-      const query = { innerJoin: () => query, where: (condition: SQL) => {
+    workspaceDb: { select: (projection?: Record<string, unknown>) => ({ from: (table: unknown) => {
+      let organizationJoined = false
+      const query = { innerJoin: () => query, leftJoin: (joined: unknown, condition: SQL) => {
+        assert.equal(table, workspaces)
+        assert.equal(joined, organizationWorkspaces)
+        assert.deepEqual(projection, { id: workspaces.id, kind: workspaces.kind, organizationId: organizationWorkspaces.organizationId })
+        const sql = dialect.sqlToQuery(condition)
+        assert.match(sql.sql, /"mikka_organization_workspaces"\."workspaceId" = "mikka_workspaces"\."id"/)
+        assert.deepEqual(sql.params, [])
+        organizationJoined = true
+        return query
+      }, where: (condition: SQL) => {
         const sql = dialect.sqlToQuery(condition)
         assert.ok(sql.params.includes(workspaceId)); assert.ok(sql.params.includes('active'))
         assert.ok(table === workspaceMembers || table === workspaces)
+        if (projection?.organizationId) assert.equal(organizationJoined, true)
+        // This fixture has no organization link. A LEFT JOIN projects SQL NULL;
+        // it must still resolve membership from the fixture's current members.
         const rows = table === workspaceMembers ? [...current.members].map(id => ({ id }))
-          : current.members.has(String(sql.params[0])) ? [{ id: workspaceId, kind: 'team' }] : []
+          : current.members.has(String(sql.params[0])) ? [{ id: workspaceId, kind: 'team', ...(organizationJoined ? { organizationId: null } : {}) }] : []
         const result = Promise.resolve(rows)
         return Object.assign(result, { orderBy: () => result })
       } }

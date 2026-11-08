@@ -28,6 +28,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const { sendThreadMessage } = await import('../lib/thread-continue')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
+  const { withTaskWorkspace } = await import('../lib/task-workspace')
   const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
   const users: string[] = []
   const github = githubAppStub()
@@ -198,13 +199,16 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       const questions = factoryRuntimeForBot(legacyNullScope ? null : b.botId).questions
       // Exercise the same host claim gate that admitted the production run.
       // A task's chat Bot may send work to another owned Bot in its workspace.
-      const claimTx = await pool.connect()
-      try {
-        await claimTx.query('BEGIN')
-        const originalClaim = await factoryRuntimeForBot(legacyNullScope ? null : b.botId).claim(claimTx, b.id, childDevice, initial.runId, new Date(Date.now() + 60_000).toISOString())
-        assert.equal(originalClaim.preserveQuestionWorktree, true)
-        await claimTx.query('ROLLBACK')
-      } finally { claimTx.release() }
+      await withTaskWorkspace(b.id, b.ws.id, async () => {
+        const claimTx = await pool.connect()
+        try {
+          await claimTx.query('BEGIN')
+          const originalClaim = await factoryRuntimeForBot(legacyNullScope ? null : b.botId).claim(claimTx, b.id, childDevice, initial.runId, new Date(Date.now() + 60_000).toISOString())
+          assert.equal(originalClaim.preserveQuestionWorktree, true)
+        } finally {
+          try { await claimTx.query('ROLLBACK') } finally { claimTx.release() }
+        }
+      })
       const questionId = randomUUID(), sessionId = randomUUID(), nativeSessionId = `native:${initial.runId}`
       await pool.query(`INSERT INTO "session" (id,"userId",token,"expiresAt","createdAt","updatedAt")
         VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, b.id, `fixture-${randomUUID()}`])
@@ -765,8 +769,10 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"botId","agentDefinition") SELECT $1,"userId","issueId","agentId","deviceId","deviceRepoId",'queued',$2,"botId","agentDefinition" FROM agent_runs WHERE id=$3`, [repairId, 'Historical issue: ' + JSON.stringify(oldText), sent.runId])
       return { runId: repairId }
     })
-    await dispatch(b.id, { binding: factoryBinding(repairingTask), agentId: execution.agentId, deviceRepoId: execution.deviceRepoId })
-    assert.equal((await dispatch(b.id, { binding: factoryBinding(repairingTask), agentId: execution.agentId, deviceRepoId: execution.deviceRepoId })).runId, repairId)
+    const dispatchRepair = () => withTaskWorkspace(b.id, b.ws.id, () =>
+      dispatch(b.id, { binding: factoryBinding(repairingTask), agentId: execution.agentId, deviceRepoId: execution.deviceRepoId }))
+    await dispatchRepair()
+    assert.equal((await dispatchRepair()).runId, repairId)
     assert.equal(repairQueues, 1, 'same automatic repair/source replay does not queue another execute')
     const repaired = (await pool.query('SELECT t."sourceEventId",r.prompt FROM factory_tasks t JOIN agent_runs r ON r.id=$2 WHERE t.id=$1', [task.id, repairId])).rows[0]
     assert.equal(repaired.sourceEventId, event.id)

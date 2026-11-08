@@ -268,7 +268,7 @@ test('run chains: folding, LIMIT on roots, stop forwarding and isolation', { ski
       // This connection-local table represents pre-migration history. The
       // production guard remains enabled on the real table throughout.
       await history.query(`CREATE TEMP TABLE agent_runs (
-        id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"workspaceId" uuid,"botId" uuid,status text,outcome text,
+        id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"workspaceId" uuid,"botId" uuid,status text,outcome text,"failureDetails" jsonb,
         "createdAt" timestamptz DEFAULT now(),"finishedAt" timestamptz,"stopRequestedAt" timestamptz,
         "questionContinuation" jsonb,"retryOf" uuid,"continuesRunId" uuid) ON COMMIT DROP`)
       await history.query(`INSERT INTO agent_runs (id,"userId","workspaceId",status,"retryOf","continuesRunId","questionContinuation","createdAt") VALUES

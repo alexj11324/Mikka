@@ -578,6 +578,7 @@ export function createFactoryMonitor(
          JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
          JOIN coordinator_events e ON e."runId"=a."runId" AND e."userId"=t."userId" AND e."issueId"=t."issueId" AND e.kind='run_finished'
          WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND t.stage='monitor' AND t.status NOT IN ('cancelled','revoked')
+          AND EXISTS (SELECT 1 FROM "user" u WHERE u.id=t."userId")
          AND NOT EXISTS (SELECT 1 FROM factory_monitor_observations o WHERE o."userId"=$1 AND o."sourceEventId"=e.id)
          ORDER BY e."createdAt" LIMIT 50`,
         [userId,botId],

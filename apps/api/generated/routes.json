@@ -40,7 +40,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "00301128afaddfc9d6fe6c48f6566ffdeb16d4a7eff074bdb284804cea9b17d7"
+      "sourceHash": "3dfe69c342ef74ab646a1e9d307d8649ab4bcfbf9be52cefb621f9d148bf9cac"
     },
     {
       "path": "/mikka/api/account/export/[token]",
@@ -863,6 +863,15 @@
       "sourceHash": "81fb5e614f4ae9cab6f7528e316252c90d44f6be53dc8c8629fa7f35bf27f9b3"
     },
     {
+      "path": "/mikka/api/enterprise/logout-target",
+      "template": "/api/enterprise/logout-target",
+      "source": "app/api/enterprise/logout-target/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "8db131f5874878e3db9a41ee223bc83b5c65f8c90c2f08296a36381e03213f37"
+    },
+    {
       "path": "/mikka/api/factory/agent-profiles",
       "template": "/api/factory/agent-profiles",
       "source": "app/api/factory/agent-profiles/route.ts",
@@ -930,7 +939,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "ca6edf2eb75bfc6332ee5e33d0b637a6b1f4874aeae042622b550a72abd921cc"
+      "sourceHash": "6c84f889ccb33e59c75cac7fc6b324e55010b6df67178aa9e7b6dfac40af0eac"
     },
     {
       "path": "/mikka/api/factory/tasks/route",
@@ -1406,7 +1415,16 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "f70c1813cd999755d4b8b3201de2d5910fa9e18d56bf871c42bed8a3cb9c6234"
+      "sourceHash": "f5503cef4f7685ce91b1faa0ef50b522386f175594c85db5ed651c4f3deddb2c"
+    },
+    {
+      "path": "/mikka/api/mobile/tasks/[id]",
+      "template": "/api/mobile/tasks/[id]",
+      "source": "app/api/mobile/tasks/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "831a1af2edc2dfaf2b3beffbd3ce78bf744686f2e3dd5897d47f3b2ee1e1848a"
     },
     {
       "path": "/mikka/api/mobile/threads",

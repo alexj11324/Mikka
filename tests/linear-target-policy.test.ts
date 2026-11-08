@@ -3,6 +3,8 @@ import test from 'node:test'
 import { randomUUID } from 'node:crypto'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
+import { workspaces, workspaceMembers } from '../lib/db/workspace-schema'
+import { organizationWorkspaces } from '../lib/db/governance-schema'
 
 function reader(rows:unknown[][]) {
   let index=0, writes=0
@@ -19,12 +21,36 @@ function reader(rows:unknown[][]) {
 }
 const issue={id:randomUUID(),userId:'owner',workspaceId:randomUUID(),ownershipState:'bound',scope:'workspace',linearSyncPolicy:'explicit',linearSyncBlocked:false,scopeVersion:2,content:{type:'doc',content:[]}}
 const dialect = new PgDialect()
-const workspace = { select: () => {
-  const chain = { from: () => chain, innerJoin: () => chain, where: (condition: SQL) => {
-    const query = dialect.sqlToQuery(condition)
-    assert.ok(query.params.includes(issue.workspaceId)); assert.ok(query.params.includes(issue.userId)); assert.ok(query.params.includes('active'))
-    return { orderBy: async () => [{ id: issue.workspaceId, kind: 'team' }] }
-  } }
+const workspace = { select: (projection: Record<string, unknown>) => {
+  assert.deepEqual(projection, { id: workspaces.id, kind: workspaces.kind, organizationId: organizationWorkspaces.organizationId })
+  let organizationJoined = false
+  const chain = {
+    from: (table: unknown) => { assert.equal(table, workspaces); return chain },
+    innerJoin: (table: unknown, condition: SQL) => {
+      assert.equal(table, workspaceMembers)
+      const query = dialect.sqlToQuery(condition)
+      assert.equal(query.sql, '"mikka_workspace_members"."workspaceId" = "mikka_workspaces"."id"')
+      assert.deepEqual(query.params, [])
+      return chain
+    },
+    leftJoin: (table: unknown, condition: SQL) => {
+      assert.equal(table, organizationWorkspaces)
+      const query = dialect.sqlToQuery(condition)
+      assert.equal(query.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"')
+      assert.deepEqual(query.params, [])
+      organizationJoined = true
+      return chain
+    },
+    where: (condition: SQL) => {
+      assert.equal(organizationJoined, true)
+      const query = dialect.sqlToQuery(condition)
+      assert.ok(query.params.includes(issue.workspaceId)); assert.ok(query.params.includes(issue.userId)); assert.ok(query.params.includes('active'))
+      assert.deepEqual(query.params, [issue.userId, 'active', issue.workspaceId, 'team', 'personal', issue.userId])
+      // This known, active Shared fixture is not linked to an Organization.
+      // Keep the real Enterprise filter in the call path with its SQL NULL link.
+      return { orderBy: async () => [{ id: issue.workspaceId, kind: 'team', organizationId: null }] }
+    },
+  }
   return chain
 } }
 const globals=globalThis as typeof globalThis & {linearTargetProbe:{tx:unknown;workspace:typeof workspace}}

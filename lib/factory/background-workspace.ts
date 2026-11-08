@@ -90,7 +90,7 @@ async function inWorkspace<T>(userId: string, workspaceId: string, work: () => P
     if (existing || inDatabaseTransaction()) throw denied()
     return await withTaskWorkspace(reader, workspaceId, run)
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'workspaceAccessDenied') throw denied()
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'workspaceAccessDenied') throw new FactoryError('factoryNotFound', { cause: error })
     throw error
   }
 }

@@ -146,7 +146,7 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
   const { issueDeviceToken, hashDeviceToken } = await import('../device-link')
   const { CLIENT_VERSION_HEADER } = await import('@mikka/protocol/version')
   const { claimLocalRun } = await import('../computer/claim')
-  const { completeRunForDevice } = await import('../run-completion')
+  const { completeRunForDevice, dispatchCompletedIssue } = await import('../run-completion')
   const { freezeExecutionIdentity } = await import('../execution-identity')
   const { factoryForBot } = await import('../factory/server')
   const { factoryRuntimeForBot, guardFactoryClaim } = await import('../factory/runtime')
@@ -165,11 +165,11 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
   const a = await task(alpha, alphaBot), b = await task(beta, betaBot)
   const definition = await freezeExecutionIdentity(control, { userId, botId: alphaBot, deviceId,
     agentDefinition: {} as NonNullable<Parameters<typeof freezeExecutionIdentity>[1]['agentDefinition']> }, undefined, alpha)
-  async function queuedRun(requester = userId) {
+  async function queuedRun(requester = userId, issueId = a.issueId) {
     const id = randomUUID()
     await control.query(`INSERT INTO agent_runs(id,"userId","workspaceId","botId","issueId","agentId","deviceId",status,prompt,"agentDefinition")
       VALUES($1,$2,$3,$4,$5,$6,$7,'queued','Synthetic native claim; no executor',$8)`,
-    [id, userId, alpha, alphaBot, a.issueId, agentId, deviceId, JSON.stringify({ executionIdentity: { ...definition, requester } })])
+    [id, userId, alpha, alphaBot, issueId, agentId, deviceId, JSON.stringify({ executionIdentity: { ...definition, requester } })])
     return id
   }
   await control.query('UPDATE enterprise_org_policy SET "enforceSso"=true WHERE "organizationId"=$1', [organizationId])
@@ -209,6 +209,31 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
     assert.equal((await control.query('SELECT status FROM agent_runs WHERE id=$1', [id])).rows[0].status, 'cancelled')
     const read = await native(readA, { runId: id })
     assert.equal(read.status, 200); assert.equal((await read.json()).value.task.id, a.task.id)
+
+    // Publication owns a separate APP transaction after completion. Exercise
+    // its fresh Enterprise admission with the same pools of one and real
+    // result, without a provider request or changing the existing Factory task.
+    const publicationIssue = randomUUID()
+    await control.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy",title,content,status,priority)
+      VALUES($1,$2,$3,'bound','workspace','explicit','Execution publication fixture',$4,'todo','normal')`,
+    [publicationIssue, userId, alpha, JSON.stringify({ type: 'doc', attrs: { mikka: { number: ++issueNumber } }, content: [] })])
+    const publicationRun = await queuedRun(userId, publicationIssue)
+    const publicationClaim = await native(() => claimLocalRun(pool, publicationRun, deviceId, new Date(Date.now() + 60_000)), { runId: publicationRun })
+    assert.equal(publicationClaim.status, 200); assert.equal((await publicationClaim.json()).value, 'claimed')
+    const scheduled: string[] = []
+    const publication = await native(async () => {
+      const result = await completeRunForDevice(userId, { id: publicationRun, issueId: publicationIssue }, {
+        stopReason: 'submitted', report: { summary: 'Synthetic publication fixture', filesChanged: [],
+          verify: { status: 'passed' }, openQuestions: [], nextStep: null },
+      })
+      assert.ok(result?.review)
+      assert.equal(await dispatchCompletedIssue(result, issueId => { scheduled.push(issueId) }), true)
+      return result
+    }, { runId: publicationRun })
+    assert.equal(publication.status, 200)
+    assert.equal((await publication.json()).value.review.id, publicationIssue)
+    assert.deepEqual(scheduled, [publicationIssue])
+    assert.equal((await control.query('SELECT status FROM agent_runs WHERE id=$1', [publicationRun])).rows[0].status, 'succeeded')
     assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
   })
 
