@@ -73,7 +73,7 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
 | #1593 | Historical failed invariant identified as missing Limits; rerun both fixed official subscription paths; collect dispatch latency, active keepalive, normal completion/cancellation and remaining external-wait/stage-handoff evidence. |
 | #1212 | Production server-side MCP abort and public/private group Stop receipts, including cleanup. |
 | #1560, #1565 | A real assigned thread completed by the daemon on the self-hosted installation; distinguish it from enrollment and transport. |
-| #1561 | Local backend idle minute passed (below); rendered desktop/Web idle-minute and deployed self-hosted usage evidence remain. |
+| #1561 | Local backend and real visible Web idle minutes plus all 10 request-budget cases passed (below); deployed usage and the remaining transport evidence still need their version-bound closeout. |
 | #1562 | Real vault store → Agent autofill, plus plaintext-free logs, on the self-hosted target. |
 | #1563 | Real self-hosted GitHub App clone → push → PR. |
 | #1564 | Screenshots of a genuine cloud-binding flow. |
@@ -200,3 +200,45 @@ the instrumented application PG client made 0 calls, received 0 protocol bytes
 and sent 15 protocol bytes; unknown readings: 0. No business reads or live
 events occurred. Counters exclude connection setup, other processes and
 TCP/TLS overhead. This is backend evidence, not a rendered-page idle test.
+
+## Later integration and visible-page evidence (2026-11-08)
+
+Head `a4e2dff44fa0be8be41b7da5c891f21676fbfb57` passed all 13 applicable
+PR workflows: 34 successful checks and seven existing conditional skips,
+with no pending or failed checks. Image run 42434350612 used checkout
+`9aa1707aff4a63da319c48c3e1d8055a8117dbc3`, whose tree equals the a4 tree.
+Artifact 13599885150 contains six passing native checks and complete cleanup;
+its actual turn-32 chat screenshot was downloaded and viewed. The provider
+remains synthetic. ZIP SHA256:
+`7e751082bd8e33dbb171cae9fe903c0480681372c74cc9bc8d7a00a2993e16fc`.
+
+An isolated local combination of a4, main ba19681c and audit batch 7c7d8d8a
+has tree `9ffbfd2b2fed5791e1c14a93acddacf1e5f917a4` (local virtual commit
+`b966b48f79de805734548e0e54b2a3fcec3830ed`, never pushed). Root/API and
+the frontend's pinned TypeScript 5.9 checks passed, as did 20 Factory unit
+cases, 13 real-PG continuity/epoch cases and all 10 idle-budget cases; no skips.
+This is bounded integration evidence, not a deployed-source claim.
+
+The same combination's real community production build served a normal
+authenticated, visible 1440x1000 Chromium home page. Built-in live and the
+scheduler were enabled, with no Cloudflare or Vercel configuration. Startup
+briefings and ops-monitor actually returned HTTP200. From 02:16:10.411 to
+02:17:10.451 UTC (60,004 ms), after 357 positive-control PG calls and a counter
+reset: zero SQL calls, zero PG receive bytes, 50 PG send bytes, zero unknown
+readings, zero business HTTP calls and one existing version request. There
+were two WebSocket receive frames and no browser errors. The screenshot was
+viewed; sign-out plus session-null, browser close, app stop and PG removal
+were verified. There were no external model calls. Report SHA256:
+`720a547e3ed54ea3ed107e37b64bdf64f29c436c7173ebf572a654fefbff39c4`.
+This remains one local page/minute, not an hourly production measurement.
+
+Issue #1567 also links the verified historical API call 42385723293 and the
+read-only receipt in **mikka-cloud** run 42386145460: 50 tokens, settled
+21 microUSD, matching authorization and payer. It used a personal billing
+workspace and does not prove the current shared-Team Coordinator or quota UI
+flow. Reading those receipts made no new paid request.
+
+Main 3c32675c subsequently changed shared CI selection and its image workflow;
+its normal merge is being validated separately. The older green a4 results
+are not relabeled as that new head's CI. Production credentials remain inside
+existing Actions/OIDC delivery; identity/configuration discovery is metadata-only.

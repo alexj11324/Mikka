@@ -59,6 +59,8 @@ export type WorkspaceLocation = {
   project: string | null
   /** The task open in the centre. */
   issue: string | null
+  /** The task open in the right column, beside whatever is in the centre (decision 2026-11-07-2045): a thread opened from it sits over it, and ← comes back to it. */
+  task: string | null
   /** The thread (its run id) open in the right column, beside whatever is in the centre (R-82). */
   thread: string | null
   /** The Artifact open in its window over the page (R-56, R-82). */
@@ -72,7 +74,7 @@ const TEAM_SECTIONS: readonly string[] = ['team-home', 'team-issues', 'team-proj
 /** Pages that can show one project. */
 const PROJECT_SECTIONS: readonly string[] = ['projects', 'team-projects'] satisfies readonly WorkspaceSection[]
 /** Keys this file owns besides `section`, in the order a new address writes them. */
-const PLACE_KEYS = ['bot', 'group', 'session', 'team', 'project', 'issue', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const PLACE_KEYS = ['bot', 'group', 'session', 'team', 'project', 'issue', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
 /** What is in the centre; the thread sits beside it and the Artifact window over it. */
 const CENTRE_KEYS = ['section', 'bot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
 
@@ -97,6 +99,7 @@ export function readLocation(params: URLSearchParams): WorkspaceLocation {
     team: TEAM_SECTIONS.includes(section) ? team : null,
     project: PROJECT_SECTIONS.includes(section) ? id('project') : null,
     issue: id('issue'),
+    task: id('task'),
     thread: id('thread'),
     artifact: id('artifact'),
     threads: params.get('threads') === 'all' ? 'all' : id('threads'),
@@ -135,6 +138,8 @@ function buildHref(current: URL, change: Partial<WorkspaceLocation>, nameCoordin
   const centreMoved = CENTRE_KEYS.some(key => next[key] !== before[key])
   // A thread sits beside the centre it was opened from; a new centre closes it unless the move names one.
   if (centreMoved && !('thread' in change)) next.thread = null
+  // So does a task opened beside it.
+  if (centreMoved && !('task' in change)) next.task = null
   // The Artifact window sits over the page it was opened from: another place, or another thread, closes it unless the move names one.
   if ((centreMoved || next.thread !== before.thread) && !('artifact' in change)) next.artifact = null
   if (next.section !== before.section || next.bot !== before.bot) for (const key of PAGE_KEYS) params.delete(key)
@@ -221,6 +226,9 @@ let seenQuery: string | null = null
 /** The entry openThread pushed: the thread it opened and the address it was opened from. */
 type OpenedThread = { runId: string; from: string }
 const OPENED = 'mikkaOpenedThread'
+/** The entry openTask pushed: the task it opened and the address it was opened from. */
+type OpenedTask = { issueId: string; from: string }
+const OPENED_TASK = 'mikkaOpenedTask'
 
 function write(href: string, mode: 'push' | 'replace', list = false) {
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
@@ -349,9 +357,32 @@ export function closeThread() {
   navigate({ thread: null }, 'replace')
 }
 
-/** Opens 全部线程 in the right column, or closes it with any thread open over it. */
+/** Opens 全部线程 in the right column, or closes it with any task or thread open over it. */
 export function toggleAllThreads(open: boolean) {
-  navigate(open ? { threads: 'all', thread: null } : { threads: null, thread: null })
+  navigate(open ? { threads: 'all', task: null, thread: null } : { threads: null, task: null, thread: null })
+}
+
+/**
+ * Opens a task in the right column beside what is in the centre (decision
+ * 2026-11-07-2045): lists show tasks, and a thread is reached from inside its
+ * task. ← in the task steps back to where it was opened, as a thread's does.
+ */
+export function openTask(issueId: string) {
+  const from = here()
+  goTo({ task: issueId, thread: null })
+  window.history.replaceState({ ...window.history.state, [OPENED_TASK]: { issueId, from } satisfies OpenedTask }, '', here())
+  window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
+/** ← or ✕ in a task in the right column: back to the list it was opened from, or its list when opened from its address. */
+export function closeTask() {
+  const opened = (window.history.state as Record<string, unknown> | null)?.[OPENED_TASK] as OpenedTask | undefined
+  const current = readLocation(new URL(window.location.href).searchParams).task
+  if (opened && opened.issueId === current && opened.from === workspaceHref(new URL(window.location.href), { task: null, thread: null })) {
+    window.history.back()
+    return
+  }
+  navigate({ task: null, thread: null }, 'replace')
 }
 
 /** Opens an Artifact in its window over the page (R-56); the centre and the thread under it stay. */
