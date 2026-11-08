@@ -275,11 +275,10 @@ export async function deleteMainAccountData(client: PoolClient, userId: string, 
   if (kept.runs.length) {
     await client.query(`update agent_tool_approvals set status='cancelled',"decidedAt"=coalesce("decidedAt",now())
       where "runId"=any($1::uuid[]) and "userId"=$2 and status in ('pending','approved')`, [kept.runs, userId])
-    // An already invoked external action may have happened. Retain uncertainty,
-    // never invent a failure/receipt. A reserved action keeps its original token
-    // invariant; deleting pending_actions removes the only route that can claim it.
-    await client.query(`update operation_ledger set status='uncertain',"updatedAt"=now()
-      where "ownerId"=$1 and status='executing' and ("runId"::text=any($2::text[]) or binding->>'executionRunId'=any($2::text[]))`, [userId, kept.runs])
+    // Preserve the ledger's last observed state, including executing/uncertain:
+    // an invoked external action may have happened. The account deletion guard
+    // intentionally rejects ledger updates; removing pending_actions, sessions
+    // and run tokens below ends authority without rewriting historical evidence.
   }
   if (kept.factoryTasks.length) {
     await client.query(`insert into factory_events("taskId","eventId",request,result)
