@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "variant": "acceptance",
+  "passed": true,
+  "signatureVerifiedStrictDeep": true,
+  "bundleIdentifier": "com.aspectlylabs.mikka.dev",
+  "urlScheme": "mikka-dev-auth",
+  "architecture": "arm64",
+  "identity": {
+    "adHoc": true,
+    "teamIdentifier": "none",
+    "hardenedRuntime": true,
+    "cdHash": "088793f57dea42a8b663fe8ea95c60fbe62f3b97"
+  },
+  "signedBundleCount": 9,
+  "entitlements": {
+    "hardenedRuntime": true,
+    "devOnlyLibraryValidationException": true,
+    "unexpected": false,
+    "executables": 5,
+    "libraries": 4,
+    "librariesWithoutEntitlements": 4
+  },
+  "fuses": {
+    "RunAsNode": false,
+    "EnableCookieEncryption": false,
+    "EnableNodeOptionsEnvironmentVariable": false,
+    "EnableNodeCliInspectArguments": true,
+    "EnableEmbeddedAsarIntegrityValidation": false,
+    "OnlyLoadAppFromAsar": true,
+    "LoadBrowserProcessSpecificV8Snapshot": false,
+    "GrantFileProtocolExtraPrivileges": true
+  }
+}

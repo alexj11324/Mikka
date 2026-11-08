@@ -1,0 +1,157 @@
+{
+  "schema": 1,
+  "candidate": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "candidateTree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+  "scope": "Native6180 failure, exact three-file navigation fix, current ALS microbenchmark and official PostHog preparation; no production acceptance claim.",
+  "rawBenchmark": {
+    "uncompressedBytes": 856449,
+    "uncompressedSha256": "3d2eef342c68b6f3d0084f362e47d3b1ad02636138753092de869b040b9aa3df",
+    "compression": "gzip mtime=0; decompresses byte-for-byte to original result.json"
+  },
+  "files": [
+    {
+      "source": "native6180/native-6180-diagnosis.safe.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/native-6180-diagnosis.safe.json",
+      "bytes": 5445,
+      "sha256": "b9ca8a61fd14aa736856f0f4a1ab033d0e0bff841b38f1c93a03715e8f9af0a1",
+      "gitBlob": "e528955c783761f34ca7b5e74b0bfce53778189a",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/original-file-hashes.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/original-file-hashes.json",
+      "bytes": 5931,
+      "sha256": "3324292decd236bf5e9966318b47b527ef0ae41d5361c896fdddeb2b0996e20d",
+      "gitBlob": "d9191a1eea7c7df84be8499dee43925c6583c939",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/native-job.safe-excerpt.txt",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/native-job.safe-excerpt.txt",
+      "bytes": 2653,
+      "sha256": "d9a23783945d230f22bc3e40c5acb9c908ced54a706b555543b6808d81964036",
+      "gitBlob": "aaac895f6f73b5c9976c4f013e13db218eecd02d",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/selection-red.original.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/selection-red.original.json",
+      "bytes": 1774,
+      "sha256": "caec3b847747d5eab25aeabce160dcfcba4c15100439ae89a7d6321222d51c9a",
+      "gitBlob": "23252ecf9e3c4de17473f1d9c3d9e962d22ad429",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/navigation-fix-final-tests.log",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/navigation-fix-final-tests.log",
+      "bytes": 4354,
+      "sha256": "21f0ffbef41e0d778cbb450fa5fbc5c5ef78bc13e839dfec795425ca64c9a82e",
+      "gitBlob": "144f55de56e95a8f3cbb18c081984123b87a99bd",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/same-url-workspace-navigation.patch",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/same-url-workspace-navigation.patch",
+      "bytes": 7666,
+      "sha256": "12625b975acdfd2a7c6fc3ddb458c3864cc767723a43be6dc847cb0f9dd4ad86",
+      "gitBlob": "e1e364d6a9d4d7a4c9d8fd380041f5a13265b4ba",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/root-verification-and-publication.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/root-verification-and-publication.json",
+      "bytes": 3867,
+      "sha256": "df1392a16ce5c3d6a7b1bf1ce49cd6afed4a68e1c5efac98acad7e5a03b163ff",
+      "gitBlob": "a5001e400e35b17b19d439b25696d17fde760040",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/native-6180-original/parity/parity.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/native-6180-original/parity/parity.json",
+      "bytes": 8632,
+      "sha256": "0a3986b2726c2d4b90ea23bd220a0d897f6f5a61ee66fd425c028c243fcfd00d",
+      "gitBlob": "22cca35f20bd196a0f0e223f928916cd42c3f846",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/native-6180-original/smoke.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/native-6180-original/smoke.json",
+      "bytes": 3105,
+      "sha256": "d64b3799338b257282b0cec3054ee939afdad8aa9da22f020e720fd35c84a2ac",
+      "gitBlob": "b9970a8e3de34ace358dfa9c4c2749c4b48ad4c0",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/package-6180-original/native-crypto.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/package-6180-original/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "cb44f946a575ef9a860184b0adcf9fe8afe6497b8a466320a657ac32037bf950",
+      "gitBlob": "4f0a485d75b8f2ccfc0622679c60fb6e0ea39650",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "native6180/package-6180-original/mac-acceptance-package.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/native6180/package-6180-original/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "078dce4bb89c2b2aebf81fd4fdc8160407a80e41481f41beb1c4138be24c5254",
+      "gitBlob": "121a6d6c45e840d0008c64307618f7e8603e0a81",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "als-microbench-6180/benchmark.mjs",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/als-microbench-6180/benchmark.mjs",
+      "bytes": 11403,
+      "sha256": "52cb43d89e2c07375353590c850baa741afab75dc1581c0eaa1b3c5ec9f1a1b8",
+      "gitBlob": "efa1b756292b8964dfce4978baa553652558c440",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "als-microbench-6180/README.md",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/als-microbench-6180/README.md",
+      "bytes": 5634,
+      "sha256": "196708ee7fa73ffd58932aed43da406c9739839ab451070cce911565f556444d",
+      "gitBlob": "ec60456972b50d8f62119fffc4d80006180d03bd",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "als-microbench-6180/result.json.gz",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/als-microbench-6180/result.json.gz",
+      "bytes": 54558,
+      "sha256": "4ec3e0a78c53f5ed941e3498f9627dda15567338f7ec25d06157a4ac2b6bb14d",
+      "gitBlob": "8be7f849aa3cee74cdc95ded4868c92a755ba1b1",
+      "encoding": "base64"
+    },
+    {
+      "source": "posthog-recovery-20261108/posthog-png-capability-20261108.prepared.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/posthog-recovery-20261108/posthog-png-capability-20261108.prepared.json",
+      "bytes": 23178,
+      "sha256": "1696aa3bdb36f0c869fb0ecc1708fd2fef024a0750e663fa4991bb42a5ce7f50",
+      "gitBlob": "a0155a905b306cfb901d4d210db4478fd236d73b",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "posthog-recovery-20261108/posthog-png-official-contracts-20261108.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/posthog-recovery-20261108/posthog-png-official-contracts-20261108.json",
+      "bytes": 77706,
+      "sha256": "33274728e364cb384981295258b9636830ec9870a5c605f38eb8fa9f8a1cd4a9",
+      "gitBlob": "c08eb311c29674910433d0d60c7b3c80406ee274",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "posthog-recovery-20261108/posthog-offset-capability-probes-20261108.safe.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/posthog-recovery-20261108/posthog-offset-capability-probes-20261108.safe.json",
+      "bytes": 8121,
+      "sha256": "d70bf98f70d3c081e1d943ab81f0273a4a2e500a1c23f6e230e5f4c7b0d812fa",
+      "gitBlob": "ae2a62cb59cbf3896a3c38aeae12cc1875e92549",
+      "encoding": "utf-8"
+    },
+    {
+      "source": "posthog-recovery-20261108/posthog-readiness-6180-20261108.safe.json",
+      "path": "docs/operations/evidence/1512-raw/native-navigation-4a07/posthog-recovery-20261108/posthog-readiness-6180-20261108.safe.json",
+      "bytes": 94048,
+      "sha256": "463a5d68b82aa3479316ca38b3bee1f2906301de2e4a9702faeeab1b2e6f9353",
+      "gitBlob": "3ba2aba08b4f40809630e1676fc9e8001c3fa253",
+      "encoding": "utf-8"
+    }
+  ]
+}

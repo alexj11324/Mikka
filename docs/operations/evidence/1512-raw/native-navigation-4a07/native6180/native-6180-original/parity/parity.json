@@ -1,0 +1,373 @@
+{
+  "version": 1,
+  "mode": "desktop",
+  "appRevision": "e0b8d63ae010f1a553d8dfdfb2436711ab8ec8e5",
+  "harnessRevision": "e0b8d63ae010f1a553d8dfdfb2436711ab8ec8e5",
+  "harnessSha256": "5cb5f4c2e971f12bbb9be17b83bae07473067812b0731d67758d5c68eab5df72",
+  "environmentId": "local-170216d0-c378-4d66-bf7c-81c82e2d878c",
+  "database": "mikka_e2e",
+  "origin": "http://localhost:3000",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "colorThreshold": 0,
+  "maximumChangedRatio": 0.001,
+  "timeZone": "UTC",
+  "captureClock": {
+    "method": "playwright_set_fixed_time",
+    "wallTime": "2026-11-08T22:20:28.690Z",
+    "timers": "running",
+    "scope": "parity-renderer-only"
+  },
+  "nativeViewports": [
+    {
+      "mode": "hosted",
+      "method": "playwright_cdp_layout_viewport",
+      "requested": {
+        "width": 1440,
+        "height": 900
+      },
+      "layout": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1,
+        "visualWidth": 1440,
+        "visualHeight": 900,
+        "visualScale": 1
+      },
+      "native": {
+        "content": {
+          "width": 1440,
+          "height": 677
+        },
+        "display": {
+          "width": 1024,
+          "height": 768,
+          "scaleFactor": 1
+        },
+        "zoomFactor": 1
+      },
+      "timeZone": {
+        "method": "cdp_timezone_override",
+        "actual": "UTC"
+      }
+    },
+    {
+      "mode": "bundled",
+      "method": "playwright_cdp_layout_viewport",
+      "requested": {
+        "width": 1440,
+        "height": 900
+      },
+      "layout": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1,
+        "visualWidth": 1440,
+        "visualHeight": 900,
+        "visualScale": 1
+      },
+      "native": {
+        "content": {
+          "width": 1440,
+          "height": 677
+        },
+        "display": {
+          "width": 1024,
+          "height": 768,
+          "scaleFactor": 1
+        },
+        "zoomFactor": 1
+      },
+      "timeZone": {
+        "method": "cdp_timezone_override",
+        "actual": "UTC"
+      }
+    }
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "masksAllowed": [
+    "avatars",
+    "timestamps"
+  ],
+  "excludedDesktopOnly": [
+    "data-desktop-only: server row, Settings › 服务器"
+  ],
+  "startedAt": "2026-11-08T22:20:28.690Z",
+  "screens": [
+    {
+      "name": "sign-in",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-markdown",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-html",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-missing",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "sign-in",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-markdown",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-html",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-missing",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    }
+  ],
+  "fixtureEpoch": "2026-11-08T00:00:00.000Z",
+  "requiredScreens": [
+    "sign-in",
+    "shared-markdown",
+    "shared-html",
+    "shared-missing",
+    "workspace-link",
+    "coordinator-details",
+    "coordinator-threads",
+    "coordinator-prs",
+    "coordinator-computer",
+    "bot-details",
+    "bot-threads",
+    "bot-prs",
+    "bot-computer",
+    "group",
+    "task",
+    "task-thread",
+    "all-threads",
+    "bot-thread-list",
+    "thread",
+    "board",
+    "list",
+    "projects",
+    "team-home",
+    "team-tasks",
+    "team-projects",
+    "plugins",
+    "suggestions",
+    "artifact-library",
+    "artifact-markdown",
+    "artifact-html",
+    "new-task",
+    "settings-members",
+    "settings-preferences",
+    "settings-memory",
+    "settings-account",
+    "settings-teams",
+    "settings-notifications",
+    "settings-security",
+    "settings-connections",
+    "settings-models",
+    "settings-logins",
+    "settings-privacy",
+    "settings-computers",
+    "settings-general",
+    "settings-permissions",
+    "settings-secrets",
+    "settings-audit",
+    "settings-usage",
+    "settings-billing",
+    "offline"
+  ],
+  "nativeModeOrder": [
+    "hosted-anonymous",
+    "bundled-anonymous",
+    "bundled-authenticated",
+    "hosted-authenticated"
+  ],
+  "nativeProfiles": 1,
+  "nativeDeviceChecks": [
+    {
+      "mode": "bundled",
+      "ready": false,
+      "deadlineMs": 480000,
+      "elapsedMs": 44,
+      "reads": 0,
+      "transitions": [],
+      "overflow": false,
+      "failure": null,
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "unavailable",
+        "reason": "socket_or_profile_missing"
+      },
+      "environment": {
+        "available": true,
+        "profileMatches": true,
+        "overrideMatches": true,
+        "files": {
+          "daemon.sock": "absent",
+          "daemon.secret": "absent",
+          "daemon.pid": "absent",
+          "daemon.lock": "absent",
+          "device.json": "absent"
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "absent",
+          "profile": "unknown",
+          "dev": false,
+          "installedVersion": null,
+          "installedRevision": null
+        }
+      }
+    }
+  ],
+  "failure": {
+    "stage": "native-device-bundled",
+    "error": {
+      "kind": "Error",
+      "code": "other"
+    }
+  },
+  "nativeCleanup": {
+    "cleaned": true,
+    "counts": {
+      "desktop_auth_requests": 1,
+      "device_token_devices": 0,
+      "device_management_commands": 0,
+      "device_repos": 0,
+      "agents": 0,
+      "device_tokens": 0,
+      "device_enrollments": 0,
+      "devices": 0
+    }
+  },
+  "workspaceNameCleanup": {
+    "captured": true,
+    "phase": "restored",
+    "restored": true,
+    "initialName": {
+      "en": false,
+      "zhCN": true
+    },
+    "initialOwnerMatchesSealedBaseline": false,
+    "beforeName": {
+      "en": true,
+      "zhCN": false
+    },
+    "peerMatchesSealedBaseline": true,
+    "onlyGeneratedNameDifference": true,
+    "afterName": {
+      "en": false,
+      "zhCN": true
+    },
+    "ownerMatchesSealedBaseline": true
+  },
+  "result": "failed",
+  "cleanup": "passed",
+  "finishedAt": "2026-11-08T22:21:05.973Z",
+  "pageErrors": []
+}

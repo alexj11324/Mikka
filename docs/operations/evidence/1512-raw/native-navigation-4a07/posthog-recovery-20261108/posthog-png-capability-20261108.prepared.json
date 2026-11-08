@@ -1,0 +1,487 @@
+{
+  "schema_version": 1,
+  "kind": "posthog_native_png_capability_preparation",
+  "issue": "alexj11324/Mikka#1512",
+  "prepared_at_utc": "2026-11-08T00:19:00Z",
+  "project_id": 670821,
+  "region": "US",
+  "posthog_conversation_id": "01a1b694-e84e-7821-89c0-1fd14c866b83",
+  "status": "READ_ONLY_PREPARATION_NO_ACTUAL_IDS",
+  "mutations": {
+    "posthog_entities_created": 0,
+    "posthog_entities_updated": 0,
+    "queries_executed": 0,
+    "exports_started": 0,
+    "compute_started": 0,
+    "model_tasks_started": 0
+  },
+  "conclusions": {
+    "required_apm_timeline_png": {
+      "met": false,
+      "official_direct_export_tool_found": false,
+      "saved_apm_node_confirmed": false,
+      "logs_hogql_in_saved_insight_renderer_confirmed": false,
+      "recommended_path": "After actual trace exists, open its real PostHog native Tracing waterfall in an authenticated real browser; capture actual rendered UI and visually inspect it. Parent handles browser readiness.",
+      "scope": "Same actual trace, send to first model call, including daemon/cloud segments required by issue1512. No replacement with AI-only data or synthetic/derived events."
+    },
+    "supplemental_ai_png": {
+      "saved_node_schema_supported": true,
+      "node": "DataVisualizationNode",
+      "display": "ActionsTable",
+      "source": "HogQLQuery",
+      "table": "events",
+      "cluster": "Default",
+      "generic_insight_png_api_documented": true,
+      "explicit_sql_table_png_renderer_guarantee_found": false,
+      "actual_renderer_verified": false,
+      "coverage": "Only observed $ai_generation metadata for exact trace + fixed UTC bounds. Shows first 20 rows. Cannot establish application/daemon/cloud timeline, full APM span completeness, Replay playback or masking."
+    },
+    "logs_cluster": "execute-sql can resolve Logs tables, but this does not establish saved-insight or PNG renderer support. Do not set a guessed connectionId='Logs' or invent source cluster fields. No cross-cluster joins.",
+    "native_nodes": [
+      {
+        "kind": {
+          "default": "DataTableNode",
+          "type": "string",
+          "const": "DataTableNode"
+        },
+        "required": [
+          "source"
+        ]
+      },
+      {
+        "kind": {
+          "default": "BIVisualizationNode",
+          "type": "string",
+          "const": "BIVisualizationNode"
+        },
+        "required": [
+          "config",
+          "source"
+        ]
+      },
+      {
+        "kind": {
+          "default": "InsightVizNode",
+          "type": "string",
+          "const": "InsightVizNode"
+        },
+        "required": [
+          "source"
+        ]
+      },
+      {
+        "kind": {
+          "default": "DataVisualizationNode",
+          "type": "string",
+          "const": "DataVisualizationNode"
+        },
+        "required": [
+          "source"
+        ]
+      },
+      {
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "TrendsQuery",
+                "FunnelsQuery",
+                "RetentionQuery",
+                "PathsQuery",
+                "PathsV2Query",
+                "StickinessQuery",
+                "LifecycleQuery",
+                "WebStatsTableQuery",
+                "WebOverviewQuery"
+              ]
+            },
+            {
+              "type": "string",
+              "enum": [
+                "MetricsQuery",
+                "MetricsHistogramQuery"
+              ]
+            }
+          ]
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      {
+        "kind": {
+          "default": "HogQLQuery",
+          "type": "string",
+          "const": "HogQLQuery"
+        },
+        "required": [
+          "query"
+        ]
+      },
+      {
+        "kind": {
+          "default": "EventsQuery",
+          "type": "string",
+          "const": "EventsQuery"
+        },
+        "required": [
+          "select"
+        ]
+      }
+    ],
+    "node_caveat": "DataTableNode is documented with EventsQuery; SQL visualization uses DataVisualizationNode. Neither native Trace/Spans query nor Logs cluster routing has a dedicated supported variant in the inspected create/update schema. An unconstrained source map is not a support guarantee."
+  },
+  "preconditions": {
+    "trace_id_hex": "Actual production trace: exactly 32 lowercase nonzero hex characters.",
+    "window": "Actual run-derived inclusive/exclusive UTC [start,end), ordinarily <=1 hour. SQL timestamps use YYYY-MM-DD HH:mm:ss; ISO versions must denote identical instants. No now(), relative range or empty placeholders.",
+    "case_name": "Closed acceptance case label, no prompt/user content.",
+    "existing_evidence": "Use actual deployed head, run/task/session IDs and stable raw PostHog evidence already collected by root. Do not launch an additional model just to obtain a screenshot.",
+    "count": "Known full AI generation count from independent pinned evidence. Table displays <=20; label the visible subset when count>20. The table never replaces raw complete pagination/count reconciliation.",
+    "id_validation": "All template placeholders must be replaced and validated before any tool call. Never run placeholders, fabricate a trace/session, insert derived events, or create a placeholder insight."
+  },
+  "future_operations": [
+    {
+      "step": 1,
+      "tool": "execute-sql",
+      "input": {
+        "query": "SELECT\n    formatDateTime(timestamp, '%H:%i:%S.%f', 'UTC') AS started_utc,\n    multiIf(match(coalesce(toString(properties.$ai_span_id), ''), '^[0-9a-f]{16}$'),\n        toString(properties.$ai_span_id), 'invalid_or_missing') AS span_id,\n    multiIf(match(coalesce(toString(properties.$ai_parent_id), ''), '^[0-9a-f]{16}$'),\n        toString(properties.$ai_parent_id), 'invalid_or_missing') AS parent_span_id,\n    1000 * toFloatOrNull(toString(properties.$ai_latency)) AS latency_ms,\n    1000 * toFloatOrNull(toString(properties.$ai_time_to_first_token)) AS ttft_ms,\n    toFloatOrNull(toString(properties.$ai_input_tokens)) AS input_tokens,\n    toFloatOrNull(toString(properties.$ai_output_tokens)) AS output_tokens,\n    multiIf(toString(properties.$ai_is_error) IN ('1', 'true'), 'error',\n        toString(properties.$ai_is_error) IN ('0', 'false'), 'ok', 'unknown') AS error_state\nFROM events\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n    AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n    AND event = '$ai_generation'\n    AND properties.$ai_trace_id = '{{trace_id_hex}}'\nORDER BY timestamp, uuid\nLIMIT 20",
+        "truncate": false,
+        "context": "Actual production #1512 trace-scoped metadata-only display validation; fixed <=1-hour UTC window; at most20 rows."
+      },
+      "allowed_only_after_real_ids": true,
+      "note": "No OFFSET. Does not replace pinned canonical evidence queries. Retain exact request and response. Query performs no cross-cluster JOIN."
+    },
+    {
+      "step": 2,
+      "tool": "insight-create",
+      "input": {
+        "name": "#1512 {{case_name}} AI metadata — {{trace_id_hex}}",
+        "description": "Trace {{trace_id_hex}}, UTC [{{window_start_utc}}, {{window_end_utc}}). First 20 AI generations ordered by timestamp/UUID. Supplement only; native APM waterfall and full raw counts are separate.",
+        "tags": [
+          "issue-1512",
+          "production-evidence",
+          "ai-metadata"
+        ],
+        "query": {
+          "kind": "DataVisualizationNode",
+          "display": "ActionsTable",
+          "source": {
+            "kind": "HogQLQuery",
+            "query": "SELECT\n    formatDateTime(timestamp, '%H:%i:%S.%f', 'UTC') AS started_utc,\n    multiIf(match(coalesce(toString(properties.$ai_span_id), ''), '^[0-9a-f]{16}$'),\n        toString(properties.$ai_span_id), 'invalid_or_missing') AS span_id,\n    multiIf(match(coalesce(toString(properties.$ai_parent_id), ''), '^[0-9a-f]{16}$'),\n        toString(properties.$ai_parent_id), 'invalid_or_missing') AS parent_span_id,\n    1000 * toFloatOrNull(toString(properties.$ai_latency)) AS latency_ms,\n    1000 * toFloatOrNull(toString(properties.$ai_time_to_first_token)) AS ttft_ms,\n    toFloatOrNull(toString(properties.$ai_input_tokens)) AS input_tokens,\n    toFloatOrNull(toString(properties.$ai_output_tokens)) AS output_tokens,\n    multiIf(toString(properties.$ai_is_error) IN ('1', 'true'), 'error',\n        toString(properties.$ai_is_error) IN ('0', 'false'), 'ok', 'unknown') AS error_state\nFROM events\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n    AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n    AND event = '$ai_generation'\n    AND properties.$ai_trace_id = '{{trace_id_hex}}'\n    AND timestamp >= {filters.dateRange.from}\n    AND timestamp < {filters.dateRange.to}\nORDER BY timestamp, uuid\nLIMIT 20",
+            "filters": {
+              "dateRange": {
+                "date_from": "{{window_start_iso}}",
+                "date_to": "{{window_end_iso}}"
+              }
+            }
+          },
+          "tableSettings": {
+            "columns": [
+              {
+                "column": "started_utc"
+              },
+              {
+                "column": "span_id"
+              },
+              {
+                "column": "parent_span_id"
+              },
+              {
+                "column": "latency_ms"
+              },
+              {
+                "column": "ttft_ms"
+              },
+              {
+                "column": "input_tokens"
+              },
+              {
+                "column": "output_tokens"
+              },
+              {
+                "column": "error_state"
+              }
+            ],
+            "pinnedColumns": [
+              "started_utc"
+            ]
+          }
+        }
+      },
+      "allowed_only_after_real_ids": true,
+      "note": "Creates one owned supplemental insight only after actual metadata projection validates. Do not add dashboard: simplest one-insight export target."
+    },
+    {
+      "step": 3,
+      "tool": "insight-get",
+      "input": {
+        "id": "{{actual_returned_short_id}}"
+      },
+      "note": "Read back numeric id, short_id, saved definition, exact trace literals, both absolute bounds, display and columns. Ensure id is positive safe integer; never send short_id to numeric PNG exporter."
+    },
+    {
+      "step": 4,
+      "tool": "insight-query",
+      "input": {
+        "insightId": "{{actual_returned_short_id}}"
+      },
+      "note": "Run only after actual insight exists; compare exact projected rows with validation/raw metadata. Current schema has no format field, so do not invent format:'json' despite tool description mentioning output formats. Preserve actual returned response and do not infer rowset completeness from formatted output."
+    },
+    {
+      "step": 5,
+      "tool": "generate-app-url",
+      "input": {
+        "url": "/insights/{id}",
+        "params": {
+          "id": "{{actual_returned_short_id}}"
+        }
+      }
+    },
+    {
+      "step": 6,
+      "executor": "Existing trusted production workflow invokes scripts/ops/posthog-export-evidence.mjs",
+      "command": "node scripts/ops/posthog-export-evidence.mjs --insight <ACTUAL_POSITIVE_NUMERIC_ID> --timeout-ms 180000",
+      "request": {
+        "method": "POST",
+        "url": "https://us.posthog.com/api/projects/670821/exports/",
+        "body": {
+          "insight": "<ACTUAL_POSITIVE_NUMERIC_ID: number>",
+          "export_format": "image/png"
+        }
+      },
+      "note": "Use real numeric type, existing runner-only Infisical key path and current main expected-SHA gate. Do not expose key, use arbitrary export_context, retry POST after uncertain response, or bypass runner restrictions."
+    },
+    {
+      "step": 7,
+      "action": "Retain export ID/status/content PNG bytes/hash and receipt; visually inspect actual image before calling supplemental evidence acceptable.",
+      "checks": [
+        "Correct saved insight and trace",
+        "Correct absolute UTC window",
+        "Real nonempty metadata table, no loader/error",
+        "Readable IDs/timings and no clipped acceptance-critical rows",
+        "No prompt, response, raw attributes or secret content",
+        "Explicit AI-only coverage caption"
+      ]
+    }
+  ],
+  "owned_update_template": {
+    "tool": "insight-update",
+    "input": {
+      "id": "{{actual_owned_insight_numeric_id_or_short_id}}",
+      "name": "#1512 {{case_name}} AI metadata — {{trace_id_hex}}",
+      "description": "Trace {{trace_id_hex}}, UTC [{{window_start_utc}}, {{window_end_utc}}). First 20 AI generations ordered by timestamp/UUID. Supplement only; native APM waterfall and full raw counts are separate.",
+      "tags": [
+        "issue-1512",
+        "production-evidence",
+        "ai-metadata"
+      ],
+      "query": {
+        "kind": "DataVisualizationNode",
+        "display": "ActionsTable",
+        "source": {
+          "kind": "HogQLQuery",
+          "query": "SELECT\n    formatDateTime(timestamp, '%H:%i:%S.%f', 'UTC') AS started_utc,\n    multiIf(match(coalesce(toString(properties.$ai_span_id), ''), '^[0-9a-f]{16}$'),\n        toString(properties.$ai_span_id), 'invalid_or_missing') AS span_id,\n    multiIf(match(coalesce(toString(properties.$ai_parent_id), ''), '^[0-9a-f]{16}$'),\n        toString(properties.$ai_parent_id), 'invalid_or_missing') AS parent_span_id,\n    1000 * toFloatOrNull(toString(properties.$ai_latency)) AS latency_ms,\n    1000 * toFloatOrNull(toString(properties.$ai_time_to_first_token)) AS ttft_ms,\n    toFloatOrNull(toString(properties.$ai_input_tokens)) AS input_tokens,\n    toFloatOrNull(toString(properties.$ai_output_tokens)) AS output_tokens,\n    multiIf(toString(properties.$ai_is_error) IN ('1', 'true'), 'error',\n        toString(properties.$ai_is_error) IN ('0', 'false'), 'ok', 'unknown') AS error_state\nFROM events\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n    AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n    AND event = '$ai_generation'\n    AND properties.$ai_trace_id = '{{trace_id_hex}}'\n    AND timestamp >= {filters.dateRange.from}\n    AND timestamp < {filters.dateRange.to}\nORDER BY timestamp, uuid\nLIMIT 20",
+          "filters": {
+            "dateRange": {
+              "date_from": "{{window_start_iso}}",
+              "date_to": "{{window_end_iso}}"
+            }
+          }
+        },
+        "tableSettings": {
+          "columns": [
+            {
+              "column": "started_utc"
+            },
+            {
+              "column": "span_id"
+            },
+            {
+              "column": "parent_span_id"
+            },
+            {
+              "column": "latency_ms"
+            },
+            {
+              "column": "ttft_ms"
+            },
+            {
+              "column": "input_tokens"
+            },
+            {
+              "column": "output_tokens"
+            },
+            {
+              "column": "error_state"
+            }
+          ],
+          "pinnedColumns": [
+            "started_utc"
+          ]
+        }
+      }
+    },
+    "note": "Only reuse a target created for this issue/case; get first. Query replacement is entire definition. Leave dashboards omitted unless intentionally preserving the full existing list. Never update another person's insight."
+  },
+  "native_apm_browser_contract": {
+    "data_tool": {
+      "name": "apm-trace-get",
+      "input": {
+        "trace_id": "{{trace_id_hex}}",
+        "dateRange": {
+          "date_from": "{{window_start_iso}}",
+          "date_to": "{{window_end_iso}}"
+        },
+        "excludeAttributes": true,
+        "offset": 0
+      }
+    },
+    "pagination": "At most2000 spans/page; follow the returned nextOffset until exhausted, only when actual trace exists. Preserve fixed trace/window. This is typed endpoint pagination, distinct from programmatic /query SQL OFFSET restrictions.",
+    "safe_fields": "Only span tree relationships, timing, status, IDs and approved low-cardinality names/services. excludeAttributes:true also excludes resource attributes/events. This output is data proof, not image proof.",
+    "route_tool": {
+      "name": "generate-app-url",
+      "input": {
+        "url": "/tracing",
+        "params": {}
+      }
+    },
+    "actual_trace_link": "Use an actual trace-specific _posthogUrl if returned by a trusted native tool, or select actual trace via native UI and copy observed URL. Current generate-app-url catalog has /tracing but no /tracing/{traceId}; do not fabricate query parameters or a native trace link.",
+    "screenshot_sequence": [
+      "Open authenticated PostHog US project670821 native Tracing UI",
+      "Set the exact run-derived absolute UTC window and choose actual trace",
+      "Expand relevant tree so send→first model stages including daemon/cloud are visible",
+      "Confirm visible trace ID and span IDs/time labels agree with full metadata reconciliation",
+      "Capture actual native rendered waterfall; if virtualization requires several captures, preserve actual consecutive views and do not recreate a composite timeline",
+      "Keep attributes/content panes collapsed; visually inspect actual PNG and only attach checked native image with scope/case/head/trace metadata"
+    ],
+    "unknowns": [
+      "Real authenticated browser availability/permission is being checked by root",
+      "Native trace page actual layout/loading/virtualization has not been exercised for any case",
+      "No official direct APM screenshot/export tool was discovered",
+      "Saved Logs/APM renderer support remains unconfirmed, not asserted impossible",
+      "Actual APM native trace URL parameters must be observed from tool/UI, not guessed"
+    ]
+  },
+  "permissions": {
+    "mcp_insight_create_update": "Schema available, but successful mutation/RBAC not tested in this read-only preparation. Likely insight write permission required; do not infer grant from tool availability.",
+    "mcp_insight_read_query": "Schema available; actual owned target readability/query permission remains untested.",
+    "exporter": "Official exports docs require export:write for POST and export:read for GET/content. Actual existing runner key scopes and access to future insight not tested.",
+    "saved_sql_data_access": "Actual Default events read/query permission and final renderer service access remain to be checked with actual target.",
+    "no_extra_scopes_requested": true
+  },
+  "pagination_caveat": {
+    "official_doc": "https://posthog.com/docs/api/queries",
+    "new_read": "Programmatic /query OFFSET is documented as unsupported; personal API key requests return400. Official MCP skill still describes execute-sql LIMIT/OFFSET paging. Do not assume identical path behavior.",
+    "action": "Root was informed. Preserve two complete stable snapshots and independent counts. Do not modify pinned fourteen-query contract in this prep. If runtime rejects OFFSET, make an explicit versioned stable composite-key cursor adjustment with updated normalizer/receipt; never silently omit pages."
+  },
+  "existing_exporter": {
+    "path": "scripts/ops/posthog-export-evidence.mjs",
+    "blob_sha": "a986e913cc0f5b79386f5bf50cef8fbefae6ac0e",
+    "bytes": 11762
+  },
+  "sources": {
+    "tool_read_receipts": [
+      {
+        "command": "info insight-create",
+        "bytes": 19217,
+        "sha256": "d9f1cadb9d1c5468aafedddaed6f572fd1add481b5a188b7f80524ed426a68ae",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "info insight-update",
+        "bytes": 16862,
+        "sha256": "828be572275ca0bafcda6b73ae2776aefec10541896b2207526a25f119c2cae3",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "info insight-get",
+        "bytes": 2377,
+        "sha256": "10fbd486803f3126976a7a90e2248ab6576b0f0cb5aeb0ec0d60834c80a6c63c",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "info insight-query",
+        "bytes": 2652,
+        "sha256": "c1b97ab0b359f9c5a5939cdbddf8d05d678802e810a3e4fcb4ecbc1ac69f49b7",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "info apm-trace-get",
+        "bytes": 2003,
+        "sha256": "0abd8930b4586c1721fb40114b7daddfd9e0d925c980a5c42eabf35f6aa36b99",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "search screenshot",
+        "bytes": 199,
+        "sha256": "375e91b5980e85fbc06aeea5ad1edf06da1a985260b692a3f8aa7d132ce862ff",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "search apm trace export",
+        "bytes": 1165,
+        "sha256": "7fccabc06cfc8416c8008d610288bb80bb5721c62b5cb44052e1086dfe016a99",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "schema insight-create query",
+        "bytes": 13756,
+        "sha256": "6a34e998558e499d8ef58f2e2f0389583441ea372ead54c3ecc628bb2ec78e98",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "learn posthog:querying-posthog-data references/models-dashboards-insights.md",
+        "bytes": 2598,
+        "sha256": "f4106837afbec01d6c406dddef7be75abcce0f19aa79fde6136d89686011ca73",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "learn posthog:querying-posthog-data references/models-variables.md",
+        "bytes": 3750,
+        "sha256": "2a7589b9c9c20467132081dac8b7e8a801c05df3e33d3896c2812560695b8e5a",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "call docs-search {\"query\":\"site:posthog.com/docs/data-warehouse/query export PNG table\"}",
+        "bytes": 7576,
+        "sha256": "af36c353f6a3b843b64cfa02480d37b8d1c83ec711602aeda8fce39d5045d99f",
+        "observed": true,
+        "output_is_runtime_execution": false
+      },
+      {
+        "command": "call docs-search {\"query\":\"site:posthog.com/docs/api/exports Create exports insight integer export_format image/png\"}",
+        "bytes": 8154,
+        "sha256": "c4698921c827473cb954bce9c60c210e7ab33344c7e7c2c6ae6c48d4cfdeff2e",
+        "observed": true,
+        "output_is_runtime_execution": false
+      }
+    ],
+    "official_docs": [
+      "https://posthog.com/docs/api/exports",
+      "https://posthog.com/docs/api/insights",
+      "https://posthog.com/docs/data-warehouse/query",
+      "https://posthog.com/docs/getting-started/data-import-export",
+      "https://posthog.com/docs/distributed-tracing/start-here",
+      "https://posthog.com/docs/api/queries"
+    ],
+    "skills": [
+      "posthog:querying-posthog-data",
+      "posthog:querying-posthog-data/references/models-dashboards-insights.md",
+      "posthog:querying-posthog-data/references/models-variables.md",
+      "posthog:querying-posthog-data/references/models-apm-spans.md",
+      "posthog:turning-engineering-analytics-into-insights",
+      "posthog:instrument-tracing"
+    ]
+  }
+}

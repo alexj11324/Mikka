@@ -1,0 +1,26 @@
+2026-11-08T22:20:10.3451710Z PASS packaged local origin and isolated renderer
+2026-11-08T22:20:10.3883100Z PASS local document CSP blocks external renderer fetches
+2026-11-08T22:20:14.1391840Z PASS server choice: probe states, probed-only selection, the page follows the chosen server and returns
+2026-11-08T22:20:17.9216240Z PASS system browser shows the signed-in account, then loopback and single-use PKCE session handoff
+2026-11-08T22:20:17.9221830Z PASS the callback page opens the Dev build's own app link
+2026-11-08T22:20:18.3875960Z PASS opening the app link brings the packaged app to the front
+2026-11-08T22:20:18.6317850Z PASS no browser session credential in renderer-accessible state
+2026-11-08T22:20:19.4713020Z PASS native badge, payload validation, device and quota bridge
+2026-11-08T22:20:22.3627370Z PASS settings deep link and shared devices page
+2026-11-08T22:20:22.4163230Z PASS sign-out clears the main-owned session
+2026-11-08T22:20:46.3835240Z PASS light/sign-in: 0.00000% pixels
+2026-11-08T22:20:47.1108000Z PASS light/shared-markdown: 0.00000% pixels
+2026-11-08T22:20:48.0397390Z PASS light/shared-html: 0.00000% pixels
+2026-11-08T22:20:49.4981310Z PASS light/shared-missing: 0.00000% pixels
+2026-11-08T22:20:50.0894080Z PASS dark/sign-in: 0.00000% pixels
+2026-11-08T22:20:51.3068220Z PASS dark/shared-markdown: 0.00000% pixels
+2026-11-08T22:20:52.6378870Z PASS dark/shared-html: 0.00000% pixels
+2026-11-08T22:20:53.8645120Z PASS dark/shared-missing: 0.00000% pixels
+2026-11-08T22:21:06.0197690Z Desktop parity failed: page.evaluate: Execution context was destroyed, most likely because of a navigation
+2026-11-08T22:21:06.2475690Z Error: DESKTOP_TEST_SETUP_EXIT_1
+2026-11-08T22:21:08.3611360Z SHA256 digest of uploaded artifact zip is 67a85524f7aa81e84c6fd79417caeb32da69167bcb75b20985db83dffb5fcb4b
+2026-11-08T22:21:08.7594310Z Artifact desktop-package-evidence-e0b8d63ae010f1a553d8dfdfb2436711ab8ec8e5.zip successfully finalized. Artifact ID 13637106197
+2026-11-08T22:21:08.7599850Z Artifact desktop-package-evidence-e0b8d63ae010f1a553d8dfdfb2436711ab8ec8e5 has been successfully uploaded! Final size is 1596 bytes. Artifact ID is 13637106197
+2026-11-08T22:21:10.5980580Z SHA256 digest of uploaded artifact zip is d155c8d53f4f811e853ae0a911a23281e0ed1a317f5216a8cbe11ea22ec603f0
+2026-11-08T22:21:10.9886870Z Artifact desktop-native-evidence-e0b8d63ae010f1a553d8dfdfb2436711ab8ec8e5.zip successfully finalized. Artifact ID 13637031473
+2026-11-08T22:21:10.9890890Z Artifact desktop-native-evidence-e0b8d63ae010f1a553d8dfdfb2436711ab8ec8e5 has been successfully uploaded! Final size is 486428 bytes. Artifact ID is 13637031473

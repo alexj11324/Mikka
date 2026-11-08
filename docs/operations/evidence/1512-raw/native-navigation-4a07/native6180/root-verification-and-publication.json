@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "sourceCandidate": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "publishedCandidate": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "publishedTree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+  "onlyChangedPaths": [
+    "apps/desktop/test/parity.mjs",
+    "apps/desktop/test/parity-page-ready.mjs",
+    "apps/desktop/test/parity-reads.test.mjs"
+  ],
+  "productionSourceChangedByNavigationFix": false,
+  "sameUrlRaceFix": "Wait for actual new-document DOMContentLoaded, registered before the single click; current aria-current=true item remains a no-navigation click. Preserve original failure/URL/readiness behavior.",
+  "tests": {
+    "navigationAndReadiness": {
+      "pass": 43,
+      "fail": 0,
+      "skip": 0,
+      "log": "native6180/navigation-fix-final-tests.log",
+      "logSha256": "21f0ffbef41e0d778cbb450fa5fbc5c5ef78bc13e839dfec795425ca64c9a82e"
+    },
+    "repositoryPolicies": {
+      "command": "node --test scripts/error-cause-policy.test.mjs scripts/polling-policy.test.mjs",
+      "pass": 57,
+      "fail": 0,
+      "skip": 0
+    },
+    "syntax": 3,
+    "diffCheck": "passed",
+    "targetedLint": "One pre-existing unused observed parameter warning; baseline was checked; not claimed clean."
+  },
+  "actualPreviousNative": {
+    "revision": "e0b8d63ae010f1a553d8dfdfb2436711ab8ec8e5",
+    "tree": "e91ea067bba2be784abbdbb384a3d6b8f30023aa",
+    "run": 42527929928,
+    "job": 128878449868,
+    "nativeResult": "failure",
+    "lifecycleExecuted": false,
+    "loginSqlBudget": null,
+    "firstStartupSqlBudget": null
+  },
+  "benchmarkRootRecomputation": {
+    "singleOperationActiveElapsedDeltaNs": {
+      "n": 2000,
+      "mean": 3550.156,
+      "p50": 1813,
+      "p95": 4648,
+      "p99": 36084,
+      "min": -149285,
+      "max": 900599
+    },
+    "batchCpuMeanDeltaUsPerOperation": {
+      "n": 512,
+      "mean": 3.552337646484375,
+      "p50": 1.9453125,
+      "p95": 20.3125,
+      "p99": 100.9375,
+      "min": -138.8203125,
+      "max": 148.0234375
+    },
+    "batchPercentilesAreNotIndividualOperationPercentiles": true,
+    "rawSinglePairs": 2000,
+    "rawBatchPairs": 512,
+    "networkAttempts": 0,
+    "sqlCalls": 0,
+    "cleanup": {
+      "base_pool_ended": true,
+      "wrapped_pool_ended": true,
+      "network_guard_restored": true,
+      "external_resources_created": 0
+    },
+    "limits": [
+      "PostgreSQL connection handshake",
+      "real PostgreSQL network",
+      "SQL execution",
+      "HTTP",
+      "model calls",
+      "PostHog export",
+      "real OTel SDK recording",
+      "production concurrency distribution",
+      "Vercel suspension lifecycle"
+    ]
+  },
+  "productionCase": {
+    "accountContract": "Issue1512 explicitly requires ACME_DEMO_EMAIL/PASSWORD and takes precedence over the newer general SMOKE_OWNER/team-workspace guidance; no account or subscription replacement.",
+    "actualModelCaseRuns": 0,
+    "nativeApmScreenshot": "not_obtained; secure browser login interrupted, no retry or credential bypass",
+    "posthogQueriesRunDuringLatestReadinessCheck": 0,
+    "notebookKernel": "stopped"
+  },
+  "lowPriorityBoundary": {
+    "description": "When a mixed notification batch contains finished plus awaiting/failed and fresh preference read fails, the whole decision action fails; Dock badge remains independent.",
+    "occurrence": 1,
+    "impact": 3,
+    "decision": "Record in issue; no speculative product change or extra Native run."
+  },
+  "latestCI": {
+    "run": 42531278865,
+    "statusAtArchive": "in_progress_or_queued",
+    "acceptancePassed": false
+  },
+  "resources": {
+    "newPaidResources": 0,
+    "benchmarkPoolsEnded": true,
+    "credentialsPrinted": false,
+    "standaloneNativePostgresStopReceipt": "not_observed"
+  },
+  "sourceReview": "Independent review found no must-fix in current ALS, notification read, owner view or three-file navigation change."
+}

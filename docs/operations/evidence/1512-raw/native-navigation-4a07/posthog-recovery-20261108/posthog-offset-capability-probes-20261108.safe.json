@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "kind": "posthog_mcp_zero_row_offset_capability_probe",
+  "issue": "alexj11324/Mikka#1512",
+  "project_id": 670821,
+  "region": "US",
+  "posthog_conversation_id": "01a1b694-e84e-7821-89c0-1fd14c866b83",
+  "started_at_utc": "2026-11-08 00:22:33 UTC",
+  "completed_at_utc": "2026-11-08 00:23:27 UTC",
+  "authorization": "Parent explicitly authorized at most2 read-only, no-business-ID, no-row, no-write probes using Default and known Logs logical table routes to resolve current MCP OFFSET rejection risk. Do not mutate pinned queries/normalizer.",
+  "budget": {
+    "maximum": 2,
+    "attempted": 2,
+    "completed": 2,
+    "retries": 0,
+    "remaining": 0
+  },
+  "production_acceptance_evidence": false,
+  "mutations": {
+    "posthog_entities_created": 0,
+    "posthog_entities_updated": 0,
+    "exports_started": 0,
+    "external_compute_started": 0,
+    "model_tasks_started": 0,
+    "repository_refs_updated": 0
+  },
+  "routing_evidence": {
+    "default_table": "events",
+    "logs_table": "posthog.trace_spans",
+    "supported_by": "Already-read official execute-sql description and posthog:querying-posthog-data/references/models-apm-spans.md; previous actual schema preflight in production-evidence-query-templates.json confirms logical Default/Logs layout.",
+    "connectionId_passed": false,
+    "physical_cluster_id_reported": false,
+    "note": "Uses the official qualified APM table name; no cluster argument exists on current execute-sql schema, and connectionId denotes external data sources, so no invented cluster selector was used."
+  },
+  "probes": [
+    {
+      "name": "default_events_zero_rows_offset500",
+      "logical_cluster": "Default",
+      "table": "events",
+      "query": "SELECT 1 AS offset_capability_probe FROM events WHERE 0 AND timestamp >= toDateTime('2026-11-08 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-08 00:01:00', 'UTC') LIMIT 0 OFFSET 500",
+      "input": {
+        "query": "SELECT 1 AS offset_capability_probe FROM events WHERE 0 AND timestamp >= toDateTime('2026-11-08 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-08 00:01:00', 'UTC') LIMIT 0 OFFSET 500",
+        "truncate": false,
+        "context": "Explicitly authorized issue1512 capability probe, not analytics or production acceptance: SELECT constant only, WHERE0, fixed one-minute UTC guard, LIMIT0 OFFSET500. Returns no event/span/attribute data. Verify current MCP OFFSET acceptance only. No metric/catalog lookup applicable."
+      },
+      "request": {
+        "command": "call execute-sql {\"query\":\"SELECT 1 AS offset_capability_probe FROM events WHERE 0 AND timestamp >= toDateTime('2026-11-08 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-08 00:01:00', 'UTC') LIMIT 0 OFFSET 500\",\"truncate\":false,\"context\":\"Explicitly authorized issue1512 capability probe, not analytics or production acceptance: SELECT constant only, WHERE0, fixed one-minute UTC guard, LIMIT0 OFFSET500. Returns no event/span/attribute data. Verify current MCP OFFSET acceptance only. No metric/catalog lookup applicable.\"}",
+        "context": "Run this exact authorized read-only zero-row capability probe once. No production IDs, no model task, no writes. Preserve the server response including any OFFSET rejection; do not retry or substitute queries.",
+        "llm_model": "gpt-6-astra",
+        "conversation_id": "01a1b694-e84e-7821-89c0-1fd14c866b83"
+      },
+      "raw_tool_response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "offset_capability_probe"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      },
+      "closed_result": {
+        "tool_reported_error": false,
+        "offset_rejection_observed": false,
+        "returned_header": "offset_capability_probe",
+        "observed_data_rows": 0,
+        "any_event_span_attribute_payload_returned": false,
+        "http_status": null,
+        "physical_scan_bytes": null,
+        "actual_backend_cluster_id": null
+      }
+    },
+    {
+      "name": "logs_apm_zero_rows_offset500",
+      "logical_cluster": "Logs",
+      "table": "posthog.trace_spans",
+      "query": "SELECT 1 AS offset_capability_probe FROM posthog.trace_spans WHERE 0 AND timestamp >= toDateTime('2026-11-08 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-08 00:01:00', 'UTC') LIMIT 0 OFFSET 500",
+      "input": {
+        "query": "SELECT 1 AS offset_capability_probe FROM posthog.trace_spans WHERE 0 AND timestamp >= toDateTime('2026-11-08 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-08 00:01:00', 'UTC') LIMIT 0 OFFSET 500",
+        "truncate": false,
+        "context": "Explicitly authorized issue1512 capability probe, not analytics or production acceptance: SELECT constant only, WHERE0, fixed one-minute UTC guard, LIMIT0 OFFSET500. Returns no event/span/attribute data. Verify current MCP OFFSET acceptance only. No metric/catalog lookup applicable."
+      },
+      "request": {
+        "command": "call execute-sql {\"query\":\"SELECT 1 AS offset_capability_probe FROM posthog.trace_spans WHERE 0 AND timestamp >= toDateTime('2026-11-08 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-08 00:01:00', 'UTC') LIMIT 0 OFFSET 500\",\"truncate\":false,\"context\":\"Explicitly authorized issue1512 capability probe, not analytics or production acceptance: SELECT constant only, WHERE0, fixed one-minute UTC guard, LIMIT0 OFFSET500. Returns no event/span/attribute data. Verify current MCP OFFSET acceptance only. No metric/catalog lookup applicable.\"}",
+        "context": "Run this exact authorized read-only zero-row capability probe once. No production IDs, no model task, no writes. Preserve the server response including any OFFSET rejection; do not retry or substitute queries.",
+        "llm_model": "gpt-6-astra",
+        "conversation_id": "01a1b694-e84e-7821-89c0-1fd14c866b83"
+      },
+      "raw_tool_response": {
+        "content": [
+          {
+            "type": "text",
+            "text": "offset_capability_probe"
+          }
+        ],
+        "structuredContent": null,
+        "isError": false
+      },
+      "closed_result": {
+        "tool_reported_error": false,
+        "offset_rejection_observed": false,
+        "returned_header": "offset_capability_probe",
+        "observed_data_rows": 0,
+        "any_event_span_attribute_payload_returned": false,
+        "http_status": null,
+        "physical_scan_bytes": null,
+        "actual_backend_cluster_id": null
+      }
+    }
+  ],
+  "conclusion": {
+    "accepted_in_current_mcp_for_exact_zero_row_shapes": true,
+    "paths_observed": [
+      "events",
+      "posthog.trace_spans"
+    ],
+    "interpretation": "Both exact SELECT-constant/WHERE0/LIMIT0/OFFSET500 requests returned isError:false and only the column header. Current MCP did not reject OFFSET500 for these two zero-row logical-table paths.",
+    "limits": [
+      "Constant false predicates/zero limit may short-circuit work; this does not verify real second-page data retrieval.",
+      "The tool reports no physical cluster identifier or scan-byte metric.",
+      "This does not override public /query API OFFSET restrictions for other authentication paths.",
+      "No production data, event, actual business ID, attribute, or trace case was read.",
+      "No saved-insight rendering/PNG ability or evidence completeness is established."
+    ],
+    "preserved_contract": "Pinned14query templates and normalizer unchanged. Preserve two complete stable snapshots, every required page and independent counts during actual production acceptance. Resolve any actual runtime restriction explicitly; never silently omit pages.",
+    "stop_condition": "Exactly2 probes exhausted authorization; no polling, retries or further SQL planned."
+  },
+  "prior_preparation_blobs": {
+    "capability_plan": "a0155a905b306cfb901d4d210db4478fd236d73b",
+    "official_contracts": "c08eb311c29674910433d0d60c7b3c80406ee274",
+    "chronology": "The prior read-only PNG preparation was frozen before these two newly authorized probes; its queries_executed:0 correctly describes its earlier preparation scope."
+  }
+}

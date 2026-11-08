@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "issue": 1512,
+  "pr": 1675,
+  "prHead": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "actualRevision": "e0b8d63ae010f1a553d8dfdfb2436711ab8ec8e5",
+  "actualTree": "e91ea067bba2be784abbdbb384a3d6b8f30023aa",
+  "actualParents": [
+    "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+    "6180cd8889006f4e1618c2549b1aa12d13506ee8"
+  ],
+  "sameTreeAsPrHead": true,
+  "run": 42527929928,
+  "job": 128878449868,
+  "attempt": 1,
+  "artifacts": [
+    {
+      "id": 13637031473,
+      "file": "native-6180-original.zip",
+      "bytes": 486428,
+      "sha256": "d155c8d53f4f811e853ae0a911a23281e0ed1a317f5216a8cbe11ea22ec603f0"
+    },
+    {
+      "id": 13637106197,
+      "file": "package-6180-original.zip",
+      "bytes": 1596,
+      "sha256": "67a85524f7aa81e84c6fd79417caeb32da69167bcb75b20985db83dffb5fcb4b"
+    }
+  ],
+  "outcome": {
+    "nativeJob": "failure",
+    "stage": "native-device-bundled",
+    "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation",
+    "smoke": {
+      "passed": 10,
+      "total": 10
+    },
+    "parity": {
+      "passed": 8,
+      "required": 100,
+      "onlyAnonymousScreensCompleted": true
+    },
+    "lifecycle": "not_executed",
+    "loginSqlBudget": null,
+    "firstStartupSqlBudget": null,
+    "crypto": {
+      "passed": true,
+      "sameImmutablePackage": true,
+      "distinctProcesses": 3,
+      "cleanup": "passed"
+    },
+    "package": {
+      "passed": true,
+      "signatureVerifiedStrictDeep": true
+    }
+  },
+  "readiness": {
+    "ready": false,
+    "elapsedMs": 44,
+    "deadlineMs": 480000,
+    "successfulReads": 0,
+    "transitions": 0,
+    "failure": null,
+    "interpretation": "The first attempted snapshot was interrupted; successful-read count zero does not imply no attempted IPC or that background setup never began."
+  },
+  "cleanup": {
+    "parity": "passed",
+    "parityNativeResourcesCleaned": true,
+    "parityWorkspaceNameRestored": true,
+    "parityOwnerMatchesSealedBaseline": true,
+    "parityPeerMatchesSealedBaseline": true,
+    "parityExplicitAccountObservation": "not_emitted",
+    "smokeStagesPassed": 6,
+    "smokeLeaseState": "released",
+    "smokeOwnerMatchesBeforeAndAfter": true,
+    "smokePeerMatchesBeforeAndAfter": true,
+    "standalonePostgresStopReceipt": "not_observed",
+    "agentCreatedPaidResources": 0
+  },
+  "cause": {
+    "classification": "same_url_document_navigation_readiness_race",
+    "sourceEvidence": [
+      "hooks/use-workspace-switcher.ts:64-72: a different workspace awaits switchWorkspace and clearPersistentReadCaches, then window.location.assign to the current locale home URL; the current workspace returns without navigation.",
+      "components/workspace-menu.tsx:94-95: aria-current=true uses the same account/workspace equality as the no-op predicate.",
+      "apps/desktop/test/parity.mjs:271-277 before patch: go() already reaches the locale home; waitForURL accepts that old URL and old ready DOM before the asynchronous document navigation.",
+      "apps/desktop/test/native-device-ready.mjs:141-142 before patch: first page.evaluate rejection propagates with successfulReads still zero."
+    ],
+    "proofBoundary": "The old artifact did not retain the exact navigation event/URL. Source flow and a deterministic original-logic regression establish the readiness defect; this is not a claim that a new real packaged run has passed."
+  },
+  "patch": {
+    "paths": [
+      "apps/desktop/test/parity.mjs",
+      "apps/desktop/test/parity-page-ready.mjs",
+      "apps/desktop/test/parity-reads.test.mjs"
+    ],
+    "file": "same-url-workspace-navigation.patch",
+    "bytes": 7666,
+    "sha256": "12625b975acdfd2a7c6fc3ddb458c3864cc767723a43be6dc847cb0f9dd4ad86",
+    "scope": "test readiness only",
+    "changedProductFiles": false,
+    "changedSqlOrBudget": false,
+    "changedMeasurementWindows": false,
+    "changedNativeDeviceReadinessGate": false,
+    "clickRetries": 0,
+    "errorSuppression": false,
+    "registeredExistingSuite": "apps/desktop/package.json test -> test/parity-reads.test.mjs",
+    "harnessHashCoversHelper": true
+  },
+  "validation": {
+    "node": "24.22.1",
+    "red": {
+      "command": "node --test --test-name-pattern='workspace selection|already-selected workspace' apps/desktop/test/parity-reads.test.mjs",
+      "exitCode": 1,
+      "pass": 2,
+      "fail": 2,
+      "baseline": "Original selection logic extracted unchanged before adding the document wait."
+    },
+    "green": {
+      "command": "node --test apps/desktop/test/parity-reads.test.mjs apps/desktop/test/native-device-ready.test.mjs apps/desktop/test/native-document.test.mjs",
+      "exitCode": 0,
+      "pass": 43,
+      "fail": 0,
+      "skip": 0,
+      "rawStdoutPersisted": false
+    },
+    "syntax": {
+      "files": 3,
+      "exitCode": 0
+    },
+    "diffCheck": {
+      "exitCode": 0
+    },
+    "lint": {
+      "command": "../../node_modules/.bin/oxlint --deny-warnings -c oxlint.json test/parity.mjs test/parity-page-ready.mjs test/parity-reads.test.mjs",
+      "exitCode": 1,
+      "diagnostic": "pre-existing no-unused-vars parameter observed in pageReady (base line94; candidate line108)",
+      "baselineChecked": true,
+      "claimedClean": false,
+      "initialAttempts": [
+        "eslint executable absent (repo uses oxlint)",
+        "root oxlint excludes apps/desktop; no files selected"
+      ]
+    }
+  },
+  "completedProductionRuns": 0,
+  "acceptancePassed": false
+}
