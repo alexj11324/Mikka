@@ -52,3 +52,11 @@ These engineering captures preserve the policy commit locale. Final English stor
 | 390 | light | 2x | ![Baseline profile 390 light 2x](basefacb/profile-390-light-2x.png) | ![Policy profile 390 light 2x](4ec411d5/profile-390-light-2x.png) |
 | 390 | dark | 1x | ![Baseline profile 390 dark 1x](basefacb/profile-390-dark-1x.png) | ![Policy profile 390 dark 1x](4ec411d5/profile-390-dark-1x.png) |
 | 390 | dark | 2x | ![Baseline profile 390 dark 2x](basefacb/profile-390-dark-2x.png) | ![Policy profile 390 dark 2x](4ec411d5/profile-390-dark-2x.png) |
+
+## Live web deletion entry
+
+A supplemental read-only run used the same policy preview source against backend `9bcdefc5fe0c047393d581eea867ffa801f53dbe`. The opened official web account page rendered its Delete account control. The run stopped before opening or submitting deletion confirmation.
+
+[Supplemental manifest](account-confirmation/manifest.json) · [Capture script](account-confirmation/capture.mjs)
+
+![Official web account page with review-account email masked](account-confirmation/web-account-entry.png)

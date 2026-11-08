@@ -1,0 +1,169 @@
+{
+  "sourceCommit": "4ec411d5d90b341aa65e58409f262af4a6d0734c",
+  "backendCommit": "9bcdefc5fe0c047393d581eea867ffa801f53dbe",
+  "previewOrigin": "https://app.aspectlylabs.com",
+  "apiOrigin": "https://app.aspectlylabs.com/mikka",
+  "authentication": "normal review-account email sign-in through the real UI and unmodified production API",
+  "previewAssetFulfillment": "only root, settings/profile HTML and Expo assets are served from the frozen cloud export",
+  "screenshotRedaction": "review account email masked",
+  "matrix": {
+    "widths": [
+      390
+    ],
+    "height": 844,
+    "appearance": [
+      "light"
+    ],
+    "textScale": [
+      1
+    ],
+    "screen": "official web account page"
+  },
+  "nativeAcceptance": false,
+  "browser": "156.0.8078.4",
+  "actions": {
+    "preloginPrivacy": "https://aspectlylabs.com/privacy",
+    "settingsPrivacy": "https://aspectlylabs.com/privacy",
+    "account": "https://app.aspectlylabs.com/mikka/settings?section=account"
+  },
+  "files": [
+    "web-account-entry.png"
+  ],
+  "apiReads": [
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/home",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/chat",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/home",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/conversations",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/home",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/settings",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/home",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace/switcher",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/agent/sessions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/live/ticket",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "method": "GET",
+      "status": 200
+    }
+  ]
+}
