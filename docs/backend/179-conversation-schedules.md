@@ -16,7 +16,10 @@ Paused slots never catch up. For an unexpected outage, `skip` or
 sweep coalesces an interval backlog into at most one due slot per schedule.
 
 `GET /api/cron/schedules` uses the existing `CRON_SECRET`. Its numeric result
-contains `materialized` and `executed`; the existing minute Worker calls it.
+contains `materialized` and `executed`. Due work starts from persisted events
+and durable timers. The Worker calls `/api/cron/reconcile` every 15 minutes as
+the safety sweep. The schedules route remains available for an authenticated
+manual invocation. See [suggestions schedules](../suggestions-cron.md).
 The occurrence's stable operation ID, row locks, immutable skip decision and
 bounded lease protect concurrent scans, restarts and mutation races. Operational
 failures retry up to three attempts. Failed reports have a persisted fair retry
@@ -42,7 +45,7 @@ runtime and its current model/connection admission. Model inference, connected
 provider reads and budget/resource admission still need the issue's fixed-version
 runtime acceptance; a mocked model response is not that evidence.
 
-## Local evidence
+## Historical local evidence
 
 Base `be539ca3`, plus shared read-catalog scaffolding `fe8e2041`. All changes are
 isolated in `/workspace/mikka-old-schedule179`. PG17 uses a newly created

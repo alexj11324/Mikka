@@ -2,9 +2,14 @@
 
 调研：[`research/chat-tool-calls-and-citations.md`](research/chat-tool-calls-and-citations.md)
 
-范围：只改前端展示（Coordinator chat 及所有用 `ReplyActivity` / `CoordinatorReply` 的一对一 chat）。不改后端协议；需要的后端字段单列在 §6。
+范围覆盖 `ReplyActivity` / `CoordinatorReply` 的工具分组与引用展示。§0 记录
+2026-11-04 的修复前状态，§6.1 记录后端字段契约。实现入口为
+`components/coordinator/reply-activity.tsx`、`lib/coordinator/tool-activity.ts`
+和 `lib/coordinator/tool-metadata.ts`。任务入口和图标按后续
+[任务列表决定](decisions/2026-11-07-2045-tasks-only-threads-inside.md)与
+[状态图标决定](decisions/2026-11-07-2230-one-icon-per-task-state.md)。
 
-## 0. 现状（已核实代码）
+## 0. 2026-11-04 的修复前状态
 
 | 问题 | 代码位置 | 原因 |
 | --- | --- | --- |
@@ -30,8 +35,9 @@
 5. **图标按类型**（lucide，同一套颜色 `text-muted-foreground`）：查看/读取 `Eye`/`FileText`，搜索 `Search`，创建/修改 `Pencil`/`Plus`，派发线程 `Send`，消息/邮件 `Mail`/`MessageSquare`，日历 `Calendar`，网页/浏览器 `Globe`，记忆 `Brain`，GitHub `GitHubIcon`，其他 `Wrench`。失败的那一条图标换成 `CircleAlert` 红色。
 6. **失败判定**：`state === 'error'`，**或** 输出预览是带 `error` / `ok:false` 键的 JSON（前端解析，见 §6 的后端建议）。
    - 失败行：红色图标 + 标题后跟原因，「运行 Factory · 没有找到 Factory」。
-   - 原因：已知错误码映射成中文（`factoryNotFound` → 没有找到 Factory，`notFound`、`forbidden`、`rateLimited`、`timeout`…，表放 `messages/*.json` `Coordinator.activity.errors`）；未知码显示码本身（等宽字体），不显示整段 JSON。
-7. **单条展开先说人话，原始 JSON 再折一层**：单条行点开，先是 `toolDetail`（`lib/coordinator/tool-detail.ts`）给出的几行，一律不显示 id（任何大小写的 id 键、值里的 UUID 和 `b_9f8e7d`、`toolu_…` 这类 id 都不显示，引用里的 id 换成省略号）。派发线程：「交给」+ 编码 Agent（Claude Code / Codex，带图标，R-74），不是 Bot；然后线程 chip（chip 自己带状态，不再另加状态徽章）；chat 没加载这个线程时，写「交给 Codex · 进行中」，状态按线程列表分组（R-52）。任务不画 chip（R-15）。下面引用样式放派发说明：服务端单独发一份说明（`quote`，最多 1000 字，超出加省略号），不受 200 字输入预览截断影响；只有超过 3 行才是可点开的按钮。其他已登记工具写对象、查询、数量、状态；没登记的工具列它自己的字段（跳过 id 和嵌套对象，值截到 80 字，输入输出合计最多 6 行）。失败的调用不写人话：行上已有失败原因。最下面是「原始数据」折叠项，默认收起，里面才是输入/输出 `CodeBlock`（失败用 destructive 变体）。组展开 ≠ 单条展开。
+   - 原因：已知错误码映射成中文（`factoryNotFound` → 没有找到 Factory，`notFound`、`forbidden`、`rateLimited`、`timeout`…，表放 `messages/*.json` `Coordinator.activity.errors`）；未知原因显示「没执行成功，已跳过」；原始码留在「原始数据」内
+     （[错误原因决定](decisions/2026-11-05-0330-error-causes.md)）。
+7. **单条展开先说人话，原始 JSON 再折一层**：单条行点开，先是 `toolDetail`（`lib/coordinator/tool-detail.ts`）给出的几行，一律不显示 id（任何大小写的 id 键、值里的 UUID 和 `b_9f8e7d`、`toolu_…` 这类 id 都不显示，引用里的 id 换成省略号）。派发线程：「交给」+ 编码 Agent（Claude Code / Codex，带图标，R-74），不是 Bot；然后用一个任务引用标出派发对象，按 R-15、R-66 打开任务；尚未加载对象时保留已确认的派发状态。公共默认插槽的旧线程 chip 路径见 §2。下面引用样式放派发说明：服务端单独发一份说明（`quote`，最多 1000 字，超出加省略号），不受 200 字输入预览截断影响；只有超过 3 行才是可点开的按钮。其他已登记工具写对象、查询、数量、状态；没登记的工具列它自己的字段（跳过 id 和嵌套对象，值截到 80 字，输入输出合计最多 6 行）。失败的调用不写人话：行上已有失败原因。最下面是「原始数据」折叠项，默认收起，里面才是输入/输出 `CodeBlock`（失败用 destructive 变体）。组展开 ≠ 单条展开。
 8. **全部展开 / 全部收起**：
    - 放在每个工具组摘要行的末尾（Coordinator 允许「对话顶部或这组旁边」，选了组旁边，这样不用改 shell 的 header）：图标按钮 `ChevronsUpDown`，tooltip 是「全部展开」/「全部收起」。电脑和触屏上都常驻显示（独立审阅 2026-11-04：Alex 专门要过这个按钮，不能藏起来）。
    - 作用于当前已加载的所有组（展开组，不展开单条 JSON）。读者对单个组的操作之后仍可覆盖。
@@ -47,12 +53,15 @@
 
 ## 2. 引用去重（改 R-15、R-66）
 
-1. **任务和线程是同一件事**：正文里同一句同时引到任务 T 和 T 的线程 R 时，只出线程 chip（点开是线程对话，R-15）；任务 chip 只在任务没有线程时出现。实现：渲染时若某个 `run` 的 `issue.id` 也在本条回复的引用里，那个任务引用不画（句子里已有线程 chip）。
+1. **同一任务的引用合并**。正文同时提到任务和其运行记录时只保留一个工作对象引用。任务引用和派发卡片先打开任务，尝试在任务的一段对话中打开（R-15、R-66、R-82）。公共默认插槽仍保留旧线程 chip 路径，官方构建的呈现由所选 UI layer 决定。
 2. **一段对话里一个线程只有一张卡片**：卡片只出现在**第一次**派发/提到它的那条回复下（以已加载的列表计）；后面再提到时，正文里是行内链接样式的 chip，不再在回复底下挂卡片。卡片原地更新状态（R-66 已有）。
 3. **事件行**（「ALEX-45 在等你回答」）：同一线程连续多条同类事件只保留最新一条。
 4. ~~同一条回复内第二次起写纯文字~~ —— 已被 2.5 第 4 条取代。
 
-### 2.5 chip 画法（按 Nielsen 10 条定，Claude App 只作参照）
+### 2.5 2026-11-04 的 chip 画法记录
+
+下面保留当时任务圆圈、线程气泡和色点的方案。后续任务卡片、列表图标与打开位置
+按 R-15、R-52、R-66、R-82；本节不再授权恢复独立线程列表或任务状态点。
 
 1. **一眼分清任务和线程（Alex 2026-11-04：「issue 和 chat 的状态要有区分度，一看就知道哪个是 issue，哪个是 chat」）**。任务一律用**圆圈**：沿用看板上那套任务状态图标（○ ◌ ◉ ✓ ✕ ⊘）。线程一律用**对话气泡**，状态用气泡右上角的色点表示：琥珀是等你，红是受阻，绿是已解决，灰点闪烁是运行中，空心灰是空闲。线程的任何地方都不再用圆圈：现在 `ThreadStatusIcon` 的 `CircleCheck`、`CircleSlash2`、`CircleAlert`、`LoaderCircle` 都要换掉，其中 `CircleCheck`、`CircleSlash2` 和任务用的完全是同一个图标，这是分不清的根源。影响范围：chat chip、线程卡片、线程列表、任务的「线程」标签页、手机端（R-15、R-52、R-66）。色点不能只靠颜色表达状态：在列表和卡片里，色点旁边都要写状态文字；放在 chip 里时，状态写进 aria-label。Artifact 用叠层图标。
 2. chip 的文字统一用 accent 色。图标颜色：任务按看板颜色；线程气泡本身用 accent，只有色点带状态色。
@@ -86,7 +95,7 @@
 
 无副标题、无解释句。
 
-## 6. 需要后端的（转 Pro，不阻塞本 PR）
+## 6. 2026-11-04 的后端接线清单
 
 1. **工具结果的失败标记**：工具返回 `{error}` 时把 `ChatTool.state` 记为 `error`，并给 `errorCode`。前端先靠解析预览兜底。
 2. **工具调用的对象标签**：`ChatTool.target`（如 `ALEX-45`、搜索词、仓库名），由服务端从完整 input 取，避免前端从 200 字截断的预览里猜。
@@ -111,6 +120,7 @@
 ## 7. 验收
 
 - `ux-heuristics` 每屏 ≥ 8；`cognitive-walkthrough`：「看懂 bot 刚才做了什么」「找到失败的那一步」，记录点击/滚动次数（目标：前者 0 次点击读摘要，后者 ≤ 1 次点击）。
-- 390 / 1440 截图（本地 `next build` + `next start`，leased 测试账号），附到 PR。
+- 在 cloud Linux 用 `pnpm build`、`pnpm start` 的本地生产构建截取
+  390 / 1440 画面，使用 [acceptance.md](../acceptance.md) 规定的测试身份并附到 PR。
 - 单测：分组摘要计数、失败判定（state 与 JSON error 两种）、任务/线程去重、卡片只出一次。
 - 同步：`docs/design/rules.md` 改 R-15、R-66，新增工具组条目；`lint:ui` / `check-copy` 增加「禁止 `使用工具`」「`ReplyActivity` 不得渲染原始 JSON 于组层」的检查；`docs/design/decisions/` 记一条。

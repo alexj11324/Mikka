@@ -1,6 +1,8 @@
 # Web 群聊创建入口
 
-- **Status:** in review (2026-11-04)
+- **Status:** implemented specification. `components/nav/new-group-dialog.tsx`
+  and its focused tests contain the creation flow. Runtime acceptance remains
+  tied to the evidence recorded on #1210 and #1209.
 - **GitHub:** #1210, #1209
 - **Owner thread:** 2026-11-04 生产验收；Web 只有新建 Bot，已有群聊能打开但无法创建。
 

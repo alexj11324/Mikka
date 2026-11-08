@@ -1,7 +1,7 @@
 # Mikka daemon
 
 The daemon connects your computer to Mikka and runs threads with your installed
-Claude Code or Codex. Node.js 22 or newer and Git are required. Sign in to the
+Claude Code, Codex or Cursor. Node.js 22 or newer and Git are required. Sign in to the
 coding CLI and make sure your local Git credentials can read the repositories
 you want to use.
 
@@ -12,12 +12,12 @@ install them with the system package manager and the daemon picks them up by
 itself. Settings > Devices names anything it could not resolve.
 
 The release candidate is a single `@aspectlylabs/mikka` package containing the
-`mikka` command and its daemon subcommands. The source workspace stays private;
+`mikka` command and its daemon subcommands. The workspace package has `private: true`;
 `pnpm --filter @mikka/daemon build` produces the package with the private
 protocol bundled. The npm organization and trusted publisher must be verified
 before publication.
 
-Once the package has been published, install it once and start the daemon:
+Install the public package and start the daemon.
 
 ```sh
 npm install -g @aspectlylabs/mikka
@@ -31,8 +31,8 @@ saves a device credential, never the browser session. The default server is
 the full application URL (including its base path) in both commands:
 
 ```sh
-mikka daemon login --server https://preview.example/mikka
-mikka daemon --server https://preview.example/mikka
+mikka daemon login --server https://mikka.example.com/mikka
+mikka daemon --server https://mikka.example.com/mikka
 ```
 
 `mikka daemon status` reports an already running daemon. `Ctrl+C` shuts it down.
@@ -45,20 +45,19 @@ For background operation, install a service after signing in:
 mikka daemon service install --server https://app.aspectlylabs.com/mikka --device-type laptop
 ```
 
-Public npm installations running under launchd or systemd check for a newer
-stable release once an hour, and as soon as a heartbeat answer names a newer
-release. A failed install keeps the running version, waits 5 minutes, then 30
+For public npm installations running under launchd or systemd, the server names
+a newer stable release in a heartbeat, command response or refused claim. The
+daemon installs that exact version when idle. A failed install keeps the running
+version, waits 5 minutes, then 30
 minutes, then 2 hours before retrying that version, and is reported to the server
-by code. The daemon finishes its running threads and
-Coordinator work before installing the exact version and restarting. Version
-checks and installation run in the background so heartbeats remain available.
+by code. Running work drains before installation and restart. Installation runs
+in the background so heartbeats remain available.
 The service keeps its server, data directory and device identity. Foreground,
 development and embedded daemons do not update themselves.
 
 Add `--no-auto-update` when installing the service to disable automatic updates.
 The setting is saved in the service definition. Manual updates remain available
-through Mikka. Failed checks or installations wait until the next daily check;
-an installation failure does not request a restart. npm replaces the global
+through Mikka. An installation failure does not request a restart. npm replaces the global
 package in place, so an interrupted installation has no automatic rollback.
 
 ## Release candidate
