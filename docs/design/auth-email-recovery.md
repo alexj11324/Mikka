@@ -1,6 +1,6 @@
 # Authentication email and recovery
 
-This backend candidate preserves the existing account. It does not delete or recreate users, mark existing email addresses verified, reset a real password, or relax Google account linking.
+This implementation reference covers the account verification and password-recovery endpoints in `lib/auth-email.ts`. The verification and reset flows retain the existing account identity and Google account-linking policy.
 
 ## Provider and configuration
 

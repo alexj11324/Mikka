@@ -26,8 +26,9 @@ Version 2 resolves an observed version 1 ambiguity: a real session submitted a
 prose summary while putting correct JSON in final chat. Preserve that instance and
 its run as historical evidence; do not rescore it or count it as a genuine Skill
 failure. After deploying version 2, freeze a fresh instance before generating any
-candidate. The evaluator, cases, six-field schema, thresholds, 25 distinct failures,
-seven-day trigger and verification command are unchanged.
+candidate. The evaluator, cases, six-field schema, comparison thresholds and verification
+command are unchanged. Proposal eligibility is decided separately by the
+Decision API, with at most one new proposal per bucket per 24 hours.
 
 The server generates 32 random bytes, encodes them as lowercase hex and calls
 `freezeBenchmarkInstance(seed)` **before** candidate generation. Persist this
@@ -78,8 +79,9 @@ command. Expected facts always come from the trusted records.
 These IDs allow 25 distinct genuine training runs in one instance under the
 unique `(instanceId, caseId, arm)` assignment constraint. Generating a case does
 not record a failure or qualify feedback. Only actual daemon runs with observed
-negative feedback can count toward the unchanged 25 distinct failures or
-seven-day trigger; correct training reports must remain successful evidence.
+negative feedback contribute eligible failure evidence for the Decision API;
+correct training reports must remain successful evidence. The 25 training cases
+are the corpus size, not a proposal threshold.
 
 `buildTask(caseId, instance)` returns the exact prompt, input, benchmark version,
 instance digest and fixed verification command. Input has `records` (ordered
@@ -126,8 +128,8 @@ so a correct candidate report can improve on it.
 
 Training reports produce genuine field-specific failure feedback using this same
 pure evaluator. They do not count as held-out comparison cases and this module
-does not insert or backdate production feedback or alter the 25 distinct failures
-or seven-day proposal trigger.
+does not insert or backdate production feedback or change the Decision API's
+proposal judgment or the 24-hour proposal cap.
 
 ## Comparison integration
 
