@@ -42,14 +42,20 @@ export function agentRuns(activity: readonly TaskActivity[]): AgentRun[] {
   return runs
 }
 
-/** A factory stage's start, marked inline in the conversation; implementing is the conversation itself. */
-const STAGE_MARK: Partial<Record<NonNullable<Attempt['stage']>, string>> = { review: '独立审查', verify: '验证', fix: '修复' }
+/**
+ * A factory stage's start, marked inline in the conversation (2026-11-04-2200). Implementing is the conversation
+ * itself, and verification belongs to it, so neither is marked; 审阅 is its own result card (reviewRun), not a marker.
+ */
+const STAGE_MARK: Partial<Record<NonNullable<Attempt['stage']>, string>> = { fix: '修复' }
+
+/** The factory's review: one run per task, drawn as a 审阅 result card that opens to its transcript. */
+export const reviewRun = (attempt: Pick<Attempt, 'stage'>) => attempt.stage === 'review'
 
 /**
  * What sits between two runs of the task's conversation. 「尝试」 appears only where the Agent changed: 「换 Claude Code
  * 继续」, or 「第 1 次尝试失败 · 换 Claude Code 再试」 when the run before failed, counting Agent switches only. With the
- * same Agent nothing divides them; where a factory stage starts (`stage`, when the server sends it) a small marker
- * says which. No stage, no marker.
+ * same Agent nothing divides them; where the factory goes back to fix (`stage`, when the server sends it) a small
+ * marker says so. No stage, no marker; the review is its own card.
  */
 export type Boundary = { kind: 'switch'; text: string } | { kind: 'stage'; text: string } | null
 export function boundary(activity: readonly TaskActivity[], previous: Attempt, next: Attempt): Boundary {

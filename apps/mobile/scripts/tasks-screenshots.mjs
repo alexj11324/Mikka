@@ -26,6 +26,7 @@ const RUN1 = '55555555-5555-4555-8555-555555555551'
 const RUN2 = '55555555-5555-4555-8555-555555555552'
 const RUN0 = '55555555-5555-4555-8555-555555555550'
 const RUN3 = '55555555-5555-4555-8555-555555555553'
+const RUN4 = '55555555-5555-4555-8555-555555555554'
 
 const ago = (days, hours = 0) => new Date(Date.now() - days * 86_400_000 - hours * 3_600_000).toISOString()
 const bot = (id, name, color, shape) => ({ id, name, color, shape })
@@ -50,11 +51,13 @@ const detail = {
     description: 'iOS 上 Google 登录回来以后停在空白页，修一下。',
     agent: { harness: 'claude_code', model: 'Sonnet 5.5' },
     place: { kind: 'laptop', name: 'MacBook' },
+    flow: { stage: 'handoff', needsYou: { kind: 'pr_review', since: ago(0, 1) }, review: { verdict: 'changes_requested' } },
   },
-  // A task is one conversation (2026-11-08): two Codex runs read as one, the failure switches to Claude Code, whose
-  // implementation is then reviewed independently by the factory (stage).
+  // A task is one conversation (2026-11-08): two Codex runs read as one, the failure switches to Claude Code; its
+  // implementation is reviewed once (需要修改), fixed, and handed to you (2026-11-04-2200).
   activity: [
-    { kind: 'attempt', runId: RUN3, n: 4, group: 'waiting', state: 'waiting', harness: 'claude_code', stage: 'review', createdAt: ago(0, 2), failed: false },
+    { kind: 'attempt', runId: RUN4, n: 5, group: 'waiting', state: 'waiting', harness: 'claude_code', stage: 'fix', createdAt: ago(0, 1), failed: false },
+    { kind: 'attempt', runId: RUN3, n: 4, group: 'resolved', state: 'done', harness: 'claude_code', stage: 'review', createdAt: ago(0, 2), failed: false },
     { kind: 'attempt', runId: RUN2, n: 3, group: 'resolved', state: 'done', pullRequest: { number: 1471 }, harness: 'claude_code', stage: 'implement', createdAt: ago(0, 3), failed: false },
     { kind: 'attempt', runId: RUN1, n: 2, group: 'blocked', state: 'failed', harness: 'codex', createdAt: ago(1), failed: true },
     { kind: 'attempt', runId: RUN0, n: 1, group: 'resolved', state: 'waiting', harness: 'codex', createdAt: ago(1, 1), failed: false },
@@ -77,6 +80,9 @@ const threads = {
     { kind: 'person', id: 'p1', text: 'iOS 上 Google 登录回来以后停在空白页，修一下', mine: true, at: Date.now() - 90_000_000 },
     { kind: 'steps', id: 's1', count: 4, at: Date.now() - 89_000_000 },
   ], 'agent_exited: codex exited with code 1 (E_SANDBOX_NETWORK)'),
+  [RUN4]: threadOf(RUN4, 'claude_code', 'waiting', [
+    { kind: 'agent', id: 'a4', text: '按审阅改好了：返回键不再回到回调页，补了一个测试。PR #1471 已更新，等你审阅。', at: Date.now() - 3_000_000 },
+  ], null),
   [RUN3]: threadOf(RUN3, 'claude_code', 'waiting', [
     { kind: 'agent', id: 'a3', text: '独立审查：回调地址和测试都对得上；还差一处：返回键会回到回调页。', at: Date.now() - 7_000_000 },
   ], null),
@@ -187,6 +193,15 @@ async function run() {
       await page.getByText('第 1 次尝试失败 · 换 Claude Code 再试').waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-4-conversation.png`) })
+      // 审阅 is one result card; it opens to the reviewer's transcript.
+      const review = page.getByRole('button', { name: /^审阅/ })
+      if (await review.count()) {
+        await review.first().click(); await page.waitForTimeout(400)
+        await page.screenshot({ path: join(outDir, `${theme}-4b-review-open.png`) })
+      }
+      // The top of the conversation: the task's one stage and what it needs from you.
+      await page.mouse.move(196, 400); await page.mouse.wheel(0, -5000); await page.waitForTimeout(400)
+      await page.screenshot({ path: join(outDir, `${theme}-4c-stage.png`) })
       await context.close()
     }
   } finally {

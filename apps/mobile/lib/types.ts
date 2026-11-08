@@ -224,6 +224,8 @@ export interface TaskDetail {
     place: { kind: MachineKind; name: string } | null
     /** A code task's review summary (#1738, from #1722); absent for a non-code task or an older server. */
     review?: import('../features/review/model/contract').ReviewSummary | null
+    /** A factory task's flow: its stage, what it needs from the person, 审阅's verdict (2026-11-04-2200). Not sent yet. */
+    flow?: import('../features/tasks/model/task-flow').TaskFlow | null
   }
   activity: TaskActivity[]
   /** The channel its task and run keys arrive on. */

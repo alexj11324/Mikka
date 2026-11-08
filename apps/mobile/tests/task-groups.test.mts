@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { attemptState, groupOf, groupOfThread, rowState, taskListRows } from '../features/tasks/model/task-groups.ts'
-import { activityEntries, agentRunTitle, boundary, conversationSegments } from '../features/tasks/model/task-conversation.ts'
+import { activityEntries, agentRunTitle, boundary, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
 
 test('a task\'s current thread decides its group, by R-52\'s judgement', () => {
   assert.equal(groupOfThread('waiting'), 'pending')
@@ -113,15 +113,30 @@ test('runs with the same Agent read as one; a divider only where the Agent chang
   assert.deepEqual(boundary(activity, r4, r5), { kind: 'switch', text: '换 Cursor 继续' })
 })
 
-test('a factory stage starting with the same Agent is a small marker; with no stage, no marker', () => {
+// 2026-11-04-2200: verification belongs to 实现, and 审阅 is its own result card; only a fix is marked inline.
+test('a fix starting with the same Agent is a small marker; review, verify, implement and no stage are not', () => {
   const run = (runId: string, n: number, stage?: string | null) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness: 'codex', createdAt: '', failed: false, ...(stage === undefined ? {} : { stage }) }) as never
   const activity = [run('r4', 4, 'fix'), run('r3', 3, 'verify'), run('r2', 2, 'review'), run('r1', 1, 'implement')]
-  assert.deepEqual(boundary(activity, run('r1', 1, 'implement'), run('r2', 2, 'review')), { kind: 'stage', text: '独立审查' })
-  assert.deepEqual(boundary(activity, run('r2', 2, 'review'), run('r3', 3, 'verify')), { kind: 'stage', text: '验证' })
-  assert.deepEqual(boundary(activity, run('r3', 3, 'verify'), run('r4', 4, 'fix')), { kind: 'stage', text: '修复' })
-  assert.equal(boundary(activity, run('r1', 1), run('r2', 2, 'implement')), null)
+  assert.deepEqual(boundary(activity, run('r2', 2, 'review'), run('r4', 4, 'fix')), { kind: 'stage', text: '修复' })
+  assert.equal(boundary(activity, run('r1', 1, 'implement'), run('r2', 2, 'review')), null)
+  assert.equal(boundary(activity, run('r2', 2, 'review'), run('r3', 3, 'verify')), null)
   assert.equal(boundary(activity, run('r1', 1), run('r2', 2)), null)
   assert.equal(boundary(activity, run('r1', 1), run('r2', 2, null)), null)
+  assert.equal(reviewRun({ stage: 'review' }), true)
+  assert.equal(reviewRun({ stage: 'implement' }), false)
+  assert.equal(reviewRun({}), false)
+})
+
+test('a factory task shows one stage and what it needs from you; 审阅 has one verdict; nothing without a flow', async () => {
+  const { stageLine, verdictWord } = await import('../features/tasks/model/task-flow.ts')
+  assert.equal(stageLine({ stage: 'review' }), '审阅')
+  assert.equal(stageLine({ stage: 'handoff', needsYou: { kind: 'pr_review', since: '' } }), '交给你 · 需要你：PR 待审')
+  assert.equal(stageLine({ stage: 'spec', needsYou: { kind: 'spec_review', since: '' } }), '方案 · 需要你：方案待审')
+  assert.equal(stageLine(null), null)
+  assert.equal(stageLine(undefined), null)
+  assert.deepEqual(['passed', 'changes_requested', 'needs_judgment'].map(verdict => verdictWord({ stage: 'review', review: { verdict: verdict as never } })), ['通过', '需要修改', '需要你判断'])
+  assert.equal(verdictWord({ stage: 'review', review: { verdict: null } }), null)
+  assert.equal(verdictWord(undefined), null)
 })
 
 test('活动 merges an Agent\'s runs in a row into one row; a switch starts 「换 X」', () => {
