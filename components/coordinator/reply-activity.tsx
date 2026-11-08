@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceLine, TraceTitle } from '@/components/ui/trace'
-import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, toolUnknown, type ToolAction } from '@/lib/coordinator/tool-activity'
+import { dispatchedRunId, toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, toolUnknown, type ToolAction } from '@/lib/coordinator/tool-activity'
 import { CitationChip, useAgentCitations } from '@/components/workspace/agent-citations'
 import { threadGroupOfRun } from '@/components/workspace/thread-status-icon'
 import { HarnessLabel } from '@/components/labels/entity-labels'
@@ -94,12 +94,15 @@ function useToolView() {
     // A call still running when its reply ended never finished.
     const { failed, reason } = tool.state === 'running' ? { failed: !live, reason: null } : toolFailure(tool)
     const why = failed ? reasonText(reason) : null
+    // A dispatch whose thread the chat draws as a card under this reply (coordinator-chat's cardsOf).
+    const dispatched = failed || running ? null : dispatchedRunId(tool)
+    const card = dispatched && sources?.[dispatched]?.kind === 'run' ? dispatched : null
     return {
       key: tool.call, state: running ? 'running' : failed ? 'error' : 'done', icon: <Icon />,
       title: running ? t('running', { tool: label }) : label, ...(target ? { target } : {}), ...(why ? { why } : {}),
       details: <ToolDetail tool={tool} failed={failed} />, raw: <RawData tool={tool} failed={failed} />,
       ...(tool.input ? { input: tool.input } : {}), ...(tool.output ? { output: tool.output } : {}),
-      openable: Boolean(tool.input || tool.output) && !running,
+      openable: Boolean(tool.input || tool.output) && !running, ...(card ? { card } : {}),
     }
   }
 }
