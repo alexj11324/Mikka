@@ -1,0 +1,119 @@
+name: Preview ingress capability probe
+# A capability experiment on disposable official VMs, not a runtime release.
+# Pull requests run offline cases only; existing workload trust is main-only.
+on:
+  pull_request:
+    paths: &probe_paths
+      - 'scripts/e2b/preview-ingress-probe.py'
+      - 'scripts/e2b/preview-ingress-acceptance.mjs'
+      - 'scripts/e2b/preview-ingress-acceptance.test.mjs'
+      - '.github/workflows/preview-ingress-probe.yml'
+  push:
+    branches: [main]
+    paths: *probe_paths
+permissions:
+  contents: read
+concurrency:
+  group: preview-ingress-probe-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: false
+  queue: max
+jobs:
+  offline:
+    name: Preview ingress offline guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - run: node --test scripts/e2b/preview-ingress-acceptance.test.mjs
+      - run: python3 -m py_compile scripts/e2b/preview-ingress-probe.py
+
+  probe:
+    name: Official ${{ matrix.template }} ingress probe
+    needs: offline
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        template: [claude, codex]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PREVIEW_PROBE_TEMPLATE: ${{ matrix.template }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        id: checkout
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify the trusted source and push before any workload credential
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs'
+          import { execFileSync } from 'node:child_process'
+          const env = process.env, event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'))
+          const valid = env.GITHUB_ACTIONS === 'true' && env.GITHUB_EVENT_NAME === 'push'
+            && env.GITHUB_REPOSITORY === 'alexj11324/Mikka' && env.GITHUB_REF === 'refs/heads/main'
+            && env.GITHUB_WORKFLOW_REF === 'alexj11324/Mikka/.github/workflows/preview-ingress-probe.yml@refs/heads/main'
+            && event.repository?.id === 1427517699 && event.repository?.owner?.id === 183887963
+            && event.ref === 'refs/heads/main' && event.deleted === false && event.forced === false
+            && /^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? '') && event.after === env.GITHUB_SHA
+            && execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', maxBuffer: 200 }).trim() === env.GITHUB_SHA
+            && ['claude', 'codex'].includes(env.PREVIEW_PROBE_TEMPLATE)
+          if (!valid) { console.error('preview_ingress_source_refused'); process.exitCode = 1 }
+          JS
+      - name: Install only the existing pinned E2B SDK
+        run: |
+          npm install --prefix "$RUNNER_TEMP/preview-ingress-sdk" --ignore-scripts --no-audit --no-fund 'e2b@2.62.1'
+          ln -s "$RUNNER_TEMP/preview-ingress-sdk/node_modules" node_modules
+      - name: Refuse obsolete main immediately before the existing E2B key
+        run: node scripts/release/web-deploy.mjs main
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Read only the existing runtime-test E2B key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          recursive: false
+          include-imports: false
+      - name: Probe one official VM with a 180-second provider kill deadline
+        run: >-
+          node scripts/e2b/preview-ingress-acceptance.mjs
+          --template "$PREVIEW_PROBE_TEMPLATE"
+          --output "$RUNNER_TEMP/preview-ingress-$PREVIEW_PROBE_TEMPLATE/report.json"
+      - name: Always reconcile only this invocation's recorded fixture
+        if: always() && steps.checkout.outcome == 'success'
+        run: >-
+          node scripts/e2b/preview-ingress-acceptance.mjs
+          --cleanup "$RUNNER_TEMP/preview-ingress-$PREVIEW_PROBE_TEMPLATE/report.json.cleanup.json"
+          --output "$RUNNER_TEMP/preview-ingress-$PREVIEW_PROBE_TEMPLATE/cleanup.json"
+      - name: Retain only closed capability and cleanup receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: preview-ingress-${{ matrix.template }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/preview-ingress-${{ matrix.template }}/report.json
+            ${{ runner.temp }}/preview-ingress-${{ matrix.template }}/cleanup.json
+          retention-days: 14
+          if-no-files-found: warn
