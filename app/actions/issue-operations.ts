@@ -192,7 +192,10 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
               if (currentMetadata.deletedAt || currentMetadata.parentId !== parentId) continue
               const id = crypto.randomUUID()
               const copyMetadata = { ...currentMetadata, number: await allocateIssueNumbers(tx, ownerId), parentId: mapping.get(parentId)!, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: source.userId === user.id ? currentMetadata.assignee : null }
-              const [copy] = await tx.insert(issues).values({ id, userId: ownerId, ...ownership, title: original.title, content: withIssueMetadata(original.content, copyMetadata), status: 'todo', priority: original.priority, revision: 1 }).returning()
+              // The child copy is consumed only by its version snapshot and invalidation.
+              // Read the stored values after triggers without returning unused task columns.
+              const [copy] = await tx.insert(issues).values({ id, userId: ownerId, ...ownership, title: original.title, content: withIssueMetadata(original.content, copyMetadata), status: 'todo', priority: original.priority, revision: 1 })
+                .returning({ id: issues.id, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority })
               await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: 1, title: copy.title, content: copy.content, status: copy.status, priority: copy.priority, ...activityActor(user.id) })
               await issueListChanged(tx, copy.id)
               mapping.set(item.id, id); queue.push(item.id)
