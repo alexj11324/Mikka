@@ -58,7 +58,8 @@ export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFi
   )
 }
 
-/** A group's bar: grey and rounded, its icon, name and count; a tap folds or opens it. */
+/** A group's header (Comma 15): its icon, name and count in the secondary colour on the page, no fill (Alex 2026-11-08:
+ * no grey slabs), lined up with the rows' icons; a tap folds or opens it. */
 export function TaskGroupBar({ id, count, folded, onToggle }: { id: TaskGroup; count: number; folded: boolean; onToggle: () => void }) {
   const Chevron = folded ? ChevronRight : ChevronDown
   return (
@@ -103,8 +104,8 @@ export function TaskRowView({ task }: { task: Task }) {
 const styles = StyleSheet.create({
   center: { paddingTop: 40, alignItems: 'center' },
   empty: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, marginHorizontal: LIST_INSET - 4, marginTop: SPACE.section - SPACE.rowY, marginBottom: 0, paddingHorizontal: 12, borderRadius: 10, borderCurve: 'continuous', backgroundColor: colors.bubble },
-  barTitle: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.text },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, marginHorizontal: ROW_SURFACE_INSET, marginTop: SPACE.section - SPACE.rowY, marginBottom: 0, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
+  barTitle: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.secondary },
   barCount: { fontSize: 15, lineHeight: 20, color: colors.secondary, fontVariant: ['tabular-nums'] },
   fill: { flex: 1 },
   row: { justifyContent: 'center', gap: SPACE.lineGap, minHeight: SPACE.rowMin, paddingVertical: SPACE.rowY, marginHorizontal: ROW_SURFACE_INSET, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
