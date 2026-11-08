@@ -38,8 +38,8 @@ export function pngDimensions(bytes) {
   assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
   assert.equal(bytes.subarray(12, 16).toString(), 'IHDR')
   const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20)
-  assert.equal(width, 1320)
-  assert.equal(height, 2868)
+  assert.equal(width, 1206)
+  assert.equal(height, 2622)
   return { width, height }
 }
 
@@ -230,7 +230,7 @@ async function capture(env) {
   writeFileSync(join(output, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
   writeFileSync(join(output, 'summary.txt'), 'Five full-resolution native simulator screenshots. Demo identity and live API reads verified. Visual review pending.\n')
   assert.deepEqual(readdirSync(output).sort(), [...SHOTS.map(name => `${name}.png`), 'manifest.json', 'summary.txt'].sort())
-  appendFileSync(env.GITHUB_STEP_SUMMARY, `Native screenshots captured from ${identity.sha} with overlay ${env.OVERLAY_SHA}. Five PNGs at 1320 × 2868. Visual review pending.\n`)
+  appendFileSync(env.GITHUB_STEP_SUMMARY, `Native screenshots captured from ${identity.sha} with overlay ${env.OVERLAY_SHA}. Five PNGs at 1206 × 2622. Visual review pending.\n`)
 }
 
 async function main(mode) {

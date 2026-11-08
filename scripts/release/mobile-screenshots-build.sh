@@ -13,10 +13,10 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync, writeFileSync } from 'node:fs'
 const simctl = (...args) => execFileSync('xcrun', ['simctl', ...args], { encoding: 'utf8' })
 const types = JSON.parse(simctl('list', 'devicetypes', '--json')).devicetypes
-const type = types.find(item => item.name === 'iPhone 17 Pro Max')
+const type = types.find(item => item.name === 'iPhone 17 Pro')
 const runtime = JSON.parse(simctl('list', 'runtimes', '--json')).runtimes
   .filter(item => item.isAvailable && /^iOS 26/.test(item.name)).at(-1)
-if (!type || !runtime) throw Error('iPhone17ProMaxAndIOS26Required')
+if (!type || !runtime) throw Error('iPhone17ProAndIOS26Required')
 const udid = simctl('create', `Mikka App Store ${process.env.GITHUB_RUN_ID}`, type.identifier, runtime.identifier).trim()
 appendFileSync(process.env.GITHUB_ENV, `SCREENSHOT_UDID=${udid}\n`)
 writeFileSync(`${process.env.RUNNER_TEMP}/mikka-screenshots-private/device.json`, JSON.stringify({ udid, device: type.name, runtime: runtime.name }))
