@@ -7,12 +7,33 @@ const calls: { path: string; connection: unknown }[] = []
 const platform = { OS: 'ios' }
 let account = { id: 'fixture-account-a', server: { url: 'https://fixture.example/mikka' } }
 let read: () => Promise<unknown> = async () => ({ token: 'fixture-one-time-token' })
-mock.module('react-native', { namedExports: { Platform: platform, Alert: { alert: (message: string) => alerts.push(message) } } })
+let openURL: (url: string) => Promise<void> = async url => { urls.push(url) }
+mock.module('react-native', { namedExports: { Platform: platform, Alert: { alert: (message: string) => alerts.push(message) }, Linking: { openURL: (url: string) => openURL(url) } } })
 mock.module('expo-web-browser', { namedExports: { openBrowserAsync: async (url: string) => { urls.push(url) } } })
 mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: { api: (path: string, _init: unknown, connection: unknown) => { calls.push({ path, connection }); return read() }, apiConnection: () => ({ account }) } })
 mock.module(new URL('../lib/config.ts', import.meta.url).href, { namedExports: { API_URL: 'https://fixture.example/mikka' } })
-const { openCloudBilling, openOnWeb } = await import('../lib/web.ts')
-beforeEach(() => { urls.length = 0; alerts.length = 0; calls.length = 0; platform.OS = 'ios'; account = { id: 'fixture-account-a', server: { url: 'https://fixture.example/mikka' } }; apiCache.clear(); read = async () => ({ token: 'fixture-one-time-token' }) })
+const { openCloudBilling, openOnWeb, openPrivacyPolicy } = await import('../lib/web.ts')
+beforeEach(() => { urls.length = 0; alerts.length = 0; calls.length = 0; platform.OS = 'ios'; account = { id: 'fixture-account-a', server: { url: 'https://fixture.example/mikka' } }; apiCache.clear(); read = async () => ({ token: 'fixture-one-time-token' }); openURL = async url => { urls.push(url) } })
+
+test('privacy opens the public website without requesting an account token', async () => {
+  await openPrivacyPolicy()
+  assert.deepEqual(urls, ['https://aspectlylabs.com/privacy'])
+  assert.deepEqual(calls, [])
+  assert.deepEqual(alerts, [])
+})
+
+test('a rejected privacy link reports the existing fixed error', async () => {
+  openURL = async () => { throw new Error('fixture-private-browser-error') }
+  await openPrivacyPolicy()
+  assert.deepEqual(alerts, ['网页打开未确认'])
+  assert.deepEqual(calls, [])
+})
+
+test('deletion entry hands off to the account page without a delete request', async () => {
+  await openOnWeb('/settings?section=account')
+  assert.deepEqual(calls, [{ path: '/api/auth/one-time-token/generate', connection: { account } }])
+  assert.equal(new URL(urls[0]).searchParams.get('to'), '/settings?section=account')
+})
 
 test('the native handoff preserves the exact chat target until token acquisition completes', async () => {
   let finish!: (value: unknown) => void
