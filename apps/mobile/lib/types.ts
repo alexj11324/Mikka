@@ -37,7 +37,7 @@ export interface RunSource {
   group?: ThreadGroup
   issue: { id: string; identifier: string | null; number: number | null; title: string
     /** A code task's review summary (#1738, from #1722); absent for a non-code task or an older server. */
-    review?: import('@/features/review/model/review').ReviewSummary | null } | null
+    review?: import('../features/review/model/contract').ReviewSummary | null } | null
   /** 运行信息, on the person's own runs. */
   info?: import('./run-info').RunInfo
 }
@@ -221,7 +221,7 @@ export interface TaskDetail {
     agent: { harness: string; model: string | null } | null
     place: { kind: MachineKind; name: string } | null
     /** A code task's review summary (#1738, from #1722); absent for a non-code task or an older server. */
-    review?: import('@/features/review/model/review').ReviewSummary | null
+    review?: import('../features/review/model/contract').ReviewSummary | null
   }
   activity: TaskActivity[]
   /** The channel its task and run keys arrive on. */

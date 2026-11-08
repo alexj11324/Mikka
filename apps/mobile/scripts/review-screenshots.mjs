@@ -75,7 +75,20 @@ const detail = {
     { kind: 'created', by: 'Coordinator', createdAt: ago(1, 1) },
   ],
 }
-const home = { workspace: { id: WORKSPACE, name: 'Acme Inc.' }, workspaces: [{ id: WORKSPACE, name: 'Acme Inc.' }], bots: [], groups: [], suggestions: 0, live: { workspaceId: WORKSPACE }, preferences: {} }
+const RUN = '55555555-5555-4555-8555-555555555552'
+/** The Coordinator's chat with the task's card (ThreadCard + the review summary row under it). */
+const chat = {
+  botId: FRONTEND, enabled: true, working: false, error: null, artifacts: {}, reactions: {}, failure: null, live: { workspaceId: WORKSPACE },
+  items: [
+    { id: 'm1', position: 1, from: 'person', text: 'iOS 上 Google 登录回来以后停在空白页，修一下', threads: [], artifacts: [], createdAt: ago(0, 4) },
+    { id: 'm2', position: 2, from: 'coordinator', text: '交给前端了，PR 开好了，有一项检查没过。', threads: [RUN], artifacts: [], createdAt: ago(0, 3) },
+  ],
+  sources: { [RUN]: { kind: 'run', id: RUN, name: '修复 iOS 登录回调', agentName: '前端', harness: 'claude_code', status: 'waiting', group: 'waiting',
+    issue: { id: TASK, identifier: '#1471', number: 1471, title: '修复 iOS 登录回调', review: summary } } },
+}
+const haiku = { id: 'b-claude', modelId: 'claude-haiku-5-5', provider: 'claude' }
+const modelMenu = { groups: [{ kind: 'subscription', provider: 'claude', plan: 'Max', options: [haiku] }], current: { ...haiku, kind: 'subscription', chosen: true, available: true } }
+const home = { workspace: { id: WORKSPACE, name: 'Acme Inc.' }, workspaces: [{ id: WORKSPACE, name: 'Acme Inc.' }], bots: [{ id: FRONTEND, name: '前端', color: 'orange', shape: 'squircle', line: '交给前端了', at: ago(0, 3) }], groups: [], suggestions: 0, live: { workspaceId: WORKSPACE }, preferences: {} }
 const session = { session: { id: 'fixture-session', userId: USER, expiresAt: '2099-01-01T00:00:00.000Z', token: 'fixture', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
   user: { id: USER, name: '阿宁', email: 'fixture@example.com', emailVerified: true, image: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' } }
 const json = (body, status = 200) => ({ status, contentType: 'application/json', body: JSON.stringify(body) })
@@ -91,6 +104,8 @@ function apiResponse(url) {
   if (path.endsWith('/review/checks')) return json(scenarios[scenarioOf(path)].checks)
   if (path.endsWith('/review')) return json(scenarios[scenarioOf(path)].read)
   if (path.startsWith('/api/mobile/tasks/')) return json({ ...detail, task: { ...detail.task, ...(scenario === 'before' ? {} : { review: scenarios[scenario]?.read.summary ?? summary }) } })
+  if (path === '/api/mobile/chat') return json(chat)
+  if (path === '/api/mobile/model') return json(modelMenu)
   if (path === '/api/pending-actions') return json([])
   if (path.startsWith('/api/live/')) return json({ error: 'offline' }, 404)
   return null
@@ -155,6 +170,13 @@ async function run() {
       await page.getByPlaceholder('写评论').waitFor({ timeout: 20_000 })
       await page.getByPlaceholder('写评论').fill('默认值别写成 /chats，用 config 里已有的 fallback。'); await settle(page); await shot(page, theme, 'r3b-comment')
       await page.getByText('加入评论').click(); await page.getByText('待发送').first().waitFor({ timeout: 20_000 }); await settle(page); await shot(page, theme, 'r3-diff')
+      // The pending batch, from the bar's 「1 条评论 · ios-unit 失败 ›」, then R2b from 「写修改意见…」.
+      await page.getByRole('button', { name: /^待发送：/ }).click(); await page.getByRole('button', { name: '删除' }).first().waitFor({ timeout: 20_000 }); await settle(page); await shot(page, theme, 'r2-batch')
+      await page.goBack(); await page.getByRole('button', { name: '写修改意见' }).waitFor({ timeout: 20_000 }); await settle(page)
+      await page.getByRole('button', { name: '写修改意见' }).click(); await page.getByLabel('修改意见', { exact: true }).waitFor({ timeout: 20_000 })
+      await page.getByLabel('修改意见', { exact: true }).fill('回调改完以后，把 Android 的 intent filter 也对一下。'); await settle(page); await shot(page, theme, 'r2b-note')
+      await page.goBack(); await page.getByRole('button', { name: /^修改意见：/ }).waitFor({ timeout: 20_000 }); await settle(page); await shot(page, theme, 'r3-bar-note')
+      await open(page, origin, `/bots/${FRONTEND}`, '交给前端了'); await shot(page, theme, 'chat-card')
       for (const name of ['running', 'merged', 'teammate', 'empty', 'reclaimed']) {
         scenario = name
         await open(page, origin, `/task/${taskOf(name)}/review`, name === 'empty' ? '没有改动' : name === 'running' ? '运行中 · 还没开 PR' : name === 'merged' ? '已合并' : name === 'reclaimed' ? '机器已回收' : '只有任务负责人可以合并')

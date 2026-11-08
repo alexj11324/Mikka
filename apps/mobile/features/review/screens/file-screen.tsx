@@ -12,6 +12,7 @@ import { ReviewBar } from '../components/review-bar'
 import { useReview } from '../components/use-review'
 import { CANNOT_SEND, denial, lineNumber, lineSide, parsePatch, type DiffLine, type PendingComment, type ReviewFileRead, type ReviewSentComment } from '../model/review'
 import { filePath } from '../model/review-api'
+import { batchHref, noteHref } from '../model/routes'
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' })
 
@@ -69,9 +70,9 @@ export function FileScreen() {
         ))}
         {read.data && !hunks.length ? <Text style={styles.empty}>{read.data.file.tooLarge ? '改动太大，没法在手机上显示' : '没有改动'}</Text> : null}
       </ScrollView>
-      {r.review && !r.merged ? <ReviewBar line={r.line} canSend={r.canSend} busy={r.sending}
+      {r.review && !r.merged ? <ReviewBar line={r.line} note={r.batch.note} canSend={r.canSend} busy={r.sending}
         blocked={r.permissions && !r.permissions.canSend ? denial(r.permissions.reasons.send, CANNOT_SEND) : undefined}
-        onOpen={() => router.push({ pathname: '/task/[id]/batch', params: { id } })} onSend={() => void r.send()} /> : null}
+        onOpenBatch={() => router.push(batchHref(id))} onOpenNote={() => router.push(noteHref(id))} onSend={() => void r.send()} /> : null}
     </View>
   )
 }

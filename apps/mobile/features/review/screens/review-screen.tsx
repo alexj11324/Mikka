@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleDot, FileCode2, GitMerge, Paperclip, TriangleAlert } from 'lucide-react-native'
+import { ChevronDown, ChevronRight, ChevronUp, CircleCheck, CircleDot, FileCode2, GitMerge, GitPullRequest, Paperclip, TriangleAlert } from 'lucide-react-native'
 import { CardButton } from '@/components/cards'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
@@ -15,7 +15,7 @@ import { colors, LIST_INSET, ROW_SURFACE_INSET, SPACE } from '@/lib/theme'
 import { ReviewBar } from '../components/review-bar'
 import { useReview } from '../components/use-review'
 import { CANNOT_MERGE, CANNOT_SEND, checksLine, denial, sourceLine, toggleCheck, type ReviewCheck, type ReviewRead } from '../model/review'
-import { fileHref } from '../model/routes'
+import { batchHref, fileHref, noteHref } from '../model/routes'
 
 const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' })
 
@@ -51,8 +51,8 @@ export function ReviewScreen() {
           </>
         ) : null}
       </ScrollView>
-      {review && !r.merged ? <ReviewBar line={r.line} canSend={r.canSend} busy={r.sending} blocked={blocked}
-        onOpen={() => router.push({ pathname: '/task/[id]/batch', params: { id } })} onSend={() => void r.send()} /> : null}
+      {review && !r.merged ? <ReviewBar line={r.line} note={r.batch.note} canSend={r.canSend} busy={r.sending} blocked={blocked}
+        onOpenBatch={() => router.push(batchHref(id))} onOpenNote={() => router.push(noteHref(id))} onSend={() => void r.send()} /> : null}
     </View>
   )
 }
@@ -102,7 +102,8 @@ function Top({ review, checks: list, open, onToggle, attached, onAttach, merged,
         <View style={styles.state}><CircleDot size={18} color={colors.orange} strokeWidth={2} /><Text style={styles.stateText}>运行中 · 还没开 PR</Text>{review.diff.live ? <Text style={styles.live}>实时</Text> : null}</View>
       ) : (
         <View style={{ gap: 6 }}>
-          <CardButton label="批准合并" primary busy={merging} disabled={!permissions.canMerge} onPress={onMerge} />
+          <CardButton label="批准合并" primary hollow busy={merging} disabled={!permissions.canMerge} onPress={onMerge}
+            icon={<GitPullRequest size={17} color={permissions.canMerge ? colors.onInk : colors.ink} strokeWidth={2} />} />
           {!permissions.canMerge ? <Text style={styles.reason}>{denial(permissions.reasons.merge, CANNOT_MERGE)}</Text> : null}
         </View>
       )}
@@ -125,14 +126,15 @@ function Files({ review, onOpen }: { review: ReviewRead; onOpen: (path: string) 
         const slash = file.path.lastIndexOf('/')
         const name = file.path.slice(slash + 1)
         const folder = slash > 0 ? file.path.slice(0, slash) : ''
-        const meta = [folder, file.comments ? `${file.comments} 条评论` : null, file.tooLarge ? '改动太大，点开加载' : null].filter(Boolean).join(' · ')
+        const meta = [folder, file.comments ? `${file.comments} 条评论` : null].filter(Boolean).join(' · ')
         return (
-          <Pressable key={file.path} accessibilityRole="button" accessibilityLabel={`${file.path}，+${file.additions} −${file.deletions}`} onPress={() => onOpen(file.path)}
+          <Pressable key={file.path} accessibilityRole="button" accessibilityLabel={`${file.path}，+${file.additions} −${file.deletions}${file.tooLarge ? '，改动太大，点开加载' : ''}`} onPress={() => onOpen(file.path)}
             style={({ pressed }) => [styles.file, pressed && { backgroundColor: colors.pressed }]}>
             <FileCode2 size={20} color={colors.secondary} strokeWidth={1.8} />
             <View style={styles.fileText}>
               <Text style={styles.fileName} numberOfLines={1}>{name}</Text>
               {meta ? <Text style={styles.fileMeta} numberOfLines={1}>{meta}</Text> : null}
+              {file.tooLarge ? <Text style={styles.fileMeta}>改动太大，点开加载</Text> : null}
             </View>
             {file.additions ? <Text style={[styles.count, { color: colors.success }]}>+{file.additions}</Text> : null}
             {file.deletions ? <Text style={[styles.count, { color: colors.danger }]}>−{file.deletions}</Text> : null}

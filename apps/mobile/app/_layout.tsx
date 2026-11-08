@@ -80,6 +80,7 @@ function SessionGate() {
         <Stack.Screen name="new-group" options={newSheetOptions(colors.page)} />
         <Stack.Screen name="task/[id]/comment" options={reviewSheetOptions(colors.page)} />
         <Stack.Screen name="task/[id]/batch" options={reviewSheetOptions(colors.page)} />
+        <Stack.Screen name="task/[id]/note" options={reviewSheetOptions(colors.page)} />
         <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
       </Stack>
     </HomeProvider>

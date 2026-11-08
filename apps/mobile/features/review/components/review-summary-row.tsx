@@ -26,7 +26,7 @@ export function ReviewSummaryRow({ summary, onPress, compact, short }: { summary
           <>
             <Text style={styles.dot}>·</Text>
             {p.failed ? <TriangleAlert size={14} color={colors.danger} strokeWidth={2} /> : null}
-            <Text style={[styles.text, p.failed && { color: colors.danger }]} numberOfLines={1}>{p.status}</Text>
+            <Text style={[styles.text, styles.status, p.failed && { color: colors.danger }]} numberOfLines={1}>{p.status}</Text>
           </>
         ) : null}
       </View>
@@ -39,6 +39,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   compact: { minHeight: 36 },
   words: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', columnGap: 6, overflow: 'hidden' },
-  text: { fontSize: 15, lineHeight: 20, color: colors.text, fontVariant: ['tabular-nums'] },
+  text: { flexShrink: 0, fontSize: 15, lineHeight: 20, color: colors.text, fontVariant: ['tabular-nums'] },
+  status: { flexShrink: 1, minWidth: 0 },
   dot: { fontSize: 15, lineHeight: 20, color: colors.tertiary },
 })

@@ -1,17 +1,17 @@
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Check, Paperclip, Trash2 } from 'lucide-react-native'
 import { NavBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
 import { tap } from '@/lib/haptics'
-import { colors, font, LIST_INSET } from '@/lib/theme'
+import { colors, LIST_INSET } from '@/lib/theme'
 import { useBatch } from '../model/batch-store'
 import { useReview } from '../components/use-review'
 import { removeComment, toggleCheck } from '../model/review'
 
 /**
- * The pending batch, from the floating bar's words: each line comment (tap to edit in R3b, or delete), the attached
- * failing checks, and the overall note 发给 Agent sends with them. The bar's 发给 Agent stays the one submit.
+ * The pending batch, from the floating bar's 「N 条评论 · 失败检查 ›」: each line comment (tap to edit in R3b, or
+ * delete) and the attached failing checks. The note is R2b's (note-sheet.tsx); the bar's 发给 Agent stays the one submit.
  */
 export function BatchSheet() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -20,10 +20,8 @@ export function BatchSheet() {
   const checks = useReview(id).checks
   return (
     <>
-      <NavBar fade={false} title="待发送" right={{ icon: 'checkmark', label: '完成', web: <Check size={20} color={colors.ink} />, onPress: () => router.back() }} />
+      <NavBar sheet fade={false} title="待发送" right={{ icon: 'checkmark', label: '完成', web: <Check size={20} color={colors.ink} />, onPress: () => router.back() }} />
       <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
-        <TextInput value={batch.note} onChangeText={note => setBatch(current => ({ ...current, note }))} placeholder="写修改意见…" placeholderTextColor={colors.secondary}
-          multiline accessibilityLabel="修改意见" style={styles.input} />
         {batch.comments.map(comment => (
           <View key={comment.id} style={styles.row}>
             <Pressable accessibilityRole="button" accessibilityLabel={`编辑 ${comment.path} 第 ${comment.line} 行的评论`} style={styles.rowText}
@@ -53,7 +51,6 @@ export function BatchSheet() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.page },
   body: { paddingHorizontal: LIST_INSET, paddingVertical: 12, gap: 12 },
-  input: { minHeight: 96, padding: 14, borderRadius: 14, borderCurve: 'continuous', backgroundColor: colors.bubble, fontFamily: font, fontSize: 17, lineHeight: 23, color: colors.text, textAlignVertical: 'top' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
   rowText: { flex: 1, gap: 4 },
   where: { fontSize: 13, color: colors.secondary },

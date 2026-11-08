@@ -31,7 +31,7 @@ export function CommentSheet() {
   const remove = () => { if (existing) { tap(); setBatch(current => removeComment(current, existing.id)) } router.back() }
   return (
     <>
-      <NavBar fade={false} title={`第 ${params.line} 行`} right={{ icon: 'xmark', label: '关闭', web: <X size={20} color={colors.ink} />, onPress: () => router.back() }} />
+      <NavBar sheet fade={false} title={`第 ${params.line} 行`} right={{ icon: 'xmark', label: '关闭', web: <X size={20} color={colors.ink} />, onPress: () => router.back() }} />
       <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Text style={styles.quote} numberOfLines={3}>{params.quote}</Text>
         <TextInput value={body} onChangeText={setBody} placeholder="写评论" placeholderTextColor={colors.secondary} multiline autoFocus
