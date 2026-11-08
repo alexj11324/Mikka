@@ -242,7 +242,7 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   assert(database.includes('DB_TEST_SHARD: ${{ matrix.shard }}'))
   assert(database.includes('DB_TEST_SELECTED: ${{ needs.changes.outputs.db_suites }}'))
   assert.match(database, /services:\n      postgres:\n        image: postgres:17/)
-  assert(database.includes('name: pr13-http-cli-approval-${{ github.sha }}-${{ matrix.shard }}'))
+  assert(database.includes('name: pr13-http-cli-approval-${{ github.sha }}-${{ strategy.job-index }}'))
   assert(!database.includes('run: pnpm build'))
   assert(Object.values(JSON.parse(readFileSync('scripts/ci/tasks.json'))).some(t => t.kind === 'integration' && t.command === 'pnpm test:issues'))
   assert(!job('ui-policy-full').includes('run: pnpm test:issues'))

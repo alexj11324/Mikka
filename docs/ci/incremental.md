@@ -49,7 +49,9 @@ claim.
 All four consumers (`ui-policy`, `desktop`, `analytics-ssr`, `self-hosted-image`)
 call `ci-selection.yml`. It fetches main and loads `bootstrap.sh` from there.
 The bootstrap archives the immutable PR base (or merge-group base / previous main
-commit) and installs only those trusted manifests with lifecycle scripts disabled.
+commit) only after proving it belongs to main history; otherwise it uses current
+main policy and forces full validation. An unmerged target branch cannot provide
+its own policy. It installs only those trusted manifests with lifecycle scripts disabled.
 The trusted selector parses candidate files as data. It never imports a candidate
 plugin or executes candidate configuration. Forks use the same path without
 secrets. The tested checkout remains GitHub's synthetic merge candidate; the

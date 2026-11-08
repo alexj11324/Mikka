@@ -10,7 +10,11 @@ trusted_sha="$(node --input-type=module -e '
 import fs from "node:fs";
 const e=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH));
 console.log(e.pull_request?.base?.sha || e.merge_group?.base_sha || (process.env.GITHUB_EVENT_NAME === "push" && e.before) || "origin/main")')"
-if ! git cat-file -e "$trusted_sha^{commit}"; then trusted_sha=origin/main; fi
+if ! git cat-file -e "$trusted_sha^{commit}" || ! git merge-base --is-ancestor "$trusted_sha" origin/main; then
+  echo 'Policy base is not in trusted main history; use main policy and full coverage.'
+  trusted_sha=origin/main
+  export CI_FORCE_FULL=true
+fi
 git archive "$trusted_sha" | tar -x -C "$trusted"
 if test -f "$trusted/scripts/ci/select.mjs"; then
   # Install only trusted manifests; lifecycle scripts and Nx plugins never run
