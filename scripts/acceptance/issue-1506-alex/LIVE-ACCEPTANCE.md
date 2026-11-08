@@ -1,45 +1,42 @@
-# Coordinator 后续验收：禁用准备稿（first-text-next V1）
+# #1506：独立 f132 Stop 验收准备（保持禁用）
 
-本稿是基于 e6f84d617581ade6ddb247176c34048cab749c04 禁用验收树的增量适配，保留既有 driver 修正和最新 Node.js/PostgreSQL 工具提示词，不回灌历史 checkpoint。
-本稿没有执行生产登录、模型、SQL、部署或控制激活，也不构成新的生产通过证明。
+本稿绑定应用源码 f132，尚未验证它的实际生产部署。Stop 十槽尚未生产执行；本次准备没有生产模型、Stop、SQL 或 cache 成绩，也不表示 #1705 已部署。四路径 overlay 尚未发布，没有正式 acceptance commit SHA。生产 alias、READY、公开版本与执行前后版本一致性均需由执行者最终核实。
 
-## 源码与禁用边界
+## 应用与 acceptance 来源
 
-应用源码输入：06173adb3fa75a4b7bfd9274efd873823f06d0ea，tree：cca2792838d3ba0ea4fedb049e798a469b8cb833。
-这只是不可变 Git 源码绑定；真实 production alias、READY、公开版本及发布配置需由执行者另行核实。
+- acceptance 基线：`058c01a15bbd9288544f9109bb05fc20b24036e1`，tree：`9dafdbbaf338ce9caa143c784b7859539da20e76`。
+- 应用源码：`f1324dafa296f76289124bb93538f1938cb1597f`，tree：`b75d0b779a5bf849ffa06d02204c321e1c6fbd36`。
+- f132 的第一父提交为 `3c32675c99d32f9c84a9b5e4bc48e59231baa4d8`。两者实际 Git diff 仅含 `.github/workflows/ui-policy.yml` 和 `docs/ci/1699-results.md`；前者只为两个 checkout 步骤添加 `if: always()`。这不构成产品运行逻辑变更。
+- 9 个 numeric producer 在 f132 上全部逐字等于 3c，也全部逐字等于 `06173adb3fa75a4b7bfd9274efd873823f06d0ea`。12 个 live 来源与 3c 逐字相同，并逐项匹配已审 pin；实际 `coordinator-stream-client.ts` decoder 字节相同。
+- 单独列出的 Stop、instrument、group、stream 来源及 `webSearchStep` 与 3c 逐字相同。与 `593c6c06dbb9717a4471b49d54ab4bfe2bfe8c9f` 的已有比较边界不变：7 个 numeric producer 整文件相同，`steps.ts`、`workflow.ts` 整文件有 GitHub context 相关差异；不声称二者整文件等同，也不声称 lazy discovery 已上线。
+- 26 项保护文件中，25 项仍匹配原冻结 contract。MCP workflow 原样保留 058 字节，仍为 `false`，其 `MIKKA_ACCEPTANCE_SHA` 仍为 3c；本次不把 MCP 改绑 f132。
 
-十二个来源 pin 均按实际应用 Git blob 校验：原十项，加上实际 read-observer 运行时依赖和 components/swr-defaults.tsx 接线来源。保留原已审十二维内容，仅将 channel 更新到 #1665 / afae721f6730434ded6be932a7f9dd585c22ee49 的每 kind watermark；a23b2e0b48dc5cb2dac8bb9ecde734a03537339e 与 f14fc28c199be3c8c85ad26a77ef65222e92bfea 的十二项逐字相同。未知漂移仍拒绝。decoder 固定 490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4。加载器只将相对导入解析到已固定的运行时模块，拒绝未列目标、外部包和越界路径。Hook、Coordinator 组件和 SWR defaults 仅核来源，不在 Node 渲染 React。
+原 `prepare-disabled.py` 与 contract 未改。它的 `1a3ca56d62b8dff6bdb243eb98feca51347185e7` 祖先要求不适用于当前应用来源，原拒绝边界保留。此次独立准备使用实际 f132 源码证明，既不修改原 guard，也不把旧拒绝记录改写成通过。已经完成的 3c 准备目录保持原样。
 
-本版明确只输出四条路径：live-source.mjs、issue-1506-alex-continue.yml、LIVE-ACCEPTANCE.md、live-consumer.test.mjs。当前 worker/offline-worker 与最新四个 Stop driver/test 原字节保护，未改其运行时接口。worker 使用实际源码 readBoundary/readFresh/observeSWRRead/acceptSWRRead/failSWRRead，读取正常 RPC 快照后才接受并提交同一对象；保留 owner/namespace、required+held+local revision、local-write identity 与关闭守卫。离线平台夹具的 fixture-read 命令只在测试模块中，生产 worker 不接收该命令。没有复制或改写产品算法。
+## 四路径与关闭状态
 
-继续使用原 ACME 自有工作区与 Haiku/Luna retained fixture receipt，不重建、不重新选模型。普通停止/工具未覆盖修正来自独立恢复 checkpoint 344fafb353d1128f89475bc827a404eff4520451，其四文件已单独离线 RED→14/14 GREEN；本稿没有新增生产 Stop 成绩。
+当前 overlay 仍基于 058，仅包括 `live-source.mjs`、continuation workflow、本文件、`control/continue.json`。独立队列 `issue-1506-acme-acceptance` 与真实 Web job lock `web-deploy-production` 的规则不变。
 
-continue.json 完全保留 e6 原件：enabled=false、phase=cache-live、expectedSha=null、cacheTurns=3、liveTabs=3、delayOneReturnedResult=true。continuation workflow 的 MIKKA_STOP_CASE 仍是 during_tool。
-presence workflow 保持原 literal false 和空应用 SHA；legacy resume workflow/control 原样，不给没有 enabled 字段的旧控制文件添加或修改字段。
-MCP workflow 原字节保留：literal false、空应用 SHA、12 分钟 timeout 和原 reader/cleanup 路径不变。MCP 四个支持文件原样。
+C 保持 `enabled=false`、`expectedSha=null`、`phase=cache-live`、`cacheTurns=3`、`liveTabs=3`、`delayOneReturnedResult=true`。固定 workspace、fixtureRunKey、receipt/hash 与 Haiku/Luna 已选模型不变。没有启用 cache-live。
 
-## 下一次缓存阶段的固定分母
+单独的 Stop matrix 与原已审模板仅有 APP_SHA 绑定差异：`APP_SHA=f1324dafa296f76289124bb93538f1938cb1597f`，`ACCEPTANCE_SHA` 仍为空，job 条件仍为 `false`。执行者发布实际 source overlay 后，才能绑定真实 acceptance commit 并决定启用。MCP 和其他控制维持已有关闭状态。
 
-未来只有 root 在确认实际部署后，另行将 continuation control 显式改为 enabled=true、phase=cache-live、expectedSha=该实际应用SHA、cacheTurns=3，才授权一轮缓存验收。单改源码 pin、上传本稿或 disabled job 成功都不是生产授权。
+## 原 Stop 十槽及判定规则
 
-固定 Haiku 三轮、Luna 三轮，最多六次用户发送；后四槽 H2/H3/L2/L3 是预先定义的 warm 槽，每槽客户端 send→firstText 目标不超过 3000ms。失败、未发送和未覆盖保留原槽，不补跑、不只挑命中或较快结果。一次模型首轮失败会停止该模型的后续轮次；另一个模型通过独立进程/会话继续运行，保持两份独立 continuation wrapper 为权威收据。
+Haiku 与 Luna 各有 ordinary-stop、before-tool、during-tool、group-public、group-private 五槽，共十槽。原 driver 提示、固定 fixture、三消费者与发送预算不变；每槽最多一次用户发送，不自动重试、不补跑。失败、未发、未覆盖均留在原分母。
 
-未来授权的 phase=cache-live 在原六条自然短答上附加三个独立 worker、原生 WebSocket/BroadcastChannel 与实际核心消费者；它调用同一个 runCacheTurns，不发送额外模型消息。observer 只代理正常 ticket/chat 读取，保留24次 chat 上限和有界关闭；没有定时 DB 轮询。现有一次返回响应延迟只改变该测试客户端的交付，真实新 revision 必须来自 socket，未覆盖即如实记录。新的 source/worker 离线证明不是新的生产通过，也不是 React/浏览器渲染证明。原六槽与 Stop 十槽失败分母不改变。
+before-tool 在第一条真实 `web_search/running` 后立即正常 Stop；during-tool 在同一事件后仅一次固定 600 ms timer 再正常 Stop。600 ms 只是客户端触发规则，不能证明工具主体已进入或尚未完成。group-public 和 group-private 分别继续采用原 responding_bot、private_generation_receipt 边界。
 
-## 流、停止和证据
+实际分类依赖精确 deployment、workflowRunId、call 和服务端终态。before-tool 必须有唯一 start/finish、finish 明确 stopped 且无矛盾 body timing；during-tool 必须严格满足 `toolStart < serverStopRequested <= serverStopAck < toolEnd`。工具先完成、部分重叠、边界相等、重复 attempt、缺 terminal/finish 或 scope 不符不能算请求目标通过；记录实际分类，并保留目标未覆盖。禁止跨 runner/服务端时钟相减。
 
-正常短回复以对应新 committed、持久化回复/cursor、权威 idle 收敛，再取消本 reader；持续 HTTP 的 EOF 不是回合成功前提。旧 prefix 不供新首字/新 committed 计数；真实 stream error、版本变化和 scope 不符仍失败。
+真实工具 terminal 后才按原规则执行 eligible case 的一次严格 SQL 审计；group terminal 必须在 session.close 后。最终还须确认 Stop ACK、正文与 stopped marker、终态、没有后续模型/工具及没有迟到追加。客户端断流或一次 idle 读取不能单独证明 provider 物理停止。已经进入的只读工具允许完成，随后不应启动新工作。
 
-普通 Stop 需本次 Stop ACK、同一新 committed、持久化 stopped 标记、idle，并核 live append/reset 最终正文与该 stream 新持久化正文一致。客户端读流关闭不等于 provider 物理停止。
+## 离线验证与证据范围
 
-工具没到真实边界仍是 failed/not_covered；自然无工具回复只有在严格持久化与 idle 确认后才省去多余 cleanup Stop。before/during 的分类仍须对应 server body/Stop/audit 区间，不凭 public running 或固定延迟宣布覆盖。
+本轮仅允许新跑实际十个 copied driver imports、原 validateContinuation/fixture 校验、copied-source manifest 与实际 decoder 比对，网络尝试、driver 调用、模型发送均应为零。结果单独存放在 f132 准备目录，不能重标 3c 的旧报告。为执行原 HEAD 断言创建的本地验证 commit 不发布，也不能冒充正式 acceptance SHA。离线通过不等于 Stop 生产通过或实际部署已核实。
 
-每个模型的 wrapper 保留真实发送、workflowRunId、所有失败和 cleanup；Actions step conclusion 不能代替内部 outcome。artifact 名仍为 issue-1506-alex-continue-<run_id>，包含 issue-1506-alex-report/*.json。Luna 早失败时不要用可能覆盖的 standalone 默认文件代替两份独立 wrapper。
+## 后续 cache 六槽规则（尚未激活）
 
-服务端日志遵守既定最多 cache6+ordinaryStop2 共8个 exact-wrun 请求、每个一次 limit100；没有新增查询预算。rawCache 是 SDK 兼容 usage 边界，不是原 provider HTTP 字节；missing 不证明 provider 没返回。各独立时钟不跨钟相减，嵌套跨度不相加。
+若后续部署和来源核实并单独启用 cache-live，仍固定 Haiku 三轮、Luna 三轮，最多六次用户发送。warm 槽 H2/H3/L2/L3 逐槽判断 send→firstText≤3000 ms；失败、未发和未覆盖保留原槽，不补跑或挑选较快样本。三独立 live consumer 复用同六次自然短答，不额外发模型消息；一条模型失败不阻止另一条继续。
 
-MCP 是独立、仍禁用的三 reader 阶段：latest、90s quiet、headers后5s abort；0模型、0业务写工具/聊天任务写入、0Stop、0MCP DELETE。正常 OAuth 创建/撤销会改变其授权记录，不能称所有 DB 零 mutation。未来实际执行需单独激活、服务器证据与授权清理，当前没有该通过证明。
-
-## 本次源码兼容边界
-
-连接 readiness 建立连续覆盖起点；后续 push 只推进其 kind 的 watermark。未发生 bot_chat 失效的已接受读取可供晚订阅复用；bot_chat 自己的新事件、断线重连或连接前读取仍要求新读。新增离线回归使用实际编译的 LiveChannel/read-observer，不改产品算法；原三独立 worker、旧响应跨新 revision 的拒绝、same-realm 在途读与 socket/error 清理断言保留。模板 LIVE_SOURCE_COMMIT=null 默认拒绝运行；未来实际合并/稳定部署的完整 SHA/tree 必须由 root 核对后显式传入。a23/afae/f14 的离线证据不代表它们已用于新生产验收。
+短答以新 committed、持久化回复/cursor、权威 idle 收敛后取消本 reader，不声称自然 EOF。API/live 消费者证据不能替代 React 界面验收。数值归因须绑定实际 application、deployment 与来源；缺失不记零，不跨独立时钟相减，不相加嵌套跨度。本段只保留规则，没有激活记录或成绩。
