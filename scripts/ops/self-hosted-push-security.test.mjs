@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { senderDeploymentGate } from './self-hosted-push-security.mjs'
+import { senderDeploymentGate, plan } from './self-hosted-push-security.mjs'
 const variables = [{key:'EXPO_ACCESS_TOKEN',target:['production'],type:'sensitive',createdAt:100,updatedAt:150}]
 const deployment = {id:'owned',target:'production',readyState:'READY',createdAt:151,meta:{githubCommitSha:'exact'}}
 test('sender must be present in a ready deployment newer than its configuration', () => {
@@ -17,4 +17,12 @@ test('missing, ambiguous, preview-only or plaintext senders fail closed', () => 
 })
 test('unknown timestamps cannot establish the cutover barrier', () => {
   assert.throws(()=>senderDeploymentGate({variables:[{...variables[0],createdAt:null,updatedAt:null}],deployment,source:'exact'}),/SENDER_TIME_UNKNOWN/)
+})
+test('unchanged original canonical version is distinct from a projection refresh', () => {
+  const projection = [{...variables[0],updatedAt:200}]
+  const original = {id:plan.privateSenderSecret,version:1,createdAt:75,updatedAt:75}
+  assert.throws(()=>senderDeploymentGate({variables:projection,deployment,source:'exact'}),/SENDER_NOT_YET_DEPLOYED/)
+  assert.equal(senderDeploymentGate({variables:projection,deployment,source:'exact',sourceCredential:original}).canonicalCredentialVersion,1)
+  for(const bad of [{...original,id:'other'},{...original,version:2},{...original,updatedAt:160}])
+    assert.throws(()=>senderDeploymentGate({variables:projection,deployment,source:'exact',sourceCredential:bad}),/SOURCE_CREDENTIAL_VERSION_CHANGED/)
 })
