@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { BASE, FILES, SOURCE, REF, HISTORY_SQL, METADATA_SQL, databaseInputs, inspectTarget, safeCode, sourceGuard } from './production-build-database-diagnostics.mjs'
+import { BASE, FILES, SOURCE, REF, HISTORY_SQL, METADATA_SQL, compilerExit, databaseInputs, inspectTarget, safeCode, sourceGuard } from './production-build-database-diagnostics.mjs'
 import { REQUIRED, buildEnvironmentValues } from '../release/web-deploy.mjs'
 
 const head = 'a'.repeat(40)
@@ -79,4 +79,12 @@ test('the diagnostic matches original builder database precedence and escaping w
   }
   assert.throws(() => databaseInputs('DATABASE_URL=""', {}), { code: 'PROBE_INPUT_REQUIRED' })
   assert.throws(() => databaseInputs('DATABASE_URL="file"', { MIKKA_DATABASE_URL: app }), { code: 'PROBE_INPUT_REQUIRED' })
+})
+
+test('compiler exit input cannot contain raw errors, shell fragments or out-of-range values', () => {
+  assert.equal(compilerExit('0'), 0)
+  assert.equal(compilerExit('137'), 137)
+  for (const value of [undefined, '', '-1', '256', '1; private-value', 'private-error', 1]) {
+    assert.throws(() => compilerExit(value), { code: 'PROBE_METADATA_INVALID' })
+  }
 })

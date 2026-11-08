@@ -427,3 +427,147 @@ jobs:
         run: node scripts/ops/production-build-database-diagnostics.mjs --inspect
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+  production-build-compiler:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/ops/production-build-databases-20261108' &&
+      github.run_attempt == 1 && startsWith(github.event.head_commit.message, 'ops: diagnose production compiler')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      MIKKA_EDITION: cloud
+      MIKKA_CLOUD_BACKEND_URL: https://mikka-cloud.vercel.app
+      VERCEL_ORG_ID: team_C7lwxVVvnUicFli6112mvxpv
+      VERCEL_PROJECT_ID: prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 75930406dda8708a84786475656ae449f5ffda88
+          path: diagnostic-source
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 554ad12e56ca59452876cbbf88c28ddbe435f100
+          path: diagnostic-receipt
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.2
+      - name: Test source and private-output boundaries before credentials
+        run: |
+          node --test scripts/ops/production-build-database-diagnostics.test.mjs
+          node --test diagnostic-receipt/scripts/release/build-vercel.test.mjs diagnostic-receipt/scripts/migrate-mode.test.mjs
+      - name: Require the reviewed original source and current main
+        run: node scripts/ops/production-build-database-diagnostics.mjs --preflight
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Read the existing Vercel pull credential
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_DEPLOY_TOKEN
+          include-imports: false
+      - name: Read the existing private UI read-only checkout credential
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: HOSTED_UI_READ_KEY
+          include-imports: false
+      - name: Check out the exact original licensed UI
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: alexj11324/mikka-hosted-ui
+          ref: 0aef26958544fb9579c4d2b01dd1d34cfa22c051
+          ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
+          path: diagnostic-source/.hosted-ui
+          persist-credentials: false
+      - name: Record the immutable private revision and clear its read key
+        working-directory: diagnostic-source
+        run: node scripts/release/hosted-ui.mjs record .hosted-ui
+      - name: Read the original production build-time values
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          recursive: false
+          include-imports: false
+      - name: Pull and fill the original production file only on the runner
+        working-directory: diagnostic-source
+        run: |
+          umask 077
+          if ! npx --yes vercel@65.4.0 pull --yes --environment=production --token "$VERCEL_TOKEN" > "$RUNNER_TEMP/production-compiler-pull.log" 2>&1; then
+            echo '{"event":"production_compiler_diagnostics_failed","code":"PROBE_VERCEL_PULL_FAILED"}'
+            exit 1
+          fi
+          GITHUB_SHA=75930406dda8708a84786475656ae449f5ffda88 node scripts/release/web-deploy.mjs env .vercel/.env.production.local
+          chmod 600 .vercel/.env.production.local
+        env:
+          VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
+      - name: Install the same frozen workspace and licensed runtime dependencies
+        working-directory: diagnostic-source
+        run: |
+          pnpm install --frozen-lockfile
+          if ! pnpm --dir .hosted-ui install --ignore-workspace --prod --ignore-scripts --frozen-lockfile > "$RUNNER_TEMP/production-compiler-ui-install.log" 2>&1; then
+            echo '{"event":"production_compiler_diagnostics_failed","code":"PROBE_UI_INSTALL_FAILED"}'
+            exit 1
+          fi
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Choose the original run-scoped deployment identity
+        working-directory: diagnostic-source
+        run: |
+          id="$(GITHUB_SHA=75930406dda8708a84786475656ae449f5ffda88 node lib/deployment-id.mjs)"
+          echo "MIKKA_DEPLOYMENT_ID=$id" >> "$GITHUB_ENV"
+      - name: Match the original unused SDK cleanup
+        run: |
+          df -h /
+          sudo rm -rf -- /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h /
+      - name: Run the original protected compiler with migrations explicitly disabled
+        id: compiler
+        working-directory: diagnostic-source
+        run: |
+          set +e
+          GITHUB_SHA=75930406dda8708a84786475656ae449f5ffda88 node scripts/release/build-vercel.mjs
+          compiler_exit=$?
+          echo "exit=$compiler_exit" >> "$GITHUB_OUTPUT"
+          exit "$compiler_exit"
+        env:
+          MIGRATE: '0'
+          NODE_OPTIONS: --max-old-space-size=4096
+          VERCEL_GIT_COMMIT_REF: main
+          VERCEL_GIT_COMMIT_SHA: 75930406dda8708a84786475656ae449f5ffda88
+          VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
+      - name: Record only bounded compiler observations and digests
+        if: always() && steps.compiler.outputs.exit != ''
+        run: node scripts/ops/production-build-database-diagnostics.mjs --compiler-receipt
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMPILER_EXIT: ${{ steps.compiler.outputs.exit }}

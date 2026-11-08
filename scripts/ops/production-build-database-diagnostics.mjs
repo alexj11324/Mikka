@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const SOURCE = '75930406dda8708a84786475656ae449f5ffda88'
-export const BASE = 'e9d7777e8bfd60fd702c00cb537906a8c43903e3'
+export const BASE = '85815106154cf6875872bb9e97f5c2ee33b37bcb'
 export const REF = 'refs/heads/ops/production-build-databases-20261108'
 export const FILES = ['.github/workflows/infisical-cloud-capabilities.yml',
   'scripts/ops/production-build-database-diagnostics.mjs', 'scripts/ops/production-build-database-diagnostics.test.mjs']
@@ -16,6 +16,10 @@ const codes = ['28000', '28P01', '3D000', '42501', '53300', '53400', '57014', '5
   'ECONNREFUSED', 'ECONNRESET', 'EAI_AGAIN', 'ENETUNREACH', 'ENOTFOUND', 'ETIMEDOUT', 'CERT_HAS_EXPIRED', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
   'PROBE_SOURCE_SCOPE', 'PROBE_MAIN_CHANGED', 'PROBE_INPUT_REQUIRED', 'PROBE_READ_ONLY_REQUIRED', 'PROBE_HISTORY_INVALID', 'PROBE_METADATA_INVALID']
 export const safeCode = error => codes.includes(error?.code) ? error.code : 'OTHER'
+export function compilerExit(value) {
+  if (typeof value !== 'string' || !/^\d{1,3}$/.test(value) || Number(value) > 255) fail('PROBE_METADATA_INVALID')
+  return Number(value)
+}
 
 // Match the original builder's file codec and nonempty-job precedence, while
 // reading only the two database keys needed for this read-only diagnostic.
@@ -91,6 +95,18 @@ async function run() {
     headers: { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) })
   if (!response.ok || (await response.json()).object?.sha !== SOURCE) fail('PROBE_MAIN_CHANGED')
   if (process.argv[2] === '--preflight') { console.log(JSON.stringify({ event: 'production_build_db_preflight', source: SOURCE, mutations: 0 })); return }
+  if (process.argv[2] === '--compiler-receipt') {
+    const receiptRoot = resolve(root, 'diagnostic-receipt')
+    if (git(receiptRoot, 'rev-parse', 'HEAD') !== '554ad12e56ca59452876cbbf88c28ddbe435f100') fail('PROBE_SOURCE_SCOPE')
+    const { buildFailureEvidence } = await import(pathToFileURL(resolve(receiptRoot, 'scripts/release/build-vercel.mjs')).href)
+    const exitStatus = compilerExit(env.COMPILER_EXIT)
+    const log = readFileSync(resolve(env.RUNNER_TEMP, 'official-web-build.log'))
+    const evidence = buildFailureEvidence({ result: { status: null, signal: null }, sourceSha: SOURCE,
+      overlaySha: '0aef26958544fb9579c4d2b01dd1d34cfa22c051', log })
+    console.log(JSON.stringify({ ...evidence, event: 'production_compiler_diagnostics', compilerWrapperExit: exitStatus,
+      migrationSuppressed: true, deployed: false }))
+    return
+  }
   if (process.argv[2] !== '--inspect') fail('PROBE_INPUT_REQUIRED')
   const load = name => import(pathToFileURL(resolve(sourceRoot, 'scripts', name)).href)
   const [connection, order, steps, scope] = await Promise.all([
