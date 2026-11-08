@@ -5,6 +5,29 @@
 - 来源：只用厂商官网、官方文档、changelog 和发布文章。每条结论都附 URL；查不到一手来源的标「未确认」。只借鉴模式，不复制代码或素材。
 - 草图：Figma `zPe5LKycb2XuT1ivCLRw07`，页面 `1110:2`「代码工作区 草图 2026-11-08」。这是结构草图，不是视觉规范（同决定 2026-11-07-2045 的草图约定）。
 
+## 最新方案：R0–R3（2026-11-08，取代下文的 D0–D5、M0–M4）
+
+参照 Linear Diffs 简化，并采纳 Alex 的判断：「不管第一次还是第二次尝试，改的都是同一个工作区，应该只有最后一次」。
+- **任务上不嵌 diff。** 聊天里的任务卡片、任务面板和「等待你」列表都只显示一行「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败」，加一个「审阅」按钮。
+- **一个整页的审阅页，点一次就进。**
+  - 左边窄条是任务的对话，中间是改动的文件，右边是 diff 和行内评论。
+  - 顶栏右侧依次是检查摘要（就地展开）、「要求修改」和「批准合并」。
+  - 底部是批次条「发给 Agent」，和「批准合并」在外观上明显不同。
+- **默认看整个 PR 的最终 diff。** 尝试只出现在「活动」里，不作为 diff 的范围。
+- **先例：** Linear 不在 issue 上嵌 diff；它的评审默认看整个 PR，没有仓库文件树，Reviews 是单独的收件箱（https://linear.app/docs/diffs）。
+- **不进 P0：** 仓库文件树、终端、预览，以及「对话 · 改动 · 文件 · 验收 · 预览」这组标签，都移到 P2，作为可选项。
+
+| 帧 | 浅色 | 深色 | 图 |
+|---|---|---|---|
+| R0 入口：聊天任务卡片和「等待你」列表上的一行摘要和「审阅」 | `1120:2` | `1120:227` | [浅](assets/2026-11-08-ws-r0-entry-light.png) · [深](assets/2026-11-08-ws-r0-entry-dark.png) |
+| R0b 任务面板：同一行摘要；尝试只在「活动」里 | `1120:432` | `1120:664` | [浅](assets/2026-11-08-ws-r0b-task-panel-light.png) · [深](assets/2026-11-08-ws-r0b-task-panel-dark.png) |
+| R1 审阅页 | `1120:869` | `1120:1231` | [浅](assets/2026-11-08-ws-r1-review-page-light.png) · [深](assets/2026-11-08-ws-r1-review-page-dark.png) |
+| R1b 审阅页 · 检查就地展开 | `1120:1542` | `1120:1895` | [浅](assets/2026-11-08-ws-r1b-review-checks-light.png) · [深](assets/2026-11-08-ws-r1b-review-checks-dark.png) |
+| R2 iPhone 审阅：检查摘要、PR、要求修改 / 批准合并、改动文件 | `1121:54` | `1121:169` | [浅](assets/2026-11-08-ws-r2-iphone-review-light.png) · [深](assets/2026-11-08-ws-r2-iphone-review-dark.png) |
+| R3 iPhone 文件 diff 和行内评论 | `1121:274` | `1121:359` | [浅](assets/2026-11-08-ws-r3-iphone-diff-light.png) · [深](assets/2026-11-08-ws-r3-iphone-diff-dark.png) |
+
+下文是这个方案之前的调研和草图，保留作为记录。D 帧和 M 帧在 Figma 上已标为「已取代」。
+
 ## 两个来源变化
 
 - **Codex 桌面版已并入 ChatGPT 桌面 App**（2026-07-09）。文档迁到 `learn.chatgpt.com/docs`，`developers.openai.com/codex` 会重定向过去（https://learn.chatgpt.com/docs/codex-manual.md）。
@@ -97,7 +120,7 @@
 | 9 | 窄屏没说 | 768–1279px 时右栏是浮层，手机网页（< 768px）现在打不开右栏（IA 缺口 G2） | 窄屏时审阅模式直接全屏，对话做成可切换的标签（学 Codex full view） |
 | 10 | 手机端行内评论 | 竞品文档没写手机能做行内评论（Cursor 只写了「ask an agent to resolve review comments」） | 可以留在 P0，但要在 TestFlight 上验证长按行出评论框的体验 |
 
-## 草图
+## 草图（已被 R0–R3 取代）
 
 Figma 页面 `1110:2`。每张都有浅色和深色版，深色是同一结构切到 Mikka 变量的「深色」模式，颜色全部绑定 `Mikka` 变量集合，没有新调色板。
 
