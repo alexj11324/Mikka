@@ -22,7 +22,17 @@ test('a teammate thread shows whose it is, its status and time, never its conten
 test('the owner reads their own thread in full', () => {
   const [mine] = projectIssueThreads([make('mine', 'viewer')], 'issue', 'viewer', new Set(['teammate', 'viewer']))
   assert.equal(mine.ownerName, null)
-  assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', summary: 'Done', bot: null })
+  assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', summary: 'Done', summarySource: 'report', bot: null })
+})
+
+test('the full owner detail identifies an error fallback without exposing private details to teammates', () => {
+  const row = { ...make('empty-report', 'viewer'), status: 'succeeded', report: { summary: '' }, error: 'Previous error' }
+  const members = new Set(['viewer', 'teammate'])
+  const [own] = projectIssueThreads([row], 'issue', 'viewer', members)
+  assert.equal(own.detail?.summary, 'Previous error')
+  assert.equal(own.detail?.summarySource, 'error')
+  const [foreign] = projectIssueThreads([row], 'issue', 'teammate', members)
+  assert.equal(foreign.detail, null)
 })
 
 test('stopping is shared status metadata and disappears when the daemon acknowledges', () => {

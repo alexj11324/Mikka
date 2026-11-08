@@ -6,6 +6,7 @@ import { alignServerTimings, cleanupCase, createSessionClient, hasStartupInitial
   startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from './cloud-startup.mjs'
 import { mcpBusinessEvidence, readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
+import { runSummaryView } from '../../lib/issue-run-conversation.ts'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const workspace = id(1), botId = id(2), deviceId = id(3), agentId = id(4)
@@ -423,7 +424,7 @@ function submittedReply() {
   const record = { sampleId: 'submitted', runId: id(901), harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true, requireTerminal: true }
   const detail = { thread: { id: record.runId, rootRunId: record.runId, latestRunId: record.runId, ownedByCurrentUser: true,
     status: 'succeeded', error: null, finishedAt: new Date(epoch + 6000).toISOString(), continuation: null,
-    attempts: [{ runId: record.runId, status: 'succeeded' }], detail: { harness: 'codex', summary: 'PRIVATE_REPORT STARTUP_OK_submitted' } },
+    attempts: [{ runId: record.runId, status: 'succeeded' }], detail: { harness: 'codex', summary: 'PRIVATE_REPORT STARTUP_OK_submitted', summarySource: 'report' } },
     chunks: [stage('agent_start', 20),
       { at: new Date(epoch + 100).toISOString(), chunk: { type: 'tool-input-available', toolCallId: 'read-file', toolName: 'mcp__mikka__inspect_artifact', input: { path: 'README.md' } } },
       { at: new Date(epoch + 200).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'read-file', output: 'PRIVATE_README' } },
@@ -443,11 +444,29 @@ test('a successful same-run canonical submit report proves delivery after the co
   assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted|Read the README/)
 })
 
+test('an empty final report cannot borrow a residual error through the real summary selector', () => {
+  const { record, detail } = submittedReply()
+  detail.thread.detail = { harness: 'codex', ...runSummaryView({ report: { summary: '' }, error: 'PRIVATE_ERROR STARTUP_OK_submitted' }) }
+  // The public successful thread masks row.error; this does not prove where
+  // its displayed summary came from. Preserve that UI projection unchanged.
+  assert.equal(detail.thread.error, null)
+  assert.equal(detail.thread.detail.summary, 'PRIVATE_ERROR STARTUP_OK_submitted')
+  detail.chunks.push(
+    { at: new Date(epoch + 5100).toISOString(), chunk: { type: 'tool-input-available', toolCallId: 'empty-handoff', toolName: 'mcp__mikka__submit', input: { summary: '' } } },
+    { at: new Date(epoch + 5200).toISOString(), chunk: { type: 'tool-output-available', toolCallId: 'empty-handoff', output: [] } })
+  assert.equal(observeChunks(record, detail, epoch + 7000), false)
+  assert.notEqual(record.replyVerified, true)
+  assert.equal(record.replyVerifiedAfterTool, false)
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted/)
+})
+
 test('canonical delivery cannot borrow another run, a pending or failed result, or an unordered submit', () => {
   const mutations = [
     d => { d.thread.id = id(902) }, d => { d.thread.rootRunId = id(902) }, d => { d.thread.latestRunId = id(902) },
     d => { d.thread.ownedByCurrentUser = false }, d => { d.thread.detail.harness = 'claude_code' },
     d => { d.thread.detail.summary = 'A different report' }, d => { d.thread.detail = null },
+    d => { d.thread.detail.summarySource = 'error' }, d => { d.thread.detail.summarySource = null },
+    d => { delete d.thread.detail.summarySource },
     d => { d.thread.status = 'running' }, d => { d.thread.status = 'failed' }, d => { d.thread.status = 'stopped' },
     d => { d.thread.error = 'PRIVATE_ERROR' }, d => { d.thread.finishedAt = null },
     d => { d.thread.finishedAt = new Date(epoch + 4900).toISOString() },
@@ -476,7 +495,7 @@ test('the complete candidate driver accepts canonical report delivery with all r
     if (sample.reads <= 1) return
     Object.assign(detail.thread, { status: 'succeeded', rootRunId: sample.runId, ownedByCurrentUser: true, error: null,
       finishedAt: new Date(epoch + 6000).toISOString(), continuation: null,
-      detail: { harness: sample.harness, summary: `PRIVATE_REPORT STARTUP_OK_${sample.marker}` } })
+      detail: { harness: sample.harness, summary: `PRIVATE_REPORT STARTUP_OK_${sample.marker}`, summarySource: 'report' } })
     detail.thread.attempts[0].status = 'succeeded'
     detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta')
     detail.chunks.splice(4, 0,

@@ -487,7 +487,7 @@ export function observeChunks(record, detail, observedAt) {
   if (submittedAt !== null && thread?.id === record.runId && thread.rootRunId === record.runId && thread.latestRunId === record.runId
     && thread.ownedByCurrentUser === true && thread.status === 'succeeded' && thread.error === null && !thread.continuation
     && thread.attempts?.length === 1 && thread.attempts[0].runId === record.runId && thread.attempts[0].status === 'succeeded'
-    && thread.detail?.harness === record.harness && typeof thread.detail.summary === 'string'
+    && thread.detail?.harness === record.harness && thread.detail.summarySource === 'report' && typeof thread.detail.summary === 'string'
     && thread.detail.summary.includes(`STARTUP_OK_${record.sampleId}`)
     && Number.isFinite(dateValue(thread.finishedAt)) && dateValue(thread.finishedAt) >= submittedAt) {
     record.replyVerified = true
