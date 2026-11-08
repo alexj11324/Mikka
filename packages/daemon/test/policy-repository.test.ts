@@ -13,6 +13,7 @@ import { createLogger } from '../src/log'
 import type { OutboxItem } from '../src/outbox'
 import { RepositoryCache } from '../src/repositories'
 import { prepareRunRepository } from '../src/run-repository'
+import { daemonTracer, runIdHash } from '../src/tracing'
 import { RunJournal } from '../src/runs/journal'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
 import { HttpServerLink } from '../src/server-link-http'
@@ -195,4 +196,29 @@ it('never seeds an empty remote when the policy barrier refuses it', async () =>
   await expect(prepareRunRepository(f.cache, join(f.root, 'private'), f.assignment, new AbortController().signal, undefined, denied)).rejects.toThrow('policySnapshotSignatureInvalid')
   expect(seed).not.toHaveBeenCalled()
   expect(git(bare, 'for-each-ref')).toBe('')
+})
+
+
+it.each(['ordinary', 'assignment', 'trusted_host'] as const)('records closed Git subprocess phases only for %s diagnostics', async mode => {
+  const f = await fixture()
+  const spans = vi.spyOn(daemonTracer, 'span')
+  const assignment = { ...f.assignment, ...(mode === 'assignment' ? { taskEnv: { CLOUD_STARTUP_TIMING: '1' } } : {}) }
+  for (let pass = 0; pass < 2; pass++)
+    await prepareRunRepository(f.cache, join(f.root, 'private'), assignment, new AbortController().signal,
+      undefined, undefined, mode === 'trusted_host')
+  const measured = spans.mock.calls.filter(([name]) => name.startsWith('daemon.repository.git.'))
+  if (mode === 'ordinary') expect(measured).toEqual([])
+  else {
+    expect(measured.map(([name]) => name)).toContain('daemon.repository.git.clone')
+    expect(measured.map(([name]) => name)).toContain('daemon.repository.git.fetch')
+    expect(measured.map(([name]) => name)).toContain('daemon.repository.git.remote_head')
+    for (const [name, attributes] of measured) {
+      expect(['daemon.repository.git.clone', 'daemon.repository.git.fetch', 'daemon.repository.git.remote_head',
+        'daemon.repository.git.remote_refs', 'daemon.repository.git.local']).toContain(name)
+      expect(attributes).toEqual({ 'mikka.run.id_hash': runIdHash(assignment.runId), 'mikka.harness': assignment.harness })
+    }
+    expect(JSON.stringify(measured.map(([name, attrs]) => ({ name, attrs })))).not.toContain(f.root)
+    expect(JSON.stringify(measured.map(([name, attrs]) => ({ name, attrs })))).not.toContain(f.remote)
+  }
+  expect(git(f.cache.pathFor(f.remote), 'rev-parse', 'origin/main')).toBe(git(f.source, 'rev-parse', 'HEAD'))
 })

@@ -329,6 +329,8 @@ export const REPO_ORIGIN_HEADER = "x-mikka-repo-origin-check"
 export const MODEL_CREDENTIAL_HEADER = "x-mikka-model-credential"
 /** The daemon accepts credentials prepared in the claim response (#1505). */
 export const RUN_CREDENTIALS_HEADER = "x-mikka-run-credentials"
+/** Only the first cloud claim can replace that sync's repository discovery. */
+export const INITIAL_REPOSITORY_HEADER = "x-mikka-initial-repository"
 
 const credentialKey = z.string().min(1).max(4_096).refine(value => !/[\r\n\0]/.test(value))
 /** Background refresh response; null means the provider set no expiry. */
@@ -394,6 +396,8 @@ export const runAssignmentSchema = z.object({
   issueId: id,
   deviceId: id,
   repoId: id,
+  /** One-shot owner-scoped settings from the claim; unknown data keeps discovery. */
+  repo: deviceRepoSchema.optional().catch(undefined),
   /** Clone URL for local runs; hosted computer assignments keep their isolated workspace. */
   remoteUrl: z.string().min(1).max(4_000).optional(),
   /** Absent means origin/HEAD after fetch. */

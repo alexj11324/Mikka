@@ -2424,9 +2424,10 @@ test(
           }});
           const fixtureWorkspace=(await import('drizzle-orm/node-postgres')).drizzle(db,{schema:await import('../db/workspace-schema')});
           const workspaceTransaction=t.mock.method((await import('../workspace-db')).workspaceDb,'transaction',fixtureWorkspace.transaction.bind(fixtureWorkspace));
+          const workspaceSelect=t.mock.method((await import('../workspace-db')).workspaceDb,'select',fixtureWorkspace.select.bind(fixtureWorkspace));
           try {
             await modelDatabase!.run(()=>createFactorySpecApproval(db,store,automaticFactoryDispatch(db))({userId:'owner',sessionId:'fixture-browser'},{binding:{taskId:planned.task.id,revision:planned.task.revision},eventId:randomUUID()}));
-          } finally {workspaceTransaction.mock.restore();profileModule.restore();}
+          } finally {workspaceSelect.mock.restore();workspaceTransaction.mock.restore();profileModule.restore();}
           assert.equal(selections,1);
           assert.equal(lastQueueSelection?.model,'fixture-executor');
           assert.equal(lastQueueSelection?.readOnly,false);
