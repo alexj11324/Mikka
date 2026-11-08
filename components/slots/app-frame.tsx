@@ -1,0 +1,9 @@
+'use client'
+
+/**
+ * 外框: the app window and its icon rail. The open-source UI draws the shared
+ * ones; a UI layer may draw its own from the same props (docs/ui-overlay.md).
+ * The pages, the window bar's content and the right-hand panel are not part of it.
+ */
+export { AppFrameView as AppFrame } from '@/components/app-frame-view'
+export { IconRailView as IconRail } from '@/components/nav/icon-rail-view'

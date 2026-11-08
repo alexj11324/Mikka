@@ -19,6 +19,7 @@ import type { ModelMessage } from 'ai'
 import { promptOptions } from '@/lib/prompt-cache'
 import { isWelcomeOnlyTurn } from '@/lib/agent-welcome'
 import { finishCoordinatorTurn } from './finish-turn'
+import { completeAttentionQuestions } from '@/lib/coordinator/question-attention'
 export { coordinatorTools } from './tools'
 
 /** Rounds of inbox per run; later events wait for the next wake. */
@@ -105,10 +106,11 @@ export async function coordinatorTurn(userId: string, botId: string) {
       const mailboxTools = prepared.mailboxTools
       const welcomeOnly = selected.harness === 'ai_sdk' && isWelcomeOnlyTurn(prepared.prompt?.messages)
       // Every model call that finished with its tools, as it finishes: 停止 keeps these without waiting for the rest.
+      let hostedTools: ReturnType<typeof coordinatorTools> | undefined
       const turn = signal.aborted && !inbox.scheduledRead
         ? Promise.resolve({ text:'',finishReason:'stop',responseMessages:[] as ModelMessage[] })
         : selected.harness === 'ai_sdk'
-        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),welcomeOnly ? {} : coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ lazyGitHubContext: !inbox.scheduledRead && (!execution || execution.snapshot.effectiveTools.includes('find_repository')),...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,audits,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),{ ...promptOptions(prepared.prompt!),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,...(welcomeOnly ? {toolChoice:'none' as const,activeTools:[]} : {}),writable:modelWritable,preventClose:true,onStepEnd:step => { finished.push(...step.response.messages) },...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,botId })
+        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),(hostedTools = welcomeOnly ? {} : coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ lazyGitHubContext: !inbox.scheduledRead && (!execution || execution.snapshot.effectiveTools.includes('find_repository')),...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,audits,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) })),{ ...promptOptions(prepared.prompt!),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,...(welcomeOnly ? {toolChoice:'none' as const,activeTools:[]} : {}),writable:modelWritable,preventClose:true,onStepEnd:step => { finished.push(...step.response.messages) },...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,botId })
         : nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),botId,execution?.snapshot,inbox.scheduledRead ? undefined : signal,finished)
       // A scheduled read is not stoppable from the chat: it posts only its fenced result. Otherwise 停止 ends a hosted
       // turn at once: the model call in flight is aborted, a tool call already running finishes on its own and nothing
@@ -116,6 +118,25 @@ export async function coordinatorTurn(userId: string, botId: string) {
       const ended = inbox.scheduledRead ? { stopped: false as const, result: await turn }
         : selected.harness === 'ai_sdk' ? await untilStopped(turn, signal)
         : { stopped: false as const, result: await turn.catch((error: unknown) => { if (signal.aborted) return { text:'',finishReason:'stop',responseMessages:[] as ModelMessage[] }; throw error }) }
+      if (!inbox.scheduledRead && !ended.stopped && !signal.aborted && selected.harness === 'ai_sdk' &&
+          ended.result.finishReason === 'stop' && inbox.attentionQuestions?.length) {
+        const attentionQuestions = inbox.attentionQuestions
+        // Completion is still part of this turn: Stop must not wait for an
+        // already running escalation or audit before marking the turn stopped.
+        await untilStopped((async () => {
+          await Promise.all(audits)
+          const escalation = hostedTools?.escalate_factory_question?.execute
+          await completeAttentionQuestions(attentionQuestions, ended.result.responseMessages, {
+            userId, enabled: Boolean(escalation), signal,
+            escalate: async input => {
+              // Reuse this execution's instrumented tool: its before/after hooks
+              // retain the running-execution, frozen-grant and stop fences.
+              const execute = escalation as (input: unknown, context: {toolCallId:string;messages:ModelMessage[];abortSignal?:AbortSignal}) => unknown
+              return await execute(input,{toolCallId:'question-attention:'+input.eventId,messages:ended.result.responseMessages,abortSignal:signal})
+            },
+          })
+        })(), signal)
+      }
       if (ended.stopped || (signal.aborted && !inbox.scheduledRead)) {
         const said = await steps.markStopped(writable,holder,streamId)
         await Promise.all(audits)

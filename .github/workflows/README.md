@@ -1,7 +1,7 @@
 # CI workflow strategy
 
-Mikka follows the premerge/postmerge split used by OpenAI Codex, while retaining
-its existing protected status names and real acceptance coverage.
+This guide maps required pull-request checks, release jobs and their source
+bindings. Current workflow files define the triggers and selected coverage.
 
 ## Pull requests: blocking checks
 
@@ -12,9 +12,11 @@ its existing protected status names and real acceptance coverage.
 - Keep `UI policy (strict)` and `Production build and browser interactions`
   successful for non-documentation PRs; the latter gates the selected isolated PostgreSQL suites across 1–4 dynamic
   shards. Full inventory validation runs even when DB execution is skipped. Despite its name, CI
-  runs no production build (decision 2026-11-01-0230); Vercel builds `main`.
-- CI runs no browser tests, not even by hand (decision 2026-11-01-1520).
-  `browser-gate.yml` only keeps the protected check name
+  does not build the production Web release artifact. `web-deploy.yml` builds
+  `main` on GitHub Actions and uploads the prebuilt output to Vercel.
+- Ordinary acceptance uses API/CLI flows under decision 2026-11-01-1520.
+  Targeted Desktop, Analytics and self-hosted jobs retain their selected browser
+  checks. `browser-gate.yml` only keeps the protected check name
   `Browser tests (before merge)` and passes at once; delete it once that name
   is removed from the required checks in the repository settings.
 - `GitGuardian Security Checks` is a separate external required check.
@@ -24,17 +26,20 @@ its existing protected status names and real acceptance coverage.
 
 ## Main pushes: postmerge checks
 
-- A push to `main` triggers `ui-policy.yml` again. It is the only test
-  workflow that reruns on `main`: the daemon and desktop releases wait for it
-  on the exact commit (`scripts/release/ci-gate.mjs`).
+- A push to `main` triggers the required `ui-policy.yml` checks again. Daemon
+  and desktop releases wait for that exact commit
+  (`scripts/release/ci-gate.mjs`). Production acceptance workflows have their
+  own successful-Web triggers and account queues.
 - The special suites (`analytics-ssr`, `cloud-computer`, `desktop`,
   `e2b-byos`, `site-search`, `ssh-device-backend`, `unattended-sandbox`) run on
   pull requests only, selected by trusted dependencies or their existing path filters; each can still be run
-  by hand (`workflow_dispatch`). Vercel's production build is the build check
-  for `main`.
-- `publish-daemon.yml` and `desktop-release.yml` run only when a path that goes
-  into their package changes. Every daemon release makes installed daemons
-  upgrade and restart, so a web-only change publishes neither.
+  by hand (`workflow_dispatch`). The Web release workflow builds and deploys
+  `main` through Vercel.
+- `publish-daemon.yml` uses daemon/package-input path filters.
+  `desktop-release.yml` also watches the shared frontend, UI and API inputs, so
+  a Web UI change can trigger a desktop release. A Markdown file under a
+  watched directory still matches those release filters. Read the exact
+  workflow paths before predicting release work.
 - The run-dispatch and Controlled Skill improvement suites run in the CI
   database shards (`pnpm test:db`); they no longer have workflows of their own.
 - The `ui-policy.yml` concurrency key includes `github.run_id` only on `main`.
@@ -89,13 +94,15 @@ application/worker release, preserving these gates.
 
 PR runs use no release credentials. Main builds read the existing `E2B_API_KEY`
 from Infisical `prod:/vercel`. The subscription gate reads the authorized
-`ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD` from `prod:/`, signs in normally, uses
+`SMOKE_OWNER_EMAIL` / `SMOKE_OWNER_PASSWORD` from `prod:/`, signs in normally, uses
 tasks titled “测试” in `alexj11324/Mikka-handoff`, then removes its own fixtures.
 Publication uses `VERCEL_TEAM_TOKEN` from `prod:/platform`. Delivery uses the
 existing GitHub OIDC identity; credential values never enter reports or logs.
 
-The worker digest excludes unrelated web lock entries and package scripts, so
-unrelated changes do not rebuild templates. The existing no-new-polling rule
+The worker digest excludes unrelated Web lock entries and package scripts.
+Every main push compares that wanted digest with the published production
+digest. Matching digests reuse the release. After a failed publication, a
+documentation-only push can still rebuild and revalidate the unpublished worker. The existing no-new-polling rule
 and task-owner E2B billing apply. See
 [Alex's preservation clarification](../../docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md).
 
@@ -152,8 +159,8 @@ source-contract and DB feature-marker edges; candidate code is parsed, not
 executed during classification. Source/security policies stay enabled, and
 unmapped/unsafe/global inputs expand coverage. Core/integration commands are
 scheduled by Nx; the existing strict database runner owns selected PG17 suites.
-The first introduction uses full blocking coverage plus shadow selection;
-selectors absent from the immutable base never authorize a skip. Manual dispatch
+When the immutable base predates the selector, full blocking coverage and
+shadow selection apply. A selector absent from that base cannot authorize a skip. Manual dispatch
 and Monday 03:23 UTC run complete CI. No Nx Cloud, remote test cache, browser E2E
 or release credentials are added. See [policy and commands](../../docs/ci/incremental.md)
 and [measured results](../../docs/ci/1699-results.md).

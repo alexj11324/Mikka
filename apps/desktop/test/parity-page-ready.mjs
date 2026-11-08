@@ -124,12 +124,8 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
       await apps.getByRole('link', { name: messages.Settings.integrations.openApp.replace('{name}', name), exact: true }).waitFor()
     }
     await expect(apps.locator('[data-slot="app-row-pending"]')).toHaveCount(0, { timeout: 45_000 })
-    const alerts = apps.getByRole('alert')
-    if (observed.linearUnavailable) {
-      await expect(alerts).toHaveCount(1)
-      await alerts.getByText(messages.Plugins.connectionStatusFailed.replace('{names}', messages.Settings.linear.title), { exact: true }).waitFor()
-      await expect(alerts.getByRole('button', { name: messages.Plugins.retry, exact: true })).toBeEnabled()
-    } else await expect(alerts).toHaveCount(0)
+    // An unreadable Linear flag is not a read failure either: no alert in any case.
+    await expect(apps.getByRole('alert')).toHaveCount(0)
   } else if (name === 'suggestions') {
     await text(messages.SuggestionsPage.empty)
     await page.getByRole('button', { name: messages.SuggestionsPage.connect, exact: true }).waitFor()

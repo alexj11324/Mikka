@@ -21,12 +21,16 @@ import { mobileTaskActivity } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskBlock } from '@/lib/task-blocked'
 
-/** Hold fresh tenant membership while reading the task and all its projections.
- * Legacy scope, Team links and Workspace kind do not determine ownership. */
-export async function mobileTask(user: Exclude<IssueReader, string>, workspace: { id: string; kind: string }, id: string) {
-  return withIssueWorkspace(user, workspace.id, () => readMobileTask({
-    ...user, [tokenWorkspace]: workspace.id, [enterprisePrincipal]: user[enterprisePrincipal],
-  }, workspace.id, id))
+/** Locate the persisted tenant through the full reader, then hold fresh
+ * membership and re-read every projection. Cookie/default choices are not pins. */
+export async function mobileTask(user: Exclude<IssueReader, string>, id: string, explicitWorkspaceId?: string) {
+  const candidate = await issueForUser(user, id, false, db, { withoutBody: true })
+  if (!candidate || candidate.ownershipState !== 'bound' || !candidate.workspaceId
+    || (explicitWorkspaceId !== undefined && candidate.workspaceId !== explicitWorkspaceId)) return null
+  const workspaceId = candidate.workspaceId
+  return withIssueWorkspace(user, workspaceId, () => readMobileTask({
+    ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal],
+  }, workspaceId, id))
 }
 
 async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: string, id: string) {

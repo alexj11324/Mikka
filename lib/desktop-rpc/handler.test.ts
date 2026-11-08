@@ -200,6 +200,18 @@ test('Task presentation batch rejects forged authority and oversized input befor
   assert.equal(calls, 2, 'empty and bounded inputs still enter the reader and its membership checks')
 })
 
+test('Coordinator submission accepts an optional captured workspace without widening its authority tuple', () => {
+  const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
+  const legacy = ['hello', null, null, owner, undefined, undefined, undefined, undefined, undefined]
+  for (const args of [['hello'], legacy, [...legacy, undefined], [...legacy, peer], [...legacy, peer.toUpperCase()]]) {
+    assert.equal(schema.safeParse(args).success, true)
+  }
+  for (const expected of [null, '', 'invalid', { workspaceId: peer }, { userId: owner }]) {
+    assert.equal(schema.safeParse([...legacy, expected]).success, false)
+  }
+  assert.equal(schema.safeParse([...legacy, peer, { admin: true }]).success, false)
+})
+
 test('billing re-export consumers accept only the existing workspace selector and purchase amounts', () => {
   const verification = desktopActionSchemas['billing.startCardVerification']
   for (const args of [[], [undefined], [owner]]) assert.equal(verification.safeParse(args).success, true)

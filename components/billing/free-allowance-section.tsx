@@ -1,71 +1,24 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
-import { useCallback, useEffect, useState } from 'react'
-import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ArrowUpRight, LoaderCircle } from 'lucide-react'
-import { toast } from 'sonner'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
-import { readCardVerification, startCardVerification, type CardVerificationStatus } from '@/lib/billing/verification-client'
-import { useLiveWait } from '@/hooks/use-live-wait'
-import { useActionError } from '@/lib/use-action-error'
+import type { FreeAllowanceState } from '@/hooks/settings/use-billing'
 
-export const cardVerificationKey = settingsKeys.cardVerification
-
-/** Drops Checkout's return parameters so a reload does not replay the return. */
-function takeReturn(name: string): string | null {
-  const url = new URL(window.location.href)
-  const value = url.searchParams.get(name)
-  if (value === null) return null
-  url.searchParams.delete(name)
-  url.searchParams.delete('session_id')
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
-  return value
-}
+export { cardVerificationKey } from '@/hooks/settings/use-billing'
 
 /**
  * 计费 › 免费额度 (Figma BIL-1 `708:26856`, BIL-3c `708:28397`, BIL-5 `708:28912`).
- * 验证 goes to Stripe Checkout in setup mode (#558); nothing of ours collects the
- * card. On `?verify=success` the row shows 正在确认… while the webhook lands.
- * Verified (BIL-3 `708:27372`): the section is gone; the $1 is part of 余额.
+ * 验证 goes to Stripe Checkout in setup mode (#558, `useFreeAllowance`); nothing of
+ * ours collects the card. Back from Checkout the row shows 正在确认… while the
+ * webhook lands. Verified (BIL-3 `708:27372`): the section is gone; the $1 is part of 余额.
  */
-export function FreeAllowanceSection({ workspaceId, onVerified }: { workspaceId: string; onVerified?: () => void }) {
+export function FreeAllowanceSection({ allowance }: { allowance: FreeAllowanceState }) {
   const t = useTranslations('Billing.allowance')
-  const actionError = useActionError()
-  const status = useSWR(cardVerificationKey(workspaceId), () => readCardVerification(workspaceId))
-  const [confirming, setConfirming] = useState(false)
-  const [redirecting, setRedirecting] = useState(false)
-
-  // Back from Checkout: the webhook's commit pushes this workspace's hosted_billing key (#1212); no timer reads it.
-  const verified = useCallback((read: Awaited<ReturnType<typeof readCardVerification>>) => !read.error && read.status === 'verified', [])
-  const waitForWebhook = useLiveWait(status, 'hosted_billing', workspaceId, cardVerificationKey(workspaceId), verified)
-  useEffect(() => {
-    if (takeReturn('verify') !== 'success') return
-    setConfirming(true)
-    void waitForWebhook().then(read => {
-      setConfirming(false)
-      if (!read || read.error || read.status !== 'verified') return
-      toast.success(read.allowance === 'claimed_elsewhere' ? t('claimedElsewhere') : t('verified'))
-      onVerified?.()
-    })
-  }, [workspaceId, waitForWebhook, onVerified, t])
-
-  async function verify() {
-    setRedirecting(true)
-    try {
-      const result = await startCardVerification(workspaceId)
-      if (result.error) { setRedirecting(false); toast.error(result.error === 'billingNotConfigured' ? t('unavailable') : actionError(result.error)); return }
-      window.location.assign(result.url)
-    } catch {
-      setRedirecting(false)
-      toast.error(actionError('billingProviderFailed'))
-    }
-  }
-
-  const data: CardVerificationStatus | null = status.data && !status.data.error ? status.data : null
+  const { confirming, redirecting, verify } = allowance
+  const data = allowance.status
   if (!data || (data.status === 'verified' && !confirming)) return null
   const pending = confirming || data.status === 'pending'
   return <SettingsSection id="billing-free-allowance" title={t('section')}>
@@ -75,7 +28,7 @@ export function FreeAllowanceSection({ workspaceId, onVerified }: { workspaceId:
         : data.status === 'unavailable'
           // BIL-5 also draws a disabled 验证; a control that does nothing fails interaction/no-dead-control, so only the state shows.
           ? <span role="status" className="text-muted-foreground">{t('unavailable')}</span>
-          : <Button type="button" size="sm" disabled={redirecting} onClick={() => { void verify() }}>{t('verify')}<ArrowUpRight data-icon="inline-end" /></Button>}
+          : <Button type="button" size="sm" disabled={redirecting} onClick={verify}>{t('verify')}<ArrowUpRight data-icon="inline-end" /></Button>}
     </SettingRow>
   </SettingsSection>
 }

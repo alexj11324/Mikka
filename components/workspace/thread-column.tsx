@@ -1,7 +1,7 @@
 'use client'
 
 import * as taskConversationSlot from '@ui-slot/task-conversation'
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
@@ -12,8 +12,10 @@ import { readAccessFailure } from '@/lib/swr/persistent-cache'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { PANEL_WIDTH } from '@/components/nav/context-panel'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
+import { usePanelInitialWidth, useWidenToggle } from '@/hooks/use-panel-width'
 import { cn } from '@/lib/utils'
 import { IssueThreadPanel } from './issue-thread-panel'
+import { RightColumnWidenContext } from './right-column-widen'
 import { closeThread, navigate, openThread, toggleAllThreads } from './workspace-navigation'
 
 /** Task detail's own breakpoint: narrower, a thread open on the task covers it, so 打开任务 leaves the thread behind. */
@@ -66,10 +68,15 @@ export function ThreadColumn({ runId, issueId: known, overList = false, name }: 
 /**
  * The right column's frame for a thread or 全部线程 (R-82): 概览's width, resizable
  * from its inner edge. Below xl it covers the window; on a phone that is a pushed page.
+ * Its ⤢ (useRightColumnWiden) reaches the header of what it holds; the default headers do not draw it.
  */
 export function RightColumn({ slot, children }: { slot: string; children: ReactNode }) {
   const tPanel = useTranslations('Shell.panel')
-  const resize = useResizableWidth(PANEL_WIDTH)
+  // A UI layer may size the default from the main area (panel-header slot); a remembered width still wins.
+  const resize = useResizableWidth({ ...PANEL_WIDTH, initial: usePanelInitialWidth(PANEL_WIDTH.initial) })
+  const widen = useWidenToggle(resize)
+  const { wide, onToggle } = widen
+  const toggle = useMemo(() => ({ wide, onToggle }), [wide, onToggle])
   const ref = useRef<HTMLElement>(null)
   useLayoutEffect(() => { ref.current?.style.setProperty('--thread-column-width', `${resize.width}px`) }, [resize.width])
   return <aside ref={ref} aria-label={tPanel('label')} data-slot={slot} className={cn(
@@ -78,7 +85,7 @@ export function RightColumn({ slot, children }: { slot: string; children: ReactN
     'xl:relative xl:w-(--thread-column-width) xl:shrink-0 xl:border-l',
     resize.dragging && 'select-none',
   )}>
-    <ResizeHandle resize={resize} label={tPanel('resize')} edge="start" className="hidden xl:block" />
-    {children}
+    <ResizeHandle resize={resize} label={tPanel('resize')} edge="start" className="hidden xl:block" onDoubleClick={widen.reset} />
+    <RightColumnWidenContext.Provider value={toggle}>{children}</RightColumnWidenContext.Provider>
   </aside>
 }

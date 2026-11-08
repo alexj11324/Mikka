@@ -34,8 +34,8 @@ export async function renewTaskSecretAccess(input: {
     if (!UUID.test(reported.runId) || !input.leases[reported.runId] || !UUID.test(input.caller.tokenId)
       || input.caller.scopeDeviceId && input.caller.scopeDeviceId !== input.deviceId) { revoked.push(reported.runId); continue }
     try {
-      // Read only the persisted tenant before taking its Workspace lease. The
-      // locked APP snapshot below must still match it; tokens cannot reassign it.
+      // Read only the persisted tenant and Task before taking the Workspace
+      // lease. The locked APP snapshot must still match; tokens cannot reassign it.
       const [stored] = await db.select({ workspaceId: agentRuns.workspaceId, issueId: agentRuns.issueId }).from(agentRuns)
         .where(and(eq(agentRuns.id, reported.runId), eq(agentRuns.userId, input.caller.userId), eq(agentRuns.deviceId, input.deviceId))).limit(1)
       if (!stored?.workspaceId || !stored.issueId) { revoked.push(reported.runId); continue }

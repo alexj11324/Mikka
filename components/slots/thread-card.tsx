@@ -11,6 +11,8 @@ import { ThreadStatus, ThreadStatusIcon } from '@/components/workspace/thread-st
 import { cn } from '@/lib/utils'
 import { THREAD_CARD, THREAD_CARD_BUTTON } from '@/components/coordinator/thread-card-style'
 import type { ThreadCardProps } from '@/components/slots/thread-card-contract'
+import { ReviewSummaryLine } from '@ui-slot/review-summary'
+import { openReview } from '@/hooks/code-review/use-review-page'
 
 
 /** R-66 review frame 356:4750: status and title, then the PRs it produced as one badge; one card per thread. A thread with no task opens too. */
@@ -23,6 +25,8 @@ export function ThreadCard({ run, onOpen }: ThreadCardProps) {
     <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-2">
       <span className="truncate text-sm leading-5 font-medium">{name}</span>
       {run.info && <RunInfoLine info={run.info} />}
+      {/* A coding task's summary line and 审阅 (R0); the default slot draws nothing. */}
+      {run.issue && <ReviewSummaryLine taskId={run.issue.id} placement="card" onOpenReview={openReview} />}
     </div>
     {/* The state's word beside its bubble and dot: icon, colour and word together (R-87). */}
     <span className="pointer-events-none relative shrink-0"><ThreadStatus status={run.status} outcome={run.outcome} icon={false} /></span>

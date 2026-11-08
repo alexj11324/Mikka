@@ -74,7 +74,7 @@ const webItem = (item: BarItem) => 'view' in item
  * material or hairline (Comma, Alex 2026-11-08): content fades out under the top
  * edge, by the system's soft scroll edge on iOS 26 and `TopFade` below it.
  */
-export function NavBar({ title, titleView, left, right, back, large, topTitle, search, background = colors.page, fade = true }: {
+export function NavBar({ title, titleView, left, right, back, large, topTitle, search, background = colors.page, fade = true, sheet }: {
   title?: string
   /** A tab's root (Bot, 任务, 建议, 设置, 搜索): one title, the system's, centred in the bar's row; the buttons grouped
    * on the right; nothing on the left (Alex 2026-11-08, after 「Bot」 showed twice). */
@@ -89,6 +89,8 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
   background?: string
   /** False under an opaque header (a form sheet's), where nothing scrolls beneath it. */
   fade?: boolean
+  /** A form sheet: closed by its own ✕ or ✓ and by swiping down, so no back button beside them. */
+  sheet?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -101,7 +103,7 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
       else router.back()
     })
     // The Web router's history availability is not reactive. Keep an exit on pushed/deep-linked pages.
-    const showBack = Platform.OS === 'web' || back !== undefined || router.canGoBack()
+    const showBack = !sheet && (Platform.OS === 'web' || back !== undefined || router.canGoBack())
     if (topTitle) return (
       <>
         <TopRow title={title ?? ''} right={rights.map(webItem)} />
@@ -152,6 +154,28 @@ function TopRow({ title, right }: { title: string; right: ReactNode[] }) {
   )
 }
 
+/**
+ * The top of a chat's list on the web build, where the bar sits above the list rather than over it: messages scrolled
+ * up dissolve into the page colour under the title pill instead of being cut at the bar's edge. iOS has the system's
+ * soft scroll edge (26) or TopFade (earlier) for this.
+ */
+export function ListTopFade({ color, height = 28 }: { color: string; height?: number }) {
+  if (Platform.OS !== 'web') return null
+  return (
+    <View pointerEvents="none" style={[styles.listFade, { height }]}>
+      <Svg width="100%" height={height}>
+        <Defs>
+          <LinearGradient id="listFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={color} stopOpacity={1} />
+            <Stop offset="1" stopColor={color} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height={height} fill="url(#listFade)" />
+      </Svg>
+    </View>
+  )
+}
+
 /** Below iOS 26: the page colour fading out under the bar, so rows scrolled up never run into its title or buttons. */
 function TopFade({ color }: { color: string }) {
   const insets = useSafeAreaInsets()
@@ -183,6 +207,7 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 6, minHeight: 50 },
   topButtons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   fade: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
+  listFade: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   search: { paddingHorizontal: 16, paddingBottom: 12 },
   searchInput: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.bubble, color: colors.text, fontFamily: font, fontSize: 16 },
 })

@@ -670,7 +670,7 @@
         "GET"
       ],
       "maxDuration": 60,
-      "sourceHash": "6efa7ffc03030083e01b8c0bbe3eded193ca8519c84a7e56622a1ac034490259"
+      "sourceHash": "2b11737af62870819d3d3ecd12cd21cf5de02877bda73b8cc39c6b38c49a831f"
     },
     {
       "path": "/mikka/api/cron/reconcile",
@@ -1415,7 +1415,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "831a1af2edc2dfaf2b3beffbd3ce78bf744686f2e3dd5897d47f3b2ee1e1848a"
+      "sourceHash": "fff0ac302b4bf361278223d2a3b2e6d30f4cdde9a1d11ca4592ff33c8c3f5355"
     },
     {
       "path": "/mikka/api/mobile/threads",
