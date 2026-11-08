@@ -586,3 +586,6 @@ test(
     }
   },
 );
+
+// Issue #1699 post-fix failure-summary probe; never merge.
+throw new Error("ISSUE_1699_FAILURE_SUMMARY_PROBE");
