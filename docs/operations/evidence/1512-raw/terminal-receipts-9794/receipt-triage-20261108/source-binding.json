@@ -1,0 +1,26 @@
+{
+  "sourceCommit": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "productSourceIdenticalTo": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "files": {
+    "packages/daemon/src/adapters/claude.ts": {
+      "sha256": "abe42f89aa17ee63425b679c1019f0d4c140799ad56a4d707a01d038c5d9a3ab",
+      "bytes": 51190
+    },
+    "packages/daemon/src/adapters/codex.ts": {
+      "sha256": "2cfe4babcf59f031a58ffc68a286aef4aa5e9bf4b9f6da8a34126537ce3da9f1",
+      "bytes": 51717
+    },
+    "packages/daemon/src/adapters/generation-metrics.ts": {
+      "sha256": "df427073be8987f77d8ae7180e03a6df0a3c79c67a700fd13e03e3ecb6dbbde9",
+      "bytes": 6447
+    },
+    "packages/daemon/src/codex-generation-telemetry.ts": {
+      "sha256": "1ccf1b86713a5eaaf40b0d422b0056d51850250c400a7678b29cf21ce704867e",
+      "bytes": 18904
+    },
+    "packages/daemon/src/tracing.ts": {
+      "sha256": "edb4df68b7f7ce5009164af6b2e479f33a6a58650412532d8122fde8a5aa9d44",
+      "bytes": 27316
+    }
+  }
+}

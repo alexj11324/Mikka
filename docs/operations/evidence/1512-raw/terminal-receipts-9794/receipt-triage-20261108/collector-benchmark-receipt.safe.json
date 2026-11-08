@@ -1,0 +1,60 @@
+{
+  "startedAt": "2026-11-08T23:06:49.190159+00:00",
+  "endedAt": "2026-11-08T23:06:50.865073+00:00",
+  "exitCode": 0,
+  "sourceBase": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "pendingSource": true,
+  "command": [
+    "node",
+    "--import",
+    "tsx",
+    "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/scripts/ops/native-generation-projection-bench.issue1512.tmp.mjs"
+  ],
+  "instrumentation": "Only snapshot raw arrays after timed loops and include them in output; timed loop, fixture, warmup and sample count unchanged. Temporary runner removed in finally.",
+  "report": {
+    "version": 1,
+    "runtime": "v24.22.1",
+    "scope": "local_OTLP_JSON_parse_and_numeric_projection_only",
+    "collectorSha256": "d776409b58cc8dc2778e5149d52eb6196a7d8d3dfaa75cf06ebb63ba68c9ebbd",
+    "cloudOrProviderRequests": 0,
+    "spansPerBatch": 512,
+    "bytesPerBatch": 116505,
+    "samples": 500,
+    "warmup": 120,
+    "generations": 1120,
+    "parse": {
+      "p50Ms": 0.233,
+      "p95Ms": 0.399
+    },
+    "projection": {
+      "p50Ms": 0.814,
+      "p95Ms": 1.306
+    },
+    "combined": {
+      "p50Ms": 1.094,
+      "p95Ms": 1.714
+    }
+  },
+  "files": [
+    {
+      "name": "collector-benchmark-original.mjs",
+      "bytes": 3431,
+      "sha256": "8183a99ffa31fe761260a208fdeee3c98675bf6b5c9c1a974a7f04ff9709633b"
+    },
+    {
+      "name": "collector-benchmark-with-raw-samples.mjs",
+      "bytes": 3522,
+      "sha256": "9f2110b317446a486b2f23b996910c09e76d85eb5816a91e14433fa935b84237"
+    },
+    {
+      "name": "collector-benchmark.stdout.json",
+      "bytes": 29094,
+      "sha256": "a4a964abfd392381d4525ce8bcab38d9138bc243462679ba46e3c766d939df01"
+    },
+    {
+      "name": "collector-benchmark.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

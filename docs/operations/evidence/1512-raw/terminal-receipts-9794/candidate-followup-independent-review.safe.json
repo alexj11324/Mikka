@@ -1,0 +1,435 @@
+{
+  "schema": "mikka.issue1512.independent-followup-review.v1",
+  "frozen_at_utc": "2026-11-08 23:10:17 UTC",
+  "reviewer": "/root/current_source_review",
+  "issue": "https://github.com/alexj11324/Mikka/issues/1512",
+  "pull_request": "https://github.com/alexj11324/Mikka/pull/1675",
+  "verdict": "no_blocking_findings_in_the_reviewed_scope",
+  "must_fix_findings": [],
+  "overall_risk": "low_to_medium",
+  "source_binding": {
+    "workspace": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume",
+    "working_tree_HEAD": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+    "published_baseline": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+    "published_baseline_tree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+    "candidate_commit": null,
+    "binding_method": "Exact bytes/SHA256 of the 13 reviewed working-tree files; no unpublished commit identity is invented.",
+    "native_files": 3,
+    "daemon_files": 8,
+    "documentation_files": 2,
+    "final_rehash_matches_reviewed_content": true,
+    "daemon_files_independently_compared_byte_for_byte_with_tested_isolated_copy": true,
+    "native_files_independently_matched_to_lifecycle_patch_manifest": true,
+    "files": [
+      {
+        "path": "apps/desktop/test/lifecycle.mjs",
+        "bytes": 33181,
+        "sha256": "45a0f56985f256f5f392ad015e0c4442a784e1b9ff1ebd8703829ecc61152a77"
+      },
+      {
+        "path": "apps/desktop/test/parity-page-ready.mjs",
+        "bytes": 14439,
+        "sha256": "9f06fac691f599532edf8cb52287b4e70e51f2b058d2b8c890b59ef74f52cbda"
+      },
+      {
+        "path": "apps/desktop/test/parity-reads.test.mjs",
+        "bytes": 25485,
+        "sha256": "8dd59995e8bc3cecbc11b8565a1407beccb5bb8db6fe789aae15eda4d9602102"
+      },
+      {
+        "path": "packages/daemon/src/adapters/generation-metrics.ts",
+        "bytes": 6748,
+        "sha256": "1a7f01e9a31b9d5fa68fe66da3bcb72b3d33519a6bcbb49f35f976fcf996ba65"
+      },
+      {
+        "path": "packages/daemon/src/adapters/generation-metrics.test.ts",
+        "bytes": 7083,
+        "sha256": "f242f0446f15c67d2adc824364f9993ba1ee0e13e89c477603756943c17acd65"
+      },
+      {
+        "path": "packages/daemon/test/claude-generation-abort.test.ts",
+        "bytes": 4286,
+        "sha256": "22e464044ffdd60fd7148d1a968334b6d4e19600dc8db512998d2ce07627f6d8"
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+        "bytes": 3767,
+        "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56"
+      },
+      {
+        "path": "packages/daemon/src/codex-generation-telemetry.ts",
+        "bytes": 19801,
+        "sha256": "d776409b58cc8dc2778e5149d52eb6196a7d8d3dfaa75cf06ebb63ba68c9ebbd"
+      },
+      {
+        "path": "packages/daemon/src/codex-generation-telemetry.test.ts",
+        "bytes": 18277,
+        "sha256": "9d0fe507b0f591caa3919e7c438cd4bba012abe5d7d625989ebcd6d8cd4338db"
+      },
+      {
+        "path": "packages/daemon/test/codex-generation-completion.test.ts",
+        "bytes": 4020,
+        "sha256": "0c6684127dbdf037a78c7a1fe99690d8d1a77d2d4134632ccb2d5e736b748a31"
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+        "bytes": 4466,
+        "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c"
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "bytes": 61488,
+        "sha256": "3c1bf09901f5ff267a0df1d927691516be50b2a868fe8faa1e2fa5c467a1c127"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "bytes": 19025,
+        "sha256": "ab6522ff9f964e580af3e66e972f105e21db2eacc499b516d0e3a1c308b8ae69"
+      }
+    ]
+  },
+  "review_method": {
+    "independent_actions": [
+      "Read the minimal unstaged follow-up diffs against the already published Desktop change in the index.",
+      "Read affected implementations and their actual caller/SDK/protocol/cleanup paths.",
+      "Read original RED and GREEN receipts, with terminal status and limitations retained.",
+      "Independently compared all eight daemon files against the tested isolated copy and checked all three Native file hashes against the manifest.",
+      "Read current workflow/helper/browser/client instrumentation to verify documentation facts and relative links.",
+      "Rehashed all 13 files before freezing this receipt."
+    ],
+    "test_execution_by_reviewer": false,
+    "claimed_validation": "Author-run source-bound receipts inspected independently; not a second execution of the test suites.",
+    "repository_mutations_by_reviewer": 0,
+    "ci_reruns_or_cancellations_by_reviewer": 0,
+    "production_tasks_by_reviewer": 0,
+    "real_model_calls_by_reviewer": 0,
+    "cloud_resources_created_by_reviewer": 0
+  },
+  "reviews": {
+    "lifecycle": {
+      "verdict": "no_blocking_findings",
+      "files": [
+        "apps/desktop/test/lifecycle.mjs",
+        "apps/desktop/test/parity-page-ready.mjs",
+        "apps/desktop/test/parity-reads.test.mjs"
+      ],
+      "conclusions": [
+        "lifecycle.mjs is exactly the prior file plus one import and replacement of the original menuitem.click with shared selectWorkspaceMenuItem delegation.",
+        "beginQueryWindow/checkpointQueryWindow implementations and all call sites, SQL measurement windows, budgets and launch/usable timing boundaries are unchanged.",
+        "Workspace-menu aria-current=true matches useWorkspaceSwitcher's same-account/same-workspace early return. Current items click once without waiting for nonexistent navigation.",
+        "A real switch registers DOMContentLoaded before its one click, then retains the original usable gate; the shared helper has no /en-only assumption, and lifecycle retains exact:true and zh-CN behavior.",
+        "The original navigation promise is still awaited; the attached catch only prevents an abandoned observer rejection becoming unhandled after a click failure. Navigation/click errors still fail the original operation.",
+        "The regression test reads and executes the actual selectFixture source through vm without launching Electron or the production acceptance fixtures."
+      ],
+      "validation": {
+        "red": {
+          "tests": 4,
+          "passed": 2,
+          "failed": 2,
+          "exit_code": 1
+        },
+        "green": {
+          "tests": 47,
+          "passed": 47,
+          "failed": 0,
+          "skipped": 0,
+          "terminal_exit_code": 0
+        },
+        "real_macos_acceptance": "Separate Native CI responsibility; these local tests do not substitute for it."
+      },
+      "baseline_warning_retained": {
+        "receipt": "native4a07/lifecycle-navigation-checks.original.json",
+        "entry_number": 5,
+        "exit_code": 1,
+        "rule": "eslint(no-unused-vars)",
+        "file": "apps/desktop/test/parity-page-ready.mjs",
+        "parameter": "observed",
+        "message": "Parameter 'observed' is declared but never used. Unused parameters should start with a '_'.",
+        "classification": "Existing pageReady parameter present before this follow-up; unchanged by the reviewed diff. No claim that all entries in this checks receipt are green.",
+        "preceding_four_entries_exit_code": 0
+      }
+    },
+    "claude_abort": {
+      "verdict": "no_blocking_findings",
+      "files": [
+        "packages/daemon/src/adapters/generation-metrics.ts",
+        "packages/daemon/src/adapters/generation-metrics.test.ts",
+        "packages/daemon/test/claude-generation-abort.test.ts",
+        "packages/daemon/test/fakes/fake-claude-generation-abort.mjs"
+      ],
+      "contract": {
+        "sdk_package": "@anthropic-ai/claude-agent-sdk",
+        "version": "0.3.305",
+        "read_source": "Installed sdk.d.ts: SDKAssistantMessage, aborted?: true, and SDKPartialAssistantMessage",
+        "meaning": "Explicit abort truncates the response before stop_reason; ordinary streamed block assistant messages are not final usage."
+      },
+      "conclusions": [
+        "Only aborted === true permits the official interrupted assistant through the no-stop-reason terminal guard; undefined/false/string flags and ordinary partial blocks do not close a generation.",
+        "Active response state and completed response ID deduplication close one error generation. Duplicate abort frames, later message_stop/full assistant and fail() do not emit another generation.",
+        "Known input/cache counts and available SDK timing are preserved; interrupted output-token placeholders remain unknown. Result aggregate totals are not substituted and no cost is invented.",
+        "Production change is limited to constant terminal-state checks/assignment in the existing assistant path; no new stream-event I/O, sink, timer or receiver.",
+        "Only permitted numeric/closed-label metadata reaches generation emission; assistant content and provider error bodies are not read for telemetry."
+      ],
+      "validation": {
+        "red": {
+          "tests": 10,
+          "passed": 5,
+          "failed": 5,
+          "exit_code": 1
+        },
+        "green_targeted": {
+          "tests": 10,
+          "passed": 10,
+          "exit_code": 0
+        },
+        "green_related_tracing_privacy": {
+          "tests": 40,
+          "passed": 40,
+          "exit_code": 0
+        },
+        "daemon_typecheck_exit_code": 0,
+        "path": "Actual ClaudeAdapter -> official SDK query -> synthetic offline child wire -> existing terminal/close -> in-memory tracing/event sinks.",
+        "scenarios": [
+          "normal",
+          "aborted",
+          "duplicate_abort",
+          "abort_then_crash"
+        ],
+        "lifecycle_assertions": [
+          "One exit event.",
+          "Child process no longer alive.",
+          "cancel/detach safely re-enter completed close.",
+          "Capture count and output unknowns checked.",
+          "No PRIVATE content or fixture credential in captured telemetry."
+        ],
+        "real_provider_or_production_validation": false
+      }
+    },
+    "codex_completion": {
+      "verdict": "no_blocking_findings",
+      "files": [
+        "packages/daemon/src/codex-generation-telemetry.ts",
+        "packages/daemon/src/codex-generation-telemetry.test.ts",
+        "packages/daemon/test/codex-generation-completion.test.ts",
+        "packages/daemon/test/fakes/fake-codex-generation-completion.mjs"
+      ],
+      "contract": {
+        "upstream_commit": "83086188ae0614bd882818ff1aa23f3194962012",
+        "version": "rust-v0.163.0",
+        "directly_read_primary_sources": [
+          {
+            "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/core/src/session/turn.rs",
+            "verified": "handle_responses and receiving span ancestry; reasoning-effort record; usage fields start Empty."
+          },
+          {
+            "url": "https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/otel/src/events/session_telemetry.rs",
+            "verified": "record_responses sets the completed name for a Completed event; numeric usage is recorded only for token_usage: Some."
+          }
+        ]
+      },
+      "conclusions": [
+        "A completed handler remains distinct from complete numeric usage. A no-usage generation still requires the existing valid native request ancestry, timing, model and conversation checks.",
+        "Object.hasOwn(fields,key) distinguishes absent raw usage keys from invalid parsed values. Partial tuples, negative/invalid scalars, non-array/over-limit or unreadable attribute lists do not become absent usage.",
+        "Complete numeric tuples take precedence over empty replay at both pending handler/receiving-pair and completed-stream layers.",
+        "A completion without usage never enters numeric signature/multiset/unmatchedNative matching; it cannot cancel a numeric app-server receipt.",
+        "Existing trace/request-span identity deduplication remains; reversed and repeated exports, complete/empty replay order and reused cumulative token totals are covered.",
+        "Native timing remains observed timing; token/cache/cost fields stay absent when unknown. Native trace absence is still unknown and native_flush_confirmed remains false.",
+        "No new RPC notification consumption, receiver, timer or synchronous I/O is introduced. New attribute tuple predicates are confined to completed handlers."
+      ],
+      "validation": {
+        "red": {
+          "tests": 16,
+          "passed": 12,
+          "failed": 4,
+          "exit_code": 1
+        },
+        "green": {
+          "tests": 16,
+          "passed": 16,
+          "exit_code": 0
+        },
+        "daemon_typecheck_exit_code": 0,
+        "path": "Actual Mikka CodexAdapter -> synthetic 0.163 JSON-RPC child and real loopback OTLP collector -> normal close/flush -> in-memory tracing/event sinks.",
+        "scenarios": {
+          "known": {
+            "generations": 1,
+            "matched_fallbacks": 1
+          },
+          "missing_fresh": {
+            "generations": 1,
+            "usage_notifications": 0,
+            "matched_fallbacks": 0
+          },
+          "missing_reused": {
+            "generations": 2,
+            "usage_notifications": 2,
+            "matched_fallbacks": 1
+          }
+        },
+        "real_official_codex_cli_executed": false,
+        "real_provider_or_production_validation": false
+      }
+    },
+    "documentation": {
+      "verdict": "no_blocking_findings",
+      "files": [
+        "docs/operations/tracing.md",
+        "scripts/acceptance/run-observability.md"
+      ],
+      "conclusions": [
+        "Current run-trace-acceptance.yml maps execute + browser-submit + one model-case to the existing --runner-browser path, with exact main/repository/source guards.",
+        "The workflow actor uses a fresh independent Chromium context and normal email login, verifies the exact personal workspace and official Cloud business backend, and clicks Create task once. The progress comment explicitly says automatic submission and forbids a manual second copy.",
+        "Replay readiness is observed after the analytics sanitizer, and the actor checks the same active session immediately before click. This is client readiness only; uploadAcknowledged stays null and actual upload/playback/PostHog ingestion require separate readback.",
+        "Cleanup closes the page, performs normal sign-out and anonymous-session readback, then closes context/browser. Cleanup failure makes the helper nonzero even if the driver succeeded; the existing manual CLI browser path is still documented.",
+        "Issue #1512 body explicitly authorizes ACME_DEMO_EMAIL/ACME_DEMO_PASSWORD in Infisical prod:/. The docs retain the other-work SMOKE/Acme Inc. scope and explicitly state personal-workspace evidence does not establish shared-team acceptance.",
+        "New Claude/Codex behavior descriptions match the reviewed source; the other model case is independent and can use browser submission to collect its own correlation evidence.",
+        "Relative document link targets exist; the shared-production-acceptance-workspace heading exists. The issue #1512 link resolves to the already read issue."
+      ],
+      "verified_links": [
+        "https://github.com/alexj11324/Mikka/issues/1512",
+        "docs/acceptance.md#shared-production-acceptance-workspace",
+        "scripts/acceptance/run-observability.md"
+      ],
+      "source_or_workflow_implementation_changed_by_documentation_edit": false
+    }
+  },
+  "supporting_source_files_read": [
+    "packages/daemon/src/adapters/claude.ts",
+    "packages/daemon/src/adapters/codex.ts",
+    "packages/daemon/src/tracing-ai.ts",
+    "packages/daemon/package.json",
+    "packages/daemon/vitest.config.ts",
+    "components/workspace-menu.tsx",
+    "hooks/use-workspace-switcher.ts",
+    ".github/workflows/run-trace-acceptance.yml",
+    "scripts/acceptance/run-observability-workflow.mjs",
+    "scripts/acceptance/run-observability-browser.mjs",
+    "scripts/acceptance/run-observability.mjs",
+    "lib/replay-readiness.ts",
+    "instrumentation-client.ts",
+    "docs/acceptance.md"
+  ],
+  "read_evidence_root": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work",
+  "read_evidence_receipts": [
+    {
+      "path": "native4a07/lifecycle-navigation-red.original.json",
+      "bytes": 2312,
+      "sha256": "3029df6be1e52805c5b725c716a5c204a42a90458fea5eb9cdb8f90e65ee3a93"
+    },
+    {
+      "path": "native4a07/lifecycle-navigation-green.original.json",
+      "bytes": 5173,
+      "sha256": "af2a533d52b49ff0a2865c342f02b8d128c5f95d53fdc4d880496e134e88c2c4"
+    },
+    {
+      "path": "native4a07/lifecycle-navigation-checks.original.json",
+      "bytes": 1196,
+      "sha256": "5efc7b88c4ac09f011f278d87a379e64ea81f0cf0758eab063ed389022a22b85"
+    },
+    {
+      "path": "native4a07/lifecycle-patch-manifest.json",
+      "bytes": 809,
+      "sha256": "4e2a30dd7d6c65ac02e0e705bef51de6bfa44d9b94661fdb4d95968124384b78"
+    },
+    {
+      "path": "receipt-triage-20261108/claude-abort-red.json",
+      "bytes": 5263,
+      "sha256": "a6d6bc0897c59f91682204956f8dbb9eef44556b0c07dfa123ff57409f82dc68"
+    },
+    {
+      "path": "receipt-triage-20261108/claude-abort-green.safe.json",
+      "bytes": 1462,
+      "sha256": "cd21bb61f45bb90e5d63e71e89af51de29549989d1f66895480b74c0fe7f7b18"
+    },
+    {
+      "path": "receipt-triage-20261108/claude-abort-source-binding.safe.json",
+      "bytes": 1186,
+      "sha256": "a4aa30e58cc72bab7163ccac268c246dce00b0053e8973d0a29981a38c18e34f"
+    },
+    {
+      "path": "receipt-triage-20261108/codex-completion-red.json",
+      "bytes": 5139,
+      "sha256": "25effec7150ac51065787225ebd271b46f5190a8c4c3f5be15282214fb716dd5"
+    },
+    {
+      "path": "receipt-triage-20261108/codex-completion-green.safe.json",
+      "bytes": 942,
+      "sha256": "e8c6d1fadd4df5af8c66af8bbde5b3b46742310411422e0f8e1bae4935c1f331"
+    },
+    {
+      "path": "receipt-triage-20261108/codex-completion-source-binding.safe.json",
+      "bytes": 1111,
+      "sha256": "47f09bd51c90936c643bd3fb3f7cb039c9b32ce8fb24b3031419f2ed683eb268"
+    },
+    {
+      "path": "receipt-triage-20261108/triage-report.md",
+      "bytes": 12570,
+      "sha256": "cf27bae65c88e10e6cb1db0082257f99670278c1de0be196cd29f779f587247e"
+    },
+    {
+      "path": "receipt-triage-20261108/triage-results.json",
+      "bytes": 6407,
+      "sha256": "492d5af8013c8a813030ceeca058b682f7a5e2e30657c57bf9cf910684c66bce"
+    },
+    {
+      "path": "receipt-triage-20261108/source-binding.json",
+      "bytes": 969,
+      "sha256": "4903fed57b4c66fa13abbaba906ab5f985683edea7a8faac41c45002448e3dc2"
+    },
+    {
+      "path": "ci-4a07-non-native-terminal.safe.json",
+      "bytes": 41650,
+      "sha256": "4bbd25bd2f41f100420a885ef8c5291fe95304208607c897b3c87304ff0c44f9"
+    }
+  ],
+  "five_risk_categories": [
+    {
+      "category": "目标一致性 / alignment",
+      "level": "low",
+      "assessment": "The two telemetry fixes address reproduced omissions for supported terminal events. The lifecycle fix preserves acceptance gates and measurement boundaries. No required product functionality is disabled to meet a budget."
+    },
+    {
+      "category": "影响范围 / impact",
+      "level": "low_to_medium",
+      "assessment": "Product changes are limited to two telemetry helpers; Native changes synchronize two test callers. No schema, credentials, authorization rules or business execution behavior changes. Existing bounded collector containers and sinks remain."
+    },
+    {
+      "category": "验证 / verification",
+      "level": "pending_current_candidate_ci_and_production",
+      "assessment": "Original failures and source-bound local green receipts were inspected and all 13 file hashes are frozen. These reads are not an independent test rerun. A new candidate still needs its own required CI, real Native acceptance and production PostHog/Replay evidence; prior head success cannot supply these."
+    },
+    {
+      "category": "回滚 / rollback",
+      "level": "low",
+      "assessment": "No migration or irreversible state transition is introduced. Follow-up changes can be reverted independently; previous failed and successful receipts remain separately preserved."
+    },
+    {
+      "category": "错误检测 / error_detection",
+      "level": "low_to_medium",
+      "assessment": "Unknown metrics stay absent, complete/partial/invalid states remain distinct, dedup and collector receipts remain observable, cleanup failures remain nonzero. Original RED results and the baseline oxlint warning are retained instead of relabeled green."
+    }
+  ],
+  "prior_ci_boundary": {
+    "run_id": 42531278865,
+    "head": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+    "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+    "actual_tree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+    "receipt": "ci-4a07-non-native-terminal.safe.json",
+    "meaning": "Source-bound historical non-Native evidence for 4a07 only; all 70 selected PG suites ran and Core/Integration Nx caches were disabled. Ten companion workflows reached success, with conditional E2B production jobs still skipped.",
+    "native_status": "Delegated to the separate Native observer; this receipt makes no current Native or whole-CI pass claim.",
+    "applies_as_new_candidate_ci_result": false,
+    "reason": "The 13 follow-up files, including both daemon telemetry implementations, were not in 4a07. Old CI/daemon results must not be relabeled as execution of this candidate.",
+    "prior_failures_preserved": true,
+    "production_acceptance_claimed": false
+  },
+  "performance_boundary": {
+    "review_result": "No added synchronous I/O, per-event network request, timer or unbounded collector is introduced by the reviewed source.",
+    "measurement_claim": "This independent review does not claim a production latency result or rerun a performance benchmark. Historical HTTP/AI/attribution/ALS measurements retain their own source and scope. Root's separately reported current collector benchmark is a separate receipt, not a production end-to-end measurement."
+  },
+  "safe_output": {
+    "contains_credentials": false,
+    "contains_raw_user_or_model_content": false,
+    "contains_provider_error_bodies": false,
+    "contains_only_source_hashes_closed_findings_counts_and_evidence_references": true
+  }
+}

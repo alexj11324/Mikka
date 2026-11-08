@@ -1,0 +1,7 @@
+{
+  "command": "pnpm check",
+  "startedAt": "2026-11-08T23:08:01.932825+00:00",
+  "endedAt": "2026-11-08T23:08:02.986682+00:00",
+  "exitCode": 1,
+  "log": "candidate-pnpm-check.log"
+}

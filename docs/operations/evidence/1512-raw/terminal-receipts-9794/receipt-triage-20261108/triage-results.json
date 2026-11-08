@@ -1,0 +1,236 @@
+{
+  "sourceCommit": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "sourceEquivalentTo": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "realModelCalls": 0,
+  "claudeSDK": "0.3.305",
+  "results": [
+    {
+      "harness": "claude_code",
+      "scenario": "GEN_NORMAL",
+      "adapterInputFrames": [
+        {
+          "type": "user",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "system",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "stream_event",
+          "eventType": "message_start",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "stream_event",
+          "eventType": "content_block_start",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "stream_event",
+          "eventType": "content_block_delta",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "assistant",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "stream_event",
+          "eventType": "content_block_stop",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "stream_event",
+          "eventType": "message_delta",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "stream_event",
+          "eventType": "message_stop",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "result",
+          "aborted": false,
+          "errorPresent": false
+        }
+      ],
+      "observeGenerationCalls": 1,
+      "aiGenerationEvents": 1,
+      "generationOutcomes": [
+        "ok"
+      ],
+      "claudeFailCalls": 0,
+      "terminalType": "exit",
+      "terminalOutcome": "succeeded",
+      "childAlive": false,
+      "collection": [],
+      "sourceInputReceipt": {
+        "officialLogicalResponseCount": 1,
+        "tokenUsageProvided": true,
+        "interrupted": false
+      },
+      "metrics": [
+        {
+          "event": "$ai_generation",
+          "inputTokens": 5,
+          "outputTokens": 7,
+          "error": false
+        }
+      ]
+    },
+    {
+      "harness": "claude_code",
+      "scenario": "GEN_ABORTED",
+      "adapterInputFrames": [
+        {
+          "type": "user",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "system",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "stream_event",
+          "eventType": "message_start",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "stream_event",
+          "eventType": "content_block_start",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "stream_event",
+          "eventType": "content_block_delta",
+          "aborted": false,
+          "errorPresent": false
+        },
+        {
+          "type": "assistant",
+          "aborted": true,
+          "errorPresent": false
+        },
+        {
+          "type": "result",
+          "aborted": false,
+          "errorPresent": false
+        }
+      ],
+      "observeGenerationCalls": 0,
+      "aiGenerationEvents": 0,
+      "generationOutcomes": [],
+      "claudeFailCalls": 0,
+      "terminalType": "exit",
+      "terminalOutcome": "failed",
+      "childAlive": false,
+      "collection": [],
+      "sourceInputReceipt": {
+        "officialLogicalResponseCount": 1,
+        "tokenUsageProvided": true,
+        "interrupted": true
+      },
+      "metrics": []
+    },
+    {
+      "harness": "codex",
+      "scenario": "GEN_NORMAL",
+      "observeGenerationCalls": 1,
+      "aiGenerationEvents": 1,
+      "generationOutcomes": [
+        "ok"
+      ],
+      "claudeFailCalls": 0,
+      "terminalType": "exit",
+      "terminalOutcome": "succeeded",
+      "childAlive": false,
+      "collection": [
+        {
+          "mikka.client_kind": "daemon",
+          "mikka.run_id": "triage_codex_GEN_NORMAL",
+          "mikka.harness": "codex",
+          "mikka.ai.native_generations": 1,
+          "mikka.ai.fallback_generations": 0,
+          "mikka.ai.matched_fallbacks": 1,
+          "mikka.ai.missing_native": 0,
+          "mikka.ai.incomplete_requests": 0,
+          "mikka.ai.invalid_spans": 0,
+          "mikka.ai.rejected_batches": 0,
+          "mikka.ai.duplicate_completions": 0,
+          "mikka.ai.collection_truncated": false,
+          "mikka.ai.cli_exit_observed": true,
+          "mikka.ai.native_flush_confirmed": false,
+          "mikka.trace.critical": false,
+          "mikka.trace.retention": "parent_unknown",
+          "mikka.outcome": "ok"
+        }
+      ],
+      "sourceInputReceipt": {
+        "officialLogicalResponseCount": 1,
+        "tokenUsageProvided": true,
+        "interrupted": false
+      },
+      "metrics": [
+        {
+          "event": "$ai_generation",
+          "inputTokens": 50,
+          "outputTokens": 20,
+          "error": false
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "scenario": "GEN_NO_USAGE",
+      "observeGenerationCalls": 0,
+      "aiGenerationEvents": 0,
+      "generationOutcomes": [],
+      "claudeFailCalls": 0,
+      "terminalType": "exit",
+      "terminalOutcome": "succeeded",
+      "childAlive": false,
+      "collection": [
+        {
+          "mikka.client_kind": "daemon",
+          "mikka.run_id": "triage_codex_GEN_NO_USAGE",
+          "mikka.harness": "codex",
+          "mikka.ai.native_generations": 0,
+          "mikka.ai.fallback_generations": 0,
+          "mikka.ai.matched_fallbacks": 0,
+          "mikka.ai.missing_native": 0,
+          "mikka.ai.incomplete_requests": 1,
+          "mikka.ai.invalid_spans": 0,
+          "mikka.ai.rejected_batches": 0,
+          "mikka.ai.duplicate_completions": 0,
+          "mikka.ai.collection_truncated": false,
+          "mikka.ai.cli_exit_observed": true,
+          "mikka.ai.native_flush_confirmed": false,
+          "mikka.trace.critical": false,
+          "mikka.trace.retention": "parent_unknown",
+          "mikka.outcome": "ok"
+        }
+      ],
+      "sourceInputReceipt": {
+        "officialLogicalResponseCount": 1,
+        "tokenUsageProvided": false,
+        "interrupted": false
+      },
+      "metrics": []
+    }
+  ]
+}

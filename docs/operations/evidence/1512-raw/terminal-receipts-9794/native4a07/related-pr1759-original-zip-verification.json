@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "kind": "related-pr-existing-original-artifact-verification",
+  "repository": "alexj11324/Mikka",
+  "pr": 1759,
+  "runId": 42527580655,
+  "jobId": 128877160621,
+  "head": "968076c89b1cfe27b6f257470ea8aa51116b7e33",
+  "actualRevision": "546dd9c86ceacc62da79390ccec5794104e64fb0",
+  "nativeArtifactId": 13636174004,
+  "originalArchivePath": "/workspace/scratch/af05d9e4f31e/triage-1512/head968-native.zip",
+  "originalArchiveBytes": 14704679,
+  "originalArchiveSha256": "e9bad0106cfc71845e6073ed1c1778fb5689c7bf9d58f8ab7ee0f5e6587d9715",
+  "originalEntryHashes": {
+    "lifecycle.json": "3ba444c86075ce128c3defa7a31d62671f1c2be3dd37fdb3390304c7071b2b01",
+    "smoke.json": "1ed836c9d11eb4123f243562e44ee0c00365135ee9672d85ce5e908997b156c1",
+    "parity/parity.json": "8f0ac268757d6e9a3f88c61dbe2d8334371f2559eb72384cae9546b853495990"
+  },
+  "lifecycle": {
+    "result": "failed",
+    "failure": {
+      "phase": "prepare-bundled-workspace",
+      "kind": "Error",
+      "code": "navigation-context-destroyed",
+      "locations": [
+        {
+          "file": "native-viewport.mjs",
+          "line": 36,
+          "column": 29
+        },
+        {
+          "file": "lifecycle.mjs",
+          "line": 151,
+          "column": 9
+        },
+        {
+          "file": "lifecycle.mjs",
+          "line": 159,
+          "column": 3
+        },
+        {
+          "file": "lifecycle.mjs",
+          "line": 354,
+          "column": 16
+        }
+      ]
+    },
+    "windowStatuses": {
+      "webLogin": "complete",
+      "nativeLogin": "incomplete"
+    },
+    "nativeCleaned": true,
+    "leaseState": "quarantined",
+    "cleanupStages": [
+      {
+        "stage": "electron-close",
+        "result": "passed"
+      },
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ]
+  },
+  "parity": {
+    "result": "passed",
+    "screens": 100,
+    "passed": 100,
+    "cleanup": "passed"
+  },
+  "smoke": {
+    "result": "passed",
+    "checks": 10
+  },
+  "sameLifecycleSourceAs4a07Sha256": "fbb1e0aa2d2bb5dcd3c85c18a67046eb71c7bd1ce2d23d7a28dbbf243bd25398",
+  "budget": "unknown (native login incomplete; startup windows absent)",
+  "note": "Existing local ZIP independently verified without new download. This belongs to PR1759; it is not evidence from the currently running PR1675 4a07 source."
+}

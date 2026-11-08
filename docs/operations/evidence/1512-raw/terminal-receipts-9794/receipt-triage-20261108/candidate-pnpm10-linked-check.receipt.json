@@ -1,0 +1,12 @@
+{
+  "command": "pnpm check",
+  "pnpmVersion": "10.34.3",
+  "pnpmSource": "/root/.cache/node/corepack/v1/pnpm/10.34.3/bin/pnpm.cjs",
+  "startedAt": "2026-11-08T23:13:19.977195+00:00",
+  "endedAt": "2026-11-08T23:13:30.890172+00:00",
+  "exitCode": 1,
+  "log": "candidate-pnpm10-linked-check.log",
+  "dependencyInstall": false,
+  "processLocalWrapperOnly": true,
+  "dependencyReuseReceipt": "existing-dependency-reuse.safe.json"
+}

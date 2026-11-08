@@ -1,0 +1,52 @@
+[
+  {
+    "status": "fulfilled",
+    "value": {
+      "chunk_id": "3795fc",
+      "wall_time_seconds": 3.0751e-05,
+      "exit_code": 0,
+      "original_token_count": 0,
+      "output": ""
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "chunk_id": "b9b066",
+      "wall_time_seconds": 3.5851e-05,
+      "exit_code": 0,
+      "original_token_count": 0,
+      "output": ""
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "chunk_id": "53ae29",
+      "wall_time_seconds": 0.022798504,
+      "exit_code": 0,
+      "original_token_count": 0,
+      "output": ""
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "chunk_id": "288e36",
+      "wall_time_seconds": 6.5632e-05,
+      "exit_code": 0,
+      "original_token_count": 0,
+      "output": ""
+    }
+  },
+  {
+    "status": "fulfilled",
+    "value": {
+      "chunk_id": "7824ee",
+      "wall_time_seconds": 0.055998254,
+      "exit_code": 1,
+      "original_token_count": 50,
+      "output": "test/parity-page-ready.mjs:111:64: warning eslint(no-unused-vars): Parameter 'observed' is declared but never used. Unused parameters should start with a '_'. help: Consider removing this parameter.\n"
+    }
+  }
+]

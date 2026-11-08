@@ -1,0 +1,286 @@
+{
+  "schema": "issue1512.evidence-checkpoint.v1",
+  "checkpoint": 9,
+  "preparedAt": "2026-11-08T23:15:51.132178+00:00",
+  "candidateCommit": "9794bc23fa2fe6eb71dbefe62fe0bcdfa0a7d183",
+  "candidateTree": "fd1aadd36228359a6ac75f6ed690f8c40877fc07",
+  "publishedBaseline": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "evidenceParent": "bc85975e4fe2e27587b54f77ea8fba7ff702e9c1",
+  "candidateBranchUpdatedAtFreeze": false,
+  "currentNativeStillRunningAtFreeze": true,
+  "productionCases": 0,
+  "boundaries": [
+    "All prior red results remain immutable.",
+    "4a07 CI is not execution evidence for candidate 9794.",
+    "External PR1759 native failure is labeled as related-source evidence.",
+    "Local full pnpm check failed due Unix-socket EPERM; no complete local source-check pass is asserted.",
+    "Adapter tests use real adapters with synthetic protocol children; no production model calls.",
+    "Collector benchmark is component latency, excluding model/network/OTLP HTTP exporter costs."
+  ],
+  "files": [
+    {
+      "localRelativePath": "candidate-followup-independent-review.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/candidate-followup-independent-review.safe.json",
+      "bytes": 22367,
+      "sha256": "418bd0aca1b068a64fd9ac9d698e11469975b2c7e437f036372d7940d19ecfb9",
+      "gitBlob": "a663e273bdab41e4a9260a6c930b9c8afbd6f1a6",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "candidate-terminal-receipts.manifest.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/candidate-terminal-receipts.manifest.safe.json",
+      "bytes": 4004,
+      "sha256": "1728f26223933d6972d8c1424ba491a03c223a370bc80fa4d912d508519722b2",
+      "gitBlob": "ad0f5df969b9ff86cc16eae1d42969a8621cb90d",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "ci-4a07-non-native-terminal.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/ci-4a07-non-native-terminal.safe.json",
+      "bytes": 41650,
+      "sha256": "4bbd25bd2f41f100420a885ef8c5291fe95304208607c897b3c87304ff0c44f9",
+      "gitBlob": "91a0eaa74724edaba370d18c6d722cbe46d3f38f",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/receipt-fixes-index.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/receipt-fixes-index.safe.json",
+      "bytes": 7483,
+      "sha256": "376d6501816d40f67668e2d1ce71eb11883fc54ff9200b14bb2a24e28c4ad511",
+      "gitBlob": "bc865868e04463387fde4764b267fc47e2ad878f",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/claude-abort-red.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/claude-abort-red.json",
+      "bytes": 5263,
+      "sha256": "a6d6bc0897c59f91682204956f8dbb9eef44556b0c07dfa123ff57409f82dc68",
+      "gitBlob": "7cebd0d7cb4beaddd2c6767b3c1704dfdf788861",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/claude-abort-green.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/claude-abort-green.safe.json",
+      "bytes": 1462,
+      "sha256": "cd21bb61f45bb90e5d63e71e89af51de29549989d1f66895480b74c0fe7f7b18",
+      "gitBlob": "dec751d3f71d5aaf16d54f6f619266f6f36e09ba",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/claude-abort-source-binding.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/claude-abort-source-binding.safe.json",
+      "bytes": 1186,
+      "sha256": "a4aa30e58cc72bab7163ccac268c246dce00b0053e8973d0a29981a38c18e34f",
+      "gitBlob": "6ab3e810213818ea44e16e411ae62839db45bbbf",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/codex-completion-red.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/codex-completion-red.json",
+      "bytes": 5139,
+      "sha256": "25effec7150ac51065787225ebd271b46f5190a8c4c3f5be15282214fb716dd5",
+      "gitBlob": "5de5a8642c3fdcfbcf9614c5d52e485059ab40c2",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/codex-completion-green.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/codex-completion-green.safe.json",
+      "bytes": 942,
+      "sha256": "e8c6d1fadd4df5af8c66af8bbde5b3b46742310411422e0f8e1bae4935c1f331",
+      "gitBlob": "f78a799a83087b1bc6b6824a38594ded262132a8",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/codex-completion-source-binding.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/codex-completion-source-binding.safe.json",
+      "bytes": 1111,
+      "sha256": "47f09bd51c90936c643bd3fb3f7cb039c9b32ce8fb24b3031419f2ed683eb268",
+      "gitBlob": "64c146d3d1b0e9564d5e629d56329e4633452497",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/combined-green.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/combined-green.safe.json",
+      "bytes": 1616,
+      "sha256": "51040a16a9a89dd8d58b0507184c404555abfddba50b80f8f2fe8abf04344c4b",
+      "gitBlob": "fa82b742a65ef043c09986747e48a31d91ff4314",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/source-binding.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/source-binding.json",
+      "bytes": 969,
+      "sha256": "4903fed57b4c66fa13abbaba906ab5f985683edea7a8faac41c45002448e3dc2",
+      "gitBlob": "6b30f06142e52f6f50bf512a2233e218bac64710",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/triage-results.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/triage-results.json",
+      "bytes": 6407,
+      "sha256": "492d5af8013c8a813030ceeca058b682f7a5e2e30657c57bf9cf910684c66bce",
+      "gitBlob": "4b3fa0a8cd3a1cec8ef06c5e9f9b228b37d53b5f",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/collector-benchmark-original.mjs",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/collector-benchmark-original.mjs",
+      "bytes": 3431,
+      "sha256": "8183a99ffa31fe761260a208fdeee3c98675bf6b5c9c1a974a7f04ff9709633b",
+      "gitBlob": "7039264e34510da61d020736dd1eb69bcb3eb612",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/collector-benchmark-with-raw-samples.mjs",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/collector-benchmark-with-raw-samples.mjs",
+      "bytes": 3522,
+      "sha256": "9f2110b317446a486b2f23b996910c09e76d85eb5816a91e14433fa935b84237",
+      "gitBlob": "0fb11176a4c8a376dfd8fb21db8a798e48360d35",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/collector-benchmark.stdout.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/collector-benchmark.stdout.json",
+      "bytes": 29094,
+      "sha256": "a4a964abfd392381d4525ce8bcab38d9138bc243462679ba46e3c766d939df01",
+      "gitBlob": "1f1c38b7e3f6fd4abe26a4052a8dfe8d3bb96c87",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/collector-benchmark.stderr.txt",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/collector-benchmark.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/collector-benchmark-receipt.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/collector-benchmark-receipt.safe.json",
+      "bytes": 1837,
+      "sha256": "1f53078d96b967143d0d270e8fefb649aeee68e5f560c6f5a1de0df560c23d68",
+      "gitBlob": "fb8e02d5d6074f8f365dec575c271fe9e65e4f5f",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/candidate-pnpm-check.log",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/candidate-pnpm-check.log",
+      "bytes": 2032,
+      "sha256": "bcd18c5519fe38f93a681d1a8fd2933dc0e258ce7f3ec645782d33bf953dd33a",
+      "gitBlob": "dbc271c59e2025bb553703f332a9675778a95e7d",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/candidate-pnpm-check.receipt.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/candidate-pnpm-check.receipt.json",
+      "bytes": 184,
+      "sha256": "4ad31583e7da2540b5607eea51980de4babd42435470fbb73a1d9a499ef574e5",
+      "gitBlob": "c1f8fda16f69dce0a5bc2157d25aeee7af60dfc2",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/candidate-pnpm10-check.log",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/candidate-pnpm10-check.log",
+      "bytes": 41951,
+      "sha256": "715b4b0c702d0cbb581631c405638af268f2855f2dc1ef5bbb0198f1ccbfacbc",
+      "gitBlob": "a6cdee8afb59b7c43033946f654a34e49488fe05",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/candidate-pnpm10-check.receipt.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/candidate-pnpm10-check.receipt.json",
+      "bytes": 356,
+      "sha256": "55c27e03e20b7ffdeb30659dc38d45626ac03731b0b2476c5a6e722b2d551c63",
+      "gitBlob": "df89a436e6ba96dea88b6b9d327cc4a2596146ea",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/candidate-pnpm10-linked-check.log",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/candidate-pnpm10-linked-check.log",
+      "bytes": 49002,
+      "sha256": "e0cb892c503810b255f387a15b313b108e554fb01030017c8ba3435140ac5502",
+      "gitBlob": "232e1724383b4b2b0786457a725dc9dd61b4b6d6",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/candidate-pnpm10-linked-check.receipt.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/candidate-pnpm10-linked-check.receipt.json",
+      "bytes": 428,
+      "sha256": "56b19421d9d67b935ce2b096be5076608cba3fa943e68723ed324d9aba6e37c5",
+      "gitBlob": "42523caeb77bf16227abd67b012a5b26dd49a594",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/candidate-pnpm-check-environment.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/candidate-pnpm-check-environment.safe.json",
+      "bytes": 962,
+      "sha256": "6f9fee49e5de1d49edf23762b04e7f2a6614231ab2fa184b0bbfc0f14487cd7d",
+      "gitBlob": "9b9afc4ce1b2a025ab68f01ea5b2896b9d2328bb",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "receipt-triage-20261108/existing-dependency-reuse.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/receipt-triage-20261108/existing-dependency-reuse.safe.json",
+      "bytes": 1033,
+      "sha256": "cf2fc785e9c264f7a4ae8fb3f89d15235a7b1b39475f1eeba87cb472d9981dd8",
+      "gitBlob": "b45da5612fbaaba1583b915566cfe74dc8f122f0",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "native4a07/lifecycle-navigation-red.original.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/native4a07/lifecycle-navigation-red.original.json",
+      "bytes": 2312,
+      "sha256": "3029df6be1e52805c5b725c716a5c204a42a90458fea5eb9cdb8f90e65ee3a93",
+      "gitBlob": "55781bed702f4fe6432896c3b8fde1e388b0c761",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "native4a07/lifecycle-navigation-green.original.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/native4a07/lifecycle-navigation-green.original.json",
+      "bytes": 5173,
+      "sha256": "af2a533d52b49ff0a2865c342f02b8d128c5f95d53fdc4d880496e134e88c2c4",
+      "gitBlob": "26c5e6cf8386395a4bd4406e20ad8793054fba70",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "native4a07/lifecycle-navigation-checks.original.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/native4a07/lifecycle-navigation-checks.original.json",
+      "bytes": 1196,
+      "sha256": "5efc7b88c4ac09f011f278d87a379e64ea81f0cf0758eab063ed389022a22b85",
+      "gitBlob": "21178d4f1291a239f3a975b10b14f2f43352df6c",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "native4a07/lifecycle-patch-manifest.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/native4a07/lifecycle-patch-manifest.json",
+      "bytes": 809,
+      "sha256": "4e2a30dd7d6c65ac02e0e705bef51de6bfa44d9b94661fdb4d95968124384b78",
+      "gitBlob": "939c932a8bf187430b79f87fc4dc1ffdf3462ff5",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "native4a07/lifecycle-workspace-navigation.patch",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/native4a07/lifecycle-workspace-navigation.patch",
+      "bytes": 8095,
+      "sha256": "e7d04dcfefaccca33670c528bba3255523720096b2c4049674c0c613a099a91b",
+      "gitBlob": "2b96ecb97b46fb844df2c04887562aa8f0c3b84d",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "native4a07/related-pr1759-native-failure.safe.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/native4a07/related-pr1759-native-failure.safe.json",
+      "bytes": 4599,
+      "sha256": "0a49e36f8ff1438d01a476a7f4f9f78512d97d066c12878b39f57bb102c2e1e2",
+      "gitBlob": "f88ee4cc925033f461882f989bb1d77c1effff6f",
+      "mode": "100644"
+    },
+    {
+      "localRelativePath": "native4a07/related-pr1759-original-zip-verification.json",
+      "path": "docs/operations/evidence/1512-raw/terminal-receipts-9794/native4a07/related-pr1759-original-zip-verification.json",
+      "bytes": 2728,
+      "sha256": "6556214fa2d4914c41d16e702c85cf0c3692a8effb261934607ba6ca0fe25bfe",
+      "gitBlob": "c34afa937c2511cc8077ffc80a15f6312cced937",
+      "mode": "100644"
+    }
+  ]
+}

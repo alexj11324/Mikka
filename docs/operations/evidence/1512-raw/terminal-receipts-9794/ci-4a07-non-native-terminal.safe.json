@@ -1,0 +1,1138 @@
+{
+  "schema": 1,
+  "observed_at_utc": "2026-11-08 23:02:16 UTC",
+  "phase": "non_native_terminal_native_pending",
+  "head": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+  "actual_tree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+  "actual_parents": [
+    "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+    "4a07f5bd1d29853edfe26e7aaddb777870b2dae0"
+  ],
+  "head_and_checkout_same_tree": true,
+  "prior_head": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "delta_from_prior": [
+    {
+      "path": "apps/desktop/test/parity-page-ready.mjs",
+      "blob": "98688b93e313a29686fb16f4d819fce491bde89b",
+      "changes": 14
+    },
+    {
+      "path": "apps/desktop/test/parity-reads.test.mjs",
+      "blob": "9bac4c76eab737b03a3a1e1ee7f19364cd0d26ce",
+      "changes": 67
+    },
+    {
+      "path": "apps/desktop/test/parity.mjs",
+      "blob": "6f34200d4dfbffdd82c94ddbe217b0db391d9d7f",
+      "changes": 7
+    }
+  ],
+  "selection": {
+    "full": true,
+    "docs_only": false,
+    "reasons": [
+      "global configuration, schema, policy or security input",
+      "unmapped file"
+    ],
+    "units": [
+      "ci-core-2",
+      "ci-core-3",
+      "ci-core-4",
+      "ci-core-5",
+      "ci-core-6",
+      "ci-core-7",
+      "ci-core-8",
+      "ci-core-9",
+      "ci-core-10",
+      "ci-core-11",
+      "ci-core-12",
+      "ci-core-13",
+      "ci-core-14",
+      "ci-core-15",
+      "ci-core-16",
+      "ci-core-17",
+      "ci-core-18",
+      "ci-core-19",
+      "ci-core-20",
+      "ci-core-21",
+      "ci-core-22",
+      "ci-core-23",
+      "ci-core-24",
+      "ci-core-25",
+      "ci-core-26",
+      "ci-core-27",
+      "ci-core-28",
+      "ci-core-29",
+      "ci-core-30",
+      "ci-core-31",
+      "ci-core-32",
+      "ci-core-33",
+      "ci-core-34",
+      "ci-core-35",
+      "ci-core-36",
+      "ci-core-37",
+      "ci-core-38",
+      "ci-core-39",
+      "ci-core-40",
+      "ci-core-41",
+      "ci-core-42",
+      "ci-core-43",
+      "ci-core-44",
+      "ci-core-45",
+      "ci-core-46",
+      "ci-core-47",
+      "ci-core-48",
+      "ci-core-49",
+      "ci-core-50",
+      "ci-core-51",
+      "ci-core-52",
+      "ci-core-53",
+      "ci-core-54",
+      "ci-core-55",
+      "ci-core-56",
+      "ci-core-57",
+      "ci-integration-2",
+      "ci-integration-3",
+      "ci-integration-4",
+      "ci-integration-5",
+      "ci-integration-6",
+      "ci-integration-7",
+      "ci-integration-8",
+      "ci-integration-9",
+      "ci-integration-10",
+      "ci-integration-11",
+      "ci-integration-12",
+      "ci-integration-13",
+      "ci-integration-14",
+      "ci-integration-15",
+      "ci-integration-16",
+      "ci-integration-17",
+      "ci-integration-18",
+      "ci-integration-19",
+      "ci-integration-20",
+      "ci-integration-21",
+      "ci-integration-22",
+      "ci-integration-23",
+      "ci-integration-24",
+      "ci-integration-25",
+      "ci-integration-26",
+      "ci-integration-27",
+      "ci-integration-28",
+      "ci-integration-29",
+      "ci-core-triage"
+    ],
+    "db_suites": [
+      "test:abuse-db",
+      "test:account-db",
+      "test:active-agents",
+      "test:activity-actor-db",
+      "test:agent-kit-db",
+      "test:agent-tool-approval-db",
+      "test:approved-writes-db",
+      "test:artifact-migration-db",
+      "test:audit-db",
+      "test:bot-chats-db",
+      "test:bot-threads-db",
+      "test:captures-db",
+      "test:chat-attachments-db",
+      "test:cloud-backend-db",
+      "test:cloud-services-db",
+      "test:computer-db",
+      "test:conversation-reads",
+      "test:coordinator-issue-create-db",
+      "test:coordinator-issue-tools-db",
+      "test:coordinator-native",
+      "test:coordinator-task-binding-db",
+      "test:credentials-db",
+      "test:desktop-auth",
+      "test:device-enrollment-db",
+      "test:device-revocation-db",
+      "test:execution-settings-db",
+      "test:factory",
+      "test:factory-all-dispatch-db",
+      "test:factory-approval-db",
+      "test:factory-check-independence-db",
+      "test:factory-checks-db",
+      "test:factory-monitor-db",
+      "test:factory-routing-db",
+      "test:github-connections-db",
+      "test:group-turns",
+      "test:groups",
+      "test:issue-search-db",
+      "test:live-db",
+      "test:local-repository-migration-db",
+      "test:migration-steps-db",
+      "test:model-admission-db",
+      "test:onboarding-db",
+      "test:ops-db",
+      "test:pat-api-db",
+      "test:pat-db",
+      "test:personal-mailbox-default-off-db",
+      "test:plugins-db",
+      "test:preview-driver",
+      "test:project-decisions-db",
+      "test:relation-cycle",
+      "test:run-dispatch",
+      "test:run-publication-db",
+      "test:run-recovery-db",
+      "test:schedules-db",
+      "test:scope-detachment-db",
+      "test:secrets-db",
+      "test:self-improvement-db",
+      "test:self-improvement-unit",
+      "test:session-mailbox-db",
+      "test:settings-activity-db",
+      "test:settings-prefs-db",
+      "test:skill-semantic-db",
+      "test:suggestion-artifact-db",
+      "test:test-accounts-db",
+      "test:user-facts-db",
+      "test:visibility-db",
+      "test:web-auth-db",
+      "test:worker-authorization-db",
+      "test:workspace-admin-db",
+      "test:workspace-migration-db"
+    ],
+    "db_matrix": {
+      "shard": [
+        "1/4",
+        "2/4",
+        "3/4",
+        "4/4"
+      ]
+    },
+    "execution_cache": "both Core and Integration logs say Cache: Skipped (--skip-nx-cache)"
+  },
+  "pg": {
+    "version": "17.11",
+    "shards": [
+      {
+        "key": "pg1",
+        "job_id": 128886316342,
+        "passed_suites": [
+          "test:audit-db",
+          "test:workspace-admin-db",
+          "test:device-revocation-db",
+          "test:self-improvement-db",
+          "test:factory-approval-db",
+          "test:abuse-db",
+          "test:conversation-reads",
+          "test:project-decisions-db",
+          "test:agent-kit-db",
+          "test:model-admission-db",
+          "test:chat-attachments-db",
+          "test:coordinator-task-binding-db",
+          "test:pat-db",
+          "test:issue-search-db",
+          "test:run-recovery-db",
+          "test:user-facts-db",
+          "test:factory-routing-db",
+          "test:settings-prefs-db"
+        ],
+        "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b"
+      },
+      {
+        "key": "pg2",
+        "job_id": 128886316320,
+        "passed_suites": [
+          "test:execution-settings-db",
+          "test:self-improvement-unit",
+          "test:account-db",
+          "test:personal-mailbox-default-off-db",
+          "test:github-connections-db",
+          "test:cloud-backend-db",
+          "test:coordinator-issue-create-db",
+          "test:schedules-db",
+          "test:skill-semantic-db",
+          "test:bot-chats-db",
+          "test:visibility-db",
+          "test:credentials-db",
+          "test:factory-check-independence-db",
+          "test:onboarding-db",
+          "test:workspace-migration-db",
+          "test:agent-tool-approval-db",
+          "test:relation-cycle",
+          "test:live-db"
+        ],
+        "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b"
+      },
+      {
+        "key": "pg3",
+        "job_id": 128886316354,
+        "passed_suites": [
+          "test:approved-writes-db",
+          "test:desktop-auth",
+          "test:group-turns",
+          "test:plugins-db",
+          "test:scope-detachment-db",
+          "test:cloud-services-db",
+          "test:factory",
+          "test:coordinator-issue-tools-db",
+          "test:local-repository-migration-db",
+          "test:session-mailbox-db",
+          "test:suggestion-artifact-db",
+          "test:web-auth-db",
+          "test:factory-checks-db",
+          "test:ops-db",
+          "test:active-agents",
+          "test:run-dispatch",
+          "test:bot-threads-db"
+        ],
+        "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b"
+      },
+      {
+        "key": "pg4",
+        "job_id": 128886316381,
+        "passed_suites": [
+          "test:computer-db",
+          "test:worker-authorization-db",
+          "test:groups",
+          "test:coordinator-native",
+          "test:factory-monitor-db",
+          "test:secrets-db",
+          "test:pat-api-db",
+          "test:test-accounts-db",
+          "test:artifact-migration-db",
+          "test:run-publication-db",
+          "test:factory-all-dispatch-db",
+          "test:migration-steps-db",
+          "test:preview-driver",
+          "test:settings-activity-db",
+          "test:captures-db",
+          "test:device-enrollment-db",
+          "test:activity-actor-db"
+        ],
+        "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b"
+      }
+    ],
+    "selected_count": 70,
+    "passed_total": 70,
+    "passed_unique": 70,
+    "missing": [],
+    "owner_view": {
+      "suite": "test:device-enrollment-db",
+      "actual_duration_ms": 11.571805,
+      "auth_boundary": "existing mocked fresh-session boundary; real device SELECT counted; not a real-login total"
+    },
+    "queue_attribution": {
+      "suite": "test:ops-db",
+      "actual_postgresql_case_ms": 43.83682
+    },
+    "revoked_run_only_measurement": {
+      "databaseStatements": 7,
+      "databaseJsonResultBytes": 781,
+      "databaseSocketBytes": 2285,
+      "databaseSocketBytesWritten": 5415,
+      "actionJsonBytes": 452
+    },
+    "cold_pool_warmup": {
+      "separate": true,
+      "capacity": 5,
+      "sql": 0,
+      "received_bytes": 2420,
+      "written_bytes": 968,
+      "total_bytes": 3388
+    },
+    "cleanup": "all four Stop containers steps success"
+  },
+  "daemon": {
+    "node": "24.22.2",
+    "test_files_pass": 136,
+    "test_files_skip": 1,
+    "tests_pass": 1557,
+    "tests_skip": 2,
+    "tests_failed": 0,
+    "required_mcp_tests": [
+      17,
+      13,
+      13
+    ],
+    "hosted_command_tests": 5
+  },
+  "node22": {
+    "linux_node": "22.22.1",
+    "tests_pass": 1557,
+    "tests_skip": 2,
+    "test_files_pass": 136,
+    "test_files_skip": 1,
+    "mac_installations": {
+      "node18": {
+        "job_id": 128886479974,
+        "job_success": true,
+        "meaning": "Expected rejection of unsupported Node 18; installer did not start npm, enroll or heartbeat",
+        "receipt": {
+          "platform": "darwin",
+          "arch": "arm64",
+          "node": "18.20.8",
+          "npmStarted": false,
+          "registrations": 0,
+          "heartbeats": 0,
+          "enrollments": 0,
+          "socketPathBytes": 73,
+          "states": [
+            {
+              "step": "check",
+              "status": "running"
+            },
+            {
+              "step": "check",
+              "status": "running"
+            },
+            {
+              "step": "check",
+              "status": "failed",
+              "cause": "node_required"
+            }
+          ],
+          "result": "check/node_required"
+        }
+      },
+      "node22": {
+        "job_id": 128886479996,
+        "job_success": true,
+        "meaning": "Actual packaged installation / launchagent / online / reconnect",
+        "receipt": {
+          "platform": "darwin",
+          "arch": "arm64",
+          "node": "22.22.1",
+          "npmStarted": true,
+          "registrations": 2,
+          "heartbeats": 2,
+          "enrollments": 1,
+          "socketPathBytes": 73,
+          "states": [
+            {
+              "step": "check",
+              "status": "running"
+            },
+            {
+              "step": "check",
+              "status": "running"
+            },
+            {
+              "step": "install",
+              "status": "running"
+            },
+            {
+              "step": "service",
+              "status": "running"
+            },
+            {
+              "step": "connect",
+              "status": "running"
+            },
+            {
+              "step": "connect",
+              "status": "online"
+            },
+            {
+              "step": "service",
+              "status": "running"
+            },
+            {
+              "step": "connect",
+              "status": "running"
+            },
+            {
+              "step": "connect",
+              "status": "online"
+            }
+          ],
+          "result": "installed/launchagent/online/reconnect"
+        }
+      },
+      "daemon_artifact": {
+        "id": 13637074367,
+        "sha256": "48987e8db2ddaeb991b30a55e8c0ce9d180ff43bcee5cfd0804577bdbb1f999b",
+        "size_bytes": 962149
+      }
+    }
+  },
+  "e2b": {
+    "scope": "PR offline test only",
+    "node_tests_pass": 189,
+    "python_suites_pass": [
+      32,
+      22,
+      16
+    ],
+    "production_jobs_skipped": [
+      "check",
+      "validate",
+      "await-web",
+      "subscriptions",
+      "publish",
+      "cleanup"
+    ],
+    "production_runtime_verified": false
+  },
+  "sources": {
+    "source": {
+      "job_id": 128886316267,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316267",
+      "log_characters_reviewed": 131080,
+      "safe_excerpt": [
+        "2026-11-08T22:41:12.5585253Z node: v24.22.2"
+      ]
+    },
+    "core": {
+      "job_id": 128886316287,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316287",
+      "log_characters_reviewed": 971251,
+      "safe_excerpt": [
+        "2026-11-08T22:43:17.3904674Z ci-tasks:       Tests  8 passed (8)",
+        "2026-11-08T22:43:18.5783892Z ci-tasks:  Test Files  1 passed (1)",
+        "2026-11-08T22:43:18.5811946Z ci-tasks:       Tests  2 passed (2)",
+        "2026-11-08T22:44:22.1535815Z ci-tasks:  Test Files  1 passed (1)",
+        "2026-11-08T22:44:22.1536829Z ci-tasks:       Tests  13 passed (13)",
+        "2026-11-08T22:44:56.5125105Z ci-tasks:  Test Files  1 passed (1)",
+        "2026-11-08T22:44:56.5125574Z ci-tasks:       Tests  6 passed (6)",
+        "2026-11-08T22:45:03.8761326Z ci-tasks:  Test Files  4 passed (4)",
+        "2026-11-08T22:45:03.8762327Z ci-tasks:       Tests  93 passed (93)",
+        "2026-11-08T22:45:38.9962406Z ci-tasks:   ✔ queued queries retain their own request trace, parent and operation without connection spans (0.307594ms)",
+        "2026-11-08T22:47:24.4373809Z  NX   Successfully ran targets core-2, core-3, core-4, core-5, core-6, core-7, core-8, core-9, core-10, core-11, core-12, core-13, core-14, core-15, core-16, core-17, core-18, core-19, core-20, core-21, core-22, core-23, core-24, core-25, core-26, core-27, core-28, core-29, core-30, core-31, core-32, core-33, core-34, core-35, core-36, core-37, core-38, core-39, core-40, core-41, core-42, core-43, core-44, core-45, core-46, core-47, core-48, core-49, core-50, core-51, core-52, core-53, core-54, core-55, core-56, core-57, core-triage for project ci-tasks",
+        "2026-11-08T22:47:24.4411742Z   Cache:             Skipped (--skip-nx-cache)"
+      ]
+    },
+    "integration": {
+      "job_id": 128886316249,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316249",
+      "log_characters_reviewed": 624136,
+      "safe_excerpt": [
+        "2026-11-08T22:41:14.3869815Z node: v24.22.2",
+        "2026-11-08T22:44:28.3748853Z ci-tasks:  Test Files  1 passed (1)",
+        "2026-11-08T22:44:28.3750357Z ci-tasks:       Tests  3 passed (3)",
+        "2026-11-08T22:45:13.9589263Z ci-tasks:  Test Files  32 passed (32)",
+        "2026-11-08T22:45:13.9590081Z ci-tasks:       Tests  393 passed (393)",
+        "2026-11-08T22:45:46.8954191Z  NX   Successfully ran targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29 for project ci-tasks",
+        "2026-11-08T22:45:46.8998063Z   Cache:             Skipped (--skip-nx-cache)"
+      ]
+    },
+    "daemon": {
+      "job_id": 128886316314,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316314",
+      "log_characters_reviewed": 113747,
+      "safe_excerpt": [
+        "2026-11-08T22:41:21.8903058Z node: v24.22.2",
+        "2026-11-08T22:42:28.4733895Z  ✓ test/mikka-mcp-backend.test.ts (17 tests) 423ms",
+        "2026-11-08T22:42:45.6437515Z  ✓ test/mikka-mcp-bridge.test.ts (13 tests) 3824ms",
+        "2026-11-08T22:42:46.6047427Z  ✓ test/project-decisions.test.ts (13 tests) 712ms",
+        "2026-11-08T22:43:38.2614970Z  Test Files  136 passed | 1 skipped (137)",
+        "2026-11-08T22:43:38.2622880Z       Tests  1557 passed | 2 skipped (1559)"
+      ]
+    },
+    "pg1": {
+      "job_id": 128886316342,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316342",
+      "log_characters_reviewed": 1037254,
+      "safe_excerpt": [
+        "2026-11-08T22:42:09.0508215Z node: v24.22.2"
+      ]
+    },
+    "pg2": {
+      "job_id": 128886316320,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316320",
+      "log_characters_reviewed": 1090787,
+      "safe_excerpt": [
+        "2026-11-08T22:42:03.0019948Z node: v24.22.2"
+      ]
+    },
+    "pg3": {
+      "job_id": 128886316354,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316354",
+      "log_characters_reviewed": 1817369,
+      "safe_excerpt": [
+        "2026-11-08T22:42:24.5951717Z node: v24.22.2",
+        "2026-11-08T22:47:00.5013619Z [db-runner test:ops-db stdout] ✔ isolated Postgres: queued requests preserve attribution with no additional SQL, including an unscoped caller and error (43.83682ms)",
+        "2026-11-08T22:47:02.6273561Z ✔ isolated Postgres: queued requests preserve attribution with no additional SQL, including an unscoped caller and error (43.83682ms)"
+      ]
+    },
+    "pg4": {
+      "job_id": 128886316381,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316381",
+      "log_characters_reviewed": 592864,
+      "safe_excerpt": [
+        "2026-11-08T22:41:32.0143782Z node: v24.22.2",
+        "2026-11-08T22:43:32.5787276Z [db-runner test:device-enrollment-db stdout] ✔ local setup owner view retains fresh session checks without reading unused devices (11.571805ms)",
+        "2026-11-08T22:44:06.1897615Z ✔ local setup owner view retains fresh session checks without reading unused devices (11.571805ms)"
+      ]
+    },
+    "node22": {
+      "job_id": 128885804112,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278845/job/128885804112",
+      "log_characters_reviewed": 132657,
+      "safe_excerpt": [
+        "2026-11-08T22:39:21.3220991Z node: v24.22.1",
+        "2026-11-08T22:40:07.7107456Z node: v22.22.1",
+        "2026-11-08T22:40:52.4605729Z  ✓ test/mikka-mcp-backend.test.ts (17 tests) 880ms",
+        "2026-11-08T22:41:21.3286250Z  ✓ test/mikka-mcp-bridge.test.ts (13 tests) 4444ms",
+        "2026-11-08T22:41:22.9804005Z  ✓ test/project-decisions.test.ts (13 tests) 1154ms",
+        "2026-11-08T22:42:23.9859617Z  Test Files  136 passed | 1 skipped (137)",
+        "2026-11-08T22:42:23.9871743Z       Tests  1557 passed | 2 skipped (1559)"
+      ]
+    },
+    "e2b": {
+      "job_id": 128885804311,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278875/job/128885804311",
+      "log_characters_reviewed": 49674,
+      "safe_excerpt": [
+        "2026-11-08T22:40:24.4357349Z node: v24.22.2"
+      ]
+    },
+    "image": {
+      "job_id": 128886708306,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886708306",
+      "log_characters_reviewed": 344164,
+      "safe_excerpt": [
+        "2026-11-08T22:42:45.5782038Z ℹ fail 0",
+        "2026-11-08T22:48:32.3115189Z   MIKKA_EXPECTED_REVISION: 353f6606ead0b45e3ea0a6015c326f9825c7229b",
+        "2026-11-08T22:54:38.7615323Z node: v24.22.2",
+        "2026-11-08T22:55:14.7071021Z ℹ tests 5",
+        "2026-11-08T22:55:14.7071480Z ℹ pass 5",
+        "2026-11-08T22:55:14.7071660Z ℹ fail 0",
+        "2026-11-08T22:55:58.3746049Z ℹ tests 1",
+        "2026-11-08T22:55:58.3746538Z ℹ pass 1",
+        "2026-11-08T22:55:58.3746684Z ℹ fail 0",
+        "2026-11-08T22:56:03.9091735Z   name: self-hosted-services-353f6606ead0b45e3ea0a6015c326f9825c7229b"
+      ]
+    },
+    "icon": {
+      "job_id": 128886778670,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886778670",
+      "log_characters_reviewed": 18088,
+      "safe_excerpt": [
+        "2026-11-08T22:58:20.9894170Z 353f6606ead0b45e3ea0a6015c326f9825c7229b"
+      ]
+    },
+    "mac18": {
+      "job_id": 128886479974,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278845/job/128886479974",
+      "log_characters_reviewed": 44175,
+      "safe_excerpt": [
+        "2026-11-08T22:55:07.9646130Z 353f6606ead0b45e3ea0a6015c326f9825c7229b",
+        "2026-11-08T22:57:19.2747210Z node: v18.20.8",
+        "2026-11-08T22:57:19.9327940Z {\"platform\":\"darwin\",\"arch\":\"arm64\",\"node\":\"18.20.8\",\"npmStarted\":false,\"registrations\":0,\"heartbeats\":0,\"enrollments\":0,\"socketPathBytes\":73,\"states\":[{\"step\":\"check\",\"status\":\"running\"},{\"step\":\"check\",\"status\":\"running\"},{\"step\":\"check\",\"status\":\"failed\",\"cause\":\"node_required\"}],\"result\":\"check/node_required\"}"
+      ]
+    },
+    "mac22": {
+      "job_id": 128886479996,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278845/job/128886479996",
+      "log_characters_reviewed": 48041,
+      "safe_excerpt": [
+        "2026-11-08T22:55:12.3155880Z 353f6606ead0b45e3ea0a6015c326f9825c7229b",
+        "2026-11-08T22:58:53.3145580Z node: v22.22.1",
+        "2026-11-08T22:59:17.4176870Z {\"platform\":\"darwin\",\"arch\":\"arm64\",\"node\":\"22.22.1\",\"npmStarted\":true,\"registrations\":2,\"heartbeats\":2,\"enrollments\":1,\"socketPathBytes\":73,\"states\":[{\"step\":\"check\",\"status\":\"running\"},{\"step\":\"check\",\"status\":\"running\"},{\"step\":\"install\",\"status\":\"running\"},{\"step\":\"service\",\"status\":\"running\"},{\"step\":\"connect\",\"status\":\"running\"},{\"step\":\"connect\",\"status\":\"online\"},{\"step\":\"service\",\"status\":\"running\"},{\"step\":\"connect\",\"status\":\"running\"},{\"step\":\"connect\",\"status\":\"online\"}],\"result\":\"installed/launchagent/online/reconnect\"}"
+      ]
+    },
+    "cloudmac": {
+      "job_id": 128885804114,
+      "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278862/job/128885804114",
+      "log_characters_reviewed": 20204,
+      "safe_excerpt": [
+        "2026-11-08T22:57:37.3504740Z 353f6606ead0b45e3ea0a6015c326f9825c7229b",
+        "2026-11-08T22:57:38.5655140Z node: v24.22.2",
+        "2026-11-08T22:58:04.4393720Z real screenshot, typed application text and click successful through default-allow MCP broker; no human review",
+        "2026-11-08T22:58:04.5283090Z ℹ tests 1",
+        "2026-11-08T22:58:04.5496800Z ℹ pass 1",
+        "2026-11-08T22:58:04.5603000Z ℹ fail 0"
+      ]
+    }
+  },
+  "non_native_jobs": [
+    {
+      "job_id": 128885804278,
+      "name": "changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:39:55Z",
+      "completed_at": "2026-11-08T22:41:02Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128885804278"
+    },
+    {
+      "job_id": 128886316249,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:04Z",
+      "completed_at": "2026-11-08T22:45:51Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316249"
+    },
+    {
+      "job_id": 128886316267,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:04Z",
+      "completed_at": "2026-11-08T22:43:49Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316267"
+    },
+    {
+      "job_id": 128886316287,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:20Z",
+      "completed_at": "2026-11-08T22:47:27Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316287"
+    },
+    {
+      "job_id": 128886316314,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:14Z",
+      "completed_at": "2026-11-08T22:43:59Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316314"
+    },
+    {
+      "job_id": 128886316320,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:42Z",
+      "completed_at": "2026-11-08T22:45:30Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316320"
+    },
+    {
+      "job_id": 128886316342,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:46Z",
+      "completed_at": "2026-11-08T22:46:31Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316342"
+    },
+    {
+      "job_id": 128886316354,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:57Z",
+      "completed_at": "2026-11-08T22:47:10Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316354"
+    },
+    {
+      "job_id": 128886316381,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:04Z",
+      "completed_at": "2026-11-08T22:44:29Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316381"
+    },
+    {
+      "job_id": 128886317196,
+      "name": "analytics-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:11Z",
+      "completed_at": "2026-11-08T22:42:01Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886317196"
+    },
+    {
+      "job_id": 128886317210,
+      "name": "image-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:41:37Z",
+      "completed_at": "2026-11-08T22:42:36Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886317210"
+    },
+    {
+      "job_id": 128886317254,
+      "name": "desktop-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:42:00Z",
+      "completed_at": "2026-11-08T22:42:52Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886317254"
+    },
+    {
+      "job_id": 128886318025,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-08T22:41:03Z",
+      "completed_at": "2026-11-08T22:41:02Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886318025"
+    },
+    {
+      "job_id": 128886565736,
+      "name": "analytics-checks / Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:42:14Z",
+      "completed_at": "2026-11-08T22:47:07Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886565736"
+    },
+    {
+      "job_id": 128886708306,
+      "name": "image-checks / image",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:42:38Z",
+      "completed_at": "2026-11-08T22:57:45Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886708306"
+    },
+    {
+      "job_id": 128886778584,
+      "name": "desktop-checks / checks",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:42:55Z",
+      "completed_at": "2026-11-08T22:44:50Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886778584"
+    },
+    {
+      "job_id": 128886778630,
+      "name": "desktop-checks / smoke",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:42:55Z",
+      "completed_at": "2026-11-08T22:46:49Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886778630"
+    },
+    {
+      "job_id": 128886778670,
+      "name": "desktop-checks / icon",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:58:11Z",
+      "completed_at": "2026-11-08T22:58:39Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886778670"
+    },
+    {
+      "job_id": 128887855460,
+      "name": "analytics-checks / analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:47:09Z",
+      "completed_at": "2026-11-08T22:47:11Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128887855460"
+    },
+    {
+      "job_id": 128887869192,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:47:12Z",
+      "completed_at": "2026-11-08T22:47:21Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128887869192"
+    }
+  ],
+  "workflow_states": [
+    {
+      "run_id": 42531278838,
+      "name": "Browser gate",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:39:17Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278838"
+    },
+    {
+      "run_id": 42531278875,
+      "name": "E2B additive runtime release",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:40:33Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278875"
+    },
+    {
+      "run_id": 42531278849,
+      "name": "Unattended sandbox acceptance",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:41:19Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278849"
+    },
+    {
+      "run_id": 42531278833,
+      "name": "SSH device backend",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:45:21Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278833"
+    },
+    {
+      "run_id": 42531278899,
+      "name": "Site search read contract",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:44:58Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278899"
+    },
+    {
+      "run_id": 42531278880,
+      "name": "Device gateway",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:42:54Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278880"
+    },
+    {
+      "run_id": 42531278840,
+      "name": "Read cache API acceptance",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:42:47Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278840"
+    },
+    {
+      "run_id": 42531278850,
+      "name": "E2B subscription custody",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:43:48Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278850"
+    },
+    {
+      "run_id": 42531278862,
+      "name": "Cloud computer backend",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:58:09Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278862"
+    },
+    {
+      "run_id": 42531278865,
+      "name": "CI",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "in_progress",
+      "conclusion": null,
+      "updated_at": "2026-11-08T22:59:13Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865"
+    },
+    {
+      "run_id": 42531278845,
+      "name": "Local device Node 22",
+      "head_sha": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+      "status": "completed",
+      "conclusion": "success",
+      "updated_at": "2026-11-08T22:59:29Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42531278845"
+    }
+  ],
+  "limitations": [
+    "All observed non-Native CI jobs reached terminal success except the workflow-conditional OIDC skip. Native remains in progress and is owned/reported separately; the whole CI is not claimed passed.",
+    "All 10 companion workflows for head 4a07 are terminal success. Conditional production E2B jobs did not run; no subscription or production acceptance is claimed.",
+    "Node 18 macOS success is the expected node_required refusal; only Node 22 performed package installation, enrollment, launchagent, online and reconnect.",
+    "Source-bound receipt applies only to 4a07 / synthetic merge 353f with matching tree. Upcoming lifecycle and Claude generation fixes require their own current-head gate; this receipt cannot be relabeled as a later candidate's execution.",
+    "The preceding 22:56 partial receipt remains unchanged. This receipt contains reviewed safe excerpts and original GitHub job references, not complete archived job logs.",
+    "No rerun, cancellation, source or configuration mutation, production task, cloud resource or model call was initiated by this observer."
+  ],
+  "preceding_partial_receipt": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-4a07-non-native-2256.safe.json",
+    "sha256": "ae654f687a2a788a7d5351cc28bcbc08b8197f89a962b93c72b6a87abecca232",
+    "preserved": true
+  },
+  "native": {
+    "owned_by_separate_observer": true,
+    "current_state": {
+      "job_id": 128890716022,
+      "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "status": "in_progress",
+      "conclusion": null,
+      "started_at": "2026-11-08T22:59:12Z",
+      "completed_at": null,
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128890716022"
+    },
+    "claimed_passed": false
+  },
+  "image": {
+    "job": {
+      "job_id": 128886708306,
+      "name": "image-checks / image",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-08T22:42:38Z",
+      "completed_at": "2026-11-08T22:57:45Z",
+      "job_url": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886708306"
+    },
+    "actual_checkout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+    "steps": [
+      {
+        "name": "Set up job",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "conclusion": "success"
+      },
+      {
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify disposable acceptance target guards and model fixture",
+        "conclusion": "success"
+      },
+      {
+        "name": "Build the public standalone application",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify packaged subscription binaries without network or credentials",
+        "conclusion": "success"
+      },
+      {
+        "name": "Start with an empty database and no Mikka credentials",
+        "conclusion": "success"
+      },
+      {
+        "name": "Build the pinned upstream MinIO fixture",
+        "conclusion": "success"
+      },
+      {
+        "name": "Apply migrations and wait for health",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify runtime edition, sign-in document, API and compiled assets",
+        "conclusion": "success"
+      },
+      {
+        "name": "Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies",
+        "conclusion": "success"
+      },
+      {
+        "name": "Reclaim intermediate build cache before installing source dependencies",
+        "conclusion": "success"
+      },
+      {
+        "name": "Install the same-revision source daemon dependencies",
+        "conclusion": "success"
+      },
+      {
+        "name": "Exercise the real daemon against the registered community user",
+        "conclusion": "success"
+      },
+      {
+        "name": "Install the native desktop runtime dependencies",
+        "conclusion": "success"
+      },
+      {
+        "name": "Build one packaged acceptance desktop with an independent default server",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify packaged desktop email login, chat and built-in live against the actual image",
+        "conclusion": "success"
+      },
+      {
+        "name": "Remove private desktop fixture material",
+        "conclusion": "success"
+      },
+      {
+        "name": "Remove private daemon fixture material",
+        "conclusion": "success"
+      },
+      {
+        "name": "Retain secret-free application acceptance evidence",
+        "conclusion": "success"
+      },
+      {
+        "name": "Upload isolated acceptance receipt",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify the same persistent installation restarts",
+        "conclusion": "success"
+      },
+      {
+        "name": "Verify the frozen community UI remains opt-in with the same data",
+        "conclusion": "success"
+      },
+      {
+        "name": "Publish the tested revision",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Retain startup diagnostics on failure",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Stop disposable services",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Install the same-revision source daemon dependencies",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "conclusion": "success"
+      }
+    ],
+    "source_daemon": {
+      "kind": "isolated-source-daemon",
+      "revision": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+      "status": "passed",
+      "checks": {
+        "target": true,
+        "enrollment": true,
+        "realProcess": true,
+        "heartbeat": true,
+        "builtinGatewayPong": true,
+        "ownerDeviceOnline": true,
+        "builtinPresenceReady": true,
+        "builtinPresenceAck": true
+      },
+      "cleanup": {
+        "credentialRevoked": true,
+        "revokedCredentialRefused": true,
+        "daemonUnregistered": true,
+        "revocationCheckedOnNextSync": true,
+        "deviceRemoved": true,
+        "sessionClosed": true,
+        "privateFilesRemoved": true
+      },
+      "taskCompletion": false,
+      "subscriptionAcceptance": false,
+      "modelRequests": false
+    },
+    "production_acceptance": false,
+    "published": false
+  },
+  "cloud_computer_macos": {
+    "job_id": 128885804114,
+    "conclusion": "success",
+    "node": "24.22.2",
+    "tests_pass": 1,
+    "tests_fail": 0,
+    "meaning": "Actual screenshot, typed application text and click through default-allow MCP broker",
+    "classification": "nonblocking workflow job"
+  }
+}

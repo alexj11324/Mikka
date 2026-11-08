@@ -1,0 +1,22 @@
+{
+  "schema": "issue1512.source-check-environment.v1",
+  "observedAt": "2026-11-08T23:15:28.006067+00:00",
+  "candidateCommit": "9794bc23fa2fe6eb71dbefe62fe0bcdfa0a7d183",
+  "candidateTree": "fd1aadd36228359a6ac75f6ed690f8c40877fc07",
+  "command": "pnpm check",
+  "toolchain": "Node 24.22.1 / pinned pnpm 10.34.3",
+  "result": "failed_environment_unix_socket_permission",
+  "failedTests": 8,
+  "failure": "listen EPERM: operation not permitted /tmp/orvd-*/daemon.sock",
+  "suite": "packages/daemon/test/commands.test.ts",
+  "fullCheckPassed": false,
+  "previousAttemptsPreserved": [
+    "candidate-pnpm-check.receipt.json",
+    "candidate-pnpm10-check.receipt.json",
+    "candidate-pnpm10-linked-check.receipt.json"
+  ],
+  "dependencyInstall": false,
+  "safetyGuardBypassed": false,
+  "testCodeModifiedToPass": false,
+  "nextVerification": "Required latest-head CI in its normal isolated runner; no local environment assertion substitutes for that execution."
+}

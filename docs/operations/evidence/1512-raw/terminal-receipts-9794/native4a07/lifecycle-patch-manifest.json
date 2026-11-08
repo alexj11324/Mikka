@@ -1,0 +1,24 @@
+{
+  "base": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "patchBytes": 8095,
+  "patchSha256": "e7d04dcfefaccca33670c528bba3255523720096b2c4049674c0c613a099a91b",
+  "lifecycleChangeExactlyImportAndClickDelegation": true,
+  "measurementFunctionsAndCallSitesUnchanged": true,
+  "files": [
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "bytes": 33181,
+      "sha256": "45a0f56985f256f5f392ad015e0c4442a784e1b9ff1ebd8703829ecc61152a77"
+    },
+    {
+      "path": "apps/desktop/test/parity-page-ready.mjs",
+      "bytes": 14439,
+      "sha256": "9f06fac691f599532edf8cb52287b4e70e51f2b058d2b8c890b59ef74f52cbda"
+    },
+    {
+      "path": "apps/desktop/test/parity-reads.test.mjs",
+      "bytes": 25485,
+      "sha256": "8dd59995e8bc3cecbc11b8565a1407beccb5bb8db6fe789aae15eda4d9602102"
+    }
+  ]
+}

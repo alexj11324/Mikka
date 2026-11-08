@@ -1,0 +1,105 @@
+{
+  "schema": "issue1512.reviewed-candidate.v1",
+  "preparedAt": "2026-11-08T23:14:32.800369+00:00",
+  "parent": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "baseTree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+  "tree": "fd1aadd36228359a6ac75f6ed690f8c40877fc07",
+  "files": [
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "bytes": 33181,
+      "sha256": "45a0f56985f256f5f392ad015e0c4442a784e1b9ff1ebd8703829ecc61152a77",
+      "gitBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/test/parity-page-ready.mjs",
+      "bytes": 14439,
+      "sha256": "9f06fac691f599532edf8cb52287b4e70e51f2b058d2b8c890b59ef74f52cbda",
+      "gitBlob": "974e50146f3b765fbe76ef002d7217def054a1b9",
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/test/parity-reads.test.mjs",
+      "bytes": 25485,
+      "sha256": "8dd59995e8bc3cecbc11b8565a1407beccb5bb8db6fe789aae15eda4d9602102",
+      "gitBlob": "9ea1009dae63bf449ce4b4cf3d0ec7e0ee9ec149",
+      "mode": "100644"
+    },
+    {
+      "path": "packages/daemon/src/adapters/generation-metrics.ts",
+      "bytes": 6748,
+      "sha256": "1a7f01e9a31b9d5fa68fe66da3bcb72b3d33519a6bcbb49f35f976fcf996ba65",
+      "gitBlob": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+      "mode": "100644"
+    },
+    {
+      "path": "packages/daemon/src/adapters/generation-metrics.test.ts",
+      "bytes": 7083,
+      "sha256": "f242f0446f15c67d2adc824364f9993ba1ee0e13e89c477603756943c17acd65",
+      "gitBlob": "7b7878479cf37d95253c3c337a9c755346963d96",
+      "mode": "100644"
+    },
+    {
+      "path": "packages/daemon/test/claude-generation-abort.test.ts",
+      "bytes": 4286,
+      "sha256": "22e464044ffdd60fd7148d1a968334b6d4e19600dc8db512998d2ce07627f6d8",
+      "gitBlob": "c9fb96f579fda0c1aa3372756074a1a90713204a",
+      "mode": "100644"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "bytes": 3767,
+      "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56",
+      "gitBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "mode": "100644"
+    },
+    {
+      "path": "packages/daemon/src/codex-generation-telemetry.ts",
+      "bytes": 19801,
+      "sha256": "d776409b58cc8dc2778e5149d52eb6196a7d8d3dfaa75cf06ebb63ba68c9ebbd",
+      "gitBlob": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+      "mode": "100644"
+    },
+    {
+      "path": "packages/daemon/src/codex-generation-telemetry.test.ts",
+      "bytes": 18277,
+      "sha256": "9d0fe507b0f591caa3919e7c438cd4bba012abe5d7d625989ebcd6d8cd4338db",
+      "gitBlob": "2464d4164da37b6b4355e4338bf039875cf9fd9e",
+      "mode": "100644"
+    },
+    {
+      "path": "packages/daemon/test/codex-generation-completion.test.ts",
+      "bytes": 4020,
+      "sha256": "0c6684127dbdf037a78c7a1fe99690d8d1a77d2d4134632ccb2d5e736b748a31",
+      "gitBlob": "76449ff682615ebd14a533422194946e75441d74",
+      "mode": "100644"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "bytes": 4466,
+      "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c",
+      "gitBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "mode": "100644"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "bytes": 61488,
+      "sha256": "3c1bf09901f5ff267a0df1d927691516be50b2a868fe8faa1e2fa5c467a1c127",
+      "gitBlob": "a750d7587a8ee4379f72481d6678f9870af28445",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "bytes": 19025,
+      "sha256": "ab6522ff9f964e580af3e66e972f105e21db2eacc499b516d0e3a1c308b8ae69",
+      "gitBlob": "176e3aead0068d801f829dcadaafcd02a61e67a3",
+      "mode": "100644"
+    }
+  ],
+  "reviewReceipt": "candidate-followup-independent-review.safe.json",
+  "reviewSha256": "418bd0aca1b068a64fd9ac9d698e11469975b2c7e437f036372d7940d19ecfb9",
+  "branchUpdated": false,
+  "ciResultForCandidate": null,
+  "productionCases": 0
+}

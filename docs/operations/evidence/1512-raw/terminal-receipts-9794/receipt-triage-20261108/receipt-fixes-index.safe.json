@@ -1,0 +1,148 @@
+{
+  "sourceBase": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "productEquivalentHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "observedAtUTC": "2026-11-08 23:06:32 UTC",
+  "realModelCalls": 0,
+  "files": [
+    {
+      "repositoryPath": "packages/daemon/src/adapters/generation-metrics.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/frozen/packages/daemon/src/adapters/generation-metrics.ts",
+      "bytes": 6748,
+      "sha256": "1a7f01e9a31b9d5fa68fe66da3bcb72b3d33519a6bcbb49f35f976fcf996ba65",
+      "gitBlobSha": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+      "testedCopyExact": true
+    },
+    {
+      "repositoryPath": "packages/daemon/src/adapters/generation-metrics.test.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/frozen/packages/daemon/src/adapters/generation-metrics.test.ts",
+      "bytes": 7083,
+      "sha256": "f242f0446f15c67d2adc824364f9993ba1ee0e13e89c477603756943c17acd65",
+      "gitBlobSha": "7b7878479cf37d95253c3c337a9c755346963d96",
+      "testedCopyExact": true
+    },
+    {
+      "repositoryPath": "packages/daemon/src/codex-generation-telemetry.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/frozen/packages/daemon/src/codex-generation-telemetry.ts",
+      "bytes": 19801,
+      "sha256": "d776409b58cc8dc2778e5149d52eb6196a7d8d3dfaa75cf06ebb63ba68c9ebbd",
+      "gitBlobSha": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+      "testedCopyExact": true
+    },
+    {
+      "repositoryPath": "packages/daemon/src/codex-generation-telemetry.test.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/frozen/packages/daemon/src/codex-generation-telemetry.test.ts",
+      "bytes": 18277,
+      "sha256": "9d0fe507b0f591caa3919e7c438cd4bba012abe5d7d625989ebcd6d8cd4338db",
+      "gitBlobSha": "2464d4164da37b6b4355e4338bf039875cf9fd9e",
+      "testedCopyExact": true
+    },
+    {
+      "repositoryPath": "packages/daemon/test/claude-generation-abort.test.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/frozen/packages/daemon/test/claude-generation-abort.test.ts",
+      "bytes": 4286,
+      "sha256": "22e464044ffdd60fd7148d1a968334b6d4e19600dc8db512998d2ce07627f6d8",
+      "gitBlobSha": "c9fb96f579fda0c1aa3372756074a1a90713204a",
+      "testedCopyExact": true
+    },
+    {
+      "repositoryPath": "packages/daemon/test/codex-generation-completion.test.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/frozen/packages/daemon/test/codex-generation-completion.test.ts",
+      "bytes": 4020,
+      "sha256": "0c6684127dbdf037a78c7a1fe99690d8d1a77d2d4134632ccb2d5e736b748a31",
+      "gitBlobSha": "76449ff682615ebd14a533422194946e75441d74",
+      "testedCopyExact": true
+    },
+    {
+      "repositoryPath": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/frozen/packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "bytes": 3767,
+      "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56",
+      "gitBlobSha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "testedCopyExact": true
+    },
+    {
+      "repositoryPath": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/frozen/packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "bytes": 4466,
+      "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c",
+      "gitBlobSha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "testedCopyExact": true
+    }
+  ],
+  "receipts": [
+    {
+      "name": "claude-abort-red.json",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/claude-abort-red.json",
+      "bytes": 5263,
+      "sha256": "a6d6bc0897c59f91682204956f8dbb9eef44556b0c07dfa123ff57409f82dc68",
+      "gitBlobSha": "7cebd0d7cb4beaddd2c6767b3c1704dfdf788861"
+    },
+    {
+      "name": "claude-abort-green.safe.json",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/claude-abort-green.safe.json",
+      "bytes": 1462,
+      "sha256": "cd21bb61f45bb90e5d63e71e89af51de29549989d1f66895480b74c0fe7f7b18",
+      "gitBlobSha": "dec751d3f71d5aaf16d54f6f619266f6f36e09ba"
+    },
+    {
+      "name": "claude-abort-source-binding.safe.json",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/claude-abort-source-binding.safe.json",
+      "bytes": 1186,
+      "sha256": "a4aa30e58cc72bab7163ccac268c246dce00b0053e8973d0a29981a38c18e34f",
+      "gitBlobSha": "6ab3e810213818ea44e16e411ae62839db45bbbf"
+    },
+    {
+      "name": "codex-completion-red.json",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/codex-completion-red.json",
+      "bytes": 5139,
+      "sha256": "25effec7150ac51065787225ebd271b46f5190a8c4c3f5be15282214fb716dd5",
+      "gitBlobSha": "5de5a8642c3fdcfbcf9614c5d52e485059ab40c2"
+    },
+    {
+      "name": "codex-completion-green.safe.json",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/codex-completion-green.safe.json",
+      "bytes": 942,
+      "sha256": "e8c6d1fadd4df5af8c66af8bbde5b3b46742310411422e0f8e1bae4935c1f331",
+      "gitBlobSha": "f78a799a83087b1bc6b6824a38594ded262132a8"
+    },
+    {
+      "name": "codex-completion-source-binding.safe.json",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/codex-completion-source-binding.safe.json",
+      "bytes": 1111,
+      "sha256": "47f09bd51c90936c643bd3fb3f7cb039c9b32ce8fb24b3031419f2ed683eb268",
+      "gitBlobSha": "64c146d3d1b0e9564d5e629d56329e4633452497"
+    },
+    {
+      "name": "combined-green.safe.json",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/combined-green.safe.json",
+      "bytes": 1616,
+      "sha256": "51040a16a9a89dd8d58b0507184c404555abfddba50b80f8f2fe8abf04344c4b",
+      "gitBlobSha": "fa82b742a65ef043c09986747e48a31d91ff4314"
+    },
+    {
+      "name": "triage-results.json",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/triage-results.json",
+      "bytes": 6407,
+      "sha256": "492d5af8013c8a813030ceeca058b682f7a5e2e30657c57bf9cf910684c66bce",
+      "gitBlobSha": "4b3fa0a8cd3a1cec8ef06c5e9f9b228b37d53b5f"
+    },
+    {
+      "name": "source-binding.json",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/source-binding.json",
+      "bytes": 969,
+      "sha256": "4903fed57b4c66fa13abbaba906ab5f985683edea7a8faac41c45002448e3dc2",
+      "gitBlobSha": "6b30f06142e52f6f50bf512a2233e218bac64710"
+    }
+  ],
+  "validation": {
+    "combinedTests": "56/56",
+    "typecheckExitCode": 0,
+    "diffCheckExitCode": 0,
+    "benchmark": "parent-owned; not repeated"
+  },
+  "limitations": [
+    "Offline source-bound regression only, not production acceptance",
+    "Native CLI trace absence remains unknown; no upstream universal completeness claim",
+    "No new rawResponse RPC handler, paid driver change, model call, production SQL, or ref mutation"
+  ]
+}

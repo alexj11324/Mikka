@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-08T22:55:43Z",
+  "ownerIssue": 1512,
+  "relatedPr": 1759,
+  "relatedBranch": "feat/coding-workspace-p0",
+  "publicHead": "968076c89b1cfe27b6f257470ea8aa51116b7e33",
+  "runId": 42527580655,
+  "jobId": 128877160621,
+  "actualRevision": "546dd9c86ceacc62da79390ccec5794104e64fb0",
+  "sourceFile": "apps/desktop/test/lifecycle.mjs",
+  "sameSourceTextAsOurPublishedHead": true,
+  "ourHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "safeJobExcerpt": [
+    "2026-11-08T22:10:36.5843860Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:10:44.8184280Z 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:10:44.8729830Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:10:47.2650350Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:11:56.8025570Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:11:56.9377180Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:13:05.6827370Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:13:06.4433510Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:13:09.6094220Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:13:21.3139800Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:13:35.7534500Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:13:35.8497900Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:13:39.1191220Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:15:57.4985360Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:15:57.7145490Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:16:42.7317910Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:16:53.0136700Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:21:56.5685490Z Desktop lifecycle failed: page.evaluate: Execution context was destroyed, most likely because of a navigation",
+    "2026-11-08T22:21:56.8678740Z Error: DESKTOP_TEST_SETUP_EXIT_1",
+    "2026-11-08T22:21:56.9523830Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:21:57.0844910Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:21:57.3264880Z   name: desktop-package-evidence-546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:21:57.3270430Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:21:59.0078390Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:21:59.7393540Z   name: desktop-native-evidence-546dd9c86ceacc62da79390ccec5794104e64fb0",
+    "2026-11-08T22:21:59.7398590Z   MIKKA_TEST_DEPLOYMENT_SHA: 546dd9c86ceacc62da79390ccec5794104e64fb0"
+  ],
+  "existingLocalEvidence": {
+    "path": "/workspace/scratch/af05d9e4f31e/triage-1512/head6180-and968-native-failures.json",
+    "parity": {
+      "result": "passed",
+      "screens": 100
+    },
+    "lifecycle": {
+      "present": true,
+      "result": "failed",
+      "phase": "prepare-bundled-workspace",
+      "code": "navigation-context-destroyed",
+      "locations": [
+        {
+          "file": "native-viewport.mjs",
+          "line": 36,
+          "column": 29
+        },
+        {
+          "file": "lifecycle.mjs",
+          "line": 151,
+          "column": 9
+        },
+        {
+          "file": "lifecycle.mjs",
+          "line": 159,
+          "column": 3
+        },
+        {
+          "file": "lifecycle.mjs",
+          "line": 354,
+          "column": 16
+        }
+      ],
+      "windowStatus": {
+        "webLogin": "complete",
+        "nativeLogin": "incomplete"
+      },
+      "accountState": "quarantined"
+    }
+  },
+  "proofBoundary": "Run metadata, actual checkout and terminal lifecycle error were independently fetched. The detailed closed stack/window/cleanup fields are from the existing read-only local evidence receipt; this agent did not redownload its 14.7 MB ZIP.",
+  "mutationsToRelatedPr": false,
+  "retry": false,
+  "sourceBytes": 33092,
+  "sourceSha256": "fbb1e0aa2d2bb5dcd3c85c18a67046eb71c7bd1ce2d23d7a28dbbf243bd25398"
+}

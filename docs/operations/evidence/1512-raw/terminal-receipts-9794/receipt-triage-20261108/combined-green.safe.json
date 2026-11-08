@@ -1,0 +1,29 @@
+{
+  "scope": "offline combined regression for owner-authorized Claude abort and Codex completed-without-usage fixes",
+  "observedAtUTC": "2026-11-08 23:06:32 UTC",
+  "sourceBase": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "equivalentProductHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "realModelCalls": 0,
+  "nativeTraceAbsenceStillUnknown": true,
+  "command": "node node_modules/vitest/vitest.mjs run test/claude-generation-abort.test.ts src/adapters/generation-metrics.test.ts test/codex-generation-completion.test.ts src/codex-generation-telemetry.test.ts src/tracing.test.ts src/tracing-sampling.test.ts --maxWorkers=1",
+  "test": {
+    "chunk_id": "817c12",
+    "wall_time_seconds": 4.159136083,
+    "exit_code": 0,
+    "original_token_count": 117,
+    "output": "\n RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/checkout/packages/daemon\n\n\n Test Files  6 passed (6)\n      Tests  56 passed (56)\n   Start at  18:06:03\n   Duration  3.88s (import 48%, tests 44%, transform 7%, worker 1%)\n\n    Isolate  6 workers spawned \u00b7 ~120ms startup each (spawn + environment, per file)\n             at least ~601ms faster with isolate: false \u2014 reuses workers across files instead of one per file\n\n"
+  },
+  "typecheckCommand": "../../node_modules/.bin/tsgo --noEmit -p tsconfig.json",
+  "typecheck": {
+    "chunk_id": "62c792",
+    "wall_time_seconds": 3.520829602,
+    "exit_code": 0,
+    "original_token_count": 0,
+    "output": ""
+  },
+  "diffCheck": {
+    "command": "git diff --check",
+    "exitCode": 0
+  },
+  "parentWillRunBenchmark": true
+}

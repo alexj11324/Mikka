@@ -1,0 +1,27 @@
+{
+  "scope": "offline source-bound validation; no model calls or production access",
+  "sourceBase": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "equivalentProductHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "realModelCalls": 0,
+  "green10": {
+    "chunk_id": "632657",
+    "wall_time_seconds": 2.029984366,
+    "exit_code": 0,
+    "original_token_count": 67,
+    "output": "\n RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/checkout/packages/daemon\n\n\n Test Files  2 passed (2)\n      Tests  10 passed (10)\n   Start at  17:58:13\n   Duration  1.72s (import 44%, tests 40%, transform 16%, worker 1%)\n\n"
+  },
+  "green40": {
+    "chunk_id": "681ee6",
+    "wall_time_seconds": 3.995951661,
+    "exit_code": 0,
+    "original_token_count": 117,
+    "output": "\n RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/checkout/packages/daemon\n\n\n Test Files  4 passed (4)\n      Tests  40 passed (40)\n   Start at  17:59:01\n   Duration  3.68s (import 51%, tests 29%, transform 19%, worker 1%)\n\n    Isolate  4 workers spawned \u00b7 ~168ms startup each (spawn + environment, per file)\n             at least ~505ms faster with isolate: false \u2014 reuses workers across files instead of one per file\n\n"
+  },
+  "typecheck": {
+    "chunk_id": "8e76b5",
+    "wall_time_seconds": 2.301157323,
+    "exit_code": 0,
+    "original_token_count": 0,
+    "output": ""
+  }
+}

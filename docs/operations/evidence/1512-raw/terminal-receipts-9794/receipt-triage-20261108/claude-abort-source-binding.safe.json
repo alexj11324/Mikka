@@ -1,0 +1,31 @@
+{
+  "base": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "productEquivalentHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "changedFiles": {
+    "packages/daemon/src/adapters/generation-metrics.ts": {
+      "sha256": "1a7f01e9a31b9d5fa68fe66da3bcb72b3d33519a6bcbb49f35f976fcf996ba65",
+      "bytes": 6748,
+      "testedCopyExact": true
+    },
+    "packages/daemon/src/adapters/generation-metrics.test.ts": {
+      "sha256": "f242f0446f15c67d2adc824364f9993ba1ee0e13e89c477603756943c17acd65",
+      "bytes": 7083,
+      "testedCopyExact": true
+    },
+    "packages/daemon/test/claude-generation-abort.test.ts": {
+      "sha256": "22e464044ffdd60fd7148d1a968334b6d4e19600dc8db512998d2ce07627f6d8",
+      "bytes": 4286,
+      "testedCopyExact": true
+    },
+    "packages/daemon/test/fakes/fake-claude-generation-abort.mjs": {
+      "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56",
+      "bytes": 3767,
+      "testedCopyExact": true
+    }
+  },
+  "productChangeOnly": "packages/daemon/src/adapters/generation-metrics.ts",
+  "realModelCalls": 0,
+  "claudeSdkVersion": "0.3.305",
+  "red": "claude-abort-red.json",
+  "green": "claude-abort-green.safe.json"
+}

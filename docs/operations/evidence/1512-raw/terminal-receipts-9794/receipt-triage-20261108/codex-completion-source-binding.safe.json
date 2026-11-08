@@ -1,0 +1,29 @@
+{
+  "base": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "equivalentProductHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "upstreamCodexCommit": "83086188ae0614bd882818ff1aa23f3194962012",
+  "files": {
+    "packages/daemon/src/codex-generation-telemetry.ts": {
+      "sha256": "d776409b58cc8dc2778e5149d52eb6196a7d8d3dfaa75cf06ebb63ba68c9ebbd",
+      "bytes": 19801,
+      "testedCopyExact": true
+    },
+    "packages/daemon/src/codex-generation-telemetry.test.ts": {
+      "sha256": "9d0fe507b0f591caa3919e7c438cd4bba012abe5d7d625989ebcd6d8cd4338db",
+      "bytes": 18277,
+      "testedCopyExact": true
+    },
+    "packages/daemon/test/codex-generation-completion.test.ts": {
+      "sha256": "0c6684127dbdf037a78c7a1fe99690d8d1a77d2d4134632ccb2d5e736b748a31",
+      "bytes": 4020,
+      "testedCopyExact": true
+    },
+    "packages/daemon/test/fakes/fake-codex-generation-completion.mjs": {
+      "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c",
+      "bytes": 4466,
+      "testedCopyExact": true
+    }
+  },
+  "realModelCalls": 0,
+  "nativeTraceAbsenceStillUnknown": true
+}

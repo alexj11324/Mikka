@@ -1,0 +1,583 @@
+
+> next-app@0.0.1 check /workspace/scratch/812e3b7d6d45/Mikka-1512-resume
+> pnpm test:self-hosting && pnpm test:settings-backend && pnpm test:signup-turnstile && pnpm test:hosted-usage && pnpm test:execution-rules && pnpm test:abuse && pnpm test:unattended && pnpm check:agent-definitions && pnpm test:agent-kit && pnpm test:agent-kit-compat && pnpm check:agent-ui && pnpm test:credentials && pnpm test:preview && pnpm test:lib-units && pnpm test:project-decisions && pnpm test:unread && pnpm test:issue-readonly-dom && pnpm test:idle-budget && pnpm test:dev-local && pnpm test:mvp-fixtures && pnpm test:agent && pnpm test:acceptance && pnpm test:test-accounts && pnpm test:auth-composio && pnpm test:ui-policy && pnpm test:platform && pnpm test:motion && pnpm test:view-state && pnpm test:i18n && pnpm i18n:check && node scripts/check-copy.mjs && pnpm test:ssh-target && pnpm test:linear-sync && pnpm test:coordinator-events && pnpm test:schedules && pnpm test:run-recovery && pnpm test:run-publication && pnpm test:coordinator-native-relay && pnpm test:coordinator-native-scope && pnpm test:coordinator-issue-tools && pnpm test:coordinator-native && pnpm test:groups && pnpm test:group-turns && pnpm test:integrations && pnpm test:csv && pnpm test:analytics && pnpm test:settings && pnpm test:account && pnpm test:issues && pnpm test:issue-search && pnpm test:slack && pnpm test:telegram && pnpm test:suggestions && pnpm test:artifacts && pnpm test:captures && pnpm test:cloud-limits && pnpm test:factory-config && pnpm lint && pnpm typecheck && pnpm test:db-runner && pnpm test:active-agents && pnpm test:conversation-reads && pnpm test:request-log && pnpm test:legacy-reads && pnpm test:mailbox-verification && pnpm test:personal-mailbox-core && pnpm test:preview-driver && pnpm test:mobile && pnpm test:github && pnpm test:factory-monitor && pnpm test:factory-approval && pnpm test:factory-check-independence && pnpm test:factory-check-recovery && pnpm test:factory && pnpm test:self-improvement-unit && pnpm test:workspace-settings && pnpm test:model-admission && pnpm test:release-security && pnpm test:audit && pnpm test:user-message-text && pnpm test:chat-actions && pnpm test:run-info && pnpm test:thread-changes && pnpm check:cloud-boundary
+
+
+> next-app@0.0.1 test:self-hosting /workspace/scratch/812e3b7d6d45/Mikka-1512-resume
+> node --import ./tests/support/server-only.mjs --import tsx --test lib/edition.test.ts scripts/release/verify-cloud-edition.test.ts lib/server-info.test.ts && node --test scripts/self-hosted-start.test.mjs
+
+✔ edition defaults to community and rejects misspelled deployment configuration (1.488944ms)
+✔ community own-provider usage never touches hosted billing, including beyond the free trial (5.017999ms)
+✔ community settings omit billing, and the GitHub install target is the configured app (0.47987ms)
+✔ fresh and existing installations use one boolean query without disclosing accounts or server credentials (6.572702ms)
+✔ database errors and invalid configuration cannot reopen setup or leak error details (0.936024ms)
+✔ email delivery and effective OAuth availability are separate from existing account state (0.735894ms)
+✔ cloud and wrong methods do no database work; HEAD has no body; compatibility UI and HTTPS state are explicit (0.790877ms)
+✔ official rollout requires both the source and actual production runtime edition (4.708095ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 429.027004
+✔ installation keys survive restart, remain private, and explicit overrides never enter the file (9.03045ms)
+✔ standalone startup uses the operator database and durable local Workflow only (0.736775ms)
+✔ bad self-hosted origins fail before migration or sign-in (0.349975ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 108.779409
+
+> next-app@0.0.1 test:settings-backend /workspace/scratch/812e3b7d6d45/Mikka-1512-resume
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/audit/cursor.test.ts lib/audit/delivery-arm.test.ts lib/secrets/audit-map.test.ts lib/secrets/dotenv.test.ts lib/usage/month.test.ts lib/billing/stripe.test.ts lib/billing/points-purchase.test.ts tests/settings-backend-routes.test.ts tests/workspace-secret-actions.test.ts
+
+✔ audit cursors round-trip and reject anything else (12.153777ms)
+✔ CSV fields are quoted and never start a formula (0.261923ms)
+(node:106) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:106) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ enqueueing an audit receipt arms the audit-retention timer on the same transaction (48.152023ms)
+(node:117) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:117) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ each fixed USD amount creates a payment session with server-owned pricing and matching payment metadata (18.891286ms)
+✔ English returns to the localized billing section and Preview keeps its isolated origin (1.418708ms)
+✔ non-admins and client-supplied values outside the fixed list cannot create customers or sessions (2.400041ms)
+✔ unconfigured payment fulfillment is unavailable before any Stripe request (1.370236ms)
+✔ first purchase creates one workspace customer and persists it for the next session (1.793762ms)
+✔ provider failures and unsafe Checkout URLs fail without leaking provider response details (2.066821ms)
+✔ from a chat: a dialog session with a publishable key, else a hosted page; both come back to that chat (9.934917ms)
+✔ config is null without a key; form encoding nests the way Stripe expects (1.967813ms)
+✔ requests carry the key as a bearer header; failures keep only the status (5.878801ms)
+✔ webhook signatures: valid, tampered, stale and missing (0.912539ms)
+✔ secret and env events map onto the audit catalogue with allowlisted metadata only (5.433362ms)
+✔ denied and skipped events stay out of the log (0.183526ms)
+✔ secret delivery changes are auditable without copying secret-bearing configuration (1.077767ms)
+✔ one KEY=value per line, with an optional # note after the value (1.593811ms)
+✔ quotes keep # and spaces in the value; export, blank and comment lines; CRLF (0.335394ms)
+✔ each bad line is reported by number; good lines still parse (0.261332ms)
+✔ a file over 2 MB is refused whole (2.684348ms)
+✔ usage months are UTC calendar months (3.911749ms)
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.297Z","requestId":"504a1f73-ccee-43d8-9c19-ef66798f1f0c","invocationId":"d210bb25-af4e-4f6b-a694-7bef8ded8459","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-08T23:13:22.301Z","requestId":"504a1f73-ccee-43d8-9c19-ef66798f1f0c","invocationId":"d210bb25-af4e-4f6b-a694-7bef8ded8459","route":"/api/workspace/switcher","method":"GET","status":200,"durationMs":4,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.304Z","requestId":"271d19ff-8c74-4025-b36c-2725aaa91eec","invocationId":"0cf27526-8129-49ee-99d3-eda478d8578a","route":"/api/workspace/switcher","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-08T23:13:22.304Z","requestId":"271d19ff-8c74-4025-b36c-2725aaa91eec","invocationId":"0cf27526-8129-49ee-99d3-eda478d8578a","route":"/api/workspace/switcher","method":"GET","status":401,"durationMs":1,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.305Z","requestId":"49acbc57-4581-4913-8bf5-0457ad29c2f5","invocationId":"7d2b592e-3595-4879-afe3-af6006ca0c2b","route":"/api/workspace/switcher","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-08T23:13:22.306Z","requestId":"49acbc57-4581-4913-8bf5-0457ad29c2f5","invocationId":"7d2b592e-3595-4879-afe3-af6006ca0c2b","route":"/api/workspace/switcher","method":"GET","status":403,"durationMs":1,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.306Z","requestId":"6e781472-1ada-4310-9430-328b4482a27b","invocationId":"a408fac3-47ce-4e9a-a9ee-6334283ac24a","route":"/api/workspace/switcher","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-08T23:13:22.306Z","requestId":"6e781472-1ada-4310-9430-328b4482a27b","invocationId":"a408fac3-47ce-4e9a-a9ee-6334283ac24a","route":"/api/workspace/switcher","method":"GET","status":403,"durationMs":0,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.307Z","requestId":"16f8e34a-4371-4c79-b591-71b81c267b60","invocationId":"e280219b-1393-4a16-a049-5d843a7d8e9b","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.308Z","requestId":"bba160fc-f59b-4c8f-84f6-0b46484f22f9","invocationId":"4e6814bf-5d7d-433c-b66f-3e79c1618b2a","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.308Z","requestId":"15c1a122-62f2-4bbd-80e8-08e335cba979","invocationId":"73c01aae-0cb4-4b7f-ab23-0644e33fff05","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.309Z","requestId":"7c0da344-a2bb-4a07-a071-ee179bb9558f","invocationId":"669175a0-fa03-4404-92dd-95512c6026aa","route":"/api/workspace/switcher","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.310Z","requestId":"c97dffb2-4a4e-46d8-8cc9-c74b9f0905f5","invocationId":"47bbd689-c6e6-4a29-bc8e-97cc695562ff","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request","timestamp":"2026-11-08T23:13:22.314Z","requestId":"c97dffb2-4a4e-46d8-8cc9-c74b9f0905f5","invocationId":"47bbd689-c6e6-4a29-bc8e-97cc695562ff","route":"/api/settings/[read]","method":"GET","status":200,"durationMs":4,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.315Z","requestId":"6b41b3f2-0494-4e14-98bb-136e516b6d6f","invocationId":"9cafa63a-8241-45be-a971-1b21e28e0901","route":"/api/settings/[read]","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-08T23:13:22.320Z","requestId":"6b41b3f2-0494-4e14-98bb-136e516b6d6f","invocationId":"9cafa63a-8241-45be-a971-1b21e28e0901","route":"/api/settings/[read]","method":"GET","status":401,"durationMs":5,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.320Z","requestId":"e0c4fbc7-7e61-422e-ae8c-4a981b932afb","invocationId":"125f7126-be53-48f5-be17-00d187fe42b5","route":"/api/settings/[read]","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-08T23:13:22.322Z","requestId":"e0c4fbc7-7e61-422e-ae8c-4a981b932afb","invocationId":"125f7126-be53-48f5-be17-00d187fe42b5","route":"/api/settings/[read]","method":"GET","status":403,"durationMs":1,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.322Z","requestId":"a3aa867c-0826-44fe-9dfe-6964bb20b621","invocationId":"0b91508f-807f-4688-979f-e8d9c944a0b5","route":"/api/settings/[read]","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-08T23:13:22.323Z","requestId":"a3aa867c-0826-44fe-9dfe-6964bb20b621","invocationId":"0b91508f-807f-4688-979f-e8d9c944a0b5","route":"/api/settings/[read]","method":"GET","status":403,"durationMs":1,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.323Z","requestId":"53454d87-84fe-4343-9ed0-af40b1767018","invocationId":"cf3bf1ba-282a-44da-9a09-96ed808856c6","route":"/api/settings/[read]","method":"GET"}
+{"level":"error","msg":"api_request","timestamp":"2026-11-08T23:13:22.324Z","requestId":"53454d87-84fe-4343-9ed0-af40b1767018","invocationId":"cf3bf1ba-282a-44da-9a09-96ed808856c6","route":"/api/settings/[read]","method":"GET","status":500,"durationMs":1,"userIdHash":null,"error":"Error"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.325Z","requestId":"14c6e3c6-6ed4-4592-9feb-6ef3d07b489b","invocationId":"2bf52f73-f221-438a-b806-c98e1764c44a","route":"/api/settings/[read]","method":"GET"}
+{"level":"warn","msg":"api_request","timestamp":"2026-11-08T23:13:22.325Z","requestId":"14c6e3c6-6ed4-4592-9feb-6ef3d07b489b","invocationId":"2bf52f73-f221-438a-b806-c98e1764c44a","route":"/api/settings/[read]","method":"GET","status":404,"durationMs":0,"userIdHash":null}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.326Z","requestId":"2eca65dd-aaed-4450-9fdb-c002ee6f0261","invocationId":"26d235e7-3f13-422f-bdef-409aba308e24","route":"/api/settings/[read]","method":"GET"}
+{"level":"info","msg":"api_request_started","timestamp":"2026-11-08T23:13:22.326Z","requestId":"3e567172-7c1e-4498-8481-562b5f99d419","invocationId":"f02ecad0-6a97-40f3-9e87-5041a8a719d7","route":"/api/settings/[read]","method":"GET"}
+(node:161) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:161) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ workspace switcher uses the authenticated session and keeps its successful response private (144.720152ms)
+✔ workspace switcher refuses a missing session before reading workspace data (0.977417ms)
+✔ workspace switcher keeps explicit workspace and membership refusals as 403 (1.617948ms)
+✔ workspace switcher does not turn database or unknown read failures into authority refusals (2.19288ms)
+✔ workspace switcher keeps an unknown session lookup failure retryable without reading workspace data (0.761572ms)
+✔ workspace-bots GET preserves the full workspace activity result and delegates scope to the existing action (4.583397ms)
+✔ workspace-bots GET preserves auth and membership refusals and never substitutes an empty activity list (10.81626ms)
+{"level":"info","msg":"api_request","timestamp":"2026-11-08T23:13:22.341Z","requestId":"2eca65dd-aaed-4450-9fdb-c002ee6f0261","invocationId":"26d235e7-3f13-422f-bdef-409aba308e24","route":"/api/settings/[read]","method":"GET","status":200,"durationMs":16,"userIdHash":null}
+{"level":"info","msg":"api_request","timestamp":"2026-11-08T23:13:22.342Z","requestId":"3e567172-7c1e-4498-8481-562b5f99d419","invocationId":"f02ecad0-6a97-40f3-9e87-5041a8a719d7","route":"/api/settings/[read]","method":"GET","status":200,"durationMs":16,"userIdHash":null}
+[billing] webhook event rejected { name: 'SyntaxError' }
+✔ concurrent devices of one owner retain their own current-session marker (16.726598ms)
+✔ audit JSON resumes the same snapshot and preserves explicit export failures (15.902201ms)
+✔ audit CSV requires a session and service authorization, preserves the workspace/filter, and escapes formulas (2.584548ms)
+✔ Stripe webhook verifies raw-body signatures before applying an event and leaves DB failures retryable (2.478829ms)
+✔ signed setup Checkout events and legacy SetupIntents reach verification; invalid signatures do not (6.760785ms)
+(node:169) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:169) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ saving and deleting an E2B key pass the authenticated actor’s transaction audit hook to storage (24.352862ms)
+✔ E2B actions authorize the page workspace and reject a foreign workspace before storage (0.781973ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 962.701563
+
+> next-app@0.0.1 test:signup-turnstile /workspace/scratch/812e3b7d6d45/Mikka-1512-resume
+> node --import tsx --test lib/signup-refusal.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/auth/turnstile.test.tsx
+
+✔ maps the #527 sign-up codes to their messages (0.73614ms)
+✔ leaves other failures to the generic message (0.13956ms)
+✔ sends the Turnstile token only when the widget produced one (0.621227ms)
+✔ a wrong password and an unknown email read the same; only an unverified email offers verification (N4) (0.169716ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 118.045804
+(node:212) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:212) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:212) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+✔ renders the Cloudflare widget when a site key is set (6.42494ms)
+✔ renders nothing without a site key (local, previews) (0.308165ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 202.630362
+
+> next-app@0.0.1 test:hosted-usage /workspace/scratch/812e3b7d6d45/Mikka-1512-resume
+> node --experimental-test-module-mocks --import tsx --test lib/billing/hosted-usage.test.ts lib/billing/verification-client.test.ts lib/subscription-refusal.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-wait.test.tsx
+
+✔ finds the hosted refusal code in a failed turn (1.095482ms)
+✔ shows the allowance and purchased points as one balance, 100 points per dollar, rounded down (0.16615ms)
+✔ the refusal line offers only what the person's state allows (1.018747ms)
+✔ a refused turn moves to the person's own subscription: the first in the menu's order (1.070365ms)
+(node:241) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:241) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ forwards each real action with the selected workspace and purchase amount (2.345928ms)
+✔ keeps the whole-point display and every transaction from the billing action (3.827973ms)
+✔ preserves billing authorization failures without a fallback read (0.694908ms)
+✔ a failed billing read rejects instead of showing an empty balance (0.705584ms)
+✔ a subscription refusal maps to its notice, never the raw step error (1.667975ms)
+✔ recovery follows the cause rather than retrying a disconnected account (0.227263ms)
+✔ other failures keep their own message (0.128754ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 158.192737
+(node:271) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:271) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ idle, it registers no key and reads nothing (18.354161ms)
+✔ waiting, it listens on the workspace key and ends with the pushed read, with no read of its own (3.931299ms)
+✔ with no push, one backstop read at the timeout, and the last data either way (2.258306ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 483.947708
+
+> next-app@0.0.1 test:execution-rules /workspace/scratch/812e3b7d6d45/Mikka-1512-resume
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/bot-quota-stop.test.ts lib/execution-worker.test.ts lib/execution-identity.test.ts lib/execution-settings-view.test.ts lib/model-options-source.test.ts lib/factory/agent-profile-target.test.ts lib/model-order-plan.test.ts lib/enabled-models-policy.test.ts lib/enabled-models-hosted.test.ts lib/credential-only-models.test.ts lib/model-order-context.test.ts lib/model-order-allowance.test.ts lib/device-scheduling.test.ts lib/model-routing.test.ts lib/model-provider-health.test.ts lib/run-model-fallback-view.test.ts lib/model-api-key-providers.test.ts lib/device-ssh-view.test.ts lib/factory/profile-quota.test.ts lib/computer/native-run-binding.test.ts lib/factory/authorize.test.ts lib/personal-policy.test.ts && pnpm --filter @mikka/daemon exec vitest run src/harness-models.test.ts test/commands.test.ts && pnpm --filter @mikka/protocol exec vitest run src/execution.test.ts
+
+(node:299) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:299) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a frozen subscription that runs out stops the turn; it never switches account or model mid-turn (29.276093ms)
+(node:300) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:300) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ native own execution combines its final binding and connection read (3.638888ms)
+✔ native shared execution combines its final binding and connection read (1.883601ms)
+✔ native execution rereads present after both membership checks (4.179183ms)
+✔ native execution rereads share after both membership checks (1.121421ms)
+✔ native execution rereads agentOwned after both membership checks (0.927559ms)
+✔ native execution rereads connected after both membership checks (1.440082ms)
+✔ native execution rereads epoch after both membership checks (0.681367ms)
+✔ a native scheduling history read still exposes an unavailable selection for existing callers (0.568287ms)
+✔ claude_code: an enabled credential model needs no device model report (1.462396ms)
+✔ codex: an enabled credential model needs no device model report (0.213271ms)
+✔ dispatch ranks match cloud-first and local-first planner selection, load and exclusions (2.950289ms)
+✔ future, offline, uninstalled and unavailable models have backend reasons and no dispatch rank (0.427014ms)
+✔ per-harness supported models come from the same account-aware device support as dispatch (0.368485ms)
+✔ dispatch availability never depends on a device model report (0.25174ms)
+✔ an earlier credential check keeps the node checking instead of inventing an install/update failure (0.271439ms)
+✔ the installer's five steps fold into the four Figma shows (1.964954ms)
+✔ a failure marks only its own step and keeps the rest waiting (0.228895ms)
+✔ online completes every step (0.186892ms)
+✔ an ssh alias counts as added by device name or host name (0.240833ms)
+✔ 添加这台电脑 shows 安装 → 启动 → 已上线, with the node check counted as installing (0.201694ms)
+✔ 重新连接 this computer shows 启动 → 已上线; SSH keeps all four steps (0.210197ms)
+(node:314) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:314) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ hosted settings expose the actual default target when cloud supersedes a configured local provider (123.550374ms)
+✔ a valid selected subscription does not query unrelated hosted policy (2.375533ms)
+✔ a valid shared subscription does not query unrelated hosted policy (0.473734ms)
+✔ a valid default subscription does not query unrelated hosted policy (2.319798ms)
+✔ a valid pooled subscription does not query unrelated hosted policy (0.520675ms)
+✔ a valid explicit API key does not query hosted policy (0.388566ms)
+✔ explicit hosted choice reads once before subscriptions and each new choice reads fresh policy (7.104985ms)
+✔ disabled explicit hosted choice keeps an available subscription fallback (2.242362ms)
+✔ disabled implicit hosted choice keeps the configured subscription fallback (0.766155ms)
+✔ disabled implicit hosted choice keeps the configured api_key fallback (0.829651ms)
+✔ actual hosted policy failure propagates without fallback and the next invocation can recover (0.752856ms)
+✔ concurrent owners do not share hosted policy and community defaults still respect disabled hosted (1.689949ms)
+✔ subscription defaults use #1515 release families and keep distinct tiers (2.746883ms)
+✔ automatic upgrades retire automatic old versions but preserve both explicit on and off (0.436848ms)
+✔ auto-enable off holds previous choices and new models remain off, including returning models (0.256858ms)
+✔ subscription reconciliation preserves the last successful refresh time until the refresh writer stamps it (0.176045ms)
+✔ borrowing a Bot uses the requester, their own device/account, and their private output (3.589383ms)
+✔ a Bot owner cannot lend their personal device implicitly (1.127821ms)
+✔ resource ownership is distinct from the Bot owner and explicit sharing is mandatory (10.239263ms)
+✔ revoking requester's membership ends a previously valid grant (3.194879ms)
+✔ revoking bot-owner's membership ends a previously valid grant (0.717993ms)
+✔ revoking resource-owner's membership ends a previously valid grant (0.694277ms)
+✔ Bot takeover and workspace migration cannot silently reassign an accepted run (1.743389ms)
+✔ subscription disconnect and revision changes revoke frozen subscription authority (1.217256ms)
+✔ retries retain immutable attribution and refuse an injected payment account (1.92956ms)
+✔ handoff reauthorizes a same-owner destination without refreshing withdrawn shares (5.864745ms)
+✔ E2B billing remains the requester's own external account and deletion denies execution (1.010484ms)
+✔ historical runs remain unattributed instead of fabricating current owners as past payers (0.298991ms)
+✔ the final provider boundary rejects stopped, completed and expired executions (1.482616ms)
+✔ usage attributes the frozen payer and leaves external amounts unknown (10.183438ms)
+✔ the provider mark follows the model id, then the account or harness (1.695868ms)
+✔ bot models group by account and list a copied binding once (1.178417ms)
+✔ a Bot with no saved model shows the Claude account first, then ChatGPT (0.229436ms)
+✔ subscription workers retain CLI auto unless a provider model is explicitly selected (2.672851ms)
+✔ explicit model and device stay frozen through retries (0.608959ms)
+(node:379) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:379) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ fixed own dispatch avoids unrelated sources while retaining fresh credential refusal (19.800843ms)
+✔ fixed shared dispatch avoids unrelated sources while retaining fresh credential refusal (3.753281ms)
+✔ a harness-only dispatch keeps its preference model even with a conflicting exact source (17.15317ms)
+✔ fixed own subscription reads only its selected source, with the original final fences (8.820243ms)
+ℹ {"kind":"subscription","shared":false,"originalQueries":12,"selectedQueries":5,"originalMembershipChecks":2,"selectedMembershipChecks":0,"providerCalls":0}
+✔ fixed own api_key reads only its selected source, with the original final fences (2.796868ms)
+ℹ {"kind":"api_key","shared":false,"originalQueries":12,"selectedQueries":6,"originalMembershipChecks":2,"selectedMembershipChecks":0,"providerCalls":0}
+✔ fixed shared subscription reads only its selected source, with the original final fences (2.542525ms)
+ℹ {"kind":"subscription","shared":true,"originalQueries":13,"selectedQueries":6,"originalMembershipChecks":2,"selectedMembershipChecks":1,"providerCalls":0}
+✔ fixed shared api_key reads only its selected source, with the original final fences (1.957983ms)
+ℹ {"kind":"api_key","shared":true,"originalQueries":12,"selectedQueries":6,"originalMembershipChecks":2,"selectedMembershipChecks":0,"providerCalls":0}
+✔ fixed subscription keeps the full implementation refusal: paused (2.190193ms)
+✔ fixed subscription keeps the full implementation refusal: removed (1.686955ms)
+✔ fixed subscription keeps the full implementation refusal: reconnect (1.598771ms)
+✔ fixed subscription keeps the full implementation refusal: epoch_changed (1.446802ms)
+✔ fixed subscription keeps the full implementation refusal: model_gone (1.912454ms)
+✔ fixed subscription keeps the full implementation refusal: quota (1.561985ms)
+✔ fixed subscription keeps the full implementation refusal: stale_quota (1.672222ms)
+✔ fixed subscription keeps the full implementation refusal: share_revoked (1.128963ms)
+✔ fixed subscription keeps the full implementation refusal: team_denied (1.096984ms)
+✔ fixed subscription keeps the full implementation refusal: payor_left (1.583648ms)
+✔ fixed subscription keeps the full implementation refusal: health (2.116962ms)
+✔ fixed API key keeps the full implementation refusal: unshared (1.669859ms)
+✔ fixed API key keeps the full implementation refusal: team_denied (1.150275ms)
+✔ fixed API key keeps the full implementation refusal: models_error (1.165858ms)
+✔ fixed API key keeps the full implementation refusal: model_gone (1.351649ms)
+✔ fixed API key keeps the full implementation refusal: protocol (1.608566ms)
+✔ fixed API key keeps the full implementation refusal: responses (1.424819ms)
+✔ fixed API key keeps the full implementation refusal: health (1.673294ms)
+✔ the original post-lock fresh read still sees pause (2.222301ms)
+✔ the original post-lock fresh read still sees share (2.501423ms)
+✔ the original post-lock fresh read still sees key_share (1.980217ms)
+✔ builtin target retains the complete catalogue and its ordering path (2.838261ms)
+✔ inherit target retains the complete catalogue and its ordering path (2.185196ms)
+✔ fixed Profile admission still refuses archived before reading its source (1.450097ms)
+✔ fixed Profile admission still refuses disabled before reading its source (0.47079ms)
+✔ fixed Profile admission still refuses revision before reading its source (0.393934ms)
+✔ fixed Profile admission still refuses owner before reading its source (0.264178ms)
+✔ fixed Profile admission still refuses workspace before reading its source (0.287153ms)
+✔ fixed Profile admission still refuses definition before reading its source (0.494376ms)
+✔ fixed Profile admission still refuses pin before reading its source (0.345992ms)
+(node:386) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:386) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ Factory authorization asks canonical issue access for metadata without its body (2.31373ms)
+✔ Factory authorization rechecks access on every call and returns only the access result (0.21209ms)
+✔ Factory authorization propagates the canonical access failure without accepting or retrying (0.683111ms)
+(node:392) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:392) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ fixed queue quota reads only the admitted candidate after exact native binding validation (4.309139ms)
+✔ fixed claim quota keeps its always probe after current run identity and exact binding validation (1.04103ms)
+✔ builtin quota preparation preserves the full preference path (2.81121ms)
+✔ inherit quota preparation preserves the full preference path (1.14099ms)
+✔ revoked binding refuses both quota preparations before reading another source (2.305276ms)
+✔ revoked execution identity prevents the forced provider probe (0.498171ms)
+✔ origin continuation keeps its existing quota exemption (0.279893ms)
+✔ question continuation keeps its existing quota exemption (0.19927ms)
+✔ foreign frozen scope cannot start quota preparation (0.246312ms)
+✔ a preset serves every protocol its official API speaks; DeepSeek and Kimi both, so their keys run on both Agents (1.620154ms)
+✔ each Agent talks to its own protocol's endpoint; a key that does not speak it has none (0.374294ms)
+✔ a custom provider serves only the protocol the person picked, at its own base URL (0.196156ms)
+✔ Codex runs on the Responses API: an OpenAI-protocol provider without it serves no Agent, but still speaks its protocol (0.222095ms)
+✔ no model name is written into lib/ or components/: model options come only from what was reported (1413.486959ms)
+✔ the guard catches a written model name and ignores comments (0.519424ms)
+✔ routing metadata exemption cannot hide model options, defaults or another file (1.434704ms)
+(node:417) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:417) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ forced startup refresh uses allowance after its original owner checks (9.429642ms)
+✔ shared startup still checks requester, payer and the share before allowance (4.100614ms)
+✔ membership denial cannot start either allowance or Settings usage (1.998164ms)
+✔ share withdrawal cannot start allowance or switch to the requester account (1.802528ms)
+✔ each completed forced refresh still performs a fresh allowance call (4.945138ms)
+(node:423) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:423) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ prompt projection skips only unused credential counts when sharing is false (159.333652ms)
+ℹ {"kind":"order_projection_query_budget","allowed":false,"full":10,"context":7,"saved":3}
+✔ prompt projection skips only unused credential counts when sharing is true (5.491192ms)
+ℹ {"kind":"order_projection_query_budget","allowed":true,"full":13,"context":9,"saved":4}
+✔ an unused count failure cannot discard prompt facts, while the full view still reports it (6.075553ms)
+✔ the prompt still rejects a required failCandidates check (1.098787ms)
+✔ the prompt still rejects a required failStates check (3.670922ms)
+✔ new prompt reads observe paused credentials and keep concurrent owners separate (21.344551ms)
+(node:435) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:435) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ untouched defaults keep the newest release per account and family while retaining the full catalogue (3.265655ms)
+✔ device readiness is independent of the credential model catalogue and CLI shortcuts (0.461045ms)
+✔ an allowance check that failed keeps the subscription preference and does not silently charge a key (0.511802ms)
+✔ the first allowed model that can run takes the run; the full provider model is what runs despite a CLI slot (0.260603ms)
+✔ ordered fallback: quota used up, signed out, or no device moves to the next model, and says why each was skipped (0.465753ms)
+✔ 本地 picks only among the devices that can run it, never one with 参与调度 off, offline, or unable to take a subscription run (2.384376ms)
+✔ an admitted subscription model runs on any eligible broker without an exact CLI model report (0.340303ms)
+✔ no computer can run it: the reason comes from the computer closest to running it (0.519584ms)
+✔ failed subscription preflight is actionable and overrides a stale broker flag without blocking API-key runs (0.491001ms)
+✔ 本地 order: a server before a computer, then the fewest unfinished runs, then the one that joined first; the same input gives the same device (0.474315ms)
+✔ a model the person picked for the thread goes first, before the list (4.872459ms)
+✔ 云端 runs the first usable model on the person's E2B machine (0.217418ms)
+✔ nothing can run: the card names why (0.29839ms)
+✔ an untouched list: opus first, then the first Codex model reported, else the first model anything reported (0.98155ms)
+✔ 云端: the cloud, then a server, then a computer; a place is tried only when the one before it can run nothing (0.270167ms)
+✔ 本地: a server, then a computer, never the cloud (0.19253ms)
+✔ a run the person put in the cloud goes nowhere else (0.17923ms)
+✔ a model whose allowance check failed stops the search in every place, unless one before it can run (0.228605ms)
+✔ a configured cloud without measured template models cannot take a subscription run (0.140222ms)
+✔ dispatch order: the 优先使用的 Agent's list first, then the other's, each keeping its own order (decision 2026-11-05-0400) (0.27833ms)
+✔ a place in the 运行位置 chain says why it cannot take a run: 参与调度 off before offline before a missing Agent (0.224388ms)
+✔ order view serializes supplied heartbeat times without changing its display snapshot (471.714983ms)
+✔ native model rejection never changes global credential or model availability (3.966753ms)
+✔ runtime balance and authentication failures remain blocked until the credential is handled (2.17505ms)
+✔ provider unavailability expires after two minutes, including its exact boundary (1.095672ms)
+✔ health accepts only the structured provider contract and never returns raw errors (0.562278ms)
+✔ no authorized candidates means no credential or runtime history is read (0.391911ms)
+✔ exact model tiers leave unknown versions and aliases at standard (1.317326ms)
+✔ offered efforts exist in the retained native capability reports and run protocol (1.558901ms)
+✔ Decision asks two independent ordered scores and never sends candidates (0.302316ms)
+✔ the transport validates score answers against the question levels (0.553625ms)
+✔ the rounded tier picks the first listed model of that tier, regardless of the list head (0.51737ms)
+✔ scores round to the nearest level within bounds (0.23215ms)
+✔ the judge reads what must change, not process, acceptance or reporting sections (1.130525ms)
+✔ a missing tier goes up, never down, and only falls lower when nothing higher can run (0.189936ms)
+✔ effort maps to the nearest level the selected model supports (0.339792ms)
+✔ only an uncertain, missing or malformed tier keeps list order (0.328425ms)
+✔ tier and effort use separate confidence floors (0.741018ms)
+✔ confidence combinations: effort never abandons the tier judgement (0.323348ms)
+✔ diagnostics carry scores, confidence and the outcome, never candidate IDs (0.265912ms)
+✔ toggle off ignores the Decision and follows the person's list position without mutation (0.13233ms)
+✔ a light failure goes to the nearest higher available tier, before an earlier strongest entry (1.335094ms)
+✔ escalation preserves list order inside a tier and never returns a lower or failed tier (0.863402ms)
+✔ escalation keeps an accepted effort only when the new model supports it (0.122245ms)
+✔ a version-1 snapshot from before the tier judgement still escalates, with an unknown required tier (0.124187ms)
+✔ the labeled routing set is well formed and each label is reachable through the host mapping (4.795662ms)
+(node:459) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:459) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a shared credential check returns its current authorization in one read (2.200929ms)
+✔ a missing share does not issue an additional read or write (0.329527ms)
+✔ a refused share does not issue an additional read or write (0.24579ms)
+✔ repeated permission checks observe revoke and restore without reusing an earlier grant (0.433994ms)
+✔ a failed authorization read propagates its original cause without another query (0.714547ms)
+✔ only a committed continuation within the same authorized chain is shown as switched (5.863763ms)
+✔ the composer follows only a confirmed switch to its current live run (0.759946ms)
+✔ multiple switch notices cannot replace the current run with an unrelated historical target (0.265581ms)
+✔ blocked and explicitly picked models keep the safe per-model reasons and setup actions (2.722727ms)
+✔ host receipt parsing rejects raw fields and malformed digests without exposing private receipt fields (0.466583ms)
+ℹ tests 180
+ℹ suites 0
+ℹ pass 180
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2959.638246
+
+ RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/Mikka-1512-resume/packages/daemon
+
+ ❯ test/commands.test.ts (8 tests | 8 failed) 210ms
+   × uninstall waits for active threads, persists and sends its receipt, removes the service and credentials, then exits 58ms
+   × redetect refreshes harnesses through the shared device command channel 26ms
+   ❯ run commands (6)
+     × cancels active work when the application rejects the device credential 22ms
+     × hands a person's message to the running agent and acks it once 24ms
+     × cancels the run when a person stops it, and closes its message 25ms
+     × keeps taking messages for other runs while one is being stopped 26ms
+     × runs overlapping server passes one after another, so it registers once 6ms
+     × ignores commands for runs it does not have, and keeps polling after a network cut 23ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/commands.test.ts > uninstall waits for active threads, persists and sends its receipt, removes the service and credentials, then exits
+Error: listen EPERM: operation not permitted /tmp/orvd-7MEcvS/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:80:30
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  test/commands.test.ts > redetect refreshes harnesses through the shared device command channel
+Error: listen EPERM: operation not permitted /tmp/orvd-bXY6OZ/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:116:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > cancels active work when the application rejects the device credential
+Error: listen EPERM: operation not permitted /tmp/orvd-27C4jF/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:133:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > hands a person's message to the running agent and acks it once
+Error: listen EPERM: operation not permitted /tmp/orvd-GPLuJP/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:144:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > cancels the run when a person stops it, and closes its message
+Error: listen EPERM: operation not permitted /tmp/orvd-CpmHbK/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:161:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > keeps taking messages for other runs while one is being stopped
+Error: listen EPERM: operation not permitted /tmp/orvd-WesfxH/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:191:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > runs overlapping server passes one after another, so it registers once
+Error: listen EPERM: operation not permitted /tmp/orvd-2T4d7i/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ test/commands.test.ts:223:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  test/commands.test.ts > run commands > ignores commands for runs it does not have, and keeps polling after a network cut
+Error: listen EPERM: operation not permitted /tmp/orvd-25cl4N/daemon.sock
+ ❯ src/rpc/server.ts:80:14
+     78|     await new Promise<void>((resolve, reject) => {
+     79|       server.once("error", reject)
+     80|       server.listen(socketPath, () => resolve())
+       |              ^
+     81|     })
+     82|     chmodSync(socketPath, 0o600)
+ ❯ RpcServer.listen src/rpc/server.ts:78:11
+ ❯ Daemon.startInternal src/main.ts:626:20
+ ❯ Daemon.start src/main.ts:329:14
+ ❯ setup test/commands.test.ts:27:18
+ ❯ test/commands.test.ts:245:32
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed (8)
+   Start at  18:13:28
+   Duration  2.37s (transform 55%, import 35%, tests 10%)
+
+undefined
+/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/packages/daemon:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run src/harness-models.test.ts test/commands.test.ts
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

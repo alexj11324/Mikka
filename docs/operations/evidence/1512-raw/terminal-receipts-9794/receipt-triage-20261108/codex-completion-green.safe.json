@@ -1,0 +1,22 @@
+{
+  "scope": "offline source-bound Codex completion regression; no model or production calls",
+  "sourceBase": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "equivalentProductHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "codexUpstreamCommit": "83086188ae0614bd882818ff1aa23f3194962012",
+  "realModelCalls": 0,
+  "nativeTraceAbsenceStillUnknown": true,
+  "green": {
+    "chunk_id": "e4b670",
+    "wall_time_seconds": 2.817015605,
+    "exit_code": 0,
+    "original_token_count": 67,
+    "output": "\n RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/issue1512-evidence-work/receipt-triage-20261108/checkout/packages/daemon\n\n\n Test Files  2 passed (2)\n      Tests  16 passed (16)\n   Start at  18:04:59\n   Duration  2.32s (tests 48%, import 30%, transform 22%, worker 1%)\n\n"
+  },
+  "typecheck": {
+    "chunk_id": "62c792",
+    "wall_time_seconds": 3.520829602,
+    "exit_code": 0,
+    "original_token_count": 0,
+    "output": ""
+  }
+}
