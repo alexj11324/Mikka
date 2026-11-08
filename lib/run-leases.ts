@@ -432,6 +432,9 @@ export async function startThreadMachine(actor: { userId: string; workspaceId: s
     }
     return { state: 'running' as const }
   } catch (error) {
+    // Resource withdrawal is not a failed VM provision. Preserve the queued
+    // receipt and every retained machine/token; the durable handoff stops.
+    if (isProjectExecutionRefusal(error)) return { state: 'unavailable' as const, reason: 'project_resources' as const }
     const { RetainedTaskMachineUnavailable } = await import('@/lib/cloud-computer/thread-machines')
     if (error instanceof RetainedTaskMachineUnavailable) return { state: 'unavailable' as const, reason: 'retained_runtime' as const }
     // A concurrent durable handoff owns this run's provisioning lease. Its

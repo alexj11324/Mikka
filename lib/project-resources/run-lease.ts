@@ -3,7 +3,9 @@ import type { PoolClient } from 'pg'
 import { ActionFailureError } from '@/lib/action-error'
 import type { agentRuns } from '@/lib/db/schema'
 import type { ProjectExecutionSnapshot } from './contracts'
-import { assertFrozenProjectExecution, requireProjectResourceLease, withProjectExecution, type ProjectExecutionInput } from './store'
+import { assertFrozenProjectExecution, requireProjectResourceLease, withProjectExecution, withProjectResourceLease, type ProjectExecutionInput } from './store'
+
+type ResourceRun = Pick<typeof agentRuns.$inferSelect, 'userId' | 'workspaceId' | 'issueId' | 'deviceId' | 'deviceRepoId' | 'agentId' | 'baseBranch' | 'agentDefinition'>
 
 export type ProjectExecutionRefusal = 'projectRepositoryDenied' | 'projectEnvironmentUnavailable' | 'projectArchived'
 export function isProjectExecutionRefusal(error: unknown): error is ActionFailureError & { code: ProjectExecutionRefusal } {
@@ -33,11 +35,21 @@ export async function withRunProjectExecution<T>(input: ProjectExecutionInput, f
   })
 }
 
+/** A queued receipt may outlive its resource authorization. Hold the same
+ * Workspace/resource lease across handoff and actual VM create/resume, before
+ * either operation opens its APP transaction. Nested startup borrows it. */
+export async function withRunProjectResources<T>(query: Pick<PoolClient, 'query'>, run: ResourceRun, operation: () => Promise<T>) {
+  if (!run.workspaceId || !run.issueId) throw new ActionFailureError('projectEnvironmentUnavailable')
+  return withProjectResourceLease(run.userId, run.workspaceId, async () => {
+    await assertRunProjectResources(query, run)
+    return operation()
+  })
+}
+
 /** Direct continuation writers already own their WS/resource lease before
  * entering APP. Read the persisted placement on their executor; no APP -> WS
  * lock acquisition or inferred Environment is allowed at this inner boundary. */
-export async function assertRunProjectResources(query: Pick<PoolClient, 'query'>,
-  run: Pick<typeof agentRuns.$inferSelect, 'userId' | 'workspaceId' | 'issueId' | 'deviceId' | 'deviceRepoId' | 'agentId' | 'baseBranch' | 'agentDefinition'>) {
+export async function assertRunProjectResources(query: Pick<PoolClient, 'query'>, run: ResourceRun) {
   if (!run.workspaceId || !run.issueId) throw new ActionFailureError('projectEnvironmentUnavailable')
   requireProjectResourceLease(run.userId, run.workspaceId)
   const { rows: [target] } = await query.query<{ repoPath: string; remoteUrl: string | null; kind: 'local' | 'cloud'; harness: string }>(

@@ -1,6 +1,6 @@
 'use server'
 import { getTranslations } from 'next-intl/server'
-import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
@@ -101,6 +101,9 @@ async function persistProject(input: unknown, partial: boolean) {
       if (hasDependencyCycle(nextId, values.properties.dependencyIds, graph)) return { error: i18nText('Errors.projectDependencyCycle') }
       // These old columns are harmless compatibility snapshots, never relation inputs.
       const stored = { ...values, lead: people.leadUserId ?? '', leadUserId: people.leadUserId, properties: { ...values.properties, members: people.memberIds } }
+      // Signal that the matching canonical member writes below are part of this
+      // already-authorized transaction. The marker expires with this transaction.
+      await tx.execute(sql`select set_config('mikka.project_v2_writer', '1', true)`)
       const [saved] = existing
         ? await tx.update(projects).set({ ...stored, revision: existing.revision + 1, updatedAt: new Date() })
           .where(and(eq(projects.id, nextId), eq(projects.workspaceId, context.workspaceId), eq(projects.revision, existing.revision))).returning()

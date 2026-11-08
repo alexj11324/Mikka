@@ -48,7 +48,10 @@ const workspaceTransaction = { select: () => ({ from: (table: unknown) => ({ whe
   assert.ok(userId === 'owner' || userId === 'other-owner')
   return [{ id: userId }]
 } }) }) }) }
-mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: { transaction: (work: (tx: typeof workspaceTransaction) => unknown) => work(workspaceTransaction) } } })
+mock.module('@/lib/workspace-db', { namedExports: {
+  workspaceDb: { transaction: (work: (tx: typeof workspaceTransaction) => unknown) => work(workspaceTransaction) },
+  workspacePool: { query: async () => { throw new Error('Issue mutation must use its held Workspace transaction') } },
+} })
 let mutate: typeof import('./issue-mutation').idempotentIssueMutation
 before(async () => {
   const implementation = (await import('./issue-mutation')).idempotentIssueMutation

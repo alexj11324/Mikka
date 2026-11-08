@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { setTimeout as delay } from 'node:timers/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
@@ -13,6 +16,15 @@ import { backfillProjectV2 } from '../scripts/project-v2-backfill.mjs'
 const url = process.env.E2E_DATABASE_URL
 if (url && !disposableDatabase()) throw new Error('Project v2 tests require a loopback *_e2e database')
 if (process.env.REQUIRE_DB === '1' && !url) throw new Error('Project v2 database tests cannot skip in required CI')
+
+async function observed(check: () => Promise<boolean>, message: string) {
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    if (await check()) return
+    await delay(10)
+  }
+  assert.fail(message)
+}
 
 test('Project v2: split database migration, canonical relationships and live tenant permissions', { skip: !url, timeout: 240_000 }, async t => {
   const suffix = randomUUID().replaceAll('-', '')
@@ -87,8 +99,41 @@ test('Project v2: split database migration, canonical relationships and live ten
     await workspace.query(`INSERT INTO workspace_project_events(id,"projectId","userId",message) VALUES($1,$2,$3,'Existing history')`, [randomUUID(), project, owner])
     const preserved = (await workspace.query('SELECT id,properties,revision,"createdAt","updatedAt" FROM workspace_projects WHERE id=$1', [project])).rows[0]
     await migrate(names.filter(name => name >= boundary))
-    const migrated = await backfillProjectV2(application, workspace)
-    assert.deepEqual(migrated, { projectsBound: 2, projectTasksBound: 121, projectsPending: 4 })
+    await t.test('old writer queued behind the real backfill cannot acknowledge a lost relationship after its receipt commits', async () => {
+      const blocker = await application.connect(), writer = await workspace.connect()
+      let migration: ReturnType<typeof backfillProjectV2> | undefined
+      let oldWrite: Promise<unknown> | undefined
+      try {
+        await blocker.query('BEGIN')
+        await blocker.query('SELECT id FROM issues WHERE id=$1 FOR UPDATE', [initialTasks[0]])
+        const blockerPid = (await blocker.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+        migration = backfillProjectV2(application, workspace)
+        void migration.catch(() => undefined) // awaited below and during cleanup
+        // The real backfill holds its Project row locks before requesting these
+        // APP task locks. Observe the database wait, not an assumed timer order.
+        await observed(async () => Boolean((await application.query(`SELECT 1 FROM pg_stat_activity
+          WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid))
+            AND query LIKE 'SELECT id,"workspaceId","ownershipState" FROM issues%'`, [blockerPid])).rowCount), 'backfill did not reach its locked Task evidence read')
+        const writerPid = (await writer.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+        oldWrite = writer.query('UPDATE workspace_projects SET "issueIds"=$2,revision=revision+1,"updatedAt"=now() WHERE id=$1 RETURNING id', [project, '[]'])
+          .then(() => ({ accepted: true }), (error: unknown) => ({ error }))
+        await observed(async () => Boolean((await workspace.query(`SELECT 1 FROM pg_stat_activity
+          WHERE pid=$1 AND wait_event_type='Lock' AND cardinality(pg_blocking_pids(pid))>0`, [writerPid])).rowCount), 'legacy writer did not wait behind the backfill Project lock')
+        assert.equal((await workspace.query('SELECT 1 FROM workspace_project_v2_migrations WHERE "projectId"=$1', [project])).rowCount, 0)
+        await blocker.query('COMMIT')
+        assert.deepEqual(await migration, { projectsBound: 2, projectTasksBound: 121, projectsPending: 4 })
+        const outcome = await oldWrite as { accepted?: boolean; error?: { code: string; message: string } }
+        assert.equal(outcome.accepted, undefined, 'a legacy-only write must never report success')
+        assert.equal(outcome.error?.code, '23514')
+        assert.equal(outcome.error?.message, 'projectLegacyWriteDenied')
+        assert.equal((await workspace.query('SELECT 1 FROM workspace_project_v2_migrations WHERE "projectId"=$1', [project])).rowCount, 1)
+        assert.equal((await workspace.query('SELECT count(*)::int n FROM workspace_project_tasks WHERE "projectId"=$1', [project])).rows[0].n, 121)
+      } finally {
+        await blocker.query('ROLLBACK')
+        await Promise.allSettled([...(migration ? [migration] : []), ...(oldWrite ? [oldWrite] : [])])
+        blocker.release(); writer.release()
+      }
+    })
     assert.deepEqual((await workspace.query('SELECT id,properties,revision,"createdAt","updatedAt" FROM workspace_projects WHERE id=$1', [project])).rows[0], preserved)
     assert.equal((await workspace.query('SELECT "leadUserId" FROM workspace_projects WHERE id=$1', [project])).rows[0].leadUserId, owner)
     assert.deepEqual((await workspace.query('SELECT "userId" FROM workspace_project_members WHERE "projectId"=$1', [project])).rows.map(row => row.userId), [owner])
@@ -124,6 +169,50 @@ test('Project v2: split database migration, canonical relationships and live ten
     const created = await actAs(member, () => actions.saveProject({ ...draft, leadUserId: owner, memberIds: [owner, member] }))
     assert.ok(created.project, JSON.stringify(created))
     const createdId = created.project.id
+
+    await t.test('upgraded database rejects old inserts and canonical legacy-only writes without altering evidence', async () => {
+      const before = (await workspace.query('SELECT to_jsonb(p) AS snapshot FROM workspace_projects p WHERE id=$1', [project])).rows[0].snapshot
+      for (const [sql, params] of [
+        ['UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [project, '[]']],
+        ['UPDATE workspace_projects SET lead=$2 WHERE id=$1', [project, member]],
+        ['UPDATE workspace_projects SET properties=jsonb_set(properties,\'{members}\',$2::jsonb) WHERE id=$1', [project, JSON.stringify([member])]],
+        ['UPDATE workspace_projects SET "userId"=$2 WHERE id=$1', [project, member]],
+      ] as const) await assert.rejects(workspace.query(sql, [...params]), { code: '23514', message: 'projectLegacyWriteDenied' })
+      const oldId = randomUUID()
+      await assert.rejects(workspace.query(`INSERT INTO workspace_projects(id,"userId",name,summary,description,status,priority,lead,team,"startDate","targetDate",properties,"issueIds",revision)
+        VALUES($1,$2,'Old writer','','','planned','none','me','Mikka','','',$3,'[]',1)`, [oldId, owner, properties]), { code: '23514', message: 'projectWorkspaceRequired' })
+      assert.equal((await workspace.query('SELECT 1 FROM workspace_projects WHERE id=$1', [oldId])).rowCount, 0)
+      assert.deepEqual((await workspace.query('SELECT to_jsonb(p) AS snapshot FROM workspace_projects p WHERE id=$1', [project])).rows[0].snapshot, before)
+      await backfillProjectV2(application, workspace)
+      const visible = (await accessibleProjects(owner, projectDb, alpha)).find(row => row.id === project)!
+      assert.equal(visible.issueIds.length, 120)
+      assert.equal(visible.leadUserId, owner)
+      assert.deepEqual(visible.memberIds, [owner])
+      assert.equal((await workspace.query('SELECT "workspaceId" FROM workspace_projects WHERE id=$1', [unresolved])).rows[0].workspaceId, null, 'existing quarantined evidence is retained')
+      assert.equal((await workspace.query('SELECT 1 FROM workspace_project_repairs WHERE "projectId"=$1', [unresolved])).rowCount, 1)
+    })
+
+    await t.test('legacy client fields through the current API update canonical people and never leak a writer marker', async () => {
+      const saved = await actAs(member, () => actions.saveProject({ ...draft, name: 'Alias-compatible API', lead: 'me', properties: { ...draft.properties, members: ['me'] } }))
+      assert.ok(saved.project, JSON.stringify(saved))
+      assert.equal(saved.project.leadUserId, member)
+      assert.deepEqual(saved.project.memberIds, [member])
+      const edited = await actAs(member, () => actions.updateProjectProperties({ id: saved.project!.id, revision: saved.project!.revision, workspaceId: alpha,
+        changes: { lead: owner, properties: { ...draft.properties, members: [owner] } } }))
+      assert.ok(edited.project, JSON.stringify(edited))
+      assert.equal(edited.project.leadUserId, owner)
+      assert.deepEqual(edited.project.memberIds, [owner])
+      const clients = await Promise.all(Array.from({ length: 5 }, () => workspaceModule!.connect()))
+      try {
+        for (const client of clients) assert.notEqual((await client.query("SELECT current_setting('mikka.project_v2_writer',true) AS marker")).rows[0].marker, '1', 'transaction marker must not survive in a pooled session')
+      } finally { clients.forEach(client => client.release()) }
+      const marker = await workspace.connect()
+      try {
+        await marker.query('BEGIN')
+        await marker.query("SELECT set_config('mikka.project_v2_writer','1',true)")
+        await assert.rejects(marker.query('UPDATE workspace_projects SET "issueIds"=$2 WHERE id=$1', [project, '[]']), { code: '23514', message: 'projectLegacyWriteDenied' })
+      } finally { await marker.query('ROLLBACK'); marker.release() }
+    })
 
     await t.test('create and edit stable people IDs; invalid/departed identities never become assignees', async () => {
       assert.equal(created.project!.workspaceId, alpha)
@@ -186,6 +275,61 @@ test('Project v2: split database migration, canonical relationships and live ten
       await assert.rejects(workspace.query('UPDATE workspace_projects SET "workspaceId"=$2 WHERE id=$1', [createdId, beta]), /projectWorkspaceTransferDenied/)
       await assert.rejects(workspace.query('INSERT INTO workspace_project_tasks("issueId","projectId","workspaceId") VALUES($1,$2,$3)', [randomUUID(), createdId, beta]), { code: '23503' })
       await assert.rejects(workspace.query('INSERT INTO workspace_project_tasks("issueId","projectId","workspaceId") VALUES($1,$2,$3)', [initialTasks[1], project, alpha]), { code: '23505' })
+    })
+
+    await t.test('the real acceptance seed entry point uses a trusted split-DB Workspace and preserves canonical edits on retry', async () => {
+      const guestId = `acceptance-guest-${randomUUID()}`, guestEmail = `acceptance-${randomUUID()}@preview.mikka.invalid`
+      await application.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Acceptance Guest',$2,true,now(),now())`, [guestId, guestEmail])
+      const seed = () => promisify(execFile)(process.execPath, [new URL('../scripts/seed-acceptance-demo.mjs', import.meta.url).pathname, guestEmail], {
+        env: { ...process.env, MIKKA_DATABASE_URL: appUrl.toString(), DATABASE_URL: tenantUrl.toString() }, timeout: 60_000,
+      })
+      const first = JSON.parse((await seed()).stdout)
+      assert.deepEqual(first, { guest: guestEmail, workspaceId: first.workspaceId, projects: 3, issues: 21, teamMembers: 4, preservedExistingData: true })
+      const tenant = (await workspace.query('SELECT "userId",kind FROM mikka_workspaces WHERE id=$1', [first.workspaceId])).rows[0]
+      assert.deepEqual(tenant, { userId: guestId, kind: 'team' })
+      const tasks = (await application.query('SELECT id,"workspaceId","ownershipState","issuedIdentifier",content FROM issues WHERE "userId"=$1 ORDER BY id', [guestId])).rows
+      assert.equal(tasks.length, 21)
+      assert.ok(tasks.every(task => task.workspaceId === first.workspaceId && task.ownershipState === 'bound' && task.issuedIdentifier))
+      assert.equal(new Set(tasks.map(task => task.issuedIdentifier)).size, 21)
+      assert.ok(tasks.every(task => task.content.attrs.mikka.project === undefined), 'Project names are not a second relationship store')
+      const seededProjects = await accessibleProjects(guestId, projectDb, first.workspaceId)
+      assert.equal(seededProjects.length, 3)
+      assert.ok(seededProjects.every(row => row.issueIds.length === 7 && row.leadUserId === guestId && JSON.stringify(row.memberIds) === JSON.stringify([guestId])))
+      const receipts = (await workspace.query('SELECT m.* FROM workspace_project_v2_migrations m JOIN workspace_projects p ON p.id=m."projectId" WHERE p."workspaceId"=$1 ORDER BY m."projectId"', [first.workspaceId])).rows
+      assert.equal(receipts.length, 3)
+      assert.equal((await workspace.query('SELECT count(*)::int n FROM workspace_projects WHERE "workspaceId"=$1 AND "issueIds"=\'[]\'::jsonb', [first.workspaceId])).rows[0].n, 3)
+      await workspace.query('DELETE FROM workspace_project_tasks WHERE "issueId"=$1', [tasks[0].id])
+      await workspace.query('UPDATE workspace_projects SET name=\'Edited demo\' WHERE id=$1', [seededProjects[0].id])
+      await application.query('UPDATE issues SET title=\'Edited task\' WHERE id=$1', [tasks[0].id])
+      const beforeTasks = (await application.query('SELECT to_jsonb(i) AS snapshot FROM issues i WHERE "userId"=$1 ORDER BY id', [guestId])).rows
+      const beforeProjects = (await workspace.query('SELECT to_jsonb(p) AS snapshot FROM workspace_projects p WHERE "workspaceId"=$1 ORDER BY id', [first.workspaceId])).rows
+      const beforeCounter = (await application.query('SELECT * FROM workspace_task_identifier_counters WHERE "workspaceId"=$1', [first.workspaceId])).rows
+      assert.deepEqual(JSON.parse((await seed()).stdout), first)
+      await backfillProjectV2(application, workspace)
+      assert.deepEqual((await application.query('SELECT to_jsonb(i) AS snapshot FROM issues i WHERE "userId"=$1 ORDER BY id', [guestId])).rows, beforeTasks)
+      assert.deepEqual((await workspace.query('SELECT to_jsonb(p) AS snapshot FROM workspace_projects p WHERE "workspaceId"=$1 ORDER BY id', [first.workspaceId])).rows, beforeProjects)
+      assert.deepEqual((await application.query('SELECT * FROM workspace_task_identifier_counters WHERE "workspaceId"=$1', [first.workspaceId])).rows, beforeCounter, 'idempotent seed does not consume more stable task numbers')
+      assert.deepEqual((await workspace.query('SELECT m.* FROM workspace_project_v2_migrations m JOIN workspace_projects p ON p.id=m."projectId" WHERE p."workspaceId"=$1 ORDER BY m."projectId"', [first.workspaceId])).rows, receipts)
+      assert.equal((await workspace.query('SELECT 1 FROM workspace_project_tasks WHERE "issueId"=$1', [tasks[0].id])).rowCount, 0)
+      assert.equal((await application.query('SELECT count(*)::int n FROM issue_versions WHERE "userId"=$1', [guestId])).rows[0].n, 21)
+      assert.equal((await workspace.query('SELECT count(*)::int n FROM workspace_project_events WHERE "userId"=$1', [guestId])).rows[0].n, 3)
+    })
+
+    await t.test('acceptance seed never adopts quarantined or other-Workspace Tasks by creator', async () => {
+      for (const workspaceId of [null, alpha]) {
+        const guestId = `acceptance-legacy-${randomUUID()}`, guestEmail = `acceptance-${randomUUID()}@preview.mikka.invalid`
+        const hash = createHash('sha256').update(`${guestEmail}:demo-v1:issue-0-0`).digest('hex')
+        const taskId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`
+        await application.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Acceptance Guest',$2,true,now(),now())`, [guestId, guestEmail])
+        await application.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Historical demo','{"type":"doc"}','todo','normal')`, [taskId, guestId, workspaceId])
+        const before = (await application.query('SELECT to_jsonb(i) AS snapshot FROM issues i WHERE id=$1', [taskId])).rows[0].snapshot
+        await assert.rejects(promisify(execFile)(process.execPath, [new URL('../scripts/seed-acceptance-demo.mjs', import.meta.url).pathname, guestEmail], {
+          env: { ...process.env, MIKKA_DATABASE_URL: appUrl.toString(), DATABASE_URL: tenantUrl.toString() }, timeout: 60_000,
+        }), /Existing demo Task needs reviewed ownership migration/)
+        assert.deepEqual((await application.query('SELECT to_jsonb(i) AS snapshot FROM issues i WHERE id=$1', [taskId])).rows[0].snapshot, before)
+        assert.equal((await workspace.query('SELECT 1 FROM workspace_projects WHERE "userId"=$1', [guestId])).rowCount, 0)
+        assert.equal((await workspace.query('SELECT 1 FROM mikka_workspaces WHERE "userId"=$1', [guestId])).rowCount, 0)
+      }
     })
   } finally {
     headersMock.restore(); localeMock.restore()

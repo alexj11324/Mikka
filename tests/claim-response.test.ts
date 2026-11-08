@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { mock } from 'node:test'
 import { gzipSync } from 'node:zlib'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
@@ -43,6 +43,14 @@ function fixture() {
     credentialCapability: false,
     catalogueCapability: false,
     nativeLeaseCapabilities: [] as boolean[],
+    ownNativeBinding: null,
+    localBindingLookups: [] as string[][],
+    cloudGitHubConfigured: false,
+    cloudGitHubLookups: [] as string[],
+    cloudGitHubCredentials: [] as string[][],
+    mailboxLookups: [] as string[][],
+    appToolkits: [] as string[],
+    appToolkitLookups: [] as (string | null)[][],
     credentialOwners: [] as string[],
     credentialFailure: undefined as Error | undefined,
     beforeCredential: undefined as (() => Promise<void>) | undefined,
@@ -57,8 +65,14 @@ function fixture() {
   return probe
 }
 async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'], expectsProjectAdmission = true) {
+  const diagnostics: unknown[][] = []
+  const errors = mock.method(console, 'error', (...args: unknown[]) => { diagnostics.push(args) })
   try { return await POST(new Request('http://127.0.0.1/mikka/v1/devices/device/runs/run/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {}),...(probe.environmentCapability ? {[PROJECT_ENVIRONMENT_HEADER]:probe.environmentCapability} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
+    errors.mock.restore()
+    assert.deepEqual(diagnostics, probe.tokenError && probe.preparation.includes('token')
+      ? [['Could not issue a run token', 'synthetic token refusal']] : [],
+    'optional tool provisioning must not hide a missing fixture or unknown database operation')
     // Trace the intended gate: an unrelated failed prerequisite must not
     // masquerade as a successful lineage, scope or lease rejection.
     assert.deepEqual(probe.preparation,preparation)
@@ -247,6 +261,7 @@ test('ordinary retries retain the normal claim path after question lineage valid
 
 test('every github.com run of a connected owner gets the owner credential endpoint, read-only and plan runs included', async () => {
   overrideDeploymentSwitch('personalMailbox', false)
+  overrideDeploymentSwitch('byos', true)
   try { for (const variant of ['implement', 'plan', 'readOnly'] as const) {
     const probe = fixture()
     if (variant === 'plan') probe.run.kind = 'plan'
@@ -261,7 +276,9 @@ test('every github.com run of a connected owner gets the owner credential endpoi
     assert.equal(Object.hasOwn(body.github, 'token'), false, 'legacy daemons keep their original strict response schema')
     assert.equal(body.github?.branch, variant === 'implement' ? 'synthetic-claim-branch' : undefined, variant)
     assert.deepEqual((probe as unknown as { githubLookups: string[] }).githubLookups, ['member'], 'only the run owner\'s connection is looked up')
-  } } finally { overrideDeploymentSwitch('personalMailbox', undefined) }
+    assert.deepEqual(probe.cloudGitHubLookups, ['member'])
+    assert.deepEqual(probe.localBindingLookups, variant === 'readOnly' ? [] : [['member', 'agent', 'codex']], 'legacy unpinned runs read only their own subscription metadata')
+  } } finally { overrideDeploymentSwitch('personalMailbox', undefined); overrideDeploymentSwitch('byos', undefined) }
 })
 
 test('an owner without a GitHub connection gets no credential endpoint', async () => {
@@ -284,7 +301,11 @@ test('a capable daemon receives the owner GitHub credential once even without op
     assert.equal(body.github.token, 'fixture-claim-github-token')
     assert.equal(body.github.expiresAt, '2030-01-01T00:00:00.000Z')
     assert.equal(body.github.endpoint, 'http://127.0.0.1/api/runs/github-token')
+    assert.equal(Boolean(body.mcp), !tokenError, 'only the intentional token failure omits optional MCP')
+    assert.deepEqual(probe.mailboxLookups, tokenError ? [] : [['member', 'run']])
+    assert.deepEqual(probe.appToolkitLookups, tokenError ? [] : [['member', null]])
     assert.deepEqual(probe.credentialOwners, ['member'])
+    assert.deepEqual(probe.cloudGitHubCredentials, [['member', probe.repo.repoPath]], 'the existing selector receives the exact Run repository before the OAuth fallback')
     assert.equal((probe.run as typeof probe.run & { machineAuthority: boolean }).machineAuthority, true)
   }
 })
@@ -482,7 +503,7 @@ test('4e3: a cloud claim reads the task secrets (workspace + repo scope) before 
   Object.assign(process.env,{MIKKA_CLOUD_COMPUTER_TASKS:'1',MIKKA_BYOS_ENABLED:'1',MIKKA_BYO_E2B_KEY:'1'})
   try{
     const probe=fixture()
-    Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:workspaceId},cloud:{subscription:{id:'binding',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}}})
+    Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:workspaceId},cloud:{subscription:{id:'binding',consumerId:'agent',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}}})
     Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
     const response=await claim(probe,['skill-preflight','policy','model-admission','secrets','claim','skill-claim','benchmark-claim','token','settings'])
     assert.equal(response.status,200)
@@ -498,7 +519,7 @@ test('a capable bound cloud daemon receives its real subscription lease in the i
     const probe = fixture()
     probe.credentialCapability = true
     const nativeLease = { route: 'codex_cli', modelId: 'gpt-6-luna', revision: 1, accountId: 'fixture-account', accessToken: 'fixture-native-access', expiresAt: '2030-01-01T00:00:00.000Z' }
-    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId }, cloud: { subscription: { id: 'binding', workspaceId, route: 'codex_cli', modelId: 'gpt-6-luna' } } })
+    Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId }, cloud: { subscription: { id: 'binding', consumerId: 'agent', workspaceId, route: 'codex_cli', modelId: 'gpt-6-luna' } } })
     Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, subscriptionBroker: true }] })
     const response = await claim(probe, ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token', 'settings'])
     assert.equal(response.status, 200)
@@ -525,7 +546,7 @@ test('a capable cloud claim preserves prepared full-model catalogue evidence wit
     const nativeLease = { route: 'claude_code_cli', modelId: 'claude-haiku-5-5', revision: 1, accountId: 'fixture-account',
       accessToken: 'fixture-native-access', expiresAt: '2030-01-01T00:00:00.000Z', modelCatalogueVerified: true }
     Object.assign(probe, { nativeLease, caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId },
-      cloud: { subscription: { id: 'binding', workspaceId, route: 'claude_code_cli', modelId: 'claude-haiku-5-5' } } })
+      cloud: { subscription: { id: 'binding', consumerId: 'agent', workspaceId, route: 'claude_code_cli', modelId: 'claude-haiku-5-5' } } })
     Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'claude_code', installed: true, toolApproval: true, subscriptionBroker: true, subscriptionModelCatalogue: true }] })
     const response = await claim(probe, ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token', 'settings'])
     assert.equal(response.status, 200)
@@ -549,7 +570,7 @@ test('URL repository settings reach local and cloud claims; an explicit clear su
         Object.assign(probe, { repositorySettings: settings })
         Object.assign(probe.repo, { verifyCommand: 'legacy cloud command' })
         if (cloud) {
-          Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId }, cloud: { subscription: { id: 'binding', workspaceId, route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
+          Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId }, cloud: { subscription: { id: 'binding', consumerId: 'agent', workspaceId, route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
           Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, computerBroker: true, subscriptionBroker: true }] })
         }
         const response = await claim(probe, cloud
@@ -562,7 +583,7 @@ test('URL repository settings reach local and cloud claims; an explicit clear su
       }
     }
     const probe = fixture()
-    Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId }, cloud: { subscription: { id: 'binding', workspaceId, route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
+    Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: workspaceId }, cloud: { subscription: { id: 'binding', consumerId: 'agent', workspaceId, route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
     Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, computerBroker: true, subscriptionBroker: true }] })
     Object.assign(probe.repo, { remoteUrl: null, verifyCommand: 'private workspace command' })
     const response = await claim(probe, ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token'])
@@ -583,7 +604,7 @@ test('platform cloud claims inject the configured secret assignment with BYO off
       const probe=fixture()
       const injection=configured ? {env:{TASK_SECRET:'synthetic-task-value',TASK_MODE:'fixture'},secretNames:['TASK_SECRET']} : {env:{},secretNames:[]}
       if(!configured)delete process.env.WORKSPACE_SECRETS_KEY
-      Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:workspaceId},cloud:{subscription:{id:'binding',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:injection,secretReads:[]})
+      Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:workspaceId},cloud:{subscription:{id:'binding',consumerId:'agent',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:injection,secretReads:[]})
       Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
       const response=await claim(probe,['skill-preflight','policy','model-admission','secrets','claim','skill-claim','benchmark-claim','token','settings'])
       assert.equal(response.status,200)
@@ -596,9 +617,9 @@ test('platform cloud claims inject the configured secret assignment with BYO off
     }
     for(const denial of ['authentication','device-scope','workspace-scope'] as const) {
       const probe=fixture()
-      Object.assign(probe,{caller:denial==='authentication' ? null : {userId:'member',scopeDeviceId:denial==='device-scope' ? 'foreign-device' : 'device',scopeWorkspaceId:'foreign-workspace'},cloud:{subscription:{id:'binding',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:{env:{TASK_SECRET:'must-not-leave'},secretNames:['TASK_SECRET']}})
+      Object.assign(probe,{caller:denial==='authentication' ? null : {userId:'member',scopeDeviceId:denial==='device-scope' ? 'foreign-device' : 'device',scopeWorkspaceId:'foreign-workspace'},cloud:{subscription:{id:'binding',consumerId:'agent',workspaceId,route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:{env:{TASK_SECRET:'must-not-leave'},secretNames:['TASK_SECRET']}})
       Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
-      const response=await claim(probe,denial==='workspace-scope' ? ['skill-preflight','policy','model-admission'] : [],denial==='workspace-scope')
+      const response=await claim(probe,denial==='workspace-scope' ? ['skill-preflight','policy'] : [],denial==='workspace-scope')
       assert.equal(response.status,denial==='authentication' ? 401 : denial==='device-scope' ? 404 : 409)
       assert.equal((await response.text()).includes('must-not-leave'),false)
       assert.ok(!probe.preparation.includes('secrets'))
@@ -643,7 +664,7 @@ test('Profile model, source or version changes keep ancestry but start a fresh n
       if (change === 'model') target.model = target.agentProfile.targetEntry.model = 'other-currently-authorized-model'
       if (change === 'source') { target.agentProfile.targetEntry.source.connectionId = 'source-b'; target.subscription.bindingId = 'binding-b' }
       if (change === 'version') target.agentProfile.version++
-      if (change === 'harness') target.harness = target.agentProfile.targetEntry.harness = 'claude_code'
+      if (change === 'harness') { target.harness = target.agentProfile.targetEntry.harness = 'claude_code'; target.subscription.route = 'claude_code_cli' }
       target.subscription.modelId = target.model
       Object.assign(probe, { cloud: { subscription: { id: target.subscription.bindingId, modelId: target.model, route: target.subscription.route, consumerId: 'agent', workspaceId } } })
       probe.device.harnesses = [{ harness: target.harness, installed: true, toolApproval: true, subscriptionBroker: true } as typeof probe.device.harnesses[number]]

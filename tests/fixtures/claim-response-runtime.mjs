@@ -39,6 +39,7 @@ export const claimWorkspacePool = { query() { throw new Error('unexpected raw wo
 const nextServer = import.meta.resolve('next/server')
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
 const actionError = new URL('../../lib/action-error.ts', import.meta.url).href
+const mailboxCapability = new URL('../../lib/personal-mailbox-capability.ts', import.meta.url).href
 const projectExecutionSource = `
 import assert from 'node:assert/strict'
 import {ActionFailureError} from ${JSON.stringify(actionError)}
@@ -96,8 +97,8 @@ import {PgDialect} from ${JSON.stringify(import.meta.resolve('drizzle-orm/pg-cor
 function query(columns){
   let table
   const q={from(value){table=value[Object.getOwnPropertySymbols(value).find(s=>s.description==='drizzle:Name')];return q},innerJoin(){return q},where(){return q},
-    async limit(){const p=globalThis.claimResponseProbe;return table==='agent_runs'?[(columns?.sessionId&&p.lost)?p.lost:{...p.run}]:table==='agents'?[p.agent]:[p.repo]},
-    async for(){const p=globalThis.claimResponseProbe;p.locks.push(table);return table==='issues'?[p.issue]:[{run:{...p.run},enabled:true}]}}
+    async limit(){const p=globalThis.claimResponseProbe;assert.ok(['agent_runs','agents','device_repos'].includes(table),'unexpected claim table');return table==='agent_runs'?[(columns?.sessionId&&p.lost)?p.lost:{...p.run}]:table==='agents'?[p.agent]:[p.repo]},
+    async for(){const p=globalThis.claimResponseProbe;assert.ok(['issues','agent_runs'].includes(table),'unexpected locked claim table');p.locks.push(table);return table==='issues'?[p.issue]:[{run:{...p.run},enabled:true}]}}
   return q
 }
 function update(value){
@@ -124,7 +125,7 @@ function update(value){
 }
 let checkedOutClient
 export const db={select:query,update,transaction:async fn=>{const p=globalThis.claimResponseProbe;assert.equal(p.appActive,1,'claim transaction uses the checked-out APP client');p.transactions++;const error=p.transactionErrors.shift();if(error)throw error;return fn({select:query})}}
-export const pool={connect:async()=>{
+export const pool={query(){throw new Error('unexpected raw APP query in claim fixture')},connect:async()=>{
   const p=globalThis.claimResponseProbe
   assert.equal(checkedOutClient,undefined,'claim cannot acquire a second APP client')
   assert.equal(p.appActive,0)
@@ -160,6 +161,17 @@ const sources = new Map([
   ['/lib/issue-team-access.ts', 'export async function issueTeamAccess(){return {allowed:globalThis.claimResponseProbe.memberAllowed}}'],
   ['/lib/issue-access.ts', 'export async function issueForUser(){const p=globalThis.claimResponseProbe;if(p.issueAccessError)throw p.issueAccessError;return p.memberAllowed&&!p.issue?.content?.attrs?.mikka?.deletedAt?p.issue:null}'],
   ['/lib/mcp/worker.ts', 'export async function issueRunToken(){const p=globalThis.claimResponseProbe;p.preparation.push("token");await p.beforeToken?.();if(p.tokenError)throw new Error("synthetic token refusal");return {token:"synthetic-only"}}'],
+  // These claims have no frozen mailbox grant. Validate that fact through the
+  // real capability contract instead of accidentally failing its module load.
+  ['/lib/personal-mailbox-runtime.ts', `import assert from 'node:assert/strict'
+    import {personalWorkerMailboxScopeMatches} from ${JSON.stringify(mailboxCapability)}
+    export async function personalWorkerMailboxAdvertised(owner,runId){
+      const p=globalThis.claimResponseProbe
+      assert.deepEqual([owner,runId],[p.run.userId,p.run.id])
+      assert.equal(p.projectAdmission.active,true)
+      assert.equal(personalWorkerMailboxScopeMatches(p.run.agentDefinition?.harness??p.agent.harness,p.run.agentDefinition,{botId:p.run.botId??null,workspaceId:p.run.workspaceId}),false)
+      p.mailboxLookups.push([owner,runId]);return []
+    }`],
   ['/lib/computer/claim.ts', `
     function claimTransaction(){
       const p=globalThis.claimResponseProbe
@@ -187,14 +199,65 @@ const sources = new Map([
       await afterClaim(tx);return {botId:"bot",ownerId:"member",display:":1",policyVersion:1,permission:"ask"}
     }
   `],
-  ['/lib/computer/native-run-binding.ts', 'export async function nativeRunBinding(){return globalThis.claimResponseProbe.cloud.subscription}'],
+  // Retain the actual nativeRunBinding checks, including consumer/harness and
+  // requested Workspace. Only its metadata repository is synthetic.
+  ['/lib/subscription-repository.ts', `import assert from 'node:assert/strict'
+    export class SubscriptionRepository {
+      constructor(query){assert.equal(typeof query.query,'function')}
+      async nativeBinding(owner,agent,harness,bindingId,workspaceId,options){
+        const p=globalThis.claimResponseProbe
+        assert.deepEqual([owner,agent,harness],[p.run.userId,p.agent.id,p.run.agentDefinition?.harness??p.agent.harness])
+        assert.deepEqual(options,{currentConnection:true})
+        assert.equal(p.projectAdmission.active,true)
+        assert.ok(p.cloud?.subscription,'subscription metadata must be explicitly configured')
+        const binding=p.cloud.subscription
+        return bindingId&&bindingId!==binding.id?null:structuredClone(binding)
+      }
+    }`],
   ['/lib/secrets/runtime.ts', secretSource],
   ['/lib/run-completion-effects.ts', 'export async function afterRunEnded(ownerId,runId){const p=globalThis.claimResponseProbe;(p.endedRuns??=[]).push({ownerId,runId})}'],
   ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(){throw new Error("unexpected daemon upgrade refusal")};export async function failQueuedSubscriptionRuntime(...args){const p=globalThis.claimResponseProbe;p.preparation.push("subscription-preflight");p.runtimeRefusal=args;p.run.status="failed";return true}'],
-  ['/lib/app-tools-server.ts', 'export async function runAppToolkits(){return []}'],
+  ['/lib/app-tools-server.ts', `import assert from 'node:assert/strict'
+    export async function runAppToolkits(owner,botId){
+      const p=globalThis.claimResponseProbe
+      assert.deepEqual([owner,botId],[p.run.userId,p.run.botId??null])
+      assert.equal(p.projectAdmission.active,true)
+      assert.deepEqual(p.appToolkits,[],'connected apps must be explicitly configured')
+      p.appToolkitLookups.push([owner,botId]);return []
+    }`],
   ['/lib/github/repository-installation.ts', 'export async function linkedGitHubAccountId(userId){const p=globalThis.claimResponseProbe;(p.githubLookups??=[]).push(userId);return p.githubAccountId===undefined?"123":p.githubAccountId}'],
+  // Exercise the real machine-credential selector. These OAuth fixtures have
+  // no self-hosted Cloud capability; unknown configuration is never guessed.
+  ['/lib/github/cloud.ts', `import assert from 'node:assert/strict'
+    function scope(owner){const p=globalThis.claimResponseProbe;assert.equal(owner,p.run.userId);assert.equal(p.projectAdmission.active,true);assert.equal(p.cloudGitHubConfigured,false);return p}
+    export async function useCloudGitHub(owner){const p=scope(owner);p.cloudGitHubLookups.push(owner);return false}
+    export async function cloudGitHubCredential(owner,remoteKey){const p=scope(owner);assert.equal(remoteKey,p.repo.repoPath);p.cloudGitHubCredentials.push([owner,remoteKey]);return null}
+  `],
   ['/lib/github/user-access.ts', 'export async function githubTokenForUser(owner){const p=globalThis.claimResponseProbe;p.credentialOwners.push(owner);await p.beforeCredential?.();if(p.credentialFailure)throw p.credentialFailure;return {token:"fixture-claim-github-token",githubAccountId:"123",expiresAt:new Date("2030-01-01T00:00:00.000Z")}}'],
-  ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){const p=globalThis.claimResponseProbe;if(!p.nativeLease)throw new Error("unexpected subscription access");return {async nativeRun(owner,device,run){(p.nativeRunCalls??=[]).push([owner,device,run]);return {ownerId:owner,runId:run}},async nativeLease(use,_signal,includeCatalogue){(p.nativeLeaseCalls??=[]).push(use);p.nativeLeaseCapabilities.push(includeCatalogue);return p.nativeLease}}}'],
+  ['/lib/subscription-runtime.ts', `import assert from 'node:assert/strict'
+    export function subscriptionRuntime(...args){
+      const p=globalThis.claimResponseProbe
+      assert.equal(p.projectAdmission.active,true)
+      if(args.length)assert.deepEqual(args,[true,false,{exportAccessLease:true}])
+      return {
+        repository:{async nativeBinding(owner,agent,harness){
+          assert.deepEqual([owner,agent,harness],[p.run.userId,p.agent.id,p.agent.harness])
+          assert.equal(p.device.kind,'local');assert.equal(p.run.agentDefinition??null,null)
+          assert.equal(p.ownNativeBinding,null,'legacy fixture explicitly has no subscription binding')
+          p.localBindingLookups.push([owner,agent,harness]);return null
+        }},
+        async nativeRun(owner,device,run){
+          assert.ok(p.nativeLease,'native custody must be explicitly configured')
+          assert.deepEqual([owner,device,run],[p.run.userId,p.device.id,p.run.id])
+          ;(p.nativeRunCalls??=[]).push([owner,device,run]);return {ownerId:owner,runId:run}
+        },
+        async nativeLease(use,signal,includeCatalogue){
+          assert.ok(p.nativeLease);assert.deepEqual(use,{ownerId:p.run.userId,runId:p.run.id})
+          assert.equal(signal.aborted,false);assert.equal(typeof includeCatalogue,'boolean')
+          ;(p.nativeLeaseCalls??=[]).push(use);p.nativeLeaseCapabilities.push(includeCatalogue);return p.nativeLease
+        }
+      }
+    }`],
 ])
 registerHooks({
   resolve(specifier,context,next){

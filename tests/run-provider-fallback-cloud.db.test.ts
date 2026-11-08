@@ -6,8 +6,9 @@ import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { emptyRunReport } from '@mikka/protocol/run'
+import { normalizeRepository } from '@mikka/protocol/repository'
 import type { OrderEntry } from '../lib/model-order-plan'
-import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedIssue, seedProjectTasks, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 
 test('cloud provider recovery preserves scope and uses fresh task machines without waking its parent', { skip: !dbUrl }, async t => {
@@ -35,13 +36,13 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
   const { workspacePool } = await import('../lib/workspace-db')
   const workers = ['claude_code', 'codex'].map(harness => ({ harness, installed: true, subscriptionBroker: true, toolApproval: true }))
   const machines = await fakeThreadMachines(pool, workers)
-  const { threadMachineProvider } = await import('../lib/cloud-computer/thread-machines')
+  const { threadMachineProvider, ensureThreadMachine, threadMachineAction } = await import('../lib/cloud-computer/thread-machines')
   const { botRuntimeProvisioner, ensureBotCloudRuntime } = await import('../lib/computer/auto-runtime')
   const { chooseCloudRunModel } = await import('../lib/computer/run-model')
   const { queueCloudRun } = await import('../lib/computer/queue-run')
   const { ensureDeviceRepository } = await import('../lib/device-repositories')
   const { persistRunCompletion } = await import('../lib/run-publications')
-  const { providerContinuationMatches, recoverProviderFailure } = await import('../lib/run-provider-fallback')
+  const { providerContinuationMatches, recoverProviderFailure, launchProviderContinuation } = await import('../lib/run-provider-fallback')
   const { handoffFactoryCloudStage } = await import('../lib/factory/cloud-stage-handoff')
   const { factoryAutomaticRuntime } = await import('../lib/factory/automatic-dispatch')
   const { withDeviceDatabaseAuthority, DeviceAuthorityRevoked } = await import('../lib/db/device-scope')
@@ -50,6 +51,7 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
   const keys = await import('../lib/model-api-keys')
   const order = await import('../lib/model-order')
   const { entryKey } = await import('../lib/model-order-plan')
+  const resources = await import('../lib/project-resources/store')
   const users: string[] = [], workspaces: string[] = []
   const provisions = new Map<string, number>()
   const realProvision = botRuntimeProvisioner.provision
@@ -93,6 +95,9 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
       await pool.query('DELETE FROM issues WHERE "userId"=ANY($1)', [users])
       await pool.query('DELETE FROM bots WHERE "ownerId"=ANY($1)', [users])
       await pool.query('DELETE FROM user_e2b_keys WHERE "userId"=ANY($1)', [users])
+      await workspacePool.query('DELETE FROM workspace_project_repositories WHERE "workspaceId"=ANY($1)', [workspaces])
+      await workspacePool.query('DELETE FROM workspace_projects WHERE "workspaceId"=ANY($1)', [workspaces])
+      await workspacePool.query('DELETE FROM workspace_environments WHERE "workspaceId"=ANY($1)', [workspaces])
       await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1)', [workspaces])
       await pool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1)', [workspaces])
       await pool.query('DELETE FROM "user" WHERE id=ANY($1)', [users])
@@ -110,7 +115,7 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     [actor.userId, actor.workspaceId])).rows[0]
   const row = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
   const children = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [runId])).rows
-  const fixture = async (label: string) => {
+  const fixture = async (label: string, withEnvironment = false) => {
     const userId = await seedUser(pool, label)
     users.push(userId)
     const workspace = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])
@@ -133,6 +138,18 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     const originalRuntime = await runtime(botId, 'claude_code')
     const remote = `https://github.com/mikka-ci/cloud-fallback-${randomUUID()}.git`
     const repository = await ensureDeviceRepository(userId, originalRuntime.deviceId, remote)
+    const environmentConfiguration = { runtime: 'cloud' as const, variables: { FALLBACK_MODE: 'original' } }
+    let environment: { id: string; revision: number } | undefined
+    if (withEnvironment) {
+      environment = await resources.saveEnvironment(userId, { workspaceId: workspace.id, name: 'Cloud fallback environment', configuration: environmentConfiguration })
+      const projectId = randomUUID()
+      await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+        VALUES($1,$2,$3,'Cloud fallback resource','','','planned','none','','','','','[]',1)`, [projectId, userId, workspace.id])
+      await seedProjectTasks(pool, projectId, [issueId])
+      await resources.saveProjectResources(userId, { workspaceId: workspace.id, projectId, revision: 1,
+        repositories: [{ repositoryKey: normalizeRepository(remote).key, environmentId: environment.id, isPrimary: true }],
+        environmentIds: [environment.id], defaultEnvironmentId: environment.id })
+    }
     const selected = await chooseCloudRunModel(pool, scope, parent.agentId, 'claude_code', undefined, 'task')
     assert.ok(!('error' in selected), JSON.stringify(selected))
     const { runId } = await queueCloudRun(pool, actor, { botId, issueId, agentId: parent.agentId, deviceRepoId: repository.id,
@@ -157,11 +174,194 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "ownerId"=$1 AND "workspaceId"=$2`, [userId, workspace.id])
     // Changing the default for new tasks cannot move this frozen cloud task.
     await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
-    return { actor, scope, botId, issueId, runId, admitted, priorTarget, remote: repository.remoteUrl, first, second, localDeviceId }
+    return { actor, scope, botId, issueId, runId, admitted, priorTarget, remote: repository.remoteUrl, first, second, localDeviceId, environment, environmentConfiguration }
   }
   const complete = (actor: { userId: string }, runId: string) => persistRunCompletion(actor.userId, runId, {
     stopReason: 'provider_failure', report: { ...emptyRunReport('Synthetic terminal provider payment failure.'),
       providerFailure: { kind: 'balance', retryable: false, status: 402, code: 'payment_required' } },
+  })
+
+  for (const change of ['environment', 'repository'] as const) await t.test(`${change} withdrawal preserves terminal completion and stops provider recovery before runtime preparation, including replay`, async () => {
+    const f = await fixture(`provider-cloud-resource-${change}`, true)
+    const { issueRunToken } = await import('../lib/mcp/worker')
+    await issueRunToken({ id: f.runId, userId: f.actor.userId })
+    const tokens = async () => (await pool.query('SELECT id,"revokedAt" FROM run_tokens WHERE "runId"=$1 ORDER BY id', [f.runId])).rows
+    const beforeTokens = await tokens()
+    assert.equal(beforeTokens.length, 1); assert.equal(beforeTokens[0].revokedAt, null)
+    const beforeMachineIds = (await pool.query('SELECT "runId" FROM thread_machines WHERE "ownerId"=$1 ORDER BY "runId"', [f.actor.userId])).rows
+    const beforeParent = await parentSnapshot(f.actor), beforeLaunches = lifecycleStarts.length, beforePlacements = launchPlacements.size
+    if (change === 'environment') {
+      await resources.saveEnvironment(f.actor.userId, { workspaceId: f.actor.workspaceId, ...f.environment!, name: 'Changed after the source started',
+        configuration: { ...f.environmentConfiguration, variables: { FALLBACK_MODE: 'updated' } } })
+    } else {
+      await resources.saveWorkspaceRepositoryPolicy(f.actor.userId, { workspaceId: f.actor.workspaceId, revision: 0, mode: 'restricted', repositoryKeys: [] })
+    }
+    // Call through to the real preparation entry point if reached. A count
+    // supplements the real Run/token/VM rows below; it cannot fake admission.
+    const dispatchRuntime = await import('../lib/computer/dispatch-runtime')
+    let preparationCalls = 0
+    const observed = mock.module(new URL('../lib/computer/dispatch-runtime.ts', import.meta.url).href, { namedExports: {
+      ...dispatchRuntime,
+      prepareBotCloudTaskRuntime: async (...args: Parameters<typeof dispatchRuntime.prepareBotCloudTaskRuntime>) => {
+        preparationCalls++
+        return dispatchRuntime.prepareBotCloudTaskRuntime(...args)
+      },
+    } })
+    try {
+      await complete(f.actor, f.runId)
+      const original = await row(f.runId)
+      assert.equal(original.status, 'failed'); assert.equal(original.stopReason, 'provider_failure')
+      assert.ok(original.finishedAt)
+      assert.deepEqual(original.report.providerFailure, { kind: 'balance', retryable: false, status: 402, code: 'payment_required' })
+      assert.deepEqual(original.agentDefinition, f.admitted.agentDefinition)
+      assert.equal(original.report.modelFallback.state, 'stopped')
+      assert.deepEqual(original.report.modelFallback.reasons, [{ choice: original.report.modelFallback.from,
+        reason: change === 'environment' ? 'projectEnvironmentUnavailable' : 'projectRepositoryDenied' }])
+      assert.deepEqual(await children(f.runId), [])
+      const revoked = await tokens()
+      assert.deepEqual(revoked.map(token => token.id), beforeTokens.map(token => token.id))
+      assert.ok(revoked.every(token => token.revokedAt), 'the original completion still revokes its worker tokens')
+      const events = (await pool.query('SELECT * FROM coordinator_events WHERE "runId"=$1 ORDER BY id', [f.runId])).rows
+      assert.ok(events.some(event => event.payload.modelFallback?.state === 'stopped'))
+      assert.equal(preparationCalls, 0)
+      await complete(f.actor, f.runId)
+      assert.equal(await recoverProviderFailure(pool, f.actor.userId, f.runId), null)
+      assert.deepEqual(await row(f.runId), original, 'a replay cannot replace the terminal report or its stopped recovery receipt')
+      assert.deepEqual(await tokens(), revoked)
+      assert.deepEqual((await pool.query('SELECT * FROM coordinator_events WHERE "runId"=$1 ORDER BY id', [f.runId])).rows, events)
+      assert.deepEqual(await children(f.runId), [])
+      assert.deepEqual((await pool.query('SELECT "runId" FROM thread_machines WHERE "ownerId"=$1 ORDER BY "runId"', [f.actor.userId])).rows, beforeMachineIds)
+      assert.deepEqual(await parentSnapshot(f.actor), beforeParent)
+      assert.equal(lifecycleStarts.length, beforeLaunches); assert.equal(launchPlacements.size, beforePlacements)
+      assert.equal(provisions.get(f.botId), 1)
+      assert.equal(preparationCalls, 0, 'stopped recovery does not select or prepare another runtime on replay')
+      assert.equal(networkAttempts, 0)
+    } finally { observed.restore() }
+  })
+
+  for (const change of ['environment', 'repository'] as const) await t.test(`${change} withdrawal after a committed switch refuses replay, handoff and direct machine wake without changing history`, async () => {
+    const f = await fixture(`provider-cloud-late-resource-${change}`, true)
+    const { issueRunToken } = await import('../lib/mcp/worker')
+    await issueRunToken({ id: f.runId, userId: f.actor.userId })
+    await complete(f.actor, f.runId)
+    const [child] = await children(f.runId), original = await row(f.runId)
+    assert.ok(child)
+    assert.equal(original.report.modelFallback.state, 'switched')
+    assert.equal(original.report.modelFallback.retryRunId, child.id)
+    assert.equal(child.status, 'queued')
+    assert.deepEqual(child.agentDefinition.projectExecution, f.admitted.agentDefinition.projectExecution)
+    const continuation = await recoverProviderFailure(pool, f.actor.userId, f.runId)
+    assert.ok(continuation)
+    const snapshot = async () => ({
+      runs: (await pool.query('SELECT * FROM agent_runs WHERE "userId"=$1 ORDER BY id', [f.actor.userId])).rows,
+      machines: (await pool.query('SELECT * FROM thread_machines WHERE "ownerId"=$1 ORDER BY "runId"', [f.actor.userId])).rows,
+      tokens: (await pool.query('SELECT id,"runId","revokedAt" FROM run_tokens WHERE "userId"=$1 ORDER BY id', [f.actor.userId])).rows,
+      devices: (await pool.query('SELECT id,"boundDeviceId","revokedAt","lastUsedAt" FROM device_tokens WHERE "userId"=$1 ORDER BY id', [f.actor.userId])).rows,
+      events: (await pool.query('SELECT * FROM coordinator_events WHERE "userId"=$1 ORDER BY id', [f.actor.userId])).rows,
+      parent: await parentSnapshot(f.actor),
+    })
+    const before = await snapshot(), beforeLaunches = lifecycleStarts.length, beforePlacements = launchPlacements.size
+    assert.equal(before.tokens.length, 1); assert.ok(before.tokens[0].revokedAt)
+    // Completion already performs the ordinary immediate launch when the
+    // durable lifecycle is disabled. Revocation must preserve that committed
+    // machine as well as refuse every subsequent launch or custody change.
+    assert.equal(before.machines.filter(machine => machine.runId === child.id).length, 1)
+    if (change === 'environment') {
+      await resources.saveEnvironment(f.actor.userId, { workspaceId: f.actor.workspaceId, ...f.environment!, name: 'Changed before durable handoff',
+        configuration: { ...f.environmentConfiguration, variables: { FALLBACK_MODE: 'updated' } } })
+    } else {
+      await resources.saveWorkspaceRepositoryPolicy(f.actor.userId, { workspaceId: f.actor.workspaceId, revision: 0, mode: 'restricted', repositoryKeys: [] })
+    }
+    const code = change === 'environment' ? 'projectEnvironmentUnavailable' : 'projectRepositoryDenied'
+    const refused = (error: unknown) => error instanceof Error && 'code' in error && error.code === code
+    // These observations call through: any mistaken custody/VM operation is
+    // real and is also caught by the persisted snapshots below.
+    const realPark = factoryAutomaticRuntime.park, realStart = factoryAutomaticRuntime.start, realConnect = threadMachineProvider.connect
+    const park = mock.method(factoryAutomaticRuntime, 'park', (...args: Parameters<typeof realPark>) => realPark(...args))
+    const start = mock.method(factoryAutomaticRuntime, 'start', (...args: Parameters<typeof realStart>) => realStart(...args))
+    const connect = mock.method(threadMachineProvider, 'connect', (...args: Parameters<typeof realConnect>) => realConnect(...args))
+    try {
+      assert.equal(await recoverProviderFailure(pool, f.actor.userId, f.runId), null)
+      await launchProviderContinuation(f.actor.userId, continuation)
+      assert.equal(await handoffFactoryCloudStage(pool, f.actor, f.runId, child.id, true), false)
+      assert.equal(park.mock.callCount(), 0); assert.equal(start.mock.callCount(), 0)
+      await assert.rejects(ensureThreadMachine(pool, f.actor, child.id), refused)
+      const { startThreadMachine } = await import('../lib/run-leases')
+      assert.deepEqual(await startThreadMachine(f.actor, child.id), { state: 'unavailable', reason: 'project_resources' })
+      // Resume/refresh call ensure directly rather than startThreadMachine.
+      // The already retained source must not connect or change its timer.
+      for (const action of ['resume', 'refresh_runtime'] as const)
+        await assert.rejects(threadMachineAction(pool, f.actor, f.runId, action), refused)
+      assert.equal(connect.mock.callCount(), 0)
+      await assert.rejects(ensureThreadMachine(pool, { ...f.actor, userId: 'foreign' }, child.id),
+        error => error instanceof Error && 'status' in error && error.status === 404 && error.message === 'Thread unavailable')
+      await assert.rejects(ensureThreadMachine(pool, f.actor, randomUUID()),
+        error => error instanceof Error && 'status' in error && error.status === 404 && error.message === 'Thread unavailable')
+      assert.deepEqual(await snapshot(), before, 'resource refusal preserves both historical Run rows, the receipt, tokens and VM custody')
+      assert.equal(lifecycleStarts.length, beforeLaunches); assert.equal(launchPlacements.size, beforePlacements)
+      assert.equal(provisions.get(f.botId), 1); assert.equal(networkAttempts, 0)
+    } finally { park.mock.restore(); start.mock.restore(); connect.mock.restore() }
+  })
+
+  for (const operation of ['wake', 'handoff'] as const) await t.test(`${operation} rechecks an APP placement change after resource preflight without timer, park or token effects`, async () => {
+    const f = await fixture(`provider-cloud-placement-${operation}`, true)
+    await complete(f.actor, f.runId)
+    const [child] = await children(f.runId)
+    assert.ok(child)
+    const changed = await ensureDeviceRepository(f.actor.userId, child.deviceId,
+      `https://github.com/mikka-ci/unbound-placement-${randomUUID()}.git`)
+    // Completion has already launched the committed child. An overdue timer
+    // on that actual machine makes an unintended finally write observable.
+    assert.equal((await pool.query(`UPDATE thread_machines SET "lifecycleAt"=now()-interval '1 hour'
+      WHERE "runId"=$1 AND "workspaceId"=$2 AND "ownerId"=$3`,
+    [child.id, f.actor.workspaceId, f.actor.userId])).rowCount, 1)
+    const snapshot = async () => ({
+      runs: (await pool.query('SELECT * FROM agent_runs WHERE "userId"=$1 ORDER BY id', [f.actor.userId])).rows,
+      machines: (await pool.query('SELECT * FROM thread_machines WHERE "ownerId"=$1 ORDER BY "runId"', [f.actor.userId])).rows,
+      tokens: (await pool.query('SELECT * FROM device_tokens WHERE "userId"=$1 ORDER BY id', [f.actor.userId])).rows,
+      events: (await pool.query('SELECT * FROM coordinator_events WHERE "userId"=$1 ORDER BY id', [f.actor.userId])).rows,
+      parent: await parentSnapshot(f.actor),
+    })
+    let enter!: () => void, release!: () => void, intercepted = false
+    const entered = new Promise<void>(resolve => { enter = resolve })
+    const proceed = new Promise<void>(resolve => { release = resolve })
+    const barrierPool = {
+      query: async (sql: string, values: unknown[]) => {
+        const result = await pool.query(sql, values)
+        if (!intercepted && sql.startsWith('SELECT repo."repoPath",repo."remoteUrl",device.kind,agent.harness FROM device_repos repo')) {
+          assert.deepEqual(values, [child.deviceRepoId, f.actor.userId, child.deviceId, child.agentId])
+          intercepted = true
+          enter()
+          await proceed
+        }
+        return result
+      },
+      connect: () => pool.connect(),
+    } as unknown as import('pg').Pool
+    const realPark = factoryAutomaticRuntime.park, realStart = factoryAutomaticRuntime.start, realConnect = threadMachineProvider.connect
+    const park = mock.method(factoryAutomaticRuntime, 'park', (...args: Parameters<typeof realPark>) => realPark(...args))
+    const start = mock.method(factoryAutomaticRuntime, 'start', (...args: Parameters<typeof realStart>) => realStart(...args))
+    const connect = mock.method(threadMachineProvider, 'connect', (...args: Parameters<typeof realConnect>) => realConnect(...args))
+    const beforeLaunches = lifecycleStarts.length, beforePlacements = launchPlacements.size
+    const execution = operation === 'wake'
+      ? ensureThreadMachine(barrierPool, f.actor, child.id)
+      : handoffFactoryCloudStage(barrierPool, f.actor, f.runId, child.id, true)
+    try {
+      await Promise.race([entered, execution.then(() => assert.fail('resource preflight must reach the controlled barrier'))])
+      assert.equal((await pool.query('UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [child.id, changed.id])).rowCount, 1)
+      const before = await snapshot()
+      release()
+      if (operation === 'wake') await assert.rejects(execution, { code: 'projectRepositoryDenied' })
+      else assert.equal(await execution, false)
+      assert.deepEqual(await snapshot(), before, 'only the explicit concurrent placement edit may persist')
+      assert.equal(park.mock.callCount(), 0); assert.equal(start.mock.callCount(), 0); assert.equal(connect.mock.callCount(), 0)
+      assert.equal(lifecycleStarts.length, beforeLaunches); assert.equal(launchPlacements.size, beforePlacements)
+      assert.equal(networkAttempts, 0)
+    } finally {
+      release()
+      await execution.catch(() => undefined)
+      park.mock.restore(); start.mock.restore(); connect.mock.restore()
+    }
   })
 
   await t.test('402 crosses harnesses using a fresh task container while its sleeping parent stays unchanged', async () => {

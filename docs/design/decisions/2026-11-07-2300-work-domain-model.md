@@ -67,9 +67,10 @@ Run schema and data changes through the ordinary migration runner on the
 actual application and Workspace databases. They can be separate databases;
 no cross-database join or fictional foreign key is assumed.
 
-Historical Project workspace evidence must agree. Valid Team relations,
-already verified task ownership, and already recorded Project decisions are
-structural evidence. A creator ID or a workspace/project name alone is not
+Historical Project workspace evidence must agree. An explicit Project workspace,
+valid Team relations and already verified task ownership are the backfill's
+structural evidence. Project decisions are preserved history; this backfill
+does not use them to establish tenancy. A creator ID or a workspace/project name alone is not
 enough. Missing, invalid or conflicting evidence creates a restricted
 repair record containing IDs and fixed reasons, not task bodies or secrets.
 An unknown project stays excluded from ordinary reads until its ownership
@@ -80,6 +81,16 @@ writing, and is safe to rerun. A task appearing in two legacy Project arrays
 is not assigned arbitrarily. `lead: 'me'` and `members: ['me']` refer to the
 historical creator only when that person has verified active membership in
 the established workspace; they never mean the user running the migration.
+
+After a canonical migration receipt is committed, a database fence rejects
+changes to the retired task array or historical creator. Legacy lead/member
+snapshots can change only in the new API's authorized transaction together
+with canonical responsibility writes. Its transaction-local writer marker is
+a version handshake, not an authorization mechanism. New Projects require an
+explicit Workspace and an empty retired task array; existing quarantined
+Projects remain available to the evidence-based backfill. During a rolling
+deployment, old writers can fail closed until the new service is ready. A
+successful legacy-only write must never conceal a lost relationship.
 
 Rollback retains the new ownership and relationship records. Fix forward
 instead of reverting to creator/Team/name-based authorization. Pending

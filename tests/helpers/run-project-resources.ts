@@ -8,11 +8,13 @@ export async function seedRunProjectResources(pool: Pool, input: {
   runtime: 'local' | 'cloud'; harness: 'codex' | 'claude_code'; environment?: boolean; baseBranch?: string | null;
 }) {
   const resources = await import('../../lib/project-resources/store')
-  const { seedProjectTasks } = await import('../support/workspace-admin-db')
   const projectId = randomUUID()
   await pool.query(`INSERT INTO workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
     VALUES($1,$2,$3,'Run resource fixture','','','planned','none','','','','','[]',1)`, [projectId, input.ownerId, input.workspaceId])
-  await seedProjectTasks(pool, projectId, [input.issueId])
+  const linked = await pool.query(`INSERT INTO workspace_project_tasks("issueId","projectId","workspaceId")
+    SELECT id,$1,"workspaceId" FROM issues WHERE id=$2 AND "workspaceId"=$3 AND "ownershipState"='bound'`,
+  [projectId, input.issueId, input.workspaceId])
+  if (linked.rowCount !== 1) throw new Error('Run resource fixture needs a bound Task in its canonical Workspace')
   const configuration = { runtime: input.runtime, harness: input.harness, repositoryKeys: [input.repositoryKey],
     variables: { RESOURCE_FIXTURE: 'original' }, setup: { command: 'node --version', copyFiles: [], approved: true } }
   const environment = input.environment === false ? null : await resources.saveEnvironment(input.ownerId, {

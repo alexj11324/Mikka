@@ -51,6 +51,13 @@ migrate: projects bound=<本轮绑定数> tasks=<本轮建关系数> pending=<�
 | `20261107230005_project_lifecycle.sql` | WS |
 | `20261107230006_project_history_retention.sql` | APP |
 | `20261107230007_task_alias_tenant.sql` | APP |
+| `20261107230008_project_writer_fence.sql` | WS |
+
+### 1.1 新旧服务交叠期间的 Project 写入
+
+WS 结构迁移会先安装 Project 写入围栏，再运行回填。已有待修复 Project 保持原样；新建 Project 必须显式提供 Workspace，并通过 canonical 表建立 Task 关系。一个 Project 完成回填或由新 API 创建后，数据库拒绝再修改旧 `issueIds` 或历史创建者。旧 `lead` / `properties.members` 的更新也必须来自已通过 Workspace、PAT、Project 权限和活跃成员检查的新 API 事务；事务局部的版本标记本身不授予权限，提交后不保留在连接池会话中。
+
+迁移先完成、旧服务尚未退出时，旧 Project 创建或关系／负责人／成员更新可能明确失败，旧服务会返回已有保存失败错误；不得将它记为保存成功后等待新读路径“同步”。即使旧 UPDATE 已经排队等待回填的行锁，回填提交后仍会被围栏拒绝。发布负责人应记录这一短暂兼容窗口，确认新 SHA READY 后使用正常新 API 验证保存。不要关闭触发器、改回旧写入或双写 JSONB 规避失败；失败的旧请求由用户在新版本重试。
 
 ## 2. 归属、隔离记录和回执
 
@@ -141,7 +148,7 @@ SELECT name, "appliedAt" FROM schema_migrations
 WHERE name IN (
   '20261107230000_project_v2.sql', '20261107230002_task_identity_aliases.sql',
   '20261107230003_team_lifecycle.sql', '20261107230004_project_resources.sql',
-  '20261107230005_project_lifecycle.sql'
+  '20261107230005_project_lifecycle.sql', '20261107230008_project_writer_fence.sql'
 ) ORDER BY name;
 
 SELECT count(*) FILTER (WHERE "workspaceId" IS NOT NULL) AS bound_projects,
@@ -293,6 +300,8 @@ PY
 使用 [本地运行环境](../local-runtime.md) 配置 Node 24、PostgreSQL 17、隔离 `*_e2e` 数据库和测试账户。不要伪装 CI 环境变量通过保护。数据库 suite 的 skip 不是通过证据。
 
 现有入口包括 `pnpm test:migrations`、`pnpm test:project-v2-db`、`pnpm test:task-identity-db`、`pnpm test:project-resources-db`、`pnpm test:domain-lifecycle-db` 以及 Team / Workspace 和 Project Map 数据库回归。具体通过数和已运行文件从实际日志填写。
+
+`test:project-v2-db` 使用真正分开的 APP / WS 数据库，覆盖结构迁移、真实回填锁等待、排队旧 writer 的拒绝和新 API 的兼容写入。它还直接启动 `scripts/seed-acceptance-demo.mjs`：脚本只接受已存在的 Acceptance Guest，使用确定的演示 Workspace UUID 创建 WS 成员、APP bound Task 和 canonical Project 关系／回执，重跑保留用户已编辑的内容、已解除关系和编号。脚本不会认领归属未知或其他 Workspace 的旧演示记录；这类数据仍须走经审查的迁移修复。该脚本是隔离验收数据工具，不是生产 repair API。
 
 真实 HTTP / RPC 验收直接复用现有本地 runner 的 Item 11：
 

@@ -21,10 +21,10 @@ import type { ProfileCheckWork } from './agent-profile-decision'
 
 /** Provider I/O boundary; no model input selects these callbacks. */
 export const factoryAutomaticRuntime = {
-  park: async (pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, nextRunId?: string) => {
+  park: async (pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, nextRunId?: string, existing?: PoolClient) => {
     const { parkThreadMachine, retainThreadMachineForHandoff } = await import('@/lib/cloud-computer/thread-machines')
-    if (nextRunId && await retainThreadMachineForHandoff(pool, actor, runId, nextRunId)) return
-    await parkThreadMachine(pool, actor, runId)
+    if (nextRunId && await retainThreadMachineForHandoff(pool, actor, runId, nextRunId, existing)) return
+    await parkThreadMachine(pool, actor, runId, undefined, undefined, existing)
   },
   // The durable Factory workflow owns its lifecycle; do not spawn a second,
   // non-idempotent child workflow from its retried handoff step.

@@ -1,7 +1,7 @@
 import { factoryTestLifecycle } from "../../../tests/helpers/factory-test-authority";
 import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
 import { bindFixtureWorkspaceDatabase } from '../../../tests/helpers/workspace-database';
-import { bindFactoryQuestionsWorkspace } from '../background-workspace';
+import { bindFactoryQuestionsWorkspace, withFactoryBackgroundWorkspace } from '../background-workspace';
 import { seedRunProjectResources } from '../../../tests/helpers/run-project-resources';
 import { isolatedPostgresURL } from "../../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -358,24 +358,26 @@ test(
           const historyIds = [...new Set([f.runId, historyRunId])];
           const before = (await pool.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=ANY($1::uuid[]) ORDER BY id', [historyIds])).rows;
           const questionBefore = (await pool.query('SELECT to_jsonb(q) AS question FROM factory_questions q WHERE id=$1', [f.q.id])).rows;
-          const tx = await pool.connect();
-          try {
-            await tx.query('BEGIN');
-            // Exercise the outer claim composition used by device claims. Calling
-            // claimContinuation directly misses the execution-purpose regression.
-            const claimed = await createFactoryClaim(store, f.service)(tx, userId, f.childDevice, runId, new Date(Date.now() + 60000).toISOString());
-            assert.equal(claimed.factoryExecuteKind, expectedKind);
-            assert.equal(claimed.preserveQuestionWorktree, true);
-            assert.equal(claimed.continuesRunId, historyRunId);
-            assert.equal(claimed.resumeSessionId, f.q.originSessionId);
-            assert.equal(claimed.requireSessionResume, true);
-            assert.equal(claimed.questionId, f.q.id);
-            assert.equal(Object.hasOwn(claimed, 'factoryCheck'), false);
-            assert.doesNotMatch(claimed.followUp as string, /Current host-recorded command evidence|Persisted producer command observations/,
-              'execution answer/recovery does not receive independent-check instructions');
-            assert.deepEqual((await tx.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=ANY($1::uuid[]) ORDER BY id', [historyIds])).rows, before);
-            assert.deepEqual((await tx.query('SELECT to_jsonb(q) AS question FROM factory_questions q WHERE id=$1', [f.q.id])).rows, questionBefore);
-          } finally { await tx.query('ROLLBACK'); tx.release(); }
+          await withFactoryBackgroundWorkspace(pool, userId, { kind: 'task', id: f.task.id }, async () => {
+            const tx = await pool.connect();
+            try {
+              await tx.query('BEGIN');
+              // Exercise the outer claim composition used by device claims. Calling
+              // claimContinuation directly misses the execution-purpose regression.
+              const claimed = await createFactoryClaim(store, f.service)(tx, userId, f.childDevice, runId, new Date(Date.now() + 60000).toISOString());
+              assert.equal(claimed.factoryExecuteKind, expectedKind);
+              assert.equal(claimed.preserveQuestionWorktree, true);
+              assert.equal(claimed.continuesRunId, historyRunId);
+              assert.equal(claimed.resumeSessionId, f.q.originSessionId);
+              assert.equal(claimed.requireSessionResume, true);
+              assert.equal(claimed.questionId, f.q.id);
+              assert.equal(Object.hasOwn(claimed, 'factoryCheck'), false);
+              assert.doesNotMatch(claimed.followUp as string, /Current host-recorded command evidence|Persisted producer command observations/,
+                'execution answer/recovery does not receive independent-check instructions');
+              assert.deepEqual((await tx.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=ANY($1::uuid[]) ORDER BY id', [historyIds])).rows, before);
+              assert.deepEqual((await tx.query('SELECT to_jsonb(q) AS question FROM factory_questions q WHERE id=$1', [f.q.id])).rows, questionBefore);
+            } finally { await tx.query('ROLLBACK'); tx.release(); }
+          });
           const current = (await pool.query('SELECT status,"agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0];
           assert.equal(current.status, 'queued');
           assert.equal(current.agentDefinition.definitionDigest, f.definition.definitionDigest);
