@@ -19,7 +19,7 @@ import { apiCache } from '@/lib/api-cache'
 import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
-import { newSheetOptions } from '@/lib/sheet-options'
+import { newSheetOptions, reviewSheetOptions } from '@/lib/sheet-options'
 import { currentAccount, servers } from '@/lib/config'
 import { serverCopy as copy } from '@/lib/server-copy'
 
@@ -78,6 +78,8 @@ function SessionGate() {
         {/* 新建 Bot and 新建群聊: full-height form sheets with the grabber (docs/design/mobile-comma, 06–07). */}
         <Stack.Screen name="new-bot" options={newSheetOptions(colors.page)} />
         <Stack.Screen name="new-group" options={newSheetOptions(colors.page)} />
+        <Stack.Screen name="task/[id]/comment" options={reviewSheetOptions(colors.page)} />
+        <Stack.Screen name="task/[id]/batch" options={reviewSheetOptions(colors.page)} />
         <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
       </Stack>
     </HomeProvider>

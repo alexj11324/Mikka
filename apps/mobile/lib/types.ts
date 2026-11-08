@@ -35,7 +35,9 @@ export interface RunSource {
   kind: 'run'; id: string; name: string; agentName: string; harness: string; status: string
   /** Its group in the thread list (R-52), decided on the server. Absent from a server older than it. */
   group?: ThreadGroup
-  issue: { id: string; identifier: string | null; number: number | null; title: string } | null
+  issue: { id: string; identifier: string | null; number: number | null; title: string
+    /** A code task's review summary (#1738, from #1722); absent for a non-code task or an older server. */
+    review?: import('@/features/review/model/review').ReviewSummary | null } | null
   /** 运行信息, on the person's own runs. */
   info?: import('./run-info').RunInfo
 }
@@ -218,6 +220,8 @@ export interface TaskDetail {
     description: string | null
     agent: { harness: string; model: string | null } | null
     place: { kind: MachineKind; name: string } | null
+    /** A code task's review summary (#1738, from #1722); absent for a non-code task or an older server. */
+    review?: import('@/features/review/model/review').ReviewSummary | null
   }
   activity: TaskActivity[]
   /** The channel its task and run keys arrive on. */
