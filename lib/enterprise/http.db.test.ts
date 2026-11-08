@@ -930,23 +930,35 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
   await t.test('native SAML logout form preserves origin and callback fences and completes signed one-use SLO', async () => {
     const login = await samlLogin(), signedIn = await session(login.jar)
     assert.ok(signedIn)
-    const startForm = (origin = appOrigin, callbackURL = `${appOrigin}/signed-out`) => fetch(`${appOrigin}/api/auth/sso/saml2/logout/${samlProviderId}`, {
-      method: 'POST', headers: { origin, 'content-type': 'application/x-www-form-urlencoded', cookie: login.jar.header() },
-      body: new URLSearchParams({ callbackURL }), redirect: 'manual',
-    })
-    for (const [origin, callbackURL] of [
-      ['https://foreign.example.invalid', `${appOrigin}/signed-out`],
-      [appOrigin, 'https://foreign.example.invalid/signed-out'],
-    ]) {
-      const denied = await startForm(origin, callbackURL)
+    const startForm = (origin: string | null = appOrigin, callbackURL = `${appOrigin}/signed-out`, logoutProvider = samlProviderId) => {
+      const headers = new Headers({ 'content-type': 'application/x-www-form-urlencoded', cookie: login.jar.header() })
+      if (origin !== null) headers.set('origin', origin)
+      return fetch(`${appOrigin}/api/auth/sso/saml2/logout/${logoutProvider}`, {
+        method: 'POST', headers, body: new URLSearchParams({ callbackURL }), redirect: 'manual',
+      })
+    }
+    for (const [origin, callbackURL, logoutProvider] of [
+      ['https://foreign.example.invalid', `${appOrigin}/signed-out`, samlProviderId],
+      [appOrigin, 'https://foreign.example.invalid/signed-out', samlProviderId],
+      [null, `${appOrigin}/signed-out`, samlProviderId],
+      [appOrigin, `${appOrigin}/signed-out`, otherProviderId],
+    ] as const) {
+      const denied = await startForm(origin, callbackURL, logoutProvider)
       assert.equal(denied.status, 403, await denied.clone().text())
+      if (origin === null) assert.equal((await denied.clone().json()).code, 'MISSING_OR_NULL_ORIGIN')
+      if (logoutProvider === otherProviderId) assert.equal((await denied.clone().json()).code, 'ENTERPRISE_LOGOUT_SESSION_MISMATCH')
       login.jar.take(denied)
       assert.equal((await session(login.jar))?.session.id, signedIn.session.id, 'a rejected form cannot revoke or clear the current session')
     }
+    const originalCookie = login.jar.header()
     const start = await startForm()
     assert.equal(start.status, 302, await start.clone().text())
     login.jar.take(start)
     assert.equal(await session(login.jar), null, 'the accepted native form revokes its initiating session before navigation')
+    assert.equal((await pool.query('select count(*) from session where id=$1', [signedIn.session.id])).rows[0].count, '0', 'the initiating session is deleted before any request to the IdP')
+    const replayedSession = await fetch(`${appOrigin}/api/auth/get-session`, { headers: { cookie: originalCookie }, redirect: 'manual' })
+    assert.equal(replayedSession.status, 200)
+    assert.equal((await replayedSession.json()) === null, true, 'the original cookie cannot authenticate before navigation to the IdP')
     const nativeRequest = new URL(start.headers.get('location')!)
     const requestId = /\bID="([^"]+)"/.exec(inflateRawSync(Buffer.from(nativeRequest.searchParams.get('SAMLRequest')!, 'base64')).toString())?.[1]
     assert.ok(requestId)
