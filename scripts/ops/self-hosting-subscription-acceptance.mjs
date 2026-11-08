@@ -216,7 +216,7 @@ export async function runCommunity(env = process.env) {
   const { executionIdentitySchema, freezeExecutionIdentity, revalidateExecutionIdentity } = await import(pathToFileURL(source + '/lib/execution-identity.ts'))
   const revision = (await execute('git', ['rev-parse', 'HEAD'], { cwd: source })).stdout.trim()
   check(/^[a-f0-9]{40}$/.test(revision) && revision === env.MIKKA_COMMUNITY_REVISION, 'REVISION')
-  const report = { kind: 'real-community-subscriptions', revision, cases: [], cleanup: {}, stage: 'source', status: 'failed',
+  const report = { kind: 'real-community-subscriptions', revision, candidate: env.MIKKA_COMMUNITY_CANDIDATE === '1', cases: [], cleanup: {}, stage: 'source', status: 'failed',
     sourceRequests: [], credentialFixture: 'existing_authorized_access_projection', freshProviderOAuth: false, refreshGrantCopied: false, canonicalGrantPresent: false }
   const publicErrors = (await execute('git', ['grep', '-n', '-E', '(Error|Refusal)\\(|error:|summary:|msg:|reason:', '--', 'lib', 'app', 'packages/daemon/src', 'packages/protocol/src'], { cwd: source, maxBuffer: 8 * 1024 * 1024 })).stdout
   const signatures = publicErrors.split('\n').flatMap(line => {
@@ -258,12 +258,12 @@ export async function runCommunity(env = process.env) {
     check(identity.user?.email === email && identity.user.emailVerified === true, 'ACCOUNT')
     const currentRelease = await readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN })
     report.sharedWorkerAtStart = currentRelease.workerSha
-    sourceConfig = { sourceCommit: 'ce67afe931e9b9d6e7b0d346a62aa4d9751195c8', workerSha: 'e8d0ebf6fabe18b9a87ef36ceb7c16e9b460a1c5', templates: { desktop: 'a9les5psny6lyrqsvq39', claude: 'ap5s6lgfjlf4gnb8n49v', codex: 't323mqsiy91e0hydifnh' } }
+    sourceConfig = currentRelease
     report.worker = { source: sourceConfig.sourceCommit, sha: sourceConfig.workerSha, templates: sourceConfig.templates }
     const expectedWorker = (await execute('python3', ['scripts/e2b/build-template.py', '--worker-hash', '--source-ref', revision], { cwd: source })).stdout.trim()
     check(expectedWorker === sourceConfig.workerSha, 'WORKER_VERSION')
     report.publicBuild = (await cloud.json('/api/version')).build
-    const sharedBuilds = [revision, env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION, '4221d9c06da079321d4fe2803879ba82043d7a1f', '0479675e188efeac341b207d8616c4d7b9d4ee23']
+    const sharedBuilds = [revision, env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION, '4221d9c06da079321d4fe2803879ba82043d7a1f', '0479675e188efeac341b207d8616c4d7b9d4ee23', 'ad7f0d0434e7d4a2527d868c4830d009b28a9d7f', '78c3c13d35c2c664113a140bccb3db4ae9606021']
     check(env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION === '9ea7b2cd61deb724f20330906f86df6df2cd9828' && sharedBuilds.includes(report.publicBuild), 'PUBLIC_VERSION')
     report.sharedControlPlaneCompatibility = 'A23_fixed_selfhost_live047_auth_cloud_github_unchanged_reviewed_quota_read_optimization'
     privatePool = new Pool({ connectionString: database, max: 1, ssl: { rejectUnauthorized: true } })
@@ -554,6 +554,11 @@ export async function runCommunity(env = process.env) {
         row.stage = 'dispatch'
         const queued = await mcp('tools/call', { name: 'dispatch_run', arguments: { issueId, agentId: agent.id, repo: 'alexj11324/Mikka', requestKey: 'selfhost:' + sampleId, note: 'Use exactly ' + s.model + ' on this subscription. Read-only; finish with ' + marker } })
         runId = queued.runId ?? queued.thread?.runId; check(UUID.test(runId), 'RUN')
+        const initialFactory = (await localPool.query(`SELECT t."sourceEventId" FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId"
+          WHERE a."runId"=$1 AND t."userId"=$2`, [runId, own.id])).rows[0]
+        check(UUID.test(initialFactory?.sourceEventId ?? ''), 'FACTORY_SOURCE')
+        const acceptedEpochHash = sha(initialFactory.sourceEventId).slice(0, 16)
+        row.acceptedEpochHash = acceptedEpochHash
         const record = executionRecord = { runId, issueId, title, sampleId, harness: s.harness, requireReply: true, requireReplyAfterTool: true, requireTerminal: true, minToolCalls: 1 }
         row.runId = runId; row.issueId = issueId
         row.stage = 'full-thread'
@@ -599,8 +604,12 @@ export async function runCommunity(env = process.env) {
         const evidence = (await community.json('/api/runs/' + runId + '/evidence')).run
         check(evidence.model === s.model && evidence.credentialType === 'subscription' && evidence.harness === s.harness
           && evidence.executionIdentity?.resourceBindings?.some(r => r.kind === 'device' && r.id === deviceId), 'RUN_PROVENANCE')
+        const finalFactory = (await localPool.query(`SELECT t."sourceEventId",a.reason FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId"
+          WHERE a."runId"=$1 AND t."userId"=$2`, [runId, own.id])).rows[0]
+        check(finalFactory && sha(finalFactory.sourceEventId).slice(0, 16) === acceptedEpochHash
+          && !/Superseded by an authenticated owner request/.test(finalFactory.reason ?? ''), 'ACCEPTED_EPOCH_REPLAYED')
         Object.assign(row, { status: 'passed', runId, issueId, successfulTool: true, replyAfterTool: true, terminal: record.lastStatus,
-          credentialType: evidence.credentialType, subscriptionRoute: evidence.subscriptionRoute })
+          credentialType: evidence.credentialType, subscriptionRoute: evidence.subscriptionRoute, acceptedEpochPreserved: true })
       } catch (error) {
         row.code = /^(COMMUNITY_[A-Z0-9_]+|startup_[a-z0-9_]{1,80})$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_THREAD_FAILED'; row.errorClass = error?.constructor?.name === 'CommandExitError' ? 'CommandExitError' : 'Error'
         if (runId && issueId) {
@@ -673,6 +682,7 @@ export async function runCommunity(env = process.env) {
       }
     }
     check(report.cases.length === 2 && report.cases.every(c => c.status === 'passed' && c.cleanup.vmStopped && c.cleanup.deviceRemoved), 'BOTH_THREADS')
+    check(report.githubManifest?.status === 'passed', 'MANIFEST_PREPARATION')
     report.publicFinalBuild = (await cloud.json('/api/version')).build
     check(sharedBuilds.includes(report.publicFinalBuild), 'PUBLIC_CHANGED')
     report.sharedWorkerAtEnd = (await readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN })).workerSha
