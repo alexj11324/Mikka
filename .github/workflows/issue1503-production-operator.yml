@@ -88,7 +88,7 @@ jobs:
         env:
           NODE_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 4221d9c06da079321d4fe2803879ba82043d7a1f
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 7e34d869aa80266494cb2e2eefeee5d8e7ff7d4d
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: claude_code
           MIKKA_1503_CODEX_QUESTION: '0'
@@ -107,7 +107,7 @@ jobs:
         env:
           NODE_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 4221d9c06da079321d4fe2803879ba82043d7a1f
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 7e34d869aa80266494cb2e2eefeee5d8e7ff7d4d
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: codex
           MIKKA_1503_CODEX_QUESTION: '1'
