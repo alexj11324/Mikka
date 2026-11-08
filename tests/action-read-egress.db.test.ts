@@ -223,7 +223,11 @@ test('team link reads page through all authorized pairs and retain explicit-id s
     await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [workspace, owner, owner + '@example.invalid'])
     await pool.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1,$2,$5,\'Read scope\',\'READ\'),($3,$4,$5,\'Other scope\',\'OTHER\')', [team, workspace, foreignTeam, otherWorkspace, owner])
     await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") SELECT id,$2,$3,$4 FROM unnest($1::uuid[]) id', [ids, team, workspace, owner])
-    await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4),($5,$6,$3,$4)', [wrongPair, team, otherWorkspace, owner, foreign, foreignTeam])
+    await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [foreign, foreignTeam, otherWorkspace, owner])
+    // The lifecycle constraint now rejects new malformed pairs at the write
+    // boundary. Keep the foreign but internally consistent link for explicit
+    // token-scope reads; do not disable the production guard to seed corruption.
+    await assert.rejects(pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [wrongPair, team, otherWorkspace, owner]), { code: '23514', message: 'workspaceAccessDenied' })
     const sampleIds = ids.slice(0, 110)
     const baseline = await measured(() => pool.query({ text: 'SELECT "issueId","teamId","workspaceId" FROM mikka_team_issues WHERE "issueId"=ANY($1::uuid[]) ORDER BY "issueId"', values: [sampleIds], rowMode: 'array' }))
     const sample = await measured(() => issueTeamScope(owner, [], { onlyIssueIds: sampleIds, teams: allowed }))
@@ -239,7 +243,7 @@ test('team link reads page through all authorized pairs and retain explicit-id s
     assert.deepEqual(await issueTeamScope(owner, [], { onlyIssueIds: [], teams: allowed }), [])
     const explicit = await issueTeamScope(owner, [foreign, wrongPair], { onlyIssueIds: [foreign, wrongPair], teams: allowed })
     assert.equal(explicit.find(row => row.issueId === foreign)?.workspaceId, otherWorkspace, 'explicit IDs preserve other-workspace links for token checks')
-    assert.equal(explicit.find(row => row.issueId === wrongPair)?.workspaceId, otherWorkspace)
+    assert.equal(explicit.find(row => row.issueId === wrongPair), undefined, 'a rejected malformed relation is never materialized by an explicit-id read')
     await pool.query('UPDATE mikka_workspace_members SET status=\'removed\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspace, owner])
     assert.deepEqual(await issueTeamScope(owner), [], 'membership is re-read on the next operation')
   } finally {

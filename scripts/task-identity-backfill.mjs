@@ -4,6 +4,42 @@
  */
 export async function backfillTaskIdentifiers(app, workspace, { batchSize = 200 } = {}) {
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1000) throw new Error('Invalid task identity batch size')
+  // APP DDL precedes P0's cross-database ownership backfill. Its historical
+  // aliases may still have a NULL tenant, including on already-issued tasks.
+  // Repair that projection and import trusted peer publication receipts before
+  // choosing any new immutable identifier. A keyset makes retries bounded and
+  // never rewrites a conflicting non-NULL tenant/owner or an issued spelling.
+  let after = null, aliasTasks = 0, boundAliases = 0, publicationAliases = 0
+  for (;;) {
+    const { rows: tasks } = await app.query(`SELECT i.id FROM issues i
+      WHERE i."ownershipState"='bound' AND i."workspaceId" IS NOT NULL
+        AND ($1::uuid IS NULL OR i.id>$1) AND (
+          EXISTS (SELECT 1 FROM task_identifier_aliases a WHERE a."issueId"=i.id
+            AND a."ownerId"=i."userId" AND a."workspaceId" IS NULL)
+          OR EXISTS (SELECT 1 FROM run_publications p
+            JOIN agent_runs r ON r.id=p."runId" AND r."issueId"=p."issueId" AND r."userId"=p."userId"
+            WHERE p."issueId"=i.id AND r."workspaceId"=i."workspaceId"
+              AND p.identifier IS NOT NULL AND p.identifier<>'' AND NOT EXISTS (
+                SELECT 1 FROM task_identifier_aliases a WHERE a."issueId"=i.id
+                  AND a.identifier=p.identifier AND a.kind='publication'))
+        ) ORDER BY i.id LIMIT $2`, [after, batchSize])
+    if (!tasks.length) break
+    after = tasks.at(-1).id
+    const client = await app.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query("SET LOCAL lock_timeout='10s'; SET LOCAL statement_timeout='60s'")
+      const { rows: [counts] } = await client.query('SELECT * FROM reconcile_bound_task_identifier_aliases($1::uuid[])', [tasks.map(task => task.id)])
+      await client.query('COMMIT')
+      aliasTasks += tasks.length
+      boundAliases += Number(counts.bound_aliases)
+      publicationAliases += Number(counts.publication_aliases)
+      console.log(`migrate: task aliases tasks=${aliasTasks} bound=${boundAliases} publications=${publicationAliases}`)
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    } finally { client.release() }
+  }
   let issued = 0
   for (;;) {
     const { rows: tasks } = await app.query(`SELECT id, "workspaceId", "userId" FROM issues

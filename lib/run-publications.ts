@@ -23,6 +23,7 @@ import { mayCompleteIssue, withRunWorkspace } from './run-completion'
 import type { QuotaPlan } from './run-quota'
 import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects } from './run-completion-effects'
 import { launchProviderContinuation, pendingProviderFallback, providerCompletion, recoverProviderFailure } from './run-provider-fallback'
+import { withProjectResourceLease } from './project-resources/store'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Run = typeof agentRuns.$inferSelect
@@ -165,7 +166,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
   const [stored] = await db.select({ workspaceId: agentRuns.workspaceId }).from(agentRuns)
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId)).where(owner).limit(1)
   if (!stored?.workspaceId) return null
-  return withRunWorkspace(userId, stored.workspaceId, async () => {
+  return withRunWorkspace(userId, stored.workspaceId, () => withProjectResourceLease(userId, stored.workspaceId!, async () => {
   const client = await pool.connect()
   let wakeDevice: string | null | undefined
   let committed = false
@@ -197,7 +198,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
       // a run that was not on a subscription has no quota to switch from, so it is an error.
       const quota = completion.stopReason === 'quota_exhausted' ? await (await import('./run-quota')).planQuotaExhausted(client, run) : undefined
       if (quota === null) completion = { ...completion, stopReason: 'error' }
-      const paused = Boolean(quota && (!quota.key || quota.cloud))
+      const paused = Boolean(quota && (!quota.key || quota.cloud || quota.resourceRefusal))
       const resetsAt = completion.report?.resetsAt ?? null
       const prepared = await prepareRunCompletionEffects(client, run, completion, factoryBound)
       // runReport strips unknown worker fields. The recovery receipt belongs
@@ -229,7 +230,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
       await settleRunCompletionEffects(client, run, completion.stopReason, factoryBound, completion.report)
       if (quota) {
-        const settled = await (await import('./run-quota')).settleQuotaExhausted(tx, run, quota, resetsAt)
+        const settled = await (await import('./run-quota')).settleQuotaExhausted(tx, run, quota, resetsAt, client)
         if (settled.cloud) quotaCloud = { run, plan: quota, resetsAt }
         if (settled.deviceId) wakeDevice = settled.deviceId
       }
@@ -254,7 +255,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
     client.release()
     if (committed && wakeDevice) (await import('./device-gateway-notify')).notifyDeviceWork(wakeDevice)
   }
-  })
+  }))
 }
 
 async function claimPublication(runId: string) {

@@ -500,13 +500,22 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   })
   return response ?? NextResponse.json({ error: 'Run access changed before claim response.' }, { status: 409 })
   }
-  if (!run.workspaceId) return NextResponse.json({ error: 'Run workspace unavailable.', code: 'workspaceAccessDenied' }, { status: 409 })
+  if (!run.workspaceId) {
+    const error = new PublicationError('issue_unavailable')
+    return NextResponse.json({ error: error.message, code: error.code }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
+  }
   try {
     return await withRunProjectExecution({ userId: caller.userId, workspaceId: run.workspaceId, issueId: run.issueId,
       repositoryKey: repo.remoteUrl ? repo.repoPath : null, baseBranch: run.baseBranch, runtime: device.kind === 'cloud' ? 'cloud' : 'local',
       harness: run.agentDefinition?.harness ?? agent.harness }, run.agentDefinition?.projectExecution, claimAuthorizedProject)
   } catch (error) {
     if (!(error instanceof ActionFailureError)) throw error
+    if (error.code === 'workspaceAccessDenied') {
+      // Resource admission runs before the existing task read. Preserve that
+      // read's public denial while issuing no lease, token or completion.
+      const unavailable = new PublicationError('issue_unavailable')
+      return NextResponse.json({ error: unavailable.message, code: unavailable.code }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
+    }
     return NextResponse.json({ error: error.code, code: error.code }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
   }
 }

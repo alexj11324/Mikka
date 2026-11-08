@@ -71,10 +71,12 @@ test('generated action stubs preserve declaration arity, including SWR zero-argu
     return Response.json({ version: 1, ok: true, result: [] })
   }
   window.mikka = {}
-  const actions = await moduleFrom({ source: 'export { listProjects } from "@/app/actions/projects"; export { getArtifact } from "@/app/actions/artifacts";', plugins: [applicationBoundary(new Map())] })
+  const actions = await moduleFrom({ source: 'export { listProjects, listWorkspaceProjects } from "@/app/actions/projects"; export { getArtifact } from "@/app/actions/artifacts";', plugins: [applicationBoundary(new Map())] })
   await actions.listProjects('SWR cache key')
+  const workspace = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
+  await actions.listWorkspaceProjects(workspace, 'extra ignored argument')
   await actions.getArtifact('artifact-id', 'extra ignored argument')
-  assert.deepEqual(requests.map(request => [request.action, request.args]), [['projects.listProjects', []], ['artifacts.getArtifact', ['artifact-id']]])
+  assert.deepEqual(requests.map(request => [request.action, request.args]), [['projects.listProjects', []], ['projects.listWorkspaceProjects', [workspace]], ['artifacts.getArtifact', ['artifact-id']]])
 }))
 
 test('action inventory includes the actual billing re-export chain and excludes type-only aliases', async () => {

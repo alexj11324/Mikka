@@ -38,19 +38,21 @@ import { createFactoryApprovalGates } from './approval';
 import { createFactoryMerges } from './merge';
 import { createFactoryStore, type FactoryTask } from "./store";
 import {
-  createFactoryDispatch,
+  createFactoryDispatch as rawDispatch,
   defaultFactoryDispatchAdapters,
   factoryBinding,
   type FactoryQueue,
 } from "./dispatch";
 import { createFactoryClaim } from "./claim";
-import { createFactoryQuestions, questionReference } from "./questions/store";
+import { createFactoryQuestions as rawQuestions, questionReference } from "./questions/store";
+import { bindFactoryQuestionsWorkspace } from './background-workspace';
 import { queueCloudQuestionContinuation } from "./questions/queue-continuation";
 import { cloudTaskTarget, ownedCloudTaskTarget } from "../computer/cloud-task-target";
 import { humanQuestionAnswerSchema, questionFingerprint } from './questions/contract';
 import { factoryEventId } from './event-id';
 import { handleFactoryQuestion } from "./questions/http";
-import { createFactoryReconciler } from "./reconcile";
+import { createFactoryReconciler as rawReconciler } from "./reconcile";
+import { resourceBoundFactoryDispatch, factoryResourceWorkspace } from '../../tests/helpers/factory-resource-boundary';
 import { factoryCheckIndependent } from "./check-independence";
 import { observeFactoryCheckDispatch } from "./check-dispatch";
 import {
@@ -68,6 +70,11 @@ import {
   createFactoryCheckRecovery,
   type FactoryCheckRecoveryDependencies,
 } from "./check-recovery";
+
+const createFactoryDispatch: typeof rawDispatch = (...args) => resourceBoundFactoryDispatch(args[0], rawDispatch(...args));
+const createFactoryReconciler: typeof rawReconciler = (source, store, questions, consumers, botId, automatic, boundary) =>
+  rawReconciler(source, store, questions, consumers, botId, automatic, boundary ?? factoryResourceWorkspace(source));
+const createFactoryQuestions: typeof rawQuestions = (...args) => bindFactoryQuestionsWorkspace(args[0], rawQuestions(...args), null);
 
 test(
   "actual migrated PG/HTTP: review/verify receipt consumers and bounded repair",
@@ -3168,7 +3175,7 @@ test(
             current = await cloudStore.apply(userId, factoryBinding(current.task), randomUUID(), { action: 'advance', stage: 'review', reason: 'Independent check' });
             const candidateBefore = (await db.query('SELECT to_jsonb(c) AS value FROM factory_candidates c WHERE id=$1', [current.task.candidateId])).rows[0].value;
             const automatic = automaticFactoryDispatch(db);
-            const cloudQuestions = createFactoryQuestions(db, authorize, cloudStore, initialDispatch, assignment);
+            const cloudQuestions = bindFactoryQuestionsWorkspace(db, rawQuestions(db, authorize, cloudStore, initialDispatch, assignment), botId);
             const cloudReconcile = createFactoryReconciler(db, cloudStore, cloudQuestions, { review: reconcileFactoryCheck, verify: reconcileFactoryCheck }, botId);
             for (const stage of ['review'] as const) {
               assert.equal(current.task.stage, stage);
@@ -3182,6 +3189,7 @@ test(
                 ['UPDATE agents SET harness=\'claude_code\' WHERE id=$1', [runtime.agentId], 'factoryCheckHarnessUnavailable'],
                 ['UPDATE factory_candidates SET repository=\'/wrong/repository\' WHERE id=$1', [current.task.candidateId], 'factoryEvidenceMismatch'],
               ] as const) {
+                await factoryResourceWorkspace(db)(userId, current.task.id, async () => {
                 const tx = await db.connect();
                 try {
                   await beginFactoryTransaction(tx);
@@ -3190,12 +3198,14 @@ test(
                   await assert.rejects(automatic(tx, cloudStore, current.task, producer),
                     (error: unknown) => error instanceof FactoryError ? error.code === code : error instanceof Error && error.message === code, sql);
                 } finally { await rollbackFactoryTransaction(tx); tx.release(); }
+                });
                 assert.deepEqual(await parent(), beforeParent, 'automatic dispatch must not commit the caller\'s disabled parent before rejecting');
                 assert.deepEqual(await cloudStore.read(userId, current.task.id), before);
                 assert.deepEqual((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [issueId])).rows, beforeRuns);
               }
-              const tx = await db.connect();
               let afterCommit: (() => Promise<void>) | void;
+              await factoryResourceWorkspace(db)(userId, current.task.id, async () => {
+              const tx = await db.connect();
               try {
                 await beginFactoryTransaction(tx);
                 afterCommit = await automatic(tx, cloudStore, current.task, producer);
@@ -3222,6 +3232,7 @@ test(
                 }
                 await commitFactoryTransaction(tx);
               } catch (error) { await rollbackFactoryTransaction(tx); throw error; } finally { tx.release(); }
+              });
               await afterCommit!();
               current = await cloudStore.read(userId, current.task.id);
               const attempt = current.attempts.find(item => item.id === current.task.attemptId)!;

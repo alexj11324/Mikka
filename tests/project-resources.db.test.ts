@@ -66,6 +66,8 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
     let claimed = 0
     await withRunProjectExecution({ ...request, baseBranch: original.baseBranch }, original, async () => { claimed++ })
     assert.equal(claimed, 1)
+    assert.equal(await withRunProjectExecution({ ...request, baseBranch: 'a'.repeat(40) }, original, async () => 'candidate checkout'), 'candidate checkout',
+      'a Factory candidate SHA does not replace the separately frozen Project target branch')
     await resources.saveWorkspaceRepositoryPolicy(owner, { workspaceId: workspace.id, revision: 1, mode: 'restricted', repositoryKeys: [repoB] })
     await rejects(withRunProjectExecution(request, original, async () => { claimed++ }), 'projectRepositoryDenied')
     assert.equal(claimed, 1, 'a queued Run is not a grant after repository revocation')

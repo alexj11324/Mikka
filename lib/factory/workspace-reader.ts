@@ -10,6 +10,7 @@ import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { FactoryError } from './contract'
 import { currentRequestScope } from '@/apps/api/src/context'
 import { workspaceSelection } from '@/lib/workspace-selection'
+import { withProjectResourceLease } from '@/lib/project-resources/store'
 
 /** Human Factory requests use the selected tenant. Background workers retain
  * their stored task/Bot authority, and scoped credentials retain their pin. */
@@ -42,7 +43,8 @@ export async function withFactoryWorkspace<T>(userId: string, work: () => Promis
     if (acting?.userId !== userId || !acting.enterprisePrincipal) throw new FactoryError('factoryNotFound')
     const reader = await factoryWorkspaceReader(userId)
     if (typeof reader === 'string' || !reader[tokenWorkspace]) throw new FactoryError('factoryNotFound')
-    return await withTaskWorkspace(reader, reader[tokenWorkspace], () => actAs(reader, work, acting.actor))
+    return await withTaskWorkspace(reader, reader[tokenWorkspace], () =>
+      withProjectResourceLease(reader, reader[tokenWorkspace], () => actAs(reader, work, acting.actor)))
   } catch (error) {
     if ((error instanceof ActionFailureError || error instanceof WorkspaceError) && error.code === 'workspaceAccessDenied') {
       throw new FactoryError('factoryNotFound', { cause: error })

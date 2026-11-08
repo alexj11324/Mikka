@@ -90,7 +90,12 @@ test('run result publication commits one owner-scoped result through retries and
     await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Publication CI computer\',\'local\',$3)', [row.deviceId, row.userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents (id,"userId","deviceId",harness,name) values ($1,$2,$3,\'codex\',$4)', [row.agentId, row.userId, row.deviceId, `codex ${row.deviceId}`])
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,null)', [row.repoId, row.deviceId, row.userId, row.remoteKey, row.remoteUrl])
-    await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$5,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal', row.workspaceId])
+    const { rows: [createdTask] } = await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$5,\'Fix redirect\',$3,\'todo\',\'normal\',$4) returning "issuedIdentifier"', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal', row.workspaceId])
+    if (options.scope === 'workspace') {
+      assert.equal(createdTask.issuedIdentifier, `W${row.workspaceId.replaceAll('-', '').slice(0, 12).toUpperCase()}-1`)
+      row.identifier = createdTask.issuedIdentifier
+      row.branch = `mikka/${row.identifier.toLowerCase()}`
+    }
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',null,\'Fix redirect\')', [row.runId, row.userId, row.issueId, row.agentId, row.deviceId, row.repoId])
     await pool.query('insert into run_tokens (id,"runId","userId","tokenHash","expiresAt") values ($1,$2,$3,$4,now()+interval \'1 hour\')', [randomUUID(), row.runId, row.userId, `synthetic-${randomUUID()}`])
     if (options.approved) await admit(row)
@@ -203,7 +208,7 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(await failFromRequest(queued.runId, queued.deviceId, queued.userId), false)
     })
 
-    await t.test('an unlinked workspace task publishes with its owner number without changing scope', async () => {
+    await t.test('an unlinked workspace task publishes its immutable Workspace identifier without changing scope', async () => {
       const { admitCloudPush } = await import('../lib/computer/cloud-push')
       const f = await fixture({ approved: true, prefix: 'MINE', number: 12, scope: 'workspace' })
       const client = await pool.connect()
@@ -212,7 +217,7 @@ test('run result publication commits one owner-scoped result through retries and
         await client.query('BEGIN')
         const admitted = await cloudAdmission()
         assert.ok(admitted, 'a task without a local team still gets a publication receipt')
-        assert.equal(admitted.publication.identifier, 'MINE-12')
+        assert.equal(admitted.publication.identifier, f.identifier)
         assert.equal(admitted.publication.branch, f.branch)
         assert.equal(admitted.publication.remoteUrl, f.remoteUrl)
         await client.query('COMMIT')
@@ -224,6 +229,7 @@ test('run result publication commits one owner-scoped result through retries and
         await client.query('COMMIT')
         assert.equal((await task(f)).scope, 'workspace')
         assert.equal((await task(f)).userId, f.userId)
+        assert.equal((await task(f)).issuedIdentifier, f.identifier)
         assert.equal((await pool.query('select count(*)::int n from mikka_team_issues where "issueId"=$1', [f.issueId])).rows[0].n, 0, 'naming does not assign a team or change access')
       } finally {
         await client.query('ROLLBACK')

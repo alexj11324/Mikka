@@ -37,9 +37,9 @@ import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { actingContext, activityActor } from '@/lib/activity-actor'
 import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
-import { queryVersion } from '@/lib/db/query-version'
+import { queryVersion, queryVersions } from '@/lib/db/query-version'
 import { workspaceDb } from '@/lib/workspace-db'
-import { teamIssues, teams as localTeams } from '@/lib/db/team-schema'
+import { teamIssues } from '@/lib/db/team-schema'
 import { issueListChanged } from '@/lib/live/lists'
 import { issueRelationsChanged } from '@/lib/live/issue-detail'
 import { ownerListRead } from '@/lib/live/list-read-server'
@@ -117,32 +117,32 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // Fingerprint before reading links that will be reused below. A relation
   // moved during this read must invalidate the next poll, never be acknowledged
   // with a newer fingerprint while returning its older team.
-  const linksVersion = await queryVersion(workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId, number: teamIssues.number, key: localTeams.identifier }).from(teamIssues)
-    .leftJoin(localTeams, eq(localTeams.id, teamIssues.teamId))
-    .where(and(eq(teamIssues.workspaceId, context.workspace.id), or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined))), workspaceDb)
+  const linksQuery = workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId }).from(teamIssues)
+    .where(and(eq(teamIssues.workspaceId, context.workspace.id), or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined)))
   // A departed/suspended human must disappear from responsibility even when
   // the Task's historical metadata did not change. These hashes are taken
   // before projection, so a concurrent revoke remains visible on the next read.
-  const membersVersion = await queryVersion(workspaceDb.select({ userId: workspaceMembers.userId, status: workspaceMembers.status }).from(workspaceMembers)
-    .where(eq(workspaceMembers.workspaceId, context.workspace.id)), workspaceDb)
-  const projectsVersion = await queryVersion(projectDb.select({ issueId: projectTasks.issueId, projectId: projects.id, name: projects.name }).from(projectTasks)
+  const membersQuery = workspaceDb.select({ userId: workspaceMembers.userId, status: workspaceMembers.status }).from(workspaceMembers)
+    .where(eq(workspaceMembers.workspaceId, context.workspace.id))
+  const projectsQuery = projectDb.select({ issueId: projectTasks.issueId, projectId: projects.id, name: projects.name }).from(projectTasks)
     .innerJoin(projects, and(eq(projects.id, projectTasks.projectId), eq(projects.workspaceId, projectTasks.workspaceId)))
-    .where(eq(projectTasks.workspaceId, context.workspace.id)), projectDb)
+    .where(eq(projectTasks.workspaceId, context.workspace.id))
+  // These three authorities live in the canonical Workspace database. Read
+  // their hashes together before reading any projection, without an APP join.
+  const { linksVersion, membersVersion, projectsVersion } = await queryVersions({ linksVersion: linksQuery, membersVersion: membersQuery, projectsVersion: projectsQuery }, workspaceDb)
   // This operation already authorized the selected tenant in loadWorkspaceContext.
   // Keep that fresh membership result instead of loading it a second time.
   const visibility = {
     predicate: issueVisibilityPredicate(userId, { allowedIds: [], workspaceIds: [context.workspace.id] }),
     links: await issueTeamScope(userId, [], { teams, withTaskNumbers: true }),
   }
-  const candidates = db.select({ id: issues.id, ownerId: issues.userId, workspaceId: issues.workspaceId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
-  // Include identifier dependencies: a prefix, profile or Linear rename can change a list without editing a task.
-  // Qualified by alias: drizzle renders columns bare here, and a bare "userId" inside
-  // issue_prefixes would compare that table with itself.
+  // The predicate binds every candidate to this one authorized Workspace.
+  // Restore that known ID in the DTO instead of transferring it per row.
+  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, shortTitle: issueShortTitle.as('shortTitle'), content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
+  // Issued identifiers are part of the Task row and do not follow Team,
+  // personal-prefix or provider renames. Current human profile changes still
+  // invalidate responsibility without rewriting historical Task metadata.
   const signature = db.select({ id: candidates.id, scope: candidates.scope, updatedAt: candidates.updatedAt, item: sql`to_jsonb(task_list)`.as('item'), identifiers: sql`jsonb_build_array(
-    (select owner.email from "user" owner where owner.id = task_list."userId"),
-    (select prefix.prefix from issue_prefixes prefix where prefix."userId" = task_list."userId"),
-    (select jsonb_agg(sync."linearTeamKey" order by sync."linearTeamKey") from linear_team_syncs sync where sync."ownerId" = task_list."userId"),
-    (select jsonb_agg(link."linearIdentifier" order by link."linearIdentifier") from linear_issue_links link where link."issueId" = task_list.id),
     (select jsonb_build_array(person.name,person.image) from "user" person where person.id = coalesce(task_list.content->'attrs'->'mikka',task_list.content->'attrs'->'orvilo')->'assignee'->>'id')
   )`.as('identifiers') }).from(candidates)
   const tasksVersion = await queryVersion(signature)
@@ -167,7 +167,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
   // link moves. Rebuild the small authorized id manifest and read only rows
   // whose visible projection differs from the caller's held snapshot.
   const positions = manifest
-    .map(row => ({ id: row.id, version: createHash('sha256').update(JSON.stringify([userId, context.workspace.id, row.signature, membersVersion, projectsVersion, links.find(link => link.issueId === row.id)?.teamId ?? null, row.scope === 'workspace' ? taskTeams.get(row.id) ?? null : null])).digest('hex').slice(0, 32) }))
+    .map(row => ({ id: row.id, version: createHash('sha256').update(JSON.stringify([userId, context.workspace.id, row.signature, membersVersion, projectsVersion, links.find(link => link.issueId === row.id)?.teamId ?? null])).digest('hex').slice(0, 32) }))
   // Every request rebuilds visibility and the complete manifest before it may
   // join. A removed task/link therefore cannot inherit an older flight even
   // when this person's workspace role and team membership are unchanged.
@@ -177,8 +177,12 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
     version, known ?? null, listPositionKey(previous), JSON.stringify(positions)], async () => {
     const changedIds = changedListIds(positions, previous)
     const rows = changedIds.length ? await db.select().from(candidates).where(inArray(candidates.id, changedIds)).orderBy(desc(candidates.updatedAt), desc(candidates.id)) : []
-    const liveRows = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
-    const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), db, taskTeams)
+    const liveRows = rows.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => ({ ...row, workspaceId: context.workspace.id }))
+    // Reuse this request's authorized APP rows; only an unissued historical
+    // Task needs the legacy reconciliation path and its additional queries.
+    const identifiers = new Map(liveRows.filter(row => row.issuedIdentifier).map(row => [row.id, row.issuedIdentifier]))
+    const unissued = liveRows.filter(row => !row.issuedIdentifier)
+    for (const [id, identifier] of await taskIdentifiers(unissued.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })), db, taskTeams)) identifiers.set(id, identifier)
     const assignees = await taskAssignees(liveRows.map(row => ({ id: row.id, workspaceId: row.workspaceId, assignee: readIssueMetadata(row.content).assignee })))
     const taskProjects = await projectViewsForTasks(liveRows)
     // The leader's revision was read before these rows. Never stamp a joined

@@ -52,11 +52,21 @@ async function readProject(tx: ProjectTransaction | typeof projectDb, reader: Pa
   return project
 }
 
-export async function listProjects(workspaceId?: string) {
+async function projectsInContext(workspaceId?: string) {
   return withDatabaseOperation('/actions/projects/list', async () => {
     const context = await projectContext(workspaceId)
     return (await accessibleProjects(context.user, projectDb, context.workspaceId)).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
   })
+}
+
+/** Retain the zero-argument action signature: existing SWR consumers pass
+ * their cache key to the fetcher, which generated clients must discard. */
+export async function listProjects() {
+  return projectsInContext()
+}
+
+export async function listWorkspaceProjects(workspaceId: string) {
+  return projectsInContext(workspaceId)
 }
 
 async function persistProject(input: unknown, partial: boolean) {

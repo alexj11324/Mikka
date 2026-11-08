@@ -53,7 +53,7 @@ export async function verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, ta
     return value.data
   }
   const project = async id => {
-    const rows = await rpc(accounts.owner, 'projects.listProjects', workspaceId)
+    const rows = await rpc(accounts.owner, 'projects.listWorkspaceProjects', workspaceId)
     const found = rows.find(row => row.id === id)
     assert.ok(found, 'domain project must remain in its Workspace')
     return found
@@ -98,7 +98,7 @@ export async function verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, ta
   assert.equal(first.createdBy, accounts.owner.userId)
   assert.equal(second.createdBy, accounts.peer.userId)
   for (const account of [accounts.owner, accounts.peer]) {
-    const visible = (await rpc(account, 'projects.listProjects', workspaceId)).filter(row => row.name === sameName)
+    const visible = (await rpc(account, 'projects.listWorkspaceProjects', workspaceId)).filter(row => row.name === sameName)
     assert.deepEqual(visible.map(row => row.id).sort(), [first.id, second.id].sort())
   }
   assert.equal(first.leadUserId, accounts.peer.userId)
@@ -130,7 +130,7 @@ export async function verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, ta
   assert.ok(!(await rpc(accounts.owner, 'projects.listProjects')).some(row => [first.id, second.id].includes(row.id)))
   const beforeForeign = await projectState(first.id)
   await denied(accounts.owner, 'projects.updateProjectProperties', [{ id: first.id, revision: first.revision, changes: { name: `${marker} forbidden` } }], ['projectNotFound'])
-  await denied(accounts.peer, 'projects.listProjects', [b.workspaceId], ['workspaceAccessDenied'])
+  await denied(accounts.peer, 'projects.listWorkspaceProjects', [b.workspaceId], ['workspaceAccessDenied'])
   await denied(accounts.peer, 'project-resources.listProjectResources', [b.workspaceId, first.id], ['workspaceAccessDenied'])
   await denied(accounts.peer, 'projects.setProjectIssues', [{ id: first.id, workspaceId, revision: first.revision, issueIds: [taskB.id] }], ['issueNotFound'])
   assert.deepEqual(await projectState(first.id), beforeForeign)

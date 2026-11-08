@@ -1,5 +1,8 @@
 import { factoryTestLifecycle } from "../../../tests/helpers/factory-test-authority";
 import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
+import { bindFixtureWorkspaceDatabase } from '../../../tests/helpers/workspace-database';
+import { bindFactoryQuestionsWorkspace } from '../background-workspace';
+import { seedRunProjectResources } from '../../../tests/helpers/run-project-resources';
 import { isolatedPostgresURL } from "../../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
@@ -113,6 +116,7 @@ test(
       };
     };
     const { store, dispatch, questions, assignments } = make(pool);
+    const closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(pool);
     try {
       const dir = new URL("../../../drizzle/", import.meta.url);
       for (const name of orderMigrations(
@@ -267,10 +271,10 @@ test(
             if(result)return result;
             fallbackCalls++;throw new Error('Cloud question used local fallback');
           });
-          const service=createFactoryQuestions(pool,authorize,store,cloudDispatch,withSkills ? {lockOrigin:async (...args:Parameters<typeof assignments.lockQuestion>)=>{
+          const service=bindFactoryQuestionsWorkspace(pool,createFactoryQuestions(pool,authorize,store,cloudDispatch,withSkills ? {lockOrigin:async (...args:Parameters<typeof assignments.lockQuestion>)=>{
             try { await assignments.lockQuestion(...args); }
             catch(error) { if(error instanceof ImprovementError) throw new FactoryError('factoryQuestionContinuationUnavailable'); throw error; }
-          },continueQuestion:assignments.continueQuestion} : undefined,undefined,afterContinuation,beforeRecovery);
+          },continueQuestion:assignments.continueQuestion} : undefined,undefined,afterContinuation,beforeRecovery),null);
           return {...f,workspaceId,botId,childDevice,childRepo,connectionId,credentialId,definition,sandboxId,service,fallbackCalls:()=>fallbackCalls};
         };
         const failedContinuation = async (beforeRecovery?: Parameters<typeof createFactoryQuestions>[7], afterContinuation?: (owner:string,result:{continuationRunId:string})=>Promise<void>, target?: CloudQuestionTarget) => {
@@ -287,6 +291,54 @@ test(
           (SELECT count(*)::int FROM factory_events WHERE "taskId"=t.id) AS events,
           (SELECT to_jsonb(m) FROM thread_machines m WHERE "runId"=q."continuationRunId") AS machine
           FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" WHERE q.id=$1`,[f.q.id])).rows[0];
+        const resourceState = async (f: Awaited<ReturnType<typeof cloudFixture>>) => (await pool.query(`SELECT
+          (SELECT to_jsonb(q) FROM factory_questions q WHERE id=$1) AS question,
+          (SELECT to_jsonb(t) FROM factory_tasks t WHERE id=$2) AS task,
+          (SELECT jsonb_agg(to_jsonb(r) ORDER BY id) FROM agent_runs r WHERE "issueId"=$3) AS runs,
+          (SELECT jsonb_agg(to_jsonb(m) ORDER BY "runId") FROM thread_machines m WHERE "issueId"=$3) AS machines,
+          (SELECT jsonb_agg(to_jsonb(e) ORDER BY "eventId") FROM factory_events e WHERE "taskId"=$2) AS events`,
+        [f.q.id,f.task.id,f.issueId])).rows[0];
+        for (const mutation of ['repository','environment-revision','environment-archive','project-archive','branch','legacy-environment','legacy-branch'] as const)
+          for (const recovering of [false,true]) await t.test(`${recovering ? 'cloud recovery' : 'cloud answer'} refuses ${mutation} before a child, VM transfer or provider preparation`, async () => {
+            let preparations=0;
+            const target={repoPath:'v2/github.com/mikka-ci/question-resources',remoteUrl:'https://github.com/mikka-ci/question-resources.git'};
+            const f=await cloudFixture('running',undefined,true,async()=>{preparations++;},target);
+            const legacy=mutation.startsWith('legacy-');
+            // An old source's absent snapshot is deliberate fixture history.
+            // New sources freeze the actual Project configuration before any edit.
+            let configured: Awaited<ReturnType<typeof seedRunProjectResources>>;
+            const configure=()=>seedRunProjectResources(pool,{ownerId:userId,workspaceId:f.workspaceId,issueId:f.issueId,
+              repositoryKey:target.repoPath,runtime:'cloud',harness:'codex',environment:mutation!=='legacy-branch'});
+            if(!legacy){
+              configured=await configure();
+              const {withProjectExecution}=await import('../../project-resources/store');
+              const {workerDefinitionDigest}=await import('../../agent-kit/worker-digest');
+              const snapshot=await withProjectExecution({userId,workspaceId:f.workspaceId,issueId:f.issueId,repositoryKey:target.repoPath,
+                runtime:'cloud',harness:'codex',baseBranch:'main'},async value=>value);
+              const definition={...f.definition,projectExecution:snapshot};
+              definition.definitionDigest=workerDefinitionDigest(definition);
+              await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1',[f.runId,JSON.stringify(definition)]);
+            }
+            let recovery: {requestId:string} & NonNullable<Awaited<ReturnType<typeof f.service.read>>['recoverReference']> | undefined;
+            if(recovering){
+              const first=await f.service.answer(human,{reference:questionReference(f.q),answerId:randomUUID(),text:'Continue the original resource fixture'});
+              await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',"sessionId"=$2,"finishedAt"=now() WHERE id=$1`,[first.continuationRunId,f.q.originSessionId]);
+              await f.service.settle(userId,first.continuationRunId);
+              const q=await f.service.read(userId,f.q.id);
+              recovery={requestId:randomUUID(),...q.recoverReference!};
+            }
+            if(legacy) configured=await configure();
+            if(mutation==='legacy-branch') await configured!.refuse('branch');
+            else if(mutation!=='legacy-environment') await configured!.refuse(mutation);
+            const before=await resourceState(f);
+            const expected=mutation==='repository'||mutation==='branch'||mutation==='legacy-branch'?'projectRepositoryDenied'
+              :mutation==='project-archive'?'projectArchived':'projectEnvironmentUnavailable';
+            await assert.rejects(()=>recovering ? f.service.recover(human,recovery!) : f.service.answer(human,{
+              reference:questionReference(f.q),answerId:randomUUID(),text:'Attempt revoked continuation'}),
+            (error:unknown)=>!!error&&typeof error==='object'&&'code' in error&&error.code===expected);
+            assert.deepEqual(await resourceState(f),before);
+            assert.equal(preparations,0);assert.equal(f.fallbackCalls(),0);
+          });
         for (const [expectedKind, target] of [
           ['deliverable', { repoPath: '/home/user/.mikka/bot-workspaces/question-delivery', remoteUrl: null }],
           ['repository', { repoPath: '/isolated', remoteUrl: 'fixture/repo' }],
@@ -1711,6 +1763,7 @@ test(
         },
       );
     } finally {
+      await closeWorkspaceDatabase();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();

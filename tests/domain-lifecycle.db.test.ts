@@ -80,14 +80,18 @@ test('account and workspace deletion preserve the canonical Project history boun
     assert.ok(planned.keptProjectIds.includes(project))
     assert.ok(planned.keptProjectIds.includes(formerProject), 'prior membership is unnecessary to preserve a Project in another surviving Workspace')
     assert.ok(!planned.keptProjectIds.includes(privateProject))
-    assert.ok(planned.keptIssueIds.includes(task))
+    assert.deepEqual(planned.keptIssueIds, [], 'Workspace planning cannot decide APP task retention before its rows are locked')
+    let retained = planned
     const client = await connection.connect()
     try {
       await client.query('begin')
-      await account.deleteMainAccountData(client, departing, planned)
+      retained = await account.freezeTaskRetention(client, departing, planned)
+      assert.ok(retained.keptIssueIds.includes(task))
+      assert.ok(!retained.keptIssueIds.includes(privateTask))
+      await account.deleteMainAccountData(client, departing, retained)
       await client.query('commit')
     } catch (error) { await client.query('rollback'); throw error } finally { client.release() }
-    await workspaceDb.transaction(tx => account.deleteWorkspaceData(tx, departing, createHash('sha256').update(`${departing}@example.invalid`).digest('hex'), planned))
+    await workspaceDb.transaction(tx => account.deleteWorkspaceData(tx, departing, createHash('sha256').update(`${departing}@example.invalid`).digest('hex'), retained))
     assert.equal(await count(connection, '"user" where id=$1', [departing]), 0, 'exercise the final user DELETE and its real foreign keys')
     assert.equal(await count(connection, 'workspace_projects where id=any($1::uuid[])', [[project, formerProject]]), 2)
     assert.equal(await count(connection, 'workspace_projects where id=$1', [privateProject]), 0)
@@ -156,6 +160,77 @@ test('account and workspace deletion preserve the canonical Project history boun
     assert.equal(await count(connection, 'workspace_project_events where id=$1', [pendingEvent]), 1)
     const { accessibleProjects } = await import('../lib/project-access')
     assert.equal((await accessibleProjects(admin, workspaceDb, shared.id)).some(project => project.id === pendingProject), false)
+  })
+
+  await t.test('replaying an old journal with an explicit empty Project set freezes surviving canonical history and prior receipts', async () => {
+    const { applyAccountDeletionManifest, exportAccountDeletionManifest } = await import('../lib/account/deletion-jobs')
+    const { auditDigest } = await import('../lib/audit/integrity')
+    const departing = await seedUser(connection, 'domain-empty-project-journal'), admin = await seedUser(connection, 'domain-replay-admin')
+    const personal = await seedPersonalWorkspace(connection, departing)
+    const shared = await seedWorkspace(connection, admin, [{ userId: admin, role: 'admin' }, { userId: departing, role: 'member' }])
+    const former = await seedWorkspace(connection, admin, [{ userId: admin, role: 'admin' }])
+    const sharedTask = await seedIssue(connection, departing, shared.id), privateTask = await seedIssue(connection, departing, personal)
+    const sharedProject = await seedUngroupedProject(departing, shared.id), formerProject = await seedUngroupedProject(departing, former.id)
+    const privateProject = await seedUngroupedProject(departing, personal), pendingProject = await seedUngroupedProject(departing, null)
+    await seedProjectTasks(connection, sharedProject, [sharedTask])
+    await seedProjectTasks(connection, privateProject, [privateTask])
+    const sharedDecision = await seedDecision(departing, shared.id, sharedProject, sharedTask)
+    const formerDecision = await seedDecision(departing, former.id, formerProject, null)
+    const privateDecision = await seedDecision(departing, personal, privateProject, privateTask)
+    await connection.query('insert into workspace_project_repairs("projectId",reason,evidence) values($1,\'workspace_evidence_missing\',$2)', [pendingProject, JSON.stringify([{ reason: 'legacy_without_trusted_workspace' }])])
+    for (const projectId of [sharedProject, formerProject, pendingProject]) {
+      await connection.query('insert into workspace_project_events(id,"projectId","userId",message) values($1,$2,$3,\'Restored historical event\')', [randomUUID(), projectId, departing])
+    }
+    // A previous replay can retain an ID absent from an older backup. Its
+    // receipt must remain monotonic even when current discovery cannot find it.
+    const previousProject = await seedUngroupedProject(departing, former.id)
+    await connection.query('delete from workspace_projects where id=$1', [previousProject])
+    const keptProjects = [sharedProject, formerProject, pendingProject].sort()
+    const keptDecisions = [sharedDecision.decisionId, formerDecision.decisionId].sort()
+    const keptSources = [sharedDecision.sourceId, formerDecision.sourceId].sort()
+    const snapshot = async () => ({
+      projects: (await connection.query('select * from workspace_projects where id=any($1::uuid[]) order by id', [keptProjects])).rows,
+      tasks: (await connection.query('select id,"userId","workspaceId","ownershipState","issuedIdentifier" from issues where id=$1', [sharedTask])).rows,
+      relations: (await connection.query('select * from workspace_project_tasks where "projectId"=any($1::uuid[]) order by "issueId"', [keptProjects])).rows,
+      decisions: (await connection.query('select * from project_decisions where id=any($1::uuid[]) order by id', [keptDecisions])).rows,
+      sources: (await connection.query('select * from project_decision_sources where id=any($1::uuid[]) order by id', [keptSources])).rows,
+      events: (await connection.query('select * from workspace_project_events where "projectId"=any($1::uuid[]) order by id', [keptProjects])).rows,
+      repairs: (await connection.query('select * from workspace_project_repairs where "projectId"=$1', [pendingProject])).rows,
+    })
+    const before = await snapshot()
+    const jobId = randomUUID(), emailHash = createHash('sha256').update(`${departing}@example.invalid`).digest('hex')
+    const legacyPlan = { solo: [personal], shared: [shared.id], keptIssueIds: [], keptProjectIds: [] }
+    // This is the actual durable journal format, with an explicitly present
+    // empty keep set from the old Team-derived planner, not a missing v2 field.
+    await connection.query(`insert into account_deletion_jobs(id,"subjectUserId","subjectEmailHash",stage,plan,"completedAt")
+      values($1,$2,$3,'completed',$4,now())`, [jobId, departing, emailHash, JSON.stringify(legacyPlan)])
+    const exported = await exportAccountDeletionManifest({ mainPool: connection, workspacePool })
+    const { digest: _exportedDigest, ...body } = exported
+    body.jobs = body.jobs.filter(job => job.id === jobId)
+    const manifest = { ...body, digest: auditDigest(body) }
+    assert.equal(manifest.jobs.length, 1)
+    assert.deepEqual(manifest.jobs[0].plan!.keptProjectIds, [])
+    assert.ok(Object.hasOwn(manifest.jobs[0].plan!, 'keptProjectIds'))
+    await connection.query('update account_deletion_jobs set plan=$2 where id=$1', [jobId, JSON.stringify({ ...legacyPlan, keptProjectIds: [previousProject] })])
+    const options = { mainPool: connection, workspacePool, deleteObject: async () => { throw new Error('No object cleanup belongs to this Project history fixture') } }
+    const expectedKept = [...keptProjects, previousProject].sort()
+    for (let replay = 0; replay < 2; replay++) {
+      assert.deepEqual(await applyAccountDeletionManifest(manifest, options), { applied: 1 })
+      assert.deepEqual(await snapshot(), before, 'canonical Project/Task identity, Decisions, evidence and quarantine repair rows remain byte-for-byte stable')
+      const journal = (await connection.query('select stage,plan from account_deletion_jobs where id=$1', [jobId])).rows[0]
+      assert.equal(journal.stage, 'completed')
+      assert.deepEqual(journal.plan.keptProjectIds, expectedKept, 'replay unions the prior receipt and current canonical Project evidence')
+      assert.deepEqual(journal.plan.keptIssueIds, [sharedTask])
+      assert.deepEqual(journal.plan.solo, [personal], 'reconciliation never expands the destructive Workspace set')
+    }
+    assert.equal(await count(connection, '"user" where id=$1', [departing]), 0)
+    assert.equal(await count(connection, 'mikka_workspace_members where "userId"=$1', [departing]), 0)
+    assert.equal(await count(connection, 'mikka_workspaces where id=$1', [personal]), 0)
+    assert.equal(await count(connection, 'mikka_workspaces where id=any($1::uuid[])', [[shared.id, former.id]]), 2)
+    assert.equal(await count(connection, 'workspace_projects where id=$1', [privateProject]), 0)
+    assert.equal(await count(connection, 'project_decisions where id=$1', [privateDecision.decisionId]), 0)
+    assert.equal(await count(connection, 'project_decision_sources where id=$1', [privateDecision.sourceId]), 0)
+    assert.equal(await count(connection, 'issues where id=$1', [privateTask]), 0)
   })
 
   await t.test('deleting a Workspace removes ungrouped Projects and lifecycle journals only in that tenant', async () => {

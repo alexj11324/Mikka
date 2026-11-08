@@ -7,6 +7,7 @@ import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/l
 import { issues, issueVersions, teamIssueCreateRequests } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { withTeamWorkspace } from '@/lib/team-workspace'
+import { ActionFailureError } from '@/lib/action-error'
 import { teams, teamIssues, teamIssueCreateReceipts } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
@@ -95,6 +96,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown, act
     })
   } catch (error) {
     if (error instanceof TeamCreateError) return { error: error.code, requestId }
+    if (error instanceof ActionFailureError && (error.code === 'workspaceAccessDenied' || error.code === 'teamIssueAccessDenied')) return { error: 'teamIssueAccessDenied' as const, requestId }
     // An application commit can succeed even if a database connection loses
     // its response. Reconcile before reporting a failure; never create a new
     // request ID for an uncertain result.

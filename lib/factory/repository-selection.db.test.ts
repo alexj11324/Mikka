@@ -7,8 +7,9 @@ import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { createFactoryStore } from './store'
-import { createFactoryDispatch, factoryBinding } from './dispatch'
-import { createFactoryReconciler } from './reconcile'
+import { createFactoryDispatch as rawDispatch, factoryBinding } from './dispatch'
+import { createFactoryReconciler as rawReconciler } from './reconcile'
+import { resourceBoundFactoryDispatch, factoryResourceWorkspace } from '../../tests/helpers/factory-resource-boundary'
 import { freezeWorkerDefinition } from '../agent-kit/worker'
 import { repositorySelectionRuntime } from './repository-selection'
 import { factoryCheckIndependent } from './check-independence'
@@ -57,8 +58,8 @@ test('Agent repository selection creates an authorized new execution, retaining 
       assert.equal(user, 'owner')
       return { repositories: [{ fullName: 'example/correct', id: '2', installationId: '1', htmlUrl: 'https://github.com/example/correct', private: true }] } as Awaited<ReturnType<typeof repositorySelectionRuntime.list>>
     }
-    const dispatch = createFactoryDispatch(pool, store, queue)
-    const sweep = createFactoryReconciler(pool, store)
+    const dispatch = resourceBoundFactoryDispatch(pool, rawDispatch(pool, store, queue))
+    const sweep = rawReconciler(pool, store, undefined, {}, null, undefined, factoryResourceWorkspace(pool))
     async function fixture(repository = 'example/correct', workspaceId = personalWorkspace) {
       const issueId = randomUUID(), sourceEventId = randomUUID()
       await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Task names example/correct','{"type":"doc","content":[]}','todo','normal',$2,'bound',$3)`, [issueId, workspaceId, workspaceId === personalWorkspace ? 'personal' : 'workspace'])

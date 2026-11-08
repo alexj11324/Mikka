@@ -74,14 +74,13 @@ export async function taskIdentifiers(tasks: TaskRef[], executor: Executor = db,
 }
 
 /** An issue row as the client sees it: metadata plus its display identifier. */
-export async function issueView<T extends { id: string; userId: string; workspaceId: string | null; scope: TaskScope; content: JSONContent; linearSyncPolicy?: string }>(issue: T, executor: Executor = db) {
+export async function issueView<T extends { id: string; userId: string; workspaceId: string | null; scope: TaskScope; content: JSONContent; linearSyncPolicy?: string; issuedIdentifier?: string | null }>(issue: T, executor: Executor = db) {
   const view = issueWithMetadata(issue)
   view.metadata.assignee = (await taskAssignees([{ id: issue.id, workspaceId: issue.workspaceId, assignee: view.metadata.assignee }], executor)).get(issue.id) ?? null
-  const identifiers = await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: view.metadata.number }], executor)
+  const identifier = issue.issuedIdentifier ?? (await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: view.metadata.number }], executor)).get(issue.id) ?? null
   const project = (await projectViewsForTasks([issue])).get(issue.id)
   view.metadata.project = project?.project ?? null
   const [verified] = issue.linearSyncPolicy === 'explicit' ? await executor.select({ id: linearIssueLinks.id }).from(linearIssueLinks)
     .where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
-  const identifier = identifiers.get(issue.id) ?? null
   return { ...view, issuedIdentifier: identifier, identifier, projectId: project?.projectId ?? null, linearTargetVerified: Boolean(verified) }
 }

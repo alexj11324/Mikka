@@ -30,8 +30,12 @@ secret values. Cross-tenant IDs do not reveal another tenant's contents.
 
 The `projects` action group keeps `listProjects`, `saveProject`,
 `updateProjectProperties`, `moveIssueToProject`, `setProjectIssues` and
-`listProjectEvents`. Explicit `workspaceId` is supported; omission resolves
-only through the server's trusted current context, never the creator.
+`listProjectEvents`. `listProjects()` retains its zero-argument fetcher
+contract and resolves only through the server's trusted current context,
+never the creator. Existing SWR callers may continue to pass it directly as
+their fetcher; their cache key is not a Workspace argument. Clients that
+need an explicit tenant use `listWorkspaceProjects(workspaceId)` instead.
+Other actions support the explicit `workspaceId` inputs shown below.
 
 Project responses add `workspaceId`, `createdBy`, `leadUserId` and `memberIds`.
 The canonical Task relation is returned through the existing `issueIds`
@@ -43,6 +47,8 @@ does not attach a Team or determine ownership.
 
 | Action | Key inputs | Result / concurrency |
 | --- | --- | --- |
+| `listProjects` | No arguments | Reads the trusted current Workspace; existing zero-argument SWR contract |
+| `listWorkspaceProjects` | Workspace UUID | Reads that exact Workspace after current membership / PAT scope checks |
 | `saveProject` | `workspaceId`, normal Project fields, `leadUserId: string|null`, `memberIds: string[]` | New Project UUID; revision starts at 1 |
 | `updateProjectProperties` | `id`, `workspaceId`, `revision`, `changes` | Stale revision refuses the write |
 | `moveIssueToProject` | `issueId`, Task `revision`, `projectId: UUID|null`, `workspaceId` | Moves one canonical relation; Task and affected Project revisions advance |

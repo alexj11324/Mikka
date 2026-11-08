@@ -339,13 +339,18 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
   })
   await t.test('only a current workspace admin can change team or project ceilings', async () => {
     const before = await read(a.run)
+    const policyAudits = async () => (await pool.query(`SELECT id,metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='agent.policy_changed' AND metadata->>'scope' IN ('team','project') ORDER BY id`,[workspaceA])).rows
+    const beforeAudits = await policyAudits()
     await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
-    for (const target of ['team','project'] as const) await assert.rejects(setCliPolicy(pool,owner,a.run,target,before.revision,{permissions:{network:'allow'}}))
-    assert.equal((await read(a.run)).revision,before.revision)
-    const audits = (await pool.query(`SELECT metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='agent.policy_changed' AND metadata->>'scope' IN ('team','project')`,[workspaceA])).rows
-    assert.equal(audits.length,4,'failed non-admin changes leave neither policy nor audit effects')
-    assert.ok(audits.every(row => Object.keys(row.metadata).sort().join(',') === 'revision,scope'))
-    await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
+    try {
+      for (const target of ['team','project'] as const) await assert.rejects(setCliPolicy(pool,owner,a.run,target,before.revision,{permissions:{network:'allow'}}))
+      assert.equal((await read(a.run)).revision,before.revision)
+      const audits = await policyAudits()
+      assert.deepEqual(audits,beforeAudits,'failed non-admin changes leave neither policy nor audit effects')
+      assert.ok(audits.every(row => Object.keys(row.metadata).sort().join(',') === 'revision,scope'))
+    } finally {
+      await pool.query(`UPDATE mikka_workspace_members SET role='admin' WHERE "workspaceId"=$1 AND "userId"=$2`,[workspaceA,owner])
+    }
   })
   await t.test('organization defaults inherit by specificity, explicit Agent values override, forced ceilings and revisions remain binding', async () => {
     const subject=await fixture(workspaceA),crossSubject=await fixture(workspaceA,botA),defaultProject=randomUUID()

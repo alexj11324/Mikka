@@ -58,6 +58,9 @@ before(async () => {
   process.env.GITHUB_WEBHOOK_SECRET = secret
   ;({ POST } = await import('../app/api/webhooks/github/route'))
   ;({ pool } = await import('../lib/db'))
+  // OAuth resource registration belongs to auth startup, not an individual
+  // webhook delivery. Wait for the real initialization before measuring it.
+  await (await import('../lib/auth')).auth.$context
 })
 
 /** Runs one signed delivery and its background work; returns the statements it sent. */

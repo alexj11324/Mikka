@@ -29,10 +29,18 @@ test('task identity: split DB migration, immutable issuance, historical aliases 
       CREATE TABLE linear_team_syncs ("ownerId" text, "linearTeamKey" text);
       CREATE TABLE linear_issue_links ("issueId" uuid, "ownerId" text, "linearIdentifier" text);
       CREATE TABLE issues (id uuid PRIMARY KEY, "userId" text NOT NULL, "workspaceId" uuid,
+        "ownershipState" text GENERATED ALWAYS AS (CASE WHEN "workspaceId" IS NULL THEN 'pending' ELSE 'bound' END) STORED,
         scope text NOT NULL, content jsonb NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now());
       CREATE TABLE run_publications ("runId" uuid PRIMARY KEY, "issueId" uuid NOT NULL, "userId" text NOT NULL,
         identifier text, branch text, "createdAt" timestamptz NOT NULL DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid NOT NULL);
+      CREATE TABLE agent_runs (id uuid PRIMARY KEY, "issueId" uuid, "userId" text NOT NULL,
+        "workspaceId" uuid, "botId" uuid, "agentDefinition" jsonb, "baseBranch" text);
+      CREATE TABLE factory_tasks (id uuid PRIMARY KEY, "issueId" uuid, "workspaceId" uuid, "botId" uuid);
+      CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY, "ownerId" text, "workspaceId" uuid);
+      CREATE TABLE artifacts (id uuid PRIMARY KEY, "issueId" uuid, "runId" uuid, "userId" text, "workspaceId" uuid);
+      CREATE TABLE issue_workspace_repairs ("issueId" uuid PRIMARY KEY, reason text, evidence jsonb,
+        "checkedAt" timestamptz NOT NULL DEFAULT now());
       INSERT INTO "user"(id,email) VALUES ('owner','owner@example.invalid'), ('peer','peer@example.invalid');
       INSERT INTO issue_prefixes VALUES ('owner','SAME'), ('peer','SAME');
     `)
@@ -42,9 +50,12 @@ test('task identity: split DB migration, immutable issuance, historical aliases 
       CREATE TABLE mikka_teams (id uuid PRIMARY KEY, "workspaceId" uuid NOT NULL, identifier varchar(12) NOT NULL);
       CREATE TABLE mikka_team_issues ("issueId" uuid PRIMARY KEY, "teamId" uuid NOT NULL,
         "workspaceId" uuid NOT NULL, "userId" text NOT NULL, number bigint NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now());
+      CREATE TABLE workspace_projects (id uuid PRIMARY KEY, "userId" text, "issueIds" jsonb NOT NULL DEFAULT '[]');
+      CREATE TABLE mikka_team_projects ("projectId" uuid, "teamId" uuid, "workspaceId" uuid, "userId" text);
     `)
     const alpha = randomUUID(), beta = randomUUID(), team = randomUUID()
     const personal = randomUUID(), grouped = randomUUID(), publication = randomUUID(), legacyOwner = randomUUID(), legacyPeer = randomUUID(), otherWorkspace = randomUUID(), pendingBackfill = randomUUID(), quarantined = randomUUID()
+    const upgraded = randomUUID(), upgradeTeam = randomUUID(), peerRun = randomUUID(), ownerRun = randomUUID()
     const legacyAgent = { kind: 'agent', id: randomUUID(), name: 'Worker', image: null }
     const content = (number: number, assignee: unknown = null) => ({ type: 'doc', attrs: { mikka: { number, assignee } }, content: [{ type: 'paragraph' }] })
     const insert = (id: string, owner: string, workspaceId: string, number: number, scope = 'workspace', assignee: unknown = null) =>
@@ -63,16 +74,33 @@ test('task identity: split DB migration, immutable issuance, historical aliases 
     await app.query('INSERT INTO issues(id,"userId","workspaceId",scope,content) VALUES($1,\'owner\',NULL,\'workspace\',$2)', [quarantined, content(99)])
     await ws.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId",number) VALUES($1,$2,$3,\'owner\',12),($4,$2,$3,\'owner\',13)', [grouped, team, alpha, publication])
     const runId = randomUUID()
+    await app.query('INSERT INTO agent_runs(id,"issueId","userId","workspaceId") VALUES($1,$2,\'owner\',$3)', [runId, publication, alpha])
     await app.query('INSERT INTO run_publications("runId","issueId","userId",identifier,branch) VALUES($1,$2,\'owner\',\'FROZEN-7\',\'mikka/FROZEN-7\')', [runId, publication])
     const publicationBefore = (await app.query('SELECT * FROM run_publications WHERE "runId"=$1', [runId])).rows[0]
+    // Normal deployment starts with identity DDL before cross-database P0
+    // reconciliation. A personal legacy scope is not tenant evidence and must
+    // not freeze the owner spelling before the peer's earlier receipt is read.
+    await app.query('INSERT INTO issues(id,"userId",scope,content) VALUES($1,\'owner\',\'personal\',$2)', [upgraded, content(71)])
+    await ws.query('INSERT INTO mikka_teams VALUES($1,$2,\'UPGR\')', [upgradeTeam, alpha])
+    await ws.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId",number) VALUES($1,$2,$3,\'owner\',71)', [upgraded, upgradeTeam, alpha])
+    await app.query('INSERT INTO linear_issue_links VALUES($1,\'owner\',\'LINEAR-71\')', [upgraded])
+    const frozen = { executionIdentity: { workspaceId: alpha }, traceContext: { taskNumber: 'PEER-71' }, taskEnv: { MODE: 'historical' } }
+    await app.query('INSERT INTO agent_runs(id,"issueId","userId","agentDefinition","baseBranch") VALUES($1,$2,\'peer\',$3,\'release/old\'),($4,$2,\'owner\',$3,\'main\')', [peerRun, upgraded, frozen, ownerRun])
+    await app.query(`INSERT INTO run_publications("runId","issueId","userId",identifier,branch,"createdAt")
+      VALUES($1,$2,'peer','PEER-71','mikka/peer-71','2020-01-01'),($3,$2,'owner','OWNER-71','mikka/owner-71','2020-02-01')`, [peerRun, upgraded, ownerRun])
+    const upgradePublicationsBefore = (await app.query('SELECT * FROM run_publications WHERE "issueId"=$1 ORDER BY "runId"', [upgraded])).rows
+    const upgradeRunsBefore = (await app.query('SELECT id,"issueId","userId","agentDefinition","baseBranch" FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [upgraded])).rows
     const appMigration = await readFile(new URL('../drizzle/20261107230001_task_identity.sql', import.meta.url), 'utf8')
     const wsMigration = await readFile(new URL('../drizzle/20261107230002_task_identity_aliases.sql', import.meta.url), 'utf8')
-    await app.query(appMigration); await ws.query(wsMigration)
+    const aliasMigration = await readFile(new URL('../drizzle/20261107230007_task_alias_tenant.sql', import.meta.url), 'utf8')
+    await app.query(appMigration); await app.query(aliasMigration); await ws.query(wsMigration)
+    await app.query('SELECT * FROM reconcile_bound_task_identifier_aliases($1::uuid[])', [[publication]])
     moduleApp = (await import('../lib/db')).pool
     moduleWS = (await import('../lib/workspace-db')).workspacePool
     const { ensureTaskIdentifiers, resolveTaskIdentifierAlias } = await import('../lib/task-identity-store')
 
     await t.test('legacy metadata separates delegation without changing body or publication history', async () => {
+      await ensureTaskIdentifiers([{ id: personal, ownerId: 'owner' }])
       const row = (await app.query('SELECT content,"issuedIdentifier" FROM issues WHERE id=$1', [personal])).rows[0]
       assert.equal(row.issuedIdentifier, 'SAME-1')
       assert.equal(row.content.attrs.mikka.assignee, null)
@@ -167,8 +195,73 @@ test('task identity: split DB migration, immutable issuance, historical aliases 
       assert.deepEqual(await resolveTaskIdentifierAlias({ workspaceId: alpha, identifier: 'SAME-99' }), { kind: 'missing' })
     })
 
+    await t.test('DDL then P0 then identity backfill preserves every trusted alias and the earliest peer publication', async () => {
+      const { backfillTaskWorkspaces } = await import('../scripts/task-workspace-backfill.mjs')
+      const { backfillTaskIdentifiers } = await import('../scripts/task-identity-backfill.mjs')
+      assert.equal((await app.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [upgraded])).rows[0].issuedIdentifier, null)
+      await app.query('UPDATE linear_issue_links SET "linearIdentifier"=\'LINEAR-72\' WHERE "issueId"=$1', [upgraded])
+      // Neither NULL-tenant aliases nor stale creator/tenant claims grant a
+      // lookup. A bogus earlier publication must not win canonical issuance.
+      await app.query(`INSERT INTO task_identifier_aliases("issueId","workspaceId","ownerId",identifier,kind,"createdAt") VALUES
+        ($1,NULL,'peer','WRONGOWNER-71','publication','1900-01-01'),
+        ($1,$2,'owner','WRONGTENANT-71','publication','1900-01-01')`, [upgraded, beta])
+      for (const identifier of ['SAME-71', 'OWNER-71', 'LINEAR-71', 'LINEAR-72', 'PEER-71', 'WRONGOWNER-71', 'WRONGTENANT-71']) {
+        assert.deepEqual(await resolveTaskIdentifierAlias({ workspaceId: alpha, identifier }), { kind: 'missing' })
+      }
+      assert.equal((await backfillTaskWorkspaces(app, ws)).bound, 1)
+      const bound = (await app.query('SELECT "workspaceId","ownershipState","issuedIdentifier" FROM issues WHERE id=$1', [upgraded])).rows[0]
+      assert.deepEqual(bound, { workspaceId: alpha, ownershipState: 'bound', issuedIdentifier: null })
+      assert.deepEqual(await backfillTaskIdentifiers(app, ws, { batchSize: 1 }), { issued: 1 })
+      assert.equal((await app.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [upgraded])).rows[0].issuedIdentifier, 'PEER-71', 'the first trusted publication wins before an owner spelling is frozen')
+      for (const identifier of ['SAME-71', 'OWNER-71', 'LINEAR-71', 'LINEAR-72', 'PEER-71', 'UPGR-71']) {
+        assert.deepEqual(await resolveTaskIdentifierAlias({ workspaceId: alpha, identifier }), { kind: 'found', issueId: upgraded })
+        assert.deepEqual(await resolveTaskIdentifierAlias({ workspaceId: beta, identifier }), { kind: 'missing' })
+      }
+      for (const identifier of ['WRONGOWNER-71', 'WRONGTENANT-71']) {
+        assert.deepEqual(await resolveTaskIdentifierAlias({ workspaceId: alpha, identifier }), { kind: 'missing' })
+      }
+      const conflicting = (await app.query('SELECT identifier,"workspaceId","ownerId" FROM task_identifier_aliases WHERE "issueId"=$1 AND identifier LIKE \'WRONG%\' ORDER BY identifier', [upgraded])).rows
+      assert.deepEqual(conflicting, [
+        { identifier: 'WRONGOWNER-71', workspaceId: null, ownerId: 'peer' },
+        { identifier: 'WRONGTENANT-71', workspaceId: beta, ownerId: 'owner' },
+      ])
+      assert.deepEqual((await app.query('SELECT * FROM run_publications WHERE "issueId"=$1 ORDER BY "runId"', [upgraded])).rows, upgradePublicationsBefore)
+      assert.deepEqual((await app.query('SELECT id,"issueId","userId","agentDefinition","baseBranch" FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [upgraded])).rows, upgradeRunsBefore)
+      assert.deepEqual(await backfillTaskIdentifiers(app, ws, { batchSize: 1 }), { issued: 0 })
+      assert.equal((await app.query('SELECT "workspaceId","issuedIdentifier" FROM issues WHERE id=$1', [quarantined])).rows[0].workspaceId, null)
+      assert.deepEqual(await resolveTaskIdentifierAlias({ workspaceId: alpha, identifier: 'SAME-99' }), { kind: 'missing' })
+    })
+
+    await t.test('an installed schema repairs aliases on issued tasks without adopting foreign publication evidence or changing the ID', async () => {
+      const { backfillTaskIdentifiers } = await import('../scripts/task-identity-backfill.mjs')
+      const current = (await app.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [upgraded])).rows[0].issuedIdentifier
+      await app.query(`INSERT INTO task_identifier_aliases("issueId","ownerId",identifier,kind) VALUES
+        ($1,'owner','PREVIOUS-71','owner'),($1,'peer','FOREIGNOWNER-71','owner')`, [upgraded])
+      const good = randomUUID(), wrongOwner = randomUUID(), wrongTask = randomUUID(), wrongWorkspace = randomUUID()
+      await app.query(`INSERT INTO agent_runs(id,"issueId","userId","workspaceId","agentDefinition") VALUES
+        ($1,$5,'peer',$6,'{}'),($2,$5,'owner',$6,'{}'),($3,$7,'peer',$6,'{}'),($4,$5,'peer',$8,'{}')`,
+      [good, wrongOwner, wrongTask, wrongWorkspace, upgraded, alpha, legacyOwner, beta])
+      await app.query(`INSERT INTO run_publications("runId","issueId","userId",identifier,branch,"createdAt") VALUES
+        ($1,$5,'peer','EARLIER-71','mikka/earlier-71','1900-01-01'),
+        ($2,$5,'peer','BADOWNER-71','mikka/badowner-71','1900-01-01'),
+        ($3,$5,'peer','BADTASK-71','mikka/badtask-71','1900-01-01'),
+        ($4,$5,'peer','BADTENANT-71','mikka/badtenant-71','1900-01-01')`, [good, wrongOwner, wrongTask, wrongWorkspace, upgraded])
+      const runsBefore = (await app.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[good, wrongOwner, wrongTask, wrongWorkspace]])).rows
+      const receiptsBefore = (await app.query('SELECT * FROM run_publications WHERE "runId"=ANY($1::uuid[]) ORDER BY "runId"', [[good, wrongOwner, wrongTask, wrongWorkspace]])).rows
+      await app.query(aliasMigration)
+      assert.deepEqual(await backfillTaskIdentifiers(app, ws, { batchSize: 1 }), { issued: 0 })
+      assert.equal((await app.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [upgraded])).rows[0].issuedIdentifier, current, 'a newly recovered older receipt is an alias, never a renumbering')
+      for (const identifier of ['PREVIOUS-71', 'EARLIER-71']) assert.deepEqual(await resolveTaskIdentifierAlias({ workspaceId: alpha, identifier }), { kind: 'found', issueId: upgraded })
+      for (const identifier of ['FOREIGNOWNER-71', 'BADOWNER-71', 'BADTASK-71', 'BADTENANT-71']) assert.deepEqual(await resolveTaskIdentifierAlias({ workspaceId: alpha, identifier }), { kind: 'missing' })
+      const aliasesBefore = (await app.query('SELECT * FROM task_identifier_aliases WHERE "issueId"=$1 ORDER BY identifier,kind', [upgraded])).rows
+      assert.deepEqual(await backfillTaskIdentifiers(app, ws, { batchSize: 1 }), { issued: 0 })
+      assert.deepEqual((await app.query('SELECT * FROM task_identifier_aliases WHERE "issueId"=$1 ORDER BY identifier,kind', [upgraded])).rows, aliasesBefore)
+      assert.deepEqual((await app.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[good, wrongOwner, wrongTask, wrongWorkspace]])).rows, runsBefore)
+      assert.deepEqual((await app.query('SELECT * FROM run_publications WHERE "runId"=ANY($1::uuid[]) ORDER BY "runId"', [[good, wrongOwner, wrongTask, wrongWorkspace]])).rows, receiptsBefore)
+    })
+
     await t.test('a stale WS alias cannot resolve a deleted task, and migrations are replay safe', async () => {
-      await app.query(appMigration); await ws.query(wsMigration)
+      await app.query(appMigration); await app.query(aliasMigration); await ws.query(wsMigration)
       assert.equal((await ensureTaskIdentifiers([{ id: grouped, ownerId: 'owner' }])).get(grouped), 'OLD-12')
       await app.query('DELETE FROM issues WHERE id=$1', [grouped])
       assert.deepEqual(await resolveTaskIdentifierAlias({ workspaceId: alpha, identifier: 'OLD-12' }), { kind: 'missing' })

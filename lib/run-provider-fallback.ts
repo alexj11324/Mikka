@@ -260,6 +260,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
             ...selection, botId: target.botId, issueId: source.issueId, agentId: target.agentId, deviceRepoId: target.deviceRepoId,
             title: issue.title, body: tiptapToText(issue.content), readOnly: source.agentDefinition.readOnly,
             withoutBot: source.botId === null, idempotencyKey: `provider:${source.id}`,
+            frozenSourceRunId: source.id,
             allowLocalRecovery: source.agentDefinition.allowLocalRecovery,
             sourceEventId: source.agentDefinition.repositoryAdmission?.requestEventId,
           }, client)
@@ -270,11 +271,9 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
         }
         const queued = await readSource(client, source.userId, runId)
         if (!queued?.agentDefinition) throw new ActionFailureError('runInvalid')
-        if (source.agentDefinition.projectExecution) {
-          const { assertFrozenProjectExecution } = await import('./project-resources/store')
-          if (!queued.agentDefinition.projectExecution) throw new ActionFailureError('projectEnvironmentUnavailable')
-          assertFrozenProjectExecution(source.agentDefinition.projectExecution, queued.agentDefinition.projectExecution)
-        }
+        const { assertRunProjectExecution } = await import('./project-resources/run-lease')
+        if (queued.agentDefinition.projectExecution) assertRunProjectExecution(source, source.agentDefinition.projectExecution, queued.agentDefinition.projectExecution)
+        else if (source.agentDefinition.projectExecution) throw new ActionFailureError('projectEnvironmentUnavailable')
         if (queued.baseBranch !== source.baseBranch) throw new ActionFailureError('projectRepositoryDenied')
         const prompt = providerContinuationPrompt(source.prompt)
         const definition = providerContinuationDefinition(source.agentDefinition, queued.agentDefinition, prompt, policyCeiling)

@@ -37,9 +37,14 @@ export async function acceptLocalRun(input: {
   factoryContext?: { sourceEventId: string; attemptId: string }
 }, existing?: PoolClient, projectExecution?: ProjectExecutionSnapshot): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
   if (!projectExecution) {
-    const { rows: [target] } = await (existing ?? pool).query(`SELECT i."workspaceId",repo."repoPath",repo."baseBranch"
+    const sourceId = input.frozenSourceRunId ?? input.sourceRunId ?? input.profileSourceRunId
+    const { rows: [target] } = await (existing ?? pool).query(`SELECT i."workspaceId",repo."repoPath",
+        CASE WHEN source.id IS NULL THEN repo."baseBranch"
+          WHEN source."agentDefinition"->'projectExecution' IS NOT NULL THEN source."agentDefinition"->'projectExecution'->>'baseBranch'
+          ELSE source."baseBranch" END AS "baseBranch"
       FROM issues i JOIN device_repos repo ON repo.id=$2 AND repo."userId"=$3
-      WHERE i.id=$1 AND i."ownershipState"='bound' AND i."workspaceId" IS NOT NULL`, [input.issueId, input.deviceRepoId, input.userId])
+      LEFT JOIN agent_runs source ON source.id=$4 AND source."userId"=$3 AND source."issueId"=i.id AND source."workspaceId"=i."workspaceId"
+      WHERE i.id=$1 AND i."ownershipState"='bound' AND i."workspaceId" IS NOT NULL`, [input.issueId, input.deviceRepoId, input.userId, sourceId ?? null])
     if (!target) throw new ActionFailureError('runInvalid', { reason: 'issueUnavailable' })
     const { withProjectExecution } = await import('./project-resources/store')
     return withProjectExecution({ userId: input.userId, workspaceId: target.workspaceId, issueId: input.issueId, repositoryKey: target.repoPath, baseBranch: target.baseBranch, runtime: 'local', harness: input.definition.harness },
@@ -104,6 +109,10 @@ export async function acceptLocalRun(input: {
     const [source] = sourceId ? await tx.select({ definition: agentRuns.agentDefinition, baseBranch: agentRuns.baseBranch }).from(agentRuns)
       .where(and(eq(agentRuns.id, sourceId), eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), eq(agentRuns.workspaceId, task.workspaceId!))).for('share') : []
     if (sourceId && !source) throw invalid('sourceRunMismatch')
+    if (source) {
+      const { assertRunProjectExecution } = await import('./project-resources/run-lease')
+      assertRunProjectExecution(source, source.definition?.projectExecution, projectExecution)
+    }
     const effectiveExecution = input.definition.projectExecution ?? (source ? source.definition?.projectExecution : projectExecution)
     if (effectiveExecution) assertFrozenProjectExecution(effectiveExecution, projectExecution)
     const effectiveBaseBranch = effectiveExecution ? effectiveExecution.baseBranch : source ? source.baseBranch : projectExecution.baseBranch

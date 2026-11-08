@@ -182,6 +182,7 @@ const functions = {
   'preferences.getPreferences': actions23.getPreferences,
   'preferences.updatePreferences': actions23.updatePreferences,
   'projects.listProjects': actions24.listProjects,
+  'projects.listWorkspaceProjects': actions24.listWorkspaceProjects,
   'projects.saveProject': actions24.saveProject,
   'projects.updateProjectProperties': actions24.updateProjectProperties,
   'projects.moveIssueToProject': actions24.moveIssueToProject,

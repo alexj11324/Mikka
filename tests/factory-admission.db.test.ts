@@ -38,7 +38,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const coordinator = await isolateCoordinatorWakes(t)
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  const { withTaskWorkspace } = await import('../lib/task-workspace')
+  const { withProjectResourceLease } = await import('../lib/project-resources/store')
   const { readOrder } = await import('../lib/model-order')
   const { queueRun, queueFactoryRun } = await import('../lib/agent-runs')
   const { acceptedEventStillMatches } = await import('../lib/run-admission-store')
@@ -53,11 +53,13 @@ test('real Factory admission preserves host scope, policy and transaction owners
   const { previewPersonalScope, changeIssueScopeLocally } = await import('../lib/issue-scope-store')
   const fixtures: Fixture[] = []
 
-  async function transaction<T>(work: (tx: PoolClient) => Promise<T>) {
+  async function transaction<T>(f: Fixture, work: (tx: PoolClient) => Promise<T>) {
+    return withProjectResourceLease(f.userId, f.workspaceId, async () => {
     const tx = await pool.connect()
     try { await tx.query('BEGIN'); const value = await work(tx); await tx.query('COMMIT'); return value }
     catch (error) { await tx.query('ROLLBACK'); throw error }
     finally { tx.release() }
+    })
   }
   async function policy(f: Fixture, permission: 'allow' | 'ask' | 'deny') {
     const current = await readCliAgentPolicy(pool, f.userId, f.agentId, null)
@@ -150,7 +152,8 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.equal(run.agentDefinition.repositoryAdmission.remoteKey, f.remoteKey)
       assert.equal(run.dispatchKey, `factory:${f.task.attemptId}`)
       assert.equal(publication.scopeVersion, 1)
-      assert.equal(publication.branch, 'mikka/fadm-1')
+      assert.equal(publication.identifier, (await pool.query('SELECT "issuedIdentifier" FROM issues WHERE id=$1', [f.issueId])).rows[0].issuedIdentifier)
+      assert.equal(publication.branch, `mikka/${publication.identifier.toLowerCase()}`)
       assert.equal((await pool.query('SELECT "runId" FROM factory_attempts WHERE id=$1', [f.task.attemptId])).rows[0].runId, admitted.runId)
       const before = await rowsFor(f)
       assert.equal((await dispatch(f)).runId, admitted.runId)
@@ -353,7 +356,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const before = await rowsFor(f)
       let runId: string | undefined
       // The caller owns both leases: Workspace first, then its APP transaction.
-      await withTaskWorkspace(f.userId, f.workspaceId, async () => {
+      await withProjectResourceLease(f.userId, f.workspaceId, async () => {
         const tx = await pool.connect()
         try {
           await beginFactoryTransaction(tx)
@@ -420,7 +423,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       // each supplied promise now, as nested after callbacks may do in production.
       globals[contextKey] = { get: () => ({ waitUntil: (promise: Promise<unknown>) => pending.push(promise) }) }
       try {
-        await withTaskWorkspace(f.userId, f.workspaceId, async () => {
+        await withProjectResourceLease(f.userId, f.workspaceId, async () => {
           const tx = await pool.connect()
           try {
             await beginFactoryTransaction(tx)
@@ -469,8 +472,8 @@ test('real Factory admission preserves host scope, policy and transaction owners
         assert.deepEqual(await rowsFor(f), before)
       }
       const f = await fixture()
-      await assert.rejects(transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f), null, { sourceEventId: f.eventId, attemptId: randomUUID() })), /runInvalid/)
-      await assert.rejects(transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f))), /runInvalid/, 'the host must supply exactly one existing Factory or Skill origin')
+      await assert.rejects(transaction(f, tx => queueFactoryRun(tx, f.userId, internalInput(f), null, { sourceEventId: f.eventId, attemptId: randomUUID() })), /runInvalid/)
+      await assert.rejects(transaction(f, tx => queueFactoryRun(tx, f.userId, internalInput(f))), /runInvalid/, 'the host must supply exactly one existing Factory or Skill origin')
       assert.equal((await rowsFor(f)).runs, 0)
     })
 
@@ -583,14 +586,14 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const f = await fixture({ destination: 'selected' })
       const origin = await dispatch(f)
       await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now(),"sessionId"=\'synthetic-completed-source\' WHERE id=$1', [origin.runId])
-      const next = await transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId))
+      const next = await transaction(f, tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId))
       const child = (await pool.query('SELECT "botId","agentDefinition" FROM agent_runs WHERE id=$1', [next.runId])).rows[0]
       assert.equal(child.botId, null)
       assert.equal(child.agentDefinition.repositoryAdmission.requestEventId, f.eventId)
       assert.equal(await acceptedEventStillMatches(child.agentDefinition.repositoryAdmission, null), true)
       await changePublicationGeneration(f)
       await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [next.runId])
-      const continued = await transaction(tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId))
+      const continued = await transaction(f, tx => queueFactoryRun(tx, f.userId, internalInput(f, `skill:${randomUUID()}`), null, undefined, origin.runId))
       const persisted = (await pool.query('SELECT "workspaceId","agentDefinition" FROM agent_runs WHERE id=$1', [continued.runId])).rows[0]
       assert.equal(persisted.workspaceId, f.workspaceId)
       assert.equal(persisted.agentDefinition.executionIdentity.workspaceId, f.workspaceId)

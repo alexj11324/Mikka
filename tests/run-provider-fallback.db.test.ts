@@ -1,3 +1,4 @@
+import { resourceBoundDispatchConstructor, resourceBoundReconcilerConstructor } from './helpers/factory-resource-boundary'
 // Real PostgreSQL, model preference admission, completion and claim. Only the
 // provider catalogue and Next's request-scoped `after` are replaced; Coordinator
 // wakes are observed without running a separate inbox consumer. Provider
@@ -195,13 +196,15 @@ test('provider failure continues the same task through its authorized preferred 
   }
 
   const automaticFailure = async (label: string, options: { subscription?: boolean; onlyLight?: boolean } = {}) => {
-    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun },
-      { automaticFactoryDispatch }, { createFactoryReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
+    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun },
+      { automaticFactoryDispatch }, { createFactoryReconciler: rawReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
       { ensureDeviceRepository }] = await Promise.all([
       import('../lib/factory/agent-profile'), import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
       import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'),
       import('../lib/factory/check-independence'), import('../lib/device-repositories'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
+    const createFactoryReconciler = resourceBoundReconcilerConstructor(rawReconciler)
     const p = await person(label), issueId = await task(p), epoch = randomUUID()
     const harness = options.subscription ? 'codex' : 'claude_code'
     const light = options.subscription ? 'gpt-6-luna' : 'claude-haiku-5-5'
@@ -283,13 +286,15 @@ test('provider failure continues the same task through its authorized preferred 
   })
 
   for (const failure of ['execute', 'review'] as const) await t.test(`automatic ${failure} repair raises the inherited Profile one tier through real Factory admission`, async () => {
-    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch, factoryBinding }, { queueFactoryRun },
-      { automaticFactoryDispatch }, { createFactoryReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
+    const [{ AgentProfileStore }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding }, { queueFactoryRun },
+      { automaticFactoryDispatch }, { createFactoryReconciler: rawReconciler }, { factoryCheckGates }, { factoryCheckIndependent },
       { admitProfileSelection }, { profileNativeSessionMatches }, { ensureDeviceRepository }, { workerDefinitionDigest }] = await Promise.all([
       import('../lib/factory/agent-profile'), import('../lib/factory/store'), import('../lib/factory/dispatch'), import('../lib/agent-runs'),
       import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'), import('../lib/factory/check-independence'),
       import('../lib/factory/profile-admission'), import('../lib/factory/profile-native-session'), import('../lib/device-repositories'), import('../lib/agent-kit/worker-digest'),
     ])
+    const createFactoryDispatch = resourceBoundDispatchConstructor(rawDispatch)
+    const createFactoryReconciler = resourceBoundReconcilerConstructor(rawReconciler)
     const p = await person(`automatic-routing-${failure}`), issueId = await task(p), epoch = randomUUID()
     const credential = await addKey(p.id, 'anthropic', ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'])
     await preferences(p, ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'].map(model => entry('claude_code', model, credential.id)))

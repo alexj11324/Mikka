@@ -39,6 +39,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   policyCeiling?: Parameters<typeof freezeWorkerDefinition>[0]['policyCeiling']
   /** The run this one continues, named in the error when the model is missing. */
   threadRunId?: string
+  /** Host provider recovery retains resource configuration without inheriting a native session or Profile. */
+  frozenSourceRunId?: string
   idempotencyKey?: string; execution?: AgentExecution
   /** A quota continuation's key (lib/run-quota.ts): frozen as given instead of choosing the credential. */
   apiKey?: RunApiKey
@@ -64,10 +66,14 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     throw error
   }
   if (!projectExecution) {
-    const { rows: [target] } = await (existing ?? pool).query(`SELECT repo."repoPath",repo."baseBranch",repo."remoteUrl",a.harness
+    const { rows: [target] } = await (existing ?? pool).query(`SELECT repo."repoPath",repo."remoteUrl",a.harness,
+        CASE WHEN source.id IS NULL THEN repo."baseBranch"
+          WHEN source."agentDefinition"->'projectExecution' IS NOT NULL THEN source."agentDefinition"->'projectExecution'->>'baseBranch'
+          ELSE source."baseBranch" END AS "baseBranch"
       FROM device_repos repo JOIN agents a ON a.id=$2 AND a."userId"=$3
       JOIN issues i ON i.id=$4 AND i."workspaceId"=$5 AND i."ownershipState"='bound'
-      WHERE repo.id=$1 AND repo."userId"=$3`, [input.deviceRepoId, input.agentId, actor.userId, input.issueId, actor.workspaceId])
+      LEFT JOIN agent_runs source ON source.id=$6 AND source."userId"=$3 AND source."issueId"=i.id AND source."workspaceId"=i."workspaceId"
+      WHERE repo.id=$1 AND repo."userId"=$3`, [input.deviceRepoId, input.agentId, actor.userId, input.issueId, actor.workspaceId, input.frozenSourceRunId ?? input.threadRunId ?? null])
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
     const { withProjectExecution } = await import('@/lib/project-resources/store')
     return withProjectExecution({ userId: actor.userId, workspaceId: actor.workspaceId, issueId: input.issueId, repositoryKey: target.remoteUrl ? target.repoPath : null, baseBranch: target.baseBranch, runtime: 'cloud', harness: target.harness },
@@ -117,8 +123,13 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
     if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')
     const frozen = freezeWorkerDefinition({ harness:target.harness,instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,modelDispatch:input.modelDispatch,agentProfile:input.agentProfile,policyCeiling:input.policyCeiling,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
-    const prior = input.threadRunId ? (await client.query('select "agentDefinition","baseBranch" from agent_runs where id=$1 and "userId"=$2 and "workspaceId"=$3 and "issueId"=$4 FOR SHARE', [input.threadRunId, actor.userId, actor.workspaceId, input.issueId])).rows[0] : undefined
-    if (input.threadRunId && !prior) throw new ComputerError(409, 'Original task execution is unavailable')
+    const sourceId = input.frozenSourceRunId ?? input.threadRunId
+    const prior = sourceId ? (await client.query('select "agentDefinition","baseBranch" from agent_runs where id=$1 and "userId"=$2 and "workspaceId"=$3 and "issueId"=$4 FOR SHARE', [sourceId, actor.userId, actor.workspaceId, input.issueId])).rows[0] : undefined
+    if (sourceId && !prior) throw new ComputerError(409, 'Original task execution is unavailable')
+    if (prior) {
+      const { assertRunProjectExecution } = await import('@/lib/project-resources/run-lease')
+      assertRunProjectExecution(prior, prior.agentDefinition?.projectExecution, projectExecution)
+    }
     const effectiveExecution: ProjectExecutionSnapshot | undefined = prior ? prior.agentDefinition?.projectExecution : projectExecution
     if (effectiveExecution) {
       assertFrozenProjectExecution(effectiveExecution, projectExecution)

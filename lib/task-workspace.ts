@@ -2,10 +2,11 @@ import 'server-only'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, asc, eq, or } from 'drizzle-orm'
 import { z } from 'zod'
+import type { PoolClient } from 'pg'
 import { ActionFailureError } from '@/lib/action-error'
 import { actingContext } from '@/lib/activity-actor'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
-import { workspaceDb } from '@/lib/workspace-db'
+import { workspaceDb, workspacePool } from '@/lib/workspace-db'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
 
@@ -21,7 +22,7 @@ const taskWorkspaceLease = new AsyncLocalStorage<HeldTaskWorkspace>()
 function leaseActive(lease: HeldTaskWorkspace): boolean {
   return lease.active && (!lease.parent || leaseActive(lease.parent))
 }
-export type BorrowedTaskWorkspaceMembership = { check(): Promise<void>; close(): Promise<void> }
+export type BorrowedTaskWorkspaceMembership = { workspaceClient: Pick<PoolClient, 'query'>; check(): Promise<void>; close(): Promise<void> }
 
 /** A borrow cannot release the owner transaction or authorize another tenant.
  * Its fresh read uses the held WS executor; no second pool checkout occurs. */
@@ -31,7 +32,11 @@ export function borrowTaskWorkspaceMembership(userId: string, workspaceId: strin
   if (lease.userId !== userId || lease.workspaceId !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
   let closed = false
   const assertActive = () => { if (closed || !leaseActive(lease)) throw new ActionFailureError('workspaceAccessDenied') }
+  // Capture the current WS executor while its owning transaction is active.
+  // The wrapper refuses use after close or after that transaction completes.
+  const query = workspacePool.query
   return {
+    workspaceClient: { query: ((...args: unknown[]) => { assertActive(); return Reflect.apply(query, workspacePool, args) }) as PoolClient['query'] },
     async check() {
       assertActive()
       const [current] = await lease.tx.select({ id: workspaces.id }).from(workspaces)

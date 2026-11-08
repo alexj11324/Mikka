@@ -63,12 +63,9 @@ END $$;
 DROP TRIGGER IF EXISTS record_linear_task_identifier_alias ON linear_issue_links;
 CREATE TRIGGER record_linear_task_identifier_alias AFTER INSERT OR UPDATE OR DELETE ON linear_issue_links
 FOR EACH ROW EXECUTE FUNCTION record_linear_task_identifier_alias();
-INSERT INTO task_identifier_aliases ("issueId", "workspaceId", "ownerId", identifier, kind, "createdAt")
-SELECT i.id, i."workspaceId", i."userId", p.identifier, 'publication', min(p."createdAt")
-FROM issues i JOIN run_publications p ON p."issueId"=i.id AND p."userId"=i."userId"
-WHERE p.identifier IS NOT NULL AND p.identifier<>''
-GROUP BY i.id, i."workspaceId", i."userId", p.identifier
-ON CONFLICT DO NOTHING;
+-- Publication receipts remain in run_publications. Import their aliases after
+-- P0 has established Task/Run tenancy (230007 and the migration backfill), so
+-- creator and peer executions use the same structural proof.
 
 CREATE OR REPLACE FUNCTION allocate_workspace_task_identifier(workspace_id uuid) RETURNS text
 LANGUAGE plpgsql AS $$
@@ -136,9 +133,11 @@ BEGIN
   IF NOT FOUND OR task_row."workspaceId" IS NULL THEN RETURN NULL; END IF;
   IF task_row."issuedIdentifier" IS NOT NULL THEN RETURN task_row."issuedIdentifier"; END IF;
   SELECT identifier INTO candidate FROM task_identifier_aliases
-    WHERE "issueId"=task_id AND kind='publication' ORDER BY "createdAt", identifier LIMIT 1;
+    WHERE "issueId"=task_id AND "ownerId"=task_row."userId" AND "workspaceId"=task_row."workspaceId"
+      AND kind='publication' ORDER BY "createdAt", identifier LIMIT 1;
   SELECT identifier, "wasWorkspace" INTO legacy_owner, legacy_workspace FROM task_identifier_aliases
-    WHERE "issueId"=task_id AND kind='owner' ORDER BY "createdAt", identifier LIMIT 1;
+    WHERE "issueId"=task_id AND "ownerId"=task_row."userId" AND "workspaceId"=task_row."workspaceId"
+      AND kind='owner' ORDER BY "createdAt", identifier LIMIT 1;
   IF candidate IS NULL AND coalesce(legacy_workspace, task_row.scope='workspace') AND team_alias IS NOT NULL THEN candidate := team_alias; END IF;
   candidate := coalesce(candidate, legacy_owner);
   IF candidate IS NULL THEN
@@ -150,13 +149,10 @@ BEGIN
   RETURN candidate;
 END $$;
 
--- Published and personal identities need no WS lookup. Other historical tasks
--- are completed from the WS snapshot by ensureTaskIdentifiers, before display.
-UPDATE issues i SET "issuedIdentifier"=coalesce(
-  (SELECT a.identifier FROM task_identifier_aliases a WHERE a."issueId"=i.id AND a.kind='publication' ORDER BY a."createdAt", a.identifier LIMIT 1),
-  CASE WHEN i.scope='personal' THEN task_owner_identifier(i."userId", i.content) END
-) WHERE i."issuedIdentifier" IS NULL AND i."workspaceId" IS NOT NULL
-  AND (i.scope='personal' OR EXISTS (SELECT 1 FROM task_identifier_aliases a WHERE a."issueId"=i.id AND a.kind='publication'));
+-- Existing tasks are issued only after both databases and P0 ownership have
+-- migrated. A peer's earlier publication is authoritative too, but its Run
+-- tenant cannot be proved until P0 backfill finishes. Issuing an owner prefix
+-- here would freeze the wrong spelling before that receipt is imported.
 
 -- Current metadata adopts distinct responsibility/delegation. Version history
 -- and frozen Run/AgentProfile/publication receipts remain byte-for-byte intact.

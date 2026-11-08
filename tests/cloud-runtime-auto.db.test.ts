@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
 import type { Pool as PgPool } from 'pg'
 import { normalizeRepository } from '@mikka/protocol/repository'
-import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
@@ -55,7 +55,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   const { ensureBotRuntime } = await import('../lib/computer/bot-runtime')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  const { withTaskWorkspace } = await import('../lib/task-workspace')
+  const { withFactoryBackgroundWorkspace } = await import('../lib/factory/background-workspace')
+  const { withProjectResourceLease } = await import('../lib/project-resources/store')
   const users: string[] = []
   const realProvision = botRuntimeProvisioner.provision
   let provisioned = 0
@@ -99,6 +100,15 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   })
 
   const order = await import('../lib/model-order')
+  // Canonical identity freezes at INSERT. Chosen fixture numbers must be
+  // present then; changing document metadata later cannot rename a Task.
+  const numberedTask = async (userId: string, workspaceId: string, number: number) => {
+    const issueId = randomUUID()
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
+      VALUES($1,$2,$3,'bound','personal','disabled',true,'Task',$4,'todo','normal')`,
+    [issueId, userId, workspaceId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [] })])
+    return issueId
+  }
   // A new workspace: the person's own E2B key and a connected Codex subscription whose account lists gpt-5,
   // 优先使用的模型 left as filled by default (that model) and 运行位置 云端; no cloud runtime.
   const person = async (label: string, e2bKey = true) => {
@@ -111,8 +121,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
     // Their own workspace: the personal one, where work with no workspace of its own goes.
     await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])
-    const issueId = await seedIssue(pool, id)
-    await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
+    const issueId = await numberedTask(id, ws.id, 7)
     const botId = await seedBot(pool, ws.id, id)
     const connection = randomUUID()
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject',$6)`, [connection, id, ws.id, 'a'.repeat(64), `synthetic-${connection}`, JSON.stringify({ revision: '1', models: ['gpt-5'] })])
@@ -138,9 +147,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     JOIN thread_machines m ON m."runId"=r.id WHERE r.id=$1`, [runId])).rows[0]
   // Another numbered task of the same person: a task has one thread (lib/thread-dispatch.ts), so reuse is shown on a second task.
   const anotherTask = async (userId: string, number: number) => {
-    const issueId = await seedIssue(pool, userId)
-    await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } } })])
-    return issueId
+    return numberedTask(userId, await seedPersonalWorkspace(pool, userId), number)
   }
 
   await t.test('no runtime yet: the run goes to the cloud and the runtime is created; a second dispatch reuses it', async () => {
@@ -510,7 +517,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE a."runId"=$1', [producer.runId])).rows[0]
     const actor = { userId: personState.id, workspaceId: personState.workspaceId }
     const beforeProviderCalls = provisioned, beforeHandoffs = stageHandoffs.length
-    await withTaskWorkspace(personState.id, personState.workspaceId, async () => {
+    await withProjectResourceLease(personState.id, personState.workspaceId, async () => {
       const client = await appPool.connect()
       try {
         await client.query('BEGIN')
@@ -662,7 +669,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal((await handleFactory(humanStore, {...request,userId:'another-owner'})).status, 404)
     assert.equal((await handleFactory(factoryRuntimeForBot(null).store, request)).status, 404, 'runtime scope stays fixed; only human APIs resolve the persisted Bot')
     const merges = createFactoryMerges(pool, async () => true, humanStore, { pullRequest: noGitHub, mergeMethods: noGitHub, merge: noGitHub })
-    const accepted = await withTaskWorkspace(personState.id, personState.workspaceId, () =>
+    const accepted = await withFactoryBackgroundWorkspace(pool, personState.id, { kind: 'task', id: pending.id }, () =>
       merges.accept({ userId: personState.id, sessionId }, { binding: factoryBinding(pending), eventId: randomUUID() }, null))
     assert.equal(accepted.status, 'accepted')
     assert.deepEqual([(await current()).stage, (await current()).status], ['approval', 'passed'])
@@ -797,8 +804,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       factoryAutomaticRuntime.enqueue = threadMachines.enqueueDurable
       let replies: Awaited<ReturnType<typeof approve>>[]
       try { replies = await Promise.all([
-        withTaskWorkspace(who.id, who.workspaceId, () => approve({ userId: who.id, sessionId }, approval)),
-        withTaskWorkspace(who.id, who.workspaceId, () => approve({ userId: who.id, sessionId }, approval)),
+        withFactoryBackgroundWorkspace(pool, who.id, { kind: 'task', id: ready.task.id }, () => approve({ userId: who.id, sessionId }, approval)),
+        withFactoryBackgroundWorkspace(pool, who.id, { kind: 'task', id: ready.task.id }, () => approve({ userId: who.id, sessionId }, approval)),
       ]) }
       finally { factoryAutomaticRuntime.enqueue = previousEnqueue }
       assert.equal(replies.filter(reply => reply.replayed).length, 1)

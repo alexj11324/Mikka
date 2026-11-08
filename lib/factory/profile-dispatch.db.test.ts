@@ -86,9 +86,14 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     import('../agent-kit/worker-digest'), import('../computer/bot-runtime-records'),
   ])
   appPool = modules[0].pool; workspacePool = modules[1].workspacePool
-  const [, , profiles, { bindAgentToConnection }, { queueCloudRun }, { createFactoryStore }, { createFactoryDispatch, factoryBinding },
-    { createFactoryReconciler }, { automaticFactoryDispatch, factoryAutomaticRuntime }, { factoryCheckGates }, { factoryCheckIndependent },
+  const [, , profiles, { bindAgentToConnection }, { queueCloudRun }, { createFactoryStore }, { createFactoryDispatch: rawDispatch, factoryBinding },
+    { createFactoryReconciler: rawReconciler }, { automaticFactoryDispatch, factoryAutomaticRuntime }, { factoryCheckGates }, { factoryCheckIndependent },
     { workerDefinitionDigest }, { ensureRecordedBotHarnessRuntime }] = modules
+  const { resourceBoundFactoryDispatch, factoryResourceWorkspace } = await import('../../tests/helpers/factory-resource-boundary')
+  const { bindFactoryQuestionsWorkspace } = await import('./background-workspace')
+  const createFactoryDispatch: typeof rawDispatch = (...args) => resourceBoundFactoryDispatch(args[0], rawDispatch(...args))
+  const createFactoryReconciler: typeof rawReconciler = (source, store, questions, consumers, botId, automatic, boundary) =>
+    rawReconciler(source, store, questions, consumers, botId, automatic, boundary ?? factoryResourceWorkspace(source))
   const handoffs: { previous: string | null; runId: string }[] = []
   t.mock.method(factoryAutomaticRuntime, 'enqueue', async (_pool: Pool, _actor: unknown, previous: string | null, runId: string) => { handoffs.push({ previous, runId }) })
   t.mock.method(factoryAutomaticRuntime, 'park', async () => { throw new Error('Provider park must stay outside dispatch') })
@@ -700,6 +705,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const pending = (retried.body as FactorySnapshot).task
     assert.equal(pending.stage, 'review'); assert.equal(pending.status, 'pending'); assert.equal(pending.candidateId, f.current.candidateId)
     const { beginFactoryTransaction, commitFactoryTransaction, rollbackFactoryTransaction, forgetFactoryTransaction } = await import('./transaction')
+    await factoryResourceWorkspace(pool)(f.ownerId, pending.id, async () => {
     const tx = await pool.connect()
     try {
       await beginFactoryTransaction(tx)
@@ -708,6 +714,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       await start?.()
     } catch (error) { await rollbackFactoryTransaction(tx); throw error }
     finally { forgetFactoryTransaction(tx); tx.release() }
+    })
     const next = (await pool.query('SELECT r.* FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" JOIN agent_runs r ON r.id=a."runId" WHERE t.id=$1', [f.task.id])).rows[0]
     assert.notEqual(next.id, queued.id)
     for (const key of ['harness', 'model', 'subscription', 'agentProfile', 'modelDispatch']) assert.deepEqual(next.agentDefinition[key], queued.agentDefinition[key], key)
@@ -1376,11 +1383,11 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       }, tx)
     })
     const authorize = async (owner: string, issue: string, tx: import('pg').PoolClient) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1
-    const questions = createFactoryQuestions(pool, authorize, f.store, dispatch, undefined, undefined, undefined, async (ownerId, scope) => {
+    const questions = bindFactoryQuestionsWorkspace(pool, createFactoryQuestions(pool, authorize, f.store, dispatch, undefined, undefined, undefined, async (ownerId, scope) => {
       // Observe only the existing provider boundary. No VM or model is called.
       assert.equal(ownerId, f.ownerId); assert.equal(scope.workspaceId, f.workspaceId)
       preparations.push({ ownerId, ...scope })
-    })
+    }), f.botId)
     const factoryClaim = createFactoryClaim(f.store, questions)
     let metadata: Record<string, unknown> = {}
     const claimRun = (runId: string) => {
@@ -1648,7 +1655,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       }, tx)
     })
     const authorize = async (owner: string, issue: string, tx: import('pg').PoolClient) => (await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2', [issue, owner])).rowCount === 1
-    const questions = createFactoryQuestions(pool, authorize, f.store, dispatch)
+    const questions = bindFactoryQuestionsWorkspace(pool, createFactoryQuestions(pool, authorize, f.store, dispatch), f.botId)
     const factoryClaim = createFactoryClaim(f.store, questions)
     const first = await dispatch(f.ownerId, { binding: factoryBinding(f.task), agentId: f.agents.codex, deviceRepoId: f.repoId, profileId })
     const sandboxId = `synthetic-default-thread-${first.runId}`

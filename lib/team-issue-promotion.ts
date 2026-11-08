@@ -6,6 +6,7 @@ import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/l
 import { issues, issueVersions, teamIssuePromotions } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { withTeamWorkspace } from '@/lib/team-workspace'
+import { ActionFailureError } from '@/lib/action-error'
 import { teams, teamIssues, teamIssuePromotionReceipts } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { lockTeamRelations } from '@/lib/team-access'
@@ -97,6 +98,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
     })
   } catch (error) {
     if (error instanceof PromotionError) return { error: error.code, requestId }
+    if (error instanceof ActionFailureError && (error.code === 'workspaceAccessDenied' || error.code === 'teamIssueAccessDenied')) return { error: 'teamIssueAccessDenied' as const, requestId }
     if (promotionStarted) {
       try {
         const [request] = await db.select().from(teamIssuePromotions).where(eq(teamIssuePromotions.requestId, requestId)).limit(1)

@@ -6,6 +6,7 @@ import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { issueThreadTargets, runChangeTargets } from './panels'
@@ -77,7 +78,10 @@ test('an issue thread list key reaches every member who can see the issue, after
     const issue = async (workspace: string | null) => {
       const id = randomUUID()
       await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,$3)`, [id, workspace ? 'workspace' : 'personal', workspace ?? home])
-      if (workspace) await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, randomUUID(), workspace])
+      if (workspace) {
+        const grouping = await seedTeam(database, workspace, 'owner')
+        await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, grouping.id, workspace])
+      }
       return id
     }
     const run = async (issueId: string | null, owner = 'owner') => {

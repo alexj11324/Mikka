@@ -92,8 +92,9 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
   const { actAs } = await import('../lib/acting-user')
   const { withTaskWorkspace, borrowTaskWorkspaceMembership, taskReaderScope } = await import('../lib/task-workspace')
   const { withFactoryWorkspace, factoryWorkspaceReader } = await import('../lib/factory/workspace-reader')
+  const { withProjectResourceLease, requireProjectResourceLease } = await import('../lib/project-resources/store')
   const { acquireProfileMembership } = await import('../lib/factory/agent-profile-store')
-  const { pool } = await import('../lib/db')
+  const { pool, withDatabaseClient } = await import('../lib/db')
   const { factoryHumanStore } = await import('../lib/factory/server')
   const intake = await import('../app/api/factory/tasks/route/route')
   const tasks = await import('../app/api/factory/tasks/route')
@@ -173,10 +174,35 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
       assert.equal(taskReaderScope(reader).workspaceId, alpha)
       if (typeof reader === 'string') assert.fail('human reader must retain its principal')
       assert.equal(reader[enterprisePrincipal], session.user[enterprisePrincipal])
+      requireProjectResourceLease(owner, alpha)
       assert.equal((await factoryHumanStore.read(owner, a.task.id)).task.id, a.task.id)
       await assert.rejects(factoryHumanStore.read(owner, b.task.id), error => code(error) === 'factoryNotFound')
     })))
     await scope.after.finish()
+  })
+
+  await t.test('the human adapter holds the resource lease before APP for spec approval and acceptance consumers', async () => {
+    const req = request('/api/factory/tasks/' + a.task.id + '/flow', alpha)
+    await run(req, () => actAs(session.user, () => withFactoryWorkspace(owner, async () => {
+      requireProjectResourceLease(owner, alpha)
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN')
+        await withDatabaseClient(tx, () => withProjectResourceLease(session.user, alpha, async () => {
+          assert.equal((await tx.query('SELECT 1 AS present')).rows[0].present, 1)
+        }, true))
+        const writer = await controls.connect()
+        try {
+          await writer.query('BEGIN')
+          assert.equal((await writer.query('SELECT pg_try_advisory_xact_lock(hashtextextended($1,0)) AS acquired',
+            ['project-resources:' + alpha])).rows[0].acquired, false, 'configuration cannot change while the human mutation owns APP')
+        } finally { await writer.query('ROLLBACK'); writer.release() }
+        await tx.query('COMMIT')
+      } catch (error) { await tx.query('ROLLBACK'); throw error }
+      finally { tx.release() }
+    })))
+    assert.throws(() => requireProjectResourceLease(owner, alpha), error => code(error) === 'projectEnvironmentUnavailable')
+    assert.equal(app.totalCount, 1); assert.equal(workspace.totalCount, 1)
   })
 
   await t.test('Profile borrows are exact, cannot close their owner, and expire after nested rollback or return', async () => {
