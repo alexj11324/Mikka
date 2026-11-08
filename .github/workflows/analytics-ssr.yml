@@ -2,7 +2,7 @@ name: Analytics SSR
 # Runs on pull requests only. After a merge, Vercel's production build of main
 # is the build check; repeating this one on main added nothing.
 on:
-  pull_request:
+  workflow_call:
   workflow_dispatch:
 permissions:
   contents: read

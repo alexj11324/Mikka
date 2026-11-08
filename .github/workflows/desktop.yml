@@ -6,7 +6,7 @@ name: Desktop shell
 # Pull requests only: the same suite already passed on the PR, and main's
 # CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
-  pull_request:
+  workflow_call:
   workflow_dispatch:
 
 permissions:

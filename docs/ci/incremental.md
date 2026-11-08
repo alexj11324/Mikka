@@ -58,7 +58,7 @@ When introducing the selector on a base that predates it, inventory is validated
 with the old trusted runner and every lane runs in full. Candidate shadow reports
 have no job outputs and cannot authorize skips.
 
-Every classification builds and validates the **entire** DB inventory, even when
+New database-named or driver-importing tests outside the legacy scan roots are rejected until explicitly enrolled; existing MTS files named by enrolled suite commands remain covered. Every classification builds and validates the **entire** DB inventory, even when
 no DB job is needed. Each DB worker validates it again. `DB_TEST_SELECTED` must
 be a unique, nonempty subset of the complete enrollment; an explicit empty set
 is an error in the runner. Only a trusted decision can skip the whole DB job.
@@ -72,7 +72,7 @@ Required status names remain `UI policy (strict)`, `Production build and browser
 interactions`, `Browser tests (before merge)` and external GitGuardian. Gates
 check each selected lane must succeed and each unselected lane must be skipped;
 failure, timeout, cancellation, missing output or unexpected skip cannot pass.
-No workflow-level path filter is added to required workflows. Main concurrency,
+Selected Docker, Desktop and Analytics PR workflows are reusable jobs of CI and their actual conclusions feed `UI policy (strict)`. They no longer also start a duplicate standalone PR run. Main keeps the existing independent image publication and release entrypoints. No workflow-level path filter is added to required workflows. Main concurrency,
 OIDC, daemon/Desktop exact-source CI gates, E2B release pairs and publication
 checks are unchanged. Existing browser-gate remains a compatibility status only;
 this change adds no browser tests.
@@ -92,7 +92,7 @@ CI_TIMINGS_FILE=/tmp/timings.json node scripts/ci/timings.mjs RUN_ID_1 RUN_ID_2
 ```
 
 CI prints areas, reasons, Nx affected projects/commands, suites and shard matrix.
-The stable gates record the final selected-job conclusion. Job/step timestamps
+The stable gates record the final selected-job conclusion plus actual completed job durations from one read-only Actions API request. The timing summary labels partial runner consumption while other gates/jobs are still running; API failures explicitly leave timing unavailable, without replacing enforcement. Job/step timestamps
 are available through the timing collector; [#1699's evidence](1699-results.md)
 separates waiting from runner consumption. `workflow_dispatch` and Monday 03:23
 UTC run the full CI even without source changes.

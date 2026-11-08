@@ -29,7 +29,7 @@ its existing protected status names and real acceptance coverage.
   on the exact commit (`scripts/release/ci-gate.mjs`).
 - The special suites (`analytics-ssr`, `cloud-computer`, `desktop`,
   `e2b-byos`, `site-search`, `ssh-device-backend`, `unattended-sandbox`) run on
-  pull requests only, and only when their paths change; each can still be run
+  pull requests only, selected by trusted dependencies or their existing path filters; each can still be run
   by hand (`workflow_dispatch`). Vercel's production build is the build check
   for `main`.
 - `publish-daemon.yml` and `desktop-release.yml` run only when a path that goes
@@ -157,3 +157,7 @@ selectors absent from the immutable base never authorize a skip. Manual dispatch
 and Monday 03:23 UTC run complete CI. No Nx Cloud, remote test cache, browser E2E
 or release credentials are added. See [policy and commands](../../docs/ci/incremental.md)
 and [measured results](../../docs/ci/1699-results.md).
+
+Selected Desktop, Analytics and Docker PR checks now run as reusable jobs of CI;
+their conclusions are included in `UI policy (strict)`. Main image publication
+remains independent, and source-SHA release gates are unchanged.

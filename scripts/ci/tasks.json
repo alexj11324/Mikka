@@ -422,7 +422,7 @@
     "env": {}
   },
   "core-triage": {
-    "command": "node --test scripts/ci/select.test.mjs scripts/ci/bootstrap.test.mjs",
+    "command": "node --test scripts/ci/*.test.mjs",
     "kind": "core",
     "env": {}
   }

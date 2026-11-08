@@ -226,14 +226,37 @@ jobs:
         env:
           MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
 
+  # PR specializations are reusable jobs so the stable gate can require their
+  # actual conclusions. Main retains its existing independent release workflows.
+  image-checks:
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.image == 'true'
+    uses: ./.github/workflows/self-hosted-image.yml
+    permissions:
+      contents: read
+      packages: write
+
+  desktop-checks:
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.desktop == 'true'
+    uses: ./.github/workflows/desktop.yml
+
+  analytics-checks:
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.analytics == 'true'
+    uses: ./.github/workflows/analytics-ssr.yml
+
   ui-policy:
     # The required check name. It reports success when only documentation
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
-    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks]
+    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, image-checks, desktop-checks, analytics-checks]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Require every selected source, unit and daemon job
         env:
@@ -242,13 +265,19 @@ jobs:
           EXPECT_INTEGRATION: ${{ needs.changes.outputs.integration }}
           EXPECT_SOURCE: ${{ needs.changes.outputs.source }}
           EXPECT_DAEMON: ${{ needs.changes.outputs.daemon }}
+          EXPECT_IMAGE: ${{ github.event_name != 'push' && needs.changes.outputs.image == 'true' }}
+          EXPECT_DESKTOP: ${{ github.event_name != 'push' && needs.changes.outputs.desktop == 'true' }}
+          EXPECT_ANALYTICS: ${{ github.event_name != 'push' && needs.changes.outputs.analytics == 'true' }}
+          IMAGE: ${{ needs.image-checks.result }}
+          DESKTOP: ${{ needs.desktop-checks.result }}
+          ANALYTICS: ${{ needs.analytics-checks.result }}
           CORE: ${{ needs.ui-policy-full.result }}
           INTEGRATION: ${{ needs.ui-policy-integrations.result }}
           SOURCE: ${{ needs.source-checks.result }}
           DAEMON: ${{ needs.daemon-checks.result }}
         run: |
           test "$CHANGES_RESULT" = success
-          for name in CORE INTEGRATION SOURCE DAEMON; do
+          for name in CORE INTEGRATION SOURCE DAEMON IMAGE DESKTOP ANALYTICS; do
             expected="EXPECT_$name"
             case "${!expected}" in
               true) test "${!name}" = success ;;
@@ -257,6 +286,13 @@ jobs:
             esac
           done
           echo 'All selected source/unit/daemon jobs succeeded.' >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Record actual completed job timings
+        if: always()
+        run: node scripts/ci/summary.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
   browser-tests-full:
     # CI runs no browser tests (decision 2026-11-01-1520); this job keeps the
@@ -383,6 +419,9 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Require every selected database shard
         env:
@@ -397,3 +436,9 @@ jobs:
             *) exit 1 ;;
           esac
           echo "Database gate: $DB_RESULT; complete inventory validated in Changed files." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Record actual completed job timings
+        if: always()
+        run: node scripts/ci/summary.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

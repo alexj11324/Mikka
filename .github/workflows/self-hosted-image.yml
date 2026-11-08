@@ -1,7 +1,6 @@
 name: Self-hosted image
 on:
-  pull_request:
-  merge_group:
+  workflow_call:
   push:
     branches: [main]
     tags: ['v*']
