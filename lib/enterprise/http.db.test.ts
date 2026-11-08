@@ -212,6 +212,12 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       else if (url.pathname === '/api/web/return') response = await (await import('../../app/api/web/return/route')).GET(request)
       else if (url.pathname === '/api/web/exchange') response = await (await import('../../app/api/web/exchange/route')).POST(request)
       else if (url.pathname === '/api/live/ticket') response = await (await import('../../app/api/live/ticket/route')).GET(request)
+      else if (/^\/api\/organizations\/[^/]+\/(?:members|audit-log)$/.test(url.pathname)) {
+        const [, , , organization, resource] = url.pathname.split('/')
+        const route = resource === 'members' ? await import('../../app/api/organizations/[organizationId]/members/route') : await import('../../app/api/organizations/[organizationId]/audit-log/route')
+        const handle = (route as unknown as Record<string, ((request: Request, context: { params: Promise<{ organizationId: string }> }) => Promise<Response>) | undefined>)[request.method]
+        response = handle ? await handle(request, { params: Promise.resolve({ organizationId: organization }) }) : new Response(null, { status: 405 })
+      }
       else if (url.pathname === '/api/enterprise/logout-target') response = await (await import('../../app/api/enterprise/logout-target/route')).GET(request)
       else if (url.pathname === '/api/account/deletion') response = await (await import('../../app/api/account/deletion/route')).POST(request)
       else if (url.pathname === '/api/mobile/push-tokens') {
@@ -735,6 +741,48 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal(returned.status, 302, await returned.clone().text())
     assert.equal(returned.headers.get('location'), `${appOrigin}/sign-in?login=1`, 'the IdP returns the browser to sign-in')
     assert.equal((await session(oidcCookies))?.user.id, userId, 'both sign-outs leave the independent OIDC session intact')
+  })
+  await t.test('the 组织 page client adds a second Org admin, who can export audit until revoked, then is refused (#1669)', async () => {
+    const { organizationApi } = await import('../../hooks/settings/use-organization')
+    const { GovernanceRequestError } = await import('../../hooks/settings/use-workspace-governance')
+    const { auth: applicationAuth } = await import('../auth')
+    const native = await applicationAuth.$context
+    const secondAdmin = `org-second-admin-${randomUUID()}`
+    await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Second admin\',$2,true,now(),now())', [secondAdmin, `${secondAdmin}@fixture.example.invalid`])
+    const ownerSession = await native.internalAdapter.createSession(adminId), adminSession = await native.internalAdapter.createSession(secondAdmin)
+    assert.ok(ownerSession); assert.ok(adminSession)
+    const original = globalThis.fetch
+    // The page's own client, exactly as it runs in the browser: same-origin relative URLs with that person's cookie.
+    const as = async <T>(token: string, work: () => Promise<T>) => {
+      const cookie = await applicationCookie(token)
+      globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, appOrigin)
+        if (url.origin !== appOrigin) return original(input, init)
+        const headers = new Headers(init?.headers); headers.set('cookie', cookie)
+        if ((init?.method ?? 'GET') !== 'GET') headers.set('origin', appOrigin)
+        return original(url, { ...init, headers, redirect: 'manual' })
+      }) as typeof fetch
+      try { return await work() } finally { globalThis.fetch = original }
+    }
+    const refused = (status: number) => (error: unknown) => error instanceof GovernanceRequestError && error.status === status
+    try {
+      await assert.rejects(as(adminSession.token, () => organizationApi.createAuditExport(organizationId, {})), refused(403), 'not yet an Org member: no audit export')
+      const added = await as(ownerSession.token, () => organizationApi.addMember(organizationId, secondAdmin, 'admin'))
+      assert.equal(added.member.role, 'admin')
+      await assert.rejects(as(adminSession.token, () => organizationApi.addMember(organizationId, randomUUID(), 'owner')), refused(403), 'an admin cannot mint an owner')
+      const exported = await as(adminSession.token, () => organizationApi.createAuditExport(organizationId, {}))
+      assert.equal(exported.manifest.organizationId, organizationId)
+      assert.ok(exported.events.some(event => event.action === 'organization.member_changed' && event.targetId === secondAdmin), 'the grant is in the audit the new admin downloads')
+      const page = await as(adminSession.token, () => organizationApi.readAuditExport(organizationId, exported.manifest.id, 0, 10))
+      assert.equal(page.manifest.id, exported.manifest.id)
+      assert.deepEqual(await as(ownerSession.token, () => organizationApi.removeMember(organizationId, secondAdmin)), { removed: true })
+      await assert.rejects(as(adminSession.token, () => organizationApi.readAuditExport(organizationId, exported.manifest.id, 0, 10)), refused(403), 'a revoked admin cannot keep reading a frozen export')
+      await assert.rejects(as(adminSession.token, () => organizationApi.createAuditExport(organizationId, {})), refused(403), 'or start a new one')
+      await assert.rejects(as(ownerSession.token, () => organizationApi.createAuditExport(randomUUID(), {})), refused(403), 'an unknown Organization is refused, not created')
+    } finally {
+      globalThis.fetch = original
+      await pool.query('delete from session where id=any($1::text[])', [[ownerSession.id, adminSession.id]])
+    }
   })
   await t.test('OIDC logout rejects wrong principals, cross-origin starts and client-selected redirects before revoking a session', async () => {
     const login = await oidcLogin(), active = await session(login.jar); assert.ok(active)
