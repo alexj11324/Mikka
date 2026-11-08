@@ -1,0 +1,102 @@
+name: Issue 1506 f132 retained group cleanup — DISABLED
+on:
+  push:
+    branches: [acceptance/issues-1504-1506]
+    paths:
+      - '.github/workflows/issue-1506-group-cleanup-f132.yml'
+      - 'scripts/acceptance/issue-1506-group-cleanup-f132/**'
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: issue-1506-acme-acceptance
+  queue: max
+  cancel-in-progress: false
+jobs:
+  cleanup_groups:
+    if: false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: web-deploy-production
+      queue: max
+      cancel-in-progress: false
+    env:
+      DRIVER_SHA: 3c6bddac19eb3d22c208cb17e6b2efd7a388687d
+      MIKKA_FIXTURE_RECEIPT: scripts/acceptance/issue-1506-alex/receipts/fixtures-ready-42286389783.json
+    steps:
+      - name: Check out this immutable cleanup evidence commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check out the original immutable cleanup driver
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.DRIVER_SHA }}
+          path: driver-source
+          persist-credentials: false
+      - name: Check out the exact original protocol decoder source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: f1324dafa296f76289124bb93538f1938cb1597f
+          path: application-source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify source identity and unchanged tracked runtime
+        run: |
+          test "$(git -C driver-source rev-parse HEAD)" = "$DRIVER_SHA"
+          git -C driver-source diff --exit-code HEAD -- scripts/acceptance lib/coordinator-stream-client.ts
+      - name: Copy only the actual fixed protocol decoder
+        run: |
+          test "$(git -C application-source rev-parse HEAD)" = f1324dafa296f76289124bb93538f1938cb1597f
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict'
+          import {readFileSync,writeFileSync,mkdirSync} from 'node:fs'
+          import {createHash} from 'node:crypto'
+          const p='lib/coordinator-stream-client.ts'
+          const bytes=readFileSync('application-source/'+p)
+          assert.equal(createHash('sha256').update(bytes).digest('hex'),'490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4')
+          mkdirSync('driver-source/lib',{recursive:true})
+          writeFileSync('driver-source/'+p,bytes)
+          NODE
+      - name: Import original modules and validate exact receipts without network
+        run: node scripts/acceptance/issue-1506-group-cleanup-f132/preflight.mjs driver-source
+      - name: Read Alex's existing email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read Alex's existing password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: ACME_DEMO_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Clean each exact retained group once with the original cleanup mode
+        run: node scripts/acceptance/issue-1506-group-cleanup-f132/run.mjs
+      - name: Retain cleanup and failed prerequisite receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1506-group-cleanup-f132-${{ github.run_id }}
+          path: |
+            group-cleanup-report/*
+            driver-source/issue-1506-alex-report/*-cleanup.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "issue": 1506,
+  "sourceSha": "3c6bddac19eb3d22c208cb17e6b2efd7a388687d",
+  "applicationSha": "f1324dafa296f76289124bb93538f1938cb1597f",
+  "modelSendsAllowed": 0,
+  "fixture": {
+    "path": "scripts/acceptance/issue-1506-alex/receipts/fixtures-ready-42286389783.json",
+    "sha256": "aa58d54fee5826627696a0d1328cb0acaab2707f1d4254aa15f1b6ae420fb9fe"
+  },
+  "sourceFiles": [
+    {
+      "path": "scripts/acceptance/issue-1506-alex/group-stop.mjs",
+      "sha256": "0ff4718a3f21babd682f27fcc640f3887c7d34ccafdb0bae9b2c1094297b2b33"
+    },
+    {
+      "path": "scripts/acceptance/issue-1506-alex/coordinator-fixtures.mjs",
+      "sha256": "3d03e583ca02cbede86dfb2c1cf07c6cec2ff39cdc1f5b30ba0f315a5e00334d"
+    },
+    {
+      "path": "scripts/acceptance/issue-1506-alex/workspace-setup.mjs",
+      "sha256": "bc0ade39138ad897d88e1108305d7c37266ea791c38238971a357d1671f52faa"
+    },
+    {
+      "path": "scripts/acceptance/issue-1506-readonly/alex-session.mjs",
+      "sha256": "ca7ef08df7c5090808459a13da789c3b9efc35896f68c81473d0cba11dc34345"
+    },
+    {
+      "path": "scripts/acceptance/issue-1504-1506/coordinator-baseline.mjs",
+      "sha256": "b74010d8f8800d7935e362c16bdf42a653d9db67531476a474e78ed9028ea3a7"
+    },
+    {
+      "path": "scripts/acceptance/issue-1504-1506/production-session.mjs",
+      "sha256": "874f8a2b20a958078f5db1e5732a917229695cc5671c1973bb910da3d5388916"
+    },
+    {
+      "path": "lib/coordinator-stream-client.ts",
+      "sha256": "490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4"
+    }
+  ],
+  "cases": [
+    {
+      "key": "public-haiku",
+      "file": "public-haiku.json",
+      "sha256": "37b68a921005f50a1f43f773f25a900be139463e7cc1d68166cdb756e9e3f42f",
+      "groupId": "ada98752-4f77-4f56-b030-606574bc4395",
+      "messageId": "cc742212-f997-44e2-878b-bd5df3172da3",
+      "groupTitle": "测试 Issue1506 group-stop public acme-1506-20261106 haiku responding_bot f1324daf"
+    },
+    {
+      "key": "public-luna",
+      "file": "public-luna.json",
+      "sha256": "4c925d936460fec50589e1011bde6541125ab87899637e25ee499a8b0f75e0e3",
+      "groupId": "f56d2758-a123-46d2-86ce-8297c9f72a3f",
+      "messageId": "f2de976d-315b-4c80-bcd5-e8b16b732389",
+      "groupTitle": "测试 Issue1506 group-stop public acme-1506-20261106 luna responding_bot f1324daf"
+    },
+    {
+      "key": "private-haiku",
+      "file": "private-haiku.json",
+      "sha256": "8eb915695db1d113b617fc7619004eb4c129a4c9dc647547ce725f471dd0dc67",
+      "groupId": "dc489895-a9b6-43b1-a0fc-f697356fc21b",
+      "messageId": "968353a2-2746-4d79-b9f9-e737d7aa0f45",
+      "groupTitle": "测试 Issue1506 group-stop private acme-1506-20261106 haiku private_generation_receipt f1324daf"
+    }
+  ]
+}
