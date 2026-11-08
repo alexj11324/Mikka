@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { organizationAuditEvents, organizationEntitlements, organizationMembers, organizations, organizationWorkspaces } from '@/lib/db/governance-schema'
 import { requireWorkspace, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
+import { invalidateTaskWorkspaceOrganization } from '@/lib/task-workspace'
 import { enqueueOrganizationAudit } from './audit'
 import { activeHumanSeats, lockWorkspaceEntitlements } from './entitlements'
 import { GovernanceError } from './errors'
@@ -69,6 +70,7 @@ export async function attachOrganizationWorkspace(organizationId: string, worksp
       return
     }
     await tx.insert(organizationWorkspaces).values({ workspaceId, organizationId })
+    invalidateTaskWorkspaceOrganization(workspaceId)
     const scope = await lockWorkspaceEntitlements(tx, workspaceId)
     const seats = await activeHumanSeats(tx, workspaceId, organizationId)
     if (scope.entitlements.activeHumanLimit !== null && seats.length > scope.entitlements.activeHumanLimit) throw new GovernanceError('seat_limit')
@@ -84,6 +86,7 @@ export async function detachOrganizationWorkspace(organizationId: string, worksp
     await requireOrganizationAdmin(tx, organizationId, userId)
     const rows = await tx.delete(organizationWorkspaces).where(and(eq(organizationWorkspaces.workspaceId, workspaceId), eq(organizationWorkspaces.organizationId, organizationId))).returning()
     if (!rows.length) throw new GovernanceError('not_found')
+    invalidateTaskWorkspaceOrganization(workspaceId)
     // Detaching or downgrading never destroys members. Further admissions enforce the resulting cap.
     await enqueueOrganizationAudit(tx, { organizationId, actorId: userId, action: 'organization.workspace_detached', targetId: workspaceId })
   })

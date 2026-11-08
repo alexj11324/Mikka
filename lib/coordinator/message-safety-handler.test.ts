@@ -5,6 +5,8 @@ import net from 'node:net'
 import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, runMessages } from '../db/schema'
+import { workspaces, workspaceMembers } from '../db/workspace-schema'
+import { organizationWorkspaces } from '../db/governance-schema'
 import { sourcedEventMessage } from './message-safety'
 import { createApiHandler } from '../../apps/api/src/application'
 import * as apiServer from '../../apps/api/compat/server'
@@ -96,17 +98,25 @@ stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () =
 // The person's Coordinator is an ordinary bot row; MCP resolves it for the authenticated owner.
 const coordinator = '28700000-0000-4000-8000-0000000c0de1'
 const workspace = '28700000-0000-4000-8000-0000000000a1'
-stub('../workspace-db.ts', { workspaceDb: { select: () => {
+stub('../workspace-db.ts', { workspaceDb: { select: (fields?: Record<string, unknown>) => {
+  assert.deepEqual(fields, { id: workspaces.id, kind: workspaces.kind, organizationId: organizationWorkspaces.organizationId })
   const selection = {
-    from: () => selection,
-    innerJoin: () => selection,
+    from: (table: unknown) => { assert.equal(table, workspaces); return selection },
+    innerJoin: (table: unknown) => { assert.equal(table, workspaceMembers); return selection },
+    leftJoin: (table: unknown, condition: SQL) => {
+      assert.equal(table, organizationWorkspaces)
+      const query = dialect.sqlToQuery(condition)
+      assert.equal(query.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"')
+      assert.deepEqual(query.params, [])
+      return selection
+    },
     where: (condition: SQL) => {
       const query = dialect.sqlToQuery(condition)
       assert.ok(query.params.includes(owner)); assert.ok(query.params.includes(workspace))
       assert.ok(query.params.includes('active')); assert.ok(query.params.includes('team')); assert.ok(query.params.includes('personal'))
       return selection
     },
-    orderBy: async () => [{ id: workspace, kind: 'team' }],
+    orderBy: async () => [{ id: workspace, kind: 'team', organizationId: null }],
   }
   return selection
 } }, workspacePool: { query: async (sql: string, params: unknown[]) => {

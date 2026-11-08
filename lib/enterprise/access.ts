@@ -105,9 +105,10 @@ async function filterWorkspaceOrganizations<T extends { id: string }>(reader: st
   return workspaces.filter((_, index) => checks[index])
 }
 
-/** Rows come from the same authoritative membership SELECT, never request
- * input or an earlier admission. Only linkage is projected with that read;
- * session, directory and organization policy are still checked every call. */
+/** Canonical linkage comes from a fresh membership SELECT or an active
+ * Workspace lock whose same-transaction link writes invalidate its projection.
+ * Never pass request-supplied links. Session, directory and organization policy
+ * are checked on every call, including reads under the same lock. */
 export function filterEnterpriseWorkspaceLinks<T extends { id: string; organizationId: string | null }>(reader: string | EnterpriseReader, workspaces: T[]): Promise<T[]> {
   return filterWorkspaceOrganizations(reader, workspaces, new Map(workspaces.map(workspace => [workspace.id, workspace.organizationId])))
 }
@@ -117,3 +118,4 @@ export async function filterEnterpriseWorkspaces<T extends { id: string }>(reade
   const links = await workspaceDb.select().from(organizationWorkspaces).where(inArray(organizationWorkspaces.workspaceId, workspaces.map(workspace => workspace.id)))
   return filterWorkspaceOrganizations(reader, workspaces, new Map(links.map(link => [link.workspaceId, link.organizationId])))
 }
+
