@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { Ban, Check, CircleAlert, CircleX, ClipboardList, ExternalLink, FileCheck, GitMerge, GitPullRequest, MessageCircleQuestion, RefreshCw, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -95,6 +95,8 @@ type Approval = { busy: boolean; error: (ApproveSpecFailure & { revision: number
  */
 export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryTask; detail: FactoryTaskDetail | undefined; onOpenThread: (runId: string) => void }) {
   const t = useTranslations('FactoryFlow')
+  const format = useFormatter()
+  const now = useNow()
   const key = flowKey(task.id)
   const { flow, error, mutate, isValidating } = useFactoryFlow(task.id, detail)
   const { mutate: revalidate } = useSWRConfig()
@@ -140,6 +142,8 @@ export function FactoryFlowCard({ task, detail, onOpenThread }: { task: FactoryT
       <ItemContent className="min-w-0 basis-64 gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <FactoryFlowBadge flow={flow} />
+          {/* How long it has waited for the person (decision 2026-11-04-2200, rule 7), beside the 需要你 kind it waits on. */}
+          {flow.needsYou?.since && <time dateTime={flow.needsYou.since} className="text-xs text-muted-foreground tabular-nums">{format.relativeTime(new Date(flow.needsYou.since), now)}</time>}
           {flow.acceptance && <CountBadges counts={flow.acceptance.counts} />}
         </div>
         <StageList flow={flow} />
