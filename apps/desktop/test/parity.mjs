@@ -271,7 +271,16 @@ async function authenticateBundled(bundled) {
 async function selectFixtureWorkspace(target) {
   await go(target)
   await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().click()
-  await target.page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: false }).click()
+  const workspace = target.page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: false })
+  if (await workspace.getAttribute('aria-current') === 'true') {
+    await workspace.click()
+  } else {
+    // Switching assigns the same URL after the server action and cache clear.
+    await Promise.all([
+      target.page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+      workspace.click(),
+    ])
+  }
   await target.page.waitForURL(url => url.pathname === `${environment.basePath}/en` || url.pathname === `${environment.basePath}/en/`)
   await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().waitFor()
   await coordinatorReady(target.page)

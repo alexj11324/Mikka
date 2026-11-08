@@ -2,7 +2,71 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import vm from 'node:vm'
 import path from 'node:path'
+import { readFile } from 'node:fs/promises'
 import { nativeDeviceEnvironment, nativeDeviceIsReady, nativeDeviceSnapshot, waitForNativeDevice } from './native-device-ready.mjs'
+
+const paritySource = await readFile(new URL('./parity.mjs', import.meta.url), 'utf8')
+const selectionStart = paritySource.indexOf('async function selectFixtureWorkspace(target) {')
+const selectionEnd = paritySource.indexOf('\nasync function coordinatorReady(page)', selectionStart)
+assert.ok(selectionStart >= 0 && selectionEnd > selectionStart)
+
+function workspaceSelection(current = false) {
+  const events = []
+  const navigation = Promise.withResolvers()
+  const workspace = {
+    getAttribute: async name => { assert.equal(name, 'aria-current'); return current ? 'true' : null },
+    click: async () => { events.push('workspace-click') },
+  }
+  const button = { first: () => button, click: async () => { events.push('menu-click') }, waitFor: async () => { events.push('workspace-ready') } }
+  const page = {
+    getByRole: role => role === 'menuitem' ? workspace : button,
+    waitForNavigation: options => {
+      assert.equal(options.waitUntil, 'domcontentloaded')
+      events.push('navigation-armed')
+      return navigation.promise.then(() => { events.push('new-document-loaded') })
+    },
+    waitForURL: async predicate => {
+      assert.equal(predicate(new URL('http://localhost/mikka/en')), true)
+      events.push('same-url-ready')
+    },
+  }
+  const select = vm.runInNewContext(`(${paritySource.slice(selectionStart, selectionEnd)})`, {
+    go: async () => { events.push('initial-document-ready') },
+    messages: { Nav: { workspaceMenu: 'Workspace menu' } },
+    fixtures: { fixture: { workspaceName: 'Fixture workspace' } },
+    environment: { basePath: '/mikka' },
+    coordinatorReady: async () => { events.push('fixture-ready') },
+  })
+  return { events, navigation, select: () => select({ page }) }
+}
+
+test('workspace selection waits for its same-URL document navigation before native readiness', async () => {
+  const state = workspaceSelection()
+  let completed = false
+  const pending = state.select().then(() => { completed = true })
+  await new Promise(setImmediate)
+  assert.equal(completed, false, 'old-document URL and fixture visibility cannot complete selection')
+  assert.deepEqual(state.events, ['initial-document-ready', 'menu-click', 'navigation-armed', 'workspace-click'])
+  state.navigation.resolve()
+  await pending
+  assert.deepEqual(state.events.slice(-4), ['new-document-loaded', 'same-url-ready', 'workspace-ready', 'fixture-ready'])
+})
+
+test('an already-current workspace closes the menu without waiting for an absent navigation', async () => {
+  const state = workspaceSelection(true)
+  await state.select()
+  assert.deepEqual(state.events, ['initial-document-ready', 'menu-click', 'workspace-click', 'same-url-ready', 'workspace-ready', 'fixture-ready'])
+})
+
+test('a failed workspace navigation cannot reach native fixture readiness', async () => {
+  const state = workspaceSelection()
+  const failure = new Error('NAVIGATION_FAILED')
+  const pending = state.select()
+  await new Promise(setImmediate)
+  state.navigation.reject(failure)
+  await assert.rejects(pending, error => error === failure)
+  assert.equal(state.events.includes('fixture-ready'), false)
+})
 
 const raw = { device: { status: 'online', deviceId: 'private-device-id', signedIn: true, server: 'online' },
   install: { id: 'private-install-id', target: 'this-computer', status: 'online', step: 'connect' } }
