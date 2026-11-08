@@ -1,5 +1,6 @@
-CREATE UNIQUE INDEX IF NOT EXISTS coding_workspace_review_batches_semantic
-  ON coding_workspace_review_batches ("boardId","userId",destination,fingerprint);
+DROP INDEX IF EXISTS coding_workspace_review_batches_semantic;
+CREATE UNIQUE INDEX coding_workspace_review_batches_semantic
+  ON coding_workspace_review_batches ("boardId","userId",destination,fingerprint) WHERE state<>'rejected';
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='coding_workspace_review_batch_accepted'
     AND conrelid='coding_workspace_review_batches'::regclass) THEN

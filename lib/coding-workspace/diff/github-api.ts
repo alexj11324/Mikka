@@ -3,6 +3,10 @@ import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
 import { WorkspaceReviewError } from '@mikka/protocol/coding-workspace-review'
 import { remainingRequestBudget, requestBudgetSignal, type RequestBudget } from '../../request-budget'
 
+/** An explicit non-rate-limit 4xx from the mutation endpoint proves this
+ * invocation was refused. A later receipt/readback failure never gets this tag. */
+export class GitHubWriteRejection extends WorkspaceReviewError {}
+
 /** One request's fixed-origin, bounded GitHub reads. Pagination links are
  * inspected only for continuation; their URLs are never followed. */
 export class GitHubDiffClient {
@@ -80,6 +84,9 @@ export class GitHubDiffClient {
       if (response.status === 429 || response.status >= 500 || response.headers.has('retry-after')
         || (response.status === 403 && (response.headers.get('x-ratelimit-remaining') === '0' || /rate.limit|abuse.detection/i.test(message))))
         throw new WorkspaceReviewError('workspace_review_github_unavailable')
+      if (method === 'POST' && !graphql && response.status >= 400 && response.status < 500)
+        throw new GitHubWriteRejection([401, 403, 404].includes(response.status) ? 'workspace_review_github_forbidden'
+          : response.status === 409 ? 'workspace_snapshot_outdated' : 'workspace_review_github_unavailable')
       if ([401, 403, 404].includes(response.status)) throw new WorkspaceReviewError('workspace_review_github_forbidden')
       if (response.status === 409) throw new WorkspaceReviewError('workspace_snapshot_outdated')
       throw new WorkspaceReviewError('workspace_review_github_unavailable')

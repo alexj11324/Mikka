@@ -9,11 +9,11 @@ export type WorkspaceAuthorizedActor = WorkspaceActor & { credential:
   | { kind: 'pat'; id: string }
   | { kind: 'device'; id: string; deviceId: string } }
 export type WorkspaceAuthorityLease = { signal: AbortSignal; check: () => Promise<void> }
-export type WorkspaceAuthorityOptions = { live?: RunWorktreeIdentity; signal?: AbortSignal;
+export type WorkspaceAuthorityOptions = { live?: RunWorktreeIdentity; signal?: AbortSignal; runLock?: 'share' | 'update';
   /** Trusted host adapters preserve an existing domain's transaction and lock
    * order. Request JSON can never choose these callbacks. */
   beforeRunLock?: (client: PoolClient) => Promise<void>;
-  transaction?: { begin: (client: PoolClient) => Promise<void>; commit: (client: PoolClient) => Promise<void>;
+  transaction?: { begin: (client: PoolClient) => Promise<void>; commit: (client: PoolClient, workspace: PoolClient) => Promise<void>;
     rollback: (client: PoolClient) => Promise<void>; finish: (client: PoolClient) => void } }
 const denied = () => new CodingWorkspaceError('workspace_not_found')
 
@@ -83,7 +83,8 @@ export async function withWorkspaceAuthority<T>(database: Pool, membership: Pool
     await client.query("SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='5s'; SET LOCAL idle_in_transaction_session_timeout='20s'")
     await options.beforeRunLock?.(client)
     if (initial.issueId && !(await client.query('SELECT id FROM issues WHERE id=$1 FOR SHARE', [initial.issueId])).rowCount) throw denied()
-    const locked = await client.query<{ issueId: string | null }>('SELECT "issueId" FROM agent_runs WHERE id=$1 FOR SHARE', [runId])
+    const locked = await client.query<{ issueId: string | null }>(options.runLock === 'update'
+      ? 'SELECT "issueId" FROM agent_runs WHERE id=$1 FOR UPDATE' : 'SELECT "issueId" FROM agent_runs WHERE id=$1 FOR SHARE', [runId])
     if (!locked.rowCount || locked.rows[0]!.issueId !== initial.issueId) throw new CodingWorkspaceError('workspace_version_conflict')
     await lockCredential(client, actor, runId)
     if ((await client.query('SELECT 1 FROM workspace_deletions WHERE id=$1', [actor.workspaceId])).rowCount) throw denied()
@@ -100,7 +101,7 @@ export async function withWorkspaceAuthority<T>(database: Pool, membership: Pool
     if (options.live && (await resolveRunWorktree(client, workspace, actor, runId, options.live.repoId)).identity.bindingId !== options.live.bindingId)
       throw new CodingWorkspaceError('workspace_version_conflict')
     check(); await workspace.query('SELECT 1'); check()
-    if (options.transaction) await options.transaction.commit(client)
+    if (options.transaction) await options.transaction.commit(client, workspace)
     else await client.query('COMMIT')
     appBegan = false
   } catch (error) {

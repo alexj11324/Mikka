@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CHECKPOINT_REVIEW_MAX_PROOF_BYTES, WORKSPACE_DIFF_MAX_BLOB_BYTES, checkpointReviewEvidence,
   type CheckpointReviewEvidence } from '@mikka/protocol/coding-workspace-review'
 import { applyCheckpoint, assertCheckpointFresh, takeCheckpoint, type TakenCheckpoint } from '../src/agents/checkpoint'
-import { snapshotTree } from '../src/agents/publish'
+import * as publish from '../src/agents/publish'
 import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.name=Checkpoint Review Fixture',
@@ -174,20 +174,29 @@ describe('checkpoint review evidence from real Git objects', () => {
     writeFileSync(script, readFileSync(script, 'utf8').replace('process.stdout.write',
       `process.stderr.write(${JSON.stringify(sentinel)});\nprocess.stdout.write`))
     f.write('filtered.txt', `${sentinel}\n`)
-    // Git may invoke clean more than once inside one add. Compare with the
-    // real legacy snapshot, not an assumed number of internal Git passes.
-    const nativeTree = await snapshotTree(f.repoPath, f.worktree), nativePasses = readFileSync(counter, 'utf8')
-    expect(nativePasses).toMatch(/^(clean\n)+$/)
-    writeFileSync(counter, '')
+    // Native clean passes can vary with Git's index stat cache. Record the real
+    // snapshot inside this capture, then require the review to add no passes.
+    const realSnapshotTree = publish.snapshotTree
+    let nativeTree: string | undefined, nativePasses: string | undefined
+    const snapshotCall = vi.spyOn(publish, 'snapshotTree').mockImplementation(async (...args) => {
+      const tree = await realSnapshotTree(...args)
+      nativeTree = tree
+      nativePasses = readFileSync(counter, 'utf8')
+      return tree
+    })
     const calls: unknown[][] = []
     for (const method of ['log', 'info', 'warn', 'error'] as const) vi.spyOn(console, method).mockImplementation((...values) => { calls.push(values) })
     const snapshot = await capture(f), evidence = review(snapshot)
+    expect(snapshotCall).toHaveBeenCalledTimes(1)
+    expect(snapshotCall).toHaveBeenCalledWith(f.repoPath, f.worktree)
+    expect(nativePasses).toMatch(/^(clean\n)+$/)
     expect(evidence.reason).toBeNull()
     expect(snapshot.tree).toBe(nativeTree)
     expect(readFileSync(counter, 'utf8')).toBe(nativePasses)
     const proofs = verifiedProofs(f, evidence), file = evidence.files.find(file => file.path === 'filtered.txt')!
     expect(proofs.get(file.newBlob!)!.toString()).toBe(`${sentinel}\n`)
     expect(readFileSync(counter, 'utf8')).toBe(nativePasses)
+    expect(snapshotCall).toHaveBeenCalledTimes(1)
     expect(calls).toEqual([])
   })
 

@@ -11,12 +11,13 @@ test('keeps the application OAuth callback outside the sync Worker', async () =>
   assert.equal(response.status, 404)
 })
 
-test('global status distinguishes a confirmed PostHog pause from unavailable configuration without accessing Hyperdrive', async t => {
+test('global status reports a missing PostHog project and a confirmed PostHog pause as disabled without accessing Hyperdrive', async t => {
   t.mock.method(globalThis, 'fetch', async () => Response.json({ errorsWhileComputingFlags: false, flags: { 'mikka-linear-sync': { enabled: false } } }))
   const env: Env = { get HYPERDRIVE(): { connectionString: string } { throw new Error('Status must not initialize a database') } }
   const request = () => new Request('https://sync.example.test/mikka/api/integrations/linear/status')
-  const unavailable = await handleRequest(request(), env, ctx)
-  assert.deepEqual(await unavailable.json(), { enabled: false, state: 'unavailable' })
+  // No PostHog project: off by default (docs/self-hosting-byok.md), not an unreadable flag.
+  const unconfigured = await handleRequest(request(), env, ctx)
+  assert.deepEqual(await unconfigured.json(), { enabled: false, state: 'disabled' })
   env.NEXT_PUBLIC_POSTHOG_KEY = 'test-worker-status-paused'
   const paused = await handleRequest(request(), env, ctx)
   assert.deepEqual(await paused.json(), { enabled: false, state: 'disabled' })

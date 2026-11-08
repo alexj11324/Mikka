@@ -179,6 +179,7 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
         body: string; path: string; side: string; start_side: string | null; original_line: number;
         original_start_line: number | null; original_commit_id: string; in_reply_to_id: null }
       const state = { head: headSha, base: targetSha, throwAfterPost: false, visible: true, repositoryStatus: 200,
+        mutationStatus: 200, commentsStatus: 200,
         inlineLimit: undefined as number | undefined, inline: [] as Inline[], receipt: null as Record<string, unknown> | null,
         onRepository: undefined as (() => Promise<void>) | undefined, onPull: undefined as (() => Promise<void>) | undefined,
         beforePost: undefined as (() => Promise<void>) | undefined }
@@ -202,6 +203,8 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
         }
         if (method === 'POST' && url.pathname === `${apiPath}/pulls/${number}/reviews`) {
           await state.beforePost?.(); assert.ok(payload && Array.isArray(payload.comments))
+          if (state.mutationStatus !== 200)
+            return Response.json({ message: 'Fixture native review mutation is forbidden' }, { status: state.mutationStatus })
           state.receipt = { id: reviewId, body: payload.body, user: { id: credential.githubAccountId },
             html_url: `${publicPull}#pullrequestreview-${reviewId}`, pull_request_url: `https://api.github.com${apiPath}/pulls/${number}`,
             commit_id: payload.commit_id, state: payload.event === 'REQUEST_CHANGES' ? 'CHANGES_REQUESTED' : payload.event === 'APPROVE' ? 'APPROVED' : 'COMMENTED',
@@ -219,7 +222,8 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
         if (method === 'GET' && url.pathname === `${apiPath}/pulls/${number}/reviews`)
           return Response.json(state.visible && state.receipt ? [state.receipt] : [])
         if (method === 'GET' && url.pathname === `${apiPath}/pulls/${number}/comments`)
-          return Response.json(state.inline.slice(0, state.inlineLimit))
+          return Response.json(state.commentsStatus === 200 ? state.inline.slice(0, state.inlineLimit)
+            : { message: 'Fixture native review readback is forbidden' }, { status: state.commentsStatus })
         throw new Error(`Unexpected fixture GitHub operation ${method} ${url.pathname}`)
       })
       const input = async (change: Partial<Extract<GitHubReviewMutation, { action: 'publish' }>> = {}) => ({
@@ -321,6 +325,11 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
       assert.equal(rows.operations[0]!.receipt, null); assert.ok(rows.comments.every(value => value.draft))
       f.state.visible = false
       assert.equal((await f.deliver(input)).state, 'uncertain', 'absence is not proof that the original POST failed')
+      const semanticInput = { ...input, requestId: randomUUID(), batchId: randomUUID() }
+      const semantic = await f.deliver(semanticInput)
+      assert.equal(semantic.state, 'uncertain'); assert.equal(semantic.batchId, unknown.batchId)
+      assert.equal(f.posts().length, 1, 'new request IDs cannot turn an unknown effect into another POST')
+      rows = await f.rows(); assert.equal(rows.batches.length, 1); assert.equal(rows.operations.length, 1)
       f.state.visible = true; f.state.inlineLimit = 1
       assert.equal((await f.deliver(input)).state, 'uncertain', 'a matching marker without both inline comments is insufficient')
       assert.equal(f.posts().length, 1)
@@ -331,6 +340,82 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
       assert.equal(rows.batches[0]!.state, 'accepted'); assert.equal(rows.operations[0]!.status, 'succeeded')
       assert.equal(rows.operations[0]!.receipt.providerObjectId, reviewId); assert.ok(rows.comments.every(value => !value.draft))
       assert.equal(f.posts().length, 1)
+      const semanticRecovered = await f.deliver(semanticInput)
+      assert.equal(semanticRecovered.state, 'accepted'); assert.equal(semanticRecovered.batchId, recovered.batchId)
+      assert.equal(f.posts().length, 1)
+    })
+
+    await t.test('an explicit mutation 403 rejects that request and permits one new request after write permission recovers', async t => {
+      const f = await fixture(t), input = await f.input()
+      f.state.mutationStatus = 403
+      assert.equal(f.state.repositoryStatus, 200, 'the credential and repository grant preflight remains authorized')
+      await assert.rejects(() => f.deliver(input), code('workspace_review_github_forbidden'))
+      assert.equal(f.posts().length, 1); assert.equal(f.posts()[0]!.pathname, `${apiPath}/pulls/${number}/reviews`)
+      assert.equal(f.state.receipt, null); assert.equal(f.state.inline.length, 0, 'the refused mutation created no provider object')
+      let rows = await f.rows()
+      assert.equal(rows.batches.length, 1); assert.equal(rows.batches[0].state, 'rejected')
+      assert.equal(rows.batches[0].receipt.reason, 'authorization_changed')
+      assert.equal(rows.operations.length, 1); assert.equal(rows.operations[0].status, 'failed')
+      assert.ok(rows.operations[0].invokedAt); assert.equal(rows.operations[0].receipt, null)
+      assert.ok(rows.comments.every(value => value.draft))
+      const refusedAgain = await f.deliver(input)
+      assert.equal(refusedAgain.state, 'rejected'); assert.equal(refusedAgain.batchId, input.batchId)
+      f.state.mutationStatus = 200
+      const oldAfterRecovery = await f.deliver(input)
+      assert.equal(oldAfterRecovery.state, 'rejected'); assert.equal(oldAfterRecovery.batchId, input.batchId)
+      assert.equal(f.posts().length, 1, 'permission recovery does not replay an immutable refused request')
+
+      const retry = { ...input, requestId: randomUUID(), batchId: randomUUID(), expectedRevision: await f.boardRevision() }
+      const accepted = await f.deliver(retry)
+      assert.equal(accepted.state, 'accepted'); assert.equal(accepted.batchId, retry.batchId)
+      assert.equal(accepted.delivery?.id, reviewId); assert.notEqual(accepted.batchId, input.batchId)
+      for (const request of [retry, { ...retry, requestId: randomUUID(), batchId: randomUUID() }]) {
+        const repeated = await f.deliver(request)
+        assert.equal(repeated.state, 'accepted'); assert.equal(repeated.batchId, accepted.batchId)
+        assert.equal(repeated.delivery?.id, accepted.delivery?.id)
+      }
+      assert.equal(f.posts().length, 2, 'one refused POST and one successful explicit retry, without transport retries')
+      rows = await f.rows()
+      assert.equal(rows.batches.length, 2); assert.equal(rows.operations.length, 2)
+      assert.equal(rows.operations.find(row => row.operationId === input.batchId)?.status, 'failed')
+      assert.equal(rows.operations.find(row => row.operationId === accepted.batchId)?.status, 'succeeded')
+      assert.ok(rows.comments.every(value => !value.draft))
+    })
+
+    await t.test('a readback 403 after an accepted POST remains uncertain and never authorizes another POST', async t => {
+      const f = await fixture(t), input = await f.input()
+      f.state.commentsStatus = 403
+      assert.equal(f.state.repositoryStatus, 200); assert.equal(f.state.mutationStatus, 200)
+      const unknown = await f.deliver(input)
+      assert.equal(unknown.state, 'uncertain'); assert.equal(unknown.delivery, null)
+      assert.equal(f.posts().length, 1); assert.equal(f.state.receipt?.id, reviewId); assert.equal(f.state.inline.length, 2)
+      const posted = f.calls.findIndex(call => call.method === 'POST')
+      const readback = f.calls.findIndex(call => call.method === 'GET' && call.pathname === `${apiPath}/pulls/${number}/comments`)
+      assert.ok(posted >= 0 && readback > posted, 'the 403 occurs on GET comments after the mutation was accepted')
+      let rows = await f.rows()
+      assert.equal(rows.batches[0].state, 'uncertain'); assert.equal(rows.operations[0].status, 'uncertain')
+      assert.ok(rows.operations[0].invokedAt); assert.equal(rows.operations[0].receipt, null)
+      assert.ok(rows.comments.every(value => value.draft))
+      const semantic = { ...input, requestId: randomUUID(), batchId: randomUUID() }
+      for (const request of [input, semantic]) {
+        const repeated = await f.deliver(request)
+        assert.equal(repeated.state, 'uncertain'); assert.equal(repeated.batchId, unknown.batchId)
+        assert.equal(repeated.delivery, null)
+      }
+      assert.equal(f.posts().length, 1)
+      rows = await f.rows(); assert.equal(rows.batches.length, 1); assert.equal(rows.operations.length, 1)
+      assert.equal(rows.batches[0].state, 'uncertain'); assert.equal(rows.operations[0].status, 'uncertain')
+
+      f.state.commentsStatus = 200
+      const recovered = await f.deliver(semantic)
+      assert.equal(recovered.state, 'accepted'); assert.equal(recovered.batchId, unknown.batchId)
+      assert.equal(recovered.delivery?.id, reviewId)
+      rows = await f.rows()
+      assert.equal(rows.batches.length, 1); assert.equal(rows.batches[0].state, 'accepted')
+      assert.equal(rows.operations.length, 1); assert.equal(rows.operations[0].status, 'succeeded')
+      assert.equal(rows.operations[0].receipt.providerObjectId, reviewId); assert.ok(rows.comments.every(value => !value.draft))
+      assert.equal((await f.deliver(input)).batchId, recovered.batchId)
+      assert.equal(f.posts().length, 1, 'restored reads reconcile the original effect without retrying the mutation')
     })
 
     await t.test('foreign tenants, non-members, owner private drafts and non-session credentials cannot publish', async t => {
@@ -405,6 +490,118 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
       const rows = await f.rows()
       assert.equal(rows.batches[0]!.state, 'rejected'); assert.equal(rows.operations[0]!.status, 'failed')
       assert.equal(rows.operations[0]!.receipt, null); assert.ok(rows.comments.every(value => value.draft))
+    })
+
+    await t.test('a proven before-send rejection permits a new explicit request after restoration while the old request stays rejected', async t => {
+      const f = await fixture(t), input = await f.input()
+      f.state.head = 'd'.repeat(40)
+      await assert.rejects(() => f.deliver(input), code('workspace_snapshot_outdated'))
+      let rows = await f.rows()
+      assert.equal(f.posts().length, 0); assert.equal(rows.batches.length, 1); assert.equal(rows.operations.length, 1)
+      assert.equal(rows.batches[0].state, 'rejected'); assert.equal(rows.operations[0].status, 'failed')
+      assert.equal(rows.operations[0].receipt, null)
+      const rejected = await f.deliver(input)
+      assert.equal(rejected.state, 'rejected'); assert.equal(rejected.batchId, input.batchId); assert.equal(rejected.delivery, null)
+      f.state.head = headSha
+      const restoredOldRequest = await f.deliver(input)
+      assert.equal(restoredOldRequest.state, 'rejected'); assert.equal(restoredOldRequest.batchId, rejected.batchId)
+      assert.equal(f.posts().length, 0, 'a refused request ID is immutable even when its target recovers')
+
+      const retry = { ...input, requestId: randomUUID(), batchId: randomUUID(), expectedRevision: await f.boardRevision() }
+      const accepted = await f.deliver(retry)
+      assert.equal(accepted.state, 'accepted'); assert.equal(accepted.batchId, retry.batchId)
+      assert.notEqual(accepted.batchId, rejected.batchId); assert.equal(accepted.delivery?.id, reviewId)
+      const repeated = await f.deliver(retry)
+      const semantic = await f.deliver({ ...retry, requestId: randomUUID(), batchId: randomUUID() })
+      for (const receipt of [repeated, semantic]) {
+        assert.equal(receipt.state, 'accepted'); assert.equal(receipt.batchId, accepted.batchId)
+        assert.equal(receipt.delivery?.id, accepted.delivery?.id)
+      }
+      const oldAfterAcceptance = await f.deliver(input)
+      assert.equal(oldAfterAcceptance.state, 'rejected'); assert.equal(oldAfterAcceptance.batchId, rejected.batchId)
+      rows = await f.rows()
+      assert.equal(f.posts().length, 1); assert.equal(rows.batches.length, 2); assert.equal(rows.operations.length, 2)
+      const old = rows.batches.find(row => row.id === rejected.batchId), current = rows.batches.find(row => row.id === accepted.batchId)
+      assert.ok(old && current)
+      assert.equal(old.state, 'rejected'); assert.equal(current.state, 'accepted')
+      assert.equal(old.fingerprint, current.fingerprint); assert.deepEqual(old.input, current.input)
+      const failed = rows.operations.find(row => row.operationId === rejected.batchId), succeeded = rows.operations.find(row => row.operationId === accepted.batchId)
+      assert.ok(failed && succeeded)
+      assert.equal(failed.status, 'failed'); assert.equal(failed.receipt, null)
+      assert.equal(succeeded.status, 'succeeded'); assert.equal(succeeded.receipt.providerObjectId, reviewId)
+      assert.ok(rows.comments.every(value => !value.draft))
+    })
+
+    await t.test('publication replacement before the effect lease wins and prevents a POST to the previous pull request', async t => {
+      const f = await fixture(t), input = await f.input(), replacement = `https://github.com/${fullName}/pull/8`
+      let changed = false
+      f.state.onRepository = async () => {
+        f.state.onRepository = undefined
+        const result = await pool.query('UPDATE run_publications SET "pullRequest"=$2 WHERE "runId"=$1',
+          [f.runId, { url: replacement }])
+        assert.equal(result.rowCount, 1); changed = true
+      }
+      await assert.rejects(() => f.deliver(input), code('workspace_snapshot_outdated'))
+      assert.equal(changed, true, 'the publication changes after the initial association read and before the effect lease')
+      assert.equal(f.posts().length, 0)
+      const rows = await f.rows()
+      assert.equal(rows.operations.length, 0); assert.ok(rows.batches.every(value => value.state === 'prepared'))
+      assert.ok(rows.comments.every(value => value.draft))
+      assert.equal((await pool.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [f.runId])).rows[0].pullRequest.url, replacement)
+    })
+
+    await t.test('the effect lease keeps the publication fixed while remote preflight and the native POST are in flight', async t => {
+      const f = await fixture(t), input = await f.input(), entered = deferred(), release = deferred()
+      const replacement = `https://github.com/${fullName}/pull/8`, writer = await pool.connect()
+      let update: Promise<PromiseSettledResult<unknown>[]> | undefined, updateFinished = false
+      let boundaryError: unknown, completed: PromiseSettledResult<ReviewBatchReceipt>[] = [], changed: PromiseSettledResult<unknown>[] = []
+      try {
+        await writer.query("SET statement_timeout='12s'")
+        const pid = Number((await writer.query('SELECT pg_backend_pid() AS pid')).rows[0].pid)
+        const isBlocked = async () => Boolean((await pool.query<{ blocked: boolean }>(
+          'SELECT cardinality(pg_blocking_pids($1))>0 AS blocked', [pid])).rows[0]?.blocked)
+        f.state.onPull = async () => { f.state.onPull = undefined; entered.resolve(); await release.promise }
+        f.state.beforePost = async () => {
+          assert.equal(updateFinished, false, 'the publication update must still wait at the actual POST')
+          assert.equal(await isBlocked(), true)
+        }
+        const delivery = Promise.allSettled([f.deliver(input)])
+        try {
+          await bounded(Promise.race([entered.promise, delivery.then(() => assert.fail('Delivery did not reach the remote preflight boundary'))]))
+          update = Promise.allSettled([writer.query('UPDATE run_publications SET "pullRequest"=$2 WHERE "runId"=$1',
+            [f.runId, { url: replacement }]).finally(() => { updateFinished = true })])
+          let blocked = false
+          const deadline = Date.now() + 3000
+          while (Date.now() < deadline && !updateFinished) {
+            if (await isBlocked()) { blocked = true; break }
+            await new Promise(resolve => setTimeout(resolve, 10))
+          }
+          assert.equal(blocked, true, 'the actual publication UPDATE must wait for the authority transaction')
+          assert.equal(updateFinished, false)
+          assert.equal((await pool.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [f.runId])).rows[0].pullRequest.url, publicPull)
+        } catch (error) { boundaryError = error }
+        finally { release.resolve() }
+        // Both operations must finish before the fixture restores the fetch mock.
+        completed = await bounded(delivery, 25_000)
+      } finally {
+        release.resolve()
+        try { if (update) changed = await bounded(update, 15_000) }
+        finally {
+          try { await writer.query('RESET statement_timeout') }
+          finally { writer.release() }
+        }
+      }
+      if (boundaryError) throw boundaryError
+      assert.ok(update, 'the concurrent replacement was attempted')
+      assert.equal(changed[0]?.status, 'fulfilled', changed[0]?.status === 'rejected' ? String(changed[0].reason) : undefined)
+      assert.equal(completed[0]?.status, 'fulfilled', completed[0]?.status === 'rejected' ? String(completed[0].reason) : undefined)
+      if (completed[0]?.status === 'fulfilled') {
+        assert.equal(completed[0].value.state, 'accepted'); assert.equal(completed[0].value.delivery?.id, reviewId)
+      }
+      assert.equal(f.posts().length, 1)
+      const rows = await f.rows()
+      assert.equal(rows.batches[0]!.state, 'accepted'); assert.equal(rows.operations[0]!.status, 'succeeded')
+      assert.equal((await pool.query('SELECT "pullRequest" FROM run_publications WHERE "runId"=$1', [f.runId])).rows[0].pullRequest.url, replacement)
     })
 
     await t.test('a newly encrypted secret policy between preparation and send invalidates the complete-source proof', async t => {

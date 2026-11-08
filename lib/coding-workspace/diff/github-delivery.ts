@@ -9,6 +9,7 @@ import { readDiffSnapshot } from './store'
 import type { DiffDependencies } from './service'
 import { diffDigest } from './patch'
 import { associatedGitHubPull } from './github'
+import { GitHubWriteRejection } from './github-api'
 import { nativeReviewUserGrant, publishNativeGitHubReview, reconcileNativeGitHubReview, type NativeReviewReceipt } from './github-write'
 import { assertBatchMaskPolicy, assertBatchSafe, batchReceipt, freezeReviewComments, insertReviewBatch, lockReviewBoard,
   maskedReviewText, priorReviewBatch, readReviewBatch, reviewMasks, settleReviewBatch } from './batch-store'
@@ -59,6 +60,13 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
   // below the 20s idle transaction limit, and abort its transport with the lease.
   const effectSignal = AbortSignal.any([AbortSignal.timeout(Math.max(1, Math.min(18_000, requestDeadline - Date.now()))), ...(signal ? [signal] : [])])
   return withReviewTransaction(deps.database, deps.membership, actor, runId, repoId, async (authority, fresh, lease) => {
+    // Publications are host evidence, not merely preflight metadata. Keep the
+    // exact producer's receipt fixed through the provider effect and outcome.
+    await authority.query(`SELECT "runId" FROM run_publications WHERE "runId"=ANY($1::uuid[])
+      AND "userId"=$2 AND "issueId"=$3 AND "remoteKey"=$4 FOR SHARE`,
+    [[runId, ...(snapshot.factory ? [snapshot.factory.producerRunId] : [])], fresh.identity.ownerId, fresh.taskId, fresh.identity.repositoryKey])
+    if (snapshot.factory) await authority.query('SELECT id FROM factory_candidates WHERE id=$1 AND "taskId"=$2 FOR SHARE',
+      [snapshot.factory.candidateId, snapshot.factory.taskId])
     if (!grant.verifyCredential) throw new WorkspaceReviewError('workspace_review_github_forbidden')
     await grant.verifyCredential(authority)
     const combined = AbortSignal.any([effectSignal, lease.signal])
@@ -76,6 +84,7 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
       proposalDigest: row.fingerprint, payloadDigest: row.fingerprint }
     const key = { operationId: row.id, ownerId: actor.userId, workspaceId: actor.workspaceId }
     let accepted: NativeReviewReceipt | undefined
+    let failureReason: ReviewBatchReceipt['reason']
     const authorize = async (client: PoolClient, binding: OperationIntent, executionRunId: string | null, phase: string) => {
       if (executionRunId !== null || !isDeepStrictEqual(binding, intent)) throw new WorkspaceReviewError('workspace_review_conflict')
       await client.query('SELECT mikka_account_assert_writable($1)', [actor.userId])
@@ -86,8 +95,8 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
         const masks = await reviewMasks(actor, fresh)
         assertBatchSafe(row.input, masks)
         // Revalidate the retained full-source proof policy for every anchor.
-        for (const item of native.write.kind === 'github_review' ? native.write.comments : [])
-          await freezeReviewComments(client, actor, fresh, snapshot, [item.id], masks)
+        await freezeReviewComments(client, actor, fresh, snapshot,
+          native.write.kind === 'github_review' ? native.write.comments.map(item => item.id) : [], masks)
         await assertBatchMaskPolicy(actor, fresh, masks)
       }
       if (phase === 'claim') {
@@ -101,7 +110,8 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
           throw new WorkspaceReviewError('workspace_review_delivery_uncertain')
         const { evidenceDigest: _evidence, ...delivery } = accepted
         await settleReviewBatch(client, fresh, row, 'accepted', delivery)
-      } else await settleReviewBatch(client, fresh, row, record.status === 'failed' ? 'rejected' : 'uncertain', null)
+      } else await settleReviewBatch(client, fresh, row, record.status === 'failed' ? 'rejected' : 'uncertain', null,
+        record.status === 'failed' ? failureReason ?? 'target_unavailable' : 'delivery_uncertain')
     }
     const ledger = createOperationLedger(deps.database, authorize, { signal: combined,
       guard: async () => ({ signal: lease.signal, check: lease.check, close: async () => {} }), project })
@@ -124,6 +134,7 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
           accepted = await publishNativeGitHubReview(grant, snapshot, native.write, row.id, row.fingerprint, async () => {
             await beforeSend()
             await grant.verifyCredential!(authority)
+            await assertAssociation({ database: authority as unknown as DiffDependencies['database'] }, fresh, snapshot)
             await lease.check()
             combined.throwIfAborted()
             sent = true
@@ -135,9 +146,12 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
         // gate remains executing. A later explicit call may only reconcile.
         // error-cause: a provider transport error may retain the bearer token or review body.
         if (combined.aborted) throw new WorkspaceReviewError('workspace_review_delivery_uncertain')
-        try { await ledger.settle(key, record.attemptToken!, { status: sent ? 'uncertain' : 'failed' }) }
+        const refused = !sent || error instanceof GitHubWriteRejection
+        failureReason = error instanceof WorkspaceReviewError && error.code === 'workspace_snapshot_outdated' ? 'source_changed'
+          : error instanceof WorkspaceReviewError && error.code === 'workspace_review_github_forbidden' ? 'authorization_changed' : 'target_unavailable'
+        try { await ledger.settle(key, record.attemptToken!, { status: refused ? 'failed' : 'uncertain' }) }
         catch (cause) { throw new WorkspaceReviewError('workspace_review_delivery_uncertain', { cause }) }
-        if (!sent && (error instanceof CodingWorkspaceError || error instanceof WorkspaceReviewError)) throw error
+        if (refused && (error instanceof CodingWorkspaceError || error instanceof WorkspaceReviewError)) throw error
       }
     } else if (record.status === 'executing' || record.status === 'uncertain') {
       await ledger.reconcile(key, async () => {
@@ -149,5 +163,8 @@ export async function deliverGitHubReview(deps: DiffDependencies, actor: ReviewA
     }
     await lease.check()
     return batchReceipt(authority, fresh, await readReviewBatch(authority, actor, fresh, row.id))
-  }, { signal: effectSignal })
+  }, { signal: effectSignal, beforeRunLock: async client => {
+    if (snapshot.factory) await client.query('SELECT id FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR SHARE',
+      [snapshot.factory.taskId, snapshot.identity.ownerId])
+  } })
 }

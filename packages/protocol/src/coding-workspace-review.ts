@@ -160,7 +160,7 @@ export const reviewBatchRequest = z.strictObject({
   commentIds: z.array(z.uuid()).max(50), note: z.string().trim().max(4000).optional(),
   failedCheckRefs: z.array(z.string().min(1).max(2000)).max(100),
   factory: z.strictObject({ taskId: z.uuid(), revision: z.number().int().positive(), attemptId: z.uuid(),
-    candidateId: z.uuid(), sourceEventId: z.uuid() }).optional(),
+    candidateId: z.uuid().nullable(), sourceEventId: z.uuid() }).optional(),
 }).refine(value => value.commentIds.length > 0 || Boolean(value.note) || value.failedCheckRefs.length > 0)
 export type ReviewBatchRequest = z.infer<typeof reviewBatchRequest>
 
@@ -174,7 +174,8 @@ export type GitHubReviewMutation = z.infer<typeof githubReviewMutation>
 export const reviewBatchReceipt = z.strictObject({
   batchId: z.uuid(), destination: z.enum(['agent', 'github']), state: z.enum(['prepared', 'delivering', 'accepted', 'rejected', 'uncertain']),
   sourceVersion: digest, revision: z.number().int().nonnegative(),
-  delivery: z.strictObject({ kind: z.enum(['run_message', 'factory_repair', 'github_review', 'github_reply']),
+  reason: z.enum(['source_changed', 'authorization_changed', 'target_unavailable', 'limit_exceeded', 'delivery_uncertain']).optional(),
+  delivery: z.strictObject({ kind: z.enum(['run_message', 'run_continuation', 'factory_repair', 'github_review', 'github_reply']),
     id: z.string().min(1).max(1024), url: z.url().max(2048).optional(), runId: z.uuid().optional(),
     headSha: sha.optional(), commitSha: sha.optional(), outdated: z.boolean().optional() }).nullable(),
 })

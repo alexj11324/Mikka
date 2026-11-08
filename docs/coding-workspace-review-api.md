@@ -25,6 +25,8 @@ daemon 只传有界 manifest 和完整私有 blob proof；服务器检查 Git ob
 | `POST /{snapshotId}/review` | JSON `{repoId,workspaceId?,mutation}`，最多 32 KiB | `ok,requestId,revision,action` 与操作回执 |
 | `GET /{snapshotId}/github-review` | `cursor?,threadId?` | `ok,review`，GitHub 原生 thread/comment 的独立分页 |
 | `POST /{snapshotId}/github-review` | JSON `{repoId,workspaceId?,mutation}`，仅 browser session | `ok,batch`，持久批次与真实发布回执 |
+| `GET /{snapshotId}/review-batches` | `batchId?` 或 `cursor?`，二者不能并用 | `ok,batch` 或 `ok,batches,nextCursor`，仅当前人的批次 |
+| `POST /{snapshotId}/review-batches` | JSON `{repoId,workspaceId?,mutation}`，仅 Run owner 的 browser session | `ok,batch`，Agent 消息或后继执行的真实回执 |
 
 `auto` 先尝试 owner 当前 live 工作树，再尝试已保留 checkpoint，最后尝试绑定的 GitHub PR。显式 commit 在原工作树不可用时可通过 GitHub 的完整 Git tree/blob 读取；不依赖当前机器。没有相应证据时返回 `availability=unavailable` 及 reason，绝不将旧 gzip patch 当作安全源码，也不编造空 diff。
 
@@ -56,11 +58,29 @@ PR 原生文件最多 3,000 个、每页 100；读取全部页，验证 `changed
 
 发布 mutation 明确区分 `action=publish` 与 `action=reply`。publish 指定 `event=COMMENT/REQUEST_CHANGES/APPROVE`、本地 `commentIds` 和 note；reply 指定 GitHub 顶层 comment ID 和正文。两者都传 `requestId,expectedRevision,batchId,sourceVersion`。只有当前人的 session 与自己的 GitHub user token 可写；installation token、PAT 或其他用户的连接不能代替。共享 Task 成员可以用自己的 GitHub 权限提交自己可见的评论，但不能选择他人的私有 draft。
 
-准备批次时冻结完整选择集合、锚点、正文、来源与 GitHub account；锁 board、校验 revision、验证完整 source proof，并按 PostgreSQL 实际 JSONB 字节数执行 32 KiB 上限。不截断反馈。重复 requestId 必须保持相同输入；不同 requestId/batchId 的相同语义也返回原批次。当前 source、PR head/base、连接 token、session 与 workspace 权限在实际发送前再次验证。
+准备批次时冻结完整选择集合、锚点、正文、来源与 GitHub account；锁 board、校验 revision、验证完整 source proof，并按 PostgreSQL 实际 JSONB 字节数执行 32 KiB 上限。不截断反馈。重复 requestId 必须保持相同输入；不同 requestId/batchId 的相同语义也返回原批次。唯一例外是已证明未产生效果的 rejected 批次：旧 requestId 永远返回原拒绝；修复原因后，必须用新的 requestId/batchId 与当前 board revision 明确重试。prepared、delivering、uncertain 和 accepted 不能借新 ID 绕过去重。当前 source、PR head/base、连接 token、session 与 workspace 权限在实际发送前再次验证；对应 host publication/candidate 在效果事务中保持锁定，不能将同一快照改投另一个 PR。
 
 一次 publish 只发送一个含全部行评论的 Review POST，使用 `commit_id,line,side,start_line,start_side`，不回退到旧 `position`。回复只支持顶层评论。复用既有 operation ledger：独立提交 invocation gate，外部调用与最终 ledger/批次回执投影保持权限租约；投影失败或 COMMIT 不确定不能被标成成功。此类人的直接操作没有伪造的 execution Run。
 
 网络结果不确定后，只做有界正向 readback；不会再次 POST。Review 必须同时匹配批次标记、完整正文、账号、commit、event，以及完整行评论集合的正文、path 和 original 行坐标，才可转 accepted。marker 一致但少评论、错行、错正文或分页未闭合仍不确认。并发提交者返回同一批次的当前状态；负 readback 不能取消另一个已 claim 请求的首次发送资格。accepted 回执包含实际 GitHub object ID、URL、commit 和来源 head；发送后的 head/base 改变单独记录 outdated。
+
+只有 mutation 请求明确返回非限流 HTTP 4xx，才证明此次写被 provider 拒绝。POST 后的 GET/GraphQL 失败不具有该含义；429、5xx、超时、响应丢失或无法证明完整内容时仍保留 uncertain。错误不包含 bearer token 或原始 provider 私有正文。
+
+## 一次完整 Agent 反馈
+
+Agent mutation 使用 `requestId,expectedRevision,batchId,snapshotId,sourceVersion,commentIds,failedCheckRefs,note?`。Factory 来源还必须带精确 `factory={taskId,revision,attemptId,candidateId,sourceEventId}`；执行中尚无候选时 candidateId 可为 null，但 attempt 必须属于所选原 Run。不能用当前 B attempt 的元组重新解释 A Run 的旧快照。
+
+服务端冻结所有选中评论的完整结构、LEFT/RIGHT 锚点、正文、note、来源 Run/repository/snapshot/base/head/tree/version，以及已验证的检查引用。最多 50 条评论，note 最多 4,000 字符；完整反馈文本最多 10,000 字符，整个冻结输入仍受实际 JSONB 32 KiB 限额。完整内容不能容纳就明确拒绝，不切掉尾部评论。检查引用仅接受当前来源的 `run-report:<uuid>`、`run-chunk:<uuid>`，以及本次精确 Factory task/attempt 的 `factory-attempt:<uuid>`；任意客户端字符串不成为检查证据。
+
+投递前重新验证真实 working tree、当前完整 checkpoint，或冻结 GitHub PR/commit 证据。文件清单、完整 blob 身份、base/head 与来源不一致时拒绝，并提示 refresh/rebase。旧源码可继续作为历史查看，但不能借历史回执将后继 Run 当成原 Run。反馈指令要求 Agent 修改前核对原始目标、文件和版本；这是反馈合同，不代表本接口已经提供终端控制权租约或文件写入 CAS。
+
+- 原 Run 仍执行：复用既有 Run message inbox，一批对应一个确定性 message ID，不创建另一个工作进程。
+- 原 Factory 执行已结束：校验当前 revision/attempt/candidate/source epoch，复用既有 finish/retry/repair 与 automatic dispatch，保留原目标、阶段和预算约束。
+- 普通 thread 的原 Run 已结束：要求它仍为该 thread/Task 的最新 Run，通过既有 Factory admission/queue 创建 continuation，冻结原执行使用的模型与账号选择，不重新选择最新模型。
+
+上述 message/queue、完整反馈附加、worker freeze 和 accepted 批次回执共用一个 APP 事务；事务提交失败不会留下已确认的孤立回执或可领取的半成品 Run。复用现有 profile、权限和 workspace membership 检查。原生 CLI session resume 从已接受批次读取完整反馈，不依赖 Markdown 分隔符截取。正文作为结构化数据加入原请求，不产生额外工具权限；发送前和领取续执行时重新检查当前秘密遮盖策略。
+
+回执 `delivery.kind` 为 `run_message`、`factory_repair` 或 `run_continuation`，带真实 message/attempt/Run ID。accepted 表示请求已原子入队，不表示 Agent 已修复问题或新执行已经成功。明确拒绝的 reason 为 `source_changed`、`authorization_changed`、`target_unavailable` 或 `limit_exceeded`；外部写的不确定结果使用 `delivery_uncertain`。读取回执只返回当前人的状态与对象关联，不返回冻结正文；GitHub 凭据失效不抹掉已有本地历史事实。列表每页 50 个，cursor 绑定 snapshot、sourceVersion 与 board revision。
 
 ## Checkpoint 证据与恢复 ACK
 
@@ -98,8 +118,10 @@ daemon receipt 到公开读取之间，同样比较 full-proof 校验时与返�
 
 Files capability 继续为 `x-mikka-coding-workspace: 1`；Diff 独立使用 `x-mikka-coding-workspace-diff: 1`。旧 Files daemon 在 SQL LIMIT 之前排除 Diff command，不能让不认识的 command 阻塞 Stop。
 
-本版还需完成并验证：普通 Run/Factory 的反馈投递；生产 E2B 与 native CLI 场景。checkpoint producer、GitHub whole-PR/commit 来源、原生 review/reply 与批次持久化已实现；真实 PG17/HTTP 回归以当前提交的 CI 结果为准。相关 schema/接口预留不能视为功能已经可用。
+checkpoint producer、GitHub whole-PR/commit 来源、原生 review/reply、普通 Run/Factory 反馈与批次持久化已实现；真实 PG17/HTTP 回归以当前提交的 CI 结果为准。生产 E2B 与 native CLI 的完整闭环仍须实际验收，不能将 provider mock 或 schema/接口存在视为已通过生产 E2E。
 
 验证入口：`pnpm test:coding-workspace-diff` 为纯 proof/anchor/撤权回归；daemon 的 `coding-workspace-diff.test.ts` 使用真实临时 Git 仓库；`pnpm test:coding-workspace-db` 在隔离 PostgreSQL 17 中覆盖 persistence、真实 session/PAT/member ACL、评论与真实 TCP API→daemon→receipt 链路。没有数据库时的 SKIP 只证明入口可加载，不算数据库通过。
 
 `github-delivery.db.test.ts` 保留真实批次、ledger、加密 GitHub 连接与权限事务，只替换上游 GitHub 网络；覆盖一次性发布、并发去重、未知结果恢复、撤权、私有草稿、超限和提交故障。`test:approved-writes-db` 的 ledger 子例覆盖无 execution Run 的 session 效果与原子投影。模拟 provider 的数据库测试不等于真实 GitHub 发布验收。
+
+`agent-delivery.db.test.ts` 使用真实 Git proof、批次、session/member 权限与 message inbox，覆盖完整多评论、去重、漂移、秘密变化、撤权、SQL/COMMIT 故障和修复后的显式重试。`test:factory-checks-db` 的 profile dispatch 套件覆盖实际 Factory repair 与普通 continuation 的模型、prompt digest、后继关系、过期元组和事务回滚。无数据库时的加载结果仍仅为 SKIP。

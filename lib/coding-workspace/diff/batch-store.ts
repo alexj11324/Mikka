@@ -16,9 +16,11 @@ const digest = z.string().regex(/^[a-f0-9]{64}$/)
 export const frozenReviewBatch = z.strictObject({
   version: z.literal(1), sourceVersion: digest, runId: z.uuid(), repoId: z.uuid(), commentIds: z.array(z.uuid()).max(50),
   native: z.strictObject({ githubAccountId: z.string().regex(/^[1-9]\d{0,39}$/), write: nativeReviewWrite }).optional(),
-  agent: z.strictObject({ text: z.string().min(1).max(10_000), factory: z.strictObject({ taskId: z.uuid(),
-    revision: z.number().int().nonnegative(), attemptId: z.uuid(), candidateId: z.uuid(), sourceEventId: z.string().min(1).max(500),
-    producerRunId: z.uuid(), sha: z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/) }).optional() }).optional(),
+  agent: z.strictObject({ text: z.string().min(1).max(10_000),
+    comments: z.array(z.strictObject({ id: z.uuid(), anchor: reviewAnchor, body: z.string().max(4000) })).max(50),
+    note: z.string().max(4000), failedCheckRefs: z.array(z.string().max(2000)).max(100), factory: z.strictObject({ taskId: z.uuid(),
+    revision: z.number().int().positive(), attemptId: z.uuid(), candidateId: z.uuid().nullable(), sourceEventId: z.uuid(),
+    producerRunId: z.uuid(), sha: z.string().regex(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/).nullable() }).optional() }).optional(),
 }).refine(value => Boolean(value.native) !== Boolean(value.agent))
 export type FrozenReviewBatch = z.infer<typeof frozenReviewBatch>
 export type ReviewBatchRow = { id: string; boardId: string; snapshotId: string; userId: string; fingerprint: string;
@@ -66,10 +68,12 @@ export async function freezeReviewComments(client: PoolClient, actor: ReviewActo
       ORDER BY c.id FOR SHARE OF c,root`, [ids, scope.boardId, actor.userId])
   if (rows.length !== ids.length) throw new WorkspaceReviewError('workspace_review_unavailable')
   const comments: FrozenReviewComment[] = []
+  const files = new Map<string, Awaited<ReturnType<typeof readStoredDiffFile>>>()
   for (const row of rows) {
     const anchor = reviewAnchor.parse(row.anchor)
     if (row.snapshotId !== snapshot.id || anchor.snapshotId !== snapshot.id || anchor.sourceVersion !== snapshot.revision.version) throw new WorkspaceReviewError('workspace_snapshot_outdated')
-    const stored = await readStoredDiffFile(client, scope, snapshot, anchor.path, masks[0]!)
+    let stored = files.get(anchor.path)
+    if (!stored) { stored = await readStoredDiffFile(client, scope, snapshot, anchor.path, masks[0]!); files.set(anchor.path, stored) }
     if (!stored.patch) throw new WorkspaceReviewError('workspace_review_anchor_invalid')
     validateReviewAnchor(anchor, stored.patch)
     if (snapshot.pullRequest && (!stored.file.github || stored.file.github.patchSha256 === null)) throw new WorkspaceReviewError('workspace_review_anchor_invalid')
@@ -102,7 +106,7 @@ export async function insertReviewBatch(client: PoolClient, actor: ReviewActor, 
   const { rows: [size] } = await client.query<{ bytes: number }>('SELECT octet_length($1::jsonb::text) AS bytes', [JSON.stringify(frozen)])
   if (!size || size.bytes > 32_768) throw new CodingWorkspaceError('workspace_limit_exceeded')
   const { rows: [duplicate] } = await client.query<ReviewBatchRow>(`SELECT * FROM coding_workspace_review_batches
-    WHERE "boardId"=$1 AND "userId"=$2 AND destination=$3 AND fingerprint=$4`, [scope.boardId, actor.userId, input.destination, fingerprint])
+    WHERE "boardId"=$1 AND "userId"=$2 AND destination=$3 AND fingerprint=$4 AND state<>'rejected'`, [scope.boardId, actor.userId, input.destination, fingerprint])
   let row: ReviewBatchRow
   if (duplicate) row = await readReviewBatch(client, actor, scope, duplicate.id)
   else {
@@ -130,15 +134,17 @@ export async function batchReceipt(client: Pick<PoolClient, 'query'>, scope: Rev
   const { rows: [board] } = await client.query<{ revision: number }>('SELECT revision FROM coding_workspace_review_boards WHERE id=$1', [scope.boardId])
   if (!board) throw new WorkspaceReviewError('workspace_review_unavailable')
   return reviewBatchReceipt.parse({ batchId: row.id, destination: row.destination, state: row.state,
-    sourceVersion: row.input.sourceVersion, revision: board.revision, delivery: row.receipt?.delivery ?? null })
+    sourceVersion: row.input.sourceVersion, revision: board.revision, delivery: row.receipt?.delivery ?? null,
+    ...(row.receipt?.reason ? { reason: row.receipt.reason } : {}) })
 }
 
 export async function settleReviewBatch(client: PoolClient, scope: ReviewScope, row: ReviewBatchRow,
-  state: 'accepted' | 'rejected' | 'uncertain', delivery: ReviewBatchReceipt['delivery']): Promise<ReviewBatchReceipt> {
+  state: 'accepted' | 'rejected' | 'uncertain', delivery: ReviewBatchReceipt['delivery'], reason?: ReviewBatchReceipt['reason']): Promise<ReviewBatchReceipt> {
   if ((state === 'accepted') !== (delivery !== null)) throw conflict()
   const { rows: [board] } = await client.query<{ revision: number }>('UPDATE coding_workspace_review_boards SET revision=revision+1,"updatedAt"=clock_timestamp() WHERE id=$1 RETURNING revision', [scope.boardId])
   if (!board) throw new WorkspaceReviewError('workspace_review_unavailable')
-  const receipt = reviewBatchReceipt.parse({ batchId: row.id, destination: row.destination, state, sourceVersion: row.input.sourceVersion, revision: board.revision, delivery })
+  const receipt = reviewBatchReceipt.parse({ batchId: row.id, destination: row.destination, state, sourceVersion: row.input.sourceVersion,
+    revision: board.revision, delivery, ...(reason ? { reason } : {}) })
   if (!(await client.query(`UPDATE coding_workspace_review_batches SET state=$2,receipt=$3,"updatedAt"=clock_timestamp()
     WHERE id=$1 AND state IN ('prepared','delivering','uncertain')`, [row.id, state, receipt])).rowCount) throw conflict()
   if (state === 'accepted' && row.input.commentIds.length) await client.query(`UPDATE coding_workspace_review_comments SET draft=false,"updatedAt"=clock_timestamp()

@@ -19,6 +19,8 @@ import { shortWhen } from '@/lib/clock'
 import { colors, LIST_INSET, SPACE } from '@/lib/theme'
 import { AttemptIcon, BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
 import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
+import { ReviewSummaryRow } from '@/features/review/components/review-summary-row'
+import { reviewHref } from '@/features/review/model/routes'
 
 
 /** Where an attempt opens: the task's one conversation, scrolled to that attempt (2026-11-07). */
@@ -61,6 +63,8 @@ export function TaskScreen() {
           <>
             {task.identifier ? <Text style={styles.key} selectable>{task.identifier}</Text> : null}
             <Text accessibilityRole="header" style={styles.title} selectable>{task.title}</Text>
+            {/* A code task's first row is its review summary; one tap opens the review (R2a, decisions/2026-11-08-1230). */}
+            {task.review ? <View style={styles.review}><ReviewSummaryRow short summary={task.review} onPress={() => router.push(reviewHref(task.id))} /></View> : null}
             <View style={styles.properties}>
               <Chip icon={<TaskStateIcon state={shown?.state ?? null} status={task.status} size={15} />}
                 label={shown?.reason ?? (shown?.state === 'waiting' ? '等待你' : shown?.state ? STATE_LABEL[shown.state] : BOARD_LABEL[task.status] ?? task.status)} />
@@ -141,6 +145,7 @@ const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%', minHeight: 30, paddingHorizontal: 10, borderRadius: 8, borderCurve: 'continuous', backgroundColor: colors.chip },
   chipText: { flexShrink: 1, fontSize: 14, color: colors.text },
   description: { marginTop: SPACE.block },
+  review: { marginTop: -SPACE.block / 2, marginBottom: SPACE.block / 2 },
   section: { marginTop: SPACE.block + 8, marginBottom: 4, fontSize: 14, fontWeight: '600', color: colors.secondary },
   activity: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 58, marginHorizontal: -8, paddingHorizontal: 8, paddingVertical: SPACE.item / 2, borderRadius: 10, borderCurve: 'continuous' },
   /** Spans the item's full height, its padding included, so the line meets the next item's. */
