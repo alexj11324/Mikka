@@ -407,7 +407,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     return authorizedCacheWorkspace({ id: active.user.id, [enterprisePrincipal]: { kind: 'session', sessionId: active.session.id } }, workspaceId)
   }
   async function phoneFixture(context: TestContext, workspaceId: string) {
-    type Push = { to: string; title: string; body: string; data: { userId: string; botId: string } }
+    type Push = { to: string; title: string; body: string; data: { userId: string; botId: string; workspaceId?: string; issueId?: string; runId?: string } }
     const botId = randomUUID(), tokens: string[] = [], receipts: string[] = [], sent: Push[][] = [], failures: unknown[] = []
     await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,\'Enterprise phone fixture\')', [botId, userId, workspaceId])
     // Only external delivery and Workflow execution are intercepted. Native
@@ -470,12 +470,17 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
         assert.equal((await pool.query('select "sessionId" from mobile_push_tokens where token=$1 and "userId"=$2', [token, userId])).rows[0]?.sessionId, sessionId)
         return token
       },
-      push: async () => {
+      push: async (task: { issueId: string; runId: string | null } | null = null) => {
         const offset = sent.length, oldEdition = process.env.MIKKA_EDITION
         process.env.MIKKA_EDITION = 'cloud'
         try {
           const { pushReply } = await import('../mobile-push')
-          await pushReply(userId, botId, 'Isolated enterprise reply', ['finished'])
+          await pushReply(userId, botId, 'Isolated enterprise reply', task ? ['review'] : ['finished'], task)
+          if (task) for (const item of sent.slice(offset).flat()) {
+            assert.equal(item.data.workspaceId, workspaceId)
+            assert.equal(item.data.issueId, task.issueId)
+            assert.equal(item.data.runId, task.runId ?? undefined)
+          }
           assert.equal(failures.length, 0)
           assert.equal((await pool.query('select count(*)::int as count from mobile_push_receipts where id=any($1::uuid[])', [receipts])).rows[0].count, receipts.length)
           return sent.slice(offset).flatMap(batch => batch.map(item => item.to))
@@ -1602,6 +1607,18 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal(await enterpriseWorkspaceAllowed(userId, personal, { kind: 'session', sessionId: 'wrong' }), true)
     const tokenA = randomUUID(), tokenOther = randomUUID()
     for (const [id, workspaceId] of [[tokenA, wsA], [tokenOther, other]]) await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,\'Fixture\',$4,\'test\')', [id, userId, workspaceId, identityTokenHash(randomUUID())])
+    const issueId = randomUUID()
+    await pool.query('insert into issues(id,"userId","workspaceId",title,content,status,priority) values($1,$2,$3,\'Enterprise phone target fixture\',$4,\'todo\',\'normal\')',
+      [issueId, userId, wsA, { type: 'doc' }])
+    t.after(async () => { await pool.query('delete from issues where id=$1', [issueId]) })
+    const { actAs } = await import('../acting-user')
+    const { tokenWorkspace } = await import('../tokens/principal')
+    // This existing other-Workspace PAT cannot replace the registered phone's
+    // real OIDC session when the target reader rechecks the enforced Org.
+    const targetPush = () => actAs({ id: userId, [tokenWorkspace]: other,
+      [enterprisePrincipal]: { kind: 'pat', tokenId: tokenOther, workspaceId: other } },
+    () => phone.push({ issueId, runId: null }))
+    assert.deepEqual(await targetPush(), [destination], 'task target authorization keeps the actual OIDC receiver despite a foreign ambient PAT')
     assert.equal(await enterpriseWorkspaceAllowed(userId, wsA, { kind: 'pat', tokenId: tokenA, workspaceId: wsA }), false)
     await pool.query('update enterprise_org_policy set "allowMachineCredentials"=true where "organizationId"=$1', [organizationId])
     assert.equal(await enterpriseWorkspaceAllowed(userId, wsA, { kind: 'pat', tokenId: tokenA, workspaceId: wsA }), true)
@@ -1611,6 +1628,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const disabled = await requestScim(`Users/${directoryId}`, 'PATCH', { schemas: [SCIM_PATCH], Operations: [{ op: 'replace', path: 'active', value: false }] }, connectionId, bearer, { 'if-match': current.headers.get('etag')! })
     assert.equal(disabled.status, 200, await disabled.clone().text())
     assert.deepEqual(await phone.push(), [], 'committed SCIM suspension prevents delivery to a previously admitted native session')
+    assert.deepEqual(await targetPush(), [], 'SCIM suspension also blocks a task target for the same registered OIDC receiver')
     await assertLogoutTarget(await logoutTargetFor(cacheToken), null)
     for (const id of [wsA, wsB]) {
       assert.equal(await enterpriseWorkspaceAllowed(userId, id, principal), false)

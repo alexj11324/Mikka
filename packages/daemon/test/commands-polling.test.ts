@@ -326,7 +326,7 @@ it.each(['task-owner', 'shared-subscription-owner'])('starts an owned desktop ta
   // The server authorizes the desktop for the task owner and a separately
   // shared subscription for billing. The payer does not own the desktop.
   await expect(claim(assignment.runId)).resolves.toEqual({})
-  expect(claimRun).toHaveBeenCalledExactlyOnceWith(assignment.deviceId, assignment.runId, expect.any(AbortSignal))
+  expect(claimRun).toHaveBeenCalledExactlyOnceWith(assignment.deviceId, assignment.runId, expect.any(AbortSignal), undefined)
   expect(start).toHaveBeenCalledExactlyOnceWith(assignment)
 })
 

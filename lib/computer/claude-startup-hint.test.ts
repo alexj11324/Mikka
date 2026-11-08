@@ -1,10 +1,11 @@
+import { anonymousCodexStartupHint } from './codex-startup-hint'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash, randomUUID } from 'node:crypto'
 import { anonymousClaudeStartupHint, firstAnonymousClaudeTask } from './claude-startup-hint'
 import { cloudStartupDiagnosticCandidate, cloudStartupDiagnosticEnv } from './startup-diagnostics'
 
-test('only a newly created, never-started first repository task can emit an anonymous hint', () => {
+for (const [harness, createHint, otherHarness] of [['claude_code', anonymousClaudeStartupHint, 'codex'], ['codex', anonymousCodexStartupHint, 'claude_code']] as const) test(harness + ' emits anonymous hints only for a newly created, never-started first repository task', () => {
   const machine = { created: true, refresh: false, retained: false, question: false }
   const run = { status: 'queued', attempt: 1 }
   assert.equal(firstAnonymousClaudeTask(machine, run), true)
@@ -15,21 +16,21 @@ test('only a newly created, never-started first repository task can emit an anon
     { questionContinuation: {} }, { stopRequestedAt: new Date() }])
     assert.equal(firstAnonymousClaudeTask(machine, { ...run, ...changed }), false)
   const bootstrap = JSON.stringify({ deviceId: randomUUID(), credential: 'fixture-bootstrap-credential' })
-  const definition = { harness: 'claude_code', modelSource: 'subscription', cliModelSelection: 'explicit',
-    subscription: { bindingId: randomUUID() }, model: 'claude-any-explicit-model', modelDispatch: { routing: { effort: 'high' } } }
+  const definition = { harness, modelSource: 'subscription', cliModelSelection: 'explicit',
+    subscription: { bindingId: randomUUID() }, model: harness + '-any-explicit-model', modelDispatch: { routing: { effort: 'high' } } }
   const input = { runId: randomUUID(), bootstrap, kind: 'implement', repository: 'v2/github.com/owner/project',
     userId: 'owner', botId: randomUUID(), freshTask: true,
     definition: definition as Parameters<typeof anonymousClaudeStartupHint>[0]['definition'] }
-  const raw = anonymousClaudeStartupHint(input)
+  const raw = createHint(input)
   const hint = JSON.parse(raw)
   assert.equal(hint.runId, input.runId)
   assert.equal(hint.bootstrapSha256, createHash('sha256').update(bootstrap).digest('hex'))
   assert.equal(hint.model, definition.model); assert.equal(hint.effort, 'high')
   assert.equal(hint.diagnostics, false); assert.equal(hint.decisionCatalogue.tool.name, 'record_decision')
   assert.ok(!raw.includes('fixture-bootstrap-credential'))
-  assert.equal(anonymousClaudeStartupHint({ ...input, freshTask: false }), '')
-  for (const changed of [{ harness: 'codex' }, { modelSource: 'provider' }, { customMcp: {} }, { cliModelSelection: 'default' }])
-    assert.equal(anonymousClaudeStartupHint({ ...input, definition: { ...definition, ...changed } as typeof input.definition }), '')
+  assert.equal(createHint({ ...input, freshTask: false }), '')
+  for (const changed of [{ harness: otherHarness }, { modelSource: 'provider' }, { customMcp: {} }, { cliModelSelection: 'default' }])
+    assert.equal(createHint({ ...input, definition: { ...definition, ...changed } as typeof input.definition }), '')
 })
 
 test('the early diagnostic candidate and final response use the same exact expiring scope', () => {

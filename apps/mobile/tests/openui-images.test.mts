@@ -28,11 +28,13 @@ const { OpenUIReply } = await import('../components/OpenUI')
 const { findImage } = await import('../lib/images')
 
 const image = (title: string) => ({ src: `https://upload.wikimedia.org/${title}.jpg`, width: 500, height: 281, title: `${title}.jpg`, source: `https://commons.wikimedia.org/wiki/File:${title}.jpg`, author: 'Someone', license: 'CC BY-SA 4.0' })
-const reply = (text: string, webPath: string | null = '/') => renderToStaticMarkup(createElement(OpenUIReply, { text, live: true, answer: async () => true, webPath, sources: {}, onOpen: () => {} }))
+const reply = (text: string) => renderToStaticMarkup(createElement(OpenUIReply, { text, live: true, answer: async () => true, sources: {}, onOpen: () => {} }))
 
-test('a fallback card offers the web only after its chat scope is known', () => {
-  assert.doesNotMatch(reply('root = UnsupportedWidget("保留卡片内容")', null), /在网页上打开/)
-  assert.match(reply('root = UnsupportedWidget("保留卡片内容")', '/?section=coordinator&workspace=11111111-1111-4111-8111-111111111111'), /在网页上打开/)
+// Alex 2026-11-08: a card the app cannot draw keeps its full words and never links to the web.
+test('a card the app has no drawing for shows its words and no web link', () => {
+  const html = reply('root = UnsupportedWidget("保留卡片内容")')
+  assert.match(html, /保留卡片内容/)
+  assert.doesNotMatch(html, /在网页上打开/)
 })
 
 const BEIJING = `root = Stack([TextContent("北京值得一去的地方："), grid])

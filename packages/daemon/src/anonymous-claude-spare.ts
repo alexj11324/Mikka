@@ -100,8 +100,8 @@ export function startAnonymousClaude(input: {
     request(body, signal) { assertBound(); if (!bridge.bound) return Promise.reject(Error('Mailbox context unavailable')); if (!mailbox) return Promise.reject(Error('Mailbox unavailable')); return mailbox.request(body, signal) },
     close: async () => {},
   }
-  const env = { ...input.env, ...(hint.diagnostics ? { CLOUD_STARTUP_TIMING: '1' } : {}), ...(hint.github ? MACHINE_GITHUB_ENV : {}),
-    MIKKA_POLICY_HASH: policySnapshotHash(hint.policy), ...CLAUDE_RUN_ENV, CLAUDE_CODE_TMPDIR: tmpDir }
+  const env: Record<string, string> = { ...input.env, ...(hint.diagnostics ? { CLOUD_STARTUP_TIMING: '1' } : {}), ...(hint.github ? MACHINE_GITHUB_ENV : {}),
+    MIKKA_RUN_ID: hint.runId, MIKKA_POLICY_HASH: policySnapshotHash(hint.policy), ...CLAUDE_RUN_ENV, CLAUDE_CODE_TMPDIR: tmpDir }
   const immutable: Options & { getOAuthToken: CandidateBinding['getOAuthToken'] } = {
     includePartialMessages: daemonTracer.enabled, cwd: parking, env, settingSources: ['user', 'project', 'local'],
     settings: { ...claudeSettings(hint.policy), forceLoginMethod: 'claudeai' },
@@ -117,6 +117,11 @@ export function startAnonymousClaude(input: {
     spawnClaudeCodeProcess: (config: SpawnOptions) => {
       lifetime.signal.throwIfAborted()
       if (child) throw Error('Anonymous Claude process already started')
+      // The SDK adds its version to both this actual child environment and
+      // process.env on its first call. Keep the fixed options equal to what
+      // this process receives, including when bootstrap preceded that call.
+      if (typeof config.env.CLAUDE_AGENT_SDK_VERSION === 'string')
+        env.CLAUDE_AGENT_SDK_VERSION = config.env.CLAUDE_AGENT_SDK_VERSION
       child = spawn(input.binary, [...config.args, ...(timing?.args ?? [])], { cwd: config.cwd, env: { ...env, ...config.env, ...timing?.env }, detached: true, stdio: 'pipe' })
       childExit = new Promise<void>(resolve => { child!.once('close', resolve); child!.once('error', resolve) })
       child.stderr?.on('data', (part: Buffer) => { stderr = (stderr + part.toString()).slice(-16000) })

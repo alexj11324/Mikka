@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { pushInput, pushQuestions, readPush } from './push-reasons'
+import { pushInput, pushQuestions, pushTask, readPush } from './push-reasons'
 
 const answer = (choice: string) => new Map([['push', { type: 'choice' as const, name: 'push', choice }]])
 
@@ -22,4 +22,14 @@ test('the events and the reply are evidence; a withheld code is never quoted', (
   assert.match(input, /reply: Done: the PR is open\./)
   assert.doesNotMatch(pushInput([{ kind: 'matter_handoff', tier: 'attention' }], null), /\d{6}/)
   assert.match(pushInput([{ kind: 'matter_handoff', tier: 'attention' }], null), /text withheld/)
+})
+
+test('a decide or review push about one task opens that task at its attempt; anything else opens the chat', () => {
+  const event = (issueId: string | null, runId: string | null) => ({ kind: 'run_question' as never, tier: null, issueId, runId })
+  assert.deepEqual(pushTask([event('t1', 'r1')], 'decide'), { issueId: 't1', runId: 'r1' })
+  assert.deepEqual(pushTask([event('t1', 'r1'), event(null, null)], 'review'), { issueId: 't1', runId: 'r1' })
+  assert.deepEqual(pushTask([event('t1', 'r1'), event('t1', 'r2')], 'decide'), { issueId: 't1', runId: null })
+  assert.equal(pushTask([event('t1', 'r1'), event('t2', 'r2')], 'decide'), null)
+  assert.equal(pushTask([event('t1', 'r1')], 'finished'), null)
+  assert.equal(pushTask([{ kind: 'user_message' as never, tier: null }], 'decide'), null)
 })

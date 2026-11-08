@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { candidateReceipt, validateTemplateSubscriptions, validateSubscriptionFiles } from './validate-template-subscriptions.mjs'
-import { observeChunks } from '../acceptance/cloud-startup.mjs'
+import { observeChunks, bootstrapAdoptionEvidence } from '../acceptance/cloud-startup.mjs'
 import { createHash } from 'node:crypto'
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -18,10 +18,28 @@ const sharedScope = { verified: true, access: 'workspace_share', requesterHash: 
 const report = { sourceCommit: COMMIT, workerSha: WORKER, templates: Object.fromEntries(['claude', 'codex'].map(kind => [kind, {
   templateId: `candidate-${kind}`, baseTemplate: kind, preinstalled: true,
 }])) }
-const proof = { deviceId: DEVICE, binarySha256: 'c'.repeat(64), version: '0.163.0' }
+const candidateProjection = harness => ({ version: 1, authority: 'none', deviceId: DEVICE, workspaceId: TEAM, harness,
+  hint: { runId: RUN, bootstrapSha256: '1'.repeat(64), diagnostics: true, model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5' } })
+const bootstrapReceipt = harness => ({ version: 1, runId: RUN, harness, bootstrapSha256: '1'.repeat(64),
+  hintSha256: hash(JSON.stringify(candidateProjection(harness).hint)) })
+const proof = { deviceId: DEVICE, workspaceId: TEAM, binarySha256: 'c'.repeat(64), version: '0.163.0',
+  bootstrapSha256: '1'.repeat(64), registrationMode: 'cloud_worker_bootstrap' }
+const bootstrapTiming = harness => {
+  const base = { version: 1, runIdHash: hash(RUN).slice(0, 16), harness, truncated: false, outcome: 'ok' }
+  return {
+    bootstrapPublication: bootstrapReceipt(harness),
+    startupTimingStatus: 'complete', preparationTimingStatus: 'complete',
+    daemonStartupTiming: { ...base, startedAt: 1200, endedAt: 1600, ms: 400, phases: [] },
+    daemonPreparationTiming: { ...base, startedAt: 1000, endedAt: 1500, ms: 500,
+      source: harness === 'codex' ? 'bootstrap_codex_initialize' : 'bootstrap_claude_start',
+      ...(harness === 'claude_code' ? { claimAuthentication: 'oauth_environment', observedAuthSource: 'oauth_environment' } : {}),
+      phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 0, endMs: 300, ms: 300, outcome: 'ok' },
+        { name: 'daemon.adapter.cli_init', startMs: 490, endMs: 500, ms: 10, outcome: 'ok' }] },
+  }
+}
 const accepted = harness => ({ mode: 'candidate', status: 'candidate_subscription_proved', accountHash: hash(OWNER).slice(0, 16), team,
   cleanup: { errors: [], workspaceRestored: true }, officialTiming: { enabled: true, cleaned: true }, samples: [{
-  status: 'execution_proved_awaiting_server_timing', sourceCommit: COMMIT, harness, runId: RUN,
+  status: 'execution_proved_awaiting_server_timing', sourceCommit: COMMIT, harness, runId: RUN, ...bootstrapTiming(harness),
   execution: { harness, model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', deviceId: DEVICE, credentialType: 'subscription', sharedScope: { ...sharedScope } },
   credentialRoute: 'subscription', replyVerified: true, cleanup: { status: 'passed' },
   minToolCalls: 1, requireReplyAfterTool: true, replyVerifiedAfterTool: true, toolCalls: [{ toolCallHash: 'd'.repeat(16), outcome: 'ok' }],
@@ -64,12 +82,14 @@ test('a different application commit is refused before login, enrollment or cand
 })
 
 test('a release receipt names the actual candidate, revision, model and registered device', () => {
-  const receipt = candidateReceipt(report, 'codex', proof, accepted('codex'))
+  const receipt = candidateReceipt(report, 'codex', { ...proof, bootstrapReceipt: bootstrapReceipt('codex') }, accepted('codex'))
   assert.deepEqual(receipt, { status: 'passed', templateId: 'candidate-codex', sourceCommit: COMMIT, workerSha: WORKER,
     harness: 'codex', model: 'gpt-6-luna', credentialRoute: 'subscription', replyVerified: true, runId: RUN,
     replyVerifiedAfterTool: true, toolEvidence: { toolCallHash: 'd'.repeat(16), outcome: 'ok' },
     deviceId: DEVICE, officialBinarySha256: proof.binarySha256, officialCliVersion: proof.version,
     sharedScope,
+    bootstrapAcceptance: { ...bootstrapAdoptionEvidence({ ...accepted('codex').samples[0], runIdHash: hash(RUN).slice(0, 16) }),
+      bootstrapSha256: proof.bootstrapSha256, hintSha256: bootstrapReceipt('codex').hintSha256 },
     agentAcceptance: { runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16), harness: 'codex', kind: 'codex_turn_start_ack', at: 1100, ms: 100 },
     runtimeAuthorization: { source: 'http_server_link', scope: 'daemon_http_server_link_and_task_fetch', complete: true, truncated: false, extraRemoteCalls: 0,
       hostAuthorizationComplete: true, basis: 'host_authorization_census_and_closed_mcp_business_paths', allFirstPartyHttpComplete: false,
@@ -121,6 +141,13 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false, 
     }
     if (path.endsWith('/api/bots/' + RUN)) return Response.json({ id: RUN, name: '测试1505 candidate fixture' })
     if (path.endsWith('/api/devices/enrollment')) return Response.json({ token: 'fixture-one-use' })
+    if (path.endsWith('/api/runs/' + RUN + '/evidence')) {
+      assert.equal(url.searchParams.get('bootstrap'), '1')
+      assert.equal(url.searchParams.get('deviceId'), DEVICE)
+      assert.equal(url.searchParams.get('workspaceId'), TEAM)
+      assert.equal(url.searchParams.get('bootstrapSha256'), proof.bootstrapSha256)
+      return Response.json({ bootstrap: candidateProjection(devices.at(-1)) })
+    }
     const { action, args } = JSON.parse(init.body)
     if (action === 'workspace.switchWorkspace') {
       if (args[0] === PERSONAL) {
@@ -142,7 +169,12 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false, 
     const harness = template.endsWith('claude') ? 'claude_code' : 'codex'
     devices.push(harness); events.push(`created-${harness}`)
     return {
-      files: { read: async () => WORKER, write: async () => {} },
+      files: {
+        read: async path => path.endsWith('bootstrap-proof.json') ? JSON.stringify(bootstrapReceipt(harness)) : WORKER,
+        write: async (path, raw) => {
+          if (path.endsWith('start.json')) assert.deepEqual(JSON.parse(raw), candidateProjection(harness))
+        },
+      },
       commands: { run: async (_, options) => {
         if (options.background) {
           options.onStdout(`mikka-template-device ${JSON.stringify({ ...proof, harness,
@@ -157,11 +189,15 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false, 
   }
   return { events, options: { fetchImpl, sandboxFactory,
     env: { GITHUB_SHA: COMMIT, SMOKE_OWNER_EMAIL: EMAIL, SMOKE_OWNER_PASSWORD: 'fixture' },
-    runAcceptance: async options => {
+    runAcceptance: async (options, dependencies) => {
       assert.equal(options.minToolCalls, 1)
       assert.equal(options.workspace, TEAM); assert.equal(options.botId, RUN)
       assert.equal(options.runtimeEvidence, 'required')
       assert.equal(options.officialTiming, 'enabled')
+      const published = await dependencies.onCandidateRunQueued({ runId: RUN, issueId: RUN, deviceId: DEVICE,
+        agentId: RUN, workspaceId: TEAM, harness: options.harness,
+        model: options.harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5' })
+      assert.deepEqual(published, bootstrapReceipt(options.harness))
       events.push(`tested-${options.harness}`)
       return runAcceptance(options)
     },
@@ -518,6 +554,8 @@ test('the observed Codex adapter-start failure retains false agent_start and err
     finish.officialCliTiming.events = []
     Object.assign(finish.mcpHttpTiming, { observedChildren: 0, observedComplete: false, children: [], requests: [] })
     delete sample.runtimeTiming
+    delete sample.daemonStartupTiming
+    delete sample.daemonPreparationTiming
     Object.assign(sample, { runIdHash, status: 'failed', error: 'startup_ended_before_execution_proof',
       replyVerified: false, replyVerifiedAfterTool: false, toolCalls: [] })
     const stage = data => ({ chunk: { type: 'data-run-stage', data } })
@@ -591,5 +629,61 @@ test('registration diagnostics reject unbounded or non-original binary metadata 
     assert.ok(diagnostics.every(row => !Object.hasOwn(row, 'candidateProof')))
     if (proofOverride.version) assert.ok(diagnostics.every(row => !Object.hasOwn(row, 'passedReceipt')))
     assert.ok(!JSON.stringify(diagnostics).includes(secret))
+  }
+})
+
+test('bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish', () => {
+  for (const harness of ['claude_code', 'codex']) {
+    const kind = harness === 'codex' ? 'codex' : 'claude'
+    const validProof = { ...proof, bootstrapReceipt: bootstrapReceipt(harness) }
+    for (const mutate of [
+      sample => { delete sample.daemonPreparationTiming },
+      sample => { sample.preparationTimingStatus = 'invalid' },
+      sample => { sample.daemonPreparationTiming.source = 'prepared_agent_start' },
+      sample => { sample.daemonPreparationTiming.runIdHash = '0'.repeat(16) },
+      sample => { sample.daemonPreparationTiming.phases.push({ ...sample.daemonPreparationTiming.phases[0] }) },
+      sample => { sample.daemonPreparationTiming.phases[0].outcome = 'error' },
+      sample => { delete sample.bootstrapPublication },
+      sample => { sample.bootstrapPublication.runId = DEVICE },
+      ...(harness === 'claude_code' ? [
+        sample => { sample.daemonPreparationTiming.claimAuthentication = 'ordinary_path' },
+        sample => { sample.daemonPreparationTiming.observedAuthSource = 'oauth_descriptor' },
+      ] : []),
+    ]) {
+      const value = accepted(harness); mutate(value.samples[0])
+      assert.throws(() => candidateReceipt(report, kind, validProof, value), /template_gate_bootstrap_adoption_missing/)
+    }
+    assert.throws(() => candidateReceipt(report, kind, proof, accepted(harness)), /template_gate_bootstrap_adoption_missing/)
+  }
+})
+
+test('bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs', async () => {
+  for (const reason of ['wrong-device', 'duplicate', 'vm-proof']) {
+    const fixture = candidateFixture(async options => accepted(options.harness))
+    let publications = 0
+    const create = fixture.options.sandboxFactory
+    fixture.options.sandboxFactory = async (...args) => {
+      const sandbox = await create(...args), read = sandbox.files.read, write = sandbox.files.write
+      sandbox.files.write = async (path, ...rest) => { if (path.endsWith('start.json')) publications++; return write(path, ...rest) }
+      sandbox.files.read = async (path, ...rest) => {
+        if (reason === 'vm-proof' && path.endsWith('bootstrap-proof.json')) return JSON.stringify({ ...bootstrapReceipt('codex'), runId: DEVICE })
+        return read(path, ...rest)
+      }
+      return sandbox
+    }
+    if (reason === 'wrong-device') {
+      const original = fixture.options.fetchImpl
+      fixture.options.fetchImpl = async (input, init) => new URL(input).pathname.endsWith('/evidence')
+        ? Response.json({ bootstrap: { ...candidateProjection('codex'), deviceId: RUN } }) : original(input, init)
+    }
+    if (reason === 'duplicate') {
+      const original = fixture.options.runAcceptance
+      fixture.options.runAcceptance = async (options, dependencies) => { await original(options, dependencies); return original(options, dependencies) }
+    }
+    await assert.rejects(validateTemplateSubscriptions(report, fixture.options), /template_gate_subscription_or_cleanup_failed/)
+    assert.equal(publications, reason === 'wrong-device' ? 0 : 2)
+    assert.equal(fixture.events.filter(event => event === 'removed').length, 2)
+    assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
+    assert.deepEqual(fixture.events.slice(-2), ['restored-workspace', 'signed-out'])
   }
 })
