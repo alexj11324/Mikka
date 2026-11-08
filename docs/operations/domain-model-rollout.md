@@ -327,3 +327,25 @@ LOCAL_LOOP_ITEMS=11 pnpm test:local-loop
 | 外部服务相关验收是否适用及其独立证据 | 待填写 |
 
 发布完成需同时确认部署 READY、实际服务 SHA 与合并结果一致，以及迁移日志和只读完整性检查符合上述标准。未知归属有隔离和可追踪处置，不能用“测试通过”省略它们，也不能因要求清零而降低权限边界。
+
+## 7. 真实订阅与项目资源的生产验收入口
+
+现有 `Production smoke` 工作流增加了本 Epic 的显式手动模式，驱动为 `scripts/acceptance/work-domain-production.mjs`。只在真实 `main` 的 `workflow_dispatch` 中运行；`domain_model_sha` 必须同时等于该 workflow 的 SHA 和生产 `/mikka/api/version` 返回的完整 SHA。输入检查和实际部署版本检查先于凭据读取。已有 GitHub OIDC 身份只读取共享 smoke 账号的邮箱和密码，不把生产数据库、GitHub 或模型凭据交给外部执行环境。
+
+| `domain_model_mode` | 行为及条件 |
+| --- | --- |
+| `preflight` | 正常登录并验证唯一授权 Shared Workspace，读取角色、Project、Environment、Bot、GitHub 仓库许可及小模型订阅候选；不提交模型工作。可不传 scope，先取得可用身份和资源 ID。 |
+| `provision` | 明确选择 Workspace、Bot、Mikka 仓库、base branch 和两订阅后，以正常 API 新建并保留领域模型审阅 Project 和受限 cloud/any Environment，或使用显式给定且配置一致的已有 Environment；不修改既有 Project 的绑定。要求当前 Workspace admin；不调用模型。 |
+| `active` | 使用完整明确的 Project、Environment、仓库、Bot 与订阅 scope，创建两个保留的实际审阅 Task，分别以官方 Claude Haiku 5.5 与 Codex GPT-6 Luna 固定 Profile 通过正常 Coordinator 派发并读取运行证据。 |
+
+`domain_model_scope` 是严格 JSON 对象，字段为 `workspaceId`、`botId`、`repositoryKey`、可选 `baseBranch`、`projectId`、`environmentId` 和 `models`。`models.claude` / `models.codex` 分别含对应的 `connectionId` 和可选的已存在固定 `profileId`。所有 ID 都来自本次正常 API 预检；仓库键沿用 `v2/github.com/owner/repo`。active 必须有 Project / Environment ID，provision 必须有 base branch 且不能指定待覆盖的 Project ID。工作流回执中的 provision scope 可作为下一步 active 输入。
+
+普通 member 可以执行其有权使用的已配置资源，但不能配置 Workspace Environment 或 Project 资源绑定。首次上线缺少资源且 smoke 账号只是 member 时，记录 `provision_permission` 和精确缺少的绑定，由已有工作区管理员通过正常产品接口完成配置后再验收。不得提高 smoke 角色、借用 Alex 会话、改数据库记录或放宽 API 权限来让测试通过。
+
+每条订阅只提交一次初始工作，使用确定的 submission ID。Task 内保留本次配置指纹，重复操作会先拒绝；网络超时不能证明请求未执行，也不是重新生成 Task 或 submission ID 的理由。两条订阅独立记录失败，不用另一模型重试已绑定的任务。正常 Factory review / verify 仍可能产生额外 Run；其模型只能来自预检确认的固定小模型订阅集合，逐个记录实际 Run，不把两条 Task 宣称为只有两次模型调用。平台内建 Decision judge 沿现有规则独立记录，不算作 CLI 订阅路径证据。
+
+驱动不改变账号的 API-key fallback 设置。固定订阅 Profile 不允许执行源 fallback；Coordinator chat 的付费 fallback 则依据已有公开 key catalog 核实。只有能够证明所选小模型不存在可达的付费 API-key fallback 时才提交；未知配置或超出小模型范围的 enabled Profile 必须在提交前拒绝。
+
+报告保留实际 Task、Project 和环境；清理只停止可归属于本次提交的 Run、回收其机器、归档本次新建的专用 Profile，并恢复自己的会话 Workspace 后退出。未知派发结果或无法证明的运行归属必须保留恢复信息并报告清理未完成，不能把普通 stop ACK 当成资源已关闭。
+
+active 的成功状态仍是 `execution_observed_pending_snapshot_review`：负责人还须将报告中的实际 Task / Run / Project UUID 与第 3 节的授权只读 APP / WS 证据配对，核对真实 repository、base branch、Environment 配置快照和历史前后摘要。只读任务按现有 daemon 规则不执行 Environment setup，因此本入口不证明生产 setup 命令已执行；setup 的实际执行由隔离的 queue / claim / daemon 贯通回归证明。最后补齐 UI owner 的最终 PR / SHA 和本地 production build 证据，才满足 Epic 的完整关闭条件。
