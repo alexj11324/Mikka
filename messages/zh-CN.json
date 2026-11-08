@@ -105,6 +105,7 @@
       "privateHint": "初始仅自己可见，创建后可邀请成员协作"
     },
     "list": {
+      "clearFilters": "清除筛选",
       "label": "任务列表",
       "noResults": "没有找到匹配的任务",
       "emptyTitle": "这里还没有任务",

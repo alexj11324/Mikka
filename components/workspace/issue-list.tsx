@@ -17,7 +17,7 @@ import { blockLabel } from './block-label'
 const LIST_COLUMNS: ReadonlySet<CardProperty> = new Set(['identifier', 'priority', 'assignee'])
 
 /** The board's list view: one row per task, its columns the same 显示 properties as the cards. */
-export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, searching, onOpen, onCreate }: {
+export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, searching, onOpen, onCreate, onClearFilters }: {
   issues: Awaited<ReturnType<typeof listIssues>>
   /** 受阻 tasks group under 受阻, as on the board, each row naming why (lib/task-blocked.ts). */
   blocks?: ReadonlyMap<string, TaskBlock>
@@ -27,6 +27,8 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
   searching: boolean
   onOpen: (id: string) => void
   onCreate: () => void
+  /** Filters hide every task: the empty state offers to clear them. */
+  onClearFilters?: () => void
 }) {
   const t = useTranslations('Issue.list')
   const tCard = useTranslations('Shell.board.card')
@@ -42,6 +44,7 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
       <EmptyTitle>{searching ? t('noResults') : t('emptyTitle')}</EmptyTitle>
     </EmptyHeader>
     {!searching && <EmptyContent><Button size="sm" onClick={onCreate}><Plus data-icon="inline-start" />{t('newTask')}</Button></EmptyContent>}
+    {searching && onClearFilters && <EmptyContent><Button size="sm" variant="outline" onClick={onClearFilters}>{t('clearFilters')}</Button></EmptyContent>}
   </Empty>
 
   return <div aria-label={t('label')} className="flex flex-col">

@@ -287,9 +287,10 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} aria-keyshortcuts="Control+j Meta+j" onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip>
         </div>
       </div>
-      {view === 'board'
+      {/* A board with nothing to show is one empty state, not five blank columns (UI audit states-06): the list's. */}
+      {view === 'board' && shown.length > 0
         ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, subtasks, owners, blocks, personalWorkspace }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
-        : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} blocks={blocks} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
+        : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} blocks={blocks} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} onClearFilters={activeFilters.length > 0 ? () => setFilters({}) : undefined} /></div>}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}

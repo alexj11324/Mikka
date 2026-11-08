@@ -22,12 +22,16 @@ import type { ChatTarget } from './bot-list'
 import { LetterAvatar } from './letter-avatar'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 import { FieldError } from '@/components/ui/field'
+import { localTaskState, type TaskState } from '@/hooks/use-bot-tasks'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Project = Awaited<ReturnType<typeof listProjects>>[number]
 type TaskHit = Extract<SiteSearchItem, { type: 'task' }>
 type GroupHit = Extract<SiteSearchItem, { type: 'group' }>
 type HistoryHit = Extract<SiteSearchItem, { type: 'history' }>
+
+/** A task state's badge tone: waiting is the person's turn, blocked and failed need help, the rest are calm. */
+const TASK_STATE_TONE = { waiting: 'warning', blocked: 'destructive', failed: 'destructive', running: 'info', queued: 'neutral', todo: 'neutral', idle: 'neutral', done: 'success', canceled: 'neutral', duplicate: 'neutral' } as const satisfies Record<TaskState, StatusTone>
 
 const STATUS_BADGES = { neutral: 'outline', warning: 'warning-light', info: 'info-light', success: 'success-light', destructive: 'destructive-light', focus: 'focus-light' } as const satisfies Record<StatusTone, string>
 
@@ -172,7 +176,15 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
                 <span className="truncate font-medium">{row.identifier && <><span className="text-muted-foreground tabular-nums">{row.identifier}</span> </>}{row.title}</span>
                 {assignee && <span className="truncate text-xs text-muted-foreground">{assignee}</span>}
               </span>
-              <CommandShortcut className="tracking-normal"><Badge variant={STATUS_BADGES[statusTone(row.status)]} size="sm">{statusLabel(row.status)}</Badge></CommandShortcut>
+              <CommandShortcut className="tracking-normal">{(() => {
+                // The task's one state, as its card, panel row and board read it (localTaskState), not the bare board
+                // status: a done run whose PR waits says Needs review here too (UI audit work-04). A server hit without
+                // its metadata keeps the board status.
+                const task = 'metadata' in row ? localTaskState(row, threads.find(thread => thread.issueId === row.id)) : null
+                return task
+                  ? <Badge variant={STATUS_BADGES[TASK_STATE_TONE[task.state]]} size="sm">{task.reason ? t(`panel.task.reason.${task.reason}`) : t(`panel.task.state.${task.state}`)}</Badge>
+                  : <Badge variant={STATUS_BADGES[statusTone(row.status)]} size="sm">{statusLabel(row.status)}</Badge>
+              })()}</CommandShortcut>
             </CommandItem>
           })}
           {search.state.tasks.nextCursor && <CommandItem value="more tasks" disabled={search.state.tasks.loadingMore} onSelect={() => search.more('tasks')} className="text-muted-foreground">{moreLabel('tasks')}</CommandItem>}

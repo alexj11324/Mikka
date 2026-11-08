@@ -105,6 +105,7 @@
       "privateHint": "Only you can see it at first; invite members after creating it"
     },
     "list": {
+      "clearFilters": "Clear filters",
       "label": "Task list",
       "noResults": "No matching tasks",
       "emptyTitle": "No tasks yet",
