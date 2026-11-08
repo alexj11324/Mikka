@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { workflowGuard } from './self-hosted-closeout.mjs'
+import { ownerViewerUrl, observeOwnerViewer } from './self-hosted-vault-viewer.mjs'
 import { encode, decode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
 
 const plan = JSON.parse(await readFile(new URL('./self-hosted-vault-plan.json', import.meta.url), 'utf8'))
@@ -68,8 +69,10 @@ export function containerGuard(container) {
 export function finalImagePassed(report) {
   const checks = ['emailVerified', 'localEnvelopeEncrypted', 'listReturnsNoPassword', 'realSiteSubmitted',
     'normalAgentStop', 'actualGuardedBroker', 'agentAutomaticSavedLogin', 'logsContainNoPlaintext',
-    'finalImageUnmodified', 'bakedWorkerUsed', 'noModelExecution']
-  const cleanup = ['subagent', 'e2bConfirmedMissing', 'login', 'key', 'session', 'fixture', 'site', 'tunnels', 'privateFiles']
+    'finalImageUnmodified', 'bakedWorkerUsed', 'noModelExecution', 'ownerViewerBeforeLogin',
+    'guardedViewerClosed', 'filledFormEmittedNoFrames', 'ownerViewerAfterSafeNavigation', 'subagentEventLogsContainNoPlaintext']
+  const cleanup = ['subagent', 'e2bConfirmedMissing', 'login', 'key', 'session', 'fixture', 'site', 'tunnels', 'privateFiles',
+    'viewers', 'fixtureLatches']
   return report.status === 'passed' && report.machineCount === 1 && report.modelCalls === 0 && report.hostedUsageRows === 0
     && checks.every(name => report.checks?.[name] === true) && cleanup.every(name => report.cleanup?.[name] === true)
 }
@@ -103,6 +106,16 @@ export function loginMatches(body, username, password) {
   return same(form.get('username'), username) && same(form.get('password'), password)
 }
 
+export function subagentEventEvidence(events, botId, subagentId, hidden) {
+  check(Array.isArray(events) && events.length > 0 && events.every(event => event?.type === 'data-subagent'
+    && event.data?.botId === botId && event.data?.subagentId === subagentId), 'SUBAGENT_EVENT_SCOPE')
+  const terminalStopped = events.some(event => event.data.state === 'stopped')
+  const serialized = JSON.stringify(events)
+  const containsPlaintext = hidden.some(value => serialized.includes(value))
+  // Event bodies and the random credential remain private memory only.
+  return { count: events.length, terminalStopped, containsPlaintext }
+}
+
 async function run(env) {
   await publishedImageGuard(env)
   const runtimeSetup = imageGuard(JSON.parse(docker('image', 'inspect', imageRef))[0])
@@ -126,13 +139,26 @@ async function run(env) {
   for (const value of hidden) console.log(`::add-mask::${value}`)
   const composePath = join(root, 'compose.json'), project = `vault-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`
   const compose = (...args) => docker('compose', '-f', composePath, '-p', project, ...args)
-  let context, pool, actor, botId, subagentId, credentialId, interruptWait, interrupted = false, cleaning = false
+  let context, pool, actor, botId, subagentId, credentialId, interruptWait, viewer, interrupted = false, cleaning = false
   let fixtureStarted = false, appOrigin, siteOrigin, submitted = 0, rejected = 0, servedLogin = 0, authenticatedViews = 0
   let submissionResolve
   const submission = new Promise(resolveSubmission => { submissionResolve = resolveSubmission })
+  const loginRequested = Promise.withResolvers(), formReceived = Promise.withResolvers()
+  const loginGate = Promise.withResolvers(), responseGate = Promise.withResolvers()
+  let loginReleased = false, responseReleased = false
+  const releaseLogin = () => { loginReleased = true; loginGate.resolve() }
+  const releaseResponse = () => { responseReleased = true; responseGate.resolve() }
   const tunnels = []
   const signal = () => { interrupted = true; process.exitCode = 1; interruptWait?.() }
   process.once('SIGTERM', signal); process.once('SIGINT', signal)
+  const waitFor = async (promise, deadlineAt) => {
+    let deadline
+    try { return await Promise.race([promise, new Promise((_, reject) => {
+      deadline = setTimeout(() => reject(new Error('AUTOFILL_TIMEOUT')), Math.max(1, deadlineAt - Date.now()))
+      interruptWait = () => reject(new Error('INTERRUPTED'))
+      if (interrupted) interruptWait()
+    })]) } finally { clearTimeout(deadline); interruptWait = undefined }
+  }
   const json = async url => {
     const r = await fetch(url, { signal: AbortSignal.timeout(15_000), redirect: 'error' }); check(r.ok, 'FIXTURE_HTTP'); return r.json()
   }
@@ -161,11 +187,20 @@ async function run(env) {
       for await (const chunk of req) { if (body.length + chunk.length > 8192) oversized = true; else body += chunk }
       const valid = !oversized && loginMatches(body, siteUsername, sitePassword); body = ''
       if (valid) {
-        submitted++
+        submitted++; formReceived.resolve(performance.now())
+        // Only this owned HTTPS fixture waits. The real product filled the
+        // browser form; no injected JavaScript clears or reads its password.
+        await responseGate.promise
+        if (cleaning) { res.writeHead(503); res.end('closed'); return }
         res.writeHead(303, { location: '/success', 'set-cookie': 'vault_acceptance=verified; HttpOnly; Secure; SameSite=Lax; Path=/', 'cache-control': 'no-store' })
         res.end(); return
       }
       rejected++; res.writeHead(403); res.end('refused'); return
+    }
+    if (req.method === 'GET' && req.url === '/login') {
+      loginRequested.resolve()
+      await loginGate.promise
+      if (cleaning) { res.writeHead(503); res.end('closed'); return }
     }
     if (req.url === '/success' && /(?:^|; )vault_acceptance=verified(?:;|$)/.test(req.headers.cookie ?? '')) {
       authenticatedViews++; submissionResolve()
@@ -245,13 +280,29 @@ async function run(env) {
     check(uuid.test(started.subagentId), 'SUBAGENT_ID'); subagentId = started.subagentId
     // The actual Workflow provisions/navigates/observes and requests the saved
     // login itself. No SQL state, guard, CDP, broker or model output is injected.
-    let deadline
-    try { await Promise.race([submission, new Promise((_, reject) => {
-      deadline = setTimeout(() => reject(new Error('AUTOFILL_TIMEOUT')), 360_000)
-      interruptWait = () => reject(new Error('INTERRUPTED'))
-      if (interrupted) interruptWait()
-    })]) }
-    finally { clearTimeout(deadline); interruptWait = undefined }
+    const autofillDeadline = Date.now() + 360_000
+    await waitFor(loginRequested.promise, autofillDeadline)
+    report.stage = 'owner-viewer-before-login'
+    const capability = await api(`/api/bots/${botId}/subagents/${subagentId}/viewer`, {})
+    check(!interrupted, 'INTERRUPTED')
+    viewer = observeOwnerViewer(ownerViewerUrl(capability, { ownerId: actor.userId,
+      workspaceId: actor.workspaceId, botId, subagentId }))
+    await viewer.beforeLogin()
+    report.checks.ownerViewerBeforeLogin = true
+    releaseLogin()
+    const formReceivedAt = await waitFor(formReceived.promise, autofillDeadline)
+    check(!interrupted && submitted === 1 && rejected === 0, 'FORM_SUBMITTED')
+    report.stage = 'guarded-filled-form-viewer'
+    const observation = await viewer.whileFormHeld(formReceivedAt)
+    report.checks.guardedViewerClosed = true; report.checks.filledFormEmittedNoFrames = true
+    report.screenshot = { channel: 'owner-subagent-viewer', guardedObservationMs: observation.observedForMs,
+      postToObservationMs: observation.postToObservationMs, guardedFrames: observation.frames,
+      rawFramesRetained: false, observerEndpointTested: false }
+    report.stage = 'owner-viewer-after-safe-navigation'
+    viewer.allowSafeNavigation(); releaseResponse()
+    const [, viewerChecks] = await waitFor(Promise.all([submission, viewer.afterSafeNavigation()]), autofillDeadline)
+    Object.assign(report.checks, viewerChecks)
+    await viewer.close(); report.cleanup.viewers = true
     check(!interrupted && submitted === 1 && rejected === 0 && servedLogin > 0, 'FORM_SUBMITTED')
     report.checks.realSiteSubmitted = true
     const machines = (await pool.query('SELECT "ownerId","workspaceId","sandboxId","operationId" FROM cloud_machines WHERE "ownerId"=$1 AND "workspaceId"=$2', [actor.userId, actor.workspaceId])).rows
@@ -265,6 +316,13 @@ async function run(env) {
     report.machineCount = machines.length
     await api(`/api/bots/${botId}/subagents/${subagentId}/stop`, {})
     report.checks.normalAgentStop = true
+    report.stage = 'subagent-event-log-privacy'
+    const eventRows = (await pool.query('SELECT event FROM subagent_events WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botId"=$3 AND "subagentId"=$4 ORDER BY seq',
+      [actor.userId, actor.workspaceId, botId, subagentId])).rows
+    report.subagentEventLogs = subagentEventEvidence(eventRows.map(row => row.event), botId, subagentId, hidden)
+    check(report.subagentEventLogs.terminalStopped, 'SUBAGENT_STOP_EVENT_MISSING')
+    check(report.subagentEventLogs.containsPlaintext === false, 'PLAINTEXT_SUBAGENT_EVENT')
+    report.checks.subagentEventLogsContainNoPlaintext = true
     const uses = await rpc('settings-activity.listSavedLoginUsage', [credentialId])
     check(uses.uses.some(use => use.subagentId === subagentId && use.botId === botId && use.result === 'input_inserted_guarded'), 'GUARDED_ACCESS_EVENT')
     report.checks.actualGuardedBroker = true
@@ -294,6 +352,10 @@ async function run(env) {
     }
   } finally {
     cleaning = true
+    releaseLogin(); releaseResponse()
+    report.cleanup.fixtureLatches = loginReleased && responseReleased
+    try { await viewer?.close(); report.cleanup.viewers = true }
+    catch { report.cleanup.viewers = false; process.exitCode = 1 }
     if (context && botId && subagentId) {
       try { const stopped = await api(`/api/bots/${botId}/subagents/${subagentId}/stop`, {}); check(['stopped', 'done', 'failed'].includes(stopped.state), 'STOP'); report.cleanup.subagent = true }
       catch { report.cleanup.subagent = false; process.exitCode = 1 }

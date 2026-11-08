@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { EventEmitter } from 'node:events'
 import { ownedMachine, ownHttps, loginMatches, publishedImageGuard, imageGuard, fixtureGuard, containerGuard,
-  finalImagePassed, stopTunnel } from './self-hosted-vault-closeout.mjs'
+  finalImagePassed, stopTunnel, subagentEventEvidence } from './self-hosted-vault-closeout.mjs'
 const plan = JSON.parse(await readFile(new URL('./self-hosted-vault-plan.json', import.meta.url), 'utf8'))
 const actor = { userId: 'fixture', workspaceId: '00000000-0000-4000-8000-000000000001' }
 const row = { ...actor, ownerId: actor.userId, sandboxId: 'owned123456789', operationId: '00000000-0000-4000-8000-000000000002' }
@@ -21,6 +21,22 @@ test('fixture origin rejects credentials, query, path and arbitrary domains', ()
 test('site accepts exactly the expected disposable fields and rejects ambiguity', () => {
   assert.equal(loginMatches('username=owned&password=secret', 'owned', 'secret'), true)
   for (const body of ['username=owned&password=other', 'username=foreign&password=secret', 'username=owned&password=secret&password=secret', 'username=owned']) assert.equal(loginMatches(body, 'owned', 'secret'), false)
+})
+test('persisted event evidence requires real exact-scope events and scans bodies without returning them', () => {
+  const event = { type: 'data-subagent', data: { botId: 'owned-bot', subagentId: 'owned-subagent', state: 'stopped', step: 'stopped' } }
+  assert.deepEqual(subagentEventEvidence([event], 'owned-bot', 'owned-subagent', ['synthetic-password', 'synthetic-user']),
+    { count: 1, terminalStopped: true, containsPlaintext: false })
+  assert.throws(() => subagentEventEvidence([], 'owned-bot', 'owned-subagent', ['synthetic-password']), /SUBAGENT_EVENT_SCOPE/)
+  assert.throws(() => subagentEventEvidence([event], 'foreign', 'owned-subagent', ['synthetic-password']), /SUBAGENT_EVENT_SCOPE/)
+  assert.throws(() => subagentEventEvidence([event], 'owned-bot', 'foreign', ['synthetic-password']), /SUBAGENT_EVENT_SCOPE/)
+  assert.equal(subagentEventEvidence([{ ...event, data: { ...event.data, state: 'running' } }], 'owned-bot', 'owned-subagent',
+    ['synthetic-password']).terminalStopped, false)
+  for (const value of ['synthetic-password', 'synthetic-user']) {
+    const evidence = subagentEventEvidence([{ ...event, data: { ...event.data, step: value } }], 'owned-bot', 'owned-subagent',
+      ['synthetic-password', 'synthetic-user'])
+    assert.equal(evidence.containsPlaintext, true)
+    assert.ok(!JSON.stringify(evidence).includes(value))
+  }
 })
 
 const workflow = { GITHUB_REPOSITORY: plan.repository, GITHUB_REF: `refs/heads/${plan.branch}`, GITHUB_ACTOR: 'alexj11324',
@@ -84,11 +100,18 @@ test('final acceptance cannot pass with missing business evidence, incomplete cl
   const report = { status: 'passed', machineCount: 1, modelCalls: 0, hostedUsageRows: 0,
     checks: Object.fromEntries(['emailVerified', 'localEnvelopeEncrypted', 'listReturnsNoPassword', 'realSiteSubmitted',
       'normalAgentStop', 'actualGuardedBroker', 'agentAutomaticSavedLogin', 'logsContainNoPlaintext',
-      'finalImageUnmodified', 'bakedWorkerUsed', 'noModelExecution'].map(name => [name, true])),
-    cleanup: Object.fromEntries(['subagent', 'e2bConfirmedMissing', 'login', 'key', 'session', 'fixture', 'site', 'tunnels', 'privateFiles'].map(name => [name, true])) }
+      'finalImageUnmodified', 'bakedWorkerUsed', 'noModelExecution', 'ownerViewerBeforeLogin',
+      'guardedViewerClosed', 'filledFormEmittedNoFrames', 'ownerViewerAfterSafeNavigation',
+      'subagentEventLogsContainNoPlaintext'].map(name => [name, true])),
+    cleanup: Object.fromEntries(['subagent', 'e2bConfirmedMissing', 'login', 'key', 'session', 'fixture', 'site', 'tunnels',
+      'privateFiles', 'viewers', 'fixtureLatches'].map(name => [name, true])) }
   assert.equal(finalImagePassed(report), true)
   for (const mutation of [{ checks: {} }, { cleanup: {} }, { machineCount: 2 }, { modelCalls: 1 }, { hostedUsageRows: 1 },
-    { cleanup: { ...report.cleanup, e2bConfirmedMissing: false } }, { checks: { ...report.checks, bakedWorkerUsed: false } }]) {
+    { cleanup: { ...report.cleanup, e2bConfirmedMissing: false } }, { checks: { ...report.checks, bakedWorkerUsed: false } },
+    ...['ownerViewerBeforeLogin', 'guardedViewerClosed', 'filledFormEmittedNoFrames', 'ownerViewerAfterSafeNavigation',
+      'subagentEventLogsContainNoPlaintext']
+      .map(name => ({ checks: { ...report.checks, [name]: false } })),
+    ...['viewers', 'fixtureLatches'].map(name => ({ cleanup: { ...report.cleanup, [name]: false } }))]) {
     assert.equal(finalImagePassed({ ...report, ...mutation }), false)
   }
 })

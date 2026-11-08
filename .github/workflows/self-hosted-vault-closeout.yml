@@ -32,7 +32,7 @@ jobs:
         id: probe_source
         with:
           repository: alexj11324/Mikka
-          ref: 6de3d9899d21945aafb29bc56b93d8f05fe409ed
+          ref: c17b55652b65fb3463edf486fc544ba1c2d0e3ef
           path: preview-ingress-source
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -40,7 +40,7 @@ jobs:
           node-version: 24
       - name: Verify the original Ops subject and frozen probe before credentials
         run: node scripts/ops/self-hosted-ingress-probe.mjs check preview-ingress-source "$PREVIEW_PROBE_TEMPLATE"
-      - name: Verify the carrier gates and all seven frozen probe cases
+      - name: Verify the carrier gates and frozen probe cases
         run: |
           node --test scripts/ops/self-hosted-ingress-probe.test.mjs
           node --test preview-ingress-source/scripts/e2b/preview-ingress-acceptance.test.mjs
@@ -139,7 +139,7 @@ jobs:
       - uses: ./.github/actions/pnpm-install
       - name: Verify exact published source and final-image guards before credentials
         run: |
-          node --import tsx --test scripts/ops/self-hosted-vault-closeout.test.mjs
+          node --import tsx --test scripts/ops/self-hosted-vault-closeout.test.mjs scripts/ops/self-hosted-vault-viewer.test.mjs
           node --import tsx scripts/ops/self-hosted-vault-closeout.mjs --check
       - name: Prepare immutable image and disposable infrastructure
         run: |

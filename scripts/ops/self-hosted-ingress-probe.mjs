@@ -8,12 +8,12 @@ import { pathToFileURL } from 'node:url'
 import { workflowGuard } from './self-hosted-closeout.mjs'
 
 export const PROBE = Object.freeze({
-  source: '6de3d9899d21945aafb29bc56b93d8f05fe409ed',
-  tree: '2c13781d7f9f9e9385c3831fb6990fdf4358be1e',
+  source: 'c17b55652b65fb3463edf486fc544ba1c2d0e3ef',
+  tree: '5e4aac51158eaef9d286157f89ee7b1bf8d5a520',
   files: {
-    'scripts/e2b/preview-ingress-probe.py': 'a5edd873a80d0117d7607d858a97a3494ea287fe6a02eb0bae8d6a3998101d78',
-    'scripts/e2b/preview-ingress-acceptance.mjs': '0fcadbd7734a324c6076968196ffda6eb1f10c2d4e097f4f258a56a83efc8f27',
-    'scripts/e2b/preview-ingress-acceptance.test.mjs': '8e8e57dad921c459618dd58686e35c6ddea56ddd880d4c7e17bcb12d4261fed9',
+    'scripts/e2b/preview-ingress-probe.py': '53eff11f87b4b6ee0b41619370c0627ace8d782b9e4eb6fe79e553c8f5d6a7f0',
+    'scripts/e2b/preview-ingress-acceptance.mjs': '4a30d479ed5c49f761e4af2da24577dcb08dc186579d5b40ce46faf7781ed242',
+    'scripts/e2b/preview-ingress-acceptance.test.mjs': '5411669abc3feab294ebaf0a932df9d3185f04f821e87c8cfb8ae6293f96c6d4',
   },
 })
 const PURPOSE = 'mikka-preview-ingress-spike'
@@ -51,7 +51,7 @@ async function verifySources(directory, env = process.env) {
 export function summarizeProbe(template, { journal, report, cleanupReport }) {
   check(['claude', 'codex'].includes(template), 'ingress_probe_template_refused')
   const result = { probeSource: PROBE.source, probeTree: PROBE.tree, requestedTemplate: template,
-    scope: 'socket-mark-capability-only', preListenerIsolationProven: false, agentPrivilegeBoundaryProven: false,
+    scope: 'nft-output-reply-fixture-ports-only', preListenerIsolationProven: false, agentPrivilegeBoundaryProven: false,
     derivedRuntimeAcceptance: false, capabilityPassed: false, cleanupConfirmed: false }
   if (cleanupReport?.version !== 1 || cleanupReport.purpose !== PURPOSE || cleanupReport.sourceCommit !== PROBE.source) return result
   if (!journal) {
