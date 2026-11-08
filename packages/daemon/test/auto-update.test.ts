@@ -115,18 +115,21 @@ it('restarts only after a successful exact-version install', async () => {
 it('keeps heartbeat syncs responsive while an install is held', async () => {
   const { daemon, internal } = maintenanceDaemon()
   const heartbeat = vi.fn(async () => ({ leases: [] }))
+  const renewTaskSecrets = vi.fn()
   Object.assign(internal, {
     device: { credential: 'fixture', deviceId: 'device-1' }, registered: true,
     options: { link: { heartbeat, listRepos: async () => [] } },
     worktrees: { diskUsage: async () => 0 }, outbox: { flushAll: async () => {} },
     journal: { all: () => [] }, pruneWorktrees: async () => {}, sweepEmptyRuns: async () => {},
-    supervisor: { heartbeatRuns: () => [], renewLeases: () => {} },
+    supervisor: { heartbeatRuns: () => [], renewLeases: () => {}, renewTaskSecrets },
   })
   let finish!: () => void
   internal.startMaintenance(() => new Promise<void>(resolve => { finish = resolve }))
   await daemon.syncWithServer()
   await daemon.syncWithServer()
   expect(heartbeat).toHaveBeenCalledTimes(2)
+  expect(renewTaskSecrets).toHaveBeenCalledTimes(2)
+  expect(renewTaskSecrets).toHaveBeenLastCalledWith(undefined)
   expect(internal.updating).toBe(true)
   finish(); await internal.maintenance
 })

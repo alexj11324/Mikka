@@ -125,6 +125,11 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
     // The caller uses ordinary owner-message delivery for a planner. A plan
     // clarification must neither acknowledge an unread message nor approve it.
     if (factoryFlowVersion(task) === 2 && task.stage === 'spec') { await tx.query('COMMIT'); return false }
+    // Coordinator handoff can forward the dispatch's already accepted owner
+    // event. It adds no new request and must not stop its current executor.
+    if (sourceEventId === task.sourceEventId && !['cancelled', 'revoked'].includes(task.status)) {
+      await tx.query('COMMIT'); return true
+    }
     const id = sourceEventId ? await factoryContinuationSource(tx, task, sourceEventId, runId) : randomUUID()
     if (!sourceEventId) await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt")
       VALUES($1,$2,$3,$4,'user_message',$5,$6,'background',now()) ON CONFLICT DO NOTHING`, [id, userId, task.botId, task.issueId, `thread-continuation:${id}`,

@@ -59,6 +59,11 @@ jobs:
       - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
         run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 app node scripts/acceptance/self-hosted-services.mjs
+      - name: Reclaim intermediate build cache before installing source dependencies
+        run: |
+          df -h /
+          docker builder prune --all --force
+          df -h /
       - name: Install the same-revision source daemon dependencies
         uses: ./.github/actions/pnpm-install
         env:

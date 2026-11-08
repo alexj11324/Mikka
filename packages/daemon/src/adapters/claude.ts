@@ -67,6 +67,7 @@ import type { AgentSandbox } from "../agents/sandbox"
 import { carryHistory, ownDir, wipeRunCredentials } from "../agents/harness-home"
 import { claudeCredentialEnv, credentialDomain } from "../agents/run-credential"
 import { buildChildEnv } from "../env"
+import { taskExecutionEnv } from '../task-env'
 import { mailboxInputs } from '@mikka/protocol/mailbox'
 import { classifyProviderFailure, ProviderFailureError, providerFailureMessage, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import { mailboxToolResult, type RunMailbox } from '../run-mailbox'
@@ -519,11 +520,11 @@ export class ClaudeAdapter implements AgentAdapter {
     let expiresAt = 0
     if (externalAuth) {
       if(externalAuth.brokered && !this.options.spawnHosted)throw new Error(SUBSCRIPTION_ERROR)
-      const clean = options.machineEnvironment ? options.env : buildChildEnv({
+      const clean = options.machineEnvironment ? options.env : taskExecutionEnv(buildChildEnv({
         host: options.env,
         runId:
           options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId
-      })
+      }), options)
       if (
         Object.entries(options.env).some(
           ([name, value]) => clean[name] !== value

@@ -17,7 +17,7 @@ const LIVE_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_inpu
 type Issue = typeof issues.$inferSelect
 type Executor = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
-export async function mayCompleteIssue(issue: Issue, userId: string) {
+export async function mayCompleteIssue(issue: Pick<Issue, 'id' | 'userId' | 'scope' | 'content'>, userId: string) {
   if (readIssueMetadata(issue.content).deletedAt) return false
   return issue.userId === userId || (issue.scope === 'workspace' && (await issueTeamAccess(issue.id, userId)).allowed)
 }

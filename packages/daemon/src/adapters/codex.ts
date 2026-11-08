@@ -50,6 +50,7 @@ import { rawCliShellAvailable, runPolicy } from "../permissions"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
+import { taskExecutionEnv } from '../task-env'
 import { mailboxToolResult } from '../run-mailbox'
 import { codexMailboxCatalogue, codexMailboxResumeVersion, recordCodexMailboxSession, verifyCodexMailboxResume } from './codex-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
@@ -374,11 +375,11 @@ export class CodexAdapter implements AgentAdapter {
     const managedAuth = Boolean(externalAuth || brokerAuth)
     if (brokerAuth && (!this.options.spawnCli || externalAuth || options.credential)) throw new Error(SUBSCRIPTION_AUTH_ERROR)
     if (managedAuth) {
-      const clean = options.machineEnvironment ? options.env : buildChildEnv({
+      const clean = options.machineEnvironment ? options.env : taskExecutionEnv(buildChildEnv({
         host: options.env,
         runId:
           options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId
-      })
+      }), options)
       if (
         Object.entries(options.env).some(
           ([name, value]) => clean[name] !== value
