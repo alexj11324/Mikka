@@ -3,13 +3,12 @@
 import { useLayoutEffect, useRef } from 'react'
 import { useViewScroll } from '@/lib/hooks/view-state'
 import { useTranslations } from 'next-intl'
-import { X } from 'lucide-react'
 import { InlineLoadError } from '@/components/load-error'
-import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { PanelHeader } from '@ui-slot/panel-header'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
+import { usePanelInitialWidth, useWidenToggle } from '@/hooks/use-panel-width'
 import type { GroupMember } from '@/lib/group-messages'
 import { cn } from '@/lib/utils'
 import { BotAvatar } from './bot-avatar'
@@ -39,19 +38,19 @@ export function GroupPanel({ group, onClose, sheet = false }: { group: { id: str
   const { data: members, error, mutate } = useGroupMembers(group.id)
   const scroll = useViewScroll<HTMLElement>(`group-panel:${group.id}`, !!members)
   const label = members ? t('members', { count: members.length }) : t('membersLoading')
-  const resize = useResizableWidth(WIDTH)
+  // A UI layer may size the default from the main area (panel-header slot); a remembered width still wins.
+  const resize = useResizableWidth({ ...WIDTH, initial: usePanelInitialWidth(WIDTH.initial) })
+  // ⤢ as 概览 has it; only a layer's header offers it, the default keeps 详情 · ✕.
+  const widen = useWidenToggle(resize)
   const asideRef = useRef<HTMLElement>(null)
   useLayoutEffect(() => { asideRef.current?.style.setProperty('--group-panel-width', `${resize.width}px`) }, [resize.width])
   const tCommon = useTranslations('Common')
   // R-37: opening and closing are instant, no motion (decision 2026-11-01-2320).
   return <aside ref={asideRef} aria-label={t('label')}
     className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden w-(--group-panel-width) overflow-hidden border-l bg-background xl:flex', resize.dragging && 'select-none')}>
-    {!sheet && <ResizeHandle resize={resize} label={tCommon('resize.groupPanel')} edge="start" />}
+    {!sheet && <ResizeHandle resize={resize} label={tCommon('resize.groupPanel')} edge="start" onDoubleClick={widen.reset} />}
     <div className={cn('flex min-h-0 flex-1 flex-col', !sheet && 'min-w-80')}>
-      <div className="flex h-11 shrink-0 items-center gap-1 px-3">
-        <p className="flex h-7 items-center rounded-full bg-muted px-2.5 text-sm">{t('details')}</p>
-        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="ml-auto" aria-label={t('close')} onClick={onClose} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('close')}</TooltipContent></Tooltip>
-      </div>
+      <PanelHeader variant="group" title={t('details')} actions={[]} onClose={onClose} widen={sheet ? undefined : { wide: widen.wide, onToggle: widen.onToggle }} />
       <div className="flex shrink-0 flex-col items-center gap-3 px-4 pt-9 pb-4">
         <GroupAvatar title={group.title} members={members} size="profile" />
         <h2 className="max-w-full truncate text-xl font-semibold">{group.title}</h2>
