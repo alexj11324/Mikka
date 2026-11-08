@@ -47,10 +47,14 @@ explicit on choices, prioritizing continuity over retiring old releases.
 Existing API-key catalogue models remain enabled. A newly reported model on
 refresh is off/fresh; opening the panel clears fresh without enabling it, and
 an explicit enable also clears fresh. Refresh and toggle serialize on the same
-credential row. Failed provider refresh retains the previous catalogue.
+credential row. Failed provider refresh retains the previous catalogue and its last successful
+refresh time. Toggling or marking models seen does not advance that time;
+historical catalogue timestamps that were never recorded return null.
 
 The hosted source has one model: the installation's configured default raw ID,
-or Mikka's existing default ID for its managed route. It defaults on. A disabled
+or Mikka's existing default ID for its managed route. An active cloud model
+binding takes precedence over a configured local provider, matching the
+existing default-model resolver. It defaults on. A disabled
 hosted default cannot start a new bot turn; the usual preferred available source
 is tried instead, and no enabled source produces the existing model error.
 Internal Decision/title/background infrastructure is not a selectable source.

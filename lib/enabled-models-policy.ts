@@ -1,7 +1,7 @@
 import { latestDefaultCandidates } from './model-order-plan'
 
 export interface ModelToggle { enabled: boolean; fresh: boolean; manual: boolean }
-export interface ModelSettings { autoEnable: boolean; models: Record<string, ModelToggle> }
+export interface ModelSettings { refreshedAt?: string | null; autoEnable: boolean; models: Record<string, ModelToggle> }
 
 /** Same release/family selection as #1515; no second version parser. */
 export function reconcileSubscriptionModels(ids: string[], previous?: ModelSettings | null): ModelSettings {
@@ -15,7 +15,7 @@ export function reconcileSubscriptionModels(ids: string[], previous?: ModelSetti
     const prior = previous?.models[id]
     models[id] = prior?.manual ? prior : { enabled: previous && !autoEnable ? prior?.enabled ?? false : latest.has(id), fresh: false, manual: false }
   }
-  return { autoEnable, models }
+  return { ...previous, autoEnable, models }
 }
 
 export function modelEnabled(settings: ModelSettings | null | undefined, id: string) {

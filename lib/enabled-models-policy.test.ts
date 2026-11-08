@@ -24,3 +24,9 @@ test('auto-enable off holds previous choices and new models remain off, includin
   assert.equal(reconcileSubscriptionModels(['gpt-6-luna'], next).models['gpt-6-luna'].enabled, true)
   assert.equal(modelEnabled(null, 'legacy'), true)
 })
+
+ test('subscription reconciliation preserves the last successful refresh time until the refresh writer stamps it', () => {
+  const state = reconcileSubscriptionModels(['gpt-6-luna'])
+  state.refreshedAt = '2026-11-07T12:00:00Z'
+  assert.equal(reconcileSubscriptionModels(['gpt-6-luna', 'gpt-7-luna'], state).refreshedAt, state.refreshedAt)
+})

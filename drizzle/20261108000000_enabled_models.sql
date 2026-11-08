@@ -23,6 +23,10 @@ BEGIN
         jsonb_build_object('enabled',TG_OP='INSERT','fresh',TG_OP<>'INSERT','manual',false));
     END IF;
   END LOOP;
+  -- Failed refreshes preserve the last successful catalogue timestamp.
+  IF NEW."modelsError" IS NULL THEN
+    NEW."modelSettings" := jsonb_set(NEW."modelSettings", '{refreshedAt}', to_jsonb(statement_timestamp()));
+  END IF;
   RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS model_api_key_catalogue_settings ON model_api_keys;

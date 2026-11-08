@@ -44,8 +44,14 @@ test('migration, toggles, source ownership, fresh keys, dispatch filters and row
     await pool.query(`UPDATE model_api_keys SET models='["old","new"]' WHERE id=$1`, [key])
     view = await readEnabledModels(pool, scope)
     assert.deepEqual(view.sources.find(item => item.id === key)?.models, [{ id: 'old', enabled: true, fresh: false }, { id: 'new', enabled: false, fresh: true }])
+    const refreshedAt = view.sources.find(item => item.id === key)!.refreshedAt
+    assert.ok(refreshedAt && Number.isFinite(Date.parse(refreshedAt)))
+    await pool.query(`UPDATE model_api_keys SET models=models,"modelsError"='unavailable',"updatedAt"=now()+interval '1 hour' WHERE id=$1`, [key])
+    assert.equal((await readEnabledModels(pool, scope)).sources.find(item => item.id === key)?.refreshedAt, refreshedAt,
+      'a failed catalogue refresh must not replace the last successful refresh time')
     await changeEnabledModels(pool, scope, key, { kind: 'seen' })
     assert.equal((await readEnabledModels(pool, scope)).sources.find(item => item.id === key)?.freshCount, 0)
+    assert.equal((await readEnabledModels(pool, scope)).sources.find(item => item.id === key)?.refreshedAt, refreshedAt, 'marking seen is not a catalogue refresh')
     await changeEnabledModels(pool, scope, key, { kind: 'model', modelId: 'new', enabled: true })
     const writer = await pool.connect()
     await writer.query('BEGIN')

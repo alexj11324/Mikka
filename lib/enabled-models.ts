@@ -24,12 +24,14 @@ const project = (row: SourceRow): EnabledModelsSource => {
 async function sources(query: Pick<Pool | PoolClient, 'query'>, scope: Scope): Promise<SourceRow[]> {
   const subscriptions = await query.query<SourceRow>(`SELECT id::text,'subscription' AS kind,
     COALESCE("modelCatalog"->'models','[]'::jsonb) AS ids,"modelSettings" AS settings,
-    "updatedAt"::text AS "refreshedAt",NULL AS "refreshError" FROM byos_connections
+    "modelSettings"->>'refreshedAt' AS "refreshedAt",NULL AS "refreshError" FROM byos_connections
     WHERE "ownerId"=$1 AND "removedAt" IS NULL ORDER BY "createdAt",id`, [scope.ownerId])
   const keys = await query.query<SourceRow>(`SELECT id::text,'api_key' AS kind,models AS ids,"modelSettings" AS settings,
-    "updatedAt"::text AS "refreshedAt","modelsError" AS "refreshError" FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`, [scope.ownerId])
+    "modelSettings"->>'refreshedAt' AS "refreshedAt","modelsError" AS "refreshError" FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`, [scope.ownerId])
   const hosted = await query.query<{ enabled: boolean }>('SELECT "hostedModelEnabled" AS enabled FROM "user" WHERE id=$1', [scope.ownerId])
-  const hostedModelId = selfHostedDefaultModelConfig()?.modelId ?? COORDINATOR_MODEL
+  const localModel = selfHostedDefaultModelConfig()
+  const target = localModel ? await (await import('./default-model')).defaultModelTarget(scope.ownerId) : null
+  const hostedModelId = target?.kind === 'self-hosted' ? localModel!.modelId : COORDINATOR_MODEL
   return [...subscriptions.rows, ...keys.rows, { id: 'hosted', kind: 'hosted', ids: [hostedModelId],
     settings: { autoEnable: false, models: { [hostedModelId]: { enabled: hosted.rows[0]?.enabled ?? true, fresh: false, manual: true } } },
     refreshedAt: null, refreshError: null }]
