@@ -18,10 +18,12 @@ const schema = z.object({ requestId: z.uuid(), issueId: z.uuid(), revision: z.nu
 type WorkspaceTx = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 type Code = 'teamIssueAccessDenied' | 'teamIssueRequestConflict' | 'teamIssueChanged'
 class PromotionError extends Error { constructor(readonly code: Code) { super(code) } }
-async function allowedTeam(tx: WorkspaceTx, userId: string, teamId: string) {
+async function allowedTeam(tx: WorkspaceTx, userId: string, teamId: string, expectedWorkspaceId?: string) {
+  // withTeamWorkspace already holds member SHARE before the relation lock.
+  // This read must not upgrade that lock while another admission waits on us.
   const [team] = await tx.select({ id: teams.id, workspaceId: teams.workspaceId }).from(teams)
     .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, teams.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
-    .where(and(eq(teams.id, teamId), isNull(teams.archivedAt))).for('update').limit(1)
+    .where(and(eq(teams.id, teamId), expectedWorkspaceId ? eq(teams.workspaceId, expectedWorkspaceId) : undefined, isNull(teams.archivedAt))).for('share').limit(1)
   if (!team) throw new PromotionError('teamIssueAccessDenied')
   return team
 }
@@ -46,7 +48,8 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
       if (!receipt) {
         if ((current?.teamId ?? null) !== expectedTeamId || (current && current.userId !== userId)) throw new PromotionError('teamIssueChanged')
         if (current) {
-          const old = await allowedTeam(workspace, userId, current.teamId)
+          if (current.workspaceId !== team.workspaceId) throw new PromotionError('teamIssueChanged')
+          const old = await allowedTeam(workspace, userId, current.teamId, team.workspaceId)
           if (old.workspaceId !== team.workspaceId) throw new PromotionError('teamIssueChanged')
         }
 
