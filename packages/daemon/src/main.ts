@@ -1423,11 +1423,12 @@ export class Daemon {
         ...(quotas ? { quotas } : {}),
         ...(this.options.autoUpdate ? { updateFailure: reportedUpdateFailure(this.updateStateFile, DAEMON_VERSION) } : {}),
       }
-      const { leases, revoked, cloudCredential, deviceCommands, daemonVersions } = await link.heartbeat(deviceId, heartbeat)
+      const { leases, revoked, cloudCredential, deviceCommands, daemonVersions, taskSecrets } = await link.heartbeat(deviceId, heartbeat)
       this.deviceReceiptsAcknowledged = receiptsVersion
       this.learnRelease(daemonVersions?.latest)
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)
+      this.supervisor.renewTaskSecrets(taskSecrets)
       if (this.options.cloudComputer && cloudCredential && this.device.credential === credential) {
         // Persist before switching transport. Keep the current token valid
         // through this pass; the next pass registers with the replacement.

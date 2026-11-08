@@ -19,6 +19,7 @@ jobs:
     concurrency:
       group: production-smoke-owner-acceptance
       cancel-in-progress: false
+      queue: max
     if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-acceptance'
     runs-on: ubuntu-latest
     timeout-minutes: 20

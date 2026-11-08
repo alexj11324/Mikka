@@ -10,7 +10,10 @@ Socket.prototype.connect = function (this: Socket, ...args: unknown[]) {
   sockets.add(this)
   return Reflect.apply(connect, this, args)
 } as typeof Socket.prototype.connect
+// Only connections opened in this test process; no SQL, parameters or row values are logged.
 const received = () => [...sockets].reduce((sum, socket) => sum + socket.bytesRead, 0)
+const sent = () => [...sockets].reduce((sum, socket) => sum + socket.bytesWritten, 0)
+let measurementSequence = 0
 
 // Installed before importing app pools: their per-client sampler binds query
 // when a connection opens. Count real PostgreSQL statements, never ORM calls.
@@ -35,11 +38,17 @@ pg.Client.prototype.query = new Proxy(query, { apply(target, client, args) {
 
 export async function measured<T>(work: () => Promise<T>) {
   const totals: Totals = { statements: 0, resultBytes: 0 }
-  const before = received()
+  const trace = process.env.MIKKA_READ_METRICS_TRACE === '1'
+  const caller = trace ? new Error().stack?.split('\n').find(line => line.includes('/tests/') && !line.includes('/helpers/read-metrics.'))?.trim() : undefined
+  const before = received(), beforeSent = sent()
   const value = await active.run(totals, work)
-  return { value, bytes: received() - before, ...totals, responseBytes: Buffer.byteLength(JSON.stringify(value) ?? '') }
+  const result = { value, bytes: received() - before, bytesWritten: sent() - beforeSent, ...totals, responseBytes: Buffer.byteLength(JSON.stringify(value) ?? '') }
+  if (trace) console.log('Read metrics trace:', JSON.stringify({ measurement: ++measurementSequence, caller,
+    databaseStatements: result.statements, databaseJsonResultBytes: result.resultBytes,
+    databaseSocketBytes: result.bytes, databaseSocketBytesWritten: result.bytesWritten, actionJsonBytes: result.responseBytes }))
+  return result
 }
 
-export const readMetrics = ({ bytes, statements, resultBytes, responseBytes }: Awaited<ReturnType<typeof measured>>) => ({
-  databaseStatements: statements, databaseJsonResultBytes: resultBytes, databaseSocketBytes: bytes, actionJsonBytes: responseBytes,
+export const readMetrics = ({ bytes, bytesWritten, statements, resultBytes, responseBytes }: Awaited<ReturnType<typeof measured>>) => ({
+  databaseStatements: statements, databaseJsonResultBytes: resultBytes, databaseSocketBytes: bytes, databaseSocketBytesWritten: bytesWritten, actionJsonBytes: responseBytes,
 })

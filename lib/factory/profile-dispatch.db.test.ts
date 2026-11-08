@@ -163,10 +163,25 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.deepEqual((await pool.query('SELECT id,epoch,state,paused,quota FROM byos_connections WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows, before)
     assert.deepEqual((await pool.query('SELECT * FROM byos_bindings WHERE "ownerId"=$1 ORDER BY id', [f.ownerId])).rows, bindings)
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 0)
-    const unsupported = templateModelsFixture([model.codex])
+    const unreported = templateModelsFixture([model.codex])
     try {
+      assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, f.scope, request, { deferStaleQuota: true }), { available: true, reason: 'quota_check_required' }, 'a template probe cannot veto the credential model or displace its pending allowance')
+      const unreportedTarget = await modules[3].resolveModelDispatch(pool, f.scope, undefined, 'cloud', undefined, {
+        cloudPurpose: 'desktop', skipCatalogueRefresh: true, probeQuota: false, bindSubscription: false, deferStaleQuota: true,
+      })
+      assert.equal(unreportedTarget.kind, 'cloud')
+      if (unreportedTarget.kind !== 'cloud') assert.fail('An unreported credential model remains eligible for quota admission')
+      assert.equal(unreportedTarget.harness, 'claude_code')
+      assert.equal(unreportedTarget.model, model.claude_code)
+      assert.equal(unreportedTarget.quotaCheckPending, true)
+      assert.deepEqual(unreportedTarget.entry.source, { kind: 'subscription', connectionId: f.connections.claude_code }, 'the unchecked preferred source still fences the later Codex entry')
+      // Remove the actual Agent, rather than one ID from its shortcut list.
+      // An unresolved preferred allowance still cannot be bypassed for Codex.
+      const catalogue = JSON.parse(process.env.MIKKA_CLOUD_TEMPLATE_MODELS!)
+      catalogue.templates.desktop.models = catalogue.templates.desktop.models.filter((info: { harness: string }) => info.harness !== 'claude_code')
+      process.env.MIKKA_CLOUD_TEMPLATE_MODELS = JSON.stringify(catalogue)
       assert.equal((await profiles.agentProfileDispatchAvailability(pool, f.scope, request, { deferStaleQuota: true })).available, false, 'a pending preferred allowance cannot be skipped for a later supported source')
-    } finally { unsupported.restore() }
+    } finally { unreported.restore() }
     const pinned = { ...request, asked: { harness: 'claude_code' as const, model: model.claude_code } }
     for (const quota of [null, {}, { ...storedQuota(94_000), status: 'unknown' }, { ...storedQuota(94_000), source: 'local_credentials' }, storedQuota(94_000, 1)]) {
       await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [f.connections.claude_code, JSON.stringify(quota)])

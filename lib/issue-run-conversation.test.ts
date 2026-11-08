@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chainChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
+import { chainChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, runSummaryText, runSummaryView, threadItems } from './issue-run-conversation'
 
 test('only active run states offer messages; completed history stays readable', () => {
   for (const state of ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) assert.equal(runIsActive(state), true)
@@ -15,6 +15,15 @@ test('a run row shows the report summary, else the first error line, else nothin
   assert.equal(runSummaryText({ report: { summary: '' }, error: '\nDevice offline\nretrying' }), 'Device offline')
   assert.equal(runSummaryText({ report: 'raw', error: null }), null)
   assert.equal(runSummaryText({ report: null, error: null }), null)
+})
+
+test('summary provenance preserves the exact report, error fallback and empty display choices', () => {
+  for (const report of [{ summary: '' }, { summary: ' \n\t' }, { summary: null }, null, 'raw', []]) {
+    assert.deepEqual(runSummaryView({ report, error: '\n Device offline\nretrying' }), { summary: 'Device offline', summarySource: 'error' })
+    assert.deepEqual(runSummaryView({ report, error: null }), { summary: null, summarySource: null })
+  }
+  assert.deepEqual(runSummaryView({ report: { summary: ' Fixed the login loop. ' }, error: 'Stale error' }),
+    { summary: 'Fixed the login loop.', summarySource: 'report' })
 })
 
 test('the issue thread list reads on its live key, never on a timer', async () => {

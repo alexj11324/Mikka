@@ -12,6 +12,7 @@
 import { gunzipSync, gzipSync } from "node:zlib"
 
 import type { RunCheckpoint } from "@mikka/protocol"
+import { TASK_SECRET_CAPABILITY_PREFIX, maskTaskSecretCapabilities, taskSecretCapabilityHoldback } from '@mikka/protocol/task-secrets'
 
 import type { RunChunk } from "./chunks"
 
@@ -59,10 +60,12 @@ export interface RunMasker {
  */
 export function createRunMasker(secrets: ReadonlyArray<{ name: string; value: string }>): RunMasker | null {
   let needles: Array<[string, string]> = []
+  let maskCapabilities = false
   const seen = new Set<string>()
   const add = (secrets: ReadonlyArray<{ name: string; value: string }>) => {
     for (const { name, value } of secrets) {
       if (typeof value !== "string" || [...value].length < MASK_MIN_LENGTH) continue
+      if (value.startsWith(TASK_SECRET_CAPABILITY_PREFIX)) { maskCapabilities = true; continue }
       for (const form of [value, Buffer.from(value, "utf8").toString("base64")]) {
         if (seen.has(form)) continue
         seen.add(form)
@@ -72,13 +75,13 @@ export function createRunMasker(secrets: ReadonlyArray<{ name: string; value: st
     needles.sort((a, b) => b[0].length - a[0].length)
   }
   add(secrets)
-  if (!needles.length) return null
+  if (!needles.length && !maskCapabilities) return null
   let pending = new Map<string, string>()
 
   const text = (value: string) => {
     let out = value
     for (const [needle, label] of needles) if (out.includes(needle)) out = out.split(needle).join(label)
-    return out
+    return maskCapabilities ? maskTaskSecretCapabilities(out) : out
   }
   /** Characters at the end of `value` that are the start of some form (at most the longest form − 1). */
   const holdback = (value: string) => {
@@ -86,7 +89,7 @@ export function createRunMasker(secrets: ReadonlyArray<{ name: string; value: st
     for (const [needle] of needles)
       for (let k = Math.min(needle.length - 1, value.length); k > hold; k--)
         if (value.endsWith(needle.slice(0, k))) { hold = k; break }
-    return hold
+    return maskCapabilities ? Math.max(hold, taskSecretCapabilityHoldback(value)) : hold
   }
   /**
    * How much of the raw buffer can be released: everything before a tail that could still grow into
@@ -169,6 +172,7 @@ export function createRunMasker(secrets: ReadonlyArray<{ name: string; value: st
     },
     dispose() {
       needles = []
+      maskCapabilities = false
       seen.clear()
       pending = new Map()
     },

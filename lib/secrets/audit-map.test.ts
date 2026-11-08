@@ -22,3 +22,14 @@ test('denied and skipped events stay out of the log', () => {
   assert.equal(secretAuditEvent({ workspaceId, actorId: 'u-1', action: 'secret.replace_denied', target: { type: 'secret', id: 'x', label: '' } }, actor), null)
   assert.equal(secretAuditEvent({ workspaceId, actorId: 'u-1', action: 'secret.injection_skipped', target: { type: 'secret', id: 'x', label: 'PATH' } }, actor), null)
 })
+
+test('secret delivery changes are auditable without copying secret-bearing configuration', () => {
+  const changed = secretAuditEvent({ workspaceId, actorId: actor.id, action: 'secret.replaced', target: { type: 'secret', id: 's1', label: 'API_TOKEN' },
+    metadata: { delivery: 'direct', previousDelivery: 'protected', secret: 'synthetic-canary', capability: 'opaque-bearer', origin: 'https://api.example.com?secret=synthetic-canary' } }, actor)
+  assert.deepEqual(changed && toAuditRow(changed).metadata, { delivery: 'direct', previousDelivery: 'protected' })
+  const invalid = secretAuditEvent({ workspaceId, actorId: actor.id, action: 'secret.created', target: { type: 'secret', id: 's1', label: 'API_TOKEN' },
+    metadata: { delivery: 'synthetic-canary', previousDelivery: 'https://evil.example' } }, actor)
+  assert.deepEqual(invalid && toAuditRow(invalid).metadata, {})
+  assert.ok(!JSON.stringify(changed).includes('synthetic-canary'))
+  assert.ok(!JSON.stringify(changed).includes('opaque-bearer'))
+})
