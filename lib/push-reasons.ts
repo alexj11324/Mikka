@@ -8,7 +8,21 @@ import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema
 export type PushReason = 'decide' | 'review' | 'finished' | 'briefing'
 export const PUSH_REASONS: readonly PushReason[] = ['decide', 'review', 'finished', 'briefing']
 
-export interface InboxEvent { kind: CoordinatorEventKind; tier: CoordinatorEventTier | null }
+/** An event the turn answered; its run and task, when it has them, say where a push about it opens (2026-11-07). */
+export interface InboxEvent { kind: CoordinatorEventKind; tier: CoordinatorEventTier | null; runId?: string | null; issueId?: string | null }
+
+/**
+ * The task a push about these events opens: a 需要你决策 or 待审阅 push about one task's thread opens that task at
+ * the attempt (decisions/2026-11-07-2045-tasks-only-threads-inside.md). Several tasks, or none, open the chat.
+ */
+export function pushTask(events: readonly InboxEvent[], reason: PushReason): { issueId: string; runId: string | null } | null {
+  if (reason !== 'decide' && reason !== 'review') return null
+  const issues = new Set(events.flatMap(event => event.issueId ? [event.issueId] : []))
+  if (issues.size !== 1) return null
+  const [issueId] = issues
+  const runs = new Set(events.flatMap(event => event.issueId === issueId && event.runId ? [event.runId] : []))
+  return { issueId: issueId!, runId: runs.size === 1 ? [...runs][0]! : null }
+}
 
 // Whether a Coordinator reply goes to the person's phone, and as which kind,
 // is the Decisions API's answer (Alex, 2026-11-01: 「全部交给 Decision API」).
