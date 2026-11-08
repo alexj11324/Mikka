@@ -1,6 +1,6 @@
 import 'server-only'
 import { withRunWorkspace } from '@/lib/run-completion'
-import { assertRunProfileClaim, refreshCloudRunProfileClaim } from '@/lib/factory/profile-admission'
+import { assertLockedRunProfileClaim, assertRunProfileClaim, refreshCloudRunProfileClaim } from '@/lib/factory/profile-admission'
 import { executionIdentityForRun, ExecutionIdentityError } from '../execution-identity'
 import type { Pool, PoolClient } from 'pg'
 import { computerPermission, type ComputerPermission } from './permission'
@@ -66,9 +66,9 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     const permission: ComputerPermission = desktop ? 'allow' : 'deny'
     await executionIdentityForRun(client, runId)
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
-    const run = (await client.query('SELECT id,"agentId" FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND "userId"=$3 AND status=$4 AND "stopRequestedAt" IS NULL AND "workspaceId"=$5 FOR UPDATE', [runId, deviceId, actor.userId, 'queued', stored.workspaceId])).rows[0]
+    const run = (await client.query<typeof import('@/lib/db/schema').agentRuns.$inferSelect>('SELECT * FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND "userId"=$3 AND status=$4 AND "stopRequestedAt" IS NULL AND "workspaceId"=$5 FOR UPDATE', [runId, deviceId, actor.userId, 'queued', stored.workspaceId])).rows[0]
     if (!run) { await client.query('COMMIT'); return null }
-    await assertRunProfileClaim(client, runId)
+    await assertLockedRunProfileClaim(client, run)
     // Every cloud thread runs on its own thread machine; the Bot's computer serves only the Bot.
     const binding = (await client.query(`SELECT b."botId",1 AS display FROM computer_run_bindings b
       JOIN thread_machines m ON m."runId"=b."runId" AND m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m."deviceId"=$2

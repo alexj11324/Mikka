@@ -29,6 +29,20 @@ def mcp_timing(run_id, harness):
             'requests': [{'child': 1, 'sequence': 1, 'operation': 'decision_catalogue', 'startedAt': 1040,
                           'endedAt': 1050, 'durationMs': 10, 'status': 200, 'outcome': 'ok'}]}
 
+def bootstrap_acceptance(run_id, harness):
+    base = {'version': 1, 'runIdHash': hashlib.sha256(run_id.encode()).hexdigest()[:16],
+            'harness': harness, 'outcome': 'ok', 'truncated': False}
+    source = 'bootstrap_codex_initialize' if harness == 'codex' else 'bootstrap_claude_start'
+    prepared = {**base, 'startedAt': 1000, 'endedAt': 1500, 'ms': 500, 'source': source,
+                'phases': [{'name': 'daemon.adapter.cli_init.prewarm', 'startMs': 0, 'endMs': 300, 'ms': 300, 'outcome': 'ok'},
+                           {'name': 'daemon.adapter.cli_init', 'startMs': 490, 'endMs': 500, 'ms': 10, 'outcome': 'ok'}]}
+    if harness == 'claude_code':
+        prepared.update(claimAuthentication='oauth_environment', observedAuthSource='oauth_environment')
+    return {'version': 1, 'runIdHash': base['runIdHash'], 'harness': harness, 'source': source,
+            'bootstrapSha256': '1' * 64, 'hintSha256': '2' * 64, 'preparationTiming': prepared,
+            'startupTiming': {**base, 'startedAt': 1200, 'endedAt': 1600, 'ms': 400, 'phases': []}}
+
+
 class FakeResponse(io.BytesIO):
     def __enter__(self): return self
     def __exit__(self, *_): return False
@@ -579,6 +593,7 @@ with fixture.root_file_metadata():
             kind: {'status': 'passed', 'templateId': 'tpl-' + kind, 'sourceCommit': report['sourceCommit'],
                    'workerSha': report['workerSha'], 'harness': harness, 'model': model, 'credentialRoute': 'subscription',
                    'officialBinarySha256': 'e' * 64, 'officialCliVersion': 'fixture-version',
+                   'bootstrapAcceptance': bootstrap_acceptance('run-' + kind, harness),
                    'agentAcceptance': {'runIdHash': hashlib.sha256(('run-' + kind).encode()).hexdigest()[:16], 'harness': harness,
                                        'kind': 'claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack', 'at': 1100, 'ms': 100},
                    'runtimeAuthorization': {'source': 'http_server_link', 'scope': 'daemon_http_server_link_and_task_fetch',
@@ -591,7 +606,7 @@ with fixture.root_file_metadata():
                    'replyVerified': True, 'runId': 'run-' + kind, 'deviceId': 'device-' + kind}
             for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]}
         self.assertIs(bt.verify_release_evidence(report), report)
-        for field, value in [('templateId', 'old-template'), ('sourceCommit', 'c' * 40), ('credentialRoute', 'api_key'), ('replyVerified', False), ('model', 'other'),
+        for field, value in [('bootstrapAcceptance', None), ('bootstrapAcceptance', bootstrap_acceptance('foreign', 'codex')), ('templateId', 'old-template'), ('sourceCommit', 'c' * 40), ('credentialRoute', 'api_key'), ('replyVerified', False), ('model', 'other'),
                              ('replyVerifiedAfterTool', None), ('replyVerifiedAfterTool', False), ('toolEvidence', None),
                              ('toolEvidence', {'toolCallHash': 'd' * 16, 'outcome': 'error'}),
                              ('toolEvidence', {'toolCallHash': 'raw-id', 'outcome': 'ok'}),
@@ -747,6 +762,12 @@ class WorkerHash(unittest.TestCase):
                 self.assertNotEqual(recipe, second)
                 write('scripts/e2b/viewer-gateway.py', 'guard'); git('add', '.'); git('commit', '-qm', 'viewer guard')
                 self.assertNotEqual(bt.worker_hash('HEAD'), recipe)
+                viewer = bt.worker_hash('HEAD')
+                write('scripts/e2b/acceptance-bootstrap.mts', 'candidate helper'); git('add', '.'); git('commit', '-qm', 'candidate helper')
+                helper = bt.worker_hash('HEAD')
+                self.assertNotEqual(helper, viewer)
+                write('scripts/e2b/acceptance-bootstrap.mts', 'changed candidate helper'); git('commit', '-qam', 'candidate helper change')
+                self.assertNotEqual(bt.worker_hash('HEAD'), helper)
             finally:
                 bt.ROOT = root
 

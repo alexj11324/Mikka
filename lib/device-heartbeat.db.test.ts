@@ -112,3 +112,102 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
     assert.equal(new Date(leased.leases[run]).getTime(), leaseExpiresAt.getTime())
   })
 })
+
+dbTest('initial claim repository handoff removes a real cloud repos request without increasing SQL, rows or response bytes', async t => {
+  const [{ createRequestDatabaseScope, pool }, { GET }, { readRepositorySettings }] = await Promise.all([
+    import('./db'), import('../app/v1/devices/[deviceId]/repos/route'), import('./device-repositories'),
+  ])
+  const { Client } = await import('pg')
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = 'repository-handoff-' + randomUUID(), device = randomUUID(), agent = randomUUID(), run = randomUUID(), repo = randomUUID(), workspace = randomUUID()
+  const token = 'orv_' + randomBytes(32).toString('base64url'), remote = 'https://github.com/fixture/repository.git'
+  type Meter = { queries: number; sqlBytes: number; resultRows: number; sentBytes: number; receivedBytes: number }
+  type Channel = { write:(chunk:Uint8Array|string,...args:unknown[])=>boolean; on:(event:'data',fn:(data:Buffer)=>void)=>unknown; off:(event:'data',fn:(data:Buffer)=>void)=>unknown }
+  let active: Meter | undefined
+  const channels = new Map<Channel,{write:Channel['write'];receive:(data:Buffer)=>void}>()
+  const original = Client.prototype.query
+  Client.prototype.query = new Proxy(original,{apply(target,client,args) {
+    if (active) {
+      const meter = active
+      meter.queries++
+      meter.sqlBytes += Buffer.byteLength(typeof args[0] === 'string' ? args[0] : args[0].text)
+      const channel = (client as unknown as {connection:{stream:Channel}}).connection.stream
+      if (!channels.has(channel)) {
+        const write = channel.write
+        const receive = (data:Buffer) => { if(active)active.receivedBytes += data.length }
+        channel.write = function(chunk,...rest) { if(active)active.sentBytes += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.byteLength; return write.call(this,chunk,...rest) }
+        channel.on('data',receive);channels.set(channel,{write,receive})
+      }
+      const observed = (result:unknown) => {
+        const results = Array.isArray(result) ? result : [result]
+        for(const value of results)if(value && typeof value==='object' && 'rows' in value && Array.isArray(value.rows))meter.resultRows += value.rows.length
+      }
+      const callback = args.at(-1)
+      if(typeof callback==='function')args[args.length-1]=(error:unknown,result:unknown)=>{observed(result);callback(error,result)}
+      const result = Reflect.apply(target,client,args)
+      return result && typeof result.then==='function' ? result.then((value:unknown)=>{observed(value);return value}) : result
+    }
+    return Reflect.apply(target,client,args)
+  }})
+  const measure = async<T>(fn:()=>Promise<T>) => {
+    const meter:Meter={queries:0,sqlBytes:0,resultRows:0,sentBytes:0,receivedBytes:0}
+    active=meter
+    try {return {meter,value:await fn()}}finally{active=undefined}
+  }
+  try {
+    await scope.run(async()=>{
+      await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$1||\'@example.invalid\',false,now(),now())',[owner])
+      await pool.query('INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,$2,\'Task fixture\',\'cloud\')',[device,owner])
+      await pool.query('INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,\'Fixture\',\'codex\')',[agent,owner])
+      await pool.query('INSERT INTO agent_runs(id,"userId","agentId","deviceId",status) VALUES($1,$2,$3,$4,\'queued\')',[run,owner,agent,device])
+      await pool.query('INSERT INTO thread_machines("runId","ownerId","workspaceId","deviceId","snapshotId","operationId",state) VALUES($1,$2,$3,$4,\'fixture\',$5,\'starting\')',[run,owner,workspace,device,randomUUID()])
+      await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt","lastUsedAt") VALUES($1,$2,$3,$4,$5,now()+interval \'1 day\',now())',[randomUUID(),owner,createHash('sha256').update(token).digest('hex'),device,workspace])
+      await pool.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,\'v2/github.com/fixture/repository\',$4)',[repo,device,owner,remote])
+      const request=()=>new Request('http://127.0.0.1/v1/devices/'+device+'/repos',{headers:{authorization:'Bearer '+token,'x-mikka-client-version':'999.0.0'}})
+      const get=()=>GET(request(),{params:Promise.resolve({deviceId:device})})
+      // Warm this isolated connection before measuring protocol messages. No production IO.
+      assert.equal((await get()).status,200)
+      for(const scenario of ['missing','complete','unicode'] as const) {
+        await pool.query('DELETE FROM repository_settings WHERE "userId"=$1',[owner])
+        if(scenario!=='missing')await pool.query('INSERT INTO repository_settings("userId","remoteKey",setup,"networkAllow") VALUES($1,\'v2/github.com/fixture/repository\',$2,$3)',[owner,JSON.stringify({approved:true,copyFiles:['.env.local'],command:scenario==='unicode'?'echo '+ '测试'.repeat(300):'npm ci'}),JSON.stringify(['registry.npmjs.org'])])
+        const old=await measure(async()=>{
+          await readRepositorySettings(owner,remote) // the existing claim read, unchanged
+          const response=await get();assert.equal(response.status,200)
+          return await response.text()
+        })
+        const next=await measure(()=>readRepositorySettings(owner,remote))
+        if(scenario!=='missing')assert(next.value?.setup, 'the complete/Unicode fixtures must read their real setup row')
+        const selected=JSON.parse(old.value).repos[0]
+        assert.deepEqual(selected.setup,next.value?.setup ?? undefined)
+        assert.deepEqual(selected.networkAllow,next.value?.networkAllow ?? undefined)
+        const originalClaim={runId:run,repoId:repo,remoteUrl:remote}
+        const oldResponseBytes=Buffer.byteLength(JSON.stringify(originalClaim))+Buffer.byteLength(old.value)
+        const nextResponseBytes=Buffer.byteLength(JSON.stringify({...originalClaim,repo:selected}))
+        assert(next.meter.queries<old.meter.queries)
+        assert(next.meter.resultRows<old.meter.resultRows)
+        assert(next.meter.sentBytes<old.meter.sentBytes)
+        assert(next.meter.receivedBytes<old.meter.receivedBytes)
+        assert(nextResponseBytes<=oldResponseBytes)
+        t.diagnostic(JSON.stringify({metric:'initial_repository_task_delta',scenario,unchangedTaskPrefixSuffixExcluded:true,
+          protocol:'PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately',original:old.meter,candidate:next.meter,
+          oldResponseBytes,nextResponseBytes,sqlDelta:next.meter.queries-old.meter.queries,
+          rowDelta:next.meter.resultRows-old.meter.resultRows,wireDelta:next.meter.sentBytes+next.meter.receivedBytes-old.meter.sentBytes-old.meter.receivedBytes,
+          responseBodyDelta:nextResponseBytes-oldResponseBytes}))
+      }
+      assert.equal(await readRepositorySettings('different-owner',remote),null)
+    })
+  } finally {
+    active=undefined;Client.prototype.query=original
+    for(const[channel,entry]of channels){channel.write=entry.write;channel.off('data',entry.receive)}
+    await scope.run(async()=>{
+      await pool.query('DELETE FROM device_tokens WHERE "userId"=$1',[owner])
+      await pool.query('DELETE FROM agent_runs WHERE "userId"=$1',[owner])
+      await pool.query('DELETE FROM agents WHERE "userId"=$1',[owner])
+      await pool.query('DELETE FROM repository_settings WHERE "userId"=$1',[owner])
+      await pool.query('DELETE FROM device_repos WHERE "userId"=$1',[owner])
+      await pool.query('DELETE FROM devices WHERE "ownerId"=$1',[owner])
+      await pool.query('DELETE FROM "user" WHERE id=$1',[owner])
+    })
+    await scope.close()
+  }
+})
