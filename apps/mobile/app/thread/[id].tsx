@@ -11,6 +11,7 @@ import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
+import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { Composer } from '@/features/chat/components/chat-composer'
 import { api, ApiError } from '@/lib/api'
 import { ReadNotice } from '@/components/ReadNotice'
@@ -31,6 +32,7 @@ export default function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const bar = useScrolledUnderBar()
   // Read again when one of its runs writes text or changes state (the web's thread and run keys); an
   // ended thread changes only when it runs again. Each read is the whole conversation.
   const { data, error, reload } = useLiveApi<ThreadDetail>(`/api/mobile/threads/${id}`, current => threadLive(current, id))
@@ -62,6 +64,7 @@ export default function ThreadScreen() {
   return (
     <View style={styles.screen}>
       <NavBar
+        scrolled={bar.scrolled}
         back={() => (router.canGoBack() ? router.back() : router.replace('/tasks'))}
         titleView={thread ? (
           <View style={styles.titleRow}>
@@ -79,7 +82,7 @@ export default function ThreadScreen() {
         // Stop for every live thread, also one waiting for your answer, whose composer sends (N1).
         right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: '停止', web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
       />
-      <KeyboardChatScrollView {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label="线程" onRetry={reload} />
         {data?.items.map((item, index) => {
