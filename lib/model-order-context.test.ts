@@ -98,7 +98,9 @@ for (const allowed of [false, true]) test(`prompt projection skips only unused c
   const fullQuery = fixture(allowed), promptQuery = fixture(allowed)
   const full = await orderView(queryType(fullQuery), fullQuery.scope, async () => devices)
   const prompt = await context(promptQuery)
-  const saved = allowed ? 4 : 3
+  // The full view counts connected subscriptions and the own/shared key rows.
+  // Empty shared-key candidates no longer issue an unused policy read.
+  const saved = 3
   t.diagnostic(JSON.stringify({ kind: 'order_projection_query_budget', allowed, full: fullQuery.trace.length, context: promptQuery.trace.length, saved: fullQuery.trace.length - promptQuery.trace.length }))
   assert.equal(fullQuery.trace.length - promptQuery.trace.length, saved, 'prompt_unused_count_queries_remain')
   assert.deepEqual(prompt, fields(full), 'the prompt consumes the exact same model and credential-state projection')

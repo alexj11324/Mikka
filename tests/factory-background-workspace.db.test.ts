@@ -327,7 +327,7 @@ test('background Factory transactions use persisted tenants before the APP pool 
 
     const [{ sweepFactoryMonitor }, { createFactoryMonitor }, { sweepFactoryWatchdog }, { factoryAuthorize }, { factoryMonitorWorkspaceKey }] = await Promise.all([
       import('../lib/factory/monitor-sweep'), import('../lib/factory/monitor'), import('../lib/factory/watchdog'),
-      import('../lib/factory/authorize'), import('../lib/factory/server'),
+      import('../lib/factory/runtime'), import('../lib/factory/server'),
     ])
     let monitorScopes = 0, admissions = 0, runtimeReads = 0, dispatches = 0, watchdogWakes = 0
     assert.deepEqual(await sweepFactoryMonitor(pool, () => {
