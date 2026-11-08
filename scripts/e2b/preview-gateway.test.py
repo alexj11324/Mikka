@@ -1,0 +1,324 @@
+"""Real TCP/HTTP/WebSocket acceptance; all identities and cookies are synthetic.
+
+No browser, model, external service or production credential is used. Run with
+python3 scripts/e2b/preview-gateway.test.py in an isolated Linux environment.
+"""
+import asyncio
+import importlib.util
+import json
+import os
+from pathlib import Path
+import tempfile
+import threading
+import time
+import unittest
+
+from aiohttp import ClientSession, DummyCookieJar, WSMsgType, web
+
+spec = importlib.util.spec_from_file_location('preview_gateway', Path(__file__).with_name('preview-gateway.py'))
+gateway_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gateway_module)
+
+
+class PreviewAcceptance(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='mikka-preview-acceptance-')
+        self.root = Path(self.temporary.name)
+        self.previous = os.getcwd()
+        os.chdir(self.root)
+        self.protected = []
+        # This fixture proves proxy behavior over real TCP, not the host
+        # kernel's firewall. The external E2B gate proves public-port denial.
+        self.gateway = gateway_module.Gateway(self.root, user_id=os.getuid(), protect=lambda port: self.protected.append(port))
+        await self.gateway.start()
+        self.observed = []
+        self.app = web.Application()
+
+        async def resource(request):
+            self.observed.append({'path': request.path_qs, 'host': request.host, 'origin': request.headers.get('Origin'),
+                                  'cookie': request.headers.get('Cookie'), 'authorization': request.headers.get('Authorization'),
+                                  'forwarded': request.headers.get('Forwarded'), 'body': (await request.read()).decode()})
+            if request.path == '/redirect':
+                return web.Response(status=302, headers={'Location': '/assets/app.js?ok=1'})
+            if request.path == '/redirect-loopback':
+                return web.Response(status=302, headers={'Location': f'http://localhost:{self.upstream_port}/nested'})
+            if request.path == '/redirect-external':
+                return web.Response(status=302, headers={'Location': 'https://example.invalid/stolen'})
+            if request.path == '/cookies':
+                response = web.Response(text='cookie set')
+                response.set_cookie('app_session', 'synthetic-app-session', path='/')
+                response.set_cookie('parent_attack', 'synthetic-parent-cookie', domain='example.test')
+                response.set_cookie('__Host-mikka_preview', 'synthetic-replacement')
+                return response
+            if request.path == '/hmr':
+                ws = web.WebSocketResponse(protocols=('vite-hmr',))
+                await ws.prepare(request)
+                async for message in ws:
+                    if message.type == WSMsgType.TEXT:
+                        await ws.send_str('hmr:' + message.data)
+                return ws
+            if request.path == '/assets/app.js':
+                return web.Response(text='export const accepted = true', content_type='application/javascript')
+            return web.Response(text='<script type="module" src="/assets/app.js"></script><a href="nested">relative</a>', content_type='text/html')
+
+        self.app.router.add_route('*', '/{path:.*}', resource)
+        self.upstream_runner = web.AppRunner(self.app)
+        await self.upstream_runner.setup()
+        self.upstream_site = web.TCPSite(self.upstream_runner, '127.0.0.1', 0)
+        await self.upstream_site.start()
+        self.upstream_port = self.upstream_site._server.sockets[0].getsockname()[1]
+        self.binding = {'taskId': 'task-a', 'runId': 'run-a', 'ownerId': 'owner-a', 'workspaceId': 'workspace-a',
+                        'deviceId': 'device-a', 'repoId': 'repo-a', 'sandboxId': 'sandbox-a', 'epoch': 1,
+                        'worktreePath': str(self.root), 'expiresAt': time.time() + 120}
+        self.origin = 'https://preview.example.test'
+        self.client = ClientSession(cookie_jar=DummyCookieJar(), trust_env=False)
+        self.cookie = None
+        self.port = None
+        self.lease_id = 'synthetic-lease-a'
+
+    async def asyncTearDown(self):
+        await self.gateway.close()
+        await self.client.close()
+        await self.upstream_runner.cleanup()
+        os.chdir(self.previous)
+        self.temporary.cleanup()
+
+    async def prepare(self, binding=None):
+        result = await self.gateway.control({'operation': 'prepare', 'binding': binding or self.binding, 'port': self.upstream_port})
+        self.assertTrue(result['running'])
+        self.port = result['gatewayPort']
+        return result
+
+    async def issue(self, binding=None):
+        return await self.gateway.control({'operation': 'issue', 'binding': binding or self.binding,
+                                          'gatewayPort': self.port, 'origin': self.origin, 'parentOrigin': 'https://mikka.example.test', 'leaseId': self.lease_id})
+
+    def headers(self, **changes):
+        return {'Host': 'preview.example.test', 'Cookie': self.cookie or '', **changes}
+
+    def url(self, path='/'):
+        return f'http://127.0.0.1:{self.port}' + path
+
+    async def open(self):
+        await self.prepare()
+        ticket = (await self.issue())['ticket']
+        async with self.client.get(self.url(gateway_module.ENTRY + '?ticket=' + ticket), headers=self.headers(**{
+            'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'iframe'}), allow_redirects=False) as reply:
+            self.assertEqual(reply.status, 200)
+            document = await reply.text()
+            self.assertIn('history.replaceState(null,"","/");location.replace("/")', document)
+            self.assertNotIn(ticket, document)
+            self.assertNotIn('Location', reply.headers)
+            self.assertIn("default-src 'none'", reply.headers['Content-Security-Policy'])
+            cookies = reply.headers.getall('Set-Cookie')
+            self.assertEqual(len(cookies), 1)
+            self.assertTrue(all(flag in cookies[0] for flag in ('__Host-', 'HttpOnly', 'Secure', 'SameSite=None', 'Partitioned', 'Path=/')))
+            self.cookie = cookies[0].split(';')[0]
+        return ticket
+
+    async def test_http_assets_relative_redirects_and_cookie_isolation(self):
+        ticket = await self.open()
+        async with self.client.get(self.url(), headers=self.headers()) as reply:
+            self.assertEqual(reply.status, 200)
+            self.assertIn('/assets/app.js', await reply.text())
+            self.assertEqual(reply.headers['Referrer-Policy'], 'no-referrer')
+            self.assertNotIn(ticket, await reply.text())
+        async with self.client.get(self.url('/assets/app.js?ok=1'), headers=self.headers(Authorization='Bearer synthetic-main-credential',
+                                   Cookie=self.cookie + '; better-auth.session_token=synthetic-main-cookie; forged=synthetic-forged',
+                                   Forwarded='host=attacker.invalid')) as reply:
+            self.assertEqual(reply.status, 200)
+            self.assertIn('application/javascript', reply.headers['Content-Type'])
+        observed = self.observed[-1]
+        self.assertEqual(observed['host'], f'localhost:{self.upstream_port}')
+        self.assertEqual(observed['origin'], f'http://localhost:{self.upstream_port}')
+        self.assertIsNone(observed['cookie'])
+        self.assertIsNone(observed['authorization'])
+        self.assertIsNone(observed['forwarded'])
+        for source, location in (('/redirect', self.origin + '/assets/app.js?ok=1'), ('/redirect-loopback', self.origin + '/nested')):
+            async with self.client.get(self.url(source), headers=self.headers(), allow_redirects=False) as reply:
+                self.assertEqual(reply.status, 302)
+                self.assertEqual(reply.headers['Location'], location)
+        async with self.client.get(self.url('/redirect-external'), headers=self.headers(), allow_redirects=False) as reply:
+            self.assertEqual(reply.status, 502)
+            self.assertEqual((await reply.json())['code'], 'redirect_denied')
+        async with self.client.get(self.url('/cookies'), headers=self.headers()) as reply:
+            self.assertEqual(reply.status, 200)
+            cookies = reply.headers.getall('Set-Cookie')
+            self.assertEqual(len(cookies), 1)
+            self.assertIn('app_session=', cookies[0])
+            self.assertNotIn('Domain=', cookies[0])
+            self.assertIn('Partitioned', cookies[0])
+        async with self.client.get(self.url('/nested'), headers=self.headers()) as reply:
+            self.assertEqual(reply.status, 200)
+        self.assertEqual(self.observed[-1]['cookie'], 'app_session=synthetic-app-session')
+        async with self.client.post(self.url('/submit'), headers=self.headers(Origin=self.origin), data='accepted-body') as reply:
+            self.assertEqual(reply.status, 200)
+        self.assertEqual(self.observed[-1]['body'], 'accepted-body')
+
+    async def test_ticket_replay_host_origin_and_scope_denials(self):
+        ticket = await self.open()
+        async with self.client.get(self.url(gateway_module.ENTRY + '?ticket=' + ticket), headers=self.headers(), allow_redirects=False) as reply:
+            self.assertEqual(reply.status, 401)
+        for headers in (self.headers(Host='attacker.invalid'), self.headers(Cookie=''), self.headers(Origin='https://attacker.invalid'), self.headers(**{'Sec-Fetch-Site': 'cross-site'})):
+            async with self.client.get(self.url(), headers=headers) as reply:
+                self.assertIn(reply.status, (401, 403))
+        async with self.client.post(self.url('/submit'), headers=self.headers(), data='denied') as reply:
+            self.assertEqual(reply.status, 403)
+        for key in ('runId', 'ownerId', 'workspaceId', 'deviceId', 'repoId', 'sandboxId', 'worktreePath'):
+            other = {**self.binding, key: self.binding[key] + '-other'}
+            with self.assertRaises(gateway_module.PreviewFailure) as error:
+                await self.issue(other)
+            self.assertEqual(error.exception.code, 'scope_changed')
+        with self.assertRaises(gateway_module.PreviewFailure):
+            await self.gateway.control({'operation': 'prepare', 'binding': self.binding, 'port': 49983})
+
+    async def test_real_websocket_hmr_and_immediate_revocation(self):
+        await self.open()
+        ws = await self.client.ws_connect(self.url('/hmr'), headers=self.headers(Origin=self.origin), protocols=('vite-hmr',))
+        self.assertEqual(ws.protocol, 'vite-hmr')
+        await ws.send_str('module-changed')
+        self.assertEqual((await ws.receive(timeout=2)).data, 'hmr:module-changed')
+        started = time.monotonic()
+        result = await self.gateway.control({'operation': 'revoke', 'runId': self.binding['runId']})
+        self.assertTrue(result['revoked'])
+        self.assertLess(time.monotonic() - started, 1)
+        self.assertIn((await ws.receive(timeout=2)).type, (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING))
+        await ws.close()
+        with self.assertRaises(gateway_module.PreviewFailure) as error:
+            await self.prepare()
+        self.assertEqual(error.exception.code, 'authorization_revoked')
+
+    async def test_slow_discovery_never_delays_revocation_or_reopens_a_stopped_run(self):
+        await self.open()
+        websocket = await self.client.ws_connect(self.url('/hmr'), headers=self.headers(Origin=self.origin))
+        entered = asyncio.Event()
+        release = threading.Event()
+        loop = asyncio.get_running_loop()
+
+        def delayed_protection(_port):
+            loop.call_soon_threadsafe(entered.set)
+            if not release.wait(timeout=5):
+                raise RuntimeError('Synthetic discovery was not released')
+
+        self.gateway.protect = delayed_protection
+        preparing = asyncio.create_task(self.prepare())
+        try:
+            await asyncio.wait_for(entered.wait(), timeout=2)
+            started = time.monotonic()
+            await asyncio.wait_for(self.gateway.control({'operation': 'revoke', 'runId': self.binding['runId']}), timeout=1)
+            self.assertLess(time.monotonic() - started, 1)
+            self.assertIn((await websocket.receive(timeout=2)).type, (WSMsgType.CLOSE, WSMsgType.CLOSING, WSMsgType.CLOSED))
+        finally:
+            release.set()
+            await websocket.close()
+        with self.assertRaises(gateway_module.PreviewFailure) as error:
+            await preparing
+        self.assertEqual(error.exception.code, 'authorization_revoked')
+        self.assertIsNone(self.gateway.port)
+
+    async def test_stop_rebind_and_new_run_origin_do_not_reuse_capability(self):
+        await self.open()
+        previous_port = self.port
+        previous_cookie = self.cookie
+        await self.upstream_site.stop()
+        # Binding a new socket at the same port must not inherit old authority.
+        self.upstream_site = web.TCPSite(self.upstream_runner, '127.0.0.1', self.upstream_port)
+        await self.upstream_site.start()
+        async with self.client.get(self.url(), headers=self.headers()) as reply:
+            self.assertEqual(reply.status, 409)
+            self.assertEqual((await reply.json())['code'], 'server_stopped')
+        next_binding = {**self.binding, 'runId': 'run-b', 'epoch': 2}
+        await self.prepare(next_binding)
+        self.assertNotEqual(self.port, previous_port)
+        await self.issue(next_binding)
+        async with self.client.get(self.url(), headers=self.headers(Cookie=previous_cookie)) as reply:
+            self.assertEqual(reply.status, 401)
+        self.assertIn(previous_port, json.loads((self.root / 'ports.json').read_text()))
+
+    async def test_expiry_closes_idle_websocket_without_polling(self):
+        self.binding['expiresAt'] = time.time() + 1
+        await self.open()
+        ws = await self.client.ws_connect(self.url('/hmr'), headers=self.headers(Origin=self.origin), protocols=('vite-hmr',))
+        message = await ws.receive(timeout=2)
+        self.assertIn(message.type, (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING))
+        await ws.close()
+        self.assertIsNone(self.gateway.site)
+
+    async def test_port_and_worktree_discovery_and_limits(self):
+        other_path = self.root / 'other-repository'
+        other_path.mkdir()
+        result = await self.gateway.control({'operation': 'prepare', 'binding': {**self.binding, 'worktreePath': str(other_path)}, 'port': self.upstream_port})
+        self.assertFalse(result['running'])
+        await self.open()
+        session = next(iter(self.gateway.sessions.values()))
+        session['bytes'] = gateway_module.MAX_SESSION_BYTES
+        async with self.client.post(self.url('/submit'), headers=self.headers(Origin=self.origin), data='one-byte-over-budget') as reply:
+            self.assertEqual(reply.status, 429)
+            self.assertEqual((await reply.json())['code'], 'byte_limit')
+        while len(self.gateway.sessions) + len(self.gateway.tickets) < gateway_module.MAX_SESSIONS:
+            self.lease_id = 'synthetic-lease-' + str(len(self.gateway.tickets) + 1)
+            await self.issue()
+        self.lease_id = 'synthetic-lease-over-limit'
+        with self.assertRaises(gateway_module.PreviewFailure) as error:
+            await self.issue()
+        self.assertEqual(error.exception.code, 'session_limit')
+
+    async def test_reopening_same_lease_rotates_ticket_without_a_sliding_expiry(self):
+        await self.open()
+        expiry = self.gateway.binding['expiresAt']
+        first = (await self.issue())['ticket']
+        second = (await self.issue())['ticket']
+        self.assertNotEqual(first, second)
+        self.assertEqual(len(self.gateway.tickets), 1)
+        async with self.client.get(self.url(gateway_module.ENTRY + '?ticket=' + first), headers=self.headers()) as reply:
+            self.assertEqual(reply.status, 401)
+        self.assertEqual(self.gateway.binding['expiresAt'], expiry)
+
+    async def test_revoked_lease_cannot_issue_late_and_new_lease_gets_new_origin(self):
+        await self.prepare()
+        previous_port = self.port
+        await self.gateway.control({'operation': 'revoke', 'runId': self.binding['runId'], 'leaseIds': [self.lease_id]})
+        await self.prepare()
+        self.assertEqual(self.port, previous_port, 'an unissued lease has no browser session to close')
+        with self.assertRaises(gateway_module.PreviewFailure) as error:
+            await self.issue()
+        self.assertEqual(error.exception.code, 'authorization_revoked')
+        self.lease_id = 'synthetic-lease-b'
+        self.assertIn('ticket', await self.issue())
+
+    async def test_terminal_lease_revocation_does_not_close_a_preview_lease(self):
+        await self.open()
+        previous_port = self.port
+        await self.gateway.control({'operation': 'revoke', 'runId': self.binding['runId'], 'leaseIds': ['synthetic-terminal-lease']})
+        self.assertEqual(self.gateway.port, previous_port)
+        async with self.client.get(self.url(), headers=self.headers()) as reply:
+            self.assertEqual(reply.status, 200)
+
+    async def test_worktree_symlink_and_public_listener_are_not_authority(self):
+        link = self.root / 'linked-worktree'
+        link.symlink_to(self.root, target_is_directory=True)
+        with self.assertRaises(gateway_module.PreviewFailure) as error:
+            await self.gateway.control({'operation': 'prepare', 'binding': {**self.binding, 'worktreePath': str(link)}, 'port': self.upstream_port})
+        self.assertEqual(error.exception.code, 'worktree_unavailable')
+        public = web.TCPSite(self.upstream_runner, '0.0.0.0', 0)
+        await public.start()
+        try:
+            port = public._server.sockets[0].getsockname()[1]
+            result = await self.gateway.control({'operation': 'prepare', 'binding': self.binding, 'port': port})
+            self.assertFalse(result['running'])
+        finally:
+            await public.stop()
+
+    async def test_missing_kernel_protection_never_mints_a_preview_origin(self):
+        def unavailable(_port):
+            raise gateway_module.FirewallError('firewall_unsupported')
+        self.gateway.protect = unavailable
+        with self.assertRaises(gateway_module.PreviewFailure) as error:
+            await self.prepare()
+        self.assertEqual(error.exception.code, 'firewall_unsupported')
+        self.assertIsNone(self.gateway.port)
+        self.assertEqual(len(self.gateway.tickets), 0)
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)

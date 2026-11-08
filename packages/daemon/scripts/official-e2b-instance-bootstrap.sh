@@ -88,6 +88,20 @@ fi
 export PATH=/opt/mikka/runtime/node/bin:$PATH
 cd "$mikka_release/source"
 env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile
+# Every official kind can serve an authenticated run preview. Keep this pinned
+# Python dependency in Mikka's own versioned directory: no apt/system package
+# changes and no dependency installation when a person opens the preview.
+mikka_preview_deps=/opt/mikka/runtime/preview-python-3.14.0
+if [[ ! -e "$mikka_preview_deps" ]]; then
+  mikka_preview_stage=$(mktemp -d /opt/mikka/runtime/.preview-python-3.14.0-XXXXXXXX)
+  env HOME=/opt/mikka/runtime/bootstrap-home PIP_CACHE_DIR=/opt/mikka/runtime/pip-cache python3 -m pip install --disable-pip-version-check --target "$mikka_preview_stage" 'aiohttp==3.14.0'
+  env PYTHONPATH="$mikka_preview_stage" python3 -c 'import aiohttp; assert aiohttp.__version__ == "3.14.0"'
+  chmod -R go-w "$mikka_preview_stage"
+  mv -T --no-clobber "$mikka_preview_stage" "$mikka_preview_deps"
+  [[ ! -e "$mikka_preview_stage" ]] || exit 3
+fi
+[[ -d "$mikka_preview_deps" && ! -L "$mikka_preview_deps" && "$(stat -c %u "$mikka_preview_deps")" = 0 ]] || exit 3
+env PYTHONPATH="$mikka_preview_deps" python3 -c 'import aiohttp; assert aiohttp.__version__ == "3.14.0"'
 mikka_phase_done dependencies
 MIKKA_CLOUD_WORKER_BUILD_SHA="$mikka_sha" node packages/daemon/scripts/build-cloud-worker.mjs
 mikka_phase_done build
@@ -175,6 +189,7 @@ if [[ "$mikka_kind" = desktop ]]; then
 fi
 mikka_phase_done desktop
 install -d -m 710 -o root -g user /run/mikka-viewer
+python3 packages/daemon/scripts/workspace-control-install.py
 chmod -R go-w "$mikka_release"
 printf '%s\n' "$mikka_sha" > /opt/mikka/worker-source-sha
 chmod 0444 /opt/mikka/worker-source-sha

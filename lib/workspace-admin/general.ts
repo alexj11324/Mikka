@@ -253,6 +253,7 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
     // The machines' sandboxes are killed before their rows go, so no refused deletion may follow: the billing check runs first too.
     const [billing] = await db.select({ status: workspaceBilling.status }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)
     if (billing?.status && (BILLING_LIVE_STATUSES as readonly string[]).includes(billing.status)) throw new WorkspaceError('workspaceHasActiveSubscription')
+    await (await import('../coding-workspace/review-sessions')).revokeReviewSessions(pool, { workspaceId }, 'membership_changed')
     await teardownWorkspaceMachines(pool, workspaceId)
     const app = await db.transaction(main => deleteAppData(main, workspaceId, teamIds, issueRows.map(row => row.id)))
 

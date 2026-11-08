@@ -141,7 +141,7 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
     const request = auditRequestContext(await headers())
     const previous = await workspaceDb.transaction(async tx => {
       await requireWorkspace(tx, input.workspaceId, user.id, true)
-      const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).limit(1)
+      const [target] = await tx.select().from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId))).for('update').limit(1)
       if (!target) throw new WorkspaceError('workspaceMemberNotFound')
       if (target.role === 'admin' && target.status === 'active' && (role !== 'admin' || status !== 'active')) {
         const others = await tx.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), ne(workspaceMembers.userId, input.userId), eq(workspaceMembers.role, 'admin'), eq(workspaceMembers.status, 'active'))).limit(1)
@@ -150,6 +150,10 @@ async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: s
       const base = { workspaceId: input.workspaceId, actor: { type: 'user' as const, id: user.id, name: user.name }, target: { type: 'member', id: target.userId, label: target.name || target.email }, ...request }
       if (target.role !== role) await enqueueWorkspaceAudit(tx, { ...base, action: 'member.role_changed', metadata: { oldRole: target.role, newRole: role } })
       if (target.status !== status) await enqueueWorkspaceAudit(tx, { ...base, action: status === 'suspended' ? 'member.suspended' : 'member.reactivated' })
+      if (target.status !== 'suspended' && status === 'suspended') {
+        const [{ pool }, { revokeReviewSessions }] = await Promise.all([import('@/lib/db'), import('@/lib/coding-workspace/review-sessions')])
+        await revokeReviewSessions(pool, { workspaceId: input.workspaceId, ownerId: input.userId }, 'membership_changed')
+      }
       if (input.transferTo !== undefined) await transferOnSuspend(tx, input.workspaceId, input.userId, input.transferTo)
       const before = await workspaceListScopesBeforeChange(tx, input.workspaceId)
       await tx.update(workspaceMembers).set({ role, status }).where(and(eq(workspaceMembers.workspaceId, input.workspaceId), eq(workspaceMembers.userId, input.userId)))

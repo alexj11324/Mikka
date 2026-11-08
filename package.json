@@ -219,7 +219,9 @@
     "test:api": "node --import ./tests/support/server-only.mjs --import tsx --test apps/api/src/*.test.ts apps/api/runtime/*.test.ts lib/browser-rpc/*.test.ts lib/agent-image-cache.test.ts lib/web-connection/*.test.ts && node --test --test-reporter=tap apps/api/build-contract.test.mjs apps/api/runtime/*.test.mjs apps/api/scripts/*.test.mjs scripts/start-app.test.mjs scripts/test-subscription-enrollment-app.test.mjs scripts/release/build-vercel.test.mjs apps/api/cloud-service-rewrite.test.mjs",
     "lint:runtime": "oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs",
     "test:cloud-services": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.test.ts lib/cloud-services/model.test.ts lib/cloud-services/model-billing.test.ts components/settings/cloud-settings.test.tsx",
-    "test:cloud-services-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.db.test.ts lib/mobile-push-delivery.db.test.ts"
+    "test:cloud-services-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.db.test.ts lib/mobile-push-delivery.db.test.ts",
+    "test:coding-review-db": "node --experimental-test-module-mocks --test-force-exit --import ./scripts/server-test.mjs --import tsx --test lib/coding-workspace/review-authority.db.test.ts",
+    "test:coding-review-unit": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coding-workspace/terminal/wire.test.ts lib/coding-workspace/terminal/http.test.ts lib/coding-workspace/terminal/runtime.test.ts lib/coding-workspace/preview/runtime.test.ts lib/coding-workspace/preview/route.test.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.121",

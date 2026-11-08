@@ -13,6 +13,7 @@ import { lockTeamRelations } from '@/lib/team-access'
 import { userActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
 import { documentScopesBeforeChange, documentScopeChanged } from '@/lib/live/panels'
+import { reviewTaskChanged } from './coding-workspace/review-sessions'
 
 const schema = z.object({ requestId: z.uuid(), issueId: z.uuid(), revision: z.number().int().positive(), teamId: z.uuid(), expectedTeamId: z.uuid().nullable() })
 type WorkspaceTx = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
@@ -93,6 +94,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         const previousScopes = await documentScopesBeforeChange(issue)
         const previousLists = await issueListScopesBeforeChange(issue)
         const [saved] = await tx.update(issues).set({ scope: 'workspace', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: issue.revision + 1, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
+        reviewTaskChanged(tx, issue, saved)
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...userActor(userId) })
         await tx.update(teamIssuePromotions).set({ status: 'complete' }).where(eq(teamIssuePromotions.requestId, requestId))
         await documentScopeChanged(tx, saved.id, previousScopes)

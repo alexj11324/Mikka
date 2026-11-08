@@ -25,6 +25,7 @@ const runtime = mock.fn((_botId: string | null) => ({ questions: scopedQuestions
 const dbRows: { botId: string | null }[] = []
 const dbPool = { query: mock.fn(async (_q: string, _p?: unknown[]) => ({ rows: dbRows })) }
 const sweepWatchdog = mock.fn(async (..._args: unknown[]) => {})
+const reconcileReview = mock.fn(async (..._args: unknown[]) => ({ closed: 0, pending: 0 }))
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 stub('./self-improvement/registry.ts', { lockSkillScope: async () => {} })
 stub('./self-improvement/skill-mounts.ts', { recordCompletionSkillMount: mount })
@@ -34,12 +35,13 @@ stub('./factory/server.ts', { factoryMonitor: { probeRun: monitor }, factoryQues
 stub('./factory/runtime.ts', { factoryRuntimeForBot: runtime })
 stub('./factory/watchdog.ts', { sweepFactoryWatchdog: sweepWatchdog })
 stub('./db/index.ts', { pool: dbPool })
+stub('./coding-workspace/review-sessions.ts', { reconcileReviewSessions: reconcileReview })
 let effects: typeof import('./run-completion-effects')
 const environment = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
 before(async () => { effects = await import('./run-completion-effects') })
 beforeEach(() => {
   trace.length = 0; mountError = null; monitorError = null; questionError = null
-  for (const fn of [mount, monitor, questions.settle, questions.record, scopedQuestions.settle, scopedQuestions.record, runtime, reconcileRun, dbPool.query, sweepWatchdog]) fn.mock.resetCalls()
+  for (const fn of [mount, monitor, questions.settle, questions.record, scopedQuestions.settle, scopedQuestions.record, runtime, reconcileRun, dbPool.query, sweepWatchdog, reconcileReview]) fn.mock.resetCalls()
   process.env.MIKKA_FACTORY_ROUTING_ENABLED='0'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED='0'
 })
 after(() => {
@@ -104,12 +106,14 @@ test('known stale question state can settle without consuming a new handoff on s
   assert.equal(questions.record.mock.callCount(), 0)
 })
 
-test('afterRunEnded: flags off touches no pool; on, reconciles only the run per owning bot via reconcile.run', async () => {
+test('afterRunEnded always reconciles review authority; Factory progression remains flag-gated', async () => {
   dbRows.length = 0; dbRows.push({ botId: 'bot-a' }, { botId: null })
   assert.equal(await effects.afterRunEnded('owner', 'run-1'), 0)
   assert.equal(dbPool.query.mock.callCount(), 0)
+  assert.deepEqual(reconcileReview.mock.calls[0].arguments, [dbPool, { runIds: ['run-1'] }])
   process.env.MIKKA_FACTORY_ROUTING_ENABLED = '1'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '1'
   assert.equal(await effects.afterRunEnded('owner', 'run-1'), 2)
+  assert.equal(reconcileReview.mock.callCount(), 2)
   assert.deepEqual(dbPool.query.mock.calls[0].arguments[1], ['run-1', 'owner'])
   assert.deepEqual(runtime.mock.calls.map((c) => c.arguments[0]), ['bot-a', null])
   assert.deepEqual(reconcileRun.mock.calls.map((c) => c.arguments), [['owner', 'run-1'], ['owner', 'run-1']])

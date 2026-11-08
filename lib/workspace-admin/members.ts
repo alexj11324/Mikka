@@ -65,7 +65,9 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
   await tx.execute(sql`update agents a set name = a.name || ' · ' || a.id::text, "updatedAt" = now()
     from bot_cloud_runtimes x where x."agentId" = a.id and x."botId" in ${ids}`)
   await tx.execute(sql`delete from bot_cloud_runtimes where "botId" in ${ids}`)
-  await tx.execute(sql`delete from computer_run_bindings where "botId" in ${ids}`)
+  const detached = await tx.execute<{ runId: string }>(sql`delete from computer_run_bindings where "botId" in ${ids} returning "runId"`)
+  if (detached.rows.length) (await import('../coding-workspace/review-sessions'))
+    .reviewSessionsRevoked(tx, { runIds: detached.rows.map(row => row.runId) }, 'run_changed')
   await tx.execute(sql`delete from agent_kit_heads where bot_id in ${ids}`)
   // A bot handed over runs on its new owner's resources, never on the previous owner's credentials.
   await tx.update(bots).set({ ownerId: toUserId, archivedAt: null, updatedAt: new Date() }).where(and(inArray(bots.id, ids), eq(bots.workspaceId, workspaceId), ownedBy))
@@ -83,6 +85,9 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
  * background credential renewals check the current share and membership.
  */
 export async function releaseDepartingMember(workspaceId: string, userId: string) {
+  // Repeat after COMMIT for callers that only schedule cleanup. Removal and
+  // suspension also fence while the Workspace/member locks are still held.
+  await (await import('../coding-workspace/review-sessions')).revokeReviewSessions(pool, { workspaceId, ownerId: userId }, 'membership_changed')
   // A card they designated keeps paying through its grace period; admins see when it stops (计费).
   await releasePaymentDesignation(workspaceId, userId)
   await db.transaction(async main => {
@@ -166,6 +171,7 @@ export async function removeMember(actorId: string, workspaceId: string, targetI
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, targetId))).for('update').limit(1)
     if (!target) throw new WorkspaceError('workspaceMemberNotFound')
     if (target.role === 'admin' && target.status === 'active') await assertAnotherAdmin(tx, workspaceId, targetId)
+    await (await import('../coding-workspace/review-sessions')).revokeReviewSessions(pool, { workspaceId, ownerId: targetId }, 'membership_changed')
     const before = await workspaceListScopesBeforeChange(tx, workspaceId)
     if (transferTo !== undefined) await requireTransferTarget(tx, workspaceId, targetId, transferTo)
     await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'member.removed', target: { type: 'member', id: targetId, label: target.name || target.email }, ...audit })

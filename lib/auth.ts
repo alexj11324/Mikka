@@ -46,6 +46,12 @@ export const auth = betterAuth({
   database: pool,
   account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
   databaseHooks: {
+    session: { delete: { after: async session => {
+      // The SQL delete has already fenced this real session ID. Await the
+      // remote close; an unavailable provider remains durably due for retry.
+      const { revokeReviewSessions } = await import('./coding-workspace/review-sessions')
+      await revokeReviewSessions(pool, { credentialKind: 'session', credentialId: session.id }, 'credential_revoked')
+    } } },
     // A new account without a picture gets a default avatar now; older accounts are left as they are.
     user: { create: {
       before: async user => ({ data: { ...user, image: user.image || newUserAvatar(user.name || user.email) } }),

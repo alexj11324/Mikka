@@ -1,0 +1,42 @@
+name: Coding workspace review data plane
+on:
+  pull_request:
+    paths:
+      - 'lib/coding-workspace/**'
+      - 'app/api/tasks/**/review/**'
+      - 'scripts/e2b/preview-gateway*'
+      - 'scripts/e2b/preview-firewall*'
+      - 'scripts/e2b/preview-frameworks.test.py'
+      - 'scripts/e2b/preview-network-acceptance.mjs'
+      - 'scripts/e2b/preview_firewall.py'
+      - 'scripts/e2b/terminal-gateway*'
+      - 'packages/daemon/scripts/official-e2b-instance-bootstrap.sh'
+      - 'packages/protocol/src/coding-terminal*'
+      - '.github/workflows/coding-workspace-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  data-plane:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install the isolated preview dependency
+        run: |
+          python3 -m venv "$RUNNER_TEMP/coding-review-python"
+          "$RUNNER_TEMP/coding-review-python/bin/pip" install --disable-pip-version-check 'aiohttp==3.14.0'
+      - name: Real HTTP and WebSocket boundaries
+        run: |
+          "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/preview-gateway.test.py
+          "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/preview-firewall.test.py
+      - name: Real root supervisor and PTY boundaries
+        run: sudo -n env MIKKA_REQUIRE_REAL_PTY=1 "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/terminal-gateway.test.py
+      - uses: ./.github/actions/pnpm-install
+      - name: Real Next and Vite pages, assets and hot reload
+        run: |
+          "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/preview-frameworks.test.py
+      - name: Check additive bootstrap syntax
+        run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh

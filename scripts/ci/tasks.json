@@ -425,5 +425,10 @@
     "command": "node --test scripts/ci/*.test.mjs",
     "kind": "core",
     "env": {}
+  },
+  "core-coding-review": {
+    "command": "pnpm test:coding-review-unit",
+    "kind": "core",
+    "env": {}
   }
 }

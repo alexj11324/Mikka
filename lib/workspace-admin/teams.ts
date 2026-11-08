@@ -9,6 +9,7 @@ import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/l
 import { lockTeamRelations } from '@/lib/team-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { ownerListChanged, workspaceListChanged } from '../live/lists'
+import { reviewSessionsRevoked } from '../coding-workspace/review-sessions'
 
 export interface TeamDeletionImpact { teamId: string; name: string; tasks: number; projects: number }
 
@@ -69,6 +70,7 @@ export async function deleteTeamData(actorId: string, teamId: string, confirmNam
       if (!issueIds.length) return 0
       const owners = await main.selectDistinct({ userId: agentRuns.userId }).from(agentRuns).where(inArray(agentRuns.issueId, issueIds))
       const deleted = await main.delete(issues).where(inArray(issues.id, issueIds)).returning({ id: issues.id })
+      for (const { id } of deleted) reviewSessionsRevoked(main, { taskId: id }, 'task_changed')
       for (const { userId } of owners) await ownerListChanged(main, userId, ['thread_list', 'task_run_list', 'bot_chat_list'])
       if (deleted.length) await workspaceListChanged(main, team.workspaceId, ['issue_list'])
       return deleted.length

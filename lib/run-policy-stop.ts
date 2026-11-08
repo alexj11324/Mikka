@@ -4,6 +4,7 @@ import { PgDialect } from 'drizzle-orm/pg-core'
 import { afterDatabaseCommit } from './db/commit-effects'
 import { notifyDeviceWork } from './device-gateway-notify'
 import { armDueTimerAfterCommit } from './due-timer'
+import { reviewSessionsRevoked } from './coding-workspace/review-sessions'
 
 export type RunPolicyStopScope =
   | { kind: 'worker'; ownerId: string; agentId: string }
@@ -46,6 +47,7 @@ export function runPolicyStopSQL(scope: RunPolicyStopScope): SQL {
 /** The statement returned the devices, including legacy runners that still
  * consume a control hint. No follow-up database lookup is needed. */
 export function notifyStoppedPolicyRuns(executor: object, rows: readonly StoppedPolicyRun[]) {
+  if (rows.length) reviewSessionsRevoked(executor, { runIds: rows.map(row => row.id) }, 'run_control')
   for (const deviceId of new Set(rows.map(row => row.deviceId))) {
     afterDatabaseCommit(executor, `policy-stop:${deviceId}`, () => notifyDeviceWork(deviceId))
   }
