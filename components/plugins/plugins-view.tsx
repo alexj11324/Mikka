@@ -224,7 +224,8 @@ function Store({ apps, ownRead, category, rootLabel, href, go, tab, setTab, quer
 
   const store = catalog.data?.apps ?? []
   const byId = new Map<string, StoreApp>(store.map(item => [item.id, item]))
-  const own: StoreEntry[] = OWN_APPS.map(id => ({ id, ...info(id), description: '' }))
+  // Ours have no Composio blurb: one line says what each brings (UI audit work-10).
+  const own: StoreEntry[] = OWN_APPS.map(id => ({ id, ...info(id), description: t(`ownDescription.${id}`) }))
   const entries = (ids: readonly string[]): StoreEntry[] => ids.flatMap(id => { const item = byId.get(id); return item ? [{ id, name: item.name, description: item.description, iconUrl: item.iconUrl, connect: item.connect }] : [] })
   const stateOf = (id: string) => isOwnApp(id)
     ? ownRead.data?.failed.includes(id) && ownRead.data.states[id] === undefined ? 'unavailable' : storeItemState({ kind: 'own', state: ownRead.data?.states[id] })
@@ -441,6 +442,8 @@ function StoreItem({ item, state, apps, href, onOpen, onConnect, onReplaceKey, o
       </Button>
       : state === null ? <Skeleton aria-hidden="true" data-slot="app-row-pending" className="size-7 rounded-md" /> : null}
     </div>
+    {/* Not available here (not set up on this server, or its status could not be read): say so instead of an empty slot. */}
+    {state === 'unavailable' && <span className="shrink-0 text-xs text-muted-foreground">{t('unavailable')}</span>}
   </div>
 }
 
