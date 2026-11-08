@@ -237,7 +237,10 @@ test('Task review send composes real transactional deliveries on PostgreSQL 17',
       type Inline = { id: string; pull_request_review_id: string; user: { id: string }; pull_request_url: string; body: string;
         path: string; side: string; start_side: string | null; original_line: number; original_start_line: number | null;
         original_commit_id: string; in_reply_to_id: null }
-      const state = { throwAfterPost: false, visible: true, mutationStatus: 200, inline: [] as Inline[], receipt: null as Record<string, unknown> | null,
+      const state = { throwAfterPost: false, visible: true, mutationStatus: 200,
+        mutationBody: { message: 'Fixture mutation refused' } as Record<string, unknown>, pullAuthorId: undefined as string | undefined,
+        mutationBodyMode: 'json' as 'json' | 'empty' | 'broken',
+        inline: [] as Inline[], receipt: null as Record<string, unknown> | null,
         beforePost: undefined as (() => Promise<void>) | undefined, afterPost: undefined as (() => Promise<void>) | undefined }
       const calls: { method: string; path: string; body?: Record<string, unknown> }[] = []
       context.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -250,10 +253,17 @@ test('Task review send composes real transactional deliveries on PostgreSQL 17',
         if (method === 'GET' && target.pathname === apiPath) return Response.json({ id: repositoryId, full_name: fullName })
         if (method === 'GET' && target.pathname === `${apiPath}/pulls/${pullNumber}`)
           return Response.json({ number: pullNumber, html_url: pullUrl, state: 'open', merged: false, changed_files: files.length,
+            ...(state.pullAuthorId ? { user: { id: state.pullAuthorId } } : {}),
             base: { sha: baseSha, repo: { id: repositoryId, full_name: fullName } }, head: { sha: headSha } })
         if (method === 'POST' && target.pathname === `${apiPath}/pulls/${pullNumber}/reviews`) {
           await state.beforePost?.(); assert.ok(payload && Array.isArray(payload.comments))
-          if (state.mutationStatus !== 200) return Response.json({ message: 'Fixture mutation refused' }, { status: state.mutationStatus })
+          if (state.mutationStatus !== 200) {
+            if (state.mutationBodyMode === 'empty') return new Response(null, { status: state.mutationStatus })
+            if (state.mutationBodyMode === 'broken') return new Response(new ReadableStream<Uint8Array>({
+              start(controller) { controller.error(new Error('Fixture provider rejection body interrupted')) },
+            }), { status: state.mutationStatus })
+            return Response.json(state.mutationBody, { status: state.mutationStatus })
+          }
           state.receipt = { id: reviewId, body: payload.body, user: { id: token.githubAccountId },
             html_url: `${pullUrl}#pullrequestreview-${reviewId}`, pull_request_url: `https://api.github.com${apiPath}/pulls/${pullNumber}`,
             commit_id: payload.commit_id, state: 'CHANGES_REQUESTED', submitted_at: new Date().toISOString() }
@@ -481,6 +491,43 @@ test('Task review send composes real transactional deliveries on PostgreSQL 17',
       assert.equal(saved.messages.length, 0); assert.equal(saved.children.length, 0)
       assert.equal(saved.operations.length, 1); assert.equal(saved.operations[0]!.status, 'failed')
       assert.equal(f.posts().length, 1); assert.equal(f.source.reads, 0)
+    })
+
+    await t.test('self-authored REQUEST_CHANGES receives a terminal 422 refusal and replay never posts again or starts the Agent', async t => {
+      for (const mode of ['json', 'empty', 'broken'] as const) await t.test(mode, async t => {
+        const f = await fixture(t, { pr: true }), input = f.submission()
+        const message = 'Can not request changes on your own pull request'
+        f.state.pullAuthorId = tokens.get(f.owner.id)!.githubAccountId
+        f.state.mutationStatus = 422
+        f.state.mutationBodyMode = mode
+        f.state.mutationBody = { message: 'Validation Failed', errors: [{ resource: 'PullRequestReview', code: 'custom', message }],
+          documentation_url: 'https://docs.github.com/rest/pulls/reviews#create-a-review-for-a-pull-request', status: '422' }
+        const rejected = await f.send(input)
+        assert.equal(rejected.status, 409); assert.equal(rejected.body.state, 'rejected')
+        assert.equal(rejected.body.error, 'workspace_review_github_unavailable')
+        assert.equal(rejected.body.github?.state, 'rejected'); assert.equal(rejected.body.github?.reason, 'target_unavailable')
+        assert.equal(rejected.body.github?.delivery, null); assert.equal(rejected.body.agent.state, 'prepared')
+        assert.equal(rejected.body.messageId, undefined); assert.equal(rejected.body.attempt, undefined)
+        assert.equal(f.posts().length, 1); assert.equal(f.posts()[0]!.body!.event, 'REQUEST_CHANGES')
+        assert.equal(f.posts()[0]!.body!.commit_id, f.headSha); assert.equal(f.source.reads, 0)
+        assert.equal(f.state.receipt, null); assert.equal(f.state.inline.length, 0)
+        const again = await f.send(input)
+        assert.equal(again.status, 409); assert.equal(again.body.state, 'rejected')
+        assert.equal(again.body.submissionId, rejected.body.submissionId)
+        assert.equal(again.body.github?.batchId, rejected.body.github!.batchId)
+        assert.equal(again.body.github?.state, 'rejected'); assert.equal(again.body.github?.reason, 'target_unavailable')
+        assert.equal(again.body.agent.batchId, rejected.body.agent.batchId); assert.equal(again.body.agent.state, 'prepared')
+        assert.equal(again.body.messageId, undefined); assert.equal(again.body.attempt, undefined)
+        assert.ok(!JSON.stringify([rejected.body, again.body]).includes(message), 'the raw provider error body is never projected')
+        const saved = await f.rows()
+        assert.equal(saved.comments.length, 1); assert.equal(saved.plans.length, 1); assert.equal(saved.batches.length, 2)
+        assert.equal(saved.batches.find(row => row.destination === 'github')!.state, 'rejected')
+        assert.equal(saved.batches.find(row => row.destination === 'agent')!.state, 'prepared')
+        assert.equal(saved.operations.length, 1); assert.equal(saved.operations[0]!.status, 'failed')
+        assert.equal(saved.operations[0]!.receipt, null)
+        assert.equal(saved.messages.length, 0); assert.equal(saved.children.length, 0)
+        assert.equal(f.posts().length, 1); assert.equal(f.source.reads, 0)
+      })
     })
 
     await t.test('native acceptance followed by actual worktree drift produces durable partial success without sending the Agent', async t => {

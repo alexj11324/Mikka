@@ -3,7 +3,7 @@ import test, { type TestContext } from 'node:test'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
 import { WorkspaceReviewError } from '@mikka/protocol/coding-workspace-review'
 import type { RequestBudget } from '../../request-budget'
-import { GitHubDiffClient } from './github-api'
+import { GitHubDiffClient, GitHubWriteRejection } from './github-api'
 
 const path = '/repos/fixture/review/git/commits/0123456789012345678901234567890123456789'
 const token = 'fixture-viewer-credential'
@@ -280,7 +280,7 @@ test('GraphQL and provider POST retain their own bounded response readers', asyn
   })
 })
 
-test('an uncertain POST result is never automatically retried', async t => {
+test('a failed POST is never automatically retried and missing response headers cannot prove rejection', async t => {
   for (const [label, answer, expected] of [
     ['transport failure', () => { throw new Error(token) }, 'workspace_review_github_unavailable'],
     ['timeout', () => { throw new DOMException(token, 'TimeoutError') }, 'workspace_review_github_unavailable'],
@@ -292,10 +292,75 @@ test('an uncertain POST result is never automatically retried', async t => {
   ] as const) await t.test(label, async t => {
     const f = fixture(t, answer)
     await assert.rejects(() => f.client.post(reviewPath, { body: 'One invocation' }), error => {
-      assert.ok(code(expected)(error)); assert.ok(!String(error).includes(token)); return true
+      assert.ok(code(expected)(error)); assert.ok(!String(error).includes(token))
+      assert.equal(error instanceof GitHubWriteRejection, ['403', '409', '422'].includes(label))
+      return true
     })
     assert.equal(f.calls.length, 1)
   })
+})
+
+test('a self-review 422 proves a refused mutation, while the same failed read cannot prove a refused write', async t => {
+  const message = 'Can not request changes on your own pull request'
+  const response = { message: 'Validation Failed', errors: [{ resource: 'PullRequestReview', code: 'custom', message }],
+    documentation_url: 'https://docs.github.com/rest/pulls/reviews#create-a-review-for-a-pull-request', status: '422' }
+  const review = { commit_id: 'a'.repeat(40), event: 'REQUEST_CHANGES', body: 'Please fix this task.', comments: [] }
+  for (const kind of ['mutation', 'GET', 'GraphQL'] as const) await t.test(kind, async t => {
+    const f = fixture(t, () => Response.json(response, { status: 422 }))
+    await assert.rejects(() => kind === 'mutation' ? f.client.post(reviewPath, review)
+      : kind === 'GET' ? f.client.get(reviewPath) : f.client.graphql(readDocument, {}), error => {
+      assert.ok(code('workspace_review_github_unavailable')(error))
+      assert.equal(error instanceof GitHubWriteRejection, kind === 'mutation')
+      assert.ok(error instanceof WorkspaceReviewError)
+      assert.equal(error.cause, undefined, 'provider validation details and credential-bearing transport objects stay private')
+      assert.ok(!String(error).includes(message)); assert.ok(!JSON.stringify(error).includes(message))
+      return true
+    })
+    assert.equal(f.calls.length, 1, 'a definitive refusal does not retry or change the requested review event')
+    if (kind === 'mutation') assert.deepEqual(JSON.parse(String(f.calls[0]!.init.body)), review)
+  })
+})
+
+test('a mutation 422 remains a definitive refusal without reading missing, broken or untrusted error bodies', async t => {
+  for (const kind of ['absent', 'broken', 'oversized', 'poison text'] as const) await t.test(kind, async t => {
+    let pulls = 0, cancelled = 0
+    const bytes = kind === 'oversized' ? Buffer.alloc(64 * 1024 + 1, 32)
+      : Buffer.from(JSON.stringify({ message: `rate limit / abuse detection / ${token}`, errors: [{ message: token }] }))
+    const response = kind === 'absent' ? new Response(null, { status: 422 })
+      : kind === 'broken' ? new Response(new ReadableStream<Uint8Array>({
+        start(controller) { controller.error(new Error(token)) },
+      }), { status: 422 })
+      : new Response(new ReadableStream<Uint8Array>({
+        pull(controller) { pulls++; controller.enqueue(bytes); controller.close() },
+        cancel() { cancelled++ },
+      }, { highWaterMark: 0 }), { status: 422 })
+    const f = fixture(t, () => response)
+    await assert.rejects(() => f.client.post(reviewPath, { event: 'REQUEST_CHANGES', body: 'One invocation' }), error => {
+      assert.ok(error instanceof GitHubWriteRejection)
+      assert.equal(error.code, 'workspace_review_github_unavailable'); assert.equal(error.cause, undefined)
+      assert.ok(!String(error).includes(token)); assert.ok(!JSON.stringify(error).includes(token))
+      return true
+    })
+    assert.equal(f.calls.length, 1)
+    if (kind === 'oversized' || kind === 'poison text') {
+      assert.equal(pulls, 0, 'the status proves refusal before any error-body bytes are consumed')
+      assert.equal(cancelled, 1, 'discard the unused response body')
+    }
+  })
+})
+
+test('a mutation 422 carrying explicit rate-limit headers does not prove definitive rejection', async t => {
+  for (const [name, value] of [['retry-after', '60'], ['x-ratelimit-remaining', '0']] as const)
+    await t.test(name, async t => {
+      const f = fixture(t, () => Response.json({ message: 'Validation Failed', privateDetail: token }, { status: 422, headers: { [name]: value } }))
+      await assert.rejects(() => f.client.post(reviewPath, { event: 'REQUEST_CHANGES', body: 'One invocation' }), error => {
+        assert.ok(code('workspace_review_github_unavailable')(error))
+        assert.equal(error instanceof GitHubWriteRejection, false)
+        assert.ok(!String(error).includes(token)); assert.ok(!JSON.stringify(error).includes(token))
+        return true
+      })
+      assert.equal(f.calls.length, 1)
+    })
 })
 
 test('GET, GraphQL and provider POST share one aggregate invocation budget', async t => {

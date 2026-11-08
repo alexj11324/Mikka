@@ -522,7 +522,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
       .then(rows => new Map(rows.map(row => [row.runId, Number(row.count)]))) : new Map<string, number>(),
     allIssueIds.length ? db.select({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status,
       priority: issues.priority, content: issueAttrsContent, codingReview: taskReviewSourceHint,
-      shortTitle: sql<string | null>`case when ${issues.shortTitleFrom}=${issues.title} then ${issues.shortTitle} end`,
+      ...(runs.some(row => row.issueId) ? { shortTitle: sql<string | null>`case when ${issues.shortTitleFrom}=${issues.title} then ${issues.shortTitle} end` } : {}),
     }).from(issues).where(and(inArray(issues.id, allIssueIds), visibility!.predicate)) : [],
   ])
   // The same bounded Task read supplies direct and embedded citations. The

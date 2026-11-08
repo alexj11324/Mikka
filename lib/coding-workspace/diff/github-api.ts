@@ -58,6 +58,13 @@ export class GitHubDiffClient {
           'x-github-api-version': '2022-11-28', 'user-agent': 'Mikka' }, signal: requestBudgetSignal(this.budget, 15_000) })
     // error-cause: transport errors may retain the bearer Authorization header.
     } catch { throw new WorkspaceReviewError('workspace_review_github_unavailable') }
+    // A mutation's explicit validation refusal is already conclusive. Losing
+    // its error body must not turn a refused write into an uncertain delivery.
+    if (method === 'POST' && !graphql && response.status === 422 && !response.headers.has('retry-after')
+      && response.headers.get('x-ratelimit-remaining') !== '0') {
+      await response.body?.cancel().catch(() => {})
+      throw new GitHubWriteRejection('workspace_review_github_unavailable')
+    }
     const reader = response.body?.getReader()
     if (!reader) throw new WorkspaceReviewError('workspace_review_github_unavailable')
     let value: unknown
@@ -82,7 +89,8 @@ export class GitHubDiffClient {
     if (!response.ok) {
       const message = value && typeof value === 'object' && 'message' in value && typeof value.message === 'string' ? value.message : ''
       if (response.status === 429 || response.status >= 500 || response.headers.has('retry-after')
-        || (response.status === 403 && (response.headers.get('x-ratelimit-remaining') === '0' || /rate.limit|abuse.detection/i.test(message))))
+        || ([403, 422].includes(response.status) && response.headers.get('x-ratelimit-remaining') === '0')
+        || (response.status === 403 && /rate.limit|abuse.detection/i.test(message)))
         throw new WorkspaceReviewError('workspace_review_github_unavailable')
       if (method === 'POST' && !graphql && response.status >= 400 && response.status < 500)
         throw new GitHubWriteRejection([401, 403, 404].includes(response.status) ? 'workspace_review_github_forbidden'

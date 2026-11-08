@@ -77,6 +77,10 @@ Task list/detail reads embed `task.review`; citations embed issue `review` or
 contacts every machine/GitHub repository nor creates a source snapshot on a
 list read. A first coding Run can therefore have an entry with unknown counts.
 No source body or check log is included in these cards.
+Mobile task list/detail reads use `review: null` when no summary exists.
+Citations keep their existing shape by omitting `review` in that case; readers
+should treat an absent property and null as no summary. The source-selection
+hint stays private and never authorizes a source or an action.
 
 ## Checks and current PR state
 
