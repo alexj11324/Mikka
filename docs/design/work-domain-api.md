@@ -202,6 +202,25 @@ read for up to 200 requested Task UUIDs:
 }
 ```
 
+iOS uses its existing Cookie-authenticated mobile transport:
+
+```ts
+api('/api/mobile/task-presentations', {
+  method: 'POST',
+  body: { workspaceId, issueIds },
+})
+```
+
+This read-only endpoint returns the same DTO, accepts at most 16 KiB of JSON,
+and keeps the original authenticated principal when invoking the batch action.
+It requires neither a desktop Bearer token nor browser RPC headers. Native
+requests with no Origin follow the existing mobile origin policy. Responses
+are `private, no-store`; errors are `401 authRequired`, `400 invalidRequest`,
+`403 workspaceAccessDenied`, `403 originNotAllowed`, or `413 bodyTooLarge`.
+The existing mobile list/detail fields remain compatible; the UI owner consumes
+this projection in the current list/live lifecycle without rewriting stored
+Task status or adding another timer.
+
 The server validates the Workspace against the authenticated principal and
 current membership, including an empty batch. Duplicate IDs are read once.
 Missing, deleted, inaccessible and other-Workspace Tasks are all omitted from

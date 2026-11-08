@@ -42,6 +42,18 @@ export async function verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, ta
     assert.ok(value && !value.error, `domain action failed: ${action}`)
     return value
   }
+  const mobilePresentationBody = async (account, body, expected = 200) => {
+    signal.throwIfAborted()
+    // The leased ordinary Cookie client sends no desktop Bearer or browser RPC
+    // header. Its fixed local Origin remains part of the account-pool boundary.
+    const response = await account.request('/api/mobile/task-presentations', {
+      method: 'POST', signal, headers: { 'content-type': 'application/json' }, body,
+    })
+    assert.equal(response.status, expected, 'mobile presentation HTTP status')
+    assert.match(response.headers.get('cache-control') ?? '', /private.*no-store/, 'mobile presentation must remain private and uncached')
+    return response.json()
+  }
+  const mobilePresentation = (account, input, expected = 200) => mobilePresentationBody(account, JSON.stringify(input), expected)
   const projectResult = async (account, action, input) => {
     const value = await successful(account, action, input)
     assert.ok(value.project?.id, `domain project missing: ${action}`)
@@ -268,11 +280,45 @@ export async function verifyWorkDomain({ accounts, pool, rpc, switchTo, a, b, ta
       assert.deepEqual(batch.items[id], await rpc(account, 'task-domain.getTaskPresentation', id), 'batch and detail use the same authorized projection')
     }
     assert.deepEqual(await rpc(account, 'task-domain.getTaskPresentations', { workspaceId, issueIds: [] }), { version: 1, workspaceId, items: {} })
+    assert.deepEqual(await mobilePresentation(account, { workspaceId, issueIds: wanted }), batch, 'ordinary mobile Cookie transport must preserve the same authorized batch')
+    assert.deepEqual(await mobilePresentation(account, { workspaceId, issueIds: [] }), { version: 1, workspaceId, items: {} })
   }
   await denied(accounts.peer, 'task-domain.getTaskPresentations', [{ workspaceId: b.workspaceId, issueIds: [taskB.id] }], ['workspaceAccessDenied'])
   await denied(accounts.peer, 'task-domain.getTaskPresentations', [{ workspaceId: b.workspaceId, issueIds: [] }], ['workspaceAccessDenied'])
+  for (const account of [accounts.owner, accounts.peer]) {
+    for (const issueIds of [[taskB.id], []]) {
+      assert.equal((await mobilePresentation(account, { workspaceId: b.workspaceId, issueIds }, 403)).error, 'workspaceAccessDenied')
+    }
+  }
+  const maximumBatch = [taskA.id, peerTask.id, ...Array.from({ length: 198 }, () => randomUUID())]
+  assert.deepEqual(Object.keys((await mobilePresentation(accounts.peer, { workspaceId, issueIds: maximumBatch })).items).sort(), [taskA.id, peerTask.id].sort())
+  for (const input of [
+    { workspaceId, issueIds: [...maximumBatch, randomUUID()] },
+    { workspaceId, issueIds: [taskA.id], userId: accounts.owner.userId },
+    { workspaceId, issueIds: ['invalid'] },
+  ]) assert.equal((await mobilePresentation(accounts.peer, input, 400)).error, 'invalidRequest')
+  assert.equal((await mobilePresentationBody(accounts.peer, '{', 400)).error, 'invalidRequest')
+  assert.equal((await mobilePresentationBody(accounts.peer, ' '.repeat(16_385), 413)).error, 'bodyTooLarge')
+
+  const membership = async status => {
+    const changed = await rpc(accounts.owner, 'workspace.updateWorkspaceMember', {
+      workspaceId, userId: accounts.peer.userId, role: 'member', status,
+    })
+    assert.equal(changed.ok, true, 'mobile presentation membership change must use the ordinary administrator action')
+  }
+  await membership('suspended')
+  try {
+    for (const issueIds of [[taskA.id, peerTask.id], []]) {
+      assert.equal((await mobilePresentation(accounts.peer, { workspaceId, issueIds }, 403)).error, 'workspaceAccessDenied')
+    }
+  } finally {
+    await membership('active')
+    await switchTo(accounts.peer, workspaceId)
+  }
+  assert.deepEqual(Object.keys((await mobilePresentation(accounts.peer, { workspaceId, issueIds: [taskA.id, peerTask.id] })).items).sort(), [taskA.id, peerTask.id].sort())
   assert.deepEqual(await factoryHistory(), originalFactory, 'Project and Team lifecycle must preserve Factory history')
   assert.deepEqual(await identities(), originalIdentities)
   await noRuns()
   await evidence('task-domain detail and one batch report the same business/Factory/Run state; batches omit foreign/missing Tasks and duplicate IDs, empty batches still enforce membership, and Shared Task access cannot reveal another owner’s Factory; all original history remains unchanged')
+  await evidence('mobile Cookie HTTP returns the identical authorized batch with private/no-store; 200 IDs work, 201 IDs/forged authority/malformed input/oversized bodies are rejected; current Workspace and fresh membership also govern empty batches, and explicit reactivation restores access without creating Runs')
 }
