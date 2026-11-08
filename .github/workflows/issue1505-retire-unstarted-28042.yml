@@ -1,0 +1,82 @@
+name: Issue 1505 retire only the unstarted 28042 acceptance
+on:
+  push:
+    branches: [ops/1505-retire-unstarted-28042]
+permissions: {}
+jobs:
+  retire:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: write
+    steps:
+      - name: Verify and cancel only the exact owned unstarted acceptance
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { writeFile } from 'node:fs/promises';
+          import { join } from 'node:path';
+          const expected={repository:'alexj11324/Mikka',runId:42427216280,attempt:1,head:'28042da9407484f5593bd1d676c1b49eb923fe9a',branch:'ops/1505-preflight',path:'.github/workflows/issue-1505-preflight.yml',jobId:128567958768};
+          const receipt={version:1,purpose:'retire_only_unstarted_owned_acceptance_after_prior_mobile_web_wins_queue',expected,replacementAppCommit:'ad7f0d0434e7d4a2527d868c4830d009b28a9d7f',startedAt:new Date().toISOString(),helperCommit:process.env.GITHUB_SHA,helperRunId:process.env.GITHUB_RUN_ID,cancelPosts:0,status:'preflight'};
+          const prefix='https://api.github.com/repos/'+expected.repository+'/actions/runs/'+expected.runId;
+          const runProjection=r=>({id:r.id,run_attempt:r.run_attempt,head_sha:r.head_sha,head_branch:r.head_branch,event:r.event,path:r.path,status:r.status,conclusion:r.conclusion});
+          const jobsProjection=j=>({id:j.id,run_id:j.run_id,run_attempt:j.run_attempt,head_sha:j.head_sha,name:j.name,status:j.status,conclusion:j.conclusion,steps:j.steps??[]});
+          async function request(suffix='',method='GET'){
+           const allowed=method==='GET'&&(suffix===''||suffix==='/attempts/1/jobs?per_page=100')||method==='POST'&&suffix==='/cancel';
+           assert.ok(allowed,'retirement_endpoint_not_allowed');
+           const response=await fetch(prefix+suffix,{method,redirect:'error',signal:AbortSignal.timeout(15000),headers:{Authorization:'Bearer '+process.env.GITHUB_TOKEN,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}});
+           assert.equal(response.status,method==='POST'?202:200,'retirement_http_status');
+           return method==='POST'?null:response.json();
+          }
+          function checkRun(r){
+           assert.equal(r.id,expected.runId,'retirement_run_id');assert.equal(r.run_attempt,expected.attempt,'retirement_attempt');
+           assert.equal(r.head_sha,expected.head,'retirement_head');assert.equal(r.head_branch,expected.branch,'retirement_branch');
+           assert.equal(r.event,'push','retirement_event');assert.equal(r.path,expected.path,'retirement_path');
+           assert.equal(r.repository?.full_name,expected.repository,'retirement_repository');
+          }
+          function checkUnstartedJobs(data,terminal=false){
+           assert.equal(data.total_count,1,'retirement_job_count');assert.equal(data.jobs?.length,1,'retirement_job_count');
+           const job=data.jobs[0];assert.equal(job.id,expected.jobId,'retirement_job_id');assert.equal(job.run_id,expected.runId,'retirement_job_run');
+           assert.equal(job.run_attempt,1,'retirement_job_attempt');assert.equal(job.head_sha,expected.head,'retirement_job_head');assert.equal(job.name,'acceptance','retirement_job_name');
+           assert.ok(Array.isArray(job.steps)&&job.steps.length===0,'retirement_job_has_steps');
+           assert.ok(terminal?job.status==='completed'&&job.conclusion==='cancelled':['pending','queued'].includes(job.status)&&job.conclusion===null,'retirement_job_started');
+           return jobsProjection(job);
+          }
+          try{
+           assert.equal(process.env.GITHUB_REPOSITORY,expected.repository,'retirement_helper_repository');
+           assert.equal(process.env.GITHUB_REF,'refs/heads/ops/1505-retire-unstarted-28042','retirement_helper_branch');
+           assert.ok(process.env.GITHUB_TOKEN,'retirement_token_missing');
+           const run=await request();checkRun(run);receipt.before=runProjection(run);
+           const jobData=await request('/attempts/1/jobs?per_page=100');
+           if(run.status==='completed'&&run.conclusion==='cancelled'){
+            receipt.jobBefore=checkUnstartedJobs(jobData,true);receipt.status='already_cancelled_unstarted';
+           }else{
+            assert.ok(['pending','queued'].includes(run.status)&&run.conclusion===null,'retirement_run_started');
+            receipt.jobBefore=checkUnstartedJobs(jobData);
+            receipt.cancelPosts=1;receipt.cancelAttemptedAt=new Date().toISOString();
+            await request('/cancel','POST');receipt.cancelAcknowledged=true;receipt.cancelAcknowledgedAt=new Date().toISOString();
+            for(let i=0;i<16;i++){
+             const finalRun=await request();checkRun(finalRun);receipt.after=runProjection(finalRun);
+             if(finalRun.status==='completed'){
+              assert.equal(finalRun.conclusion,'cancelled','retirement_final_conclusion');
+              receipt.jobAfter=checkUnstartedJobs(await request('/attempts/1/jobs?per_page=100'),true);
+              receipt.status='cancelled_unstarted';break;
+             }
+             await new Promise(resolve=>setTimeout(resolve,3000));
+            }
+            assert.equal(receipt.status,'cancelled_unstarted','retirement_cancellation_not_observed');
+           }
+          }catch(error){receipt.status='failed';receipt.error=String(error?.message??error);process.exitCode=1;}
+          finally{receipt.finishedAt=new Date().toISOString();await writeFile(join(process.env.RUNNER_TEMP,'retirement.json'),JSON.stringify(receipt,null,2)+'\n',{mode:0o600});console.log(JSON.stringify(receipt));}
+          JS
+      - name: Preserve the bounded cancellation receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1505-retire-unstarted-28042
+          path: ${{ runner.temp }}/retirement.json
+          if-no-files-found: error
+          retention-days: 14
