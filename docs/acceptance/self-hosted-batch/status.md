@@ -454,3 +454,46 @@ and all Origin/session/one-time-CSRF checks remain intact. Allow/Cancel pass
 the real-component/browser regression; six HTTP/policy tests and core types
 pass. Its existing service owner handles full CI and publication; it is not
 normal production consent acceptance and introduces no second public PR.
+
+## Final combined source follow-up
+
+The complete frozen1705/cf456 history is normally merged into this same PR.
+Its stopped-stream projection, empty stopped-round identity, cache version and
+explicit-mention fixes are the prerequisite for the remaining1212 matrix.
+All29 non-package changed blobs match that frozen source; the package merge
+preserves every previous script token and its new test entries. The combined
+repository's coordinator-stream suite passes85/85 without skips.
+
+The1506 compatibility review also removes an unused hosted-policy SQL read
+from successful subscription choices and corrects the internal model prompt's
+obsolete device-reported-model rule. The policy Promise exists only within
+one resolver invocation and is created only when a hosted choice consumes it.
+The four delivered source/test blobs match the review's exact SHA256 and Git
+blobs. The combined48-case model/ownership/fallback/context suite passes; the
+SQL executor in those cases is a checked fixture, not a real database.
+
+The repeated production core-compatibility refusal has an independently
+confirmed root cause. Real read-only SMOKE probe42458455381/job128662380233
+gets exactly100 valid token rows and no continuation cursor; devices and live
+identity are valid and its session is closed. The driver had required fewer
+than100 rows, while the API permanently truncated history at100. Read-only
+production aggregates contain two accounts at that cap and a largest history
+of263; these counts do not identify the SMOKE account's total.
+
+The existing authenticated token endpoint now returns owner-bound keyset
+pages and an explicit nextCursor. Timestamp-descending/id-ascending order is
+unchanged, and PostgreSQL resolves the anchor so microseconds are preserved.
+Foreign/missing/malformed cursors are refused. No token value/hash is exposed.
+The driver reads complete before/after pages, rejects repeated/truncated data,
+and retains its original resource identity and exactly-one-new-credential
+checks. It never deletes old tokens to fit an acceptance limit.
+
+The27-case core/mobile-driver suite passes, including a263-row history and
+negative cursor/truncation controls. Real isolated PG17 proves263 rows across
+three pages, microsecond/tie order, authentication, owner isolation and cursor
+refusals. The first full enrollment suite is8pass/1fail because an older empty
+response assertion omitted the additive nextCursor field; that expectation
+is corrected and only the failed enrollment case is rerun, passing. Both own
+PG containers are removed. The repository's complete root/API/frontend type
+checks and targeted lint pass; final combined CI and deployed core replay
+remain required. No current green source is substituted for that final head.

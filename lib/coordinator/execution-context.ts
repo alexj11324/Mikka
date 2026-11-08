@@ -120,7 +120,7 @@ export function modelListText(facts: Pick<ExecutionFacts, 'order'>): string {
   if (!entries.length) return 'Allowed models (优先使用的模型): none yet. dispatch_run returns a card that leads to adding a subscription or an API key.'
   const place = location === 'cloud' ? '运行位置 云端: their E2B cloud, then a server, then a computer' : '运行位置 本地: a server, then a computer'
   return [
-    `Allowed models (优先使用的模型), in the order a new thread tries them (${place}). dispatch_run and dispatch_bot_computer take only these. A subscription model runs only where a machine's daemon reported it:`,
+    `Allowed models (优先使用的模型), in the order a new thread tries them (${place}). dispatch_run and dispatch_bot_computer take only these. Models are admitted by their credential's enabled catalogue. On computers and servers, subscription runs need the installed Agent and subscription injection support; a reported subscription preflight failure blocks that device:`,
     ...entries.map((entry, index) => `${index + 1}. ${entry.agent} (${entry.harness}) ${entry.model} · ${entry.provider} ${entry.source === 'subscription' ? 'subscription' : 'API key (its models are the provider\'s list; a machine needs only the Agent)'} · runs on: ${entry.places.length ? entry.places.join(', ') : 'nowhere yet'}${entry.unsupported?.length ? ` · not on: ${entry.unsupported.join('; ')}` : ''}`),
   ].join('\n')
 }
