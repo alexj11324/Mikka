@@ -332,8 +332,7 @@ export function MembersSettings({
             <span>{t("title")}</span>
           </header>}
           <div className={cn("flex w-full flex-col gap-6 px-5 py-5 md:px-10 lg:px-14 lg:py-8", embedded && "px-0 py-0 md:px-0 lg:px-0 lg:py-0")}>
-            {/* Embedded in settings, the frame already names the page: the heading stays for screen readers only. */}
-            <h1 className={cn("text-xl font-semibold", embedded && "sr-only")}>{t("title")}</h1>
+            <h1 className={cn("text-xl font-semibold", embedded && "max-md:sr-only")}>{t("title")}</h1>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="min-w-0 flex-1 sm:w-72">

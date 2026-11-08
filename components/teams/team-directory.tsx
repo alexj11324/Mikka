@@ -81,8 +81,7 @@ export function TeamDirectory({ workspaceId }: { workspaceId?: string }) {
   </SettingsContent>
   return <SettingsContent data-settings-state={readError ? 'error' : 'ready'} className="gap-6">
     {initialTeamId ? <Empty><EmptyHeader><EmptyTitle>{i18nText("FeatureCopy.c_19b23b31")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={() => navigate(directoryHref)}>{i18nText("FeatureCopy.c_30108106")}</Button></Empty> : <section aria-label={i18nText("FeatureCopy.c_efbc2a6b")} className="flex flex-col gap-6">
-      {/* The settings frame names the page; this heading is for screen readers. */}
-      <h1 className="sr-only">{i18nText("Settings.sections.teams.title")}</h1>
+      <h1 className="text-xl font-semibold">{i18nText("Settings.sections.teams.title")}</h1>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <div className="min-w-0 flex-1 sm:w-80"><SearchInput aria-label={t('searchTeams')} placeholder={t('filterPlaceholder')} value={query} onChange={event => setQuery(event.target.value)} /></div>
