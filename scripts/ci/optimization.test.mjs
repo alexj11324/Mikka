@@ -17,6 +17,10 @@ test('Desktop platform caches warm on changed main install inputs without duplic
   assert.deepEqual(warmer.permissions, { contents: 'read' })
   const setup = warmer.jobs['desktop-dependencies'].steps.find(step => step.uses === './.github/actions/pnpm-install')
   assert.deepEqual(setup.with, { profile: 'desktop', 'skip-electron': 'true' })
+  // Analytics can consume the full Linux tree populated by the main Image job,
+  // which already suppresses Electron's unused runtime download.
+  const analyticsSetup = workflow('analytics-ssr').jobs['analytics-ssr-full'].steps.find(step => step.uses === './.github/actions/pnpm-install')
+  assert.equal(analyticsSetup.with['skip-electron'], 'true')
 })
 
 test('selected specialty calls reuse the parent decision; direct dispatch still runs trusted selection', () => {

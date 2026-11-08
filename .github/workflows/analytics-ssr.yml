@@ -58,6 +58,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          skip-electron: 'true'
       - name: Apply tracked SQL only to the disposable CI database
         run: MIGRATE=1 node scripts/migrate.mjs
       - run: pnpm build
