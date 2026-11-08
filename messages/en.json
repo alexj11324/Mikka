@@ -768,6 +768,7 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
+    "scheduledOffline": "Scheduled · runs when back online",
     "otherDevices": "Servers",
     "menu": "More for {name}",
     "add": {
@@ -1714,6 +1715,7 @@
     }
   },
   "Settings": {
+    "unavailableTitle": "{title} is temporarily unavailable",
     "title": "Settings",
     "searchLabel": "Search settings",
     "searchPlaceholder": "Search settings…",
@@ -1828,6 +1830,7 @@
       "account": "This account"
     },
     "memory": {
+      "emptyBody": "Mikka saves facts from chats and connected apps; they appear here.",
       "enabled": "Use memory",
       "learn": "Learn from connected apps",
       "error": "Could not update memory",
@@ -2559,6 +2562,9 @@
       }
     },
     "billing": {
+      "notConfiguredTitle": "Billing isn't set up on this server",
+      "notConfiguredBody": "Plans, seats and points need a payment provider, which whoever runs this server turns on.",
+      "notConfiguredAction": "How to set up billing",
       "loading": "Loading billing",
       "loadFailed": "Couldn’t load billing",
       "plan": "Plan",
@@ -2649,6 +2655,7 @@
       "afterQuotaSection": "When quota runs out"
     },
     "modelOrder": {
+      "fallbackNeedsKey": "Add an API key and connect a subscription to use this.",
       "placesLabel": "Dispatch order",
       "placeServers": "Servers",
       "placeComputers": "Computers",
@@ -4901,6 +4908,10 @@
     "mergeConfirm": "Merge"
   },
   "ArtifactReview": {
+    "checksRatio": "{passed}/{total} passed",
+    "checksFailedNote": "{count} failed",
+    "checksPendingNote": "{count} running",
+    "evidenceRatio": "{passed}/{total} with evidence",
     "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · Made when the thread finishes",
