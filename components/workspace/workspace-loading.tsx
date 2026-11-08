@@ -1,10 +1,12 @@
 import { useTranslations } from 'next-intl'
 import { Skeleton } from '@/components/ui/skeleton'
 
+/** A page's content while it loads: announced as loading, not as a task editor, since every page uses it (UI audit states-04). */
 export function WorkspaceContentLoading() {
   const t = useTranslations('Workspace')
-  return <div role="status" aria-label={t('loadingEditor')} aria-busy="true" data-loading-placeholder="" className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6">
-    <span className="sr-only">{t('loadingEditor')}</span>
+  const name = t('loading')
+  return <div role="status" aria-label={name} aria-busy="true" data-loading-placeholder="" className="flex min-h-0 flex-1 flex-col gap-6 p-4 sm:p-6">
+    <span className="sr-only">{name}</span>
     <div aria-hidden="true" className="flex flex-1 flex-col gap-6">
       <Skeleton className="h-8 w-40" />
       <Skeleton className="h-20 w-2/3" />
