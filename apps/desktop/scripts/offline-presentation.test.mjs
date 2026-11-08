@@ -27,6 +27,9 @@ test('the bundled offline card restores standalone font rendering instead of inh
   for (const property of ['-webkit-font-smoothing', 'font-synthesis', 'text-rendering']) {
     assert.equal(declarations.get(property), 'auto', `${property} must match the standalone fallback`)
   }
+  // Its variables carry their own names, so the app's stylesheet can hand them the app's tokens (states-02).
+  assert.ok(declarations.has('--offline-bg') && !declarations.has('--bg'))
+  assert.equal(declarations.get('background'), 'var(--offline-bg)')
 })
 
 test('standalone and bundled offline surfaces use the same factual state copy without a display timer', async () => {

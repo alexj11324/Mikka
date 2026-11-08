@@ -23,7 +23,7 @@ import { readAuthentication, readBootstrap, type AuthenticationBootstrap, type B
 import { Link } from './i18n-navigation'
 import { localeOf, navigate, REFRESH_EVENT, useLocation, withoutLocale } from './location'
 import { getTransportState, setTransportState, subscribeTransport } from './transport-state'
-import { resetReadBatchScope } from './read-batch'
+import { DesktopTransportError, resetReadBatchScope } from './read-batch'
 import { Offline } from './offline'
 import { setClientConfiguration } from './client-configuration'
 import { platform, AuthForm, BrowserRoute, setSession, onSessionChanged, authenticatedReturn, bootstrapScope, PlatformExtras, requireUpdate } from 'mikka:platform'
@@ -54,6 +54,8 @@ export function App() {
 function SessionApplication() {
   const [bootstrap, setBootstrap] = useState<ApplicationBootstrap | null>(null)
   const [failed, setFailed] = useState(false)
+  // The status Mikka answered the failed bootstrap with; undefined when nothing answered.
+  const [failedStatus, setFailedStatus] = useState<number | undefined>(undefined)
   const [pending, setPending] = useState(true)
   const location = useLocation()
   const requestedScope = bootstrapScope(location)
@@ -90,8 +92,8 @@ function SessionApplication() {
       setBootstrap(value)
       setFailed(false)
       setTransportState('ready')
-    }).catch(() => {
-      if (current === generation.current) setFailed(true)
+    }).catch((error: unknown) => {
+      if (current === generation.current) { setFailed(true); setFailedStatus(answeredStatus(error)) }
     }).finally(() => {
       if (current === generation.current) { setPending(false); inFlight.current = null }
     })
@@ -141,8 +143,16 @@ function SessionApplication() {
   }, [state, bootstrap?.value.user])
   if (state === 'update-required') return <UpdateRequired />
   if (!bootstrap || bootstrap.scope !== requestedScope || (bootstrap.scope === 'workspace' && bootstrap.workspace !== requestedWorkspace))
-    return failed ? <Offline pending={pending} retry={() => void reload()} /> : <WorkspaceLoading />
+    return failed ? <Offline pending={pending} status={failedStatus} retry={() => void reload()} /> : <WorkspaceLoading />
   return <><ConnectionStatus offline={state === 'offline' || failed} retry={() => void reload()} /><AccountCache key={bootstrap.value.user?.id ?? 'signed-out'}><Routes bootstrap={bootstrap} /></AccountCache></>
+}
+
+/** The HTTP status a failed read was answered with, through any wrapping causes: a server error is not a lost connection. */
+function answeredStatus(error: unknown): number | undefined {
+  for (let current = error, depth = 0; current && depth < 5; current = (current as { cause?: unknown }).cause, depth++) {
+    if (current instanceof DesktopTransportError && typeof current.status === 'number') return current.status
+  }
+  return undefined
 }
 
 function AccountCache({ children }: { children: ReactNode }) {

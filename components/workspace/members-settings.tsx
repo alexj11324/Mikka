@@ -480,10 +480,7 @@ export function MembersSettings({
                                   {t("status.suspended")}
                                 </span>
                               ) : member.role === "admin" ? (
-                                <Badge
-                                  variant="secondary"
-                                  className="bg-workspace-accent/15 text-workspace-accent"
-                                >
+                                <Badge variant="secondary">
                                   {t("role.admin")}
                                 </Badge>
                               ) : (

@@ -5554,6 +5554,8 @@
   },
   "DesktopRenderer": {
     "serverUnavailable": "无法连接 Mikka",
+    "serverError": "Mikka 加载失败",
+    "serverErrorStatus": "服务器错误 {status}",
     "networkUnavailable": "没有网络",
     "reconnecting": "正在重新连接…",
     "offlineHint": "等待连接恢复。",
