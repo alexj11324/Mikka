@@ -282,4 +282,74 @@ test('background Factory transactions use persisted tenants before the APP pool 
     assert.equal(await claimLocalRun(pool, id, deviceId, new Date(Date.now() + 60000)), 'unavailable')
     assert.deepEqual(await state(), before)
   })
+
+  await t.test('retained Factory history of a deleted author never re-enters monitor or watchdog batches', async () => {
+    const retired = await seedUser(controls, 'factory-retired')
+    const shared = (await seedWorkspace(controls, retired, [{ userId: retired, role: 'admin' }, { userId: stranger, role: 'member' }])).id
+    const retainedAgent = await seedAgent(controls, retired)
+    const retained: Array<{ taskId: string; runId: string }> = []
+    for (const status of ['passed', 'blocked'] as const) {
+      const issueId = randomUUID(), sourceEventId = randomUUID(), runId = randomUUID(), candidateId = randomUUID()
+      const stage = status === 'passed' ? 'monitor' : 'execute'
+      await controls.query('INSERT INTO issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority) VALUES($1,$2,$3,\'bound\',\'workspace\',\'Retained Factory fixture\',\'{"type":"doc"}\',\'todo\',\'normal\')',
+        [issueId, retired, shared])
+      await controls.query('INSERT INTO coordinator_events(id,"userId","issueId",kind,"dedupeKey",payload) VALUES($1::uuid,$2,$3,\'user_message\',$1::text,\'{"text":"Retained source"}\')',
+        [sourceEventId, retired, issueId])
+      const { task } = await factoryForBot(null).route(retired, { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Retained history after account deletion', needsSpec: false })
+      await controls.query('INSERT INTO agent_runs(id,"userId","workspaceId","agentId","issueId",status,kind,prompt) VALUES($1,$2,$3,$4,$5,\'succeeded\',\'acceptance\',\'Retained result\')',
+        [runId, retired, shared, retainedAgent, issueId])
+      await controls.query('INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId") VALUES($1,$2,$3,\'fixture/repository\',\'test\',\'fixture\',$4)',
+        [candidateId, task.id, 'd'.repeat(40), runId])
+      await controls.query('UPDATE factory_attempts SET stage=$2,status=$3,"runId"=$4,"candidateId"=$5,output=$6::jsonb,"finishedAt"=now() WHERE id=$1',
+        [task.attemptId, stage, status, runId, candidateId, JSON.stringify(status === 'blocked'
+          ? { watchdog: { reasonCode: 'task_stalled', requestEpoch: sourceEventId } } : { monitorOutcome: 'healthy' })])
+      await controls.query('UPDATE factory_tasks SET stage=$2,status=$3,"candidateId"=$4,"updatedAt"=now()-interval \'2 minutes\' WHERE id=$1',
+        [task.id, stage, status, candidateId])
+      if (status === 'passed') await controls.query('INSERT INTO coordinator_events(id,"userId","issueId","runId",kind,"dedupeKey",payload) VALUES($1::uuid,$2,$3,$4,\'run_finished\',$1::text,\'{}\')',
+        [randomUUID(), retired, issueId, runId])
+      retained.push({ taskId: task.id, runId })
+    }
+    const ids = retained.map(row => row.taskId)
+    const history = async () => Promise.all([
+      controls.query('SELECT * FROM factory_tasks WHERE id=ANY($1::uuid[]) ORDER BY id', [ids]).then(result => result.rows),
+      controls.query('SELECT * FROM factory_attempts WHERE "taskId"=ANY($1::uuid[]) ORDER BY id', [ids]).then(result => result.rows),
+      controls.query('SELECT * FROM factory_candidates WHERE "taskId"=ANY($1::uuid[]) ORDER BY id', [ids]).then(result => result.rows),
+      controls.query('SELECT * FROM factory_events WHERE "taskId"=ANY($1::uuid[]) ORDER BY "taskId","eventId"', [ids]).then(result => result.rows),
+    ])
+    const before = await history()
+    await wakes.flush()
+    const priorWakes = [...wakes.calls]
+    // The account suite exercises the full deletion job. Here its retained
+    // state reaches the real background readers with the author row gone.
+    await controls.query('DELETE FROM mikka_workspace_members WHERE "userId"=$1', [retired])
+    await controls.query('DELETE FROM "user" WHERE id=$1', [retired])
+    assert.deepEqual(await history(), before, 'passed and blocked results remain historical facts')
+
+    const [{ sweepFactoryMonitor }, { createFactoryMonitor }, { sweepFactoryWatchdog }, { factoryAuthorize }, { factoryMonitorWorkspaceKey }] = await Promise.all([
+      import('../lib/factory/monitor-sweep'), import('../lib/factory/monitor'), import('../lib/factory/watchdog'),
+      import('../lib/factory/authorize'), import('../lib/factory/server'),
+    ])
+    let monitorScopes = 0, admissions = 0, runtimeReads = 0, dispatches = 0, watchdogWakes = 0
+    assert.deepEqual(await sweepFactoryMonitor(pool, () => {
+      monitorScopes++
+      return { reconcile: async () => ({ observed: 0 }) }
+    }, { deadline: Date.now() + 5000 }), { enabled: true, scopes: 0, observed: 0, failed: 0, deferred: 0 })
+    const boundary: import('../lib/factory/background-workspace').FactoryWorkspaceBoundary = async (userId, taskId, work, existing) => {
+      admissions++
+      return factoryTaskWorkspaceBoundary(pool, null)(userId, taskId, work, existing)
+    }
+    const monitor = createFactoryMonitor(pool, factoryRuntimeForBot(null).store, factoryAuthorize, factoryMonitorWorkspaceKey, undefined, [], null, boundary)
+    assert.deepEqual(await monitor.reconcile(retired), { observed: 0 })
+    assert.deepEqual(await sweepFactoryWatchdog(pool, {
+      runtime: botId => { runtimeReads++; return factoryRuntimeForBot(botId) },
+      dispatch: async () => { dispatches++ },
+      wake: async () => { watchdogWakes++ },
+    }, new Date(), Date.now() + 5000, { userId: retired, runId: retained[1].runId }),
+    { scanned: 0, recovered: 0, blocked: 0, deferred: 0, failed: 0 })
+    assert.deepEqual({ monitorScopes, admissions, runtimeReads, dispatches, watchdogWakes },
+      { monitorScopes: 0, admissions: 0, runtimeReads: 0, dispatches: 0, watchdogWakes: 0 })
+    await wakes.flush()
+    assert.deepEqual(wakes.calls, priorWakes, 'historical reads schedule no Coordinator wake')
+    assert.deepEqual(await history(), before, 'background scans do not rewrite completed or blocked history')
+  })
 })

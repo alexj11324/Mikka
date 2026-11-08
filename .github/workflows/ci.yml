@@ -1,0 +1,522 @@
+name: CI
+
+# Merge-blocking source and database checks run on GitHub's PR merge candidate,
+# not a same-repository branch push. This avoids duplicating the same expensive
+# jobs and detects integration failures against the target branch at PR time.
+# - pull_request: premerge checks (same-repo and fork PRs);
+# - merge_group: synthetic queue candidate, if a queue is enabled later;
+# - push main: postmerge verification of each distinct main commit.
+# CI runs no browser tests (decision 2026-11-01-1520). Preserve the existing
+# protected status-check names.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Main commits need unique groups: a new pending run must not evict an older
+  # pending run (cancel-in-progress: false alone does not guarantee that).
+  group: ui-policy-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  # Existing accounting/admission suites exercise the hosted deployment.
+  # The self-hosted image workflow separately runs the default community mode.
+  MIKKA_EDITION: cloud
+  # A cache restore that fails (e.g. the account's cache egress limit) would
+  # otherwise hang for actions/cache's 10-minute default before falling back
+  # to a normal install, which outlasts the short jobs' own timeouts.
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  # Ephemeral CI registration fixtures share one loopback IP. Keep finite
+  # limits while leaving the production defaults at 5 signups/IP/hour.
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+
+jobs:
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      docs_only: ${{ steps.docs.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - id: docs
+        # Run the classifier from main, never from this checkout: a pull
+        # request must not be able to rewrite the script that skips its own
+        # required checks.
+        run: |
+          git fetch origin main --no-tags
+          trusted_dir="$(mktemp -d)"
+          trusted="$trusted_dir/ci-docs-only.mjs"
+          echo "Retained trusted classifier: $trusted"
+          if ! git show origin/main:scripts/ci-docs-only.mjs > "$trusted" 2>/dev/null; then
+            echo "docs_only=false (classifier is not on main yet)"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git diff --quiet origin/main -- scripts/ci-docs-only.mjs; then
+            echo "docs_only=false (classifier differs from main)"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node "$trusted"
+
+  cloud-secret-access:
+    name: Cloud credential access (OIDC)
+    # Credential checks do not run for documentation-only changes.
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Read one credential through Infisical workload identity
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: staging
+          secret-path: /vercel
+          secret-name: COMPOSIO_API_KEY
+          include-imports: false
+      - name: Verify cloud credential against its issuer
+        run: |
+          node --input-type=module <<'JS'
+          if (!process.env.COMPOSIO_API_KEY) throw new Error('Cloud credential was not injected')
+          const response = await fetch('https://backend.composio.dev/api/v3.1/webhook_subscriptions', {
+            headers: { 'x-api-key': process.env.COMPOSIO_API_KEY },
+            signal: AbortSignal.timeout(15000),
+          })
+          if (!response.ok) throw new Error(`Issuer rejected cloud credential: HTTP ${response.status}`)
+          console.log('Infisical OIDC and issuer credential validation succeeded')
+          JS
+
+  ui-policy-full:
+    name: Core unit checks
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
+      - run: pnpm test:factory-check-independence
+      - run: pnpm test:factory-check-recovery
+      - run: pnpm test:factory-routing
+      - run: pnpm test:self-improvement-semantic-source
+      - run: node --test scripts/ci-docs-only.test.mjs
+      - run: pnpm test:ui-policy
+      - name: Idle request budget (main pages, no browser)
+        run: pnpm test:idle-budget
+      - run: pnpm test:motion
+      - run: pnpm test:i18n
+      - run: pnpm i18n:check
+      - run: pnpm test:ssh-target
+      - run: pnpm test:linear-sync
+      - run: pnpm check:agent-definitions
+      - name: Release identity, vulnerability policy and artifact tamper regressions
+        run: pnpm test:release-security
+      - run: pnpm test:mailbox-verification
+      - run: pnpm test:factory-approval
+      - run: pnpm test:personal-mailbox-core
+      - run: pnpm test:factory-monitor
+      - run: pnpm test:execution-rules
+      - run: pnpm test:abuse
+      - run: pnpm test:governance
+      - run: pnpm test:self-hosting
+      - run: pnpm test:self-hosted-byok
+      - run: pnpm test:cloud-services
+      - run: pnpm test:hosted-usage
+      - run: pnpm test:model-admission
+      - run: pnpm test:audit
+      - run: pnpm test:agent-kit
+      - run: pnpm test:agent-kit-compat
+      - run: pnpm test:approved-writes
+      - run: pnpm test:coordinator-events
+      - run: pnpm test:schedules
+      - run: pnpm test:run-recovery
+      - run: pnpm test:mvp-fixtures
+      - run: pnpm test:credentials
+      - run: pnpm test:run-publication
+      - run: pnpm test:workflow-wakes
+      - name: Factory daemon check regressions and shared report contract
+        run: |
+          pnpm --filter @mikka/protocol exec vitest run src/run.test.ts
+          pnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts
+      - run: pnpm test:mobile-push
+      - run: pnpm test:mobile
+      - run: pnpm test:coordinator-native-relay
+      - run: pnpm test:coordinator-native-scope
+      - run: pnpm test:coordinator-issue-tools
+      # pnpm check scripts and test files that ran in no workflow (mattpocock/skills tdd audit).
+      - run: pnpm test:signup-turnstile
+      - run: pnpm test:cloud-limits
+      - run: pnpm test:analytics
+      - run: pnpm test:artifacts
+      - run: pnpm test:factory-config
+      - run: pnpm test:user-message-text
+      - run: pnpm test:run-info
+      - run: pnpm test:thread-changes
+      - run: pnpm check:agent-ui
+      - run: pnpm test:dev-local
+      - run: pnpm test:lib-units
+      - run: pnpm test:project-decisions
+      - run: pnpm test:unread
+      - run: pnpm test:issue-readonly-dom
+
+  ui-policy-integrations:
+    name: Integration unit checks
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
+      - run: pnpm test:active-agents
+        env:
+          # Database regressions run against ephemeral Postgres in browser-tests-full below.
+          MIKKA_DATABASE_URL: ""
+      - run: pnpm test:auth-composio
+      - name: Test environment binding and fail-closed guards
+        run: pnpm test:test-accounts
+      - name: Authentication email integration tests (isolated Postgres)
+        run: node scripts/test-auth-email.mjs
+      - run: pnpm test:groups
+      - run: pnpm test:live-lists
+      - run: pnpm test:group-turns
+      - run: pnpm test:integrations
+      - run: pnpm test:github
+      - run: pnpm test:request-log
+      # Legacy read routes; previously only in legacy-read-compat.yml, which ran on merged branches.
+      - run: pnpm test:legacy-reads
+      - run: pnpm test:slack
+      - run: pnpm test:telegram
+      - run: pnpm test:agent
+      - run: pnpm test:acceptance
+      - run: pnpm test:suggestions
+      - run: pnpm test:captures
+      - run: pnpm test:db-runner
+      - run: pnpm test:csv
+      - run: pnpm test:settings
+      - run: pnpm test:settings-backend
+      - run: pnpm test:workspace-settings
+      - run: pnpm test:settings-prefs
+      - run: pnpm test:account
+      - run: pnpm test:issues
+      - run: pnpm test:issue-search
+      # Tests that ran in no workflow; they need nothing outside the runner.
+      - name: Shared protocol unit tests
+        run: pnpm --filter @mikka/protocol test
+      - name: E2B local API relay
+        run: node --test scripts/e2b/local-api-relay.test.mjs
+      - name: Audit business UI composition
+        run: pnpm --silent lint:ui --json > ui-audit.json
+      - name: Show audit summary
+        if: always()
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            if (fs.existsSync("ui-audit.json")) {
+              const audit = JSON.parse(fs.readFileSync("ui-audit.json", "utf8"));
+              const summary = `## Strict UI policy\n\n${audit.files} business files style-scanned; ${audit.interactionFiles} files interaction-scanned (including business blocks); ${audit.errors} errors. ${audit.libraryFiles} component-library files excluded from style checks only. No upstream source verification.\n\n` + Object.entries(audit.counts).map(([rule, count]) => `- ${rule}: ${count}`).join("\n") + "\n";
+              console.log(summary);
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+            }
+          '
+      - name: Upload detailed audit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ui-policy-audit
+          path: ui-audit.json
+          if-no-files-found: ignore
+
+
+  source-checks:
+    name: Source checks
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
+      - run: pnpm check:cloud-boundary
+      - name: Verify all production release credentials use existing Infisical OIDC
+        run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
+        if: always()
+      - run: pnpm lint:code
+        if: always()
+      - run: node apps/api/scripts/generate-routes.mjs --check
+        if: always()
+      - run: pnpm lint:runtime
+        if: always()
+      - run: pnpm test:api
+        if: always()
+      - run: pnpm --filter @mikka/frontend test
+        if: always()
+      - run: pnpm typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        if: always()
+      - run: pnpm --filter @mikka/protocol typecheck
+      - run: pnpm --filter @mikka/mobile typecheck
+
+  daemon-checks:
+    name: Daemon checks
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    # Fixed standard Linux image; host namespace/security policy stays unchanged.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      MIKKA_DATABASE_URL: postgres://mikka:mikka@127.0.0.1:5432/mikka
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
+      - name: Daemon unit and transport regression tests
+        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
+      - name: Existing mailbox CLI integration tests
+        run: pnpm --filter @mikka/daemon test:mailbox-cli
+      # Part of the daemon's own test script, which otherwise runs only when main publishes.
+      - name: Daemon repository identity, GitHub credential and trusted endpoint tests
+        run: |
+          pnpm --filter @mikka/daemon test:repository-identity
+          pnpm --filter @mikka/daemon test:github-credentials
+          pnpm --filter @mikka/daemon test:trusted-endpoint
+      - name: Local computer authority through actual daemon and adapter protocol
+        run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
+        env:
+          NODE_ENV: test
+          MIKKA_TEST_MODE: '1'
+      - name: Preserve daemon unit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr13-cli-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/pr13-daemon-unit-results.json
+          if-no-files-found: warn
+      - run: pnpm --filter @mikka/daemon typecheck
+      - run: pnpm --filter @mikka/daemon build
+        id: daemon-package
+      - run: pnpm --filter @mikka/daemon test:package
+        env:
+          MIKKA_DAEMON_DIST_DIR: ${{ steps.daemon-package.outputs.package-directory }}
+
+  ui-policy:
+    # The required check name. It reports success when only documentation
+    # changed; otherwise it mirrors the full suite's result.
+    name: UI policy (strict)
+    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the full suite unless only documentation changed
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          FULL_RESULT: ${{ needs.ui-policy-full.result }}
+          INTEGRATIONS_RESULT: ${{ needs.ui-policy-integrations.result }}
+          SOURCE_RESULT: ${{ needs.source-checks.result }}
+          DAEMON_RESULT: ${{ needs.daemon-checks.result }}
+        run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Changed files job did not succeed: $CHANGES_RESULT"
+            exit 1
+          fi
+          if [ "$DOCS_ONLY" = "true" ]; then
+            echo "Documentation-only change; the full UI policy suite is skipped."
+            exit 0
+          fi
+          for result in "$FULL_RESULT" "$INTEGRATIONS_RESULT" "$SOURCE_RESULT" "$DAEMON_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "A required source, unit or daemon job did not succeed: $result"
+              exit 1
+            fi
+          done
+
+  browser-tests-full:
+    # CI runs no browser tests (decision 2026-11-01-1520); this job keeps the
+    # database suites that the required check names cover.
+    name: Database checks (${{ matrix.shard }}/4)
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      REQUIRE_DB: '1'
+      DB_TEST_SHARD: ${{ matrix.shard }}/4
+      MIKKA_TEST_DB_PORT: '5432'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3100
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: ./.github/actions/pnpm-install
+      # The .deb files apt downloads for the packages below, keyed on the package
+      # list and the runner image (a new image can carry newer dependencies).
+      # Read-only except on pushes to main, like the pnpm store.
+      - name: Name the native dependency package cache
+        id: native-debs-key
+        run: echo "key=native-debs-v1-$ImageOS-$ImageVersion-${{ runner.arch }}-bubblewrap-socat-ripgrep" >> "$GITHUB_OUTPUT"
+      - name: Restore native dependency packages
+        id: native-debs
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/native-debs
+          key: ${{ steps.native-debs-key.outputs.key }}
+      - name: Install native dependencies for the CLI approval database roundtrip
+        # A stalled Ubuntu mirror once held apt for the rest of the job
+        # (2026-11-01, run 41257416436). Fail this step instead of the job.
+        timeout-minutes: 5
+        run: |
+          packages=(bubblewrap socat ripgrep)
+          if compgen -G "$HOME/native-debs/*.deb" > /dev/null && sudo dpkg -i "$HOME"/native-debs/*.deb && command -v bwrap socat rg > /dev/null; then
+            echo "Installed ${packages[*]} from the cached packages"
+            exit 0
+          fi
+          echo "No usable cached packages; installing ${packages[*]} from the Ubuntu mirror"
+          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+          sudo apt-get "${apt_options[@]}" update
+          sudo apt-get clean
+          sudo apt-get "${apt_options[@]}" install -y -f "${packages[@]}"
+          command -v bwrap socat rg > /dev/null
+          rm -rf "$HOME/native-debs" && mkdir -p "$HOME/native-debs"
+          if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then cp /var/cache/apt/archives/*.deb "$HOME/native-debs/"; fi
+      - name: Save native dependency packages (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.native-debs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/native-debs
+          key: ${{ steps.native-debs-key.outputs.key }}
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
+      - name: Bootstrap empty database using tracked migrations only
+        run: node --experimental-strip-types --test tests/migrate-empty-db.test.mjs
+        env:
+          MIGRATION_BOOTSTRAP_CI: '1'
+      - run: pnpm test:e2e:setup
+      - name: Bind the disposable test environment to the exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Verify local execution identities and repository records (isolated Postgres)
+        if: matrix.shard == 1
+        run: node --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/local-runtime.integration.ts
+      - name: Verify thread sharing, membership and privacy against isolated database
+        if: matrix.shard == 1
+        run: node --experimental-test-module-mocks --conditions=react-server --import ./tests/support/server-only-loader.mjs --import tsx --test tests/issue-threads.integration.ts
+      - name: Required DB suites (temporary Postgres 17, no skips)
+        run: pnpm test:db
+        env:
+          REQUIRE_DB: '1'
+          RUN_DISPATCH_DB_TESTS: '1'
+          FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+          CREDENTIAL_TEST_RETAIN_RESOURCES: '1'
+          DB_TEST_EXPECTED: test:project-decisions-db,test:chat-attachments-db,test:ops-db,test:model-admission-db,test:abuse-db,test:onboarding-db,test:execution-settings-db,test:device-enrollment-db,test:account-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:approved-writes-db,test:artifact-migration-db,test:audit-db,test:bot-chats-db,test:bot-threads-db,test:captures-db,test:cloud-backend-db,test:cloud-services-db,test:computer-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-issue-tools-db,test:coordinator-native,test:coordinator-task-binding-db,test:credentials-db,test:desktop-auth,test:factory,test:factory-all-dispatch-db,test:factory-approval-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-monitor-db,test:factory-routing-db,test:github-connections-db,test:group-turns,test:groups,test:issue-search-db,test:live-db,test:local-repository-migration-db,test:migration-steps-db,test:pat-db,test:pat-api-db,test:personal-mailbox-default-off-db,test:preview-driver,test:relation-cycle,test:run-dispatch,test:run-publication-db,test:scope-detachment-db,test:secrets-db,test:session-mailbox-db,test:self-improvement-db,test:self-improvement-unit,test:settings-activity-db,test:settings-prefs-db,test:skill-semantic-db,test:suggestion-artifact-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:workspace-admin-db,test:workspace-migration-db,test:device-revocation-db,test:worker-authorization-db,test:schedules-db,test:run-recovery-db,test:plugins-db,test:web-auth-db
+      - name: Preserve synthetic CLI approval database evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pr13-http-cli-approval-${{ github.sha }}-${{ matrix.shard }}
+          path: |
+            /tmp/mikka-http-network-approval-*/evidence.json
+            /tmp/mikka-http-network-approval-*/*/repo/cli.stderr.log
+            ${{ runner.temp }}/pr13-personal-mailbox-results.xml
+          if-no-files-found: warn
+      # No production build in CI: Vercel builds main (decision 2026-11-01-0230).
+
+  browser-tests:
+    # The required check name. Same docs-only behavior as UI policy above.
+    name: Production build and browser interactions
+    needs: [changes, browser-tests-full]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the full suite unless only documentation changed
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          FULL_RESULT: ${{ needs.browser-tests-full.result }}
+        run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Changed files job did not succeed: $CHANGES_RESULT"
+            exit 1
+          fi
+          if [ "$DOCS_ONLY" = "true" ]; then
+            echo "Documentation-only change; the production build and database suites are skipped."
+            exit 0
+          fi
+          if [ "$FULL_RESULT" != "success" ]; then
+            echo "The production build and database suites did not succeed: $FULL_RESULT"
+            exit 1
+          fi

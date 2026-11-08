@@ -78,6 +78,7 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
         AND source.report->'modelFallback'->>'retryRunId'=live.id::text LIMIT 1) provider_check ON live."retryOf" IS NULL
     LEFT JOIN agent_runs previous ON previous.id=COALESCE(live."retryOf",provider_check.id) AND previous."userId"=t."userId" AND previous."issueId"=t."issueId"
     WHERE (t.status IN ('pending','running') OR (t.status='blocked' AND a.output->'watchdog'->>'reasonCode'='task_stalled'))
+      AND EXISTS (SELECT 1 FROM "user" u WHERE u.id=t."userId")
       AND t.stage IN ('spec','execute','review','verify','monitor')
       AND (live.status IS NULL OR live.status NOT IN ('paused','waiting_input'))
       AND (($2::text IS NULL AND t."updatedAt" < $1::timestamptz - interval '1 minute'

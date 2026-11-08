@@ -33,13 +33,15 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
     await pool.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text NOT NULL,name varchar(120) NOT NULL,slug varchar(64) UNIQUE,icon text,kind text NOT NULL DEFAULT 'team',"createdAt" timestamptz NOT NULL DEFAULT now());
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid NOT NULL,"userId" text NOT NULL,name text NOT NULL,email text NOT NULL,role text NOT NULL,status text NOT NULL DEFAULT 'active',"createdAt" timestamptz NOT NULL DEFAULT now(),PRIMARY KEY("workspaceId","userId"));
       CREATE TABLE mikka_workspace_invitations (id uuid PRIMARY KEY,"workspaceId" uuid NOT NULL,"userId" text NOT NULL,email text NOT NULL,role text NOT NULL,"tokenHash" text NOT NULL UNIQUE,status text NOT NULL DEFAULT 'pending',"expiresAt" timestamptz NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now(),UNIQUE("workspaceId",email));`)
+    const { planWorkspaces } = await import('../lib/account/delete')
     const legacyPersonal = randomUUID()
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,'legacy-owner','Legacy','personal');`, [legacyPersonal])
-    await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,'legacy-peer','Legacy','legacy@example.invalid','member')`, [legacyPersonal])
+    await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,'legacy-owner','Owner','owner@example.invalid','admin'),($1,'legacy-peer','Legacy','legacy@example.invalid','member')`, [legacyPersonal])
+    assert.deepEqual(await db.transaction(tx => planWorkspaces(tx, 'legacy-owner')), { soleAdminOf: ['Legacy'] }, 'an active Personal peer must still block deletion')
     await pool.query(await readFile(new URL('../drizzle/20261107180100_team_entitlements.sql', import.meta.url), 'utf8'))
     await pool.query('create table workspace_audit_outbox (id uuid primary key,"workspaceId" uuid not null,payload jsonb not null,"createdAt" timestamptz not null,"deliveredAt" timestamptz)')
-    assert.equal((await pool.query('select status from mikka_workspace_members where "workspaceId"=$1', [legacyPersonal])).rows[0].status, 'suspended')
-    await assert.rejects(pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1', [legacyPersonal]), /only its owner/)
+    assert.equal((await pool.query('select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=\'legacy-peer\'', [legacyPersonal])).rows[0].status, 'suspended')
+    await assert.rejects(pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=\'legacy-peer\'', [legacyPersonal]), /only its owner/)
     const workspace = async (members: number, kind: 'personal' | 'team' = 'team') => {
       const id = randomUUID()
       await db.insert(workspaceSchema.workspaces).values({ id, userId: 'human-0', name: 'Seat fixture', kind })
@@ -58,6 +60,19 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
       await db.insert(workspaceSchema.workspaceInvitations).values({ id: randomUUID(), workspaceId, userId: 'human-0', email: `${userId}@example.invalid`, role: 'member', tokenHash, expiresAt: new Date(Date.now() + 60000) })
       return db.transaction(tx => acceptHumanInvitation(tx, { id: userId, name: userId, email: `${userId}@example.invalid` }, tokenHash, mode))
     }
+
+    await t.test('migrated Personal peers do not block the real owner deletion plan', async () => {
+      assert.deepEqual(await db.transaction(tx => planWorkspaces(tx, 'legacy-owner')),
+        { solo: [legacyPersonal], shared: [], keptIssueIds: [], keptProjectIds: [] })
+      assert.deepEqual((await pool.query('SELECT "userId",status FROM mikka_workspace_members WHERE "workspaceId"=$1 ORDER BY "userId"', [legacyPersonal])).rows,
+        [{ userId: 'legacy-owner', status: 'active' }, { userId: 'legacy-peer', status: 'suspended' }], 'planning preserves migrated history')
+    })
+
+    await t.test('suspended Team peers still prevent deleting their only active administrator', async () => {
+      const id = await workspace(2)
+      await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=\'human-1\'', [id])
+      assert.deepEqual(await db.transaction(tx => planWorkspaces(tx, 'human-0')), { soleAdminOf: ['Seat fixture'] })
+    })
 
     await t.test('two accepts competing for the fifth seat leave exactly five humans', async () => {
       const id = await workspace(4)
