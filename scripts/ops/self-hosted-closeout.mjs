@@ -475,6 +475,11 @@ async function run(env) {
           safeRawQuotaCodePresent: raw === 'cloud_quota_exhausted' || raw === 'cloud_quota_exhausted (response)',
           exactStoredCode: refused.error === 'cloud_quota_exhausted' || refused.error === 'cloud_quota_exhausted (response)',
           fatalWrapper: refused.error === 'FatalError: cloud_quota_exhausted' || refused.error === 'FatalError: cloud_quota_exhausted (response)' }
+        // Only the exact SDK/name/code grammar may leave this disposable DB.
+        // No arbitrary error text or tool/provider body enters the artifact.
+        const safeWrappedQuota = /^(?:Step "step\/\/@ai-sdk\/workflow@[a-zA-Z0-9.+-]+\/\/(?:doStreamStep|doGenerateStep)" failed after \d+ retries: )?(?:(?:FatalError|CloudServiceError|Error): )?cloud_quota_exhausted(?: \(response\))?$/
+        if (typeof refused.error === 'string' && safeWrappedQuota.test(refused.error)) report.quotaObservation.safeStoredError = refused.error
+        report.quotaObservation.workflowPrefix = typeof refused.error === 'string' && refused.error.startsWith('Step "step//@ai-sdk/workflow@')
         const visible = {}
         for (const [locale, route] of [['en', 'en/'], ['zh-CN', '']]) {
           const messages = JSON.parse(await readFile(resolve('messages', `${locale}.json`), 'utf8'))
