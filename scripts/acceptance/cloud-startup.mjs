@@ -31,12 +31,12 @@ const fail = (code, cause) => { throw new Error(`startup_${code}`, cause ? { cau
 export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'sign_in', 'session_identity', 'workspace_identity',
   'team_selection', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'profile_create', 'profile_validation',
   'chat_model_selection', 'issue_create', 'coordinator_submit', 'coordinator_stream', 'thread_lookup', 'coordinator_stop',
-  'subscription_proof', 'execution_watch', 'execution_receipt', 'cleanup'])
+  'subscription_proof', 'bootstrap_publication', 'execution_watch', 'execution_receipt', 'cleanup'])
 // These are driver-owned codes, never a prefix rule accepting arbitrary error
 // messages. The candidate validator independently projects this same contract.
 export const STARTUP_FAILURE_CODES = Object.freeze([
   'aborted', 'action_refused', 'api_refused', 'bot_create_failed', 'bot_invalid', 'build_changed', 'build_mismatch', 'build_missing',
-  'candidate_target_invalid', 'cleanup_machine_unconfirmed', 'cleanup_scope_mismatch', 'cleanup_terminal_timeout', 'client_required',
+  'bootstrap_publication_failed', 'candidate_target_invalid', 'cleanup_machine_unconfirmed', 'cleanup_scope_mismatch', 'cleanup_terminal_timeout', 'client_required',
   'coordinator_stream_invalid', 'coordinator_stream_too_large', 'coordinator_stream_unavailable', 'daemon_startup_timing_incomplete',
   'diagnostic_bot_required', 'dispatch_not_new', 'dispatch_not_observed', 'dispatch_refused', 'dispatch_run_missing', 'dispatch_timings_required',
   'ended_before_execution_proof', 'execution_device_mismatch', 'execution_timeout', 'factory_list_invalid', 'failed',
@@ -281,10 +281,12 @@ function readDispatchOutput(output) {
 }
 
 /** A bounded NDJSON read, never a polling loop. Only safe identifiers/times leave. */
-async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs }, now) {
+async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false }, now) {
   const marker = `STARTUP_OK_${record.sampleId}`
   const toolInput = { issueId: record.issueId, repo: REPOSITORY, target: deviceId ? { deviceId } : 'cloud', profileId,
-    ...(agentId ? { agentId } : {}), readOnly: true,
+    // The owned lease probe executes Python; read-only runs intentionally have
+    // no native shell. Ordinary startup checks keep their read-only policy.
+    ...(agentId ? { agentId } : {}), readOnly: !leaseAudit,
     note: `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
   const text = `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用已固定模型的指定 Profile，不另传 model，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
   const trace = sampledRequestTrace()
@@ -376,8 +378,21 @@ function readStartupTiming(value, record, names = STARTUP_PHASES) {
     ms: value.ms, outcome: value.outcome, phases, truncated: value.truncated }
 }
 
+
+const REPOSITORY_GIT_PHASES = new Set(['clone', 'fetch', 'remote_head', 'remote_refs', 'local'].map(name => `daemon.repository.git.${name}`))
+function readRepositoryTiming(value, record) {
+  if (value?.source !== 'prepare_run_repository' || value.clock !== 'repository_prepare_monotonic'
+    || Object.keys(value).sort().join(',') !== 'clock,endedAt,harness,ms,outcome,phases,runIdHash,source,startedAt,truncated,version'
+    || !Array.isArray(value.phases) || value.phases.length > 32
+    || value.phases.some(phase => !phase || Object.keys(phase).sort().join(',') !== 'endMs,ms,name,outcome,startMs')) return null
+  const timing = readStartupTiming(value, record, REPOSITORY_GIT_PHASES)
+  if (!timing || Buffer.byteLength(JSON.stringify(value)) > 8192) return null
+  return { ...timing, source: value.source, clock: value.clock }
+}
+
 function readPreparationTiming(value, record, stage) {
-  if (!['prepared_agent_start', 'bootstrap_claude_start'].includes(value?.source) || value.harness !== 'claude_code' || !stage) return null
+  if (!['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize'].includes(value?.source) ||
+    value.harness !== (value.source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code') || !stage) return null
   const timing = readStartupTiming(value, record, PREPARATION_PHASES)
   // The task-owned Promise starts before the stage joins it and settles before
   // that join returns. Never rebase its earlier intervals onto the stage root.
@@ -401,6 +416,63 @@ export function hasStartupInitialization(record) {
     && has(prepared, 'daemon.adapter.cli_init.prewarm') && has(prepared, 'daemon.adapter.cli_init'))
 }
 
+/** The template gate requires actual adoption. Production measurement keeps
+ * recording ordinary fallback honestly through hasStartupInitialization. */
+export function bootstrapAdoptionEvidence(record) {
+  const stage = readStartupTiming(record.daemonStartupTiming, record)
+  const prepared = readPreparationTiming(record.daemonPreparationTiming, record, stage)
+  const source = record.harness === 'claude_code' ? 'bootstrap_claude_start' : 'bootstrap_codex_initialize'
+  if (record.startupTimingStatus !== 'complete' || record.preparationTimingStatus !== 'complete'
+    || !stage || !prepared || stage.truncated || prepared.truncated || stage.outcome !== 'ok' || prepared.outcome !== 'ok'
+    || prepared.source !== source || prepared.phases.some(phase => phase.outcome !== 'ok')
+    || ['daemon.adapter.cli_init.prewarm', 'daemon.adapter.cli_init'].some(name =>
+      prepared.phases.filter(phase => phase.name === name).length !== 1)
+    || (record.harness === 'claude_code' && (prepared.claimAuthentication !== 'oauth_environment'
+      || prepared.observedAuthSource !== 'oauth_environment'))) return null
+  return { version: 1, runIdHash: record.runIdHash, harness: record.harness, source,
+    preparationTiming: prepared, startupTiming: stage }
+}
+
+/** Failure-only projection of already observed data; it never authorizes adoption.
+ * Reuse the strict readers so arbitrary chunk fields cannot reach an artifact. */
+export function bootstrapAdoptionDiagnostics(record) {
+  if (typeof record?.runIdHash !== 'string' || !/^[a-f0-9]{16}$/.test(record.runIdHash)
+    || typeof record.harness !== 'string' || !Object.hasOwn(MODELS, record.harness)) return null
+  const stage = readStartupTiming(record.daemonStartupTiming, record)
+  const prepared = readPreparationTiming(record.daemonPreparationTiming, record, stage)
+  const status = value => ['unavailable', 'invalid', 'incomplete', 'truncated', 'complete'].includes(value) ? value : 'unavailable'
+  const source = record.harness === 'claude_code' ? 'bootstrap_claude_start' : 'bootstrap_codex_initialize'
+  return {
+    version: 1, runIdHash: record.runIdHash, harness: record.harness,
+    startupTimingStatus: status(record.startupTimingStatus), preparationTimingStatus: status(record.preparationTimingStatus),
+    startupTiming: stage, preparationTiming: prepared,
+    adoptionChecks: {
+      startupTimingStatus: record.startupTimingStatus === 'complete',
+      preparationTimingStatus: record.preparationTimingStatus === 'complete',
+      startupReceipt: Boolean(stage), preparationReceipt: Boolean(prepared),
+      startupUntruncated: stage?.truncated === false, preparationUntruncated: prepared?.truncated === false,
+      startupOutcome: stage?.outcome === 'ok', preparationOutcome: prepared?.outcome === 'ok',
+      preparationSource: prepared?.source === source,
+      preparationPhases: Boolean(prepared?.phases.every(phase => phase.outcome === 'ok')),
+      prewarmPhaseCount: prepared?.phases.filter(phase => phase.name === 'daemon.adapter.cli_init.prewarm').length === 1,
+      cliInitPhaseCount: prepared?.phases.filter(phase => phase.name === 'daemon.adapter.cli_init').length === 1,
+      claimAuthentication: record.harness !== 'claude_code' || prepared?.claimAuthentication === 'oauth_environment',
+      observedAuthSource: record.harness !== 'claude_code' || prepared?.observedAuthSource === 'oauth_environment',
+    },
+  }
+}
+
+/** Re-check the bounded actual timing proof at each publication boundary. */
+export function readBootstrapAcceptance(value, record) {
+  if (value?.version !== 1 || value.runIdHash !== record.runIdHash || value.harness !== record.harness
+    || !/^[a-f0-9]{64}$/.test(value.bootstrapSha256 ?? '') || !/^[a-f0-9]{64}$/.test(value.hintSha256 ?? '')
+    || Object.keys(value).sort().join(',') !== 'bootstrapSha256,harness,hintSha256,preparationTiming,runIdHash,source,startupTiming,version') return null
+  const adopted = bootstrapAdoptionEvidence({ ...record, startupTimingStatus: 'complete', preparationTimingStatus: 'complete',
+    daemonStartupTiming: value.startupTiming, daemonPreparationTiming: value.preparationTiming })
+  return adopted && value.source === adopted.source ? { ...adopted,
+    bootstrapSha256: value.bootstrapSha256, hintSha256: value.hintSha256 } : null
+}
+
 /** Only post-start provider output counts. Stage/usage/state/status and a bare
  * message boundary are daemon activity, not evidence of model execution. */
 export function observeChunks(record, detail, observedAt) {
@@ -409,6 +481,8 @@ export function observeChunks(record, detail, observedAt) {
   // getIssueThread replays the stream. Derive ordering afresh from this read,
   // never from toolCalls retained by an earlier read of the same chunks.
   const toolInputs = new Set()
+  const submittedReplies = new Set()
+  let submittedAt = null
   let started = false, reply = '', completedTool = false, replyAfterTool = '', replyVerifiedAfterTool = false
   for (const item of detail.chunks ?? []) {
     const { chunk } = item
@@ -425,6 +499,11 @@ export function observeChunks(record, detail, observedAt) {
       if (['repository', 'worktree', 'agent_start'].includes(data?.stage) && Number.isFinite(data.ms) && typeof data.ok === 'boolean') {
         if (!stages.some(stage => stage.stage === data.stage)) stages.push({ stage: data.stage, ms: data.ms, ok: data.ok,
           ...(Number.isFinite(at) ? { storedAt: iso(at) } : {}) })
+        if (data.stage === 'repository' && data.repositoryTiming !== undefined) {
+          const timing = readRepositoryTiming(data.repositoryTiming, record)
+          if (timing) record.daemonRepositoryTiming ??= timing
+          record.repositoryTimingStatus = record.repositoryTimingStatus === 'invalid' || !timing ? 'invalid' : record.daemonRepositoryTiming.truncated ? 'truncated' : 'complete'
+        }
         if (data.stage === 'agent_start') {
           const timing = readStartupTiming(data.startupTiming, record)
           if (timing) record.daemonStartupTiming ??= timing
@@ -446,6 +525,9 @@ export function observeChunks(record, detail, observedAt) {
       if (['tool-input-start', 'tool-input-available', 'tool-output-available', 'tool-output-error'].includes(chunk?.type)
         && typeof chunk.toolCallId === 'string' && chunk.toolCallId.length > 0 && chunk.toolCallId.length <= 512) {
         const toolCallHash = sha(chunk.toolCallId).slice(0, 16)
+        if (chunk.type === 'tool-input-available' && completedTool && chunk.toolName === 'mcp__mikka__submit'
+          && typeof chunk.input?.summary === 'string' && chunk.input.summary.includes(`STARTUP_OK_${record.sampleId}`)) submittedReplies.add(toolCallHash)
+        if (chunk.type === 'tool-output-available' && submittedReplies.has(toolCallHash) && Number.isFinite(at)) submittedAt = at
         if (chunk.type.startsWith('tool-input-') && toolInputs.size < 64) toolInputs.add(toolCallHash)
         if (chunk.type === 'tool-output-available' && toolInputs.has(toolCallHash)) completedTool = true
         let tool = toolCalls.find(call => call.toolCallHash === toolCallHash)
@@ -474,6 +556,20 @@ export function observeChunks(record, detail, observedAt) {
         }
       }
     }
+  }
+  // submit is the normal successful delivery channel. The owner-only summary
+  // comes from the persisted report, not from an arbitrary tool input/output.
+  // Require this exact, uncontinued run and an observed submit after its read.
+  const thread = detail.thread
+  if (submittedAt !== null && thread?.id === record.runId && thread.rootRunId === record.runId && thread.latestRunId === record.runId
+    && thread.ownedByCurrentUser === true && thread.status === 'succeeded' && thread.error === null && !thread.continuation
+    && thread.attempts?.length === 1 && thread.attempts[0].runId === record.runId && thread.attempts[0].status === 'succeeded'
+    && thread.detail?.harness === record.harness && thread.detail.summarySource === 'report' && typeof thread.detail.summary === 'string'
+    && thread.detail.summary.includes(`STARTUP_OK_${record.sampleId}`)
+    && Number.isFinite(dateValue(thread.finishedAt)) && dateValue(thread.finishedAt) >= submittedAt) {
+    record.replyVerified = true
+    replyVerifiedAfterTool = true
+    record.replySource = 'submitted_report'
   }
   record.replyVerifiedAfterTool = replyVerifiedAfterTool
   record.lastStatus = typeof detail.thread?.status === 'string' && /^[a-z_]+$/.test(detail.thread.status) ? detail.thread.status : null
@@ -633,7 +729,7 @@ export async function subscriptionProof(client, record, scope, profile) {
       profileVersion: profile.version, profileDigest: profile.digest, access: 'workspace_share' } }
 }
 
-export async function cleanupCase(client, record, target, { timeoutMs = 60000, WebSocketImpl = globalThis.WebSocket, now = Date.now } = {}) {
+export async function cleanupCase(client, record, target, { timeoutMs = 60000, WebSocketImpl = globalThis.WebSocket, now = Date.now, preserveIssue = false } = {}) {
   const cleanup = record.cleanup ??= { status: 'running', errors: [] }
   const runIds = new Set(record.runId ? [record.runId] : [])
   let runsEnded = true, machinesEnded = true
@@ -718,12 +814,13 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
   }
   // Failed Factory cancellation can leave a producer able to create another
   // attempt. Keep the issue accessible for recovery even if known runs ended.
-  if (record.issueId && runsEnded && factoryCancelled && machinesEnded) await step('taskDeleted', async () => {
+  if (record.issueId && !preserveIssue && runsEnded && factoryCancelled && machinesEnded) await step('taskDeleted', async () => {
     const { issue } = await client.rpc('issues.getIssue', [record.issueId])
     assert(issue?.id === record.issueId && issue.title === record.title, 'cleanup_scope_mismatch')
     await client.rpc('issue-operations.setIssueDeleted', [{ id: issue.id, revision: issue.revision }])
   })
-  if (!runsEnded || !factoryCancelled || !machinesEnded || cleanup.errors.length) cleanup.retainedFixture = { issueId: record.issueId, runIds: [...runIds] }
+  if (preserveIssue) cleanup.taskRetained = true
+  if (preserveIssue || !runsEnded || !factoryCancelled || !machinesEnded || cleanup.errors.length) cleanup.retainedFixture = { issueId: record.issueId, runIds: [...runIds] }
   cleanup.status = cleanup.errors.length ? 'failed' : 'passed'
 }
 
@@ -736,7 +833,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   deviceId, agentId, sourceCommit, expectedBuild, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
-  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false }) {
+  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
   assert(scope?.ownerId && scope.adminId && scope.ownerId !== scope.adminId && scope.botId === botId
@@ -745,6 +842,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   assert(repository === REPOSITORY && titlePrefix.includes('测试') && titlePrefix.length <= 80, 'fixture_scope_invalid')
   assert(/^[A-Za-z0-9_-]{1,80}$/.test(sampleId), 'sample_id_invalid')
   assert((!deviceId && !agentId) || (UUID.test(deviceId ?? '') && UUID.test(agentId ?? '')), 'candidate_target_invalid')
+  assert(onCandidateRunQueued === undefined || typeof onCandidateRunQueued === 'function' && deviceId && agentId, 'candidate_target_invalid')
   const record = { sampleId, harness, requestedModel: model, title: `${titlePrefix} ${sampleId} ${harness}`,
     profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId) || leaseAudit, requireOfficialTiming: officialTiming === 'enabled',
     requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required' || leaseAudit),
@@ -754,8 +852,10 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     assert(typeof build === 'string' && (!expectedBuild || build === expectedBuild), 'build_mismatch')
     assert(!record.build || build === record.build, 'build_changed'); record.build = build
   })
+  let initialPinPassed = false, finalPinAttempted = false
   try {
     await pin()
+    initialPinPassed = true
     record.phase = 'session_identity'
     const identity = await client.json('/api/auth/get-session')
     assert(identity.user?.id === scope.ownerId && isSmokeAccountEmail(identity.user.email), 'session_identity_mismatch')
@@ -774,12 +874,22 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
       type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.\n${leaseInstructions}` }] }],
     } }])
     assert(UUID.test(created.issue?.id ?? ''), 'issue_create_failed'); record.issueId = created.issue.id
-    await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs }, now)
+    await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit }, now)
     record.phase = 'coordinator_stop'
     await client.rpc('coordinator.stopCoordinatorTurn', [botId])
     record.coordinatorStopped = true
     record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
+    if (onCandidateRunQueued) {
+      record.phase = 'bootstrap_publication'
+      try {
+        record.bootstrapPublication = await onCandidateRunQueued({ runId: record.runId, issueId: record.issueId,
+          deviceId, agentId, workspaceId: scope.workspaceId, harness, model })
+        const published = record.bootstrapPublication
+        assert(published?.version === 1 && published.runId === record.runId && published.harness === harness
+          && /^[a-f0-9]{64}$/.test(published.bootstrapSha256 ?? '') && /^[a-f0-9]{64}$/.test(published.hintSha256 ?? ''), 'bootstrap_publication_failed')
+      } catch (error) { fail('bootstrap_publication_failed', error) }
+    }
     record.phase = 'execution_watch'
     await watchRun(client, record, timeoutMs, WebSocketImpl, now, undefined, leaseDriver ? {
       observe: detail => {
@@ -791,6 +901,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
     record.phase = 'build_pin'
+    finalPinAttempted = true
     await pin()
     record.phase = 'execution_receipt'
     if (runtimeEvidenceMode === 'required') assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
@@ -806,6 +917,12 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.status = 'failed'; record.failure = startupFailure(error, record.phase); record.error = record.failure.code
   }
   finally {
+    // A failed execution still needs its closing version observation. Keep the
+    // original failure, and do not repeat a pin already attempted on success.
+    if (initialPinPassed && !finalPinAttempted) {
+      try { await pin() }
+      catch (error) { record.versionPinFailure = startupFailure(error, 'build_pin'); record.status = 'failed' }
+    }
     if (record.messageSubmittedAt && !record.coordinatorStopped) {
       try { await client.rpc('coordinator.stopCoordinatorTurn', [botId]); record.coordinatorStopped = true }
       catch (error) {
@@ -822,7 +939,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
 }
 
 export async function runCloudStartup(options, { env = process.env, fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now,
-  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }) } = {}) {
+  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued } = {}) {
   const { email, password } = smokeAcceptanceAccount(env)
   assert(typeof WebSocketImpl === 'function', 'node_websocket_required')
   const client = createSessionClient(options.origin, fetchImpl), fixtureId = randomUUID()
@@ -933,12 +1050,14 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       }
       report.phase = 'profile_validation'
       const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, profile, scope, harness, sampleId,
-        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl })
+        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued })
       report.samples.push(sample)
-      if (['startup_build_mismatch', 'startup_build_changed', 'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error)) {
+      const versionFailure = sample.versionPinFailure?.code ?? (['startup_build_mismatch', 'startup_build_changed',
+        'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error) ? sample.error : null)
+      if (versionFailure) {
         report.batchAborted = 'version_pin_changed'
         report.phase = 'build_pin'
-        fail(sample.error.slice('startup_'.length))
+        fail(versionFailure.slice('startup_'.length))
       }
     }
     report.phase = 'build_pin'

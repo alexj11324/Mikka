@@ -1,3 +1,5 @@
+import type { AnonymousCodexCandidate } from '../anonymous-codex-spare'
+import type { FreshCandidate } from '../anonymous-claude-spare'
 import { captureRunFailure, failureFrom, type RunFailure, type RunFailureContext } from "@mikka/protocol/run-failure"
 import { codexFailureInfo, codexFailureMessage, type CodexFailureInfo, type CodexFailurePhase } from "./codex-failure"
 import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } from "../runs/quota-exhausted"
@@ -50,8 +52,9 @@ import { rawCliShellAvailable, runPolicy } from "../permissions"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
+import { taskExecutionEnv } from '../task-env'
 import { mailboxToolResult } from '../run-mailbox'
-import { codexMailboxCatalogue, codexMailboxResumeVerified, recordCodexMailboxSession, verifyCodexMailboxResume } from './codex-mailbox'
+import { codexMailboxCatalogue, codexMailboxResumeVersion, recordCodexMailboxSession, verifyCodexMailboxResume } from './codex-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
 import { classifyProviderFailure, ProviderFailureError, providerFailureMessage, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import type {
@@ -75,6 +78,8 @@ import type {
 } from "./types"
 
 export interface CodexAdapterOptions {
+  anonymousCodexCandidate?: AnonymousCodexCandidate
+  anonymousCodexFresh?: FreshCandidate
   sandbox: AgentSandbox
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
@@ -374,11 +379,11 @@ export class CodexAdapter implements AgentAdapter {
     const managedAuth = Boolean(externalAuth || brokerAuth)
     if (brokerAuth && (!this.options.spawnCli || externalAuth || options.credential)) throw new Error(SUBSCRIPTION_AUTH_ERROR)
     if (managedAuth) {
-      const clean = options.machineEnvironment ? options.env : buildChildEnv({
+      const clean = options.machineEnvironment ? options.env : taskExecutionEnv(buildChildEnv({
         host: options.env,
         runId:
           options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId
-      })
+      }), options)
       if (
         Object.entries(options.env).some(
           ([name, value]) => clean[name] !== value
@@ -410,11 +415,11 @@ export class CodexAdapter implements AgentAdapter {
       ? { home: options.env.CODEX_HOME ?? join(options.env.HOME, '.codex') }
       : prepareCodexHome(join(runDir, "codex-home"), log)
     if (options.machineEnvironment) mkdirSync(codexHome.home, { recursive: true, mode: 0o700 })
-    if (mailboxCatalogue && threadId) verifyCodexMailboxResume(
+    const mailboxResumeVersion = mailboxCatalogue && threadId ? verifyCodexMailboxResume(
       this.options.stateDir,
       mode === 'continue' ? options.continueSession!.runId : options.runId,
       codexHome.home, threadId, mailboxCatalogue,
-    )
+    ) : null
     const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
     // The official platform package includes code-mode helpers beside Codex.
@@ -512,7 +517,15 @@ export class CodexAdapter implements AgentAdapter {
       pidFile: paths.pidFile,
       marker: ctx.runDir,
     }
-    if (daemonTracer.generationsEnabled && traceContext) {
+    const adopted = mode === 'new' && externalAuth && options.machineEnvironment && !computerMcp && !options.apps?.apps.length &&
+      this.options.anonymousCodexFresh ? await this.options.anonymousCodexCandidate?.adopt({
+        fresh: this.options.anonymousCodexFresh, cwd: ctx.worktree, env: spawnOptions.env, binary, mcp, traceContext,
+        repositoryRoot: options.gitWritePaths?.length === 1 ? options.gitWritePaths[0] : undefined,
+        assertLive: () => { if (approval.revoked) throw Error('Run tool approval unavailable') },
+        onRevoke: callback => approval.onRevoke(callback),
+      }) : undefined
+    if (adopted) nativeGenerations = adopted.nativeGenerations
+    if (!adopted && daemonTracer.generationsEnabled && traceContext) {
       const bypass = codexTraceEnvironment(spawnOptions.env)
       if (!bypass) {
         nativeUnavailableReason = 'platform_proxy_unverified'
@@ -531,7 +544,7 @@ export class CodexAdapter implements AgentAdapter {
       }
     }
     let child: Awaited<ReturnType<typeof spawnCli>>
-    try { child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions) }
+    try { child = adopted?.child ?? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions) }
     catch (error) { closeNativeGenerations(false); throw error }
     // Existing owned-child shutdown determines the deadline. The receiver
     // stays live through native exporter shutdown and drains in the background.
@@ -541,7 +554,7 @@ export class CodexAdapter implements AgentAdapter {
     void child.exited.finally(off)
     // After the whole group is gone (`exited` kills it first).
     void child.exited.then(() => { wipeRunCredentials(runDir) })
-    const rpc: MessageConnection = jsonlConnection(
+    const rpc: MessageConnection = adopted?.rpc ?? jsonlConnection(
       child.process.stdout,
       child.process.stdin,
     )
@@ -689,6 +702,8 @@ export class CodexAdapter implements AgentAdapter {
         }
         case "item/agentMessage/delta": {
           const { itemId, delta } = params as DeltaNotification
+          // An empty delta must not hide the completed item's full message.
+          if (typeof delta !== "string" || delta.length === 0) return
           if (!streamed.has(itemId)) {
             streamed.add(itemId)
             queue.chunk({ type: "text-start", id: itemId })
@@ -772,7 +787,7 @@ export class CodexAdapter implements AgentAdapter {
           return
       }
     })
-    rpc.listen()
+    if (!adopted) rpc.listen()
 
     const turnCompleted = async (turn: TurnNotification["turn"]) => {
       generations.endTurn()
@@ -891,7 +906,7 @@ export class CodexAdapter implements AgentAdapter {
     let startupPhase: 'initialize' | 'oauth_login' | 'thread_start' | 'turn_start' = 'initialize'
     try {
       const traceAttributes = { "mikka.harness": "codex", "mikka.run.id_hash": runIdHash(options.runId) }
-      const initialized = await daemonTracer.span("daemon.adapter.cli_init", traceAttributes, () => ready(
+      const initialized = adopted?.initialized ?? await daemonTracer.span("daemon.adapter.cli_init", traceAttributes, () => ready(
         rpc.sendRequest<{ userAgent?: string }>("initialize", {
           clientInfo: {
             name: "mikka",
@@ -902,9 +917,9 @@ export class CodexAdapter implements AgentAdapter {
         }),
         "initialize",
       ))
-      await rpc.sendNotification("initialized")
-      const mailboxResumeVerified = codexMailboxResumeVerified(initialized.userAgent)
-      if (mailboxCatalogue && mode !== 'new' && !mailboxResumeVerified)
+      if (!adopted) await rpc.sendNotification("initialized")
+      const mailboxNativeVersion = codexMailboxResumeVersion(initialized.userAgent)
+      if (mailboxCatalogue && mode !== 'new' && (!mailboxNativeVersion || mailboxNativeVersion !== mailboxResumeVersion))
         throw new Error('Run mailbox requires a verified original Codex thread')
       if (externalAuth) {
         startupPhase = 'oauth_login'
@@ -930,6 +945,7 @@ export class CodexAdapter implements AgentAdapter {
       }
       const thread: Omit<ThreadResumeParams, 'threadId'> = {
         cwd: ctx.worktree,
+        ...(adopted ? { config: adopted.threadConfig } : {}),
         // Nothing is asked and Codex's own sandbox is off: the equivalent of
         // `--dangerously-bypass-approvals-and-sandbox` (decision 2026-11-01-2335).
         approvalPolicy: "never",
@@ -968,7 +984,7 @@ export class CodexAdapter implements AgentAdapter {
       sessionId = response.thread.id
       if ((options.requireSessionResume || (options.mailbox && threadId)) && sessionId !== threadId)
         throw new Error("Codex resumed a different question thread")
-      if (mailboxCatalogue && mailboxResumeVerified) recordCodexMailboxSession(this.options.stateDir, options.runId, codexHome.home, response.thread, mailboxCatalogue, mode !== 'new')
+      if (mailboxCatalogue && mailboxNativeVersion) recordCodexMailboxSession(this.options.stateDir, options.runId, codexHome.home, response.thread, mailboxCatalogue, mode !== 'new', mailboxNativeVersion)
       runtimeModel = typeof response.model === "string" && response.model ? response.model : null
       if (runtimeModel) options.onRuntimeModel?.(sessionId, runtimeModel)
       if(managedAuth)await this.options.onHostedSession?.(sessionId)

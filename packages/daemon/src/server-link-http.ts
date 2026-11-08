@@ -18,6 +18,7 @@ import { chatFileDownloadSchema, chatFileTransferSchema, CHAT_FILE_MAX_BYTES } f
 import { ToolApprovalGate, type RunControlMode } from "./agents/tool-approval"
 import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
+import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 import { nativeBrokerContextSchema, nativeLeaseSchema, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeBrokerRequest } from '@mikka/protocol/subscription'
@@ -30,6 +31,7 @@ import {
   RECOVERY_WORKTREE_HEADER,
   MODEL_CREDENTIAL_HEADER,
   RUN_CREDENTIALS_HEADER,
+  INITIAL_REPOSITORY_HEADER,
   MAILBOX_NOTICE_HEADER,
   DAEMON_RPC_ERRORS,
   devicePaths,
@@ -63,7 +65,7 @@ import {
 } from "./errors"
 import { DAEMON_VERSION } from "./paths"
 import { createRunMailbox } from './run-mailbox'
-import { daemonTracer, routeTemplate, runIdHash } from "./tracing"
+import { daemonTracer, routeTemplate } from "./tracing"
 import { runRuntimeTimings } from "./run-runtime-timing"
 import type {
   ChunkBatch,
@@ -105,6 +107,7 @@ export class SessionRejectedError extends DaemonError {
 }
 
 interface CallOptions<T> {
+  initialRepository?: true
   body?: unknown
   schema?: z.ZodType<T>
   /** Endpoint-specific success decoding, including an older empty response. */
@@ -263,12 +266,12 @@ export class HttpServerLink implements ServerLink {
     token: string | null,
     {
       timeoutMs = 15_000,
-      signal,
-    }: { timeoutMs?: number; signal?: AbortSignal } = {}
+      signal, initialRepository,
+    }: { timeoutMs?: number; signal?: AbortSignal; initialRepository?: true } = {}
   ): Promise<Response> {
     const route = routeTemplate(path)
     return daemonTracer.span(`${method} ${route}`, { "mikka.route": route, "url.path": route, "http.request.method": method }, async span => {
-      const response = await this.sendTraced(method, path, body, token, { timeoutMs, signal })
+      const response = await this.sendTraced(method, path, body, token, { timeoutMs, signal, initialRepository })
       span.set("http.response.status_code", response.status)
       if (response.status >= 400) span.set("mikka.outcome", `http_${response.status}`)
       return response
@@ -280,7 +283,7 @@ export class HttpServerLink implements ServerLink {
     path: string,
     body: unknown,
     token: string | null,
-    { timeoutMs, signal }: { timeoutMs: number; signal?: AbortSignal },
+    { timeoutMs, signal, initialRepository }: { timeoutMs: number; signal?: AbortSignal; initialRepository?: true },
   ): Promise<Response> {
     const measured = runRuntimeTimings.request(method, path, body)
     let status: number | undefined
@@ -297,7 +300,9 @@ export class HttpServerLink implements ServerLink {
           [REPO_ORIGIN_HEADER]: '1',
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
+          [TASK_SECRETS_HEADER]: TASK_SECRETS_VERSION,
           [RUN_CREDENTIALS_HEADER]: '1',
+          ...(initialRepository ? { [INITIAL_REPOSITORY_HEADER]: '1' } : {}),
           [SUBSCRIPTION_MODEL_CATALOGUE_HEADER]: '1',
           [MAILBOX_NOTICE_HEADER]: '1',
           ...daemonTracer.headers(),
@@ -338,7 +343,7 @@ export class HttpServerLink implements ServerLink {
       path,
       options.body,
       this.credential,
-      { timeoutMs: options.timeoutMs, signal: options.signal }
+      { timeoutMs: options.timeoutMs, signal: options.signal, initialRepository: options.initialRepository }
     )
     if (response.status >= 500 || response.status === 429)
       throw new ServerUnreachableError(response.status)
@@ -416,11 +421,11 @@ export class HttpServerLink implements ServerLink {
     return runIds
   }
 
-  async claimRun(deviceId: string, runId: string, signal?: AbortSignal): Promise<RunAssignment> {
+  async claimRun(deviceId: string, runId: string, signal?: AbortSignal, options?: { initialRepository: true }): Promise<RunAssignment> {
     return this.call(
       "POST",
       devicePaths.claim(checkId(deviceId), checkId(runId)),
-      { schema: runAssignmentSchema, claimOf: runId, signal }
+      { schema: runAssignmentSchema, claimOf: runId, signal, initialRepository: options?.initialRepository }
     )
   }
   async validateSkillReceipt(runId:string,receiptId:string) {

@@ -25,7 +25,7 @@ export async function mobileTask(user: Exclude<IssueReader, string>, workspace: 
   const blockerIds = metadata.blockedByIds ?? []
   const visibleBlockers = blockerIds.length ? await issueVisibility(user, false, workspace.id, db, { onlyIssueIds: blockerIds }) : null
   const [identifiers, runs, [decoration], versions, labels, blockers] = await Promise.all([
-    taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number }]),
+    taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number }], db, access.linked === false ? new Map() : undefined),
     db.select({ runId: agentRuns.id, status: agentRuns.status, outcome: agentRuns.outcome,
       createdAt: agentRuns.createdAt, threadReplacedBy: agentRuns.threadReplacedBy,
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`,

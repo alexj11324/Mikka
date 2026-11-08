@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { chatProjectionHash } from './chat-projection-version'
 import { captureRunFailure, readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 import { APP_BUILD } from '@/lib/app-build'
 import { sourcedEventMessage } from './message-safety'
@@ -22,6 +22,7 @@ import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions,
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
+import { attentionQuestionsFromEvents, type AttentionQuestion } from './question-attention'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
@@ -113,6 +114,8 @@ export interface InboxTake {
   pushHidesText: boolean
   taskEventId?: string
   sourceEventId?: string
+  /** Durable human handoffs already chosen by this inbox's Decision receipts. */
+  attentionQuestions?: AttentionQuestion[]
   scheduledRead?: ScheduledRead
 }
 
@@ -197,16 +200,18 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       .where(and(eventsOf(userId, botId), isNotNull(coordinatorEvents.deliveredAt), sql`${coordinatorEvents.payload}->'mikkaTelegramReply'->>'state' = 'pending'`))
       .orderBy(asc(coordinatorEvents.createdAt), asc(coordinatorEvents.id)).limit(100)
     const handoffs = events.filter(event => isHandoff(event.kind))
+    const attentionQuestions = scheduledRead ? [] : attentionQuestionsFromEvents(events)
     return {
       held: true, added: events.length,
       ...(taskEventId ? { taskEventId } : {}),
       ...(sourceEventId ? { sourceEventId } : {}),
       ...(scheduledRead ? { scheduledRead } : {}),
+      ...(attentionQuestions.length ? { attentionQuestions } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
       handoffOnly: handoffs.length === events.length,
-      pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier })),
+      pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier, runId: event.runId, issueId: event.issueId })),
       pushHidesText: handoffs.some(carriesCode),
     }
   })
@@ -498,12 +503,15 @@ export async function citationSources(userId: string, texts: readonly string[], 
   const runIds = [...new Set([...cited.runIds, ...threads])]
   const sources: Record<string, CitationSource> = {}
   if (!issueIds.length && !runIds.length) return sources
-  // One membership read for every visibility check of this call (never kept past it).
-  // Loaded here, not at module load: team-access brings in the workspace resolver, which the store's other callers never need.
-  const teams = await (await import('@/lib/team-access')).accessibleTeamScopes(userId)
+  // Runs reuse one membership read. A direct task-only citation folds its
+  // membership check into the bounded identifier visibility query.
+  const teams = runIds.length ? await (await import('@/lib/team-access')).accessibleTeamScopes(userId) : undefined
+  const visibility = issueIds.length
+    ? await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams, withIdentifierTeams: true }) : null
+  const identifierTeams = new Map<string, { key: string; number: number }>(visibility?.taskTeams)
   const issueRows = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds, teams })).predicate)) : []
+    .where(and(inArray(issues.id, issueIds), visibility!.predicate)) : []
   // Only what a citation shows: the report's summary, the prompt's opening (its name) and each task without its body.
   const runs = runIds.length ? await visibleRuns(userId, { runIds, limit: runIds.length, brief: true, teams }) : []
   // A teammate's run arrives as the bare projection (no agent id): its prompt, report and steps stay with its owner.
@@ -515,13 +523,13 @@ export async function citationSources(userId: string, texts: readonly string[], 
     ownIds.length ? db.select({ runId: runChunks.runId, count: sql<number>`count(*)` }).from(runChunks)
       .where(and(inArray(runChunks.runId, ownIds), sql`${runChunks.chunk}->>'type' = 'tool-input-available'`)).groupBy(runChunks.runId)
       .then(rows => new Map(rows.map(row => [row.runId, Number(row.count)]))) : new Map<string, number>(),
-    issuesForUser(userId, runIssueIds, false, db, { withoutBody: true, teams }),
+    issuesForUser(userId, runIssueIds, false, db, { withoutBody: true, teams, identifierTeams }),
   ])
   // Every cited and run task's display identifier in one lookup.
   const identifiers = await taskIdentifiers([
     ...issueRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })),
     ...[...tasks.values()].map(task => ({ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number })),
-  ])
+  ], db, identifierTeams)
   for (const { content, ownerId: _owner, scope: _scope, ...row } of issueRows) {
     const metadata = readIssueMetadata(content)
     if (!metadata.deletedAt) sources[row.id] = { kind: 'issue', ...row, number: metadata.number ?? null, identifier: identifiers.get(row.id) ?? null }
@@ -648,7 +656,7 @@ async function chatPrefix(userId: string, botId: string, through: number) {
   const rows = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message }).from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.position} <= ${through}`)).orderBy(desc(coordinatorMessages.position)).limit(200).as('chat_prefix')
   const [result] = await db.select({ hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))` }).from(rows)
-  return result.hash
+  return chatProjectionHash(result.hash)
 }
 
 /** Hash and metadata share one statement snapshot, so a concurrent prefix edit
@@ -661,7 +669,7 @@ async function chatPrefixMetadata(userId: string, botId: string, through: number
     hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))`,
     rows: sql<ChatToolMetadataRow[]>`coalesce(jsonb_agg(jsonb_build_object('position', ${rows.position}, 'parts', ${rows.parts}) order by ${rows.position}) filter (where ${rows.position} >= ${Math.max(0, cursor - 199)} and jsonb_array_length(${rows.parts}) > 0), '[]'::jsonb)`,
   }).from(rows)
-  return result
+  return { ...result, hash: chatProjectionHash(result.hash) }
 }
 
 /** The web chat's first screen: the latest messages, older ones a page at a time
@@ -738,7 +746,7 @@ export async function chatVersionState(userId: string, limit = 200, botId: strin
   const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}), ...(stored.createdAt ? { createdAt: new Date(stored.createdAt) } : {}) } : undefined
   const now = new Date()
   return {
-    version: createHash('sha256').update(`${limit}|${stored.hash}|${snapshot.failureVersion ?? ''}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`).digest('hex').slice(0, 32),
+    version: chatProjectionHash(`${limit}|${stored.hash}|${snapshot.failureVersion ?? ''}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`),
     cursor: stored.last,
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting, now, lastMessage),

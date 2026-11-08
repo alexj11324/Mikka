@@ -885,6 +885,8 @@
     "sandboxUsernsSpec": "Ubuntu's description of this setting",
     "sandboxDetail": "Error: {detail}",
     "sandboxFix": "How to fix",
+    "noAgentYet": "No agent yet",
+    "howToInstall": "How to install",
     "installAgent": "How to install",
     "copyInstall": "Copy {command}",
     "commands": {
@@ -2522,6 +2524,8 @@
       "byBot": "By bot",
       "byMember": "By member",
       "exportCsv": "Export CSV",
+      "runs": "Runs",
+      "runsPerDay": "Runs per day",
       "threads": "New threads",
       "runTime": "Run time",
       "runSeconds": "Run seconds",
@@ -2555,6 +2559,7 @@
     },
     "billing": {
       "loading": "Loading billing",
+      "loadFailed": "Couldn’t load billing",
       "plan": "Plan",
       "team": "Team",
       "free": "Free",
@@ -4200,6 +4205,7 @@
       "groupChats": "Group chats"
     },
     "newTask": "New task",
+    "reviewTask": "Review {identifier}",
     "newConversation": "New conversation",
     "openList": "Expand bot list",
     "back": "Back",
@@ -4229,6 +4235,7 @@
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
     "panel": {
       "label": "Right panel",
+      "overview": "Overview",
       "allThreads": "All threads",
       "allThreadsWaiting": "All threads, {count} waiting on you",
       "tabs": "Right panel content",
@@ -5226,6 +5233,18 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
+    "task_secret_unavailable": {
+      "default": "A task Secret is unavailable. Check its delivery policy and retry the task.",
+      "invalid_capability": "The task Secret capability is invalid. Retry the task to obtain a new grant.",
+      "expired_capability": "The task Secret grant expired or was not renewed. Retry the task.",
+      "binding_mismatch": "The Secret grant does not belong to this task or device.",
+      "invalid_request": "The Secret request has an unsupported method, path or header.",
+      "destination_denied": "This Secret policy does not permit the requested destination or operation.",
+      "upstream_unavailable": "The authorized service could not be reached. Check its availability before retrying.",
+      "response_blocked": "The service response was blocked because it could disclose authentication or was unsupported.",
+      "limit_exceeded": "The Secret request exceeds the supported size or grant limit.",
+      "configuration": "Configure this Secret’s protected HTTP policy, or explicitly allow direct exposure for this Secret."
+    },
     "run_subscription_expired": { "default": "The model subscription needs to be reconnected." },
     "run_api_key_invalid": { "default": "The provider rejected the API key. Check the key in model settings." },
     "run_quota_exceeded": { "default": "The provider's usage limit or credit balance has been reached. Check your usage." },
@@ -5608,6 +5627,20 @@
       "failed": "That didn't work"
     }
   },
+  "HostedConnections": {
+    "appsTitle": "Apps",
+    "appsNote": "Apps you've connected. Bots can use them only while they're on.",
+    "addMore": "Add in Plugins",
+    "emptyNote": "Apps you connect in Plugins, such as GitHub, Linear or Slack, appear here.",
+    "state": {
+      "on": "On",
+      "off": "Turned off",
+      "expired": "Needs reconnecting",
+      "connected": "Connected",
+      "paused": "Paused",
+      "pending": "Loading"
+    }
+  },
   "HostedSettings": {
     "back": "Back",
     "general": {
@@ -5655,6 +5688,14 @@
       "providerOn": "{on}/{total} on",
       "firstModel": "Tasks start with",
       "keyProvider": "Provider"
+    }
+  },
+  "CodeReview": {
+    "summary": {
+      "pr": "PR #{number}",
+      "files": "{count, plural, one {# file} other {# files}} +{additions} −{deletions}",
+      "failed": "⚠ {count, plural, one {# check} other {# checks}} failed",
+      "running": "Running"
     }
   }
 }

@@ -33,7 +33,7 @@ test('a refused target makes no request and cannot leak supplied credentials', a
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_/)
 })
 
-function fixture({ leak = false, mixed = false } = {}) {
+function fixture({ leak = false, mixed = false, strictScope = false, missingPersonal = false } = {}) {
   const id = n => '10000000-0000-4000-8000-' + String(n).padStart(12, '0')
   const owner = id(1), team = id(2), personal = id(3), ownIssue = id(4), otherIssue = id(5), task = id(6), tokenId = id(7)
   const token = 'mkp_' + 't'.repeat(43), bearer = 'n'.repeat(43), cookie = 'cookie-PRIVATE'
@@ -71,8 +71,12 @@ function fixture({ leak = false, mixed = false } = {}) {
           { userId: 'admin', email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' },
         ] : [] })
     }
-    if (path === '/api/factory/tasks') return ok({ tasks: [{ id: task }],
-      liveWorkspaceId: url.searchParams.get('issueId') === ownIssue ? team : personal })
+    if (path === '/api/factory/tasks') {
+      const resourceWorkspace = url.searchParams.get('issueId') === ownIssue ? team : personal
+      if ((strictScope && workspace !== resourceWorkspace) || (missingPersonal && resourceWorkspace === personal))
+        return ok({ error: 'factoryNotFound' }, 404)
+      return ok({ tasks: [{ id: task }], liveWorkspaceId: resourceWorkspace })
+    }
     assert.equal(path, '/api/rpc')
     actions.push(body.action)
     const args = decode(body.args)
@@ -81,14 +85,15 @@ function fixture({ leak = false, mixed = false } = {}) {
       case 'workspace.switchWorkspace': workspace = args[0]; data = { ok: true, data: { workspaceId: workspace } }; break
       case 'issues.listWorkspaceIssues': data = mixed ? [{ id: otherIssue }, { id: ownIssue }]
         : [{ id: args[0] === team ? ownIssue : otherIssue }]; break
-      case 'tokens.createAccessToken': assert.equal(args[1], team); data = { ok: true, data: { id: tokenId, token } }; break
+      case 'tokens.createAccessToken': assert.equal(args[1], team); if (strictScope) assert.equal(workspace, team); data = { ok: true, data: { id: tokenId, token } }; break
       case 'tokens.revokeAccessToken': assert.equal(args[0].id, tokenId); revoked = true; data = { ok: true, data: { id: tokenId } }; break
       case 'tokens.listAccessTokens': data = { ok: true, data: revoked ? [] : [{ id: tokenId }] }; break
       default: assert.fail('unapproved production action')
     }
     return ok({ version: 1, ok: true, result: encode(data) })
   }
-  return { env: credentials, fetchImpl, closed: () => revoked && loggedOut && workspace === personal, actions }
+  return { env: credentials, fetchImpl, closed: () => revoked && loggedOut && workspace === personal,
+    restored: () => loggedOut && workspace === personal, actions }
 }
 for (const leak of [false, true]) test(`safe production driver ${leak ? 'detects isolation failure' : 'checks human and PAT paths'} and closes its own resources`, async () => {
   const f = fixture({ leak }), report = await runAuthAudit(f)
@@ -105,4 +110,20 @@ test('a mixed legacy list cannot misidentify a personal issue as the team positi
   assert.equal(report.checks.patOwnWorkspace.httpStatus, 200)
   assert.equal(report.checks.patOtherWorkspaceList.httpStatus, 404)
   assert.equal(f.closed(), true)
+})
+test('human baselines use their authorized workspace context and return to the team before PAT creation', async () => {
+  const f = fixture({ strictScope: true, mixed: true }), report = await runAuthAudit(f)
+  assert.equal(report.status, 'passed', JSON.stringify(report))
+  assert.equal(report.checks.patOwnWorkspace.httpStatus, 200)
+  assert.equal(report.checks.patOtherWorkspaceList.httpStatus, 404)
+  assert.equal(report.checks.patOtherWorkspaceDetail.httpStatus, 404)
+  assert.equal(f.closed(), true)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE|mkp_|n{43}|t{43}|example.invalid/)
+})
+test('an unavailable personal baseline creates no PAT and restores its own session workspace', async () => {
+  const f = fixture({ strictScope: true, missingPersonal: true }), report = await runAuthAudit(f)
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'issue_missing')
+  assert.equal(f.actions.includes('tokens.createAccessToken'), false)
+  assert.equal(f.restored(), true)
 })

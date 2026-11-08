@@ -63,9 +63,11 @@ export async function resolveBotModelChoice(
   if (key && preference.key) return { kind: 'apiKey', key, model: preference.key.model, chosen: true }
   const fallback = preference.key ? 'preference' as const : undefined
 
-  const hostedAllowed = await hostedModelEnabled(pool, scope.ownerId)
+  // Only hosted choices consume this policy; both consumers share one read per invocation.
+  let hostedPolicy: Promise<boolean> | undefined
+  const hostedAllowed = () => hostedPolicy ??= hostedModelEnabled(pool, scope.ownerId)
   const hosted = async (state: ChoiceState): Promise<BotModelChoice> => {
-    if (!hostedAllowed) {
+    if (!await hostedAllowed()) {
       const next = await (await import('./points-fallback')).pointsFallback(pool as Pool, scope)
       if (next?.kind === 'api_key') {
         const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
@@ -92,7 +94,7 @@ export async function resolveBotModelChoice(
     }
     return { kind: 'hosted', ...state }
   }
-  if (preference.selected === HOSTED_CHOICE && !preference.key && hostedAllowed) return hosted({ chosen: true })
+  if (preference.selected === HOSTED_CHOICE && !preference.key && await hostedAllowed()) return hosted({ chosen: true })
 
   const rows = cached.rows ?? await settings.chatModels(scope)
   const selected = preference.selected && !preference.key ? await settings.chatBinding(scope, preference.selected) : undefined

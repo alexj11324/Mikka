@@ -13,8 +13,8 @@ import { buildChildEnv } from '../src/env'
 import { createLogger } from '../src/log'
 import type { RunMailbox } from '../src/run-mailbox'
 
-// Real adapter + synthetic CLI. Official 0.163.0 and a loopback Responses
-// fixture separately verify the rollout catalogue format used by this fake.
+// Real adapter + synthetic CLI. Official 0.163.0 and 0.166.0 loopback
+// Responses fixtures separately verify the rollout catalogue and native resume.
 const root = mkdtempSync(join(tmpdir(), 'mikka-codex-mailbox-resume-'))
 const cwd = join(root, 'worktree')
 mkdirSync(cwd)
@@ -71,8 +71,9 @@ async function drain(session: AgentSession) {
   return output
 }
 
-async function original(f: ReturnType<typeof fixture>) {
+async function original(f: ReturnType<typeof fixture>, nativeVersion = '0.163.0') {
   const runId = randomUUID(), first = transport('original')
+  f.controls(runId, { userAgent: `mikka/${nativeVersion} (Synthetic Linux)` })
   const session = await f.adapter().start(f.options(runId, first.mailbox))
   await drain(session)
   assert.equal(first.calls.length, 1)
@@ -114,8 +115,51 @@ test('Codex mailbox continues the original history in a new run and restarts wit
   await restarted.mailbox.close(); await last.mailbox.close()
 })
 
+test('Codex 0.166.0 records its actual version and resumes the same mailbox thread with the current transport', { timeout: 20000 }, async () => {
+  const f = fixture(), source = await original(f, '0.166.0'), childRunId = randomUUID(), current = transport('current')
+  assert.ok(existsSync(f.receipt(source.runId)), 'The verified native release must record resume evidence')
+  assert.equal(JSON.parse(readFileSync(f.receipt(source.runId), 'utf8')).nativeVersion, '0.166.0')
+  f.controls(childRunId, { userAgent: 'mikka/0.166.0 (Synthetic Linux)' })
+  const continued = await f.adapter().start({ ...f.options(childRunId, current.mailbox), requireSessionResume: true,
+    continueSession: { runId: source.runId, sessionId: source.sessionId, message: prompt } })
+  assert.equal(continued.sessionId, source.sessionId)
+  assert.ok((await drain(continued)).includes('current'))
+  assert.equal(current.calls.length, 1)
+  assert.equal(source.first.calls.length, 1)
+  assert.deepEqual(f.trace(childRunId).filter(item => item.method.startsWith('thread/')), [{ method: 'thread/resume', dynamicToolsPresent: false }])
+  const recorded = JSON.parse(readFileSync(f.receipt(childRunId), 'utf8'))
+  assert.equal(recorded.nativeVersion, '0.166.0')
+  assert.equal(recorded.runId, childRunId)
+  assert.equal(recorded.threadId, source.sessionId)
+  await current.mailbox.close()
+
+  const restarted = transport('restarted')
+  f.controls(childRunId, { userAgent: 'mikka/0.166.0 (Synthetic Linux)', mailboxOnRestart: true })
+  const resumed = await f.adapter().resume(source.sessionId, f.options(childRunId, restarted.mailbox))
+  assert.equal(resumed.sessionId, source.sessionId)
+  assert.ok((await drain(resumed)).includes('restarted'))
+  assert.equal(restarted.calls.length, 1)
+  assert.equal(current.calls.length, 1)
+  await restarted.mailbox.close()
+})
+
+test('Codex mailbox resume rejects unverified cross-version history before thread/resume or a native turn', { timeout: 20000 }, async t => {
+  for (const [originalVersion, currentVersion] of [['0.163.0', '0.166.0'], ['0.166.0', '0.163.0']]) await t.test(originalVersion + ' to ' + currentVersion, async () => {
+    const f = fixture(), source = await original(f, originalVersion), nextId = randomUUID(), current = transport('current')
+    assert.ok(existsSync(f.receipt(source.runId)), 'The original verified release must have a real host receipt')
+    assert.equal(JSON.parse(readFileSync(f.receipt(source.runId), 'utf8')).nativeVersion, originalVersion)
+    f.controls(nextId, { userAgent: `mikka/${currentVersion} (Synthetic Linux)` })
+    await assert.rejects(f.adapter().start({ ...f.options(nextId, current.mailbox),
+      continueSession: { runId: source.runId, sessionId: source.sessionId, message: prompt } }), /Run mailbox/)
+    assert.deepEqual(f.trace(nextId), [])
+    assert.equal(current.calls.length, 0)
+    assert.equal(existsSync(f.receipt(nextId)), false)
+    await current.mailbox.close()
+  })
+})
+
 test('Codex mailbox resume rejects missing or changed capability evidence before any native turn', { timeout: 30000 }, async t => {
-  for (const change of ['missing-receipt', 'catalogue', 'header-catalogue', 'header-schema', 'header-session', 'missing-history', 'receipt-path', 'receipt-run', 'receipt-session', 'history-link'] as const) await t.test(change, async () => {
+  for (const change of ['missing-receipt', 'catalogue', 'header-catalogue', 'header-schema', 'header-session', 'missing-history', 'receipt-path', 'receipt-run', 'receipt-session', 'receipt-version', 'history-link'] as const) await t.test(change, async () => {
     const f = fixture(), source = await original(f), nextId = randomUUID(), current = transport('current', change === 'catalogue' ? 'mailbox_sent' : 'mailbox_inbox')
     const history = join(f.codexHome(source.runId), 'sessions', source.sessionId + '.jsonl')
     if (change === 'missing-receipt') rmSync(f.receipt(source.runId), { force: true })
@@ -127,14 +171,14 @@ test('Codex mailbox resume rejects missing or changed capability evidence before
       writeFileSync(history, JSON.stringify(header) + '\n')
     }
     if (change === 'missing-history') rmSync(history)
-    if (change === 'receipt-path' || change === 'receipt-run' || change === 'receipt-session') {
+    if (change === 'receipt-path' || change === 'receipt-run' || change === 'receipt-session' || change === 'receipt-version') {
       const file = f.receipt(source.runId)
       // The old implementation has no receipt; the positive case above is
       // the regression red. This synthetic host record still must not grant
       // a path outside the retained history directories.
       mkdirSync(join(f.stateDir, 'codex-mailbox'), { recursive: true })
       const receipt = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { version: 1, runId: source.runId, threadId: source.sessionId }
-      writeFileSync(file, JSON.stringify({ ...receipt, ...(change === 'receipt-path' ? { historyPath: '../outside.jsonl' } : change === 'receipt-run' ? { runId: randomUUID() } : { threadId: 'foreign-thread' }) }))
+      writeFileSync(file, JSON.stringify({ ...receipt, ...(change === 'receipt-path' ? { historyPath: '../outside.jsonl' } : change === 'receipt-run' ? { runId: randomUUID() } : change === 'receipt-version' ? { nativeVersion: '0.164.0' } : { threadId: 'foreign-thread' }) }))
     }
     if (change === 'history-link') {
       const target = join(f.stateDir, 'synthetic-outside-history.jsonl')

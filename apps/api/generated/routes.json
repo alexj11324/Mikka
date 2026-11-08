@@ -670,7 +670,7 @@
         "GET"
       ],
       "maxDuration": 60,
-      "sourceHash": "6efa7ffc03030083e01b8c0bbe3eded193ca8519c84a7e56622a1ac034490259"
+      "sourceHash": "2b11737af62870819d3d3ecd12cd21cf5de02877bda73b8cc39c6b38c49a831f"
     },
     {
       "path": "/mikka/api/cron/reconcile",
@@ -803,7 +803,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "dc3284cf87d77b0e5cf0f738d4d95a1fc3e6033468068a6ca930af48f223c7b1"
+      "sourceHash": "83690e72095683aef1961e15b399dab4abaac18d56f67e04357e6decf722173d"
     },
     {
       "path": "/mikka/api/device-tokens/[tokenId]/revoke",
@@ -1565,7 +1565,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "f51c8e65daa53269bdf4e857759b0d5300006b5a783f3a9536a904cedf263d44"
+      "sourceHash": "e0818cf6420a3c1ed1fa34e346716a3abb4c1e8ca55d77eff89ae1caaf8a3536"
     },
     {
       "path": "/mikka/api/search",
@@ -1575,6 +1575,16 @@
         "GET"
       ],
       "sourceHash": "276c412e105af607495eb724c5559b61656e5a0d89ef23cf5a9d51c7cb1211ae"
+    },
+    {
+      "path": "/mikka/api/secrets/delivery",
+      "template": "/api/secrets/delivery",
+      "source": "app/api/secrets/delivery/route.ts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "sourceHash": "d7090f753f8af5da218953a744e79e3f22ab9af95482625e725021b9bdd35f0c"
     },
     {
       "path": "/mikka/api/self-improvement",
@@ -2056,7 +2066,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "e7afdeb463e80355680671f123e2ee1bb6e9f8d9f06f1880e42a1c27ba51bd75"
+      "sourceHash": "b32fa96dd7fa77afca9900389f1a11266293eccfd7ce8b89e02d734a0de1395c"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/repos",
@@ -2092,7 +2102,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "586ced81afbb37c2215ffac487cdac1f0a92286902ada4c1536fdab5157e4d1d"
+      "sourceHash": "1310564b0ba665075a28204da7383013e25ca8d4b3356d3befcf33fe2707bf67"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
@@ -2251,6 +2261,16 @@
         "POST"
       ],
       "sourceHash": "20557762165127bd0f548041265b7d1d3ffbdee769b3bf79e2f3736ad9d7e346"
+    },
+    {
+      "path": "/mikka/v1/task-secrets/[runId]",
+      "template": "/v1/task-secrets/[runId]",
+      "source": "app/v1/task-secrets/[runId]/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "8b9677d86e78dbad178a9f04fd694867050535246795269b6d18b6be0e21da8b"
     },
     {
       "path": "/mikka/w/[slug]",

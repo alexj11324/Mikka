@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace, acceptanceBot,
-  STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES } from '../acceptance/cloud-startup.mjs'
+  STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, bootstrapAdoptionEvidence, bootstrapAdoptionDiagnostics } from '../acceptance/cloud-startup.mjs'
 import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
@@ -18,6 +18,7 @@ const GATE_CODES = new Set([
   'source_invalid', 'source_mismatch', 'account_required', 'fixtures_required', 'application_build_mismatch',
   'sign_in_failed', 'account_mismatch', 'candidate_invalid', 'candidate_worker_mismatch', 'enrollment_failed',
   'registration_timeout', 'registration_output_invalid', 'daemon_exited', 'daemon_failed', 'registration_invalid',
+  'bootstrap_projection_invalid', 'bootstrap_publication_failed', 'bootstrap_proof_invalid', 'bootstrap_adoption_missing',
   'registered_agent_missing', 'execution_failed', 'execution_evidence_invalid', 'official_agent_acceptance_missing', 'tool_reply_evidence_missing',
   'device_cleanup_failed', 'sandbox_cleanup_failed', 'application_build_changed', 'sign_out_failed',
   'subscription_or_cleanup_failed', 'subscriptions_missing', 'paths_required', 'workspace_restore_failed', 'shared_scope_evidence_invalid',
@@ -66,7 +67,30 @@ function startupFailure(record) {
     ...(code === 'startup_http_error' && Number.isInteger(httpStatus) && httpStatus >= 400 && httpStatus <= 599 ? { httpStatus } : {}) }
 }
 
-function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, deviceId, { sourceCommit, cleanupDetails, passedReceipt, registeredProof }) {
+/** Mirrors only the final receipt's binding predicates, never their raw inputs. */
+function bootstrapReceiptChecks(kind, proof, sample, expectedScope) {
+  const harness = kind === 'claude' ? 'claude_code' : 'codex'
+  const bootstrap = proof.bootstrapReceipt, publication = sample?.bootstrapPublication
+  return {
+    registrationMode: proof.registrationMode === 'cloud_worker_bootstrap',
+    workspaceId: UUID.test(proof.workspaceId ?? ''),
+    bootstrapVersion: bootstrap?.version === 1,
+    bootstrapRun: Boolean(bootstrap && sample && bootstrap.runId === sample.runId),
+    bootstrapHarness: bootstrap?.harness === harness,
+    bootstrapDigest: /^[a-f0-9]{64}$/.test(bootstrap?.bootstrapSha256 ?? '') && bootstrap.bootstrapSha256 === proof.bootstrapSha256,
+    hintDigest: /^[a-f0-9]{64}$/.test(bootstrap?.hintSha256 ?? ''),
+    bootstrapShape: Boolean(bootstrap && Object.keys(bootstrap).length === 5),
+    publicationVersion: publication?.version === 1,
+    publicationRun: Boolean(publication && bootstrap && publication.runId === bootstrap.runId),
+    publicationHarness: publication?.harness === harness,
+    publicationBootstrapDigest: Boolean(publication && bootstrap && publication.bootstrapSha256 === bootstrap.bootstrapSha256),
+    publicationHintDigest: Boolean(publication && bootstrap && publication.hintSha256 === bootstrap.hintSha256),
+    publicationShape: Boolean(publication && Object.keys(publication).length === 5),
+    expectedWorkspace: !expectedScope || proof.workspaceId === expectedScope.workspaceId,
+  }
+}
+
+function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, deviceId, { sourceCommit, cleanupDetails, passedReceipt, registeredProof, bootstrapChecks }) {
   const sample = acceptance?.samples?.[0]
   const sampleFailure = startupFailure(sample)
   const failure = sampleFailure ?? startupFailure(acceptance)
@@ -74,6 +98,13 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
   const runIdHash = UUID.test(sample?.runId ?? '') ? createHash('sha256').update(sample.runId).digest('hex').slice(0, 16) : null
   const timing = runIdHash ? readRuntimeTiming(sample?.runtimeTiming, { runIdHash, harness }) : null
   const evidence = runtimeEvidence(timing, { requireOfficial: true })
+  const bootstrap = error && sample && runIdHash ? bootstrapAdoptionDiagnostics({ ...sample, runIdHash }) : null
+  const bootstrapDiagnostics = bootstrap ? { ...bootstrap, bindingChecks: bootstrapChecks ?? null, projectionTruncated: false } : null
+  if (bootstrapDiagnostics && Buffer.byteLength(JSON.stringify(bootstrapDiagnostics)) > 32768) {
+    bootstrapDiagnostics.startupTiming = null
+    bootstrapDiagnostics.preparationTiming = null
+    bootstrapDiagnostics.projectionTruncated = true
+  }
   const agentStart = Array.isArray(sample?.stages) ? sample.stages.slice(0, 3).find(row => row?.stage === 'agent_start') : null
   const startup = sample?.daemonStartupTiming
   const cliInit = runIdHash !== null && startup?.version === 1 && startup.runIdHash === runIdHash && startup.harness === harness
@@ -116,6 +147,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
     ...(passedReceipt && cliVersion(passedReceipt.officialCliVersion) && /^[a-f0-9]{64}$/.test(passedReceipt.officialBinarySha256 ?? '') ? { passedReceipt } : {}),
     // Registration proves the selected original binary, not task execution.
     ...(error && registeredProof ? { candidateProof: registeredProof } : {}),
+    ...(bootstrapDiagnostics ? { bootstrapDiagnostics } : {}),
     ...(retainedFixture ? { retainedFixture } : {}),
     ...(cleanup.has('device_remove_failed') && UUID.test(deviceId ?? '') ? { registeredDeviceId: deviceId } : {}) }
 }
@@ -150,11 +182,22 @@ export function candidateReceipt(report, kind, proof, acceptance, expectedScope)
     && runtime?.complete === true && runtime.truncated === false
     && runtime.agentAccepted?.kind === (harness === 'claude_code' ? 'claude_user_ack' : 'codex_turn_start_ack')
     && authorization.status === 'passed', 'official_agent_acceptance_missing')
+  const bootstrap = proof.bootstrapReceipt, publication = sample.bootstrapPublication
+  const adoption = bootstrapAdoptionEvidence({ ...sample, runIdHash })
+  check(proof.registrationMode === 'cloud_worker_bootstrap' && UUID.test(proof.workspaceId ?? '')
+    && bootstrap?.version === 1 && bootstrap.runId === sample.runId && bootstrap.harness === harness
+    && /^[a-f0-9]{64}$/.test(bootstrap.bootstrapSha256 ?? '') && bootstrap.bootstrapSha256 === proof.bootstrapSha256
+    && /^[a-f0-9]{64}$/.test(bootstrap.hintSha256 ?? '') && Object.keys(bootstrap).length === 5
+    && publication?.version === 1 && publication.runId === bootstrap.runId && publication.harness === harness
+    && publication.bootstrapSha256 === bootstrap.bootstrapSha256 && publication.hintSha256 === bootstrap.hintSha256
+    && Object.keys(publication).length === 5 && adoption
+    && (!expectedScope || proof.workspaceId === expectedScope.workspaceId), 'bootstrap_adoption_missing')
   return { status: 'passed', templateId: report.templates[kind].templateId, sourceCommit: report.sourceCommit,
     workerSha: report.workerSha, harness, model, credentialRoute: 'subscription', replyVerified: true,
     replyVerifiedAfterTool: true, toolEvidence: { toolCallHash: tool.toolCallHash, outcome: 'ok' },
     runId: sample.runId, deviceId: proof.deviceId, officialBinarySha256: proof.binarySha256,
     officialCliVersion: proof.version,
+    bootstrapAcceptance: { ...adoption, bootstrapSha256: bootstrap.bootstrapSha256, hintSha256: bootstrap.hintSha256 },
     sharedScope: { verified: true, access: 'workspace_share', requesterHash: scope.requesterHash, payerHash: scope.payerHash,
       workspaceHash: scope.workspaceHash, connectionHash: scope.connectionHash, bindingHash: scope.bindingHash,
       connectionRevision: scope.connectionRevision, profileVersion: scope.profileVersion, profileDigest: scope.profileDigest },
@@ -192,7 +235,7 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
     scope = await selectAcceptanceTeam(client, { ownerId, workspace: env.MIKKA_ACCEPTANCE_WORKSPACE_ID }, value => { originalWorkspaceId = value })
     bot = await acceptanceBot(client, env.MIKKA_ACCEPTANCE_BOT_ID, randomUUID())
     for (const [kind, harness] of KINDS) {
-      let sandbox, deviceId, acceptance, diagnosticError, registeredProof, enrollmentIssued = false, stage = 'candidate'
+      let sandbox, deviceId, acceptance, diagnosticError, registeredProof, bootstrapChecks, enrollmentIssued = false, stage = 'candidate'
       const cleanupErrors = [], cleanupDetails = []
       try {
         const template = report.templates?.[kind]
@@ -216,7 +259,7 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
         try {
           const process = await sandbox.commands.run(
             'cat /run/mikka-template-acceptance/enrollment | runuser -u user -- env PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:/usr/local/bin:/usr/bin:/bin:/home/user/.local/bin ' +
-            `MIKKA_ACCEPTANCE_ORIGIN=${origin} MIKKA_ACCEPTANCE_HARNESS=${harness} ` +
+            `MIKKA_ACCEPTANCE_ORIGIN=${origin} MIKKA_ACCEPTANCE_HARNESS=${harness} MIKKA_ACCEPTANCE_WORKSPACE_ID=${scope.workspaceId} ` +
             '/opt/mikka/worker/packages/daemon/node_modules/.bin/tsx /opt/mikka/worker/scripts/e2b/acceptance-daemon.mts', {
               user: 'root', background: true, timeoutMs: 0, onStdout: text => {
                 buffer += text
@@ -227,7 +270,9 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
             })
           void process.wait().then(() => rejectReady(Error('template_gate_daemon_exited')), error => rejectReady(Error('template_gate_daemon_failed', { cause: error })))
           const proof = await ready
-          check(UUID.test(proof.deviceId ?? '') && proof.harness === harness && /^[a-f0-9]{64}$/.test(proof.binarySha256 ?? ''), 'registration_invalid')
+          check(UUID.test(proof.deviceId ?? '') && proof.harness === harness && /^[a-f0-9]{64}$/.test(proof.binarySha256 ?? '')
+            && proof.workspaceId === scope.workspaceId && proof.registrationMode === 'cloud_worker_bootstrap'
+            && /^[a-f0-9]{64}$/.test(proof.bootstrapSha256 ?? ''), 'registration_invalid')
           deviceId = proof.deviceId
           registeredProof = registrationDiagnostic(report, kind, proof)
           stage = 'agents'
@@ -235,13 +280,45 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
           const matching = agents.filter(agent => agent.deviceId === deviceId && agent.harness === harness)
           check(matching.length === 1, 'registered_agent_missing')
           stage = 'acceptance'
+          let publication, publicationAttempted = false
+          const onCandidateRunQueued = async queued => {
+            check(!publicationAttempted && queued.deviceId === deviceId && queued.workspaceId === scope.workspaceId
+              && queued.harness === harness && UUID.test(queued.runId ?? ''), 'bootstrap_projection_invalid')
+            publicationAttempted = true
+            const query = new URLSearchParams({ bootstrap: '1', deviceId, workspaceId: scope.workspaceId, bootstrapSha256: proof.bootstrapSha256 })
+            const evidence = await client.json('/api/runs/' + queued.runId + '/evidence?' + query)
+            const projected = evidence.bootstrap
+            check(projected?.version === 1 && projected.authority === 'none' && projected.deviceId === deviceId
+              && projected.workspaceId === scope.workspaceId && projected.harness === harness
+              && projected.hint?.runId === queued.runId && projected.hint.bootstrapSha256 === proof.bootstrapSha256
+              && projected.hint.diagnostics === true && projected.hint.model === queued.model, 'bootstrap_projection_invalid')
+            const raw = JSON.stringify(projected)
+            check(Buffer.byteLength(raw) <= 65536, 'bootstrap_projection_invalid')
+            // Only non-secret canonical configuration crosses this file boundary.
+            // The existing preloader decodes the real sidecars and owns the claim.
+            await sandbox.files.write('/run/mikka-template-acceptance/start.json', raw, { user: 'root' })
+            await sandbox.commands.run('install -o user -g user -m 600 /run/mikka-template-acceptance/start.json /home/user/.mikka/template-acceptance/start.next && ' +
+              'mv /home/user/.mikka/template-acceptance/start.next /home/user/.mikka/template-acceptance/start.json', { user: 'root', timeoutMs: 10000 })
+            publication = { version: 1, runId: queued.runId, harness, bootstrapSha256: proof.bootstrapSha256,
+              hintSha256: createHash('sha256').update(JSON.stringify(projected.hint)).digest('hex') }
+            return publication
+          }
           acceptance = await runAcceptance({ origin, workspace: scope.workspaceId,
             botId: bot.botId, mode: 'candidate', strategy: 'derived', runs: 1, harness,
             deviceId, agentId: matching[0].id, revision: report.sourceCommit, expectedBuild: version.build,
             timeoutMs: 240000, maxStartupMs: 5000, minToolCalls: 1,
-            runtimeEvidence: 'required', officialTiming: 'enabled' }, { env, fetchImpl })
+            runtimeEvidence: 'required', officialTiming: 'enabled' }, { env, fetchImpl, onCandidateRunQueued })
           stage = 'receipt'
-          passed[kind] = candidateReceipt(report, kind, proof, acceptance, scope)
+          let bootstrapReceipt
+          try { bootstrapReceipt = JSON.parse(await sandbox.files.read('/home/user/.mikka/template-acceptance/bootstrap-proof.json', { user: 'root' })) }
+          catch (error) { fail('bootstrap_proof_invalid', error) }
+          check(publication && JSON.stringify(bootstrapReceipt) === JSON.stringify(publication), 'bootstrap_proof_invalid')
+          try { passed[kind] = candidateReceipt(report, kind, { ...proof, bootstrapReceipt }, acceptance, scope) }
+          catch (error) {
+            if (error?.message === 'template_gate_bootstrap_adoption_missing')
+              bootstrapChecks = bootstrapReceiptChecks(kind, { ...proof, bootstrapReceipt }, acceptance.samples?.[0], scope)
+            throw error
+          }
         } finally { clearTimeout(timer) }
       } catch (error) { diagnosticError = error; failures.push({ kind, error }) }
       finally {
@@ -275,7 +352,7 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
           }
         }
         onDiagnostic(candidateDiagnostic(kind, stage, diagnosticError, acceptance, cleanupErrors, deviceId,
-          { sourceCommit: report.sourceCommit, cleanupDetails, passedReceipt: passed[kind], registeredProof }))
+          { sourceCommit: report.sourceCommit, cleanupDetails, passedReceipt: passed[kind], registeredProof, bootstrapChecks }))
       }
     }
     check((await client.json('/api/version')).build === version.build, 'application_build_changed')

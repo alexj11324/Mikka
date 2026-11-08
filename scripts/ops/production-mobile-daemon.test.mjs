@@ -26,7 +26,7 @@ const storedToken = (tokenId, name = 'Existing token') => ({ id: tokenId, name,
 
 function fixture(options = {}) {
   let clock = Date.parse('2026-11-06T13:00:00.000Z'), activeSession = false, newDevice = null, removed = false
-  const tokenRows = [storedToken(OLD_TOKEN)]
+  const tokenRows = Array.from({ length: options.tokenCount ?? 1 }, (_, i) => storedToken(i === 0 ? OLD_TOKEN : id(100 + i)))
   const oldDevice = { id: OLD_DEVICE, name: 'Existing protected device', enabled: true, online: false,
     hostname: 'existing', platform: 'other', arch: 'other', harnesses: [], lastSeenAt: null, repos: [] }
   const requests = []
@@ -138,7 +138,16 @@ function fixture(options = {}) {
       if (path.endsWith('/renderer-manifest.json')) return response({ version: 1, target: 'web',
         usedActions: options.missingAction ? ['agents.pollDevices', 'agents.setDeviceEnabled']
           : ['agents.pollDevices', 'agents.setDeviceEnabled', 'agents.removeDevice'] })
-      if (path.endsWith('/api/device-tokens') && method === 'GET') return response({ tokens: tokenRows.map(row => ({ ...row })) })
+      if (path.endsWith('/api/device-tokens') && method === 'GET') {
+        if (options.legacyTokenPage) return response({ tokens: tokenRows.slice(0, 100).map(row => ({ ...row })) })
+        if (!options.paginateTokens) return response({ tokens: tokenRows.map(row => ({ ...row })) })
+        const cursor = url.searchParams.get('cursor')
+        const start = cursor ? tokenRows.findIndex(row => row.id === cursor) + 1 : 0
+        const page = tokenRows.slice(start, start + 100)
+        const nextCursor = options.repeatTokenCursor ? page[0]?.id
+          : tokenRows.length > start + 100 ? page.at(-1).id : null
+        return response({ tokens: page.map(row => ({ ...row })), nextCursor })
+      }
       if (path.endsWith('/api/devices/enrollment')) return response({ token: GRANT })
       if (path.endsWith('/api/device-tokens/' + NEW_TOKEN + '/revoke')) {
         const token = tokenRows.find(row => row.id === NEW_TOKEN)
@@ -255,6 +264,30 @@ test('real source HTTP client proves mobile owner, enroll, disabled heartbeat, r
   assert.equal(f.tokenRows.find(row => row.id === OLD_TOKEN).revokedAt, null)
   assert.equal(f.oldDevice.enabled, true)
   noSensitiveReport(report)
+})
+
+test('complete paginated token history preserves all 263 originals through enrollment and cleanup', async () => {
+  const f = fixture({ tokenCount: 263, paginateTokens: true })
+  const report = await f.run()
+  assert.equal(report.status, 'pass', JSON.stringify(report))
+  assert.ok(Object.values(report.cleanup).every(Boolean))
+  assert.equal(f.tokenRows.length, 264)
+  assert.equal(f.tokenRows.filter(row => row.revokedAt !== null).length, 1)
+  assert.equal(f.tokenRows.find(row => row.id === NEW_TOKEN).revokedBy, OWNER)
+  assert.ok(f.requests.filter(row => row.path.endsWith('/api/device-tokens') && row.search.startsWith('?cursor=')).length >= 6)
+  noSensitiveReport(report)
+})
+
+test('an old truncated page or an invalid cursor cannot authorize resource creation', async () => {
+  for (const options of [{ tokenCount: 263, legacyTokenPage: true }, { tokenCount: 263, paginateTokens: true, repeatTokenCursor: true }]) {
+    const f = fixture(options), report = await f.run()
+    assert.equal(report.status, 'fail')
+    assert.ok(report.errors.some(error => error.code === 'resource_baseline_invalid'))
+    assert.equal(report.resources.enrollmentAttempts, 0)
+    assert.equal(f.tokenRows.filter(row => row.revokedAt !== null).length, 0)
+    assert.equal(report.cleanup.sessionClosed, true)
+    noSensitiveReport(report)
+  }
 })
 
 test('wrong ops context and wrong mobile owner cannot create production resources', async () => {

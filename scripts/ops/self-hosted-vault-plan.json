@@ -1,0 +1,11 @@
+{
+  "repository": "alexj11324/Mikka",
+  "branch": "ops/self-hosted-vault-closeout-20261108",
+  "source": "7223cf3a0238863432e9b72be8e47f9889b29efd",
+  "ciRun": 42513369454,
+  "imageRun": 42513369318,
+  "imageDigest": "sha256:f9ca1fa0d09adaac3391181f224c4abfa89ff04a3310e8de0e699e204c4f160d",
+  "configDigest": "sha256:37d107774e5c5cde3a013a181af6a26689e0e2fcd9b61b2da9a28abcc460017f",
+  "workerHash": "49343d3eae603d17436ee85d1f83d7c68fdd4e71",
+  "template": "desktop"
+}

@@ -25,7 +25,9 @@ const BUILD_STEPS = ['Build (runs migrations last, as the Vercel build did)',
   'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
 export const RUNTIME_RELEASE_PATHS = ['.github/workflows/e2b-official-runtime.yml', '.github/workflows/e2b-template.yml', '.github/workflows/web-deploy.yml',
   'scripts/e2b/validate-template-subscriptions.mjs', 'scripts/e2b/cleanup-template-candidates.py',
-  'scripts/e2b/runtime-report.mjs',
+  'scripts/e2b/runtime-report.mjs', 'scripts/e2b/acceptance-daemon.mts', 'scripts/e2b/acceptance-bootstrap.mts',
+  'lib/captures/bootstrap-evidence.ts', 'app/api/runs/[runId]/evidence/route.ts',
+  'lib/computer/claude-startup-hint.ts', 'lib/computer/codex-startup-hint.ts',
   'scripts/acceptance/cloud-startup.mjs', 'scripts/acceptance/cloud-startup-evidence.mjs',
   'scripts/acceptance/team-workspace.mjs', 'lib/smoke-account.ts',
   'scripts/e2b/publish-template-env.mjs', 'scripts/release/web-deploy.mjs', 'scripts/release/build-vercel.mjs']
@@ -181,9 +183,21 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
         { token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
       const builds = (jobs.jobs ?? []).filter(job => job.name === 'deploy' && job.head_sha === webBuild)
       const job = builds[0]
-      if (jobs.total_count !== jobs.jobs?.length || builds.length !== 1 || job.status !== 'completed' || job.conclusion !== 'success'
-        || !BUILD_STEPS.every(name => job.steps?.filter(step => step.name === name && step.status === 'completed' && step.conclusion === 'success').length === 1)) {
+      if (jobs.total_count !== jobs.jobs?.length || builds.length !== 1 || job.status !== 'completed' || job.conclusion !== 'success') {
         throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+      }
+      const required = BUILD_STEPS.map(name => Array.isArray(job.steps) ? job.steps.filter(step => step.name === name) : [])
+      if (required.some(steps => steps.length !== 1)) throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+      const steps = required.map(([step]) => step)
+      if (!steps.every(step => step.status === 'completed' && step.conclusion === 'success')) {
+        // GitHub can finish a job before its step list catches up. Only pending
+        // results may wait; skipped, failed, missing or duplicate proof refuses.
+        if (!steps.every(step => step.status === 'completed' ? step.conclusion === 'success'
+          : ['queued', 'pending', 'in_progress'].includes(step.status) && step.conclusion === null)) {
+          throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+        }
+        if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))
+        continue
       }
       if (remaining() <= 0) break
       if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay) === webBuild && remaining() > 0) {

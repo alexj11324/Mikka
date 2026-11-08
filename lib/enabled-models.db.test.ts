@@ -22,16 +22,19 @@ test('migration, toggles, source ownership, fresh keys, dispatch filters and row
   try {
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY);
       INSERT INTO "user" VALUES ('owner'),('other');
-      CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"modelCatalog" jsonb,"createdAt" timestamptz DEFAULT now(),"updatedAt" timestamptz DEFAULT now(),"removedAt" timestamptz,epoch bigint DEFAULT 1,state text DEFAULT 'connected',paused boolean DEFAULT false,provider text DEFAULT 'claude',"accountLabel" text,quota jsonb);
+      CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text NOT NULL,"modelCatalog" jsonb,"createdAt" timestamptz DEFAULT now(),"updatedAt" timestamptz DEFAULT now(),"removedAt" timestamptz,epoch bigint DEFAULT 1,state text DEFAULT 'connected',paused boolean DEFAULT false,provider text DEFAULT 'claude',"accountLabel" text,quota jsonb);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"consumerId" text,"workspaceId" text,"modelId" text,route text,"connectionId" uuid,"connectionRevision" bigint,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE model_api_keys (id uuid PRIMARY KEY,"ownerId" text,models jsonb,"modelsError" text,"createdAt" timestamptz DEFAULT now(),"updatedAt" timestamptz DEFAULT now());
       CREATE TABLE model_order_entries (id uuid DEFAULT gen_random_uuid(),"ownerId" text,"workspaceId" text,"sourceKind" text,"sourceId" uuid,model text)`)
-    await pool.query(`INSERT INTO byos_connections (id,"ownerId","modelCatalog") VALUES ($1,'owner',$2)`, [source, { revision: '1', models: ['claude-opus-4-5', 'claude-opus-4-6'] }])
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","modelCatalog","workspaceId") VALUES ($1,'owner',$2,$3)`, [source, { revision: '1', models: ['claude-opus-4-5', 'claude-opus-4-6'] }, workspaceId])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","consumerId","workspaceId","modelId",route,"connectionId","connectionRevision") VALUES ($1,'owner','bot',$2,'claude-opus-4-5','claude_cpa',$3,1)`, [binding, workspaceId, source])
     await pool.query(`INSERT INTO model_api_keys (id,"ownerId",models) VALUES ($1,'owner','["old"]')`, [key])
-    await pool.query(await readFile(new URL('../drizzle/20261108000000_enabled_models.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261108120101_enabled_models.sql', import.meta.url), 'utf8'))
     let view = await readEnabledModels(pool, scope)
     assert.equal(view.sources.find(item => item.id === source)?.enabledCount, 2, 'legacy old releases stay available')
+    assert.deepEqual(view.sources.find(item => item.id === source)?.models.map(({ id, family }) => ({ id, family })), [
+      { id: 'claude-opus-4-5', family: 'Opus' }, { id: 'claude-opus-4-6', family: 'Opus' },
+    ], 'raw model IDs and the existing family classification reach the settings API')
     assert.equal(await hostedModelEnabled(pool, scope.ownerId), true)
     await assert.rejects(changeEnabledModels(pool, { ...scope, ownerId: 'other' }, source, { kind: 'all', enabled: false }), /executionModelUnknown/)
     await pool.query(`INSERT INTO model_order_entries ("ownerId","workspaceId","sourceKind","sourceId",model) VALUES ('owner',$1,'subscription',$2,'claude-opus-4-5'),('shared-member',$1,'subscription',$2,'claude-opus-4-5')`, [workspaceId, source])
@@ -43,7 +46,7 @@ test('migration, toggles, source ownership, fresh keys, dispatch filters and row
     assert.equal((await executionModelOptions(pool, scope)).length, 1)
     await pool.query(`UPDATE model_api_keys SET models='["old","new"]' WHERE id=$1`, [key])
     view = await readEnabledModels(pool, scope)
-    assert.deepEqual(view.sources.find(item => item.id === key)?.models, [{ id: 'old', enabled: true, fresh: false }, { id: 'new', enabled: false, fresh: true }])
+    assert.deepEqual(view.sources.find(item => item.id === key)?.models, [{ id: 'old', family: null, enabled: true, fresh: false }, { id: 'new', family: null, enabled: false, fresh: true }])
     const refreshedAt = view.sources.find(item => item.id === key)!.refreshedAt
     assert.ok(refreshedAt && Number.isFinite(Date.parse(refreshedAt)))
     await pool.query(`UPDATE model_api_keys SET models=models,"modelsError"='unavailable',"updatedAt"=now()+interval '1 hour' WHERE id=$1`, [key])
@@ -61,8 +64,8 @@ test('migration, toggles, source ownership, fresh keys, dispatch filters and row
     await writer.query('COMMIT'); writer.release()
     await toggle
     const result = (await readEnabledModels(pool, scope)).sources.find(item => item.id === key)!
-    assert.deepEqual(result.models.find(item => item.id === 'new'), { id: 'new', enabled: false, fresh: false })
-    assert.deepEqual(result.models.find(item => item.id === 'newer'), { id: 'newer', enabled: false, fresh: true })
+    assert.deepEqual(result.models.find(item => item.id === 'new'), { id: 'new', family: null, enabled: false, fresh: false })
+    assert.deepEqual(result.models.find(item => item.id === 'newer'), { id: 'newer', family: null, enabled: false, fresh: true })
     await pool.query(`ALTER TABLE model_api_keys ADD COLUMN provider text DEFAULT 'deepseek', ADD COLUMN name text,
       ADD COLUMN "baseUrl" text, ADD COLUMN protocol text DEFAULT 'anthropic', ADD COLUMN last4 text DEFAULT 'test',
       ADD COLUMN "responsesApi" boolean DEFAULT true;

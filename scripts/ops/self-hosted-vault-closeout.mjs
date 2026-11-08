@@ -5,12 +5,84 @@ import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
-import { sourceGuard, workflowGuard } from './self-hosted-closeout.mjs'
+import { workflowGuard } from './self-hosted-closeout.mjs'
 import { encode, decode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
 
-const plan = JSON.parse(await readFile(new URL('./self-hosted-closeout-plan.json', import.meta.url), 'utf8'))
+const plan = JSON.parse(await readFile(new URL('./self-hosted-vault-plan.json', import.meta.url), 'utf8'))
 const check = (value, code) => { if (!value) throw new Error(code) }
 const digest = value => createHash('sha256').update(value).digest('hex')
+const imageRef = `ghcr.io/${plan.repository.toLowerCase()}@${plan.imageDigest}`
+const runtimeKeys = ['MIKKA_CLOUD_WORKER_SOURCE_COMMIT', 'MIKKA_CLOUD_WORKER_SHA', 'MIKKA_CLOUD_WORKER_URL',
+  'MIKKA_CLOUD_TEMPLATE_MODELS', 'MIKKA_CLOUD_RUNTIME_PREVIOUS', 'E2B_BYO_COMPUTER_TEMPLATE', 'E2B_CLAUDE_TEMPLATE',
+  'E2B_CODEX_TEMPLATE', 'E2B_TEMPLATE', 'NODE_OPTIONS', 'MIKKA_VAULT_DIAGNOSTICS']
+const modelKeys = ['MIKKA_DEFAULT_MODEL_BASE_URL', 'MIKKA_DEFAULT_MODEL_API_KEY', 'MIKKA_DEFAULT_MODEL_ID',
+  'AI_GATEWAY_API_KEY', 'ZEROCAT_BASE_URL', 'ZEROCAT_API_KEY', 'DECISIONS_API_KEY', 'VERCEL_OIDC_TOKEN',
+  'OPENAI_API_KEY', 'ANTHROPIC_API_KEY']
+const environment = values => Object.fromEntries((values ?? []).map(value => {
+  const at = value.indexOf('='); return [value.slice(0, at), value.slice(at + 1)]
+}))
+const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 180_000 })
+
+// This is an isolated final-image test. It does not read a moving production
+// domain or claim that hosted production has published the same runtime pair.
+export async function publishedImageGuard(env, request = fetch) {
+  workflowGuard(env)
+  check(env.GITHUB_REPOSITORY === plan.repository && env.GITHUB_REF === `refs/heads/${plan.branch}`, 'VAULT_WORKFLOW')
+  for (const [id, path] of [[plan.ciRun, '.github/workflows/ui-policy.yml'], [plan.imageRun, '.github/workflows/self-hosted-image.yml']]) {
+    const response = await request(`https://api.github.com/repos/${plan.repository}/actions/runs/${id}`, {
+      headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
+      redirect: 'error', signal: AbortSignal.timeout(20_000) })
+    check(response.ok, 'SOURCE_CI_HTTP')
+    const run = await response.json()
+    check(run.repository?.full_name === plan.repository && run.id === id && run.path === path
+      && run.head_sha === plan.source && run.head_branch === 'main' && run.event === 'push'
+      && run.status === 'completed' && run.conclusion === 'success', 'SOURCE_CI')
+  }
+}
+
+function runtimeEnvironment(env) {
+  check(env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT === plan.source && env.MIKKA_CLOUD_WORKER_SHA === plan.workerHash, 'IMAGE_RUNTIME')
+  check(runtimeKeys.slice(2).every(key => !env[key]), 'IMAGE_RUNTIME_OVERRIDE')
+  check(modelKeys.every(key => !env[key]), 'MODEL_CONFIGURATION')
+}
+
+export function imageGuard(image) {
+  check(image?.Id === plan.configDigest && image.RepoDigests?.includes(imageRef), 'IMAGE_DIGEST')
+  check(image.Config?.Labels?.['org.opencontainers.image.revision'] === plan.source, 'IMAGE_REVISION')
+  runtimeEnvironment(environment(image.Config.Env))
+  return { source: plan.source, workerHash: plan.workerHash, configDigest: image.Id, template: plan.template,
+    operatorConfiguredPins: false, hostScriptMounts: false, modelConfigurationAbsent: true }
+}
+
+export function fixtureGuard(app) {
+  check(app?.image === imageRef && JSON.stringify(app.volumes) === JSON.stringify(['data:/data']), 'FIXTURE_IMAGE_MOUNTS')
+  check([...runtimeKeys, ...modelKeys, 'E2B_API_KEY'].every(key => !Object.hasOwn(app.environment ?? {}, key)), 'FIXTURE_ENV_OVERRIDE')
+}
+
+export function containerGuard(container) {
+  check(container?.Image === plan.configDigest, 'CONTAINER_IMAGE')
+  check(container.Mounts?.length === 1 && container.Mounts[0].Type === 'volume'
+    && container.Mounts[0].Destination === '/data' && container.Mounts[0].RW === true, 'CONTAINER_MOUNTS')
+  runtimeEnvironment(environment(container.Config?.Env))
+}
+export function finalImagePassed(report) {
+  const checks = ['emailVerified', 'localEnvelopeEncrypted', 'listReturnsNoPassword', 'realSiteSubmitted',
+    'normalAgentStop', 'actualGuardedBroker', 'agentAutomaticSavedLogin', 'logsContainNoPlaintext',
+    'finalImageUnmodified', 'bakedWorkerUsed', 'noModelExecution']
+  const cleanup = ['subagent', 'e2bConfirmedMissing', 'login', 'key', 'session', 'fixture', 'site', 'tunnels', 'privateFiles']
+  return report.status === 'passed' && report.machineCount === 1 && report.modelCalls === 0 && report.hostedUsageRows === 0
+    && checks.every(name => report.checks?.[name] === true) && cleanup.every(name => report.cleanup?.[name] === true)
+}
+
+export async function stopTunnel(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  await new Promise((resolveStopped, rejectStopped) => {
+    const hard = setTimeout(() => child.kill('SIGKILL'), 3_000)
+    const deadline = setTimeout(() => { clearTimeout(hard); rejectStopped(new Error('TUNNEL_STOP_UNCONFIRMED')) }, 5_000)
+    child.once('exit', () => { clearTimeout(hard); clearTimeout(deadline); resolveStopped() })
+    child.kill('SIGTERM')
+  })
+}
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 export function ownedMachine(row, actor, metadata) {
   check(row?.ownerId === actor.userId && row?.workspaceId === actor.workspaceId
@@ -31,26 +103,9 @@ export function loginMatches(body, username, password) {
   return same(form.get('username'), username) && same(form.get('password'), password)
 }
 
-async function candidateGuard(env) {
-  workflowGuard(env)
-  check(/^[a-f0-9]{40}$/.test(plan.gatewayCandidateSource ?? ''), 'CANDIDATE_SOURCE')
-  const paths = ['scripts/e2b/subagent-gateway.py', 'scripts/e2b/subagent-cdp.mjs']
-  check(JSON.stringify(Object.keys(plan.gatewayCandidateFiles ?? {}).sort()) === JSON.stringify(paths.sort()), 'CANDIDATE_PATHS')
-  for (const path of paths) {
-    const response = await fetch(`https://api.github.com/repos/${plan.repository}/contents/${path}?ref=${plan.gatewayCandidateSource}`, {
-      headers: { Authorization: `Bearer ${env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
-      redirect: 'error', signal: AbortSignal.timeout(20_000) })
-    check(response.ok, 'CANDIDATE_FILE')
-    const file = await response.json()
-    check(file.type === 'file' && file.encoding === 'base64' && file.size > 0 && file.size < 262_144, 'CANDIDATE_FILE')
-    check(digest(Buffer.from(file.content, 'base64')) === plan.gatewayCandidateFiles[path]
-      && digest(await readFile(resolve(path))) === plan.gatewayCandidateFiles[path], 'CANDIDATE_DIGEST')
-  }
-}
-
 async function run(env) {
-  await sourceGuard(env)
-  await candidateGuard(env)
+  await publishedImageGuard(env)
+  const runtimeSetup = imageGuard(JSON.parse(docker('image', 'inspect', imageRef))[0])
   check(/^[a-f0-9]{40}$/.test(plan.workerHash ?? ''), 'WORKER_SOURCE_PIN')
   check(env.E2B_API_KEY && env.RUNNER_TEMP, 'WORKLOAD_KEY')
   const { Sandbox, SandboxNotFoundError } = await import('e2b')
@@ -61,24 +116,22 @@ async function run(env) {
   await mkdir(root, { mode: 0o700 }); await mkdir(output, { recursive: true })
   const report = { source: plan.source, imageDigest: plan.imageDigest, driver: env.GITHUB_SHA,
     started: new Date().toISOString(), stage: 'fixture', checks: {}, cleanup: {}, productionOAuth: false,
-    realE2B: true, modelCalls: 0, scope: 'real-subagent-workflow-and-in-process-local-kms-broker' }
-  report.runtimeCandidate = { source: plan.gatewayCandidateSource, files: plan.gatewayCandidateFiles,
-    readOnlyScriptMounts: true, fullFinalImageAcceptance: false }
+    realE2B: true, modelCalls: null, hostedProductionAcceptance: false, productionRuntimePairingVerified: false,
+    fullFinalImageAcceptance: false, runtimeSetup, scope: 'real-subagent-workflow-and-in-process-local-kms-broker' }
   const dbPassword = randomBytes(24).toString('hex'), accountPassword = randomBytes(24).toString('base64url')
   const masterKey = randomBytes(32).toString('base64'), secretsKey = randomBytes(32).toString('hex')
   const siteUsername = randomBytes(18).toString('base64url'), sitePassword = randomBytes(32).toString('base64url')
   const email = `vault-${randomUUID()}@selfhost.example.test`
-  const hidden = [dbPassword, accountPassword, masterKey, secretsKey, sitePassword, env.E2B_API_KEY]
+  const hidden = [dbPassword, accountPassword, masterKey, secretsKey, siteUsername, sitePassword, env.E2B_API_KEY]
   for (const value of hidden) console.log(`::add-mask::${value}`)
-  const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 180_000 })
   const composePath = join(root, 'compose.json'), project = `vault-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`
   const compose = (...args) => docker('compose', '-f', composePath, '-p', project, ...args)
-  let context, pool, actor, botId, subagentId, credentialId, interrupted = false, cleaning = false
+  let context, pool, actor, botId, subagentId, credentialId, interruptWait, interrupted = false, cleaning = false
   let fixtureStarted = false, appOrigin, siteOrigin, submitted = 0, rejected = 0, servedLogin = 0, authenticatedViews = 0
   let submissionResolve
   const submission = new Promise(resolveSubmission => { submissionResolve = resolveSubmission })
   const tunnels = []
-  const signal = () => { interrupted = true; process.exitCode = 1 }
+  const signal = () => { interrupted = true; process.exitCode = 1; interruptWait?.() }
   process.once('SIGTERM', signal); process.once('SIGINT', signal)
   const json = async url => {
     const r = await fetch(url, { signal: AbortSignal.timeout(15_000), redirect: 'error' }); check(r.ok, 'FIXTURE_HTTP'); return r.json()
@@ -142,22 +195,17 @@ async function run(env) {
       postgres: { image: 'postgres:17-alpine', environment: { POSTGRES_DB: 'mikka_e2e', POSTGRES_USER: 'mikka', POSTGRES_PASSWORD: dbPassword },
         ports: ['127.0.0.1:54329:5432'], healthcheck: { test: ['CMD-SHELL', 'pg_isready -U mikka -d mikka_e2e'], interval: '3s', timeout: '3s', retries: 30 } },
       mailpit: { image: 'axllent/mailpit:v1.27.4', ports: ['127.0.0.1:8025:8025'], environment: { MP_DISABLE_VERSION_CHECK: 'true', MP_QUIET: 'true' } },
-      app: { image: `ghcr.io/alexj11324/mikka@${plan.imageDigest}`, init: true, ports: ['127.0.0.1:3000:3000'], volumes: ['data:/data', `${resolve('scripts/ops/vault-runtime-diagnostics.mjs')}:/opt/closeout/vault-runtime-diagnostics.mjs:ro`],
+      app: { image: imageRef, init: true, ports: ['127.0.0.1:3000:3000'], volumes: ['data:/data'],
         environment: { DATABASE_URL: database, MIKKA_DATABASE_URL: database, BETTER_AUTH_URL: appOrigin,
-          MIKKA_VAULT_DIAGNOSTICS: '1', NODE_OPTIONS: '--import=/opt/closeout/vault-runtime-diagnostics.mjs',
-          MIKKA_CLOUD_WORKER_SOURCE_COMMIT: plan.source, MIKKA_CLOUD_WORKER_SHA: plan.workerHash,
           MIKKA_EDITION: 'community', MIKKA_EXTERNAL_CRON: '1', CREDENTIAL_MASTER_KEY: masterKey, WORKSPACE_SECRETS_KEY: secretsKey,
           SMTP_URL: 'smtp://mailpit:1025', MIKKA_EMAIL_FROM: 'Vault acceptance <login@selfhost.example.test>' },
         depends_on: { postgres: { condition: 'service_healthy' }, mailpit: { condition: 'service_started' } } }
     }, volumes: { data: {} } }
-    for (const path of Object.keys(plan.gatewayCandidateFiles)) fixture.services.app.volumes.push(`${resolve(path)}:/app/${path}:ro`)
+    fixtureGuard(fixture.services.app)
     await writeFile(composePath, JSON.stringify(fixture), { mode: 0o600 }); fixtureStarted = true
-    const image = JSON.parse(docker('image', 'inspect', `ghcr.io/alexj11324/mikka@${plan.imageDigest}`))[0]
-    const imageEnv = Object.fromEntries((image.Config?.Env ?? []).map(value => { const at = value.indexOf('='); return [value.slice(0, at), value.slice(at + 1)] }))
-    report.runtimeSetup = { imageSourcePinPresent: !!imageEnv.MIKKA_CLOUD_WORKER_SOURCE_COMMIT,
-      imageWorkerPinPresent: !!imageEnv.MIKKA_CLOUD_WORKER_SHA, operatorConfiguredPins: true,
-      source: plan.source, workerHash: plan.workerHash, template: 'desktop' }
     compose('up', '--detach', '--wait', '--wait-timeout', '240')
+    containerGuard(JSON.parse(docker('inspect', compose('ps', '--quiet', 'app').trim()))[0])
+    report.checks.finalImageUnmodified = true
     for (let i = 0; ; i++) {
       try { check((await json(appOrigin + '/mikka/api/version')).build === plan.source, 'IMAGE_SOURCE'); break }
       catch { check(i < 30 && !interrupted, 'IMAGE_READY'); await delay(1000) }
@@ -198,16 +246,34 @@ async function run(env) {
     // The actual Workflow provisions/navigates/observes and requests the saved
     // login itself. No SQL state, guard, CDP, broker or model output is injected.
     let deadline
-    try { await Promise.race([submission, new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('AUTOFILL_TIMEOUT')), 360_000) })]) }
-    finally { clearTimeout(deadline) }
+    try { await Promise.race([submission, new Promise((_, reject) => {
+      deadline = setTimeout(() => reject(new Error('AUTOFILL_TIMEOUT')), 360_000)
+      interruptWait = () => reject(new Error('INTERRUPTED'))
+      if (interrupted) interruptWait()
+    })]) }
+    finally { clearTimeout(deadline); interruptWait = undefined }
     check(!interrupted && submitted === 1 && rejected === 0 && servedLogin > 0, 'FORM_SUBMITTED')
     report.checks.realSiteSubmitted = true
+    const machines = (await pool.query('SELECT "ownerId","workspaceId","sandboxId","operationId" FROM cloud_machines WHERE "ownerId"=$1 AND "workspaceId"=$2', [actor.userId, actor.workspaceId])).rows
+    check(machines.length === 1, 'MACHINE_COUNT')
+    const machine = machines[0], info = await Sandbox.getInfo(machine.sandboxId, { apiKey: env.E2B_API_KEY })
+    const sandboxId = ownedMachine(machine, actor, info.metadata)
+    const sandbox = await Sandbox.connect(sandboxId, { apiKey: env.E2B_API_KEY })
+    check((await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim() === plan.workerHash, 'LIVE_WORKER_SOURCE')
+    report.checks.bakedWorkerUsed = true
+    report.sandboxHash = digest(sandboxId).slice(0, 16)
+    report.machineCount = machines.length
     await api(`/api/bots/${botId}/subagents/${subagentId}/stop`, {})
     report.checks.normalAgentStop = true
     const uses = await rpc('settings-activity.listSavedLoginUsage', [credentialId])
     check(uses.uses.some(use => use.subagentId === subagentId && use.botId === botId && use.result === 'input_inserted_guarded'), 'GUARDED_ACCESS_EVENT')
     report.checks.actualGuardedBroker = true
     report.checks.agentAutomaticSavedLogin = true
+    const usage = await pool.query('SELECT count(*)::int AS count FROM hosted_usage')
+    check(usage.rows[0].count === 0, 'MODEL_USAGE')
+    report.checks.noModelExecution = true
+    report.modelCalls = 0
+    report.hostedUsageRows = usage.rows[0].count
     report.site = { servedLogin, submitted, rejected, authenticatedViews }
     report.status = 'passed'; report.stage = 'completed'
   } catch (error) {
@@ -278,29 +344,32 @@ async function run(env) {
     if (fixtureStarted) {
       try {
         const logs = compose('logs', '--no-color')
-        report.runtimeBoundaries = logs.split('\n').flatMap(line => {
-          const at = line.indexOf('{"kind":"vault_runtime_boundary"')
-          if (at < 0) return []
-          try { const value = JSON.parse(line.slice(at)); return value.kind === 'vault_runtime_boundary' ? [value] : [] } catch { return [] }
-        }).slice(-40)
-        report.checks.logsContainNoPlaintext = hidden.every(value => !logs.includes(value)) && !logs.includes(siteUsername)
+        report.checks.logsContainNoPlaintext = hidden.every(value => !logs.includes(value))
         check(report.checks.logsContainNoPlaintext, 'PLAINTEXT_LOG')
       } catch { report.checks.logsContainNoPlaintext = false; process.exitCode = 1 }
-      try { compose('down', '--volumes', '--remove-orphans'); report.cleanup.fixture = true } catch { report.cleanup.fixture = false; process.exitCode = 1 }
+      try {
+        compose('down', '--volumes', '--remove-orphans')
+        check(!docker('ps', '--all', '--quiet', '--filter', `label=com.docker.compose.project=${project}`).trim()
+          && !docker('volume', 'ls', '--quiet', '--filter', `label=com.docker.compose.project=${project}`).trim(), 'FIXTURE_CLEANUP')
+        report.cleanup.fixture = true
+      } catch { report.cleanup.fixture = false; process.exitCode = 1 }
     }
     site.closeAllConnections(); await new Promise(resolveClosed => site.close(resolveClosed)); report.cleanup.site = true
-    for (const child of tunnels) child.kill('SIGTERM')
-    report.cleanup.tunnels = true
+    try { await Promise.all(tunnels.map(stopTunnel)); report.cleanup.tunnels = true }
+    catch { report.cleanup.tunnels = false; process.exitCode = 1 }
     process.off('SIGTERM', signal); process.off('SIGINT', signal)
     await rm(root, { recursive: true, force: true }); report.cleanup.privateFiles = true
     report.finished = new Date().toISOString()
     report.site = { servedLogin, submitted, rejected, authenticatedViews }
     if (process.exitCode) report.status = 'failed'
+    report.fullFinalImageAcceptance = finalImagePassed(report)
+    if (!report.fullFinalImageAcceptance) { report.status = 'failed'; process.exitCode = 1 }
     await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
     console.log(JSON.stringify(report))
   }
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv.includes('--check')) { workflowGuard(process.env); await sourceGuard(process.env); await candidateGuard(process.env); console.log('Exact image source, public candidate file digests and workload branch verified before credentials') }
+  if (process.argv.includes('--check')) { await publishedImageGuard(process.env); console.log('Exact main CI, published image workflow and existing workload branch verified before credentials') }
+  else if (process.argv.includes('--image-check')) { workflowGuard(process.env); imageGuard(JSON.parse(docker('image', 'inspect', imageRef))[0]); console.log('Final image digest, baked runtime and absent model credentials verified before workload credentials') }
   else await run(process.env)
 }

@@ -1,3 +1,4 @@
+import type { AnonymousCodexCandidate } from './anonymous-codex-spare'
 import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
 import { captureRunFailure } from "@mikka/protocol/run-failure"
 import { coordinatorCapable } from "./coordinator/runner"
@@ -96,6 +97,7 @@ import {
   type SupervisorDeps,
 } from "./runs/supervisor"
 import { DeviceGatewayClosedError, openDeviceGateway, runDeviceGateway } from "./device-gateway"
+import { deviceRepoSchema } from "@mikka/protocol"
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
@@ -159,7 +161,7 @@ export interface DaemonOptions {
   /** One-use control-plane locator; the existing registered claim still authorizes it. */
   initialRunId?: string
   /** Trusted one-use bootstrap optimization; fresh claim still grants authority. */
-  anonymousClaudeCandidate?: AnonymousClaudeCandidate
+  anonymousClaudeCandidate?: AnonymousClaudeCandidate; anonymousCodexCandidate?: AnonymousCodexCandidate
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
   /** Trusted acceptance launcher only; opt in to persisted run/CLI diagnostics. */
@@ -304,7 +306,7 @@ export class Daemon {
   private syncing: Promise<void> = Promise.resolve()
   private initialRunHint?: string
   /** An early claim must retain the first sync's complete repository settings. */
-  private initialRepositorySync?: { runId: string; ready: Promise<void> }
+  private initialRepositorySync?: { runId: string; ready: Promise<void>; repository?: Promise<DeviceRepo | undefined>; received?: (repo?: DeviceRepo) => void }
   /** Cuts the poll loop's pause short (the device just registered). */
   private wakeCommands: (() => void) | null = null
 
@@ -447,7 +449,7 @@ export class Daemon {
           journal: this.journal,
           binaries: this.options.harnessBinaries,
           collectCliTiming: this.options.collectCliTiming,
-          anonymousClaudeCandidate: this.options.anonymousClaudeCandidate,
+          anonymousClaudeCandidate: this.options.anonymousClaudeCandidate, anonymousCodexCandidate: this.options.anonymousCodexCandidate,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
           computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
           // The cloud machine's own probe decides which subscription models a run may use here.
@@ -553,8 +555,8 @@ export class Daemon {
           }
         : undefined,
       repository: assignment => this.repository(assignment),
-      prepareRepository: (assignment, signal, githubEnvironment, policyReady) => prepareRunRepository(this.repositories,
-        runPaths(this.paths.adapterState, assignment.runId).privateDir, assignment, signal, githubEnvironment, policyReady),
+      prepareRepository: (assignment, signal, githubEnvironment, policyReady, onRepositoryTiming) => prepareRunRepository(this.repositories,
+        runPaths(this.paths.adapterState, assignment.runId).privateDir, assignment, signal, githubEnvironment, policyReady, this.options.collectCliTiming, onRepositoryTiming),
       baseRef: assignment => assignment.remoteUrl
         ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)
         : Promise.resolve(assignment.baseBranch ?? 'HEAD'),
@@ -950,8 +952,12 @@ export class Daemon {
       this.queuedClaims.set(runId, "claiming")
       started = true
       void this.claimAndStart(runId).then(
-        () => { this.queuedClaims.delete(runId) },
+        () => {
+          if (this.initialRepositorySync?.runId === runId) this.initialRepositorySync.received?.()
+          this.queuedClaims.delete(runId)
+        },
         (error: unknown) => {
+          if (this.initialRepositorySync?.runId === runId) this.initialRepositorySync.received?.()
           this.queuedClaims.set(runId, "failed")
           this.log.warn({ run_id: runId, err: error }, "could not start run")
         }
@@ -1392,7 +1398,10 @@ export class Daemon {
       resolveRepositories = resolve; rejectRepositories = reject
     }) : undefined
     if (initialRunId && repositoriesReady) {
-      this.initialRepositorySync = { runId: initialRunId, ready: repositoriesReady }
+      let received: ((repo?: DeviceRepo) => void) | undefined
+      const repository = this.options.hostedSubscriptions && this.options.e2bContainerRuntime && this.journal.all().length === 0
+        ? new Promise<DeviceRepo | undefined>(resolve => { received = resolve }) : undefined
+      this.initialRepositorySync = { runId: initialRunId, ready: repositoriesReady, repository, received }
       // A failed sync may settle before the claim response. The claim still
       // observes this same rejection before any repository or CLI effects.
       void repositoriesReady.catch(() => undefined)
@@ -1406,7 +1415,7 @@ export class Daemon {
       const deviceId = this.device.deviceId as string
       if (initialRunId) {
         this.initialRunHint = undefined
-        this.claimQueued([initialRunId])
+        if (!this.claimQueued([initialRunId])) this.initialRepositorySync?.received?.()
       }
       // Lease renewal still precedes repository/discovery work; the hinted
       // claim above runs concurrently without delaying this heartbeat.
@@ -1423,11 +1432,12 @@ export class Daemon {
         ...(quotas ? { quotas } : {}),
         ...(this.options.autoUpdate ? { updateFailure: reportedUpdateFailure(this.updateStateFile, DAEMON_VERSION) } : {}),
       }
-      const { leases, revoked, cloudCredential, deviceCommands, daemonVersions } = await link.heartbeat(deviceId, heartbeat)
+      const { leases, revoked, cloudCredential, deviceCommands, daemonVersions, taskSecrets } = await link.heartbeat(deviceId, heartbeat)
       this.deviceReceiptsAcknowledged = receiptsVersion
       this.learnRelease(daemonVersions?.latest)
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)
+      this.supervisor.renewTaskSecrets(taskSecrets)
       if (this.options.cloudComputer && cloudCredential && this.device.credential === credential) {
         // Persist before switching transport. Keep the current token valid
         // through this pass; the next pass registers with the replacement.
@@ -1483,7 +1493,10 @@ export class Daemon {
       // Work in progress leaves the machine, so another can take over.
       const checkpointRun = link.checkpointRun?.bind(link)
       if (checkpointRun) await this.supervisor.saveCheckpoints(checkpointRun)
-      this.saveDevice({ repos: await link.listRepos(deviceId) })
+      // A complete claim projection replaces only this initial discovery.
+      // Heartbeat, revocation, rotation, uninstall and checkpoints remain above.
+      const initialRepository = await this.initialRepositorySync?.repository
+      this.saveDevice({ repos: initialRepository ? [initialRepository] : await link.listRepos(deviceId) })
       resolveRepositories?.()
       this.server = "online"
       await this.outbox.flushAll()
@@ -1576,12 +1589,20 @@ export class Daemon {
     if (!isSafeId(runId)) return this.refuseRun(runId)
     const existing = this.journal.get(runId)
     if (existing) return this.supervisor.summary(existing)
-    const repositoriesReady = this.initialRepositorySync?.runId === runId ? this.initialRepositorySync.ready : undefined
-    const assignment = await daemonTracer.span("daemon.run.lease", { "mikka.run.id_hash": runIdHash(runId) }, async span => {
-      const claimed = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal)
+    const initialSync = this.initialRepositorySync?.runId === runId ? this.initialRepositorySync : undefined
+    const repositoriesReady = initialSync?.ready
+    let assignment: RunAssignment
+    try { assignment = await daemonTracer.span("daemon.run.lease", { "mikka.run.id_hash": runIdHash(runId) }, async span => {
+      const claimed = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal, initialSync?.received ? { initialRepository: true } : undefined)
       span.set("mikka.harness", claimed.harness)
       return claimed
-    }, { root: true })
+    }, { root: true }) }
+    catch (error) { initialSync?.received?.(); throw error }
+    const projected = deviceRepoSchema.safeParse(assignment.repo)
+    initialSync?.received?.(assignment.runId === runId && assignment.deviceId === deviceId &&
+      !assignment.continuesRunId && !assignment.resumeFrom && !assignment.resumeSessionId && !assignment.requireSessionResume && !assignment.requireWorktreeContinuation &&
+      assignment.remoteUrl && projected.success && projected.data.repoId === assignment.repoId && projected.data.remoteUrl === assignment.remoteUrl
+      ? projected.data : undefined)
     if (assignment.runId !== runId) return this.refuseRun(runId)
     if (repositoriesReady) await repositoriesReady
     // A hosted workspace can be registered after this daemon starts. Resolve
@@ -1621,7 +1642,9 @@ export class Daemon {
     if (this.stopped) throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
     if (this.device.deviceId !== deviceId || this.device.credential !== credential || this.device.workspaceId !== workspaceId)
       throw new ServerUnreachableError('Device session changed while claiming run')
-    return await this.supervisor.start(assignment)
+    // The initial discovery receipt is consumed here, never journaled for resume.
+    const { repo: _initialRepository, ...runAssignment } = assignment
+    return await this.supervisor.start(runAssignment)
   }
 
   /**
@@ -1914,7 +1937,7 @@ export class Daemon {
 
   private async stopInternal() {
     this.stopped = true
-    const anonymousClosing = this.options.anonymousClaudeCandidate?.close()
+    const anonymousClosing = Promise.all([this.options.anonymousClaudeCandidate?.close(), this.options.anonymousCodexCandidate?.close()])
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
     await this.maintenance

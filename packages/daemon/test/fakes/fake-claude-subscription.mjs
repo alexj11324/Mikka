@@ -45,6 +45,8 @@ writeFileSync(join(config, 'fixture-auth.json'), JSON.stringify({ tokenSha: crea
   ...(apiKey ? { baseUrl: process.env.ANTHROPIC_BASE_URL } : {}) }))
 // Capture only the official effort flag and session identity, never auth argv/env.
 writeFileSync(join(config, 'fixture-effort.json'), JSON.stringify({ transport: 'cli', sessionId, effort: flag('--effort') ?? null, resumed: flag('--resume') !== undefined }))
+// Observe the real SDK's serialized PR attribution without recording auth settings.
+writeFileSync(join(config, 'fixture-settings.json'), JSON.stringify({ attribution: JSON.parse(flag('--settings') ?? '{}').attribution ?? null }))
 const processReceipt = join(config, 'fixture-process.json')
 let prompts = 0
 writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))

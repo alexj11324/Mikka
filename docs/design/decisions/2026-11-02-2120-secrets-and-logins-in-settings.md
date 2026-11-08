@@ -27,5 +27,5 @@
    value. (Alex first asked for view and copy, then withdrew it the same day.)
 
 Design: Figma `kVQC1aa6P0tPI1SQ0PjC6V`, page 「密钥与登录 v3」 (v1 and v2 are 已废弃) (proposal, not yet
-accepted as a layout source). Research:
-`../research/2026-11-02-devin-secrets.md`.
+accepted as a layout source). Historical research, retained at its recorded repository revision:
+[Devin secrets comparison](https://github.com/alexj11324/Mikka/blob/bf633a2e86e5e8dad3b5b16adc28afd286583482/docs/design/research/2026-11-02-devin-secrets.md).

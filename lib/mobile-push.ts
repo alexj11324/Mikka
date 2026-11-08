@@ -50,11 +50,12 @@ export function pushBody(text: string): string {
 
 /**
  * Sends a Coordinator (or bot) reply to every phone the person signed in on,
- * when their settings allow it and the chat's 通知 is on. Tapping the push opens that chat. `text` null
+ * when their settings allow it and the chat's 通知 is on. Tapping the push opens that chat, or with `task` that
+ * task at its attempt (2026-11-07). `text` null
  * is a reply about a verification code: the push only says one came, the code
  * stays in the app chat. Tokens Expo reports as gone are removed. Never throws.
  */
-export async function pushReply(userId: string, botId: string, text: string | null, reasons: readonly PushReason[]): Promise<void> {
+export async function pushReply(userId: string, botId: string, text: string | null, reasons: readonly PushReason[], task: { issueId: string; runId: string | null } | null = null): Promise<void> {
   try {
     if (!reasons.length || text?.trim() === '') return
     if (!pushAllowed(await readPreferences(userId), reasons)) return
@@ -67,7 +68,7 @@ export async function pushReply(userId: string, botId: string, text: string | nu
     const coordinator = !bot || bot.coordinator
     const body = text === null ? await codePushBody(await personLocale(userId)) : pushBody(text)
     await deliverPhonePush(userId, { to: tokens.map(({ token }) => token), title: coordinator ? 'Coordinator' : bot.name, body,
-      data: { botId: coordinator ? null : botId, serverUrl: `${appOrigin}${BASE_PATH}`, userId }, collapseId: botId }, await personLocale(userId))
+      data: { botId: coordinator ? null : botId, ...(task ? { issueId: task.issueId, ...(task.runId ? { runId: task.runId } : {}) } : {}), serverUrl: `${appOrigin}${BASE_PATH}`, userId }, collapseId: botId }, await personLocale(userId))
   } catch (error) {
     console.error('phone_push_failed', { code: error instanceof Error && 'code' in error && typeof error.code === 'string' && /^cloud_[a-z_]+$/.test(error.code) ? error.code : 'push_unavailable' })
   }

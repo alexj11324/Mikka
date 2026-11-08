@@ -9,8 +9,120 @@ concurrency:
   cancel-in-progress: false
   queue: max
 jobs:
-  vault:
+  ingress_claude:
+    name: Owned official Claude ingress capability
     if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions: &workload_permissions
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      PREVIEW_PROBE_TEMPLATE: claude
+    outputs:
+      cleanup_confirmed: ${{ steps.verdict.outputs.cleanup_confirmed }}
+      capability_passed: ${{ steps.verdict.outputs.capability_passed }}
+    steps: &ingress_steps
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        id: probe_source
+        with:
+          repository: alexj11324/Mikka
+          ref: 6de3d9899d21945aafb29bc56b93d8f05fe409ed
+          path: preview-ingress-source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify the original Ops subject and frozen probe before credentials
+        run: node scripts/ops/self-hosted-ingress-probe.mjs check preview-ingress-source "$PREVIEW_PROBE_TEMPLATE"
+      - name: Verify the carrier gates and all seven frozen probe cases
+        run: |
+          node --test scripts/ops/self-hosted-ingress-probe.test.mjs
+          node --test preview-ingress-source/scripts/e2b/preview-ingress-acceptance.test.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('preview-ingress-source/scripts/e2b/preview-ingress-probe.py')
+          compile(path.read_bytes(), str(path), 'exec')
+          PY
+      - name: Install only the reviewed E2B SDK
+        run: |
+          npm install --prefix "$RUNNER_TEMP/preview-ingress-sdk" --ignore-scripts --no-audit --no-fund 'e2b@2.62.1'
+          ln -s "$RUNNER_TEMP/preview-ingress-sdk/node_modules" preview-ingress-source/node_modules
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs'
+          const sdk = JSON.parse(readFileSync('preview-ingress-source/node_modules/e2b/package.json', 'utf8'))
+          if (sdk.version !== '2.62.1') throw new Error('ingress_sdk_version_refused')
+          JS
+      - name: Recheck both immutable checkouts immediately before the existing key
+        id: source
+        run: node scripts/ops/self-hosted-ingress-probe.mjs check preview-ingress-source "$PREVIEW_PROBE_TEMPLATE"
+      - name: Read only the existing E2B workload credential
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          recursive: false
+          include-imports: false
+      - name: Probe exactly one owned VM with a 180-second provider kill deadline
+        working-directory: preview-ingress-source
+        run: >-
+          node scripts/e2b/preview-ingress-acceptance.mjs
+          --template "$PREVIEW_PROBE_TEMPLATE"
+          --output "$RUNNER_TEMP/preview-ingress-$PREVIEW_PROBE_TEMPLATE/report.json"
+      - name: Always reconcile only the frozen probe's exact creation journal
+        if: always() && steps.source.outcome == 'success'
+        working-directory: preview-ingress-source
+        run: >-
+          node scripts/e2b/preview-ingress-acceptance.mjs
+          --cleanup "$RUNNER_TEMP/preview-ingress-$PREVIEW_PROBE_TEMPLATE/report.json.cleanup.json"
+          --output "$RUNNER_TEMP/preview-ingress-$PREVIEW_PROBE_TEMPLATE/cleanup.json"
+      - name: Preserve capability failure and gate further allocation on real cleanup
+        id: verdict
+        if: always() && steps.source.outcome == 'success'
+        run: node scripts/ops/self-hosted-ingress-probe.mjs verdict preview-ingress-source "$PREVIEW_PROBE_TEMPLATE"
+      - name: Retain only closed capability and cleanup receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: owned-preview-ingress-${{ env.PREVIEW_PROBE_TEMPLATE }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/preview-ingress-${{ env.PREVIEW_PROBE_TEMPLATE }}/report.json
+            ${{ runner.temp }}/preview-ingress-${{ env.PREVIEW_PROBE_TEMPLATE }}/cleanup.json
+            ${{ runner.temp }}/preview-ingress-${{ env.PREVIEW_PROBE_TEMPLATE }}/verdict.json
+          retention-days: 14
+          if-no-files-found: warn
+  ingress_codex:
+    name: Owned official Codex ingress capability
+    needs: ingress_claude
+    if: >-
+      always() && !cancelled() && needs.ingress_claude.outputs.cleanup_confirmed == 'true' &&
+      github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' &&
+      github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions: *workload_permissions
+    env:
+      PREVIEW_PROBE_TEMPLATE: codex
+    outputs:
+      cleanup_confirmed: ${{ steps.verdict.outputs.cleanup_confirmed }}
+      capability_passed: ${{ steps.verdict.outputs.capability_passed }}
+    steps: *ingress_steps
+  vault:
+    needs: ingress_codex
+    if: >-
+      always() && !cancelled() && needs.ingress_codex.outputs.cleanup_confirmed == 'true' &&
+      github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' &&
+      github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -25,13 +137,14 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
-      - name: Verify exact published source and isolated fixture guards before credentials
+      - name: Verify exact published source and final-image guards before credentials
         run: |
-          node --import tsx --test scripts/ops/self-hosted-vault-closeout.test.mjs scripts/ops/vault-runtime-diagnostics.test.mjs
+          node --import tsx --test scripts/ops/self-hosted-vault-closeout.test.mjs
           node --import tsx scripts/ops/self-hosted-vault-closeout.mjs --check
       - name: Prepare immutable image and disposable infrastructure
         run: |
-          docker pull ghcr.io/alexj11324/mikka@sha256:f189f6dff33fa84e007edd320b42be0ae639d84210b0ef5577256c003268b811
+          docker pull ghcr.io/alexj11324/mikka@sha256:f9ca1fa0d09adaac3391181f224c4abfa89ff04a3310e8de0e699e204c4f160d
+          node --import tsx scripts/ops/self-hosted-vault-closeout.mjs --image-check
           docker pull postgres:17-alpine
           docker pull axllent/mailpit:v1.27.4
           curl --fail --silent --show-error --location --max-time 60 https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 --output "$RUNNER_TEMP/cloudflared"
