@@ -11,6 +11,7 @@ const MAX_MS = 4 * 60 * 60_000, MIN_MS = 2 * 60 * 60_000, MARGIN_MS = 10_000
 const PERMISSIONS = { metadata: 'read', contents: 'write', pull_requests: 'write', checks: 'read', statuses: 'read', actions: 'read' }
 const ACTIVE = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
 const hash = value => createHash('sha256').update(value).digest('hex')
+const emailHash = value => typeof value === 'string' ? createHash('sha256').update(value, 'utf8').digest('hex') : null
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const id = value => /^(?:[1-9]\d*)$/.test(String(value)) && (typeof value !== 'number' || Number.isSafeInteger(value))
 const fail = code => { throw new Error(`issue1503_github_renewal_${code}`) }
@@ -95,6 +96,15 @@ async function githubRequest(path, authorization, body) {
   return result
 }
 
+export function renewalIdleCounts(row) {
+  const keys = ['activeRuns', 'pendingFactoryTasks', 'pendingSubagents', 'coordinatorLeases',
+    'pendingPublications', 'pendingMerges', 'activeThreadMachines', 'activeCloudMachines']
+  check(object(row) && Object.keys(row).length === keys.length && keys.every(key => Object.hasOwn(row, key)), 'fixture_work_active')
+  const counts = Object.fromEntries(keys.map(key => [key, Number(row[key])]))
+  check(Object.values(counts).every(value => Number.isSafeInteger(value) && value === 0), 'fixture_work_active')
+  return counts
+}
+
 async function idle(query) {
   const { rows: [row] } = await query.query(`WITH fixture_bots AS (SELECT id FROM bots WHERE "workspaceId"=$1),
     fixture_tasks AS (SELECT id,"issueId",status FROM factory_tasks WHERE "botId" IN (SELECT id FROM fixture_bots)),
@@ -111,11 +121,15 @@ async function idle(query) {
       (SELECT count(*) FROM run_publications WHERE ("runId" IN (SELECT id FROM fixture_runs)
         OR "issueId" IN (SELECT "issueId" FROM fixture_tasks))
         AND (status IN ('pending','processing') OR "leaseExpiresAt">now())) AS "pendingPublications",
-      (SELECT count(*) FROM factory_merges WHERE "taskId" IN (SELECT id FROM fixture_tasks) AND status='merging') AS "pendingMerges"`,
-  [WORKSPACE_ID, ACTIVE])
-  const counts = Object.fromEntries(Object.entries(row).map(([key, value]) => [key, Number(value)]))
-  check(Object.values(counts).every(value => Number.isSafeInteger(value) && value === 0), 'fixture_work_active')
-  return counts
+      (SELECT count(*) FROM factory_merges WHERE "taskId" IN (SELECT id FROM fixture_tasks) AND status='merging') AS "pendingMerges",
+      (SELECT count(*) FROM thread_machines WHERE "ownerId"=$3 AND
+        (state='running' OR "workerLeaseUntil">now() OR ("workerLeaseId" IS NOT NULL AND "workerLeaseUntil" IS NULL))) AS "activeThreadMachines",
+      (SELECT count(*) FROM cloud_machines WHERE "ownerId"=$3 AND
+        (state IN ('running','waking') OR "workerLeaseUntil">now() OR "provisionLeaseUntil">now()
+          OR ("workerLeaseId" IS NOT NULL AND "workerLeaseUntil" IS NULL)
+          OR ("provisionLeaseId" IS NOT NULL AND "provisionLeaseUntil" IS NULL))) AS "activeCloudMachines"`,
+  [WORKSPACE_ID, ACTIVE, SMOKE_USER_ID])
+  return renewalIdleCounts(row)
 }
 
 async function matching(query, state, locked = false) {
@@ -147,13 +161,16 @@ export async function runRenewal() {
     pool = database.pool; workspacePool = (await import('../../../lib/workspace-db.ts')).workspacePool
     const connection = await import('../../../lib/github/connection.ts')
     stage = 'validate_fixture'
-    const { rows: users } = await pool.query(`SELECT id FROM "user" WHERE (id=$1 AND email=$2) OR (id=$3 AND email=$4)`,
-      [OWNER_USER_ID, 'alexjiang20232024@gmail.com', SMOKE_USER_ID, 'alexjiang20232024+mikka-smoke-owner@gmail.com'])
+    const { rows: users } = await pool.query(`SELECT id,email FROM "user" WHERE id=$1 OR id=$2`,
+      [OWNER_USER_ID, SMOKE_USER_ID])
     const { rows: [workspace] } = await workspacePool.query(`SELECT w.id,w."userId",w.kind,w.slug,
       (SELECT count(*) FROM mikka_workspace_members m WHERE m."workspaceId"=w.id) AS members,
       (SELECT count(*) FROM mikka_workspace_members m WHERE m."workspaceId"=w.id AND m.status='active' AND m."userId"=ANY($2::text[])) AS active
       FROM mikka_workspaces w WHERE w.id=$1`, [WORKSPACE_ID, [SMOKE_USER_ID, OWNER_USER_ID]])
-    check(users.length === 2 && workspace?.userId === SMOKE_USER_ID && workspace.kind === 'team'
+    check(users.length === 2
+      && emailHash(users.find(user => user.id === OWNER_USER_ID)?.email) === 'c6032681fcca35e9a45d042dc67def8773bf58b68cc42392d2ce643c79765a42'
+      && emailHash(users.find(user => user.id === SMOKE_USER_ID)?.email) === 'a20ddbf2c101381c3de802e5e546365caf46bc80b69f3526cd967331cf9bb20d'
+      && workspace?.userId === SMOKE_USER_ID && workspace.kind === 'team'
       && workspace.slug === 'issue-1503-factory-smoke-20261106' && Number(workspace.members) === 2 && Number(workspace.active) === 2, 'fixture_membership_changed')
     report.activityBefore = await idle(pool)
     stage = 'matching_existing_child'
