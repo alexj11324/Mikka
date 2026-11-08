@@ -680,7 +680,7 @@
         "GET"
       ],
       "maxDuration": 300,
-      "sourceHash": "6f74b8d6512b30d9abc28daa3230fcb9d75822b954001c57c8332ea11c2a559c"
+      "sourceHash": "031756d55985c735b0e0c5c1b26a3e98b28cdee77dc8424deeec91d454179bd2"
     },
     {
       "path": "/mikka/api/cron/run-recovery",
@@ -1568,6 +1568,35 @@
       "sourceHash": "e0818cf6420a3c1ed1fa34e346716a3abb4c1e8ca55d77eff89ae1caaf8a3536"
     },
     {
+      "path": "/mikka/api/runs/[runId]/workspace/files",
+      "template": "/api/runs/[runId]/workspace/files",
+      "source": "app/api/runs/[runId]/workspace/files/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "d5955bf861d306a217f3fcd37c11321f2dd15739ba445a4828bc58ad87b2b658"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/identity",
+      "template": "/api/runs/[runId]/workspace/identity",
+      "source": "app/api/runs/[runId]/workspace/identity/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "6d09f4ecaaa7a199fd4ccd43622060838f4393c958fd0ee0c3d5b88546000247"
+    },
+    {
+      "path": "/mikka/api/runs/[runId]/workspace/mentions",
+      "template": "/api/runs/[runId]/workspace/mentions",
+      "source": "app/api/runs/[runId]/workspace/mentions/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "a95188c73286856d155f72b207ce76bca94da485e6f231d3dac5634ea2f6221b"
+    },
+    {
       "path": "/mikka/api/search",
       "template": "/api/search",
       "source": "app/api/search/route.ts",
@@ -1994,7 +2023,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "0459c12b0b463183cd6d2d996ee74bb212d9c9ec2a05d419423c8b1fb0ce3d20"
+      "sourceHash": "b57458bc3b1f6223feea4ae01a8f6e0fc1e7b12f4357216df3fa39883b5bc66d"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/commands/ack",
@@ -2141,6 +2170,15 @@
         "POST"
       ],
       "sourceHash": "53005357743284c771bfd40d7ba6f88ace83314c32f85e0dc0b553ca2d4f5e26"
+    },
+    {
+      "path": "/mikka/v1/devices/[deviceId]/workspace/requests/[requestId]",
+      "template": "/v1/devices/[deviceId]/workspace/requests/[requestId]",
+      "source": "app/v1/devices/[deviceId]/workspace/requests/[requestId]/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "9b62e1b1ce56df81649246aa4e04fcfac4e3daabcf31d1d4837afa1a6065c815"
     },
     {
       "path": "/mikka/v1/mailbox",
