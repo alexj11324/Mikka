@@ -1011,6 +1011,8 @@ export const runCaptureSteps = pgTable('run_capture_steps', {
   captureId: uuid('captureId').notNull().references(() => runCaptures.id, { onDelete: 'cascade' }),
   userId: text('userId').notNull(),
   atMs: integer('atMs').notNull(),
+  /** Observed action duration ending at atMs; null for historical steps and marks. */
+  durationMs: integer('durationMs'),
   label: varchar('label', { length: 200 }).notNull(),
   source: text('source').$type<'action' | 'mark'>().notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),

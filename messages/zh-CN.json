@@ -5404,6 +5404,12 @@
     "factory_spec_approval_required": {
       "default": "请先审阅并批准方案，再开始实现。"
     },
+    "factory_visual_evidence_required": {
+      "default": "请先录下运行中的应用、测试或接口调用结果，或渲染后的文档页面，再交接这次实现。"
+    },
+    "factory_public_evidence_required": {
+      "default": "请检查可视证据不含私密信息，标记可公开分享，并将链接发布到 PR 描述后再交接。"
+    },
     "cloud_not_connected": {
       "default": "尚未连接 Mikka 云服务。"
     },

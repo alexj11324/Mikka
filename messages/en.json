@@ -5404,6 +5404,12 @@
     "factory_spec_approval_required": {
       "default": "Review and approve the specification before implementation starts."
     },
+    "factory_visual_evidence_required": {
+      "default": "Record the running application, test or API result, or rendered documentation before handing over this implementation."
+    },
+    "factory_public_evidence_required": {
+      "default": "Check the visual evidence contains no private data, mark it safe to share, and publish its links in the pull request before handoff."
+    },
     "cloud_not_connected": {
       "default": "Mikka Cloud is not connected."
     },

@@ -1,4 +1,6 @@
+import { observePoolCommits } from '../db/commit-effects';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { createFactoryStore as createCurrentFactoryStore } from './store';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
 // below are explicit synthetic fixtures, never live-provider acceptance.
@@ -44,6 +46,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
   const target = new URL(url!)
   target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
+  observePoolCommits(pool);
   const flags = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
   try {
     const dir = new URL('../../drizzle/', import.meta.url)
@@ -79,6 +82,8 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       const routed = await store.route('owner', { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic completed native continuation', missingInformation: [], missingPermissions: [], needsSpec: false })
       const producer = await executeDispatch('owner', { binding: factoryBinding(routed.task), agentId, deviceRepoId: repoId })
       const producerRunId = producer.runId, producerAttemptId = producer.task.attemptId
+      const captureId = await addFactoryVisualEvidence(pool, producerRunId)
+      await pool.query(`UPDATE run_captures SET "createdAt"=now()-interval '119 minutes',"updatedAt"=now()-interval '119 minutes' WHERE id=$1`, [captureId])
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='original-native-session',"startedAt"=now()-interval '2 hours',"finishedAt"=now()-interval '118 minutes',"worktreePath"=$2,report=$3 WHERE id=$1`,
         [producerRunId, worktreePath, JSON.stringify({ sourceCommit: base, summary: 'Original completed report remains unchanged.', verify: { status: 'not_run' } })])
       const clock = Date.now()
@@ -182,6 +187,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       try {
         const accepted = await approvalEvidence(client, result.task)
         assert.deepEqual(accepted.manifest.artifacts.map(a => a.stage), ['execute'])
+        assert.deepEqual(accepted.captures.map(a => a.runId), [f.producerRunId])
         assert.equal(accepted.manifest.artifacts[0].deliverableSnapshotSha, head)
         assert.equal(accepted.manifest.reviewHistory?.length, 1)
         assert.equal(accepted.manifest.reviewHistory![0].candidateId, f.oldCandidateId)
@@ -236,6 +242,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       try {
         const accepted = await approvalEvidence(client, ready)
         assert.deepEqual(accepted.manifest.artifacts.map(entry => entry.stage), ['execute', 'review', 'verify'])
+        assert.deepEqual(accepted.captures.map(entry => entry.runId), [f.producerRunId])
         const producerEvidence = accepted.manifest.artifacts[0]
         assert.equal(producerEvidence.runId, f.producerRunId)
         assert.equal(producerEvidence.completionRecoveryEventId, f.completionEventId)

@@ -1,7 +1,7 @@
 import type { RepositoryGitTiming, RepositoryTimingObserver } from '../repository-git-timing'
 import { captureRunFailure, failureFrom, type RunFailure } from "@mikka/protocol/run-failure"
 import { DAEMON_VERSION } from "../paths"
-import { runCriterion, reviewVerdict } from "@mikka/protocol/run"
+import { runCriterion, reviewVerdict, runVisualEvidence } from "@mikka/protocol/run"
 // Run supervisor: owns the run state machine
 //   queued -> preparing -> running <-> waiting_input -> finishing -> succeeded
 //   running -> stopped | failed | cancelled (and finishing -> failed on verify)
@@ -2050,6 +2050,8 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
   if (agent.repositorySelection) picked.repositorySelection = agent.repositorySelection
   if (agent.verificationCommand && typeof agent.verificationCommand.command === 'string' && agent.verificationCommand.command.trim() && typeof agent.verificationCommand.basis === 'string' && agent.verificationCommand.basis.trim())
     picked.verificationCommand = { command: agent.verificationCommand.command.trim().slice(0, 2000), basis: agent.verificationCommand.basis.trim().slice(0, 2000) }
+  const visualEvidence = runVisualEvidence.safeParse(agent.visualEvidence)
+  if (visualEvidence.success) picked.visualEvidence = visualEvidence.data
   const verdict = reviewVerdict.safeParse(agent.reviewVerdict)
   if (verdict.success) picked.reviewVerdict = verdict.data
   if (typeof agent.summary === "string")

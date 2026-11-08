@@ -1,4 +1,6 @@
+import { observePoolCommits } from '../db/commit-effects';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 // BE-9: run completion drives Factory reconcile without a Coordinator turn.
 // Real migrations, store, dispatch and reconciler over a disposable *_e2e PG.
 import assert from "node:assert/strict";
@@ -50,6 +52,7 @@ test("run completion enters review without the Coordinator; replays do not advan
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 8 });
+  observePoolCommits(pool);
   const flags = { r: process.env.MIKKA_FACTORY_ROUTING_ENABLED, l: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED };
   try {
     const dir = new URL("../../drizzle/", import.meta.url);
@@ -123,7 +126,10 @@ test("run completion enters review without the Coordinator; replays do not advan
         [sourceId, JSON.stringify({ providerFailure: { kind: 'balance', retryable: false, code: 'insufficient_quota' }, modelFallback: fallback })]);
       return childId;
     };
-    const succeed = (runId: string) => pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='s1',report=$2,"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp() WHERE id=$1`, [runId, JSON.stringify({ publish: { commit: "b".repeat(40) }, verify: { status: "passed" }, summary: "done" })]);
+    const succeed = async (runId: string) => {
+      await addFactoryVisualEvidence(pool, runId);
+      return pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='s1',report=$2,"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp() WHERE id=$1`, [runId, JSON.stringify({ publish: { commit: "b".repeat(40) }, verify: { status: "passed" }, summary: "done" })]);
+    };
     const exhaustedCompletion = async () => {
       const created = await runningTask();
       await succeed(created.runId);
@@ -413,13 +419,15 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal(manifest.candidate.sha, null);
       assert.ok(Array.isArray(manifest.artifacts));
       const artifacts = manifest.artifacts.map((item: unknown) => {
-        assert.ok(item && typeof item === 'object' && 'stage' in item && 'runId' in item && 'sessionId' in item);
+        assert.ok(item && typeof item === 'object' && 'stage' in item && 'runId' in item && 'sessionId' in item && 'kind' in item);
         return item;
       });
-      assert.deepEqual(artifacts.map(item => item.stage), ['execute', 'review']);
-      assert.deepEqual(artifacts.map(item => item.runId), [exhausted.runId, reviewer.runId]);
-      assert.ok('completionRecoveryEventId' in artifacts[0]);
-      assert.equal(artifacts[0].completionRecoveryEventId, ownerRequest.body.eventId);
+      const reports = artifacts.filter(item => item.kind === 'report');
+      assert.deepEqual(reports.map(item => item.stage), ['execute', 'review']);
+      assert.deepEqual(reports.map(item => item.runId), [exhausted.runId, reviewer.runId]);
+      assert.deepEqual(artifacts.filter(item => item.kind === 'screenshot').map(item => item.runId), [exhausted.runId]);
+      assert.ok('completionRecoveryEventId' in reports[0]);
+      assert.equal(reports[0].completionRecoveryEventId, ownerRequest.body.eventId);
       assert.equal(new Set(artifacts.map(item => item.sessionId)).size, 2);
       assert.deepEqual(await receiptRows(), savedReceipts, 'displaying evidence never rewrites either successful completion or Owner recovery receipt');
       assert.deepEqual(await preservedHistory(), oldHistory);
@@ -677,15 +685,13 @@ test("run completion enters review without the Coordinator; replays do not advan
 
     await t.test("completed run moves execute → review via the completion hook alone", async () => {
       const report = { publish: { commit: "b".repeat(40) }, verify: { status: "passed" }, summary: "done" };
-      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='s1',report=$2,"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp() WHERE id=$1`, [d.runId, JSON.stringify(report)]);
       // A3: the run's ready captures become evidence by reference; failed or unfinished ones do not.
       const shot = randomUUID(), clip = randomUUID(), broken = randomUUID();
-      const capture = (id: string, kind: string, type: string, status: string) => pool.query(
-        `INSERT INTO run_captures (id,"userId","runId",kind,"contentType",source,status,title,size,sha256,"storageKey","inlineContent","updatedAt") VALUES ($1,'owner',$2,$3,$4,'local',$5,$6,3,$7,$8,'\\x010203',clock_timestamp())`,
-        [id, d.runId, kind, type, status, `capture ${id.slice(0, 4)}`, "c".repeat(64), `owner/captures/${id}`]);
-      await capture(shot, "image", "image/png", "ready");
-      await capture(clip, "video", "video/mp4", "ready");
-      await capture(broken, "image", "image/png", "failed");
+      await addFactoryVisualEvidence(pool, d.runId, { captureId: shot });
+      await addFactoryVisualEvidence(pool, d.runId, { captureId: clip, kind: 'video' });
+      await addFactoryVisualEvidence(pool, d.runId, { captureId: broken });
+      await pool.query("UPDATE run_captures SET status='failed' WHERE id=$1", [broken]);
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='s1',report=$2,"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp() WHERE id=$1`, [d.runId, JSON.stringify(report)]);
       assert.equal(await reconcileFactoryAfterCompletion(pool, "owner", d.runId, reconcileFor), 1);
       const after = await store.read("owner", routed.task.id);
       assert.equal(after.task.stage, "review");

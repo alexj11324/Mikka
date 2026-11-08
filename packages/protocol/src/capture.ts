@@ -24,6 +24,8 @@ export const CAPTURE_MAX_BYTES: Record<CaptureKind, number> = {
 }
 /** Longest a cloud computer recording runs before it stops by itself. */
 export const RECORDING_MAX_SECONDS = 300
+/** A bounded local recording may be longer than one cloud desktop recording. */
+export const CAPTURE_MAX_DURATION_MS = 3_600_000
 export const CAPTURE_TITLE_MAX = 200
 
 export const CAPTURE_EXTENSIONS: Record<CaptureContentType, string> = {
@@ -77,6 +79,17 @@ export function cleanCaptureTitle(title: string): string {
 const sha256 = z.string().regex(/^[a-f0-9]{64}$/)
 const title = z.string().trim().min(1).max(CAPTURE_TITLE_MAX)
 
+/** End offset plus the observed action duration; marks carry no action window. */
+export const recordingStep = z.object({
+  atMs: z.number().int().min(0).max(CAPTURE_MAX_DURATION_MS),
+  label: title,
+  source: z.enum(["action", "mark"]),
+  durationMs: z.number().int().min(0).max(CAPTURE_MAX_DURATION_MS).nullable().optional(),
+}).strict().refine(step => step.durationMs == null || (step.source === "action" && step.durationMs <= step.atMs), {
+  message: "An action duration must fit its recorded end offset.",
+})
+export type RecordingStep = z.infer<typeof recordingStep>
+
 // --- Daemon upload: begin, send, complete -----------------------------------
 
 /** `POST /v1/runs/:runId/captures`: announce one file the daemon will send. */
@@ -87,7 +100,16 @@ export const captureUploadRequest = z.object({
   contentType: z.enum(CAPTURE_CONTENT_TYPES),
   size: z.number().int().min(1).max(CAPTURE_MAX_BYTES.video),
   sha256,
-}).strict()
+  /** Final, processed video duration and its remapped timeline. */
+  durationMs: z.number().int().min(1).max(CAPTURE_MAX_DURATION_MS).optional(),
+  steps: z.array(recordingStep).max(200).optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.durationMs !== undefined || value.steps !== undefined) {
+    if (!value.contentType.startsWith("video/")) ctx.addIssue({ code: "custom", message: "Only videos carry a recording timeline." })
+    if (value.steps?.some(step => value.durationMs === undefined || step.atMs > value.durationMs))
+      ctx.addIssue({ code: "custom", message: "Recording steps must fit the final video duration." })
+  }
+})
 export type CaptureUploadRequest = z.infer<typeof captureUploadRequest>
 
 /**
@@ -128,7 +150,9 @@ export const screenCaptureRequest = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start_recording"), title, maxSeconds: z.number().int().min(5).max(RECORDING_MAX_SECONDS).optional() }).strict(),
   z.object({ action: z.literal("stop_recording") }).strict(),
   // A step on the recording's timeline: an action's own description, or a moment the agent marks.
-  z.object({ action: z.literal("step"), label: title, source: z.enum(["action", "mark"]) }).strict(),
+  z.object({ action: z.literal("step"), label: title, source: z.enum(["action", "mark"]),
+    durationMs: z.number().int().min(0).max(RECORDING_MAX_SECONDS * 1000).optional(),
+  }).strict().refine(step => step.durationMs === undefined || step.source === "action", { message: "Only actions have a duration." }),
 ])
 export type ScreenCaptureRequest = z.infer<typeof screenCaptureRequest>
 export const screenCaptureResponse = z.discriminatedUnion("action", [

@@ -2,14 +2,84 @@ import { factoryFlowVersion } from './contract'
 import { repositoryExecutionMatches } from './execution-receipt'
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
+import { CAPTURE_MAX_BYTES } from '@mikka/protocol/capture';
 import {
   evidenceSchema,
   FactoryError,
   type FactoryEvidence,
 } from "./approval-contract";
-import type { FactoryCandidate, FactoryTask } from "./approval-dependencies";
+import type { FactoryApprovalStore, FactoryCandidate, FactoryTask } from "./approval-dependencies";
 import { maskCredentials } from "../secrets/mask";
 import { completedRecoveryEvidence, readDeliverableSnapshotReceipt } from './deliverable-snapshot';
+
+export const FACTORY_VISUAL_EVIDENCE_REQUIRED = 'factory_visual_evidence_required';
+export const FACTORY_PUBLIC_EVIDENCE_REQUIRED = 'factory_public_evidence_required';
+export const factoryEvidenceBlockReason = (code: string) => code === FACTORY_PUBLIC_EVIDENCE_REQUIRED
+  ? 'The current candidate PR must contain confirmed public links to its checked visual evidence before handoff.'
+  : 'The current implementation run has no ready screenshot or recording. Record the running application, test or API result, or rendered documentation before handoff.';
+
+/** The producer's stored media, never a reviewer capture, text claim or an old
+ * candidate's evidence. Upload completion owns byte validation and storage. */
+export async function hasFactoryVisualEvidence(tx: PoolClient, task: Pick<FactoryTask, 'id' | 'userId' | 'issueId' | 'candidateId'>,
+  /** Only the store's private completed-run recovery authority supplies this,
+   * before its immutable owner receipt is written in the same transaction. */
+  completedProducer?: { runId: string; sessionId: string }): Promise<boolean> {
+  if (!task.candidateId) return false;
+  const { rows: [producer] } = await tx.query(`SELECT c.*,r.report,r."sessionId",
+      EXISTS (SELECT 1 FROM factory_attempts a WHERE a."taskId"=c."taskId" AND a."runId"=r.id
+        AND a.stage='execute' AND a."sessionId"=r."sessionId") AS "sessionMatches"
+    FROM factory_candidates c JOIN agent_runs r ON r.id=c."runId" AND r."userId"=$3 AND r."issueId"=$4
+    WHERE c.id=$1 AND c."taskId"=$2 AND r.status='succeeded' AND r."stopReason"='submitted'
+      AND r."stopRequestedAt" IS NULL AND r."sessionId" IS NOT NULL AND r."sessionId"<>''
+      AND r."startedAt" IS NOT NULL AND r."finishedAt" IS NOT NULL
+      AND EXISTS (SELECT 1 FROM factory_attempts a WHERE a."taskId"=c."taskId" AND a."runId"=r.id AND a.stage='execute') FOR SHARE OF c,r`,
+  [task.candidateId, task.id, task.userId, task.issueId]);
+  if (!producer || (producer.kind === 'report'
+    ? !/^[a-f0-9]{40}$/.test(producer.sha ?? '') || producer.report?.sourceCommit !== producer.sha
+    : producer.kind === 'deliverable'
+      ? producer.sha !== null || !/^[a-f0-9]{40}$/.test(producer.report?.sourceCommit ?? '')
+      : !repositoryExecutionMatches(producer.report, producer.sha))) return false;
+  if (!producer.sessionMatches && !(completedProducer && completedProducer.runId === producer.runId && completedProducer.sessionId === producer.sessionId)) {
+    const recovered = await recoveredExecutionEvidence(tx, task, producer);
+    if (!recovered || recovered.sessionId !== producer.sessionId) return false;
+  }
+  const { rowCount } = await tx.query(`SELECT id FROM run_captures WHERE "runId"=$1 AND "userId"=$2 AND status='ready'
+    AND ((kind='image' AND "contentType" IN ('image/png','image/jpeg','image/webp') AND size BETWEEN 1 AND $3)
+      OR (kind='video' AND "contentType" IN ('video/mp4','video/webm') AND size BETWEEN 1 AND $4))
+    AND sha256 ~ '^[a-f0-9]{64}$' AND (NULLIF("storageKey",'') IS NOT NULL OR octet_length("inlineContent")=size)
+    LIMIT 1 FOR SHARE`, [producer.runId, task.userId, CAPTURE_MAX_BYTES.image, CAPTURE_MAX_BYTES.video]);
+  return rowCount === 1;
+}
+
+export async function requireFactoryVisualEvidence(tx: PoolClient, task: Pick<FactoryTask, 'id' | 'userId' | 'issueId' | 'candidateId'>): Promise<void> {
+  if (!await hasFactoryVisualEvidence(tx, task)) throw new FactoryError(FACTORY_VISUAL_EVIDENCE_REQUIRED);
+}
+
+/** A refusal is returned so the caller can commit the blocked state. Other
+ * failures still throw and roll back the whole transaction. */
+export async function factoryHandoffEvidenceError(tx: PoolClient, task: FactoryTask,
+  completedProducer?: { runId: string; sessionId: string }): Promise<FactoryError | null> {
+  if (!await hasFactoryVisualEvidence(tx, task, completedProducer)) return new FactoryError(FACTORY_VISUAL_EVIDENCE_REQUIRED);
+  const { assertFactoryPublicationEvidence } = await import('../captures/publication');
+  try { await assertFactoryPublicationEvidence(tx, task); }
+  catch (error) {
+    if ((error as { code?: string } | null)?.code === FACTORY_PUBLIC_EVIDENCE_REQUIRED) return new FactoryError(FACTORY_PUBLIC_EVIDENCE_REQUIRED);
+    throw error;
+  }
+  return null;
+}
+
+/** Direct approval/merge of an older pending task must use the same gate as
+ * stage advancement. Return the error; throw it only after COMMIT. */
+export async function blockFactoryApprovalWithoutEvidence(tx: PoolClient, task: FactoryTask, store: FactoryApprovalStore, eventId: string): Promise<FactoryError | null> {
+  const error = await factoryHandoffEvidenceError(tx, task);
+  if (!error) return null;
+  await store.apply(task.userId, { taskId: task.id, revision: task.revision }, eventId, {
+    action: 'finish', status: 'blocked', reason: factoryEvidenceBlockReason(error.code), evidence: [],
+    output: { evidenceGate: { code: error.code, candidateId: task.candidateId } },
+  }, tx);
+  return error;
+}
 
 /** What a screenshot or recording entry shown to the reviewer carries. */
 export interface FactoryCaptureEvidence {
@@ -204,7 +274,7 @@ export async function runCaptureEvidence(
 
 /** An owner-consumed completion has its own immutable receipt. The old blocked
  * attempt stays blocked; only its canonical completed-run evidence is projected. */
-async function recoveredExecutionEvidence(tx: PoolClient, task: FactoryTask, candidate: FactoryCandidate & { runId: string }) {
+async function recoveredExecutionEvidence(tx: PoolClient, task: Pick<FactoryTask,'id'|'userId'|'issueId'>, candidate: FactoryCandidate & { runId: string }) {
   const completed = await completedRecoveryEvidence(tx, task, candidate);
   if (completed || candidate.kind !== 'deliverable') return completed;
   const retained = await readDeliverableSnapshotReceipt(tx, task, candidate.id);

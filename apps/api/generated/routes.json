@@ -2167,7 +2167,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "b69245de5ec3e1728ef4b622ca003e010c14b4d2a03d4bd8965dd7866fc911d0"
+      "sourceHash": "45861c18cf0b8325355b2a366a9c7de08049eabc3db2323e63a16c329ce4362b"
     },
     {
       "path": "/mikka/v1/runs/[runId]/captures/[captureId]",
@@ -2204,7 +2204,8 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "0174eb18a3003b554a4cfd996dc516ce36cef29dd868bfe5e72656b035967991"
+      "maxDuration": 120,
+      "sourceHash": "4dfb4d423cef7a5efda37e1d48950041f73538bda2d614a54d64e3d9c5687abb"
     },
     {
       "path": "/mikka/v1/runs/[runId]/decision",
@@ -2242,7 +2243,7 @@
         "POST"
       ],
       "maxDuration": 120,
-      "sourceHash": "555b2393a908f8090fdc56cf2656abed0e9a8be388c9a0fbf7a39b4d22026d4e"
+      "sourceHash": "3168481523edcc710c87a462df5e55c51955bcc39dc41b7e7acb26c618477d54"
     },
     {
       "path": "/mikka/v1/runs/[runId]/skill-receipt",

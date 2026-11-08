@@ -36,13 +36,23 @@ function objectUrl(config: ObjectStorageConfig, key: string): string {
   return `${config.endpoint}/${encodeURIComponent(config.bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
 }
 
-export async function putArtifactObject(key: string, body: string | Uint8Array<ArrayBuffer>, contentType: string): Promise<void> {
+/** aws4fetch's retry backoff does not observe AbortSignal. Deadline-bound
+ * writes sign once and let fetch abort the actual request without late retries. */
+async function writeObject(config: ObjectStorageConfig, key: string, init: RequestInit, signal?: AbortSignal) {
+  if (!signal) return config.client.fetch(objectUrl(config, key), init)
+  signal.throwIfAborted()
+  const signed = await config.client.sign(objectUrl(config, key), { ...init, signal })
+  signal.throwIfAborted()
+  return fetch(signed, { signal })
+}
+
+export async function putArtifactObject(key: string, body: string | Uint8Array<ArrayBuffer>, contentType: string, signal?: AbortSignal): Promise<void> {
   const config = objectStorageConfig()
   if (!config) throw new Error('Object storage is not configured')
   // Next's fetch adapter can stream a signed Request and lose its implicit
   // body length. R2 rejects that transfer with 411, so carry the byte length.
   const contentLength = typeof body === 'string' ? Buffer.byteLength(body, 'utf8') : body.byteLength
-  const response = await config.client.fetch(objectUrl(config, key), { method: 'PUT', body, redirect: 'error', headers: { 'content-type': contentType, 'content-length': String(contentLength), 'if-none-match': '*' } })
+  const response = await writeObject(config, key, { method: 'PUT', body, redirect: 'error', headers: { 'content-type': contentType, 'content-length': String(contentLength), 'if-none-match': '*' } }, signal)
   // 412: the object is already there; keys are content-addressed per version, so it is the same file.
   if (!response.ok && response.status !== 412) throw new Error(`Object storage put failed: ${response.status}`)
 }
@@ -73,10 +83,10 @@ export async function getArtifactObjectBytes(key: string): Promise<Uint8Array<Ar
   return new Uint8Array(await response.arrayBuffer())
 }
 
-export async function deleteArtifactObject(key: string): Promise<void> {
+export async function deleteArtifactObject(key: string, signal?: AbortSignal): Promise<void> {
   const config = objectStorageConfig()
   if (!config) throw new Error('Object storage is not configured')
-  const response = await config.client.fetch(objectUrl(config, key), { method: 'DELETE', redirect: 'error' })
+  const response = await writeObject(config, key, { method: 'DELETE', redirect: 'error' }, signal)
   if (!response.ok && response.status !== 404) throw new Error(`Object storage delete failed: ${response.status}`)
 }
 

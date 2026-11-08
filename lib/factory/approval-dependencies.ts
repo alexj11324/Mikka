@@ -51,7 +51,7 @@ export interface FactoryApprovalStore {
     change:
       | {
           action: "finish";
-          status: "passed" | "failed";
+          status: "passed" | "failed" | "blocked";
           reason: string;
           evidence: z.infer<typeof evidenceSchema>[];
           output: Record<string, unknown>;

@@ -6,6 +6,7 @@ import { Sandbox, SandboxNotFoundError } from 'e2b'
 import { computerTemplate, e2bApiKey, sandboxKeyOwner, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { E2BKeyError } from '@/lib/secrets/flag'
 import { bootstrapOfficialInstance, runtimeCommandOptions, runtimeRequestOptions, type RuntimeBudget } from './official-runtime'
+import type { ProcessedCaptureVideo, RecordingStep } from '../../packages/daemon/src/agents/capture-video.mjs'
 
 const lifetime = 15 * 60_000
 export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean; policyVersion: number }
@@ -132,15 +133,19 @@ export async function viewerGrant(sandbox: Sandbox, lease: DesktopLease, userId:
 
 const CAPTURE_DIR = '/home/user/.mikka/captures'
 const CAPTURE_SCRIPT = '/opt/mikka/computer/screen-capture.sh'
+const CAPTURE_VIDEO_SCRIPT = '/opt/mikka/computer/capture-video.mjs'
 const captureId = (id: string) => { if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id)) throw new Error('Invalid capture id'); return id }
 const captureDisplay = (display: number) => { if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display'); return display }
 
 async function installCaptureScript(sandbox: Sandbox, signal?: AbortSignal) {
   // Machines provisioned by an older deployment lack it; writing it each time keeps them current.
   // Bundled for the /v1/runs/*/screen route (next.config.mjs).
-  const script = await readFile(join(process.cwd(), 'scripts/e2b/screen-capture.sh'), { encoding: 'utf8', signal })
+  const scripts = await Promise.all([
+    { path: CAPTURE_SCRIPT, source: 'scripts/e2b/screen-capture.sh' },
+    { path: CAPTURE_VIDEO_SCRIPT, source: 'packages/daemon/src/agents/capture-video.mjs' },
+  ].map(async file => ({ path: file.path, data: await readFile(join(process.cwd(), file.source), { encoding: 'utf8', signal }) })))
   signal?.throwIfAborted()
-  await sandbox.files.write(CAPTURE_SCRIPT, script, { user: 'root', signal })
+  await sandbox.files.write(scripts, { user: 'root', signal })
   signal?.throwIfAborted()
   await sandbox.commands.run(`chmod 0755 ${CAPTURE_SCRIPT}`, { user: 'root', timeoutMs: 10_000, signal })
 }
@@ -174,15 +179,25 @@ export async function startScreenRecording(sandbox: Sandbox, display: number, id
 }
 
 /** Ends the recording and returns the mp4 with its length; the file leaves the machine. */
-export async function stopScreenRecording(sandbox: Sandbox, display: number, id: string, signal?: AbortSignal): Promise<{ bytes: Uint8Array; durationMs: number }> {
+export async function stopScreenRecording(sandbox: Sandbox, display: number, id: string, signal?: AbortSignal, steps: RecordingStep[] = []): Promise<{ bytes: Uint8Array; durationMs: number; steps?: RecordingStep[] }> {
   // The script the recording started with is on the machine; a run ending
   // elsewhere (heartbeat, completion) need not bundle it.
   captureDisplay(display); captureId(id)
   signal?.throwIfAborted()
-  const stopped = await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} stop ${display} ${id}`, { user: 'user', timeoutMs: 30_000, signal })
-  const seconds = Number.parseFloat(stopped.stdout.trim().split('\n').at(-1) ?? '')
-  const bytes = await takeFile(sandbox, display, id, `${id}.mp4`, signal)
-  return { bytes, durationMs: Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0 }
+  try {
+    await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} stop ${display} ${id}`, { user: 'user', timeoutMs: 30_000, signal })
+    signal?.throwIfAborted()
+    // Only data goes in this file. Labels never enter a command or FFmpeg filter.
+    await sandbox.files.write(`${CAPTURE_DIR}/${id}.steps.json`, JSON.stringify({ steps, timeoutMs: 75_000 }), { user: 'user', signal })
+    const processed = await sandbox.commands.run(`node ${CAPTURE_VIDEO_SCRIPT} ${CAPTURE_DIR}/${id}.mp4 ${CAPTURE_DIR}/${id}.processed.mp4 ${CAPTURE_DIR}/${id}.steps.json`, { user: 'user', timeoutMs: 80_000, signal })
+    const result = JSON.parse(processed.stdout.trim()) as ProcessedCaptureVideo
+    if (!Number.isSafeInteger(result.durationMs) || result.durationMs <= 0 || result.durationMs > 300_000 || !Array.isArray(result.steps))
+      throw new Error('Recording processing result is invalid')
+    const bytes = await sandbox.files.read(`${CAPTURE_DIR}/${id}.processed.mp4`, { user: 'user', format: 'bytes', signal })
+    return { bytes, durationMs: result.durationMs, steps: result.steps }
+  } finally {
+    if (!signal?.aborted) await sandbox.commands.run(`bash ${CAPTURE_SCRIPT} discard ${display} ${id}`, { user: 'user', timeoutMs: 10_000, signal }).catch(() => undefined)
+  }
 }
 
 /** Stops and deletes a recording without keeping it. */

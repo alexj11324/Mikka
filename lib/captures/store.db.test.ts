@@ -4,6 +4,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { Pool } from 'pg'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 // Run captures belong to one run and its owner: teammates, other devices and
@@ -30,18 +31,41 @@ dbTest('artifact evidence follows each real submission version, not the artifact
     import('next/dist/server/app-render/work-async-storage.external'), import('next/dist/server/app-render/work-unit-async-storage.external'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
+  const observer = new Pool({ connectionString: databaseUrl!, max: 1 })
   const alice = `artifact-versions-${randomUUID()}`, bob = `artifact-foreign-${randomUUID()}`
   const agentId = randomUUID(), otherAgentId = randomUUID(), issueId = randomUUID(), otherIssueId = randomUUID()
   const firstRun = randomUUID(), nextRun = randomUUID(), otherRun = randomUUID()
   // Only the post-response scheduler is a fixture. Submit, receipt, version,
   // evidence and file reads use their real code and the isolated database.
   let scheduled = 0
-  const afterContext = { after: () => { scheduled++ } }
   const request = { type: 'request', phase: 'action' } as NonNullable<ReturnType<typeof workUnitAsyncStorage.getStore>>
-  const submit = (runId: string, input: Parameters<typeof submitArtifact>[1], userId = alice, issue: string = issueId) => workAsyncStorage.run(
-    { afterContext } as unknown as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,
-    () => workUnitAsyncStorage.run(request, () => submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input)),
-  )
+  const submit = async (runId: string, input: Parameters<typeof submitArtifact>[1], userId = alice, issue: string = issueId) => {
+    type CommittedVersion = { artifactId: string; version: number; sha256: string }
+    const notifications: Promise<CommittedVersion[]>[] = []
+    const afterContext = { after: () => {
+      scheduled++
+      // Live run/chat/artifact/project-map notifications depend on gateway
+      // configuration. Check the committed data they announce, not their count.
+      // This independent connection cannot see the writer's uncommitted rows.
+      notifications.push(observer.query<CommittedVersion>(`SELECT a.id AS "artifactId",v.version,v.sha256
+        FROM coordinator_events e JOIN artifacts a ON a.id::text=e.payload->>'artifactId'
+        JOIN artifact_versions v ON v."artifactId"=a.id AND v.version::text=e.payload->>'version'
+        WHERE e."userId"=$1 AND e."runId"=$2 AND e."issueId"=$3 AND e.kind='artifact_submitted'
+          AND e."dedupeKey"='artifact_submitted:'||a.id::text||':'||v.version::text`, [userId, runId, issue]).then(result => result.rows))
+    } }
+    const result = await workAsyncStorage.run(
+      { afterContext } as unknown as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,
+      () => workUnitAsyncStorage.run(request, () => submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input)),
+    )
+    const observed = await Promise.all(notifications)
+    if ('error' in result) assert.deepEqual(observed, [], 'a refused submission schedules no background work')
+    else {
+      assert.ok(observed.length > 0, 'each committed version schedules its background notifications')
+      for (const rows of observed) assert.deepEqual(rows, [{ artifactId: result.artifactId, version: result.version, sha256: sha(Buffer.from(input.content)) }],
+        'notifications see the matching version and durable receipt from an independent connection')
+    }
+    return result
+  }
   t.after(async () => {
     await scope.run(async () => {
       await pool.query('DELETE FROM coordinator_events WHERE "userId"=ANY($1::text[])', [[alice, bob]])
@@ -51,6 +75,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       await pool.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agentId, otherAgentId]])
       await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[alice, bob]])
     })
+    await observer.end()
     await scope.close()
   })
   await scope.run(async () => {
@@ -68,6 +93,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
     assert.ok(!('error' in next)); assert.equal(next.artifactId, first.artifactId); assert.equal(next.version, 2)
 
     await t.test('v2 belongs to the continuation and each run downloads its own bytes', async () => {
+      const beforeRead = scheduled
       const older = await runEvidence(alice, firstRun), newer = await runEvidence(alice, nextRun)
       assert.deepEqual(older?.artifacts.map(row => [row.id, row.latestVersion]), [[first.artifactId, 1]])
       assert.deepEqual(newer?.artifacts.map(row => [row.id, row.latestVersion]), [[first.artifactId, 2]])
@@ -77,7 +103,7 @@ dbTest('artifact evidence follows each real submission version, not the artifact
       assert.deepEqual(original, { runId: firstRun, latestVersion: 2 }, 'the creator is immutable, while global latest remains useful outside per-run evidence')
       const receipts = (await pool.query(`SELECT "runId",payload->>'version' AS version FROM coordinator_events WHERE "dedupeKey" LIKE $1 ORDER BY "dedupeKey"`, [`artifact_submitted:${first.artifactId}:%`])).rows
       assert.deepEqual(receipts, [{ runId: firstRun, version: '1' }, { runId: nextRun, version: '2' }])
-      assert.equal(scheduled, 4, 'each committed version schedules the receipt and submission wake hooks')
+      assert.equal(scheduled, beforeRead, 'reading versioned evidence never schedules another wake or invalidation')
     })
 
     await t.test('a foreign owner cannot read the run, replace the file, or download its version', async () => {

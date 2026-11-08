@@ -88,3 +88,24 @@ test('S3 configuration signs a private bucket, round-trips bytes and keeps commu
   delete process.env.S3_SECRET_ACCESS_KEY
   assert.throws(() => artifactStorage(), /S3 configuration is incomplete/, 'a partial bucket configuration never silently stores data elsewhere')
 })
+
+test('deadline-bound object writes pass cancellation to fetch and do not enter unbounded retry backoff', async t => {
+  const names = ['S3_ENDPOINT','S3_BUCKET','S3_ACCESS_KEY_ID','S3_SECRET_ACCESS_KEY'] as const
+  const previous = names.map(name => process.env[name])
+  Object.assign(process.env, { S3_ENDPOINT:'https://storage.example.invalid',S3_BUCKET:'fixture',S3_ACCESS_KEY_ID:'fixture',S3_SECRET_ACCESS_KEY:'fixture-secret' })
+  t.after(() => names.forEach((name,index) => { if (previous[index] === undefined) delete process.env[name]; else process.env[name]=previous[index] }))
+  const controller = new AbortController(), seen: Request[] = []
+  t.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = new Request(input, init)
+    seen.push(request)
+    assert.equal(request.signal.aborted,false)
+    return new Response(null, { status:503 })
+  })
+  await assert.rejects(putArtifactObject('bounded',Buffer.from('recording'),'video/mp4',controller.signal), /Object storage put failed: 503/)
+  await assert.rejects(deleteArtifactObject('bounded',controller.signal), /Object storage delete failed: 503/)
+  assert.deepEqual(seen.map(request => request.method), ['PUT','DELETE'], 'each bounded write sends one signed request without a retry timer')
+  controller.abort()
+  assert.ok(seen.every(request => request.signal.aborted), 'both signed requests retain their caller cancellation')
+  await assert.rejects(putArtifactObject('cancelled',Buffer.from('recording'),'video/mp4',controller.signal), { name:'AbortError' })
+  assert.equal(seen.length,2,'an already cancelled write sends no request')
+})

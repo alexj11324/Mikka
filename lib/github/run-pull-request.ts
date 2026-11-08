@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { pullRequestBody } from '@mikka/protocol/orchestrator'
 import { normalizeRepository } from '@mikka/protocol/repository'
+import { bodyWithPublicationEvidence, factoryPullRequestText, validPublicationEvidence, type PublicationEvidence } from '@/lib/captures/publication-contract'
+import { maskCredentials } from '@/lib/secrets/mask'
 
 import { PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
 export { PublicationError, PUBLICATION_ERRORS, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
@@ -32,7 +34,7 @@ const prSchema = z.object({
   merged_at: z.string().nullable(), body: z.string().nullable(),
   // A single PR carries its line counts; GitHub's list of PRs leaves them out.
   additions: z.number().int().nonnegative().optional(), deletions: z.number().int().nonnegative().optional(),
-  head: z.object({ ref: z.string(), repo: z.object({ id }).nullable() }),
+  head: z.object({ ref: z.string(), sha: z.string().regex(/^[a-f0-9]{40,64}$/i).optional(), repo: z.object({ id }).nullable() }),
   base: z.object({ repo: z.object({ id }) }),
 })
 
@@ -55,7 +57,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 
 /** The URL and redirects are fixed; no caller can send the person's credential to a git URL. */
 function api(fetcher: typeof fetch) {
-  return async (path: string, token: string, init: { method?: 'GET' | 'POST'; body?: unknown; missing?: PublicationErrorCode } = {}) => {
+  return async (path: string, token: string, init: { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; missing?: PublicationErrorCode } = {}) => {
     let response: Response
     try {
       response = await fetcher(`https://api.github.com${path}`, {
@@ -108,12 +110,16 @@ export async function openRunPullRequest(options: Options & {
   branch: string; commit: string; baseBranch: string | null
   allowCreate?: boolean
   draft?: boolean
+  /** Host-generated links to captures whose producer explicitly checked them for public sharing. */
+  visualEvidence?: PublicationEvidence
   /** The host holds current task/approval authority for each bounded write. */
   withWrite?: <T>(write: () => Promise<T>) => Promise<T>
   /** Bookkeeping once the repository is read with the owner's token; it must not throw. */
   onVerified?: (binding: GitHubRepositoryBinding) => Promise<void>
 }): Promise<PublishedPullRequest> {
   if (!/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/.test(options.branch) || !/^[a-f0-9]{40,64}$/i.test(options.commit) || !z.uuid().safeParse(options.issueId).success) throw new PublicationError('publication_mismatch')
+  const visualEvidence = options.visualEvidence === undefined ? undefined : validPublicationEvidence(options.visualEvidence)
+  if (options.visualEvidence !== undefined && (!visualEvidence || visualEvidence.issueId !== options.issueId || visualEvidence.sha !== options.commit)) throw new PublicationError('factory_public_evidence_required')
   const access = await repositoryAccess(options)
   const { request, path, binding } = access
   await options.onVerified?.(binding)
@@ -123,11 +129,42 @@ export async function openRunPullRequest(options: Options & {
   const marker = `<!-- mikka-issue:${options.issueId} -->`
   const write = <T>(operation: () => Promise<T>) => options.withWrite ? options.withWrite(operation) : operation()
   const result = async (raw: unknown): Promise<PublishedPullRequest> => {
-    const pr = parse(prSchema, raw)
+    let pr = parse(prSchema, raw)
+    if (visualEvidence && pr.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
     const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : {}
     if (pr.head.ref !== options.branch || pr.head.repo?.id !== binding.repositoryId || pr.base.repo.id !== binding.repositoryId || !pr.body?.trimEnd().endsWith(marker)) throw new PublicationError('pull_request_conflict')
     const expected = `https://github.com/${access.owner}/${access.repo}/pull/${pr.number}`
     if (pr.html_url.toLowerCase() !== expected.toLowerCase()) throw new PublicationError('github_request_failed')
+    let evidenceDigest: string | undefined
+    if (visualEvidence) {
+      const expectedBody = bodyWithPublicationEvidence(pr.body!, options.issueId, visualEvidence)
+      if (!expectedBody) throw new PublicationError('pull_request_conflict')
+      if (pr.state === 'open' && !pr.merged_at) {
+        // Read the current description inside the authority fence, preserving
+        // edits made after the PR list was read. Each bounded write rechecks head.
+        const updated = await write(async () => {
+          const latest = parse(prSchema, await request(`${path}/pulls/${pr.number}`, writeToken))
+          if (latest.number !== pr.number || latest.html_url !== pr.html_url) throw new PublicationError('github_request_failed')
+          if (latest.head.ref !== options.branch || latest.head.repo?.id !== binding.repositoryId
+            || latest.base.repo.id !== binding.repositoryId || !latest.body?.trimEnd().endsWith(marker)
+            || latest.state !== 'open' || latest.merged_at) throw new PublicationError('pull_request_conflict')
+          if (latest.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+          const head = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, writeToken))
+          if (head.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+          const body = bodyWithPublicationEvidence(latest.body, options.issueId, visualEvidence)
+          if (!body) throw new PublicationError('pull_request_conflict')
+          if (body === latest.body) return latest
+          const saved = parse(prSchema, await request(`${path}/pulls/${pr.number}`, writeToken, { method: 'PATCH', body: { body } }))
+          if (saved.number !== latest.number || saved.html_url !== latest.html_url || saved.body !== body
+            || saved.head.ref !== options.branch || saved.head.repo?.id !== binding.repositoryId || saved.base.repo.id !== binding.repositoryId) throw new PublicationError('github_request_failed')
+          if (saved.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+          return saved
+        })
+        pr = updated
+      }
+      if (pr.body === bodyWithPublicationEvidence(pr.body!, options.issueId, visualEvidence)) evidenceDigest = visualEvidence.digest
+      else throw new PublicationError('factory_public_evidence_required')
+    }
     // A later unverified run must not leave an earlier ready-for-review PR open.
     // Only a task-marked PR may be converted; never reopen a closed/merged PR.
     if (options.draft && pr.state === 'open' && !pr.draft && !pr.merged_at) {
@@ -139,9 +176,9 @@ export async function openRunPullRequest(options: Options & {
         },
       })))
       if (converted.data.convertPullRequestToDraft.pullRequest.id !== pr.node_id) throw new PublicationError('github_request_failed')
-      return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft', ...lines }
+      return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft', ...lines, ...(evidenceDigest ? { evidenceDigest } : {}) }
     }
-    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open', ...lines }
+    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open', ...lines, ...(evidenceDigest ? { evidenceDigest } : {}) }
   }
   const find = async () => {
     const query = new URLSearchParams({ state: 'all', head: `${access.owner}:${options.branch}`, per_page: '100', sort: 'created', direction: 'desc' })
@@ -156,12 +193,25 @@ export async function openRunPullRequest(options: Options & {
   if (existing) return existing
   if (options.allowCreate === false) throw new PublicationError('pull_request_limit')
   try {
-    return await result(await write(() => request(`${path}/pulls`, writeToken, { method: 'POST', body: {
-      title: `${options.identifier}: ${options.title}`.slice(0, 256),
+    return await result(await write(async () => {
+      if (visualEvidence) {
+        const current = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, writeToken))
+        if (current.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+      }
+      return request(`${path}/pulls`, writeToken, { method: 'POST', body: {
+      title: visualEvidence ? factoryPullRequestText(options.issueId).title : `${options.identifier}: ${maskCredentials(options.title)}`.slice(0, 256),
       head: options.branch, base: options.baseBranch ?? binding.defaultBranch,
       ...(options.draft ? { draft: true } : {}),
-      body: `${pullRequestBody(undefined, { key: options.identifier, title: options.title, summary: options.summary })}${options.draft ? '\n\nVerification was not run: no repository verification command is configured. This draft needs human review.' : ''}\n\n${marker}`,
-    } })))
+      body: (() => {
+        const prose = visualEvidence ? factoryPullRequestText(options.issueId)
+          : { key: options.identifier, title: maskCredentials(options.title), summary: maskCredentials(options.summary) }
+        const body = `${pullRequestBody(undefined, prose)}${options.draft ? '\n\nVerification was not run: no repository verification command is configured. This draft needs human review.' : ''}\n\n${marker}`
+        const value = visualEvidence ? bodyWithPublicationEvidence(body, options.issueId, visualEvidence) : body
+        if (!value) throw new PublicationError('pull_request_conflict')
+        return value
+      })(),
+      } })
+    }))
   } catch (error) {
     // A timeout or 422 may mean GitHub accepted another concurrent attempt.
     const created = await find()
