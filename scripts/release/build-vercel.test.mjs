@@ -242,3 +242,13 @@ test('both selected migration targets fail early with only a key and fixed code'
     }
   }
 })
+
+
+test('a real deletion-fence SQLSTATE is retained without exposing its account or database text', () => {
+  const log = Buffer.from("migrate: starting\nerror: private-account-fixture account_deletion_pending\n  code: '55000',\n")
+  const evidence = buildFailureEvidence({ result: { status: 1 }, sourceSha: 'a'.repeat(40), overlaySha: 'b'.repeat(40), log })
+  assert.equal(evidence.lastObservedPhase, 'migrate')
+  assert.equal(evidence.databaseCode, '55000')
+  assert.equal(JSON.stringify(evidence).includes('private-account-fixture'), false)
+  assert.equal(JSON.stringify(evidence).includes('account_deletion_pending'), false)
+})
