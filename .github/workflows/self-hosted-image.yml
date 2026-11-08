@@ -79,10 +79,12 @@ jobs:
           docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})'
           node --import tsx scripts/acceptance/self-hosted-daemon.mjs
       - name: Install the native desktop runtime dependencies
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           pnpm exec playwright install --with-deps chromium
           sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
-          node apps/desktop/node_modules/electron/install.js
+          node apps/desktop/scripts/install-electron.mjs
       - name: Build one packaged acceptance desktop with an independent default server
         run: |
           pnpm --filter @mikka/desktop build
