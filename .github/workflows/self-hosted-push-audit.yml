@@ -1,0 +1,47 @@
+name: Self-hosted push configuration audit
+on:
+  push:
+    branches: [ops/self-hosted-push-audit-20261108]
+permissions:
+  contents: read
+jobs:
+  audit:
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-push-audit-20261108'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Read existing metadata credential
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Read existing EAS operator credential
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: EXPO_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Read provider settings only, without push or mutation
+        run: node scripts/ops/self-hosted-push-audit.mjs
