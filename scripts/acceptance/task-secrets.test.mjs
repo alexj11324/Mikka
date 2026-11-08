@@ -102,6 +102,183 @@ test('receipt projection drops arbitrary credentials/URLs and refuses unconfirme
   }
 })
 
+/** Exercise the real driver and its observeChunks callback; only external
+ * account/provider transports and the live delivery of one snapshot are fake. */
+async function normalCloudCase(changeDetail = () => {}, releaseAttestation) {
+  const uuid = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const ownerId = 'synthetic-smoke-owner', adminId = 'synthetic-team-admin', workspaceId = uuid(1), botId = uuid(2)
+  const profileId = uuid(3), issueId = uuid(4), deviceId = uuid(5), connectionId = uuid(6)
+  const email = 'acceptance+mikka-smoke@example.invalid', model = 'gpt-6-luna', digest = '6'.repeat(64)
+  const source = { kind: 'subscription', connectionId }, calls = []
+  let profile, issue, bot, machineEnded = false, observed = false
+  const workspace = { currentUserId: ownerId, workspace: { id: workspaceId, kind: 'team' }, role: 'member',
+    choices: [{ id: workspaceId, kind: 'team' }],
+    members: [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] }
+  const client = {
+    clear() {},
+    async request(path) {
+      calls.push(path)
+      if (path === '/api/auth/sign-in/email' || path === '/api/auth/sign-out') return new Response('{}')
+      assert.equal(path, `/api/coordinator/stream?botId=${botId}&wait=1`)
+      return new Response([{ type: 'tool', name: 'dispatch_run', state: 'running', call: 'dispatch', input: issueId },
+        { type: 'tool', name: 'dispatch_run', state: 'done', call: 'dispatch' }].map(item => JSON.stringify(item)).join('\n') + '\n',
+      { headers: { 'content-type': 'application/x-ndjson' } })
+    },
+    async json(path, init) {
+      calls.push(path)
+      if (path === '/api/version') return { build: config.sourceCommit }
+      if (path === '/api/auth/get-session') return { user: { id: ownerId, email } }
+      if (path === '/api/workspace' || path === `/api/workspace?workspace=${workspaceId}`) return workspace
+      if (path === '/api/rpc') {
+        assert.deepEqual(JSON.parse(init.body), { version: 1, action: 'workspace.switchWorkspace', args: [workspaceId] })
+        return { version: 1, ok: true, result: { ok: true, data: { workspaceId } } }
+      }
+      if (path === `/api/settings/api-keys?workspace=${workspaceId}`) return { apiKeyAfterQuota: false }
+      if (path === '/api/integrations/github') return { viewerId: ownerId, connected: true, repositories: [{ fullName: config.repository }] }
+      if (path.startsWith('/api/issues/search?')) return { items: [], truncated: false, nextCursor: null }
+      if (path === `/api/bots/${botId}`) return bot
+      if (path === '/api/factory/agent-profiles') {
+        profile = { ...JSON.parse(init.body).profile, id: profileId, version: 1, digest }
+        return { profile }
+      }
+      if (path === `/api/factory/agent-profiles/${profileId}`) { assert.equal(init.method, 'DELETE'); return {} }
+      if (path === `/api/runs/${runId}/evidence`) return { run: {
+        id: runId, issueId, harness: 'codex', model, credentialType: 'subscription', subscriptionRoute: 'codex_cli',
+        agentProfile: { profileId, version: 1, digest, source: 'explicit' },
+        executionIdentity: { version: 1, requester: ownerId, executionPrincipal: ownerId, botId, botOwner: ownerId,
+          outputOwner: ownerId, workspaceId, personalResourcePolicy: 'requester_only',
+          billingAccount: { model: { kind: 'subscription', ownerId: adminId, resourceId: connectionId },
+            runtime: { kind: 'e2b', ownerId, resourceId: ownerId } },
+          resourceBindings: [{ kind: 'device', id: deviceId, ownerId, access: 'owner' },
+            { kind: 'subscription', id: connectionId, ownerId: adminId, access: 'workspace_share', revision: '1' }] },
+      } }
+      if (path === `/api/factory/tasks?issueId=${issueId}`) return { issueId, tasks: [] }
+      if (path === `/api/threads/${runId}/machine`) { machineEnded = true; return { runId, state: 'ended' } }
+      assert.fail(`unexpected json path: ${path}`)
+    },
+    async rpc(name, args) {
+      calls.push(name)
+      if (['task-runs.pollThreads', 'task-runs.pollTaskRuns'].includes(name)) return { items: [] }
+      if (name === 'model-order.getModelOrder') return { candidates: [{ harness: 'codex', model, source, credentialOwnerId: adminId }] }
+      if (name === 'bots.createBot') { bot = { ...args[0], id: botId }; return bot }
+      const selected = { id: connectionId, provider: 'codex', modelId: model }
+      if (name === 'execution-settings.getBotModelMenu') return { groups: [{ kind: 'subscription', provider: 'codex', owner: adminId, options: [selected] }] }
+      if (name === 'execution-settings.chooseBotModel') return { current: { ...selected, kind: 'subscription', chosen: true, available: true } }
+      if (name === 'issues.saveIssue') { issue = { ...args[0], id: issueId, revision: 1 }; return { issue } }
+      if (['coordinator.sendCoordinatorMessage', 'coordinator.stopCoordinatorTurn', 'issue-operations.setIssueDeleted'].includes(name)) return {}
+      if (name === 'agents.pollIssueThreads') return { threads: [{ id: runId, ownedByCurrentUser: true }] }
+      if (name === 'agents.getThreadMachine') return { kind: 'cloud', state: machineEnded ? 'ended' : 'running',
+        cloud: machineEnded ? null : { template: env.EXPECTED_CODEX_TEMPLATE, sandboxId: 'synthetic-task-vm' } }
+      if (name === 'agents.getIssueThread') return { thread: { id: runId, status: 'stopped', attempts: [{ runId, status: 'stopped' }] } }
+      if (name === 'issues.getIssue') return { issue }
+      if (name === 'workspace.switchWorkspace') return { workspaceId }
+      assert.fail(`unexpected rpc: ${name}`)
+    },
+  }
+  const options = readOptions(['--execute'], { ...env, TASK_SECRETS_MODEL_CASE: 'codex' })
+  if (releaseAttestation) options.releaseAttestation = releaseAttestation
+  const report = await runTaskSecretsAcceptance(options, {
+    env: { SMOKE_OWNER_EMAIL: email, SMOKE_OWNER_PASSWORD: 'synthetic-test-password' }, sessionClient: () => client,
+    buildBundles: async () => ({ client: { sha256: '7'.repeat(64) } }),
+    createFixture: async () => ({ evidence: { scope: 'synthetic-test-transport' }, fixtureOrigin: config.fixtureOrigin, upstreamOrigin: config.upstreamOrigin,
+      createCase: async id => ({ caseId: id, bootstrapToken: config.bootstrapToken, canarySha256: config.canarySha256, responseSha256: config.responseSha256 }),
+      bind: async (_id, actualRun) => { assert.equal(actualRun, runId) },
+      receipt: async () => ({ runId, issued: true, rotated: true, counts: { protected: 10, public: 10, echo: 1, redirect: 1 } }),
+      deleteCase: async () => {}, close: async () => ({ status: 'passed' }) }),
+    watch: async (_client, record, _timeout, _socket, now, _cleanupIds, hooks) => {
+      observed = true
+      const text = issue.content.content[0].content[0].text, command = text.slice(text.indexOf("python3 - <<'MIKKA_1712_PY'"))
+      const receipt = goodReceipt(); receipt.caseId = record.caseId
+      receipt.github.branch = `acceptance/1712/${record.caseId}/codex`; receipt.github.filename = `acceptance-1712-${record.caseId}.txt`
+      const detail = { thread: { id: runId, status: 'stopped' }, chunks: [
+        { chunk: { type: 'data-run-stage', data: { stage: 'agent_start', ms: 10, ok: true } } },
+        ...toolPair(receipt, command).chunks,
+        { chunk: { type: 'text-delta', delta: `STARTUP_OK_${record.sampleId}` } },
+      ] }
+      changeDetail(detail, record, now())
+      if (!await hooks.observe(detail)) throw Error('startup_ended_before_execution_proof')
+    },
+  })
+  assert.equal(observed, true, JSON.stringify(report))
+  assert.equal(report.cleanup.errors.length, 0)
+  assert.equal(report.cases[0].cleanup.status, 'passed')
+  assert.ok(!calls.some(name => name.startsWith('workspace-secrets.') || name.startsWith('user-secrets.')))
+  return report
+}
+
+test('normal cloud execution completes without opt-in diagnostic receipts and keeps its native proofs', async () => {
+  const report = await normalCloudCase()
+  assert.equal(report.status, 'scoped_external_acceptance_passed', JSON.stringify(report))
+  const sample = report.cases[0]
+  assert.equal(sample.native.github.cleanup, true)
+  assert.equal(sample.native.http.samples, 10)
+  assert.equal(sample.execution.credentialType, 'subscription')
+  assert.equal(sample.machine.template, env.EXPECTED_CODEX_TEMPLATE)
+  assert.equal(sample.lastStatus, 'stopped')
+  assert.equal(sample.runtimeTiming, undefined)
+  assert.deepEqual(sample.runtimeDiagnostics, { enabledByDriver: false, required: false, executionGateUsed: false, authorizationCensusUsed: false, status: 'not_observed' })
+  assert.deepEqual(report.authorizationCensus, { source: 'unavailable', reason: 'release_attestation_not_supplied', taskCases: 'not_measured' })
+})
+
+test('optional diagnostics cannot replace the native tool, post-tool reply, matching terminal run or external proof', async () => {
+  const changes = {
+    missingTool: detail => { detail.chunks = detail.chunks.filter(item => !item.chunk.type.startsWith('tool-')) },
+    missingReply: detail => { detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta') },
+    replyBeforeTool: detail => { detail.chunks.splice(1, 0, detail.chunks.pop()) },
+    notTerminal: detail => { detail.thread.status = 'running' },
+    failed: detail => { detail.thread.status = 'failed' },
+    cancelled: detail => { detail.thread.status = 'cancelled' },
+    succeeded: detail => { detail.thread.status = 'succeeded' },
+    completed: detail => { detail.thread.status = 'completed' },
+    foreignTerminal: detail => { detail.thread.id = caseId },
+    missingNativeProof: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output = 'done' },
+    missingAgentStart: detail => { detail.chunks.shift() },
+  }
+  for (const [name, change] of Object.entries(changes)) {
+    const report = await normalCloudCase(change)
+    assert.equal(report.status, 'blocked', name)
+    assert.equal(report.cases[0].failure, 'startup_ended_before_execution_proof', name)
+    assert.equal(report.authorizationCensus.source, 'unavailable', name)
+  }
+})
+
+test('invalid, truncated and failed optional runtime diagnostics never supply an authorization census', async () => {
+  for (const kind of ['invalid', 'truncated', 'failed']) {
+    const report = await normalCloudCase((detail, record, now) => {
+      const timing = kind === 'invalid' ? { complete: true, extraRemoteCalls: 0 } : {
+        version: 1, source: 'http_server_link', window: 'run_launch_to_agent_exit', scope: 'daemon_http_server_link_and_task_fetch',
+        allFirstPartyHttpComplete: false, runIdHash: record.runIdHash, harness: record.harness,
+        startedAt: now - 100, endedAt: now, ms: 100, executionStartMs: 10, executionEndMs: 90,
+        agentAccepted: { kind: 'codex_turn_start_ack', at: now - 90, ms: 10 }, complete: true, truncated: kind === 'truncated',
+        requests: kind === 'failed' ? [{ sequence: 1, endpoint: 'provider_proxy', phase: 'executing', method: 'POST', shared: false,
+          startMs: 20, endMs: 30, ms: 10, outcome: 'ok' }] : [],
+        counts: kind === 'failed' ? [{ endpoint: 'provider_proxy', phase: 'executing', shared: false, started: 1, completed: 1, errors: 0, ms: 10 }] : [],
+        providerOutputChunks: 1, toolCallsStarted: 1, toolCallsCompleted: 1, toolCallsFailed: 0,
+      }
+      detail.chunks.push({ chunk: { type: 'finish', messageMetadata: { mikkaRuntimeTiming: timing } } })
+    })
+    const sample = report.cases[0]
+    assert.equal(sample.runtimeDiagnostics.status, 'unusable', kind)
+    assert.equal(sample.runtimeDiagnostics.authorizationCensusUsed, false, kind)
+    assert.equal(sample.runtimeEvidence, undefined, kind)
+    assert.equal(report.authorizationCensus.source, 'unavailable', kind)
+    assert.equal(report.authorizationCensus.extraRemoteCalls, undefined, kind)
+  }
+})
+
+test('only an official release attestation references its candidate census, without claiming measurements for native cases', async () => {
+  // readOptions/assertDriverAttestation verify this controlled object before
+  // the production entry point; here exercise its report attribution only.
+  const release = { sourceCommit: config.sourceCommit, upstream: { runId: 123, runAttempt: 1, workflowId: 456 },
+    artifact: { id: 789, sha256: 'a'.repeat(64) }, reportSha256: 'b'.repeat(64) }
+  const report = await normalCloudCase(undefined, release)
+  assert.deepEqual(report.authorizationCensus, { source: 'pinned_official_release', scope: 'candidate_subscription_execution',
+    samplesPerHarness: 1, taskCases: 'not_measured', sourceCommit: release.sourceCommit, upstream: release.upstream,
+    artifactId: release.artifact.id, reportSha256: release.reportSha256 })
+  assert.equal(report.authorizationCensus.extraRemoteCalls, undefined)
+  assert.equal(report.cases[0].runtimeDiagnostics.authorizationCensusUsed, false)
+})
+
 test('the finite canary scan returns counts and booleans, never matching or unrelated file/environment values', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mikka-1712-scan-test-'))
   try {

@@ -196,6 +196,14 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
     startedAt: new Date(now()).toISOString(), mode: options.execute ? 'execute' : 'preflight', status: 'running',
     productionCanary: productionCanaryPlan(), productionStoreMutated: false,
     externalEvidenceStillRequired: ['production_claim_store_canary', 'PostHog_canary_absence', 'screenshots_checkpoints_templates', 'Factory_full_acceptance'],
+    // Only the exact official publication has the trusted-host diagnostic
+    // opt-in and strict zero-extra-authorization gate. These are references to
+    // its one sample per harness, never measurements of the cases below.
+    authorizationCensus: options.releaseAttestation ? {
+      source: 'pinned_official_release', scope: 'candidate_subscription_execution', samplesPerHarness: 1, taskCases: 'not_measured',
+      sourceCommit: options.releaseAttestation.sourceCommit, upstream: options.releaseAttestation.upstream,
+      artifactId: options.releaseAttestation.artifact.id, reportSha256: options.releaseAttestation.reportSha256,
+    } : { source: 'unavailable', reason: 'release_attestation_not_supplied', taskCases: 'not_measured' },
     ...(options.releaseAttestation ? { releaseAttestation: options.releaseAttestation } : {}), cases: [], cleanup: { errors: [] } }
   if (options.productionCanary) {
     report.status = 'blocked'; report.failure = 'task_secrets_production_canary_requires_review'; return report
@@ -250,7 +258,11 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
       const caseId = randomUUID(), record = { caseId, sampleId: caseId, harness: item.harness, requestedModel: item.model,
         title: `测试 1712 ${caseId} ${item.harness}`, sourceCommit: options.sourceCommit, workerSha: options.workerSha,
         workerSourceCommit: options.workerSourceCommit, requireReply: true, minToolCalls: 1, requireReplyAfterTool: true,
-        requireRuntimeReceipt: true, requireTerminal: true, stages: [], status: 'running', cleanup: { status: 'running', errors: [] },
+        // Normal write-capable cloud tasks have no diagnostic opt-in. The
+        // native command, reply, terminal state and external proofs stay required.
+        requireRuntimeReceipt: false, requireTerminal: true,
+        runtimeDiagnostics: { enabledByDriver: false, required: false, executionGateUsed: false, authorizationCensusUsed: false, status: 'not_observed' },
+        stages: [], status: 'running', cleanup: { status: 'running', errors: [] },
         remoteCleanupTarget: { repository: REPOSITORY, branch: `acceptance/1712/${caseId}/${item.harness}`, mergeAuthorized: false } }
       report.cases.push(record)
       let fixtureCaseCreated = false
@@ -288,13 +300,23 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
           const text = JSON.stringify(detail.chunks ?? [])
           check(![...text.matchAll(/mikka1712s_[a-f0-9]{64}/g)].some(match => hash(match[0]) === state.canarySha256), 'canary_visible')
           const complete = observeChunks(record, detail, now())
+          if (record.runtimeTimingStatus) {
+            record.runtimeDiagnostics.observedStatus = record.runtimeTimingStatus
+            record.runtimeDiagnostics.status = record.runtimeTimingStatus === 'complete' && record.runtimeEvidence?.status === 'passed'
+              ? 'available_not_used_for_authorization_census' : 'unusable'
+          }
+          // observeChunks may retain an earlier valid timing on a replay. Keep
+          // those closed observations, but never its optional derived census.
+          delete record.runtimeEvidence
           record.native = nativeReceipt(detail, record, command)
           if (record.native && !record.machine) {
             const machine = await client.rpc('agents.getThreadMachine', [record.issueId, record.runId])
             check(machine.kind === 'cloud' && machine.cloud?.template === options.templates[item.harness], 'runtime')
             record.machine = { template: machine.cloud.template, sandboxIdHash: hash(machine.cloud.sandboxId).slice(0, 16) }
           }
-          return complete && Boolean(record.native)
+          // A normal no-submit CLI turn ends as stopped. The owner projection
+          // does not expose its stop reason; the native proofs remain required.
+          return complete && Boolean(record.native) && record.lastStatus === 'stopped'
         } })
         await subscriptionProof(client, record, scope, profile)
         record.fixtureReceipt = await fixture.receipt(caseId)

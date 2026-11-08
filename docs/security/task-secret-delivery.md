@@ -296,6 +296,16 @@ public unauthenticated route on the same fixture, not a production vendor or
 native-model before/after measurement. Ambiguous Git cleanup retains its exact
 target and Mikka Issue for recovery instead of deleting an unverified resource.
 
+Ordinary writable task cases do not enable the opt-in runtime diagnostic
+collector. Their native tool, post-tool reply, terminal state, subscription,
+worker/template, Git and HTTP proofs remain required. Missing diagnostics are
+not a zero-RPC measurement; malformed or truncated diagnostics are unusable.
+These no-submit cases require the ordinary thread to end as `stopped` with all
+native proofs; they do not assert an unexposed stop reason or Factory completion.
+The automatic report references the exact official release's strict
+authorization census, with one candidate subscription sample per harness.
+Manual runs without that release attestation report this census as unavailable.
+
 A separate serialized job reuses the existing `run-observability` driver and
 its original ACME demo account for the full Factory Artifact flow: execution,
 independent review, exact artifact bytes and normal Owner acceptance. It uses
