@@ -51,7 +51,7 @@ async function run(env) {
   const report = { source: plan.source, imageDigest: plan.imageDigest, cloudSource: plan.cloudSource, workflowSource: env.GITHUB_SHA,
     started: new Date().toISOString(), stage: 'guards', checks: {}, screenshots: [], cleanup: {} }
   const project = `closeout-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`
-  let tunnel, browser, context, local, serverId, cloudUserId, cloudWorkspaceId, cloudCsrf, localOrigin
+  let tunnel, browser, context, local, serverId, cloudUserId, cloudWorkspaceId, cloudCsrf, localOrigin, modelBotId, modelLive
   let registered = false
   let interrupted = false, cleaning = false
   const signal = () => {
@@ -118,6 +118,24 @@ async function run(env) {
     context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' })
     local = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' })
     const page = await local.newPage(), cloud = await context.newPage()
+    const observedPages = [page, cloud]
+    for (const target of observedPages) {
+      target.on('request', request => {
+        const u = new URL(request.url())
+        if (u.origin !== plan.publicOrigin || u.pathname !== '/mikka/cloud/oauth/authorize' || request.method() !== 'POST') return
+        const form = new URLSearchParams(request.postData() ?? '')
+        report.consentPosts ??= []
+        report.consentPosts.push({ approve: ['true', 'false'].includes(form.get('approve')) ? form.get('approve') : form.has('approve') ? 'other' : 'missing',
+          csrfPresent: Boolean(form.get('csrf_token')), requestIdPresent: Boolean(form.get('request_id')),
+          workspaceMatches: form.get('workspace_id') === cloudWorkspaceId })
+      })
+      target.on('response', response => {
+        const u = new URL(response.url())
+        if (response.request().method() === 'POST' && u.origin === plan.publicOrigin && u.pathname === '/mikka/cloud/oauth/authorize') {
+          report.consentStatuses ??= []; report.consentStatuses.push(response.status())
+        }
+      })
+    }
     const screenshot = async (target, name) => {
       check(!interrupted, 'INTERRUPTED')
       check(/^[a-z0-9-]+$/.test(name), 'ARTIFACT_NAME')
@@ -130,6 +148,15 @@ async function run(env) {
     const both = async (target, url, name, prepare) => {
       for (const colorScheme of ['light', 'dark']) {
         await target.emulateMedia({ colorScheme }); await target.goto(url, { waitUntil: 'networkidle' })
+        if (new URL(url).origin === localOrigin) {
+          const skip = target.getByRole('button', { name: /^(Skip setup|跳过设置)$/ })
+          if (await skip.isVisible()) {
+            await skip.click(); await skip.waitFor({ state: 'hidden' })
+            await target.goto(url, { waitUntil: 'networkidle' })
+          }
+          if (url.includes('section=cloud')) await target.locator('#cloud-heading').waitFor()
+          if (url.includes('section=account')) await target.locator('#personal-cloud-heading').waitFor()
+        }
         if (prepare) await prepare(target)
         await screenshot(target, `${name}-${colorScheme}`)
       }
@@ -188,27 +215,90 @@ async function run(env) {
       await cloud.locator('select[name=workspace_id]').selectOption(cloudWorkspaceId)
       await screenshot(cloud, `consent-${colorScheme}`)
       if (colorScheme === 'dark') {
+        report.stage = 'consent-oauth-signin'
         // OAuth's callback belongs to the self-hosted user's genuine browser session.
         // Open the same authorize request in that context, then perform a normal
         // cloud email sign-in there instead of fabricating or copying cookies.
         const login = await local.request.post(`${plan.publicOrigin}/mikka/api/auth/sign-in/email`, {
           data: { email: env.SMOKE_OWNER_EMAIL, password: env.SMOKE_OWNER_PASSWORD }, headers: { Origin: plan.publicOrigin } })
         check(login.ok(), 'OAUTH_SHARED_SIGN_IN')
+        report.stage = 'consent-oauth-workspace'
         await selectTeamWorkspace({ ownerId: cloudUserId, json: async (path, body) => {
           const r = await local.request.fetch(`${plan.publicOrigin}${path}`, { method: body ? 'POST' : 'GET',
             ...(body ? { data: body, headers: { Origin: plan.publicOrigin,
               ...(path === '/mikka/api/rpc' ? { 'x-mikka-rpc': '1' } : {}) } } : {}) })
           check(r.ok(), 'OAUTH_TEAM'); return r.json()
         } })
+        report.stage = 'consent-oauth-render'
         await page.goto(authorize, { waitUntil: 'networkidle' })
         await page.locator('select[name=workspace_id]').selectOption(cloudWorkspaceId)
+        report.stage = 'consent-approve'
         await page.getByRole('button', { name: /^(Allow|允许)$/ }).click()
+        report.stage = 'consent-callback'
         await page.waitForURL(u => u.origin === localOrigin, { timeout: 30_000 })
       }
     }
     check((await localApi('/api/cloud/status')).personal.connected, 'PERSONAL_BOUND')
     report.checks.personalBound = true
+    report.fixtureServerId = serverId
     await both(page, `${localOrigin}/mikka/en/settings?section=account`, 'personal-connected')
+    if (env.CLOSEOUT_MODELS === '1') {
+      report.stage = 'hosted-coordinator'
+      const { decode } = await import('../../lib/desktop-rpc/wire.ts')
+      const usage = async () => {
+        const response = await cloudApi('/mikka/api/rpc', { version: 1, action: 'billing.getHostedUsage', args: [cloudWorkspaceId] })
+        check(response.version === 1 && response.ok === true, 'BILLING_RPC')
+        const value = decode(response.result)
+        check(!value.error && value.workspaceId === cloudWorkspaceId && Array.isArray(value.recent), 'BILLING_WORKSPACE')
+        return value
+      }
+      const before = await usage()
+      check(before.state === 'ready' && before.balance.verified === true && before.balance.free + before.balance.purchased >= 100_000,
+        'BOUND_PAYER_NOT_READY')
+      const priorUsage = new Set(before.recent.map(r => r.id))
+      const workspace = await localApi('/api/workspace')
+      const { socketEvents } = await import('../acceptance/self-hosted-services.mjs')
+      const ticket = await localApi(`/api/live/ticket?workspace=${workspace.workspace.id}`)
+      const liveURL = new URL(ticket.url)
+      check(liveURL.origin === localOrigin.replace('https:', 'wss:') && liveURL.pathname.startsWith('/mikka/v1/live/'), 'LOCAL_LIVE_TARGET')
+      modelLive = socketEvents(liveURL.href, ticket.protocol); await modelLive.ready
+      await modelLive.next(event => event.type === 'live_ready' && event.version === 2)
+      const bot = await localApi('/api/bots', { name: `Cloud reply ${env.GITHUB_RUN_ID}` }, [201])
+      modelBotId = bot.id
+      check(bot.workspaceId === workspace.workspace.id, 'MODEL_BOT_WORKSPACE')
+      const hostedId = '00000000-0000-0000-0000-000000000000'
+      const menu = await localApi(`/api/mobile/model?bot=${bot.id}`)
+      check(menu.groups.some(group => group.options?.some(option => option.id === hostedId && option.hostedSource === 'cloud')),
+        'CLOUD_DEFAULT_MODEL_MISSING')
+      const pick = await local.request.put(`${localOrigin}/mikka/api/mobile/model`, {
+        data: { bot: bot.id, id: hostedId }, headers: { Origin: localOrigin } })
+      check(pick.ok() && (await pick.json()).current?.id === hostedId, 'CLOUD_DEFAULT_MODEL_PICK')
+      await localApi('/api/mobile/chat', { botId: bot.id, text: 'Reply only CLOUD_CLOSEOUT_OK. Do not call any tools.', submissionId: randomUUID() }, [202])
+      const deadline = Date.now() + 120_000
+      for (;;) {
+        const chat = await localApi(`/api/mobile/chat?bot=${bot.id}`)
+        check(chat.enabled === true && !chat.error && !chat.failure, 'CLOUD_COORDINATOR_REFUSED')
+        if (!chat.working && chat.items?.some(item => item.from === 'coordinator' && item.text?.trim() === 'CLOUD_CLOSEOUT_OK')) break
+        check(Date.now() < deadline, 'CLOUD_COORDINATOR_TIMEOUT')
+        await modelLive.next(event => event.kind === 'bot_chat' && event.id === bot.id, deadline - Date.now())
+      }
+      await modelLive.close(); modelLive = null
+      const after = await usage()
+      const fresh = after.recent.filter(row => !priorUsage.has(row.id))
+      check(fresh.length > 0 && fresh.length <= 8 && fresh.every(row => row.model === 'deepseek/deepseek-v4.1-flash'
+        && row.state === 'settled' && Number.isSafeInteger(Number(row.costMicroUsd)) && Number(row.costMicroUsd) > 0), 'HOSTED_SETTLEMENT')
+      report.checks.hostedCoordinator = { replied: true, model: 'deepseek/deepseek-v4.1-flash', billingWorkspaceMatchesBinding: true,
+        controlWorkspace: 'shared-team', payerKind: 'existing-personal-binding', modelCalls: fresh.length,
+        settledMicroUsd: fresh.reduce((sum, row) => sum + Number(row.costMicroUsd), 0),
+        inputTokens: fresh.reduce((sum, row) => sum + Number(row.inputTokens), 0),
+        outputTokens: fresh.reduce((sum, row) => sum + Number(row.outputTokens), 0) }
+      const billing = await localApi('/api/cloud/models/billing')
+      const billingURL = new URL(billing.url)
+      check(billingURL.origin === plan.publicOrigin && billingURL.searchParams.get('workspace') === cloudWorkspaceId
+        && billingURL.searchParams.get('section') === 'billing', 'CLOUD_BILLING_LINK')
+      await both(cloud, billingURL.href, 'hosted-billing')
+      await selectTeamWorkspace({ ownerId: cloudUserId, json: cloudApi })
+    }
     report.stage = 'management'
     const manage = `${plan.publicOrigin}/mikka/cloud/manage?serverId=${encodeURIComponent(serverId)}`
     await both(cloud, manage, 'connections', async p => {
@@ -319,6 +409,11 @@ async function run(env) {
     process.exitCode = 1
   } finally {
     cleaning = true
+    if (modelBotId && local) {
+      try { await localApi('/api/mobile/chat/stop', { botId: modelBotId }); report.cleanup.coordinatorStopped = true }
+      catch { report.cleanup.coordinatorStopped = false; process.exitCode = 1 }
+    }
+    if (modelLive) { try { await modelLive.close() } catch {} }
     if (registered && local) {
       try { await localApi('/api/cloud/disconnect', { action: 'server' }); registered = false; report.cleanup.serverDisconnected = true }
       catch { report.cleanup.serverDisconnected = false; process.exitCode = 1 }
@@ -339,7 +434,8 @@ async function run(env) {
     await rm(root, { recursive: true, force: true })
     report.finished = new Date().toISOString()
     await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
-    console.log(JSON.stringify({ stage: report.stage, failure: report.failure, failureDetail: report.failureDetail, checks: report.checks, cleanup: report.cleanup }))
+    console.log(JSON.stringify({ stage: report.stage, failure: report.failure, failureDetail: report.failureDetail,
+      consentPosts: report.consentPosts, consentStatuses: report.consentStatuses, checks: report.checks, cleanup: report.cleanup }))
   }
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
