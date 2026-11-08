@@ -9,6 +9,8 @@ import tasks from './tasks.json' with { type: 'json' }
 
 export const sourceId = file => `source:${file}`
 export const taskId = key => `ci-${key}`
+// Actions uses bash -e -o pipefail. Keep that contract inside Nx too.
+export const strictCommand = command => `bash -e -o pipefail -c '${command.replaceAll("'", "'\"'\"'")}'`
 export const dbId = script => `db-${script.replaceAll(':', '-')}`
 const code = /\.(?:[cm]?[jt]sx?)$/
 const testFile = /(?:\.test\.|\.spec\.|\/test[s]?\/)/
@@ -90,6 +92,6 @@ export function buildGraph(root = process.cwd()) {
     add(pkg.name, { root: pkg.root, tags: ['package'], targets: Object.fromEntries(['test', 'typecheck', 'build'].filter(k => pkg.scripts?.[k]).map(k => [k, { command: `pnpm --filter ${pkg.name} ${k}`, cache: false }])) })
     for (const file of files) if (file.startsWith(`${pkg.root}/`)) edge(pkg.name, sourceId(file))
   }
-  add('ci-tasks', { root: 'scripts/ci', tags: ['scheduler'], targets: Object.fromEntries(Object.entries(tasks).map(([key, task]) => [key, { executor: 'nx:run-commands', cache: false, inputs: [], outputs: [], options: { command: task.command, cwd: '.', env: task.env } }])) })
+  add('ci-tasks', { root: 'scripts/ci', tags: ['scheduler'], targets: Object.fromEntries(Object.entries(tasks).map(([key, task]) => [key, { executor: 'nx:run-commands', cache: false, inputs: [], outputs: [], options: { command: strictCommand(task.command), cwd: '.', env: task.env } }])) })
   return { graph: { nodes, dependencies, externalNodes: {} }, db, unresolved, files }
 }

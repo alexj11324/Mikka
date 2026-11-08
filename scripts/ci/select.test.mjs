@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { select, diffRange, area } from './select.mjs'
-import { buildGraph, dbId, sourceId } from './graph.mjs'
+import { buildGraph, dbId, sourceId, strictCommand } from './graph.mjs'
 import { selectScripts, shardScripts } from '../run-db-tests.mjs'
 
 const change = (file, extra = {}) => ({file, status:'M', mode:'100644', oldMode:'100644', ...extra})
@@ -111,4 +111,11 @@ test('the actual required gate scripts reject unselected failures and selected s
     }
     if(job==='browser-tests') { assert(run({EXPECT_DB:'false',DB_RESULT:'skipped'}));assert(!run({EXPECT_DB:'false',DB_RESULT:'failure'})) }
   }
+})
+
+test('Nx commands retain Actions fail-fast and pipefail, including multiline steps', () => {
+  const result = spawnSync('sh',['-c',strictCommand("printf '%s' 'literal $HOME'\nfalse\necho masked-failure")],{encoding:'utf8'})
+  assert.equal(result.status,1)
+  assert.equal(result.stdout,'literal $HOME')
+  assert.equal(spawnSync('sh',['-c',strictCommand('false | cat')]).status,1)
 })
