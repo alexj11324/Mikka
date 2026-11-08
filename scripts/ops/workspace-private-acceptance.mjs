@@ -9,15 +9,16 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '968076c89b1cfe27b6f257470ea8aa51116b7e33',
-  tree: 'e388db868d5d9a616547a20c1e2d36c8d2b0296a',
+  source: '4ec74d5caae87d20358409b41906091cca33b46f',
+  tree: '6ec1f97897c2db3300286977e041acb43b81a686',
+  workerSha: '3efaf3e00956f2833b9447315404a2e814541c87',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
-    'package.json': 'c758bcb1652dd5fb21a082fba9685c23a34719ea5eaa669b08068dda01b06ccf',
+    'package.json': '0f17119e190637a88295d7b5d50e9b73433c0c3737fc30b8f8ddf766b6d2ee7a',
     'pnpm-lock.yaml': '345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054',
     'pnpm-workspace.yaml': '8977ce9916b92a015e0f4dad1d45bcf51c9427637a5988fcdc585a1a21a0301e',
-    'scripts/e2b/workspace-candidates.py': '6dbe8bdd066b870592ef9090587f70dee979b914c10baa1b01ee6d6a605456ed',
-    'scripts/e2b/workspace-candidates.test.py': 'ba5b9d946df54ade2045ecb9c3a12267cfd97674f4fc86fe0b1455f441da5b3d',
+    'scripts/e2b/workspace-candidates.py': '86021b50c45109d6319b7fcf2e97b3f58e22074596547e728ba338a4023e139b',
+    'scripts/e2b/workspace-candidates.test.py': '7a2443e410b8f03a25ef3dc77f4c8d3bb574c9adc518066c1f393ea0bb153dbf',
     'scripts/e2b/build-template.py': 'efe0a20a73749a06b4e2f20fb4b1c8a1bd99a7b7a4fdae961fee9d410b424d85',
     'scripts/e2b/build-template.test.py': '78e367541f0e6441c60944b107b179b78a75ea754bee0d729df0aa9f5bd4749e',
     'scripts/e2b/official-files.py': '6191212b14205c7cb8043efcfb85eaff05670f8cb65c4c801052cf9d3a28babe',
@@ -51,12 +52,30 @@ const RUNTIME_CODES = ['configuration', 'source', 'candidate', 'scope', 'guard',
   'positive_control', 'raw_exposed', 'outbound', 'dependencies', 'preview', 'authentication', 'http', 'hmr',
   'revoke', 'takeover', 'resume', 'terminal', 'cleanup', 'journal', 'internal']
 const BUILDER_CODES = ['api_key_missing', 'candidate_attempt_already_recorded', 'candidate_build_failed', 'candidate_build_not_ready',
-  'candidate_identity_mismatch', 'candidate_name_mismatch', 'candidate_not_exact_private_template', 'candidate_preflight_failed',
+  'candidate_build_identity_missing', 'candidate_build_status_invalid', 'candidate_identity_mismatch', 'candidate_name_mismatch', 'candidate_not_exact_private_template', 'candidate_preflight_failed',
   'creation_journal_invalid', 'creation_journal_missing', 'operation_failed', 'operation_interrupted', 'output_directory_invalid',
   'output_file_invalid', 'probe_cleanup_incomplete', 'probe_deletion_unconfirmed', 'probe_identity_reused', 'probe_scope_mismatch',
   'provider_http_error', 'resource_identity_invalid', 'sandbox_creation_unconfirmed', 'sandbox_deletion_unconfirmed',
   'sandbox_listing_limit', 'sandbox_scope_mismatch', 'source_checkout_modified', 'source_ref_invalid',
-  'source_ref_not_checkout_head', 'template_cleanup_failed', 'worker_identity_invalid', 'workflow_identity_required']
+  'source_ref_not_checkout_head', 'template_cleanup_failed', 'worker_identity_invalid', 'workflow_identity_required',
+  'template_build_failed', 'template_upload_failed', 'provider_authentication_failed', 'provider_rate_limited',
+  'provider_busy', 'provider_disk_space', 'operation_timeout']
+const BUILDER_ERROR_TYPES = ['CandidateError', 'Exception', 'RuntimeError', 'ValueError', 'TypeError', 'AssertionError',
+  'OSError', 'FileNotFoundError', 'PermissionError', 'FileExistsError', 'JSONDecodeError', 'TimeoutError', 'KeyboardInterrupt',
+  'SystemExit', 'CalledProcessError', 'TimeoutExpired', 'HTTPError', 'URLError', 'BuildException', 'FileUploadException',
+  'SandboxException', 'TemplateException', 'AuthenticationException', 'InvalidArgumentException', 'NotEnoughSpaceException',
+  'NotFoundException', 'TimeoutException', 'RateLimitException', 'ServiceBusyException', 'HTTPStatusError', 'RequestError',
+  'ConnectError', 'ReadError', 'WriteError', 'RemoteProtocolError', 'ConnectTimeout', 'ReadTimeout', 'WriteTimeout',
+  'PoolTimeout', 'UnexpectedStatus']
+const BOOTSTRAP_PHASES = ['validation', 'source', 'node', 'gh', 'dependencies', 'build', 'cli', 'journal', 'desktop', 'finalize']
+const INGRESS_DETAILS = ['listener', 'boot', 'identity', 'state', 'receipt', 'provider', 'command', 'tool', 'backend',
+  'rule_order', 'late_install', 'worker', 'worker_order', 'operation', 'runtime']
+const BUILD_HOST_ERRORS = ['official_cli_kind_invalid', 'official_cli_path_invalid', 'official_cli_baseline_mismatch',
+  'official_cli_missing', 'official_cli_manifest_invalid', 'runtime_cli_missing', 'cli_relocation_invalid',
+  'added_cli_paths_invalid', 'official_cli_changed', 'added_cli_path_invalid', 'official_cli_manifest_untrusted',
+  'runtime_cli_changed', 'runtime_cli_unavailable', 'official_cli_manifest_changed', 'e2b_finalization_policy_invalid',
+  'e2b_certificate_policy_invalid', 'official_conservation_invalid', 'official_manifest_invalid', 'official_files_removed',
+  'official_files_changed', 'e2b_certificate_target_invalid', 'terminal_control_install_refused']
 const BUILD_STAGES = ['identity', 'credential', 'preflight', 'build', 'complete', 'cleanup', 'probe_cleanup',
   ...KINDS.flatMap(kind => ['build', 'private', 'models', 'conservation'].map(prefix => `${prefix}_${kind}`))]
 const RUNTIME_STAGES = ['create', 'identity', 'prelistener_guard', 'initial_ingress', 'gateway_listener_wiring',
@@ -65,6 +84,55 @@ const CLEANUP_OUTCOMES = ['creation_not_requested', 'no_creation_journal', 'crea
   'provider_already_absent', 'provider_kill_acknowledged_and_absent', 'provider_absence_not_confirmed', 'cleanup_failed']
 const FRAMEWORK_FLAGS = ['rawDenied', 'authenticatedHttp', 'assets', 'hotReload', 'crossSiteBootstrap', 'revoked', 'takeoverDenied']
 const FRAMEWORK_VERSIONS = { next: '16.4.1', vite: '8.3.6', react: '19.3.1', 'react-dom': '19.3.1' }
+const exitCode = number => Number.isInteger(number) && number >= -255 && number <= 255 ? number : null
+
+function diagnosticException(value) {
+  return {
+    exceptionChain: (Array.isArray(value?.exceptionChain) ? value.exceptionChain.slice(0, 8) : []).map(row => ({
+      type: one(row?.type, BUILDER_ERROR_TYPES, 'other'), code: one(row?.code, BUILDER_CODES, 'operation_failed'),
+      httpStatus: status(row?.httpStatus), exitCode: exitCode(row?.exitCode),
+    })),
+    exceptionChainTruncated: value?.exceptionChainTruncated === true,
+  }
+}
+
+function buildStatusLookup(value) {
+  if (!value || typeof value !== 'object') return null
+  const matched = value.identityMatched === true
+  return { attempted: value.attempted === true, identityMatched: matched,
+    status: matched ? one(value.status, ['building', 'waiting', 'ready', 'error'], null) : null,
+    step: { phase: matched ? one(value.step?.phase, ['base', 'workdir', 'private_directory', 'copy_runtime', 'official_capture',
+      'bootstrap', 'npm_runtime', 'official_verify', 'worker_user', 'finalize', 'unknown']) : null,
+    index: matched ? count(value.step?.index) : null },
+    exitCode: matched ? exitCode(value.exitCode) : null,
+    exitCodeSource: matched && exitCode(value.exitCode) !== null ? one(value.exitCodeSource, ['provider_reason'], null) : null,
+    reasonLogEntries: matched ? count(value.reasonLogEntries) : null,
+    reasonLogEntriesTruncated: value.reasonLogEntriesTruncated === true,
+    failure: value.failure ? diagnosticException(value.failure) : null }
+}
+
+function buildDiagnostic(value) {
+  if (!value || typeof value !== 'object') return null
+  const events = rows => (Array.isArray(rows) ? rows.slice(0, 64) : []).flatMap(row => {
+    switch (row?.phase) {
+      case 'template_created': return [{ phase: row.phase }]
+      case 'bootstrap': return [{ phase: row.phase, detail: one(row.detail, BOOTSTRAP_PHASES), elapsedMs: count(row.elapsedMs) }]
+      case 'ingress': return [{ phase: row.phase, detail: one(row.detail, INGRESS_DETAILS) }]
+      case 'host_failure': return [{ phase: row.phase, detail: one(row.detail, BUILD_HOST_ERRORS) }]
+      case 'official_capture': return [{ phase: row.phase, entries: count(row.entries) }]
+      default: return []
+    }
+  })
+  return {
+    ...diagnosticException(value),
+    statusLookup: buildStatusLookup(value.statusLookup),
+    buildLogs: Object.fromEntries(KINDS.filter(kind => value.buildLogs?.[kind]).map(kind => {
+      const row = value.buildLogs[kind]
+      return [kind, { entries: count(row.entries), ignoredLines: count(row.ignoredLines), oversizedEntries: count(row.oversizedEntries),
+        truncated: row.truncated === true, events: events(row.events) }]
+    })),
+  }
+}
 
 export function assertSourceIdentity({ source, tree, dirty, opsDirty, files }) {
   check(source === P0.source && tree === P0.tree && dirty === false && opsDirty === false
@@ -90,6 +158,10 @@ async function verifySources(directory, env = process.env) {
 
 export function assertDependencies(versions) {
   check(Object.entries(P0.sdks).every(([key, value]) => versions?.[key] === value), 'workspace_dependency_refused')
+}
+
+export function assertWorkerIdentity(workerSha) {
+  check(workerSha === P0.workerSha, 'workspace_worker_refused')
 }
 
 function scopeMatches(value, context) {
@@ -183,7 +255,7 @@ function journalEvidence(context, builder, journals, candidates) {
 /** Summarization consumes only fixed-source receipts and emits a closed schema;
  * arbitrary SDK text, report fields, cookie/header values and URLs never copy. */
 export function summarizeAcceptance(context, input) {
-  check(SHA.test(context.opsSource) && SHA.test(context.workerSha)
+  check(SHA.test(context.opsSource) && context.workerSha === P0.workerSha
     && /^[1-9][0-9]*$/.test(context.runId) && /^[1-9][0-9]*$/.test(context.runAttempt), 'workspace_receipt_context')
   const { buildReport, candidates, builderJournal, templateCleanups = [], vmCleanup, runtime = {}, journals = {}, outcomes = {} } = input
   const buildPassed = scopeMatches(buildReport?.identity, context) && buildReport.status === 'passed' && buildReport.stage === 'complete'
@@ -238,7 +310,8 @@ export function summarizeAcceptance(context, input) {
     [key, one(outcomes[key], ['success', 'failure', 'cancelled', 'skipped'])]))
   return { version: 1, sourceCommit: P0.source, sourceTree: P0.tree, ...context, scope: 'private_derived_candidates_only',
     productionTaskAuthorityTested: false, subscriptionsTested: false, agentRootIsolationProven: false,
-    build: { passed: !!buildPassed, status: one(buildReport?.status, ['passed', 'failed']), stage: one(buildReport?.stage, BUILD_STAGES), code: one(buildReport?.code, BUILDER_CODES, null) },
+    build: { passed: !!buildPassed, status: one(buildReport?.status, ['passed', 'failed']), stage: one(buildReport?.stage, BUILD_STAGES),
+      code: one(buildReport?.code, BUILDER_CODES, null), diagnostic: buildDiagnostic(buildReport?.diagnostic) },
     candidates: Object.fromEntries(KINDS.map(kind => { const row = candidates?.templates?.[kind]
       return [kind, { baseTemplate: one(row?.baseTemplate, KINDS), templateId: boundedId(row?.templateId), buildId: boundedId(row?.buildId),
         ...flags(row, ['preinstalled', 'privateVerified']), conservation: conservationEvidence(row?.conservation) }]
@@ -281,13 +354,13 @@ async function main([operation, sourceDirectory, ...extra]) {
     check(['pause', 'connect'].every(name => typeof sdk.Sandbox.prototype[name] === 'function')
       && ['list', 'getInfo', 'kill', 'create'].every(name => typeof sdk.Sandbox[name] === 'function') && Socket.OPEN === 1, 'workspace_sdk_shape_refused')
     const workerSha = execFileSync(python, ['scripts/e2b/build-template.py', '--worker-hash', '--source-ref', P0.source], { cwd: directory, encoding: 'utf8' }).trim()
-    check(SHA.test(workerSha), 'workspace_worker_refused')
+    assertWorkerIdentity(workerSha)
     await save(resolve(evidence, 'source.json'), { ...source, workerSha, versions })
     console.log(JSON.stringify({ ...source, workerSha, versions })); return
   }
   const saved = await optionalJson(resolve(evidence, 'source.json'))
   check(saved?.sourceCommit === P0.source && saved.sourceTree === P0.tree && saved.opsSource === source.opsSource
-    && saved.runId === source.runId && saved.runAttempt === source.runAttempt && SHA.test(saved.workerSha ?? ''), 'workspace_saved_source_refused')
+    && saved.runId === source.runId && saved.runAttempt === source.runAttempt && saved.workerSha === P0.workerSha, 'workspace_saved_source_refused')
   const base = resolve(process.env.RUNNER_TEMP, 'workspace-private'), builds = resolve(base, 'candidates'), runtime = resolve(base, 'runtime')
   const names = await readdir(builds).catch(error => { if (error.code === 'ENOENT') return []; throw error })
   const cleanupNames = names.filter(name => /^cleanup(?:-(?:[2-9]|[1-9][0-9]+))?\.json$/.test(name))

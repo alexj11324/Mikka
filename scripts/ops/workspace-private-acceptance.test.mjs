@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
-import { P0, assertDependencies, assertSourceIdentity, summarizeAcceptance } from './workspace-private-acceptance.mjs'
+import { P0, assertDependencies, assertSourceIdentity, assertWorkerIdentity, summarizeAcceptance } from './workspace-private-acceptance.mjs'
 
-const context = { opsSource: 'a'.repeat(40), workerSha: 'b'.repeat(40), runId: '123', runAttempt: '2' }
+const context = { opsSource: 'a'.repeat(40), workerSha: P0.workerSha, runId: '123', runAttempt: '2' }
 const identity = { sourceCommit: P0.source, workerSha: context.workerSha, workflowCommit: context.opsSource,
   runId: context.runId, runAttempt: context.runAttempt }
 const fixture = '00000000-0000-4000-8000-000000000001'
@@ -64,6 +64,11 @@ test('both clean checkouts and every pinned entry are checked before the workloa
     assert.throws(() => assertSourceIdentity({ ...value, files: { ...P0.files, [file]: '0'.repeat(64) } }))
   assertDependencies(P0.sdks)
   for (const key of Object.keys(P0.sdks)) assert.throws(() => assertDependencies({ ...P0.sdks, [key]: 'unexpected-version' }))
+  assertWorkerIdentity(P0.workerSha)
+  for (const workerSha of ['b'.repeat(40), undefined, 'invalid']) {
+    assert.throws(() => assertWorkerIdentity(workerSha))
+    assert.throws(() => summarizeAcceptance({ ...context, workerSha }, fixtureReceipts()))
+  }
 })
 
 test('both private candidates, complete runtime receipts and separate cleanup outcomes are needed', () => {
@@ -155,6 +160,59 @@ test('closed artifacts keep resource journals and counters without copying SDK t
   assert.equal(JSON.stringify(result).includes(privateText), false)
 })
 
+test('build diagnostics retain bounded type/status/host phase evidence without copying raw SDK data', () => {
+  const value = fixtureReceipts(), privateText = 'synthetic-private-sdk-text'
+  value.buildReport = { identity, status: 'failed', stage: 'build_claude', code: 'template_build_failed', diagnostic: {
+    message: privateText, exceptionChainTruncated: true,
+    exceptionChain: [
+      { type: 'BuildException', code: 'template_build_failed', exitCode: 1, message: privateText, url: privateText },
+      { type: 'HTTPError', code: 'provider_http_error', httpStatus: 503, headers: { Authorization: privateText } },
+      ...Array.from({ length: 8 }, () => ({ type: privateText, code: privateText, httpStatus: privateText, exitCode: privateText })),
+    ],
+    buildLogs: { claude: { entries: 200, ignoredLines: 100, oversizedEntries: 1, truncated: true, raw: privateText,
+      events: [{ phase: 'template_created', privateText }, { phase: 'bootstrap', detail: 'source', elapsedMs: 12 },
+        { phase: 'ingress', detail: 'tool', message: privateText }, { phase: 'host_failure', detail: 'official_files_changed', path: privateText },
+        { phase: 'official_capture', entries: 9, sha256: privateText },
+        ...Array.from({ length: 80 }, () => ({ phase: 'bootstrap', detail: privateText, elapsedMs: privateText }))] },
+      [privateText]: { events: [] } },
+  } }
+  const result = summarizeAcceptance(context, value), diagnostic = result.build.diagnostic
+  assert.equal(result.passed, false)
+  assert.equal(result.build.code, 'template_build_failed')
+  assert.equal(diagnostic.exceptionChain.length, 8)
+  assert.deepEqual(diagnostic.exceptionChain[0], { type: 'BuildException', code: 'template_build_failed', httpStatus: null, exitCode: 1 })
+  assert.equal(diagnostic.exceptionChain[1].httpStatus, 503)
+  assert.equal(diagnostic.exceptionChain[2].type, 'other')
+  assert.equal(diagnostic.buildLogs.claude.events.length, 64)
+  assert.deepEqual(diagnostic.buildLogs.claude.events[1], { phase: 'bootstrap', detail: 'source', elapsedMs: 12 })
+  assert.equal(diagnostic.buildLogs.claude.entries, 200)
+  assert.equal(diagnostic.buildLogs.claude.truncated, true)
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+})
+
+test('a failed status lookup preserves the original failure and only exact-identity status metadata', () => {
+  const value = fixtureReceipts(), privateText = 'private-provider-reason-command'
+  value.buildReport = { identity, status: 'failed', stage: 'build_claude', code: 'template_build_failed', diagnostic: {
+    exceptionChain: [{ type: 'BuildException', code: 'template_build_failed' }], statusLookup: {
+      attempted: true, identityMatched: true, status: 'error', step: { phase: 'bootstrap', index: 9, raw: privateText },
+      reason: privateText, exitCode: 2, exitCodeSource: 'provider_reason', reasonLogEntries: 3, reasonLogEntriesTruncated: false,
+    },
+  } }
+  let result = summarizeAcceptance(context, value)
+  assert.equal(result.passed, false)
+  assert.equal(result.build.diagnostic.statusLookup.status, 'error')
+  assert.equal(result.build.diagnostic.statusLookup.exitCode, 2)
+  assert.deepEqual(result.build.diagnostic.statusLookup.step, { phase: 'bootstrap', index: 9 })
+  value.buildReport.diagnostic.statusLookup = { ...value.buildReport.diagnostic.statusLookup, identityMatched: false,
+    failure: { exceptionChain: [{ type: 'HTTPError', code: 'provider_http_error', httpStatus: 503, message: privateText }] } }
+  result = summarizeAcceptance(context, value)
+  assert.equal(result.build.code, 'template_build_failed')
+  assert.equal(result.build.diagnostic.statusLookup.status, null)
+  assert.equal(result.build.diagnostic.statusLookup.step.phase, null)
+  assert.equal(result.build.diagnostic.statusLookup.failure.exceptionChain[0].httpStatus, 503)
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+})
+
 test('workflow retains the original sole credential and gives cleanup time outside the production lane', () => {
   const workflow = readFileSync(new URL('../../.github/workflows/self-hosted-vault-closeout.yml', import.meta.url), 'utf8')
   assert.match(workflow, /branches: \[ops\/self-hosted-vault-closeout-20261108\]/)
@@ -164,7 +222,8 @@ test('workflow retains the original sole credential and gives cleanup time outsi
   assert.deepEqual([...workflow.matchAll(/^\s+secret-name: (.+)$/gm)].map(match => match[1]), ['E2B_API_KEY'])
   for (const exact of ['identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac', 'oidc-audience: mikka-infisical',
     'project-id: 89850d6a-f020-4936-863e-df77380dfe40', 'secret-path: /vercel', 'env-slug: prod',
-    'recursive: false', 'include-imports: false', `ref: ${P0.source}`]) assert.ok(workflow.includes(exact))
+    'recursive: false', 'include-imports: false', `P0_SOURCE: ${P0.source}`, `ref: ${P0.source}`]) assert.ok(workflow.includes(exact))
+  assert.equal(workflow.split(P0.source).length - 1, 2)
   assert.ok(workflow.indexOf('mjs dependencies workspace-acceptance-source') < workflow.indexOf('uses: Infisical/secrets-action'))
   assert.ok(workflow.indexOf('id: vm_cleanup') < workflow.indexOf('id: template_cleanup'))
   assert.equal([...workflow.matchAll(/if: always\(\) && steps.source.outcome == 'success' && steps.credential.outcome == 'success' && steps.build.outcome != 'skipped'/g)].length, 2)
