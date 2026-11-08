@@ -20,6 +20,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
         with:
           version: 10.34.3
@@ -28,9 +29,9 @@ jobs:
           node-version: 24.22.2
       - name: Require the exact public patch and validation-only child
         run: |
-          test "$(git rev-parse HEAD^)" = 0f4536d14f5aaa9489df8fd2c1015e127eb6672d
-          test "$(git diff --name-only HEAD^ HEAD)" = .github/workflows/self-hosted-monitor-validation.yml
-          git diff --exit-code HEAD^ HEAD -- app/api/cron/ops-monitor/route.ts app/api/cron/ops-monitor/route.test.ts
+          git merge-base --is-ancestor 0f4536d14f5aaa9489df8fd2c1015e127eb6672d HEAD
+          test "$(git diff --name-only 0f4536d14f5aaa9489df8fd2c1015e127eb6672d HEAD)" = .github/workflows/self-hosted-monitor-validation.yml
+          git diff --exit-code 0f4536d14f5aaa9489df8fd2c1015e127eb6672d HEAD -- app/api/cron/ops-monitor/route.ts app/api/cron/ops-monitor/route.test.ts
       - name: Install the original frozen public workspace dependencies
         run: pnpm install --frozen-lockfile
       - name: Verify community and cloud monitoring outcomes
