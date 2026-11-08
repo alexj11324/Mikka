@@ -45,3 +45,17 @@ jobs:
           include-imports: false
       - name: Read provider settings only, without push or mutation
         run: node scripts/ops/self-hosted-push-audit.mjs
+      - name: Read the existing push sender for project-access verification only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /mikka-cloud-production
+          secret-name: EXPO_ACCESS_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Read exact EAS project flags with both existing credentials
+        run: node scripts/ops/self-hosted-push-project-audit.mjs
