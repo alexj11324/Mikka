@@ -186,7 +186,7 @@ jobs:
 
   deployment-comparison:
     # No browser/install/wait loop: quarter-hour follow-ups read the same fixed windows.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')) && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
+    if: github.ref == 'refs/heads/main' && (github.repository == 'alexj11324/Mikka' && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')) && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
