@@ -3,7 +3,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 're
 import { useRouter } from 'expo-router'
 import { Check, X } from 'lucide-react-native'
 import { BotAvatar, Spinner } from '@/components/icons'
-import { NavBar, underBar } from '@/components/NavBar'
+import { NavBar } from '@/components/NavBar'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -47,11 +47,11 @@ export default function NewGroup() {
   }
   const toggle = (id: string) => { tap(); setPicked(list => list.includes(id) ? list.filter(item => item !== id) : [...list, id]) }
   return (
-    <View style={styles.screen}>
-      <NavBar title="新建群聊"
+    <>
+      <NavBar fade={false} title="新建群聊"
         left={{ icon: 'xmark', label: '取消', disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
         right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !ready || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
-      <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
+      <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Field style={styles.field}>
           <TextInput editable={!busy} value={title} onChangeText={setTitle} placeholder="群聊名称" placeholderTextColor={colors.secondary} maxLength={200} autoFocus
             style={styles.input} accessibilityLabel="群聊名称" />
@@ -65,7 +65,7 @@ export default function NewGroup() {
             return (
               <Pressable key={bot.id} accessibilityRole="checkbox" accessibilityLabel={bot.name} accessibilityState={{ checked: on, disabled: busy }} aria-checked={Platform.OS === 'web' ? on : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} disabled={busy} onPress={() => toggle(bot.id)}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
-                <BotAvatar color={bot.color} shape={bot.shape} size={30} />
+                <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size={30} />
                 <Text style={styles.name} numberOfLines={1}>{bot.name}</Text>
                 {on ? <Symbol name="checkmark" size={19} color={colors.accent} web={<Check size={22} color={colors.accent} strokeWidth={2.2} />} /> : null}
               </Pressable>
@@ -74,7 +74,7 @@ export default function NewGroup() {
         </Group>
         {home.data && !bots.length ? <Text style={styles.note}>先新建一个 Bot</Text> : null}
       </ScrollView>
-    </View>
+    </>
   )
 }
 

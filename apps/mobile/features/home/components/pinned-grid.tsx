@@ -3,7 +3,7 @@ import { Star } from 'lucide-react-native'
 import { BotAvatar } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
-import { colors } from '@/lib/theme'
+import { AVATAR, colors, LIST_INSET } from '@/lib/theme'
 import type { HomeChat, useHomeChats } from '../model/use-home-chats'
 import { ChatBadge } from './chat-badge'
 import { ChatLink } from './chat-link'
@@ -26,7 +26,7 @@ function PinnedTile({ chat, actions }: { chat: HomeChat; actions: Actions }) {
       <ChatLink chat={chat} actions={actions} accessibilityLabel={name} style={({ pressed }) => [styles.tile, pressed && { opacity: 0.6 }]}>
         <View style={styles.tileInner}>
           <View>
-            {chat.row.kind === 'bot' ? <BotAvatar color={chat.row.bot.color} shape={chat.row.bot.shape} size={64} />
+            {chat.row.kind === 'bot' ? <BotAvatar id={chat.row.bot.id} coordinator={chat.row.bot.coordinator} color={chat.row.bot.color} shape={chat.row.bot.shape} size={AVATAR.pin} />
               : <View style={styles.group}><Symbol name="person.2.fill" size={26} color={colors.secondary} web={<Text style={styles.glyph}>群</Text>} /></View>}
             <View style={styles.star} accessibilityElementsHidden importantForAccessibility="no">
               <Symbol name="star.fill" size={14} color={colors.orange} web={<Star size={14} color={colors.orange} fill={colors.orange} strokeWidth={0} />} />
@@ -41,12 +41,12 @@ function PinnedTile({ chat, actions }: { chat: HomeChat; actions: Actions }) {
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 8, rowGap: 16 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: LIST_INSET - 4, paddingTop: 12, paddingBottom: 16, rowGap: 20 },
   star: { position: 'absolute', right: -6, top: -4 },
   cell: { width: '33.333%' },
   tile: { paddingHorizontal: 4 },
   tileInner: { alignItems: 'center', gap: 8 },
-  group: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
+  group: { width: AVATAR.pin, height: AVATAR.pin, borderRadius: AVATAR.pin / 2, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
   glyph: { fontSize: 20, color: colors.secondary },
-  name: { fontSize: 13, lineHeight: 17, textAlign: 'center' },
+  name: { fontSize: 14, lineHeight: 18, textAlign: 'center' },
 })
