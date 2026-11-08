@@ -112,6 +112,10 @@ async function run() {
       await open(page, origin, `/bots/${BOT}`, '构建排上了')
       if (before) { await shot(page, theme, 'chat-before'); await context.close(); continue }
       await shot(page, theme, 'chat')
+      // Part way up: messages dissolve under the title pill rather than being cut at the bar.
+      await page.mouse.move(196, 400); await page.mouse.wheel(0, -50); await settle(page)
+      await shot(page, theme, 'chat-edge')
+      await page.mouse.wheel(0, 3000); await settle(page)
       // The top of the chat: 「昨天 21:04」 above yesterday's pair, 「09:21」 above today's.
       await page.mouse.move(196, 400); await page.mouse.wheel(0, -3000); await settle(page)
       await shot(page, theme, 'chat-top')

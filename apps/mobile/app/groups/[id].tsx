@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { BotBubble, MessageActions, MessageRow, MyBubble, Reactions, TimeSeparator } from '@/components/chat'
 import { Markdown } from '@/components/Markdown'
-import { NavBar } from '@/components/NavBar'
+import { ListTopFade, NavBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
 import { Composer } from '@/features/chat/components/chat-composer'
 import { GlassButton } from '@/components/GlassButton'
@@ -171,7 +171,6 @@ export default function GroupChat() {
           {separator}
           <MessageRow align="right" onSelect={() => select(message.body, message.id)}>
             <MyBubble text={message.body} />{chips(message.id, 'right')}
-            <MessageActions align="right" message={held(message.body, message.id)} />
           </MessageRow>
         </View>
       )
@@ -220,6 +219,7 @@ export default function GroupChat() {
         {sendFailed ? <Text accessibilityRole="alert" style={styles.error}>没发出去，消息仍在输入框中。</Text> : null}
         {stopFailed ? <StopFailed busy={stopping} onRetry={() => void stop()} /> : null}
           </>} />
+        <ListTopFade color={colors.page} />
       </View>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
