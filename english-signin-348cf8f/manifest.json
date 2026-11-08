@@ -1,0 +1,163 @@
+{
+  "status": "passed",
+  "sourceCommit": "348cf8f1322d555f3584b40b0198c7392b4c08df",
+  "overlayCommit": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+  "backendVersionBefore": {
+    "build": "9bcdefc5fe0c047393d581eea867ffa801f53dbe",
+    "overlaySha": "c34b3adf07240afebae725b2af599cfbc69c4f42"
+  },
+  "backendVersionAfter": {
+    "build": "9bcdefc5fe0c047393d581eea867ffa801f53dbe",
+    "overlaySha": "c34b3adf07240afebae725b2af599cfbc69c4f42"
+  },
+  "backendStable": true,
+  "renderer": "Expo Web production static export on cloud Linux",
+  "nativeAcceptance": false,
+  "nativeAppleAcceptance": false,
+  "appleButtonExpectedOnWeb": false,
+  "appStoreUploadCandidates": false,
+  "apiResponseFixtures": false,
+  "authentication": "anonymous real sign-in entry screen, no sign-in submitted",
+  "locale": "en-US",
+  "buildConfiguration": {
+    "EXPO_PUBLIC_API_URL": "https://app.aspectlylabs.com/mikka",
+    "MIKKA_MOBILE_OVERLAY_DIR": ".hosted-ui/mobile"
+  },
+  "matrix": {
+    "widths": [
+      320,
+      393,
+      440
+    ],
+    "height": 956,
+    "scale": 3,
+    "appearances": [
+      "light",
+      "dark"
+    ]
+  },
+  "files": [
+    {
+      "file": "signin-320-light.png",
+      "width": 960,
+      "height": 2868,
+      "appearance": "light",
+      "sourceCommit": "348cf8f1322d555f3584b40b0198c7392b4c08df",
+      "overlayCommit": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+      "sha256": "25b84b9778466ec5e5bb05b22043638490976d433646b87a641e4c450aac0068",
+      "englishOnly": true
+    },
+    {
+      "file": "signin-320-dark.png",
+      "width": 960,
+      "height": 2868,
+      "appearance": "dark",
+      "sourceCommit": "348cf8f1322d555f3584b40b0198c7392b4c08df",
+      "overlayCommit": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+      "sha256": "edd3b23751082a4dd985fed5068947817354f45b7de0c46f1dd7c492bd9e6dff",
+      "englishOnly": true
+    },
+    {
+      "file": "signin-393-light.png",
+      "width": 1179,
+      "height": 2868,
+      "appearance": "light",
+      "sourceCommit": "348cf8f1322d555f3584b40b0198c7392b4c08df",
+      "overlayCommit": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+      "sha256": "8383e7c05256066c6b95f7883e498856d4479fb1d6994bc4007068c1e9efd949",
+      "englishOnly": true
+    },
+    {
+      "file": "signin-393-dark.png",
+      "width": 1179,
+      "height": 2868,
+      "appearance": "dark",
+      "sourceCommit": "348cf8f1322d555f3584b40b0198c7392b4c08df",
+      "overlayCommit": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+      "sha256": "71d3d30c97f5e454279f978d39d8ff2eaea3ccb302eb1819c134ed0d3dfcbc47",
+      "englishOnly": true
+    },
+    {
+      "file": "signin-440-light.png",
+      "width": 1320,
+      "height": 2868,
+      "appearance": "light",
+      "sourceCommit": "348cf8f1322d555f3584b40b0198c7392b4c08df",
+      "overlayCommit": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+      "sha256": "0aee491e0a24be568eb526b49a215f034185af39874adfa13e386c2e14e83c1e",
+      "englishOnly": true
+    },
+    {
+      "file": "signin-440-dark.png",
+      "width": 1320,
+      "height": 2868,
+      "appearance": "dark",
+      "sourceCommit": "348cf8f1322d555f3584b40b0198c7392b4c08df",
+      "overlayCommit": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+      "sha256": "ce90220472230c7e35f52e21e713ee4bb9ac0b49f76641a7dd7294532a4a3f5f",
+      "englishOnly": true
+    }
+  ],
+  "apiReads": [
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/version",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "method": "GET",
+      "status": 200
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "stage": "eas build:inspect archive",
+  "sourceSha": "348cf8f1322d555f3584b40b0198c7392b4c08df",
+  "validatorSha": "55355a2ed2403387a7bd4431d95f10251e471812",
+  "overlaySha": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+  "profile": "hosted-production",
+  "archiveDigest": "582ee3263ce8be705cac3e939c57f7ef3a3b0ac1f57fc1a34928936e6b6dc6f6",
+  "files": 6139,
+  "overlayTrackedPaths": 365,
+  "overlayFiles": 291,
+  "excludedFilesDetected": 0,
+  "excludedEmptyDirectories": [
+    "docs",
+    ".hosted-ui/docs"
+  ],
+  "finalMainWorkflowInspection": "pending"
+}
