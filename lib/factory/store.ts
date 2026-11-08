@@ -23,7 +23,7 @@ import { readFactoryFlowStates } from './public-flow';
 import { publicFactoryTaskSummary, type FactoryPublicTaskSummary } from './public-task';
 import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
 import { captureIdOf } from "./evidence";
-import type { Pool, PoolClient } from "pg";
+import { escapeLiteral, type Pool, type PoolClient, type QueryResult } from "pg";
 import { z } from "zod";
 import { daemonTestMode, normalizeRepository, repositoryBindingMatches } from '@mikka/protocol/repository'
 import {
@@ -40,6 +40,13 @@ import {
   type FactoryStage,
   type FactoryStatus,
 } from "./contract";
+
+function isSelectResult(value: unknown): value is Pick<QueryResult, 'command' | 'rows'> {
+  if (!value || typeof value !== 'object') return false;
+  const result = value as Partial<QueryResult>;
+  return result.command === 'SELECT' && Array.isArray(result.rows)
+    && result.rows.every(row => row !== null && typeof row === 'object' && !Array.isArray(row));
+}
 
 type ProviderRun = Parameters<typeof import('../run-provider-fallback').providerContinuationMatches>[0]
 
@@ -235,18 +242,26 @@ export function createFactoryStore(
       forgetFactoryTransaction(tx); tx.release();
     }
   }
-  async function sourceAllowed(
+  async function allowedSource(
     tx: PoolClient,
     userId: string,
     eventId: string,
     issueId: string,
+    lock = true,
     sourceBotId = botId,
+    withPayload = false,
   ) {
     const { rows } = await tx.query(
-      `SELECT e.id FROM coordinator_events e WHERE e.id=$1 AND e."userId"=$2 AND e.kind='user_message' AND e."botId" IS NOT DISTINCT FROM $3::uuid AND (e."issueId" IS NULL OR e."issueId"=$4) AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$3 AND b."ownerId"=$2))`,
+      // A null-Bot source can still be considered by Coordinator backfill.
+      // Keep the validated execution scope until this write transaction ends;
+      // a source moved before this lock is acquired must fail the predicate.
+      `SELECT e.id${withPayload ? ',e.payload' : ''} FROM coordinator_events e WHERE e.id=$1 AND e."userId"=$2 AND e.kind='user_message' AND e."botId" IS NOT DISTINCT FROM $3::uuid AND (e."issueId" IS NULL OR e."issueId"=$4) AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$3 AND b."ownerId"=$2))${lock && sourceBotId === null ? ' FOR SHARE OF e' : ''}`,
       [eventId, userId, sourceBotId, issueId],
     );
-    return rows.length === 1;
+    return rows.length === 1 ? rows[0] : undefined;
+  }
+  async function sourceAllowed(tx: PoolClient, userId: string, eventId: string, issueId: string, lock = true, sourceBotId = botId) {
+    return Boolean(await allowedSource(tx, userId, eventId, issueId, lock, sourceBotId));
   }
   /** lock=false is the read-only variant for GETs: same ownership/scope checks, no row locks. */
   async function owned(tx: PoolClient, userId: string, taskId: string, lock = true, readScope: "bot" | "user" = "bot") {
@@ -265,7 +280,7 @@ export function createFactoryStore(
       (task.botId !== botId && (lock || readScope === "bot")) ||
       !factoryScopeAllows(task, issue) ||
       !(await authorize(userId, task.issueId, tx)) ||
-      !(await sourceAllowed(tx, userId, task.sourceEventId, task.issueId, task.botId))
+      !(await sourceAllowed(tx, userId, task.sourceEventId, task.issueId, lock, task.botId))
     )
       fail("factoryNotFound");
     return task;
@@ -278,14 +293,13 @@ export function createFactoryStore(
     tx: PoolClient,
     task: FactoryTask,
   ): Promise<FactorySnapshot> {
-    const { rows: attempts } = await tx.query<FactoryAttempt>(
-      'SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position',
-      [task.id],
-    );
-    const { rows: candidates } = await tx.query<FactoryCandidate>(
-      'SELECT * FROM factory_candidates WHERE "taskId"=$1 ORDER BY "createdAt"',
-      [task.id],
-    );
+    // Keep both SELECT statements and native pg types in one round trip.
+    const taskId = escapeLiteral(task.id);
+    const result: unknown = await tx.query(`SELECT * FROM factory_attempts WHERE "taskId"=${taskId} ORDER BY position;
+      SELECT * FROM factory_candidates WHERE "taskId"=${taskId} ORDER BY "createdAt"`);
+    if (!Array.isArray(result) || result.length !== 2 || !result.every(isSelectResult)) throw new TypeError('Invalid Factory snapshot');
+    const attempts = result[0].rows as FactoryAttempt[];
+    const candidates = result[1].rows as FactoryCandidate[];
     // Return the same JSON representation on the first call and durable replay.
     return JSON.parse(
       JSON.stringify({ contractVersion: 1, task, attempts, candidates }),
@@ -446,17 +460,8 @@ export function createFactoryStore(
         const issue = await lockedIssue(tx, route.issueId);
         if (!issue || !(await authorize(userId, route.issueId, tx))) fail("factoryNotFound");
         if (prior && !factoryScopeAllows(prior, issue)) fail("factoryNotFound");
-        const {
-          rows: [source],
-        } = await tx.query(
-          'SELECT id,payload FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND kind=\'user_message\' AND ("issueId" IS NULL OR "issueId"=$3)',
-          [route.sourceEventId, userId, route.issueId],
-        );
-        if (
-          !source ||
-          !(await sourceAllowed(tx, userId, route.sourceEventId, route.issueId))
-        )
-          fail("factorySourceMismatch");
+        const source = await allowedSource(tx, userId, route.sourceEventId, route.issueId, true, botId, true);
+        if (!source) fail("factorySourceMismatch");
         if (prior) {
           if (prior.botId !== botId) fail("factoryNotFound");
           if (prior.sourceEventId !== route.sourceEventId) {

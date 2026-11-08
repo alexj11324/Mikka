@@ -1,8 +1,7 @@
 import 'server-only'
 import { generateText } from 'ai'
 import { and, eq, isNull } from 'drizzle-orm'
-import { gatewayAuth } from '@/lib/ai-gateway-auth'
-import { zeroCatConfig } from '@/lib/abuse/zerocat'
+import { defaultModelAvailable } from '@/lib/default-model'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
@@ -10,6 +9,7 @@ import { issueListChanged } from '@/lib/live/lists'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { isCjk, parseShortTitle, shortTitlePrompt } from './short-title'
 import { causeFields } from '@mikka/protocol/coded-error'
+import { withAiMetadata } from './tracing/ai'
 
 /** The small text model that names tasks; the Coordinator's flash model, as for 建议's action lines. */
 const SHORT_TITLE_MODEL = COORDINATOR_MODEL
@@ -23,7 +23,7 @@ const SHORT_TITLE_TIMEOUT_MS = 10_000
  */
 export async function writeShortTitle(issueId: string, ownerId: string): Promise<void> {
   try {
-    if (!zeroCatConfig() && !await gatewayAuth()) return
+    if (!await defaultModelAvailable(ownerId)) return
     const [task] = await db.select({ title: issues.title, content: issues.content, shortTitle: issues.shortTitle }).from(issues)
       .where(and(eq(issues.id, issueId), eq(issues.userId, ownerId))).limit(1)
     if (!task || task.shortTitle) return
@@ -34,7 +34,7 @@ export async function writeShortTitle(issueId: string, ownerId: string): Promise
     const model = await hostedModel(workspaceId, SHORT_TITLE_MODEL, undefined, ownerId)
     const body = tiptapToText(task.content)
     const { instructions, prompt } = shortTitlePrompt({ title: task.title, body })
-    const { text } = await generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(SHORT_TITLE_TIMEOUT_MS) })
+    const { text } = await withAiMetadata({ operation: 'short_title' }, () => generateText({ model, instructions, prompt, maxRetries: 1, abortSignal: AbortSignal.timeout(SHORT_TITLE_TIMEOUT_MS) }))
     const shortTitle = parseShortTitle(text, isCjk(`${task.title} ${body}`))
     if (!shortTitle) return
     await db.transaction(async tx => {

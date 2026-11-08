@@ -14,6 +14,8 @@ import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-
 import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-workspace'
 import type { ListLiveRead } from '@/lib/live/list-read'
 import { ownerLiveScope } from '@/lib/live/owner-scope'
+import { getEdition, type MikkaEdition } from '@/lib/edition'
+import { isServerAdmin } from '@/lib/server-admin'
 
 function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
@@ -109,9 +111,12 @@ export async function loadWorkspaceSettings(requestedId?: string, authenticatedU
   const live: { live?: ListLiveRead & { homeWorkspaceId: string | null } } = { live: { ownerId: context.currentUserId, workspaceId, homeWorkspaceId: home?.workspaceId ?? null,
     ...(nextExpiry === undefined ? {} : { deadline: { at: new Date(nextExpiry).toISOString(), afterMs: nextExpiry - observedAt } }),
   } }
+  // Optional on the wire for clients that still connect to a pre-edition server.
+  const deployment: { edition?: MikkaEdition; serverAdmin?: boolean } = { edition: getEdition(), serverAdmin: isServerAdmin(context.currentUserId) }
   return {
     ...context,
     ...live,
+    ...deployment,
     members: members.map(member => ({ ...member, image: images.get(member.userId) ?? null, createdAt: member.createdAt.toISOString() })),
     invitations: invitations.map(invite => ({ ...invite, createdAt: invite.createdAt.toISOString(), expiresAt: invite.expiresAt.toISOString() })),
   }

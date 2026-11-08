@@ -377,12 +377,14 @@ function readStartupTiming(value, record, names = STARTUP_PHASES) {
 }
 
 function readPreparationTiming(value, record, stage) {
-  if (value?.source !== 'prepared_agent_start' || value.harness !== 'claude_code' || !stage) return null
+  if (!['prepared_agent_start', 'bootstrap_claude_start'].includes(value?.source) || value.harness !== 'claude_code' || !stage) return null
   const timing = readStartupTiming(value, record, PREPARATION_PHASES)
   // The task-owned Promise starts before the stage joins it and settles before
   // that join returns. Never rebase its earlier intervals onto the stage root.
   if (!timing || timing.startedAt > stage.startedAt || timing.endedAt > stage.endedAt) return null
-  return { ...timing, source: 'prepared_agent_start' }
+  if (value.source === 'bootstrap_claude_start' && !['oauth_environment', 'ordinary_path', 'unverified'].includes(value.claimAuthentication)) return null
+  if (value.source === 'bootstrap_claude_start' && !['oauth_environment', 'oauth_descriptor', 'non_api_key_unspecified', 'unknown'].includes(value.observedAuthSource)) return null
+  return { ...timing, source: value.source, ...(value.source === 'bootstrap_claude_start' ? { claimAuthentication: value.claimAuthentication, observedAuthSource: value.observedAuthSource } : {}) }
 }
 
 /** Both start paths require actual successful CLI initialization. A provided
@@ -395,6 +397,7 @@ export function hasStartupInitialization(record) {
     return record.daemonPreparationTiming === undefined && has(stage, 'daemon.adapter.cli_init')
   const prepared = record.preparationTimingStatus === 'complete' && readPreparationTiming(record.daemonPreparationTiming, record, stage)
   return Boolean(prepared && !prepared.truncated && prepared.outcome === 'ok'
+    && (prepared.source !== 'bootstrap_claude_start' || (prepared.claimAuthentication === 'ordinary_path' || prepared.claimAuthentication === 'oauth_environment' && prepared.observedAuthSource === 'oauth_environment'))
     && has(prepared, 'daemon.adapter.cli_init.prewarm') && has(prepared, 'daemon.adapter.cli_init'))
 }
 
@@ -733,7 +736,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   deviceId, agentId, sourceCommit, expectedBuild, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
-  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild }) {
+  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
   assert(scope?.ownerId && scope.adminId && scope.ownerId !== scope.adminId && scope.botId === botId
@@ -743,8 +746,8 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   assert(/^[A-Za-z0-9_-]{1,80}$/.test(sampleId), 'sample_id_invalid')
   assert((!deviceId && !agentId) || (UUID.test(deviceId ?? '') && UUID.test(agentId ?? '')), 'candidate_target_invalid')
   const record = { sampleId, harness, requestedModel: model, title: `${titlePrefix} ${sampleId} ${harness}`,
-    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId), requireOfficialTiming: officialTiming === 'enabled',
-    requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required'),
+    profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId) || leaseAudit, requireOfficialTiming: officialTiming === 'enabled',
+    requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required' || leaseAudit),
     stages: [], status: 'running', phase: 'build_pin', ...(sourceCommit ? { sourceCommit } : {}) }
   const pin = pinBuild ?? (async () => {
     const { build } = await client.json('/api/version')
@@ -765,8 +768,10 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'chat_model_selection'
     await chooseSharedChatModel(client, botId, harness)
     record.phase = 'issue_create'
+    const leaseDriver = leaseAudit ? await import('./cloud-lease-audit.mjs') : null
+    const leaseInstructions = leaseDriver ? await leaseDriver.leaseAuditInstructions(sampleId, harness) : ''
     const created = await client.rpc('issues.saveIssue', [{ title: record.title, status: 'todo', priority: 'low', content: {
-      type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.` }] }],
+      type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `Read one line of README in ${REPOSITORY} and reply STARTUP_OK_${sampleId}. Read only; no files, branches, commits, PRs, external messages, or additional agents.\n${leaseInstructions}` }] }],
     } }])
     assert(UUID.test(created.issue?.id ?? ''), 'issue_create_failed'); record.issueId = created.issue.id
     await dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs }, now)
@@ -776,7 +781,13 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
     record.phase = 'execution_watch'
-    await watchRun(client, record, timeoutMs, WebSocketImpl, now)
+    await watchRun(client, record, timeoutMs, WebSocketImpl, now, undefined, leaseDriver ? {
+      observe: detail => {
+        const complete = observeChunks(record, detail, now())
+        record.leaseAudit = leaseDriver.leaseAuditReceipt(detail.chunks, record.runId, harness)
+        return complete
+      },
+    } : undefined)
     record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
     record.phase = 'build_pin'

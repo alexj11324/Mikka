@@ -1,5 +1,6 @@
 import { deploymentSwitch } from '@/lib/deployment-switches'
-import { causeFields, logCodedError } from '@mikka/protocol/coded-error'
+import { CodedError, causeFields, logCodedError } from '@mikka/protocol/coded-error'
+import { serverRunFailure } from '@/lib/run-failure-details'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { runListChanged } from '@/lib/live/lists'
@@ -50,7 +51,7 @@ import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { leaseDevice } from '@/lib/subscription-native-device'
 import { sharedNativeBinding } from '@/lib/personal-policy'
 import { PublicationError } from '@/lib/run-publication-result'
-import { linkedGitHubAccountId } from '@/lib/github/repository-installation'
+import { githubMachineConfigured, githubMachineCredential } from '@/lib/github/machine-credential'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
@@ -104,7 +105,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
   if (!agent || !repo || !run.issueId) {
     const failed = await db.update(agentRuns)
-      .set({ status: 'failed', stopReason: 'error', error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
+      .set({ status: 'failed', stopReason: 'error', failureDetails: serverRunFailure(runId, new Date()), error: 'Run is missing its agent, repository or issue.', finishedAt: new Date(), updatedAt: new Date() })
       .where(eq(agentRuns.id, runId)).returning({ id: agentRuns.id })
     if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
     await afterRunEnded(caller.userId, runId)
@@ -118,7 +119,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     const summary = 'The selected Agent Profile changed or is no longer available. Select an available Profile for a new run.'
     // The claim transaction has rolled back. Only its still-unclaimed row may
     // be settled; a concurrent claim/stop must never be overwritten.
-    const rejected = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: summary,
+    const rejected = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: summary, failureDetails: serverRunFailure(runId, new Date(), new CodedError('run_failed', { cause: error })),
       report: { summary, filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null }, finishedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
       .returning({ id: agentRuns.id })
@@ -322,7 +323,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     skillAssignment = await skillAssignments.recordClaim(caller.userId, deviceId, runId, leaseExpiresAt, supportsSkillArtifacts, supportsTeamSkills)
     benchmarkAssignment = await claimBenchmarkAssignment(caller.userId, deviceId, runId, leaseExpiresAt)
   } catch (error) {
-    const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
+    const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', failureDetails: serverRunFailure(runId, new Date(), new CodedError('run_failed', { cause: error })), error: 'Skill assignment provenance unavailable.', finishedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt)))).returning({ id: agentRuns.id })
     if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId) }
     await afterRunEnded(caller.userId, runId)
@@ -346,9 +347,8 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
         request.headers.get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER) === '1')
     }),
     cloudStartupSpan('cloud.worker.claim.github_credentials', startupAttributes, async () => {
-      if (!githubRepository || !await linkedGitHubAccountId(caller.userId)) return undefined
-      const { githubTokenForUser } = await import('@/lib/github/user-access')
-      const issued = await githubTokenForUser(caller.userId)
+      if (!githubRepository || !await githubMachineConfigured(caller.userId)) return undefined
+      const issued = await githubMachineCredential(caller.userId, { remoteKey: repo.repoPath })
       return { token: issued.token, expiresAt: issued.expiresAt?.toISOString() ?? null }
     }),
   ] as const) : undefined
@@ -437,7 +437,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       // only this claim's still-preparing lease, never a concurrent stop/retry.
       console.warn(JSON.stringify({ msg: 'run_claim_credentials_failed', runId,
         failures: failures.map(result => causeFields((result as PromiseRejectedResult).reason)) }))
-      const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', error: 'Run credentials unavailable.', finishedAt: new Date(), updatedAt: new Date() })
+      const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', failureDetails: serverRunFailure(runId, new Date(), new CodedError('run_failed', { cause: (failures[0] as PromiseRejectedResult).reason })), error: 'Run credentials unavailable.', finishedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt)), isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
       if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId); await afterRunEnded(caller.userId, runId) }
       return NextResponse.json({ error: 'Run credentials unavailable.' }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
@@ -446,7 +446,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     if (github.status === 'fulfilled') githubCredential = github.value
   }
   const githubConnected = receivesRunCredentials ? Boolean(githubCredential)
-    : repo.repoPath.startsWith('v2/github.com/') && Boolean(await linkedGitHubAccountId(caller.userId))
+    : repo.repoPath.startsWith('v2/github.com/') && await githubMachineConfigured(caller.userId)
   timings.next('response_fence')
   const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => {
     const assignedEnv = cloudStartupDiagnosticEnv(taskEnv, { deviceKind: device.kind, run: current,
@@ -454,6 +454,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({
     ...publication,
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
+    ...(run.agentDefinition?.traceContext ? { traceContext: { ...run.agentDefinition.traceContext, runId } } : {}),
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),
     ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: current.prompt,
     kind: current.kind, leaseExpiresAt, policyRevision: cliPolicy.revision,

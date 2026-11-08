@@ -1,6 +1,9 @@
 import { hostedRefusal } from '@/lib/billing/hosted-usage'
 import { subscriptionRefusal, type SubscriptionRefusalNotice } from '@/lib/subscription-refusal'
 import { chatBalanceRefusal } from '@/lib/chat-balance'
+import { cloudErrorCode, type CloudErrorCode } from '@/lib/cloud-services/errors'
+import { parseCodedErrorText } from '@mikka/protocol/coded-error'
+import { readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 
 /**
  * Why a chat's last reply did not come, as the web's chat reads it
@@ -17,13 +20,15 @@ export type ChatFailure = (
   | { kind: 'subscription'; notice: NonNullable<ReturnType<typeof subscriptionRefusal>> }
   | { kind: 'wake'; code: WakeCode }
   // Keep the existing discriminator readable by already-installed mobile clients.
-  | { kind: 'failed'; reason?: 'balance' | 'tools' }
+  | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
   // The stored code(s) as recorded, for 详情 only (decision 2026-11-05-0330): the
   // line's own code, then the turn failure behind a wake code. Never the words.
-) & { raw?: string }
+) & { raw?: string; failureDetails?: RunFailure }
 
-export function chatFailure(chat: { working: boolean; error: string | null; cause?: string | null; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
-  const failure = failureOf(chat)
+export function chatFailure(chat: { working: boolean; error: string | null; cause?: string | null; failureDetails?: unknown; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
+  const details = chat.working || !chat.error ? null : readRunFailure(chat.failureDetails)
+  const legacy = failureOf(chat) ?? (details ? { kind: 'failed' as const } : null)
+  const failure = legacy && details ? { ...legacy, failureDetails: details } : legacy
   if (!failure || !chat.error) return failure
   // A stored code (with its detail) always goes; other text only when nothing else names the failure,
   // so a recognised provider refusal does not carry its request ids along (the phone contract).
@@ -43,6 +48,8 @@ function failureOf(chat: { working: boolean; error: string | null; items?: reado
   if (chat.working) return null
   // A turn that ended with no reply and nothing recorded (its lease ran out): the person's message is the newest.
   if (!chat.error) return chat.items?.findLast(item => item.from !== 'event')?.from === 'person' && !chat.items.at(-1)?.pending ? { kind: 'failed' } : null
+  const cloudCode = cloudErrorCode(parseCodedErrorText(chat.error)?.code)
+  if (cloudCode) return { kind: 'failed', cloudCode }
   const hosted = hostedRefusal(chat.error)
   if (hosted) return { kind: 'hosted', code: hosted }
   const notice = subscriptionRefusal(chat.error)
@@ -59,6 +66,7 @@ const TRANSIENT_HOSTED = new Set(['usage_in_progress', 'usage_concurrency_limit'
 export type FailureMessageKey =
   | { namespace: 'Billing.refusal'; key: 'unavailable' | 'verificationRequiredPlain' | 'free_allowance_used' | 'points_exhausted' | 'platform_paused' }
   | { namespace: 'Coordinator'; key: `subscriptionRefusal.${SubscriptionRefusalNotice}` | `wakeErrors.${WakeCode}` | 'failedTitle' | 'apiBalance' | 'replyToolUnavailable' }
+  | { namespace: 'RunErrors'; key: `${CloudErrorCode}.default` }
 
 export function failureMessageKey(failure: ChatFailure): FailureMessageKey {
   switch (failure.kind) {
@@ -66,6 +74,6 @@ export function failureMessageKey(failure: ChatFailure): FailureMessageKey {
       return { namespace: 'Billing.refusal', key: TRANSIENT_HOSTED.has(failure.code) ? 'unavailable' : failure.code === 'verification_required' ? 'verificationRequiredPlain' : failure.code as 'free_allowance_used' | 'points_exhausted' | 'platform_paused' }
     case 'subscription': return { namespace: 'Coordinator', key: `subscriptionRefusal.${failure.notice}` }
     case 'wake': return { namespace: 'Coordinator', key: `wakeErrors.${failure.code}` }
-    default: return { namespace: 'Coordinator', key: failure.reason === 'balance' ? 'apiBalance' : failure.reason === 'tools' ? 'replyToolUnavailable' : 'failedTitle' }
+    default: return failure.cloudCode ? { namespace: 'RunErrors', key: `${failure.cloudCode}.default` } : { namespace: 'Coordinator', key: failure.reason === 'balance' ? 'apiBalance' : failure.reason === 'tools' ? 'replyToolUnavailable' : 'failedTitle' }
   }
 }

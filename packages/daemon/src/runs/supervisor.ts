@@ -1,3 +1,5 @@
+import { captureRunFailure, failureFrom, type RunFailure } from "@mikka/protocol/run-failure"
+import { DAEMON_VERSION } from "../paths"
 import { runCriterion, reviewVerdict } from "@mikka/protocol/run"
 // Run supervisor: owns the run state machine
 //   queued -> preparing -> running <-> waiting_input -> finishing -> succeeded
@@ -632,7 +634,7 @@ export class RunSupervisor {
     })
     this.push(assignment.runId, {
       kind: "complete",
-      completion: { stopReason: "error", report: baseReport(error.message) },
+      completion: { stopReason: "error", report: baseReport(error.message), failureDetails: captureRunFailure(error, { runId: assignment.runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment.prompt] }) },
     })
     this.disposeMasker(assignment.runId)
     throw error
@@ -916,6 +918,10 @@ export class RunSupervisor {
   /** Serialize Errors before masking so non-enumerable message/stack/cause
    * fields cannot bypass the same dynamic credential set as run output. */
   private logError(runId: string, error: unknown) {
+    // Captured provider exceptions can retain raw SDK causes in memory. Log
+    // only their registered identity and bounded cause fields, never messages.
+    const failure = failureFrom(error)
+    if (failure) return { code: failure.code, ...(failure.detail ? { detail: failure.detail } : {}), causes: failure.causes }
     const masker = this.maskers.get(runId)
     if (!masker) return error
     const seen = new WeakSet<object>()
@@ -941,6 +947,7 @@ export class RunSupervisor {
     stopReason: StopReason,
     error?: string,
     report: HandoffReport = baseReport(error),
+    failureDetails?: RunFailure,
   ) {
     this.active.get(runId)?.toolApproval?.revoke()
     // Report collection and capture uploads can await after the provider's
@@ -1015,13 +1022,21 @@ export class RunSupervisor {
         waitingQuestionId: report.question.questionId,
       })
     }
+    // A provider's terminal failure is an ordinary iterator result, not a
+    // throw. Mark its run span explicitly without passing private CLI text.
+    if (state === 'failed') active?.span?.fail({ name: 'RunFailure' }, stopReason)
+    else active?.span?.set('mikka.outcome', stopReason)
     this.setState(runId, state, {
       stopReason,
       ...(error ? { error } : {}),
     })
+    const terminalFailure = state === "failed" && !active?.cancelRequested && !active?.forcedStop
+      ? captureRunFailure(failureDetails ?? new Error(error ?? report.summary), {
+        runId, appVersion: DAEMON_VERSION, sensitiveText: [entry?.assignment.prompt ?? ""],
+      }) : undefined
     this.push(runId, {
       kind: "complete",
-      completion: { stopReason, report },
+      completion: { stopReason, report, ...(terminalFailure ? { failureDetails: terminalFailure } : {}) },
     })
     this.disposeMasker(runId)
     const run = this.active.get(runId)
@@ -1359,10 +1374,10 @@ export class RunSupervisor {
     const harness = assignment?.harness
     if (assignment && runDiagnosticsEnabled(assignment.taskEnv, this.deps.collectCliTiming))
       run.runtimeTiming = runRuntimeTimings.begin(runId, assignment.deviceId, assignment.harness)
-    run.done = daemonTracer.span("daemon.run", { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
+    run.done = daemonTracer.span("daemon.run", { "mikka.run_id": runId, "mikka.run.id_hash": runIdHash(runId), "mikka.harness": harness }, span => {
       run.span = span
       return this.drive(runId, repo, run, initialClaim)
-    }, { root: true })
+    }, { root: true, traceContext: assignment?.traceContext })
       .catch(async (error: unknown) => {
         run.repositoryPreparing?.refuseEffects(error)
         run.repositoryPreparing?.abort.abort()
@@ -1381,6 +1396,7 @@ export class RunSupervisor {
             run.cancelRequested ? run.forcedStop ?? "cancelled" : providerFailure ? "provider_failure" : error instanceof CheckpointRecoveryError ? 'blocked' : "error",
             run.cancelRequested ? undefined : message,
             { ...baseReport(run.cancelRequested ? undefined : message), ...(providerFailure ? { providerFailure, providerCheckpoint: checkpoint.checkpoint } : {}) },
+            captureRunFailure(error, { runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment?.prompt ?? ""] }),
           )
         } catch (finishError) {
           this.deps.log.error(
@@ -1398,7 +1414,12 @@ export class RunSupervisor {
         finally {
           try { run.github?.close() }
           catch { this.deps.log.warn('GitHub credential cleanup failed') }
-          finally { clearTimeout(run.cancelTimer); run.runtimeTiming?.close(); this.active.delete(runId) }
+          finally {
+            clearTimeout(run.cancelTimer); run.runtimeTiming?.close(); this.active.delete(runId)
+            // Start draining all three telemetry queues before an idle cloud VM
+            // can pause; the completed run never waits for the collector.
+            void daemonTracer.flush()
+          }
         }
       })
   }
@@ -1505,6 +1526,7 @@ export class RunSupervisor {
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
     const baseOptions = {
+      traceContext: daemonTracer.capture(),
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
       github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
         ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
@@ -1925,7 +1947,7 @@ export class RunSupervisor {
         const checkpoint = await this.saveTerminalCheckpoint(runId, run, capturesSaved)
         if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: checkpoint.checkpoint }
         if (this.stopping) return
-        this.finish(runId, stopReason, error ?? verifyError, report)
+        this.finish(runId, stopReason, error ?? verifyError, report, event.failureDetails)
         log.info(
           { outcome: event.outcome, stop_reason: stopReason },
           "run ended",

@@ -5,10 +5,11 @@ The design authority is the current main implementation and accepted decisions
 in `docs/design/README.md`. Figma page `268:4750` is archived (#1296);
 `358:9186` is a reference to verify, not an accepted redesign spec.
 
-The screens read the server's `app/api/mobile/*` routes (mobile.md,
-"Engineering"). `EXPO_PUBLIC_API_URL` points the app at another server, with
-the base path (e.g. a local production build at `http://127.0.0.1:3000/mikka`);
-the default is production. Branches have no Vercel Preview.
+The screens read the selected server's `app/api/mobile/*` routes (mobile.md,
+"Engineering"). The sign-in screen selects Mikka Cloud or a self-hosted server
+at runtime. `EXPO_PUBLIC_API_URL` changes the initial server for a preview build,
+including its base path (e.g. `http://127.0.0.1:3000/mikka`); official iOS builds
+start on Mikka Cloud. Branches have no Vercel Preview.
 
 ```sh
 pnpm install                       # from the repository root
@@ -34,6 +35,37 @@ Layout:
 - `lib/`: the auth client, `api()` and `useApi()`, response types, push
   registration, theme colours.
 
+## Servers and accounts
+
+From sign-in, choose **更改 → 自托管服务器**, enter an HTTPS address, and tap
+**连接**. The credential-free probe reads `/api/desktop/discovery`, falling
+back from the origin root to `/mikka` once. It shows the actual server name and
+build revision before **继续**. Redirects, invalid metadata, incompatible
+versions and missing `mobileReady` produce explicit errors. HTTP is allowed
+only for exact loopback addresses, for development on that same device.
+
+The server must explicitly trust `mikka://` in `AUTH_TRUSTED_ORIGINS`.
+Available Google/GitHub/email methods come from discovery; OAuth uses the
+selected server's own clients and the existing Better Auth Expo return flow.
+See [server setup](../../docs/self-hosting.md#connect-the-official-ios-app).
+
+**设置 → 账号与服务器** switches saved accounts or adds one. On iOS, the account
+index lives in SecureStore using the existing Better Auth chunking adapter.
+Each slot permanently binds one server URL to its own cookie, cached session,
+workspace, workspace order and push-token keys. Existing `mikka_*` keys belong
+to the legacy default-server slot; they are never copied into a new server's
+jar. Two accounts on one installation receive different slots too. Index
+writes are read back before the active account changes; an unreadable index
+blocks session initialization and offers retry.
+
+Each API call captures its server and auth client before asynchronous keychain
+reads. Multi-step uploads, download grants and browser handoffs keep that same
+connection. Changing accounts remounts screens, clears the API identity cache,
+and resets realtime subscriptions. Live tickets may name any operator's secure
+WebSocket gateway; the complete URL, including `/mikka`, is retained. Plain
+`ws:` is limited to loopback. Expo Web uses browser cookies and is a layout
+preview; it does not establish iOS SecureStore or native multi-account acceptance.
+
 ## Push
 
 Registering a phone for pushes needs the EAS project id, committed in
@@ -47,6 +79,23 @@ own, or when the person turns a push on in 通知; never at launch. A tapped
 push opens what it is about (`lib/push-route.ts`): a proposal's card
 (`pendingActionId`), a finished thread (`runId`), or the chat it came from
 (`botId`).
+
+New payloads include `data.serverUrl` (canonical origin plus base path) and
+`data.userId`. Foreground banners and push taps must match both fields to the
+active account; IDs from another installation cannot open a local chat. Legacy
+payloads without either field are accepted only by the existing official-cloud
+slot. Switching accounts unregisters the old server first, with bounded network
+work; an in-flight registration finishes cleanup before the next account can
+register the same Expo token. An offline server can still retain a registration,
+so remote revocation and background OS delivery require device acceptance.
+
+The server binds a token to the native session that posts it and reads that
+session itself; the app never sends a session id (#1659). The app registers at
+sign-in, when its session changes (same phone and token, new session) and on
+return to the front. A registration counts as done only once the server has
+confirmed it for the current session, and only for 12 hours, so a token posted
+before the server bound sessions is posted again on the next of those events.
+There is no timer: a phone left in the background posts nothing.
 
 ## Releases
 
@@ -103,3 +152,7 @@ build used for native acceptance. Docker Expo Web can check application
 flows, accessible markup and responsive screenshots. VoiceOver, Dynamic
 Type, UIKit navigation, haptics and native Reduce Motion require real iOS
 evidence. A published artifact alone does not establish device acceptance.
+
+The self-hosted server change's explicit screenshot matrix and native acceptance
+steps are in [mobile self-hosting acceptance](../../docs/testing/mobile-self-hosting.md).
+Switching servers never changes the official EAS update project or channel.

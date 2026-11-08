@@ -72,6 +72,9 @@ export interface OrderView {
   deviceModels: Record<string, string[]>
 }
 
+/** The prompt's display facts; never a model admission or dispatch authority. */
+export type OrderContextView = Pick<OrderView, 'location' | 'preferredHarness' | 'entries' | 'candidates' | 'cloudReady' | 'cloudModels'>
+
 interface EntryRow { id: string; harness: OrderHarness; model: string; sourceKind: 'subscription' | 'api_key'; sourceId: string }
 const toEntry = (row: EntryRow): OrderEntry => ({
   id: row.id, harness: row.harness, model: row.model,
@@ -186,7 +189,7 @@ const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, con
   await service.member(scope.ownerId, scope.workspaceId)
   await service.workspace(credentialOwnerId, scope.workspaceId)
   if (credentialOwnerId !== scope.ownerId && !(await (await import('./personal-policy')).othersMayUse(query, credentialOwnerId, scope.workspaceId))) throw new ActionFailureError('executionAccountUnavailable')
-  await service.usage(credentialOwnerId, connectionId, signal)
+  await service.allowance(credentialOwnerId, connectionId, signal)
 }
 
 /** Each entry's credential, read now. Dispatch refreshes missing/stale allowance
@@ -313,17 +316,24 @@ export async function poolDevices(query: Query, ownerId: string): Promise<(PoolD
 
 /** The page: credentials' candidates, the list with each entry's status, and 运行位置.
  * A display caller may share its own device read; execution/dispatch never consumes this projection. */
-export async function orderView(query: Query, scope: OrderScope, readDevices: () => Promise<PoolDevice[]> = () => poolDevices(query, scope.ownerId)): Promise<OrderView> {
+export function orderView(query: Query, scope: OrderScope, readDevices?: () => Promise<PoolDevice[]>): Promise<OrderView>
+export function orderView(query: Query, scope: OrderScope, readDevices: (() => Promise<PoolDevice[]>) | undefined, projection: 'context'): Promise<OrderContextView>
+export async function orderView(query: Query, scope: OrderScope, readDevices: () => Promise<PoolDevice[]> = () => poolDevices(query, scope.ownerId), projection?: 'context'): Promise<OrderView | OrderContextView> {
   const candidates = await orderCandidates(query, scope)
   const order = await readOrder(query, scope, candidates)
   const states = await credentialStates(query, scope, order.entries, candidates, Date.now(), { probe: false, display: true })
   const devices = await readDevices()
   const added = new Set(order.entries.map(entryKey))
   const agents = agentsByOffer(candidates)
-  const { usableApiKeys } = await import('./model-api-keys')
-  const { rows: connected } = await query.query<{ id: string }>(`SELECT id::text AS id FROM byos_connections WHERE "ownerId"=$1 AND state='connected'`, [scope.ownerId])
-  const subscriptions = new Set([...connected.map(row => row.id), ...candidates.flatMap(candidate => candidate.source.kind === 'subscription' ? [candidate.source.connectionId] : [])])
-  const credentials = subscriptions.size + (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).length
+  let credentials: number | undefined
+  // Only Settings consumes this count. Prompt facts already derive their
+  // credential kinds from the freshly authorized candidates above.
+  if (projection !== 'context') {
+    const { usableApiKeys } = await import('./model-api-keys')
+    const { rows: connected } = await query.query<{ id: string }>(`SELECT id::text AS id FROM byos_connections WHERE "ownerId"=$1 AND state='connected'`, [scope.ownerId])
+    const subscriptions = new Set([...connected.map(row => row.id), ...candidates.flatMap(candidate => candidate.source.kind === 'subscription' ? [candidate.source.connectionId] : [])])
+    credentials = subscriptions.size + (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).length
+  }
   // 会先用 and the ready devices follow dispatch: the 优先使用的 Agent's list first.
   const runnable = dispatchOrder(order.entries, order.preferredHarness)
   const ready = order.location === 'cloud' && await (await import('./rule-dispatch')).cloudReady(query, { ...scope, botId: null, harness: runnable[0]?.harness ?? 'claude_code' })
@@ -332,13 +342,28 @@ export async function orderView(query: Query, scope: OrderScope, readDevices: ()
   const cloudModels = Object.fromEntries(order.entries.map(entry => [entry.id, cloudModelSupport(entry)]))
   const plan = planDispatch({ entries: runnable, location: order.location, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] })
   const firstDevice = plan.kind === 'device' ? devices.find(device => device.id === plan.deviceId) : undefined
+  const context: OrderContextView = {
+    location: order.location,
+    preferredHarness: order.preferredHarness,
+    cloudReady: ready,
+    cloudModels,
+    entries: order.entries.map(entry => {
+      const state = states.get(entry.id)!
+      // 云端 that runs takes every model; otherwise a server or a computer must.
+      const block: OrderRow['block'] = !state.credential.usable ? { reason: state.credential.reason, ...(state.credential.resetsAt ? { resetsAt: state.credential.resetsAt } : {}) }
+        : !(ready && cloudModels[entry.id] === 'ready') && !devices.some(device => deviceModel(device, entry)) ? { reason: 'noDevice', device: whyNoDevice(devices, entry) } : null
+      return { ...entry, provider: state.provider, agents: agents.get(offerKey(entry)) ?? [entry.harness], block }
+    }),
+    candidates: candidates.map(candidate => ({ ...candidate, added: added.has(entryKey(candidate)) })),
+  }
+  if (projection === 'context') return context
   return {
     dispatchOrder: deviceSchedulingView({ location: order.location, entries: runnable, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] }),
     location: order.location,
     customized: order.customized,
     autoModelRouting: order.autoModelRouting,
     preferredHarness: order.preferredHarness,
-    credentials,
+    credentials: credentials!,
     devices: devices.filter(device => device.enabled).length,
     cloudReady: ready,
     cloudModels,
@@ -354,14 +379,8 @@ export async function orderView(query: Query, scope: OrderScope, readDevices: ()
     readyDeviceIds: devices.filter(device => planDispatch({ entries: runnable, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),
     deviceModels: Object.fromEntries(devices.map(device => [device.id,
       [...new Set(order.entries.filter(entry => deviceModel({ ...device, enabled: true, online: true }, entry)).map(entry => entry.model))]])),
-    entries: order.entries.map(entry => {
-      const state = states.get(entry.id)!
-      // 云端 that runs takes every model; otherwise a server or a computer must.
-      const block: OrderRow['block'] = !state.credential.usable ? { reason: state.credential.reason, ...(state.credential.resetsAt ? { resetsAt: state.credential.resetsAt } : {}) }
-        : !(ready && cloudModels[entry.id] === 'ready') && !devices.some(device => deviceModel(device, entry)) ? { reason: 'noDevice', device: whyNoDevice(devices, entry) } : null
-      return { ...entry, provider: state.provider, agents: agents.get(offerKey(entry)) ?? [entry.harness], block }
-    }),
-    candidates: candidates.map(candidate => ({ ...candidate, added: added.has(entryKey(candidate)) })),
+    entries: context.entries,
+    candidates: context.candidates,
   }
 }
 

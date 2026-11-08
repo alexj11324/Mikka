@@ -10,6 +10,11 @@ import type { LocalDevice } from '@mikka/protocol/bridge'
  */
 export type LocalSetup = 'none' | 'install' | 'repair'
 
+/** Only an identified online daemon needs the server's ownership list. */
+export function localSetupNeedsOwnership(local: LocalDevice): boolean {
+  return local.status === 'online' && local.signedIn && Boolean(local.deviceId)
+}
+
 export function localSetupAction(local: LocalDevice, myDeviceIds: readonly string[]): LocalSetup {
   if (local.status === 'connecting') return 'none'
   if (local.status === 'online') return local.signedIn && local.deviceId && myDeviceIds.includes(local.deviceId) ? 'none' : 'install'

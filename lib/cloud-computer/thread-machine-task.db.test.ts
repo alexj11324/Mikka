@@ -1,3 +1,4 @@
+import { REGISTRATION_COMPLETE, REGISTRATION_WAITING } from '../computer/registration-command';
 // One task, one cloud sandbox (Alex, 2026-11-01). A task's next run resumes the
 // sandbox its last run left paused; no other task, bot or repository can take
 // it; a finished run of an open task parks its sandbox (paused, tokens
@@ -230,7 +231,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
                 await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`,[bootstrap.deviceId,createHash('sha256').update(bootstrap.credential).digest('hex')]);
                 await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`,[bootstrap.deviceId]);
               }
-              return {stdout:'',stderr:'',exitCode:0};
+              return {stdout:command.includes(REGISTRATION_COMPLETE)?REGISTRATION_COMPLETE+'\n':'',stderr:'',exitCode:0};
             }}} as never;
         };
         assert.deepEqual(await ensureThreadMachine(pool,actor,f.next,fixture.provider),{runId:f.next,state:'running'});
@@ -405,6 +406,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
               await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
               steps.push('registered');
+              stdout = REGISTRATION_COMPLETE + '\n';
             } else if (command.includes('mikka-runtime-process-verified')) {
               steps.push('rpc'); stdout = 'mikka-runtime-process-verified 42';
             } else assert.ok(command.includes('node dist/cloud/cloud-worker.js'), 'only worker startup remains');
@@ -1013,6 +1015,39 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [next])).rows[0].status, 'running', 'no run status is rewritten on failure');
     }));
 
+    for (const status of ['stopped','cancelled'] as const) await t.test('explicit refresh retains a safely exited '+status+' run and its microsecond stop marker', () => withRefreshWorker(async()=>{
+      const prior=await parked(await task(),{status}),fixture=refreshFake({prior},'paused')
+      await pool.query(`UPDATE agent_runs r SET "stopRequestedAt"='2026-11-06T23:59:59.123456Z',
+        report='{"safePoint":{"session":"exited"}}',"deviceId"=m."deviceId","deviceRepoId"=m."repoId"
+        FROM thread_machines m WHERE r.id=$1 AND m."runId"=r.id`,[prior.runId])
+      const before=(await pool.query('SELECT status,"stopRequestedAt"::text AS stop,report FROM agent_runs WHERE id=$1',[prior.runId])).rows[0]
+      assert.deepEqual(await ensureThreadMachine(pool,actor,prior.runId,fixture.provider,undefined,true),{runId:prior.runId,state:'running'})
+      assert.deepEqual((await pool.query('SELECT status,"stopRequestedAt"::text AS stop,report FROM agent_runs WHERE id=$1',[prior.runId])).rows[0],before)
+      assert.deepEqual(fixture.steps,['stage','switch','registered','verify','rpc'])
+    }))
+    for (const stopPhase of ['stage','publication'] as const) await t.test('a fresh stop during maintenance '+stopPhase+' cannot use the historic stopped-run exception', () => withRefreshWorker(async()=>{
+      const prior=await parked(await task(),{status:'stopped'}),fixture=refreshFake({prior},'paused')
+      await pool.query(`UPDATE agent_runs r SET "stopRequestedAt"='2026-11-06T23:59:59.123456Z',
+        report='{"safePoint":{"session":"exited"}}',"deviceId"=m."deviceId","deviceRepoId"=m."repoId"
+        FROM thread_machines m WHERE r.id=$1 AND m."runId"=r.id`,[prior.runId])
+      const connect=fixture.provider.connect
+      fixture.provider.connect=async(...args)=>{
+        const box=await connect(...args),execute=box.commands.run.bind(box.commands)
+        box.commands.run=(async(...commandArgs:Parameters<typeof box.commands.run>)=>{
+          const result=await execute(...commandArgs)
+          if(String(commandArgs[0]).includes(stopPhase==='stage'?'MIKKA_OFFICIAL_WORKER_STAGE':'mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json'))
+            await pool.query('UPDATE agent_runs SET "stopRequestedAt"=clock_timestamp() WHERE id=$1',[prior.runId])
+          return result
+        }) as typeof box.commands.run
+        return box
+      }
+      const warning=mock.method(console,'warn',()=>undefined)
+      try{await assert.rejects(ensureThreadMachine(pool,actor,prior.runId,fixture.provider,undefined,true),/Thread provisioning cancelled|Task runtime is busy or its ownership changed/)}
+      finally{warning.mock.restore()}
+      assert.notEqual((await machine(prior.runId)).state,'running')
+      assert.ok(fixture.steps.includes('rollback'))
+    }))
+
     for (const [state, recovered] of [['paused', false], ['running', true]] as const) {
       await t.test(`explicit runtime refresh updates the ${state} failed original VM without changing answer or recovery history`, () => withRefreshWorker(async () => {
         const f = await failedQuestionMachine(state, recovered), fixture = refreshFake(f, state);
@@ -1099,8 +1134,11 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       fixture.provider.connect = async id => {
         const sandbox = await connect(id, workspaceId);
         const execute = sandbox.commands.run.bind(sandbox.commands);
-        sandbox.commands.run = (async (command: string, options: { timeoutMs?: number }) => {
-          if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) return { stdout: '', stderr: '', exitCode: 0 };
+        sandbox.commands.run = (async (command: string, options: { timeoutMs?: number; onStdout?: (chunk: string) => void }) => {
+          if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
+            options.onStdout?.(REGISTRATION_WAITING + '\n');
+            throw new Error('cloud_registration_timeout');
+          }
           if (command.startsWith('tail -n 200 ')) return { stdout: tail, stderr: '', exitCode: 0 };
           const result = await execute(command, options);
           if (command.includes('node dist/cloud/cloud-worker.js')) {
@@ -1167,7 +1205,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
       try {
         const runId = await run(await task()), fixture = fake();
-        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0, uploads = 0;
+        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0, uploads = 0, starts = 0;
         fixture.provider.create = async (_source, op) => ({
           sandboxId: `sandbox-${op}`,
           files: {
@@ -1185,10 +1223,13 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               assert.equal('initialRunId' in JSON.parse(primary.data), false, 'old strict bootstrap consumers retain the original schema');
             },
           },
-          commands: { run: async (command: string) => {
+          commands: { run: async (command: string, options: { user?: string; background?: boolean }) => {
             if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
               assert.ok(bootstrap);
               assert.equal(uploads, 1, 'the optional locator shares the existing upload RPC');
+              assert.equal(options.user, 'root');
+              assert.notEqual(options.background, true, 'publication failures must complete before any fallback');
+              assert.match(command, /runuser -u user -- sh -c/);
               assert.ok(command.indexOf('mv /home/user/.mikka/initial-run.next /home/user/.mikka/initial-run.json') < command.indexOf('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json'));
               const used = await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
               assert.equal(used.rowCount, 1);
@@ -1196,8 +1237,10 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
               authenticated++;
               // Make the historical late floor observably later than this real authentication.
               await pool.query('SELECT pg_sleep(0.02)');
+              return { stdout: REGISTRATION_COMPLETE + '\n', stderr: '', exitCode: 0 };
             }
             if (command.includes('node dist/cloud/cloud-worker.js')) {
+              starts++;
               // The preloader already authenticated. Production throttles the token
               // timestamp, so explicit startup must not manufacture another use.
               let reads = 0;
@@ -1208,6 +1251,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         }) as never;
         assert.deepEqual(await ensureThreadMachine(pool, actor, runId, fixture.provider), { runId, state: 'running' });
         assert.equal(authenticated, 1);
+        assert.equal(starts, 0, 'the registered preloader needs no second remote start command');
       } finally {
         Date.now = realNow;
         if (savedWorker.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = savedWorker.url;

@@ -25,7 +25,8 @@ import { readNativeStartup } from './native-startup.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { waitForNativeDevice } from './native-device-ready.mjs'
 import { continueInSystemBrowser } from './browser-handoff.mjs'
-import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledRootDocument } from './native-document.mjs'
+import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
+import { createLifecycleQueryCounter, queryCountDelta } from './lifecycle-query-counts.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -62,7 +63,7 @@ const evidence = {
   },
 }
 const check = name => { evidence.checks.push({ name, result: 'passed' }); console.log(`PASS ${name}`) }
-let scope, browser, fixtures, nativeResources, application, ownerEmail, releaseObserver, generatedWorkspaceName
+let scope, browser, fixtures, nativeResources, application, ownerEmail, releaseObserver, generatedWorkspaceName, queryCounter
 let passed = false
 let cleanupFailure
 const active = new Set()
@@ -72,6 +73,24 @@ const phaseStart = performance.now()
 const mark = value => {
   phase = value
   if (evidence.phases.length < 128) evidence.phases.push({ phase, elapsedMs: Math.round(performance.now() - phaseStart) })
+}
+
+async function beginQueryWindow(name, metadata) {
+  const start = await queryCounter.snapshot()
+  const report = { status: 'measuring', ...metadata, checkpoints: [{ phase: 'before', snapshot: start }], segments: [] }
+  evidence.queryCounts.windows[name] = report
+  return { start, previous: start, report }
+}
+
+async function checkpointQueryWindow(window, phase, complete = false) {
+  const snapshot = await queryCounter.snapshot()
+  window.report.checkpoints.push({ phase, snapshot })
+  window.report.segments.push({ phase, ...queryCountDelta(window.previous, snapshot) })
+  window.previous = snapshot
+  if (complete) {
+    window.report.total = queryCountDelta(window.start, snapshot)
+    window.report.status = 'complete'
+  }
 }
 
 async function launch(mode, extraArgs = []) {
@@ -138,11 +157,12 @@ async function selectFixture(page) {
   await page.getByRole('button', { name: menuNames[locale], exact: true }).first().click()
   await page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true }).click()
   await usable(page)
+  return locale
 }
 
 async function nativeSignIn(app, page, account = scope.owner) {
   mark('auth-initial-document')
-  await waitForBundledRootDocument(page)
+  await waitForBundledDocument(page)
   mark('auth-open-browser')
   await app.evaluate(({ shell }) => {
     globalThis.__mikkaLifecycleExternal = null
@@ -277,6 +297,26 @@ async function opaqueFrameBoundary(app, page) {
 }
 
 try {
+  queryCounter = await createLifecycleQueryCounter({ revision, origin: environment.origin })
+  evidence.queryCounts = {
+    version: 1, source: queryCounter.source, windows: {},
+    scope: 'all actual pg.Client.query calls and PostgreSQL protocol bytes in the primary API process; no sampling',
+    exclusions: ['test-account lease/session tracking and fixture SQL in the separate harness process', 'PostgreSQL connection handshake and TCP/TLS overhead'],
+    background: 'all concurrent primary API background traffic is included; no guessed subtraction or per-request attribution',
+    boundary: 'query calls started and protocol bytes transferred by each checkpoint; in-flight response bytes can cross a checkpoint',
+    login: { authentication: 'normal email sign-in and get-session through the original leased-account helper; freshly saved private storageState',
+      native: 'the same email authentication, then real PKCE with the authenticated browser session and initial renderer/workspace selection',
+      web: 'the same email authentication, then a new actual Chromium context and the same workspace selection',
+      externalOAuthChallenge: false, sessionCache: 'normal signed-cookie cache, no manual flush; cache hits are not measured',
+      comparable: false, comparisonBasis: 'common ordinary authentication and same usable workspace; native includes its additional PKCE transport',
+      order: 'short Web context closes first; native and hosted retain the final ordinary login through the unchanged lifecycle checks',
+      protocolPhases: 'native handoff overlaps automatic renderer navigation; these concurrent queries are not falsely separated',
+      accountAndWorkspace: 'same leased owner and existing seeded fixture', locale: 'zh-CN' },
+    startup: { samples: 'first pair only from the unchanged five-pair lifecycle sequence',
+      clients: 'bundled Electron and the preserved hosted Web renderer in the same compiled Electron shell',
+      sessionCache: 'same retained authenticated app profile/workspace; normal profile and OS caches, no purge',
+      backend: 'same primary API and fixed source; server is already warm', performanceThreshold: 'none' },
+  }
   // The lease helper renews this five-minute lease while the process is alive.
   scope = await acquireTestAccounts({ runId: `desktop-lifecycle-${Date.now()}`, workerId: 'lifecycle', requestId: `lifecycle-${process.pid}-${Date.now()}`, ttlMs: 300_000 })
   releaseObserver = await observeAccountRelease(scope)
@@ -284,15 +324,41 @@ try {
   fixtures = await createParityFixtures(scope, { includePeerCoordinator: true })
   nativeResources = await captureNativeResources(scope)
   browser = await chromium.launch({ headless: true })
+  // The real multi-session plugin revokes the earlier same-account session
+  // when this cookie jar signs in again. PKCE retains that browser session,
+  // so finish and close the short Web comparison before creating the native
+  // profile used by every unchanged lifecycle check. No additional login.
+  mark('measure-web-login')
+  const webLogin = await beginQueryWindow('webLogin', { client: 'chromium', phase: 'ordinary-login-to-usable-workspace' })
+  await scope.owner.reauthenticate()
+  await checkpointQueryWindow(webLogin, 'common-email-authentication')
+  const webContext = await browser.newContext({ storageState: scope.owner.storageStatePath, viewport, locale: 'zh-CN' })
+  try {
+    const webPage = await webContext.newPage()
+    webPage.setDefaultTimeout(60_000)
+    await webPage.goto(`${environment.origin}/mikka`, { waitUntil: 'domcontentloaded' })
+    await checkpointQueryWindow(webLogin, 'web-navigation-to-dom-content-loaded')
+    assert.equal(await selectFixture(webPage), 'zh-CN')
+    await checkpointQueryWindow(webLogin, 'workspace-selection-to-usable', true)
+  } finally { await webContext.close() }
+
   let run = await launch('bundled')
   application = run.app
+  await waitForBundledDocument(run.page)
+  const nativeLogin = await beginQueryWindow('nativeLogin', { client: 'bundled-electron', phase: 'ordinary-login-to-usable-workspace' })
+  await scope.owner.reauthenticate()
+  await checkpointQueryWindow(nativeLogin, 'common-email-authentication')
   ownerEmail = (await nativeSignIn(run.app, run.page)).user.email
+  await checkpointQueryWindow(nativeLogin, 'native-pkce-and-automatic-renderer-to-public-session')
   mark('prepare-bundled-workspace')
-  await selectFixture(run.page)
+  assert.equal(await selectFixture(run.page), 'zh-CN')
+  await checkpointQueryWindow(nativeLogin, 'workspace-selection-to-usable', true)
+  evidence.queryCounts.login.comparable = true
   await prepareNativeDevice(run, 'bundled')
   await recordNativeState(run.page, 'authenticated-profile', 'bundled')
   await run.page.evaluate(() => localStorage.setItem('theme', 'light'))
   await close(run.app); application = null
+
   run = await launch('hosted')
   application = run.app
   mark('prepare-hosted-authentication')
@@ -310,10 +376,13 @@ try {
     const order = pair % 2 ? ['bundled', 'hosted'] : ['hosted', 'bundled']
     for (const mode of order) {
       mark(`cold-${mode}`)
+      const startupQueries = pair === 1
+        ? await beginQueryWindow(`startup-${mode}`, { client: `${mode}-electron`, phase: 'authenticated-launch-to-usable-workspace', pair }) : null
       run = await launch(mode)
       application = run.app
       await usable(run.page, 'Lifecycle readiness draft')
       const milliseconds = Math.round((performance.now() - run.started) * 100) / 100
+      if (startupQueries) await checkpointQueryWindow(startupQueries, 'launch-to-usable', true)
       evidence.samples.push({ pair, order: order.indexOf(mode) + 1, mode, milliseconds,
         launchTiming: run.launchTiming, startup: await readNativeStartup(run.app, run.page) })
       await recordNativeState(run.page, `cold-pair-${pair}`, mode)
@@ -416,6 +485,9 @@ try {
   // Cold start is measured and recorded in evidence.coldStart, not a pass/fail gate (Alex, 2026-11-06).
   passed = true
 } catch (error) {
+  for (const window of Object.values(evidence.queryCounts?.windows ?? {})) {
+    if (window.status === 'measuring') window.status = 'incomplete'
+  }
   evidence.failure = { phase, ...nativeLifecycleFailure(error) }
   throw error
 } finally {
@@ -425,7 +497,7 @@ try {
   if (application) await cleanup('electron-close', () => close(application)).catch(error => cleanupErrors.push(error))
   for (const app of active) await cleanup('electron-close', () => close(app)).catch(error => cleanupErrors.push(error))
   let browserClosed = true
-  if (browser) await cleanup('browser-close', () => browser.close()).catch(() => { browserClosed = false })
+  if (browser) await cleanup('browser-close', () => browser.close()).catch(error => { browserClosed = false; cleanupErrors.push(error) })
   let drained = false
   try { drained = (await cleanup('daemon-drain', () => stopLocalDaemons(Object.values(profiles)))).profilesStopped } catch (error) { cleanupErrors.push(error) }
   if (nativeResources && drained && !cleanupErrors.length) {
@@ -440,6 +512,7 @@ try {
   if (scope) await cleanup('lease-release', () => scope.release({ outcome: passed ? 'clean' : 'dirty' })).catch(error => { passed = false; cleanupErrors.push(error) })
   evidence.accountObservation = releaseObserver?.read() ?? { observed: false }
   releaseObserver?.restore()
+  if (queryCounter && evidence.queryCounts) evidence.queryCounts.rpcActions = await queryCounter.rpcActions(evidence.queryCounts.windows)
   evidence.finishedAt = new Date().toISOString()
   evidence.result = passed ? 'passed' : 'failed'
   await writeFile(join(output, 'lifecycle.json'), `${JSON.stringify(evidence, null, 2)}\n`)

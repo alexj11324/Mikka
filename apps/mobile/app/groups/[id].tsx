@@ -193,7 +193,7 @@ export default function GroupChat() {
 
   return (
     <View style={styles.screen}>
-      <NavBar title={title} material />
+      <NavBar title={title} />
       <GestureDetector gesture={timeReveal}>
       <View style={{ flex: 1, overflow: 'hidden' }}>
         <ChatMessageList ref={list} testID="group-chat-scroll" data={messages} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}

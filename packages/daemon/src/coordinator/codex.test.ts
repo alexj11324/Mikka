@@ -1,3 +1,4 @@
+import { failureFrom } from "@mikka/protocol/run-failure"
 import { PassThrough } from "node:stream"
 import { describe, expect, it, vi } from "vitest"
 import { z } from "zod"
@@ -7,7 +8,7 @@ import { runCodexCoordinator } from "./codex"
 const input = { instructions: "You are Mikka. Speak naturally.", context: "[Memory] Alex prefers Chinese.\n[Event] A new email arrived.", timeoutMs: 3000 }
 const final = 'root = TextContent("Alex，收到一封邮件，要我准备回复吗？")'
 
-function fixture(mode = "ok") {
+function fixture(mode = "ok", failure?: unknown) {
   const a = new PassThrough(), b = new PassThrough()
   const client = jsonlConnection(a, b), server = jsonlConnection(b, a)
   const calls: Record<string, unknown> = {}
@@ -31,7 +32,7 @@ function fixture(mode = "ok") {
     // A legal server can notify before returning turn/start.
     await server.sendNotification("item/completed", { threadId: "thread-1", turnId: "turn-1", item: { id: "progress", type: "agentMessage", phase: "commentary", text: "checking" } })
     if (mode !== "empty") await server.sendNotification("item/completed", { threadId: "thread-1", turnId: "turn-1", item: { id: "answer", type: "agentMessage", phase: "final_answer", text: final } })
-    await server.sendNotification("turn/completed", { threadId: "thread-1", turn: { id: "turn-1", status: mode === "fail" ? "failed" : "completed" } })
+    await server.sendNotification("turn/completed", { threadId: "thread-1", turn: { id: "turn-1", status: mode === "fail" ? "failed" : "completed", error: failure } })
     if (mode === "tools") calls.afterEnd = await server.sendRequest("item/tool/call", { ...call, callId: "late" })
     if (mode === "lost-ack") return new Promise(() => undefined)
     return { turn: { id: mode === "wrong-ack" ? "other" : "turn-1" } }
@@ -77,4 +78,23 @@ describe("Codex Coordinator over real JSONL RPC", () => {
     await expect(runCodexCoordinator({ ...input, signal: controller.signal }, { cwd: "/tmp", tools: [], connect })).rejects.toThrow()
     expect(connect).not.toHaveBeenCalled()
   })
+})
+
+it("captures the raw native turn refusal before schema parsing and redacts the actual context", async () => {
+  const message = "Subscription session expired."
+  const f = fixture("fail", { message: `unexpected status 401: ${JSON.stringify({ error: { type: "authentication_error", message } })}`, codexErrorInfo: { httpConnectionFailed: { httpStatusCode: 401 } } })
+  const error = await runCodexCoordinator(input, { ...f.host, runId: "native-turn" }).catch(error => error)
+  const failure = failureFrom(error)
+  expect(failure).toMatchObject({ schemaVersion: 1, runId: "native-turn", provider: "codex", category: "subscription", status: 401 })
+  expect(failure?.providerMessage).toContain("Subscription session expired")
+  expect(failure?.providerMessage).not.toContain("Alex prefers Chinese")
+  expect(failure?.appVersion).not.toBe("unknown")
+  expect(f.close).toHaveBeenCalledOnce()
+})
+
+it("omits native provider prose that echoes the real context", async () => {
+  const f = fixture("fail", { message: `unexpected status 401: ${JSON.stringify({ error: { message: `Subscription session expired. Request: ${input.context}` } })}` })
+  const error = await runCodexCoordinator(input, f.host).catch(error => error)
+  expect(failureFrom(error)).toMatchObject({ category: "subscription", status: 401 })
+  expect(failureFrom(error)?.providerMessage).toBeUndefined()
 })

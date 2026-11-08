@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 import type { Attributes, AttributeValue, Link, SpanStatus } from '@opentelemetry/api'
 import type { ReadableSpan, TimedEvent } from '@opentelemetry/sdk-trace-base'
 import { scrubString } from '@mikka/protocol/tracing'
+import { telemetryId } from '@mikka/protocol/trace-context'
+import { shortName } from './labels'
 
 export { scrubString }
 
@@ -42,6 +44,7 @@ const ALLOWED = new Set([
   'net.peer.name', 'net.peer.port', 'server.port', 'error.type', 'span.kind',
   'db.system', 'db.system.name', 'db.name', 'db.namespace', 'db.operation', 'db.operation.name', 'db.response.returned_rows',
   'db.query.text', 'db.statement',
+  'posthogDistinctId', 'sessionId',
 ])
 const STATEMENT_KEYS = new Set(['db.query.text', 'db.statement'])
 /** `next.*` keys that carry no request data worth the risk. */
@@ -70,9 +73,32 @@ export function sanitizeAttributes(attributes: Attributes): Attributes {
     const next = cleanValue(value)
     if (next !== undefined) clean[key] = next
   }
+  // PgInstrumentation 0.76 uses server.address, which must remain private.
+  // Keep only a closed regional projection for the two production candidates.
+  // Never trust a caller-supplied region label or export the endpoint/account.
+  delete clean['mikka.db_peer_region']
+  if (attributes['db.system.name'] === 'postgresql' || attributes['db.system'] === 'postgresql') {
+    const host = attributes['server.address'] ?? attributes['net.peer.name']
+    const region = typeof host === 'string'
+      ? /^ep-[a-z0-9-]+(?:\.c-\d+)?\.(us-east-[12])\.aws\.neon\.tech$/i.exec(host)?.[1]?.toLowerCase()
+      : undefined
+    if (region) clean['mikka.db_peer_region'] = `aws-${region}`
+  }
   // The root span learns its route only after it starts; give it the same grouping key as its children.
   if (clean['mikka.route'] === undefined && typeof clean['http.route'] === 'string') clean['mikka.route'] = clean['http.route']
+  // Workflow SDK sets these after onStart. Preserve safe identifiers and
+  // function labels at export, without its serialized inputs or queue payloads.
+  if (telemetryId(attributes['workflow.run.id'])) clean['mikka.workflow_run_id'] = attributes['workflow.run.id'] as string
+  const workflow = shortName(attributes['workflow.name'])
+  const step = shortName(attributes['step.name'])
+  if (workflow) clean['mikka.workflow'] = workflow
+  if (step) clean['mikka.step'] = step
   return clean
+}
+
+/** SDK display names include a compiled module path; the operation is the span name. */
+export function sanitizeSpanName(name: string): string {
+  return scrubString(/^(?:workflow|step)\./.test(name) ? name.split(' ', 1)[0] : name)
 }
 
 function sanitizeEvent(event: TimedEvent): TimedEvent {
@@ -88,7 +114,7 @@ export function sanitizeSpan(span: ReadableSpan): ReadableSpan {
   const status: SpanStatus = { code: span.status.code }
   const links: Link[] = span.links.map(link => ({ context: link.context }))
   return Object.create(span, {
-    name: { value: scrubString(span.name), enumerable: true },
+    name: { value: sanitizeSpanName(span.name), enumerable: true },
     attributes: { value: sanitizeAttributes(span.attributes), enumerable: true },
     events: { value: span.events.map(sanitizeEvent), enumerable: true },
     status: { value: status, enumerable: true },

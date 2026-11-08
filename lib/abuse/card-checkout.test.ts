@@ -5,7 +5,7 @@ import { BASE_PATH } from '../base-path'
 const workspaceId = '11111111-1111-4111-8111-111111111111'
 // The person's own workspace: verification is theirs, whichever workspace they start it from (C19).
 const teamId = '22222222-2222-4222-8222-222222222222'
-const env = { STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_WEBHOOK_SECRET: 'whsec_fixture', BETTER_AUTH_URL: 'https://app.example' }
+const env = { MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_WEBHOOK_SECRET: 'whsec_fixture', BETTER_AUTH_URL: 'https://app.example' }
 let admin = true
 let customerId: string | undefined
 let providerStatus = 200

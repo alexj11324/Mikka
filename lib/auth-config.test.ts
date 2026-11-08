@@ -1,8 +1,119 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { betterAuth } from 'better-auth'
-import { oAuthProxy } from 'better-auth/plugins'
-import { authOAuthProxyOptions, authTrustedOrigins, resolveAppOrigin } from './auth-config'
+import { bearer, oAuthProxy } from 'better-auth/plugins'
+import { humanSessionHeaders } from './desktop-rpc/handler'
+import { readFreshSessionsInScope, withFreshSession, SESSION_OPTIONS } from './fresh-session'
+import { authOAuthProxyOptions as configuredAuthOAuthProxyOptions, authTrustedOrigins as configuredAuthTrustedOrigins, authEffectiveTrustedOrigins, resolveAppOrigin } from './auth-config'
+
+// Existing hosted behavior remains strict; a community deployment is tested separately.
+const authTrustedOrigins = (env: Record<string, string | undefined>) => configuredAuthTrustedOrigins({ MIKKA_EDITION: 'cloud', ...env })
+const authOAuthProxyOptions = (env: Record<string, string | undefined>) => configuredAuthOAuthProxyOptions({ MIKKA_EDITION: 'cloud', ...env })
+
+test('community trusts the exact mobile scheme only when configured; cloud retains its current mobile default', () => {
+  const env = { MIKKA_EDITION: 'community', BETTER_AUTH_URL: 'https://self.example' }
+  assert.deepEqual(authEffectiveTrustedOrigins(env), ['https://self.example'])
+  assert.deepEqual(authEffectiveTrustedOrigins({ ...env, AUTH_TRUSTED_ORIGINS: 'mikka://,https://self.example,mikka://' }), ['https://self.example', 'mikka://'])
+  assert.ok(authEffectiveTrustedOrigins({ ...env, MIKKA_EDITION: 'cloud' }).includes('mikka://'))
+  for (const value of ['mikka://app', 'mikka://*', 'mikka:///callback', 'mikka://?target=other', 'other://']) {
+    assert.throws(() => authEffectiveTrustedOrigins({ ...env, AUTH_TRUSTED_ORIGINS: value }))
+  }
+  assert.throws(() => authEffectiveTrustedOrigins({ ...env, BETTER_AUTH_URL: 'mikka://' }))
+})
+
+test('community cannot borrow the hosted OAuth proxy or enable one with a partial setting', () => {
+  for (const value of [{ BETTER_AUTH_OAUTH_PROXY_URL: 'https://app.aspectlylabs.com' }, { BETTER_AUTH_OAUTH_PROXY_SECRET: 'fixture-proxy-secret' }]) {
+    assert.throws(() => configuredAuthOAuthProxyOptions(value), /SELF_HOSTED_OAUTH_PROXY_UNSUPPORTED/)
+  }
+  assert.equal(configuredAuthOAuthProxyOptions({ BETTER_AUTH_URL: 'https://self.example' }), undefined)
+})
+
+test('real Better Auth uses each community server OAuth callback without the hosted proxy', async () => {
+  for (const origin of ['https://self.example.test', 'http://localhost:3030']) {
+    const env = { BETTER_AUTH_URL: origin, MIKKA_EDITION: 'community' }
+    const auth = betterAuth({
+      baseURL: resolveAppOrigin(env), basePath: '/mikka/api/auth',
+      secret: 'fixture-community-secret-with-sufficient-entropy',
+      trustedOrigins: authEffectiveTrustedOrigins(env), logger: { disabled: true },
+      socialProviders: { google: { clientId: 'fixture-google', clientSecret: 'fixture-secret' },
+        github: { clientId: 'fixture-github', clientSecret: 'fixture-secret' } },
+    })
+    for (const provider of ['google', 'github']) {
+      const response = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/social`, {
+        method: 'POST', headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify({ provider, callbackURL: `${origin}/mikka/api/desktop/return`, disableRedirect: true }),
+      }))
+      assert.equal(response.status, 200)
+      const authorization = new URL((await response.json()).url)
+      assert.equal(authorization.searchParams.get('redirect_uri'), `${origin}/mikka/api/auth/callback/${provider}`)
+      assert.ok(authorization.searchParams.get('state'))
+      assert.ok(response.headers.get('set-cookie'))
+    }
+  }
+})
+
+test('community email sessions authenticate locally and foreign browser origins remain refused', async () => {
+  const origin = 'https://self-email.example.test'
+  const auth = betterAuth({
+    baseURL: origin, basePath: '/mikka/api/auth', secret: 'fixture-email-secret-with-sufficient-entropy',
+    trustedOrigins: authEffectiveTrustedOrigins({ BETTER_AUTH_URL: origin }),
+    emailAndPassword: { enabled: true }, plugins: [bearer()], logger: { disabled: true },
+  })
+  const response = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-up/email`, {
+    method: 'POST', headers: { origin, 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Local user', email: 'local-desktop@example.test', password: 'fixture-password-123' }),
+  }))
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  const session = await auth.api.getSession({ headers: new Headers({ authorization: `Bearer ${body.token}` }) })
+  assert.equal(session?.user.id, body.user.id)
+  const denied = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-out`, {
+    method: 'POST', headers: { origin: 'https://attacker.example', cookie: response.headers.getSetCookie().map(value => value.split(';')[0]).join('; '), 'content-type': 'application/json' }, body: '{}',
+  }))
+  assert.equal(denied.status, 403)
+})
+
+test('real SDK signed native sessions pass human REST freshness and retain revocation and cookie isolation', async () => {
+  const origin = 'https://native-human.example.test'
+  const auth = betterAuth({ baseURL: origin, basePath: '/mikka/api/auth',
+    secret: 'fixture-native-human-secret-with-sufficient-entropy', trustedOrigins: [origin],
+    emailAndPassword: { enabled: true }, plugins: [bearer()], session: SESSION_OPTIONS, logger: { disabled: true } })
+  const response = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-up/email`, {
+    method: 'POST', headers: { origin, 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Fixture', email: 'native-human@example.test', password: 'fixture-password-123' }),
+  }))
+  assert.equal(response.status, 200)
+  const user = (await response.json()).user
+  const token = response.headers.get('set-auth-token')!
+  assert.ok(token?.endsWith('='), 'the real SDK emits a padded signed bearer')
+  const cookie = response.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
+  const request = (authorization: string) => new Request(`${origin}/mikka/api/integrations/mcp/shares`, {
+    method: 'PATCH', headers: { origin, authorization, cookie }, body: '{}',
+  })
+  const headers = humanSessionHeaders(request(`Bearer ${token}`))
+  assert.ok(headers, 'human REST must admit the SDK signed bearer format')
+  assert.equal(headers.has('cookie'), false)
+  readFreshSessionsInScope(auth.api, { cookieName: async () => (await auth.$context).authCookies.sessionData.name })
+  const read = (input: Headers) => withFreshSession(() => auth.api.getSession({ headers: input }))
+  assert.equal((await read(headers))?.user.id, user.id)
+  const tampered = humanSessionHeaders(request(`Bearer ${token.slice(0, -3)}xxx`))!
+  assert.equal(await read(tampered), null, 'an invalid signature cannot borrow the browser cookie')
+  for (const prefix of ['mkp_', 'mka_', 'mkr_']) assert.equal(humanSessionHeaders(request(`Bearer ${prefix}${'a'.repeat(43)}`)), null)
+  const logout = await auth.handler(new Request(`${origin}/mikka/api/auth/sign-out`, {
+    method: 'POST', headers: { origin, authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}',
+  }))
+  assert.equal(logout.status, 200)
+  assert.equal(await read(headers), null, 'the fresh human boundary observes actual session revocation')
+})
+
+test('community production permits its exact loopback origin without allowing cleartext network origins', () => {
+  for (const origin of ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000']) {
+    assert.deepEqual(configuredAuthTrustedOrigins({ NODE_ENV: 'production', BETTER_AUTH_URL: origin }), [origin])
+  }
+  for (const origin of ['http://example.com', 'http://localhost.attacker.com', 'http://10.0.0.5:3000']) {
+    assert.throws(() => configuredAuthTrustedOrigins({ NODE_ENV: 'production', BETTER_AUTH_URL: origin }))
+  }
+})
 
 const hub = 'https://app.aspectlylabs.com'
 const preview = 'https://mikka-preview.example.com'

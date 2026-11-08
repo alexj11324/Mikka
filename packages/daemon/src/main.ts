@@ -1,3 +1,5 @@
+import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
+import { captureRunFailure } from "@mikka/protocol/run-failure"
 import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
@@ -69,6 +71,7 @@ import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
+import { writeCloudRegistration } from "./cloud-registration"
 import { reusableHostedModels, type HostedModelProbe } from "./cloud-model-probe"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
@@ -78,6 +81,7 @@ import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
 import { Outbox } from "./outbox"
+import type { RunTraceContext } from '@mikka/protocol/trace-context'
 import { QuotaPoller, type QuotaSource } from "./quota/poller"
 import { DAEMON_VERSION, daemonPaths, type DaemonPaths } from "./paths"
 import { daemonTracer, runIdHash } from "./tracing"
@@ -154,6 +158,8 @@ export interface DaemonOptions {
   preloadedModels?: HostedModelProbe
   /** One-use control-plane locator; the existing registered claim still authorizes it. */
   initialRunId?: string
+  /** Trusted one-use bootstrap optimization; fresh claim still grants authority. */
+  anonymousClaudeCandidate?: AnonymousClaudeCandidate
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
   /** Trusted acceptance launcher only; opt in to persisted run/CLI diagnostics. */
@@ -234,6 +240,7 @@ export class Daemon {
   private releaseLock: (() => Promise<void>) | null = null
   private rpc: RpcServer | null = null
   private outbox!: Outbox
+  private registrationTraceContext?: RunTraceContext
   private journal!: RunJournal
   private captureUploader!: CaptureUploader
   private worktrees!: WorktreeManager
@@ -351,7 +358,8 @@ export class Daemon {
       this.log,
       undefined,
       (runId, _item, error) => this.supervisor.markUndeliverable(runId, error),
-      this.options.retainResources
+      this.options.retainResources,
+      runId => this.journal.get(runId)?.assignment.traceContext,
     )
     this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
     this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
@@ -439,6 +447,7 @@ export class Daemon {
           journal: this.journal,
           binaries: this.options.harnessBinaries,
           collectCliTiming: this.options.collectCliTiming,
+          anonymousClaudeCandidate: this.options.anonymousClaudeCandidate,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
           computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
           // The cloud machine's own probe decides which subscription models a run may use here.
@@ -1314,7 +1323,7 @@ export class Daemon {
 
   private async register(credential: string) {
     const { workspaceId, deviceId: knownDeviceId } = this.device
-    const { deviceId, tracing } = await this.options.link.registerDevice(
+    const { deviceId, tracing } = await daemonTracer.span("daemon.registration", {}, async () => this.options.link.registerDevice(
       credential,
       {
         name: hostname(),
@@ -1332,7 +1341,7 @@ export class Daemon {
           : {}),
       },
       knownDeviceId
-    )
+    ), { traceContext: this.registrationTraceContext })
     // A late registration must not restore the session replaced over RPC.
     if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) throw new Error('Device session changed during registration')
     if (deviceId !== this.device.deviceId) {
@@ -1344,6 +1353,10 @@ export class Daemon {
     const computerBroker = this.localComputerBroker ?? this.cloudComputerBroker ?? this.options.computerBroker
     if (computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
     this.registered = true
+    if (this.options.hostedSubscriptions && this.options.e2bContainerRuntime && workspaceId && !this.stopped) {
+      try { writeCloudRegistration(this.paths.dataDir, deviceId, workspaceId, credential) }
+      catch { this.log.warn({ event: 'cloud_registration_notice_failed' }, 'Cloud registration notification unavailable') }
+    }
     if (computerBroker && !this.stopped) {
       this.reviewAbort?.abort()
       const abort = new AbortController()
@@ -1597,8 +1610,9 @@ export class Daemon {
       }
       if (!matches) {
         const message = "Repository origin does not match the approved repository"
-        await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message) })
-        throw new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+        const error = new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
+        await this.options.link.completeRun(runId, { stopReason: "error", report: baseReport(message), failureDetails: captureRunFailure(error, { runId, appVersion: DAEMON_VERSION, sensitiveText: [assignment.prompt] }) })
+        throw error
       }
     }
     if (assignment.computer && (!this.cloudComputerBroker || !cloudComputerGrantMatches(assignment, runId, deviceId))) throw new Error('Cloud computer runtime unavailable')
@@ -1627,6 +1641,7 @@ export class Daemon {
         .completeRun(runId, {
           stopReason: "error",
           report: baseReport(error.message),
+          failureDetails: captureRunFailure(error, { runId, appVersion: DAEMON_VERSION }),
         })
         .catch((err: unknown) =>
           this.log.warn({ run_id: runId, err }, "could not report refused run")
@@ -1762,7 +1777,7 @@ export class Daemon {
       "device.setCredential": (raw) => {
         this.reviewAbort?.abort()
         this.reviewAbort = null
-        const { credential, workspaceId } =
+        const { credential, workspaceId, traceContext } =
           daemonRpc["device.setCredential"].params.parse(raw)
         // The device id is kept, in every workspace (ADR ORV-284):
         // registering with it in another workspace joins this same device
@@ -1773,7 +1788,8 @@ export class Daemon {
         })
         this.revokeLocalComputerGrants()
         this.registered = false
-        void this.syncWithServer()
+        this.registrationTraceContext = traceContext
+        void daemonTracer.withContext(traceContext, () => this.syncWithServer())
         return { ok: true as const }
       },
       "device.clearCredential": () => {
@@ -1898,6 +1914,7 @@ export class Daemon {
 
   private async stopInternal() {
     this.stopped = true
+    const anonymousClosing = this.options.anonymousClaudeCandidate?.close()
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
     await this.maintenance
@@ -1919,6 +1936,7 @@ export class Daemon {
       await this.localComputerBroker?.close()
       await this.cloudComputerBroker?.close()
     }
+    await anonymousClosing
     await this.outbox?.close()
     await daemonTracer.shutdown()
     const release = this.releaseLock

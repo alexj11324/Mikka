@@ -1,5 +1,7 @@
 import { z } from 'zod'
+import { noteLogRpcAction } from '../request-log'
 import { decode, encode, DESKTOP_RPC_VERSION, DESKTOP_RPC_PREVIOUS_VERSION, UPDATE_REQUIRED } from './wire'
+import { desktopSameOriginRequest } from '../desktop-auth'
 
 export type DesktopAction = { args: z.ZodType; invoke: (args: never[]) => Promise<unknown> }
 export type DesktopActions = Readonly<Record<string, DesktopAction>>
@@ -16,7 +18,9 @@ const failure = rpcFailure
  * must still pass Better Auth's signature, bearer-binding and expiry checks. */
 export function desktopBearerHeaders(request: Request): Headers | null {
   const authorization = request.headers.get('authorization')
-  if (!authorization || !/^Bearer [A-Za-z0-9_.%~+/-]{32,512}$/.test(authorization) || /^Bearer (?:mkp_|mka_|mkr_)/.test(authorization)) return null
+  // Better Auth's set-auth-token is a signed value with base64 padding.
+  // Only trailing padding is allowed; the complete token stays within 512 bytes.
+  if (!authorization || !/^Bearer (?=.{32,512}$)[A-Za-z0-9_.%~+/-]+={0,2}$/.test(authorization) || /^Bearer (?:mkp_|mka_|mkr_)/.test(authorization)) return null
   const headers = new Headers(request.headers)
   headers.delete('cookie')
   return headers
@@ -70,6 +74,7 @@ export async function dispatchRpc<Session>(options: RpcDispatchOptions<Session>,
     if (![DESKTOP_RPC_VERSION, DESKTOP_RPC_PREVIOUS_VERSION].includes(input.version as 0 | 1)
       || (headerVersion !== null && headerVersion !== String(input.version))) return failure(426, UPDATE_REQUIRED)
     if (!Object.hasOwn(options.actions, input.action)) return failure(404, 'desktop_rpc_action_unknown', input.version)
+    noteLogRpcAction(input.action)
     const action = options.actions[input.action]
     let args: unknown
     try { args = decode(input.args) } catch { return failure(400, 'desktop_rpc_request_invalid', input.version) }
@@ -90,6 +95,7 @@ export function createDesktopRpc<Session>(options: RpcDispatchOptions<Session> &
   authenticate: (headers: Headers) => Promise<Session | null>
 }) {
   return async (request: Request): Promise<Response> => {
+    if (!desktopSameOriginRequest(request)) return failure(403, 'desktop_rpc_request_invalid')
     const headers = desktopBearerHeaders(request)
     if (!headers) return failure(401, 'desktop_session_expired')
     let session: Session | null

@@ -28,7 +28,7 @@ async function ticket(request: Request) {
   if (!member.rowCount) return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
   const config = liveGatewayConfig(process.env)
   if (!config) return NextResponse.json({ url: null, protocol: null, expiresAt: null }, { headers })
-  const scope = { ownerId: session.user.id, workspaceId }, issued = liveTicket(scope, config)
+  const scope = { ownerId: session.user.id, workspaceId }, issued = liveTicket(scope, config, Date.now(), session.session?.id)
   const homeScope = member.rows[0]?.personalHome ? homeScopeProof(scope, issued.expiresAt, config.secret) : null
   return NextResponse.json({ ...issued, ...(homeScope ? { homeScope } : {}) }, { headers })
 }

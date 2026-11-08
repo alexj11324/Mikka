@@ -1,0 +1,123 @@
+name: Self-hosted image
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: self-hosted-image-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      COMPOSE_FILE: docker-compose.yml:tests/self-hosted/compose.services.yml
+      COMPOSE_PROJECT_NAME: mikka-selfhost-ci
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify disposable acceptance target guards and model fixture
+        run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
+      - name: Build the public standalone application
+        run: docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --tag mikka-self-hosted:check .
+      - name: Verify packaged subscription binaries without network or credentials
+        run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
+      - name: Start with an empty database and no Mikka credentials
+        run: |
+          node --input-type=module <<'JS'
+          import { randomBytes } from 'node:crypto'
+          import { appendFileSync } from 'node:fs'
+          for (const [name, value] of Object.entries({ POSTGRES_PASSWORD: randomBytes(24).toString('hex'), SELF_HOSTED_FIXTURE_KEY: randomBytes(32).toString('base64') })) {
+            console.log(`::add-mask::${value}`)
+            appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`)
+          }
+          appendFileSync(process.env.GITHUB_ENV, 'MIKKA_IMAGE=mikka-self-hosted:check\n')
+          JS
+      - name: Build the pinned upstream MinIO fixture
+        run: docker compose build minio
+      - name: Apply migrations and wait for health
+        run: docker compose up --detach --wait --wait-timeout 240
+      - name: Verify runtime edition, sign-in document, API and compiled assets
+        run: node scripts/self-hosted-smoke.mjs
+        env:
+          MIKKA_EXPECTED_REVISION: ${{ github.sha }}
+      - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
+        timeout-minutes: 10
+        run: docker compose exec -T app node scripts/acceptance/self-hosted-services.mjs
+      - name: Install the same-revision source daemon dependencies
+        uses: ./.github/actions/pnpm-install
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Exercise the real daemon against the registered community user
+        timeout-minutes: 6
+        run: |
+          node --import tsx --test scripts/acceptance/self-hosted-daemon.test.mjs
+          umask 077
+          mkdir -m 700 "$RUNNER_TEMP/mikka-selfhost-daemon"
+          docker compose cp app:/data/self-hosted-daemon-session.private.json "$RUNNER_TEMP/mikka-selfhost-daemon/session.json"
+          chmod 600 "$RUNNER_TEMP/mikka-selfhost-daemon/session.json"
+          docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})'
+          node --import tsx scripts/acceptance/self-hosted-daemon.mjs
+      - name: Remove private daemon fixture material
+        if: always()
+        run: |
+          rm -rf -- "$RUNNER_TEMP/mikka-selfhost-daemon"
+          docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})' || true
+      - name: Retain secret-free application acceptance evidence
+        if: always()
+        run: |
+          mkdir -p .artifacts/self-hosted
+          docker compose cp app:/data/self-hosted-services-evidence.json .artifacts/self-hosted/evidence.json || true
+      - name: Upload isolated acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: self-hosted-services-${{ github.sha }}
+          path: |
+            .artifacts/self-hosted/evidence.json
+            .artifacts/self-hosted/daemon.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Verify the same persistent installation restarts
+        run: |
+          docker compose restart app
+          docker compose up --detach --wait --wait-timeout 120
+          node scripts/self-hosted-smoke.mjs
+      - name: Verify the frozen community UI remains opt-in with the same data
+        run: |
+          MIKKA_COMMUNITY_UI=1 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
+          MIKKA_EXPECT_COMMUNITY_UI=1 node scripts/self-hosted-smoke.mjs
+          MIKKA_COMMUNITY_UI=0 docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 app
+          node scripts/self-hosted-smoke.mjs
+      - name: Publish the tested revision
+        if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka'
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          image=ghcr.io/alexj11324/mikka
+          docker tag mikka-self-hosted:check "$image:$GITHUB_SHA"
+          docker push "$image:$GITHUB_SHA"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            docker tag mikka-self-hosted:check "$image:$GITHUB_REF_NAME"
+            docker push "$image:$GITHUB_REF_NAME"
+          elif [ "$GITHUB_REF" = refs/heads/main ]; then
+            docker tag mikka-self-hosted:check "$image:latest"
+            docker push "$image:latest"
+          fi
+      - name: Retain startup diagnostics on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=150
+      - name: Stop disposable services
+        if: always()
+        run: docker compose down --volumes --remove-orphans

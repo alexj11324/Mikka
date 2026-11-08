@@ -1,3 +1,6 @@
+import { captureRunFailure, type RunFailureContext } from '@mikka/protocol/run-failure'
+import { WorkflowRunFailureError } from './workflow-run-failure'
+import { APP_BUILD } from './app-build'
 import { workerSubscriptionMatches } from './agent-kit/worker'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { quotaSnapshotSchema, type QuotaSnapshot } from '@mikka/protocol'
@@ -107,6 +110,7 @@ export class SubscriptionService {
         const model = provider(modelId)
         const doStream = model.doStream.bind(model)
         model.doStream = async options => {
+          const failureContext: RunFailureContext = { credential: 'subscription', provider: connection.provider === 'openai' ? 'codex' : 'claude_code', appVersion: APP_BUILD, requestBodyValues: { prompt: options.prompt, tools: options.tools, providerOptions: options.providerOptions, headers: options.headers } }
           try {
             const result = await doStream(options)
             const reader = result.stream.getReader()
@@ -126,14 +130,14 @@ export class SubscriptionService {
                     }
                     await logGenerationFailure('stream_part', value.error)
                   }
-                  controller.enqueue(value.type === 'error' ? { type: 'error', error: subscriptionGenerationError(value.error) } : value)
+                  controller.enqueue(value.type === 'error' ? { type: 'error', error: subscriptionGenerationError(value.error, failureContext) } : value)
                 } catch (error) {
                   if (closed) return
                   const cancelled = requestedCancellation(error, options.abortSignal, signal)
                   if (cancelled) { closed = true; reader.releaseLock(); controller.error(cancelled); return }
                   await logGenerationFailure('stream', error)
                   closed = true; reader.releaseLock()
-                  controller.enqueue({ type: 'error', error: subscriptionGenerationError(error) }); controller.close()
+                  controller.enqueue({ type: 'error', error: subscriptionGenerationError(error, failureContext) }); controller.close()
                 }
               },
               async cancel(reason) { closed = true; await reader.cancel(reason); reader.releaseLock() }
@@ -142,7 +146,7 @@ export class SubscriptionService {
           } catch (error) {
             const cancelled = requestedCancellation(error, options.abortSignal, signal)
             if (cancelled) throw cancelled
-            await logGenerationFailure('start', error); throw subscriptionGenerationError(error)
+            await logGenerationFailure('start', error); throw subscriptionGenerationError(error, failureContext)
           }
         }
         return model
@@ -269,6 +273,26 @@ export class SubscriptionService {
     const row = await this.repository.connection(ownerId, binding.connectionId)
     return run({ use, modelId: binding.modelId, access: () => this.access(use), worker: this.worker(this.repository.scope(row)).forUse(use) })
   }
+  /** Fresh allowance for model admission, under the same owner custody as Usage.
+   * Settings-only account/profile reads and account writes stay in usage(). */
+  async allowance(ownerId: string, id: string, signal?: AbortSignal): Promise<void> {
+    const row = await this.repository.connection(ownerId, id)
+    if (row.state !== 'connected') return
+    try {
+      const result = await this.worker(this.repository.scope(row)).call<Pick<WorkerUsage, 'status' | 'body'>>('allowance', { revision: Number(row.epoch) }, signal)
+      const quota = quotaSnapshotSchema.parse(await this.quota(row.provider, result))
+      const plan = result.body && typeof result.body === 'object' && 'plan_type' in result.body ? result.body.plan_type : undefined
+      // Only the already-returned, allowlisted Codex quota plan is new metadata.
+      // Claude and missing/unknown plans keep the current DB value in the same
+      // epoch-fenced UPDATE, including a Settings change during this await.
+      const hasPlan = row.provider === 'codex' && result.status === 200 && typeof plan === 'string'
+        && ['plus', 'pro', 'free', 'team', 'business', 'enterprise', 'go'].includes(plan) && typeof quota.plan === 'string' && quota.plan.length > 0
+      await this.repository.saveQuota(row, quota, hasPlan ? undefined : { preservePlan: true })
+    } catch {
+      const now = await this.repository.connection(ownerId, id).catch(() => null)
+      if (now && now.state !== row.state) await (await import('./live/lists')).ownerSettingsChanged(this.repository.pool, ownerId)
+    }
+  }
   /** The owner's own Settings read: no binding, a connected revision only.
    * Never throws for a provider or worker failure: the row degrades instead,
    * keeping the last known email. */
@@ -343,17 +367,19 @@ function requestedCancellation(error: unknown, ...signals: (AbortSignal | undefi
 
 /** Only fixed, typed refusal codes cross into persisted chat errors. SDK
  * wrappers may carry the original error in cause; raw provider text cannot. */
-export function subscriptionGenerationError(error: unknown): Error {
+export function subscriptionGenerationError(error: unknown, context: RunFailureContext = {}): Error {
+  const original = error
+  let code = 'subscription_generation_failed'
   for (let depth = 0; depth < 4; depth++) {
     if (error instanceof SubscriptionRefusal || error instanceof WorkerRefusal) {
-      if (GENERATION_FAILURES.has(error.code)) return new Error(error.code)
-      if (error.code === 'invalid_credential_bundle') return new Error('reconnect_required')
-      if (BACKEND_FAILURES.has(error.code)) return new Error('backend_unavailable')
+      if (GENERATION_FAILURES.has(error.code)) { code = error.code; break }
+      if (error.code === 'invalid_credential_bundle') { code = 'reconnect_required'; break }
+      if (BACKEND_FAILURES.has(error.code)) { code = 'backend_unavailable'; break }
     }
     if (!(error instanceof Error)) break
     error = error.cause
   }
-  return new Error('subscription_generation_failed')
+  return new WorkflowRunFailureError(captureRunFailure(original, { credential: 'subscription', ...context }), { cause: original }, code)
 }
 
 /**

@@ -1,5 +1,6 @@
 /** The shapes app/api/mobile/* and /api/suggestions return (see those routes on the server). */
 import type { SubscriptionRefusalNotice } from '../../../lib/subscription-refusal'
+import type { CloudErrorCode } from '../../../lib/cloud-services/errors'
 import type { PresenceProof } from '../../../lib/live/presence'
 export type Source = 'gmail' | 'github' | 'slack' | 'notion' | 'linear' | 'googlecalendar'
 export type MachineKind = 'cloud' | 'laptop' | 'server'
@@ -88,7 +89,7 @@ export type ChatFailure = (
   | { kind: 'hosted'; code: string }
   | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
   | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
-  | { kind: 'failed'; reason?: 'balance' | 'tools' }
+  | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
   // The stored code(s), shown only under 详情 (the web's RunErrorDetails); older servers omit it.
 ) & { raw?: string }
 
@@ -173,7 +174,55 @@ export interface Suggestions { groups: { source: Source; items: Suggestion[] }[]
 export type TaskBlockReason = 'question' | 'quota' | 'run' | 'failed' | 'dependency' | 'flagged'
 export interface Task { id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string
   /** Absent from a server older than 受阻. */
-  blocked?: { reason: TaskBlockReason; blocker: string | null } | null }
+  blocked?: { reason: TaskBlockReason; blocker: string | null } | null
+  /** Its list group from its current thread (R-52, 2026-11-07); absent from an older server (features/tasks/model/task-groups.ts). */
+  group?: TaskGroup
+  /** The bot that dispatched it. */
+  bot?: TaskBot | null
+  /** A scheduled task's next run. */
+  schedule?: TaskSchedule | null
+  createdAt?: string
+  /** Its state (decisions/2026-11-07-2230): an attempt's in 等待你 and 进行中, else its board status. Absent from an older server. */
+  state?: ServerTaskState | null
+  /** Why, as a code; the app writes the words (features/tasks/model/task-groups.ts REASON_WORD). */
+  reason?: TaskReason | null
+  /** The blocking task's identifier when `reason` is blocked_by. */
+  blockedBy?: string | null }
+
+/** One icon per state (decisions/2026-11-07-2230-one-icon-per-task-state.md); open and closed tasks show their board status. */
+export type TaskState = 'waiting' | 'failed' | 'blocked' | 'running' | 'queued'
+/** The API's `state`: the four attempt states, or the board status of an open or closed task. */
+export type ServerTaskState = TaskState | 'todo' | 'done' | 'canceled' | 'duplicate'
+export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'blocked_by' | 'flagged'
+
+/** 待处理 · 进行中 · 待办 · 已完成 (decisions/2026-11-07-2045-tasks-only-threads-inside.md). */
+export type TaskGroup = 'pending' | 'running' | 'todo' | 'done'
+export interface TaskBot { id: string; name: string; color?: string; shape?: string }
+export interface TaskSchedule { label: string; nextAt: string | null }
+
+/** One entry of a task's 活动, newest first. */
+export type TaskActivity =
+  | { kind: 'attempt'; runId: string; n: number; group: ThreadGroup; harness: string; createdAt: string; failed: boolean
+    /** Its own result (2026-11-07-2230); absent from an older server. */
+    state?: 'running' | 'waiting' | 'failed' | 'blocked' | 'done'
+    /** The pull request it opened; absent from an older server. */
+    pullRequest?: { number: number; url?: string | null } | null }
+  | { kind: 'replaced'; runId: string; createdAt: string }
+  | { kind: 'created'; by: string | null; createdAt: string }
+
+/** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
+export interface TaskDetail {
+  task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
+    bot: TaskBot | null
+    schedule: TaskSchedule | null
+    description: string | null
+    agent: { harness: string; model: string | null } | null
+    place: { kind: MachineKind; name: string } | null
+  }
+  activity: TaskActivity[]
+  /** The channel its task and run keys arrive on. */
+  live?: { workspaceId: string }
+}
 
 export interface Preferences {
   proactive: boolean

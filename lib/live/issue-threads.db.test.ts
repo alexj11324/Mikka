@@ -134,7 +134,7 @@ test('an issue thread list key reaches every member who can see the issue, after
     await t.test('a newly covered writer (unclaimed startup failure) wakes the thread list once', async () => {
       const { failUnclaimedCloudStart } = await import('../run-leases')
       const { coordinatorEnabled } = await import('../coordinator/wake')
-      assert.equal(coordinatorEnabled(), false, 'this isolated writer regression must not start model work')
+      assert.equal(await coordinatorEnabled(), false, 'this isolated writer regression must not start model work')
       const bot = randomUUID(), id = randomUUID(), definition = { schemaVersion: 1, harness: 'codex', model: 'gpt-6-luna' }
       await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Startup fixture')`, [bot, home])
       await database.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","botId",status,prompt,"agentDefinition") VALUES($1,'owner',$2,$3,$4,'queued','Startup fixture',$5)`, [id, personalIssue, agents.get('owner'), bot, definition])

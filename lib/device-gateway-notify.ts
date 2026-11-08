@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { deviceGatewayEndpoint } from './device-gateway-client'
 import { afterDatabaseCommit } from './db/commit-effects'
 import { DEVICE_WORK_CHANNEL, notifyChannel } from './db/listen'
+import { gatewayConfig } from './builtin-gateway/config'
 
 /** Wakes this device's waiting commands long poll (the gateway-down fallback).
  * Sent with each gateway wake: with the gateway configured, every write that
@@ -17,6 +18,11 @@ async function notifyLongPoll(deviceId: string) {
 
 /** A wake is idempotent; retry transient failures without dropping committed work. */
 async function sendWake(deviceId: string, endpoint: NonNullable<ReturnType<typeof deviceGatewayEndpoint>>) {
+  if (endpoint.mode === 'builtin') {
+    try { const { builtinGateway } = await import('./builtin-gateway/runtime'); await builtinGateway()?.hub.work(deviceId) }
+    catch { console.warn('[device-gateway] builtin work notification failed', { deviceId }) }
+    return
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt) await delay(attempt * 250)
     try {
@@ -49,7 +55,7 @@ export function notifyDeviceWork(deviceId: string | null | undefined) {
 export async function notifyQueuedLocalRun(database: {
   query: (text: string, values: unknown[]) => Promise<{ rows: { deviceId: string }[] }>
 }, userId: string, runId: string) {
-  if (!process.env.DEVICE_GATEWAY_URL || !process.env.DEVICE_GATEWAY_PUSH_SECRET) return
+  if (!gatewayConfig()) return
   try {
     const { rows: [run] } = await database.query(`SELECT r."deviceId" FROM agent_runs r
       JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
@@ -73,7 +79,7 @@ const ACTIVE_RUN_STATUSES = ['preparing', 'running', 'paused', 'waiting_input', 
 export async function notifyRunControl(database: {
   query: (text: string, values: unknown[]) => Promise<{ rows: { deviceId: string }[] }>
 }, target: RunControlTarget) {
-  if (!process.env.DEVICE_GATEWAY_URL || !process.env.DEVICE_GATEWAY_PUSH_SECRET) return
+  if (!gatewayConfig()) return
   if ('runIds' in target && target.runIds.length === 0) return
   const [where, values]: [string, unknown[]] = 'runIds' in target ? ['r.id=ANY($1::uuid[])', [[...target.runIds]]]
     : 'userId' in target ? ['r."userId"=$1 AND r.status=ANY($2::text[])', [target.userId, ACTIVE_RUN_STATUSES]]
@@ -89,7 +95,7 @@ export async function notifyRunControl(database: {
 /** notifyRunControl once this transaction commits; nothing on rollback. The
  * device lookup reads the committed rows from the default pool. */
 export function runControlChanged(executor: object, target: RunControlTarget, lookup?: Parameters<typeof notifyRunControl>[0]) {
-  if (!process.env.DEVICE_GATEWAY_URL || !process.env.DEVICE_GATEWAY_PUSH_SECRET) return
+  if (!gatewayConfig()) return
   if ('runIds' in target && target.runIds.length === 0) return
   const key = 'runIds' in target ? `runs:${[...target.runIds].sort().join(',')}` : 'userId' in target ? `owner:${target.userId}` : `workspace:${target.workspaceId}`
   // A wake is best-effort: it can never fail the stop or policy write itself.

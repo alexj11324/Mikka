@@ -15,8 +15,7 @@ import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { press, tap } from '@/lib/haptics'
 import { splitQuoted } from '@/lib/quote'
-import { authHeaders } from '@/lib/api'
-import { API_URL } from '@/lib/config'
+import { apiConnection, authHeaders } from '@/lib/api'
 import type { Reaction, ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
@@ -73,13 +72,14 @@ export function FoldedWords({ text, color }: { text: string; color: string }) {
 
 /** A sent photo as the chat loads it: the person's own message, signed in. */
 export function useChatPhotos(): (messageId: string | undefined, count: number | undefined) => ImageURISource[] {
+  const [connection] = useState(apiConnection)
   const [headers, setHeaders] = useState<Record<string, string> | null>(null)
-  useEffect(() => { void authHeaders().then(setHeaders) }, [])
+  useEffect(() => { void authHeaders(connection).then(setHeaders) }, [connection])
   return (messageId, count) => {
     if (!count) return []
     // Still in the inbox (no message row yet): grey stand-ins until the next poll.
     if (!messageId || !headers) return Array.from({ length: count }, () => ({ uri: '' }))
-    return Array.from({ length: count }, (_, index) => ({ uri: `${API_URL}/api/mobile/chat/image?message=${messageId}&index=${index}`, headers }))
+    return Array.from({ length: count }, (_, index) => ({ uri: `${connection.account.server.url}/api/mobile/chat/image?message=${messageId}&index=${index}`, headers }))
   }
 }
 
@@ -112,10 +112,11 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRe
  * A thread card: status icon and name, outputs as chips; no step line (R-66). Opens the thread's page. A thread
  * waiting for the person carries its action (去回答, #1386); a long name is cut here and read in full on its page.
  */
-export function ThreadCard({ title, status, info, onPress, action }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string }) {
+export function ThreadCard({ title, status, info, onPress, action, icon }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string; icon?: ReactNode }) {
   const body = (
     <>
-      <StatusIcon status={status} size={18} />
+      {/* A task card (2026-11-07) passes its task state's icon; a thread without a task keeps its bubble. */}
+      {icon ?? <StatusIcon status={status} size={18} />}
       <View style={{ flex: 1 }}>
         <Text style={styles.threadTitle} numberOfLines={1}>{title}</Text>
         {info ? <Text style={styles.threadInfo} numberOfLines={1}>{info}</Text> : null}

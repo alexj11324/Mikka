@@ -1,6 +1,7 @@
 import 'server-only'
 import { auth } from '@/lib/auth'
 import { githubConnectionToken } from './connection'
+import { readGitHubAppConfig } from './app-config'
 
 export { GitHubAccessError, type GitHubAccessCode } from './user-access-error'
 import { GitHubAccessError } from './user-access-error'
@@ -99,7 +100,9 @@ async function authorizedRepositories(headers: Headers) {
 
 /** What this one user's own GitHub token reaches through the Mikka App: the live source the Plugins page shows. */
 async function repositoriesForUser(userId: string, headers?: Headers) {
-  const appId = process.env.GITHUB_APP_ID
+  const cloud = await (await import('./cloud')).cloudGitHubRepositories(userId)
+  if (cloud) return cloud
+  const appId = (await readGitHubAppConfig()).id
   if (!appId || !/^[1-9]\d*$/.test(appId)) throw new GitHubAccessError('githubNotConfigured', 503)
   const { token, githubAccountId } = await userToken(userId, headers)
   const identity = (await githubGet(token, '/user')).data
@@ -156,7 +159,9 @@ export async function readAuthorizedPullRequest(headers: Headers, url: string) {
   const access = await authorizedRepositories(headers)
   const repo = access.repositories.find(item => item.fullName.toLowerCase() === match[1].toLowerCase())
   if (!repo) throw new GitHubAccessError('githubRepositoryForbidden', 403)
-  const pr = (await githubGet(access.token, `/repos/${repo.fullName}/pulls/${number}`)).data
+  const token = access.token ?? (await (await import('./cloud')).cloudGitHubCredential(access.userId, `v2/github.com/${repo.fullName.toLowerCase()}`))?.token
+  if (!token) throw new GitHubAccessError('githubNotConnected', 409)
+  const pr = (await githubGet(token, `/repos/${repo.fullName}/pulls/${number}`)).data
   const baseRepo = object(object(pr.base).repo)
   if (pr.number !== number || githubId(baseRepo.id) !== repo.id || (pr.state !== 'open' && pr.state !== 'closed') || typeof pr.updated_at !== 'string' || !Number.isFinite(Date.parse(pr.updated_at))) throw new GitHubAccessError('githubUnavailable', 502)
   const state: 'open' | 'closed' | 'merged' = pr.state === 'closed' && (pr.merged === true || typeof pr.merged_at === 'string') ? 'merged' : pr.state
@@ -172,7 +177,9 @@ export async function readAuthorizedIssue(headers: Headers, url: string) {
   const access = await authorizedRepositories(headers)
   const repo = access.repositories.find(item => item.fullName.toLowerCase() === match[1].toLowerCase())
   if (!repo) throw new GitHubAccessError('githubRepositoryForbidden', 403)
-  const issue = (await githubGet(access.token, `/repos/${repo.fullName}/issues/${number}`)).data
+  const token = access.token ?? (await (await import('./cloud')).cloudGitHubCredential(access.userId, `v2/github.com/${repo.fullName.toLowerCase()}`))?.token
+  if (!token) throw new GitHubAccessError('githubNotConnected', 409)
+  const issue = (await githubGet(token, `/repos/${repo.fullName}/issues/${number}`)).data
   const canonical = `https://github.com/${repo.fullName}/issues/${number}`
   if (issue.pull_request != null || issue.number !== number || typeof issue.html_url !== 'string' || issue.html_url.toLowerCase() !== canonical.toLowerCase() ||
       (issue.state !== 'open' && issue.state !== 'closed') || typeof issue.updated_at !== 'string' || !Number.isFinite(Date.parse(issue.updated_at))) throw new GitHubAccessError('githubUnavailable', 502)

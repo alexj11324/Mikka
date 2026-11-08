@@ -6,6 +6,7 @@ import type { PgRequestHookInformation, PgResponseHookInformation } from '@opent
 import { basePath } from '@/lib/base-path-config.mjs'
 import { routeScope, workflowStepRoute } from './labels'
 import { statementId, statementOperation } from './sanitize'
+import { captureTraceContext, traceAttributes } from './context'
 
 // What each span says about where it came from (docs/operations/tracing.md):
 // `mikka.route`, the grouping key, and `mikka.client_kind`, who called.
@@ -35,6 +36,19 @@ export function clientKindFor(path: string): ClientKind {
 }
 
 const text = (value: unknown) => (typeof value === 'string' && value ? value : undefined)
+const REQUEST_KEYS = ['mikka.request_id', 'mikka.user_id_hash', 'mikka.rpc.action'] as const
+
+function requestAttributes(value: unknown): Attributes | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return
+  const metadata = value as Record<string, unknown>
+  if (typeof metadata.requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(metadata.requestId)) return
+  const attributes: Attributes = { 'mikka.request_id': metadata.requestId }
+  if (typeof metadata.userIdHash === 'string' && /^[0-9a-f]{16}$/.test(metadata.userIdHash)) attributes['mikka.user_id_hash'] = metadata.userIdHash
+  if (typeof metadata.rpcAction === 'string' && metadata.rpcAction.length <= 120 && /^[a-z][\w-]*\.[a-z]\w*$/i.test(metadata.rpcAction)) attributes['mikka.rpc.action'] = metadata.rpcAction
+  return attributes
+}
+
+type RequestAttribution = { root: ApiSpan; attributes: Attributes }
 
 /**
  * Stamps every recording span when it starts. The route is a job span's own,
@@ -46,6 +60,26 @@ const text = (value: unknown) => (typeof value === 'string' && value ? value : u
  * step's, else from the incoming path on the root span.
  */
 export class RouteAttributesProcessor implements SpanProcessor {
+  // The diagnostic payload and each local span are weak keys for one request.
+  // Later auth updates reach its entry span even while an auth child is active;
+  // future descendants see those updates without a trace-global identity map.
+  private readonly requestAttribution = new WeakMap<object, RequestAttribution>()
+  private readonly requestMetadataChannel = channel('mikka.request.metadata')
+  private readonly stampRequestMetadata = (metadata: unknown) => {
+    try {
+      const attributes = requestAttributes(metadata)
+      if (!attributes) return
+      const prior = this.requestAttribution.get(metadata as object)
+      const root = prior?.root ?? trace.getActiveSpan()
+      if (!root) return
+      const scope = prior ?? { root, attributes }
+      scope.attributes = attributes
+      this.requestAttribution.set(metadata as object, scope)
+      this.requestAttribution.set(root, scope)
+      root.setAttributes(attributes)
+    } catch { /* attribution never changes the request */ }
+  }
+
   private readonly requestClientChannel = channel('mikka.request.client')
   private readonly stampRequestClient = (attributes: unknown) => {
     try { trace.getActiveSpan()?.setAttributes(attributes as Attributes) } catch { /* tracing never breaks a request */ }
@@ -61,13 +95,26 @@ export class RouteAttributesProcessor implements SpanProcessor {
   }
 
   constructor() {
+    this.requestMetadataChannel.subscribe(this.stampRequestMetadata)
     this.requestClientChannel.subscribe(this.stampRequestClient)
     this.requestErrorChannel.subscribe(this.stampRequestError)
   }
   onStart(span: Span, parentContext: Context): void {
     try {
-      const parent = (trace.getSpan(parentContext) as unknown as { attributes?: Attributes } | undefined)?.attributes
+      const parentSpan = trace.getSpan(parentContext)
+      const parent = (parentSpan as unknown as { attributes?: Attributes } | undefined)?.attributes
       const own = span.attributes
+      const request = parentSpan && this.requestAttribution.get(parentSpan)
+      const attribution = request?.attributes ?? (parent?.['mikka.request_id'] ? requestAttributes({
+        requestId: parent['mikka.request_id'], userIdHash: parent['mikka.user_id_hash'], rpcAction: parent['mikka.rpc.action'],
+      }) : undefined)
+      if (attribution && (own['mikka.request_id'] === undefined || own['mikka.request_id'] === attribution['mikka.request_id'])) {
+        if (request) this.requestAttribution.set(span, request)
+        for (const key of REQUEST_KEYS) if (own[key] === undefined && attribution[key] !== undefined) span.setAttribute(key, attribution[key])
+      }
+      const inherited = traceAttributes(captureTraceContext({}, parentContext))
+      for (const [key, value] of Object.entries(inherited)) if (own[key] === undefined) span.setAttribute(key, value)
+      if (typeof own['workflow.run.id'] === 'string') span.setAttribute('mikka.workflow_run_id', own['workflow.run.id'])
       const step = workflowStepRoute()
       const route = text(own['mikka.route']) ?? routeScope.getStore() ?? step ?? text(parent?.['mikka.route']) ?? text(own['next.route']) ?? text(own['http.route'])
       const path = text(own['http.target']) ?? text(own['url.path'])
@@ -85,6 +132,7 @@ export class RouteAttributesProcessor implements SpanProcessor {
   onEnd(_span: ReadableSpan): void {}
   forceFlush(): Promise<void> { return Promise.resolve() }
   shutdown(): Promise<void> {
+    this.requestMetadataChannel.unsubscribe(this.stampRequestMetadata)
     this.requestClientChannel.unsubscribe(this.stampRequestClient)
     this.requestErrorChannel.unsubscribe(this.stampRequestError)
     return Promise.resolve()

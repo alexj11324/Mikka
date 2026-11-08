@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { seedCoordinator } from '../../tests/support/coordinator-bot'
+import { captureRunFailure } from '@mikka/protocol/run-failure'
 
 // Every bot chats on the Coordinator harness; botId keeps their chats apart.
 // Database regressions execute only in CI against ephemeral Postgres 17.
@@ -481,12 +482,13 @@ dbTest('重试 re-runs a failed bot turn once, for the message already sent, in 
     const answered = await store.chatView(owner, 200, botId)
     assert.equal(answered.error, null, 'the chat-wide line clears once a turn ends cleanly')
     assert.deepEqual(answered.items.map(item => [item.from, item.text, item.failure ?? null]), [
-      ['person', 'Plan my week', { kind: 'hosted', code: 'verification_required', raw: 'verification_required' }],
+      ['person', 'Plan my week', { kind: 'hosted', code: 'verification_required', raw: 'verification_required', failureDetails: answered.items[0].failure?.failureDetails }],
       ['person', 'Then plan next week', null],
       ['coordinator', 'Here is the plan.', null],
     ])
+    assert.equal(answered.items[0].failure?.failureDetails?.runId, 'wrun_third-turn')
     const context = await store.loadConversation(owner, botId)
-    assert.ok(context.messages.every(({ message }) => !('mikkaFailure' in message)), 'the model never sees the mark')
+    assert.ok(context.messages.every(({ message }) => !('mikkaFailure' in message) && !('mikkaFailureDetails' in message)), 'the model never sees failure metadata')
   })
 })
 
@@ -868,5 +870,54 @@ dbTest('Factory completion delivery keeps historical handoffs and reads current 
     const plain = String((await store.loadConversation(owner, botId)).messages.at(-1)!.message.content)
     assert.ok(plain.includes('Plain task complete') && plain.includes('Verified GitHub pull request: https://github.com/example/plain/pull/1 (open)'))
     assert.ok(!plain.includes('Current host observation'), 'ordinary non-Factory notifications retain their own publication and result')
+  })
+})
+
+
+dbTest('structured failures survive a fresh chat read, retain the lease fence, and stay out of model/list projections', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { eq, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  ])
+  const owner = `test-run-failure-${randomUUID()}`, holder = 'wrun_structured_failure'
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  let botId = '', version = '', storedFailure: unknown
+  t.after(async () => { await scope.close() })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values (${owner},'Failure fixture',${`${owner}@example.invalid`},false,now(),now())`)
+    botId = (await seedCoordinator(owner)).botId
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'A private synthetic request for the bot.', { botId }))
+    await store.takeInbox(owner, holder, botId)
+    const failureDetails = captureRunFailure({ statusCode: 400, responseBody: JSON.stringify({ error: { type: 'invalid_request_error', message: 'The provider does not support this request format.' } }) }, { provider: 'codex', credential: 'subscription', runId: holder, appVersion: 'a'.repeat(40) })
+    await store.failTurn(owner, holder, 'subscription_generation_failed', botId, undefined, failureDetails)
+    const chat = await store.chatView(owner, 200, botId)
+    assert.equal(chat.failureDetails?.category, 'invalid_request')
+    assert.equal(chat.failureDetails?.providerMessage, 'The provider does not support this request format.')
+    assert.equal(chat.failureDetails?.runId, holder)
+    assert.deepEqual(chat.items[0].failure?.failureDetails, chat.failureDetails)
+    storedFailure = chat.failureDetails
+    version = (await store.chatVersion(owner, 200, botId)).version
+    await store.failTurn(owner, holder, 'late_overwrite', botId, undefined, captureRunFailure({ statusCode: 429 }))
+    assert.deepEqual((await store.chatView(owner, 200, botId)).failureDetails, storedFailure, 'the first release consumed this lease')
+  })
+  await scope.close()
+  const reloaded = createRequestDatabaseScope(databaseUrl!)
+  t.after(async () => { await reloaded.close() })
+  await reloaded.run(async () => {
+    const chat = await store.chatView(owner, 200, botId)
+    assert.deepEqual(chat.failureDetails, storedFailure, 'a new request/database scope reads the persisted record')
+    const context = await store.loadConversation(owner, botId)
+    assert.ok(context.messages.every(row => !('mikkaFailureDetails' in row.message)))
+    assert.doesNotMatch(JSON.stringify(await store.botChats(owner)), /providerMessage|The provider does not support/)
+    assert.equal((await store.chatView('another-owner', 200, botId)).failureDetails, undefined)
+    const altered = { ...chat.failureDetails!, occurredAt: new Date(Date.parse(chat.failureDetails!.occurredAt) + 1000).toISOString() }
+    await db.update(schema.coordinatorSessions).set({ lastFailure: altered }).where(eq(schema.coordinatorSessions.botId, botId))
+    assert.notEqual((await store.chatVersion(owner, 200, botId)).version, version, 'details alone change the existing snapshot hash')
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Try a fresh request.', { botId }))
+    await store.takeInbox(owner, 'wrun_recovered_failure', botId)
+    await store.appendMessages(owner, 'wrun_recovered_failure', [{ role: 'assistant', content: 'Recovered.', mikkaFailureDetails: altered } as unknown as import('ai').ModelMessage], null, botId)
+    const recovered = await store.chatView(owner, 200, botId)
+    assert.equal(recovered.failureDetails, undefined, 'a successful response clears current failure details')
+    assert.equal(recovered.items.at(-1)?.failure, undefined, 'model output cannot forge a host failure')
+    assert.deepEqual(recovered.items[0].failure?.failureDetails, storedFailure, 'historical failed message retains its own record')
   })
 })

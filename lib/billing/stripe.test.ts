@@ -5,7 +5,8 @@ import { stripeConfig, stripeForm, stripePost, StripeRequestError, verifyStripeS
 
 test('config is null without a key; form encoding nests the way Stripe expects', () => {
   assert.equal(stripeConfig({}), null)
-  assert.deepEqual(stripeConfig({ STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_TEAM_PRICE_ID: 'price_1' }), { secretKey: 'sk_test_x', teamPriceId: 'price_1', webhookSecret: null })
+  assert.equal(stripeConfig({ STRIPE_SECRET_KEY: 'sk_test_x' }), null)
+  assert.deepEqual(stripeConfig({ MIKKA_EDITION: 'cloud', STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_TEAM_PRICE_ID: 'price_1' }), { secretKey: 'sk_test_x', teamPriceId: 'price_1', webhookSecret: null })
   assert.deepEqual(stripeForm({ mode: 'subscription', line_items: [{ price: 'p', quantity: 2 }], metadata: { workspaceId: 'w' }, skip: undefined }),
     ['mode=subscription', 'line_items%5B0%5D%5Bprice%5D=p', 'line_items%5B0%5D%5Bquantity%5D=2', 'metadata%5BworkspaceId%5D=w'])
 })

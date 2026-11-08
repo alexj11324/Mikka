@@ -31,6 +31,8 @@ import type { DaemonPreparationTiming } from '../tracing'
  * `stopReason` is `submitted` (the agent handed in its work explicitly).
  */
 export interface ExitEvent {
+  /** Host-captured failure; never accepted from a model handoff. */
+  failureDetails?: import("@mikka/protocol/run-failure").RunFailure
   type: "exit"
   outcome: "succeeded" | "failed" | "cancelled"
   /** An adapter error may end its stream without proving the native process exited. */
@@ -68,6 +70,8 @@ export interface AgentCapabilities {
 }
 
 export interface SessionOptions {
+  /** Parent run context for asynchronous SDK callbacks after adapter startup. */
+  traceContext?: import('@mikka/protocol/trace-context').RunTraceContext
   /** API key or custom provider for this run (agents/run-credential.ts), never written to disk. */
   credential?: RunCredential
   /** Trusted server-issued delivery binding, never model-selected. */

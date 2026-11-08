@@ -17,6 +17,7 @@ async function navigation(url, callback) {
     export { flushSync } from 'react-dom'
     export { NextIntlClientProvider } from 'next-intl'
     export { useRouter } from './apps/desktop/src/renderer/i18n-navigation.tsx'
+    export { isClientRoute } from './apps/desktop/src/renderer/location.ts'
   `)
   const root = api.createRoot(window.document.body.appendChild(window.document.createElement('div')))
   let router
@@ -34,7 +35,7 @@ async function navigation(url, callback) {
     get: () => cookie.get.call(window.document),
     set: value => { writes.push(value); cookie.set.call(window.document, value) },
   })
-  try { await callback({ window, render, writes }) }
+  try { await callback({ window, render, writes, isClientRoute: api.isClientRoute }) }
   finally {
     api.flushSync(() => root.unmount())
     await window.happyDOM.close()
@@ -48,6 +49,16 @@ async function navigation(url, callback) {
 const request = (window, url = window.location.href) => new Request(url, {
   headers: { cookie: window.document.cookie, 'accept-language': 'en', 'sec-fetch-dest': 'document' },
 })
+
+test('only backend authentication documents force business navigation back to the HTTP server entry', () => navigation('https://server.example/mikka/sign-in', async ({ window, isClientRoute }) => {
+  const url = path => new URL(`/mikka${path}`, window.location.origin)
+  assert.equal(isClientRoute(url('/settings')), true)
+  window.document.documentElement.dataset.mikkaServerPage = 'authentication'
+  for (const path of ['/', '/settings', '/settings/members', '/dashboard']) assert.equal(isClientRoute(url(path)), false, path)
+  for (const path of ['/sign-in', '/sign-up', '/device?user_code=TEST', '/oauth/consent', '/?section=plugins&app=github']) assert.equal(isClientRoute(url(path)), true, path)
+  delete window.document.documentElement.dataset.mikkaServerPage
+  assert.equal(isClientRoute(url('/settings')), true, 'remote server configuration cannot restrict the official app document')
+}))
 
 test('explicit en-to-zh web navigation retains the chosen language through server refresh and reentry', () => navigation('https://app.example/mikka/en/settings?section=general&workspace=team', async ({ window, render, writes }) => {
   window.document.cookie = 'NEXT_LOCALE=en; Path=/mikka'

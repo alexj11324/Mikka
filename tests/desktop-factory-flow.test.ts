@@ -19,7 +19,7 @@ test('Factory flow routes accept only a freshly verified native or browser human
       return native || browser ? { user: { id: 'owner' }, session: { id: native ? 'native-session' : 'browser-session' } } : null
     } } } } }),
     mock.module(new URL('../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: { connect: async () => tx } } }),
-    mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_name: string, handler: unknown) => handler, noteLogUser: () => {} } }),
+    mock.module(new URL('../lib/request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, handler: unknown) => handler, noteLogUser: () => {} } }),
     mock.module(new URL('../lib/factory/server.ts', import.meta.url).href, { namedExports: {
       factoryHumanStore: { readTask: async (client: unknown, userId: string, id: string) => {
         readTasks++

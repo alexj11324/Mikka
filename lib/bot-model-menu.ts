@@ -5,7 +5,9 @@ import { ActionFailureError } from "./action-error";
 import type { ExecutionSettings, ExecutionSettingsScope } from "./execution-settings";
 import { apiKeyChatBaseUrl } from "./model-api-key-providers";
 import { subscriptionAvailability } from "./subscription-quota";
-import { resolveBotModelChoice } from "./bot-model-choice";
+import { botModelPreference, resolveBotModelChoice } from "./bot-model-choice";
+import { isCloudEdition } from "./edition";
+import { defaultModelTarget } from "./default-model";
 
 export { quotaExhausted } from "./subscription-quota";
 import {
@@ -65,7 +67,7 @@ export async function botModelMenu(
     group.options.push({ id: row.bindingId, modelId: row.modelId, provider: row.provider });
   }
   // API keys and custom providers that reach bot chats (C22): the person's own, then teammates' shared ones.
-  const { usableApiKeys, botApiKeyChoice } = await import("./model-api-keys");
+  const { usableApiKeys } = await import("./model-api-keys");
   const keys = (await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).filter((key) => apiKeyChatBaseUrl(key) && key.models.length);
   const keyOptions = (key: (typeof keys)[number]) =>
     key.models.map((model) => ({ id: apiKeyOptionId(key.id, model), modelId: model, provider: key.provider }));
@@ -85,10 +87,14 @@ export async function botModelMenu(
   }
   // Mikka 默认 is listed only where this chat's workspace has points for it, with how many (decision 2026-11-02-1450).
   const { hostedPointsHere } = await import("./points-fallback");
-  const { points, trialLeft } = await hostedPointsHere(scope.workspaceId);
-  const usable = points > 0 || trialLeft > 0;
+  const local = !isCloudEdition();
+  const target = local ? await defaultModelTarget(scope.ownerId) : null;
+  const { points, trialLeft } = local ? { points: 0, trialLeft: 0 } : await hostedPointsHere(scope.workspaceId);
+  const usable = local ? target !== null : points > 0 || trialLeft > 0;
+  const hostedSource = local ? target?.kind === "cloud" ? "cloud" as const : "self-hosted" as const : undefined;
+  const hostedOption = { ...HOSTED, ...(hostedSource ? { hostedSource } : {}) };
   const groups: BotModelMenuGroup[] = [
-    ...(usable ? [{ kind: "hosted" as const, points, ...(points > 0 ? {} : { trialLeft }), options: [{ ...HOSTED }] }] : []),
+    ...(usable ? [{ kind: "hosted" as const, ...(hostedSource ? { hostedSource } : { points, ...(points > 0 ? {} : { trialLeft }) }), options: [hostedOption] }] : []),
     ...subscriptions.values(),
     ...sharedSubscriptions.values(),
     ...ownKeys.map((key) => ({ kind: "apiKey" as const, credentialLabel: keyLabel(key), options: keyOptions(key) })),
@@ -96,23 +102,12 @@ export async function botModelMenu(
       kind: "shared" as const, owner: ownerNames.get(key.ownerId)!, credentialLabel: keyLabel(key), options: keyOptions(key),
     })),
   ];
-  const keyChoice = await botApiKeyChoice(pool, scope, botId);
-
-  const row = (
-    await pool.query<{ bindingId: string | null }>(
-      'SELECT "bindingId" FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
-      [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
-    )
-  ).rows[0];
-  // A saved key has a null binding too; only a row without either is an
-  // explicit Mikka 默认 preference.
-  const selected = keyChoice ? undefined : row ? (row.bindingId ?? HOSTED_CHOICE) : undefined;
   const choice = await resolveBotModelChoice(pool, settings, scope, botId,
-    { selected, key: keyChoice }, { rows, pooled, keys, now });
+    await botModelPreference(pool, scope, botId), { rows, pooled, keys, now });
   const state = { chosen: choice.chosen, ...(choice.fallback ? { fallback: choice.fallback } : {}) };
   let current: BotModelCurrent;
   if (choice.kind === "hosted") {
-    current = { ...HOSTED, kind: "hosted", ...state, available: usable, availability: usable ? "available" : "exhausted" };
+    current = { ...hostedOption, kind: "hosted", ...state, available: usable, availability: usable ? "available" : "exhausted" };
   } else if (choice.kind === "apiKey") {
     current = {
       id: apiKeyOptionId(choice.key.id, choice.model), modelId: choice.model, provider: choice.key.provider,

@@ -19,6 +19,7 @@ declare module 'mikka:platform' {
   export const setSession: typeof import('./auth-client').setSession
   export const onSessionChanged: typeof import('./platform').onSessionChanged
   export const authenticatedReturn: typeof import('./platform').authenticatedReturn
+  export const bootstrapScope: typeof import('./platform').bootstrapScope
   export const PlatformExtras: typeof import('./platform').PlatformExtras
   export const requireUpdate: typeof import('./platform').requireUpdate
 }

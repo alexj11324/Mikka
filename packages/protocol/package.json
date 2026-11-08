@@ -5,6 +5,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "exports": {
+    "./claude-startup": "./src/claude-startup.ts",
     "./chat-attachments": "./src/chat-attachments.ts",
     "./mailbox": "./src/mailbox.ts",
     "./personal-agent-message": "./src/personal-agent-message.ts",
@@ -36,6 +37,7 @@
     "./preview": "./src/preview.ts",
     "./profile": "./src/profile.ts",
     "./provider-failure": "./src/provider-failure.ts",
+    "./run-failure": "./src/run-failure.ts",
     "./coded-error": "./src/coded-error.ts",
     "./user-error-codes": "./src/user-error-codes.ts",
     "./quota": "./src/quota.ts",

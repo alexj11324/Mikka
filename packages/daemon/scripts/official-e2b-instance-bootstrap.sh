@@ -89,7 +89,7 @@ export PATH=/opt/mikka/runtime/node/bin:$PATH
 cd "$mikka_release/source"
 env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile
 mikka_phase_done dependencies
-node packages/daemon/scripts/build-cloud-worker.mjs
+MIKKA_CLOUD_WORKER_BUILD_SHA="$mikka_sha" node packages/daemon/scripts/build-cloud-worker.mjs
 mikka_phase_done build
 # Keep missing CLIs in the existing versioned private package store. Previous
 # versions stay available to a retained release; official executables are untouched.

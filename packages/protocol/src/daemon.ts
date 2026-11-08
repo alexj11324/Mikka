@@ -14,6 +14,7 @@
 // Naming (firm): the machine running the daemon is a `device`; an agent is
 // identified only by its `harness`. "runtime" means a JS runtime, nothing else.
 import { z } from "zod"
+import { sanitizeTraceContext } from './trace-context'
 
 import { harnessInfoSchema, harnessSchema } from "./harness"
 import { quotaSnapshotReportSchema, quotaSnapshotSchema } from "./quota"
@@ -190,6 +191,8 @@ export const daemonRpc = {
       credential: z.string().min(1),
       /** Needed only for users in more than one workspace. */
       workspaceId: z.uuid().optional(),
+      /** Correlation for a cloud worker handoff; never authentication. */
+      traceContext: z.unknown().transform(sanitizeTraceContext).optional(),
     }),
     result: ok,
   },

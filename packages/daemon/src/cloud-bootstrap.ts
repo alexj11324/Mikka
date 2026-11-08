@@ -1,7 +1,10 @@
-import { constants, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, unlinkSync, watch, writeFileSync } from 'node:fs'
+import { constants, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, unlinkSync, watch, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
+import { anonymousClaudeHintSchema, type AnonymousClaudeHint } from '@mikka/protocol/claude-startup'
+import { deviceRegistered } from '@mikka/protocol/device'
+import { sanitizeTraceContext } from '@mikka/protocol/trace-context'
 import { readJson, writeJsonAtomic } from './fs-util'
 import { DAEMON_VERSION, daemonPaths } from './paths'
 import { connectDaemonInDataDir, isNoDaemon } from './rpc/client'
@@ -13,6 +16,8 @@ const configSchema = z.object({
   credential: z.string().regex(/^orv_[A-Za-z0-9_-]{43}$/),
   server: z.url({ protocol: /^https$/ }),
   protectionBypass: z.string().regex(/^[A-Za-z0-9_-]{20,256}$/).optional(),
+  traceContext: z.unknown().transform(sanitizeTraceContext).optional(),
+  tracing: deviceRegistered.shape.tracing,
 }).strict()
 
 const initialRunSchema = z.object({
@@ -36,6 +41,31 @@ function consumeInitialRun(path: string, bootstrap: string): string | undefined 
   return runId
 }
 
+/** Optional preparation metadata. Unsafe filesystem ownership is not an
+ * optional parse failure; it remains a rejected handoff. */
+function consumeAnonymousClaude(path: string, bootstrap: string, runId?: string): AnonymousClaudeHint | undefined {
+  let fd: number
+  try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK) }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return; throw error }
+  let body: string | undefined
+  try {
+    const stat = fstatSync(fd)
+    if (!stat.isFile() || stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0)
+      throw Error('Unsafe anonymous Claude handoff')
+    if (stat.size <= 32768) {
+      const bytes = Buffer.alloc(32769), count = readSync(fd, bytes, 0, bytes.length, 0)
+      if (count === stat.size && count <= 32768) body = bytes.subarray(0, count).toString('utf8')
+    }
+  } finally { closeSync(fd) }
+  unlinkSync(path)
+  if (body === undefined) return
+  try {
+    const parsed = anonymousClaudeHintSchema.safeParse(JSON.parse(body))
+    if (parsed.success && parsed.data.runId === runId &&
+      parsed.data.bootstrapSha256 === createHash('sha256').update(bootstrap).digest('hex')) return parsed.data
+  } catch { /* Malformed optional configuration retains ordinary startup. */ }
+}
+
 /** Read a one-use control-plane handoff. Never accept a symlink, a file
  * readable by another account, or task-supplied URL credentials. */
 export function consumeCloudBootstrap(path: string) {
@@ -49,7 +79,8 @@ export function consumeCloudBootstrap(path: string) {
     if (url.username || url.password || url.search || url.hash || (config.protectionBypass && !url.hostname.endsWith('.vercel.app'))) throw new Error('Invalid cloud worker server')
     unlinkSync(path)
     const initialRunId = consumeInitialRun(join(dirname(path), 'initial-run.json'), body)
-    return { ...config, ...(initialRunId ? { initialRunId } : {}) }
+    const anonymousClaudeHint = consumeAnonymousClaude(join(dirname(path), 'anonymous-claude.json'), body, initialRunId)
+    return { ...config, ...(initialRunId ? { initialRunId } : {}), ...(anonymousClaudeHint ? { anonymousClaudeHint } : {}) }
   } finally { closeSync(fd) }
 }
 
@@ -118,7 +149,7 @@ export async function installCloudCredential(dataDir: string, config: z.infer<ty
       const status = await client.request('daemon.status')
       if (status.deviceId && status.deviceId !== config.deviceId) throw new Error('Cloud device identity changed')
       if (!current) throw new Error('Cloud device identity unavailable')
-      await client.request('device.setCredential', { credential: config.credential, workspaceId: config.workspaceId })
+      await client.request('device.setCredential', { credential: config.credential, workspaceId: config.workspaceId, traceContext: config.traceContext })
       return 'updated'
     } finally { client.close() }
   } catch (error) {

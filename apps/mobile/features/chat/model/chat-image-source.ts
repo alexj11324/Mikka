@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ImageURISource } from 'react-native'
 import { CHAT_IMAGE_EXTENSIONS, fileExtension, type ChatFile } from '@mikka/protocol/chat-attachments'
-import { api, authHeaders } from '@/lib/api'
-import { API_URL } from '@/lib/config'
+import { api, apiConnection, authHeaders } from '@/lib/api'
 
 /** A chat file the gallery draws as a picture rather than a file chip. */
 export const isImageFile = (file: Pick<ChatFile, 'name'>) => CHAT_IMAGE_EXTENSIONS.has(fileExtension(file.name))
@@ -18,20 +17,22 @@ const resolving = new Map<string, Promise<ImageURISource | null>>()
  * storage), or the server itself, signed in, when the file lives in the database. Null when it cannot be read.
  */
 export function imageFileSource(id: string): Promise<ImageURISource | null> {
-  const kept = resolved.get(id)
+  const connection = apiConnection()
+  const key = `${connection.account.id}:${id}`
+  const kept = resolved.get(key)
   if (kept && Date.now() - kept.at < LINK_LIFETIME_MS) return Promise.resolve(kept.source)
-  let request = resolving.get(id)
+  let request = resolving.get(key)
   if (!request) {
     request = (async () => {
-      const grant = await api<{ downloadUrl: string }>(`/api/chat/attachments/${id}?download-url`)
+      const grant = await api<{ downloadUrl: string }>(`/api/chat/attachments/${id}?download-url`, {}, connection)
       const url = new URL(grant.downloadUrl)
-      const sameOrigin = url.origin === new URL(API_URL).origin
+      const sameOrigin = url.origin === new URL(connection.account.server.url).origin
       if (!sameOrigin && url.protocol !== 'https:') return null
-      const source: ImageURISource = sameOrigin ? { uri: grant.downloadUrl, headers: await authHeaders() } : { uri: grant.downloadUrl }
-      resolved.set(id, { source, at: Date.now() })
+      const source: ImageURISource = sameOrigin ? { uri: grant.downloadUrl, headers: await authHeaders(connection) } : { uri: grant.downloadUrl }
+      resolved.set(key, { source, at: Date.now() })
       return source
-    })().catch(() => null).finally(() => { resolving.delete(id) })
-    resolving.set(id, request)
+    })().catch(() => null).finally(() => { resolving.delete(key) })
+    resolving.set(key, request)
   }
   return request
 }

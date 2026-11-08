@@ -20,6 +20,10 @@ export async function deviceIsOnline(device: DevicePresence, now?: number): Prom
   const endpoint = deviceGatewayEndpoint(device.id, 'status')
   if (!endpoint) return false
   try {
+    if (endpoint.mode === 'builtin') {
+      const { builtinGateway } = await import('./builtin-gateway/runtime')
+      return (await builtinGateway()?.hub.status(device.id))?.online === true
+    }
     const response = await fetch(endpoint.url, {
       headers: { authorization: `Bearer ${endpoint.secret}` },
       cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(2_000),

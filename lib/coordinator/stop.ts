@@ -1,6 +1,6 @@
 import { QUIET_REPLY } from '@/lib/attention/handoff'
 import type { ModelMessage } from 'ai'
-import type { CoordinatorWorkflowStreamPart } from './stream'
+import { coordinatorModelPart, type CoordinatorWorkflowStreamPart } from './stream'
 
 // 停止 in a chat: the person stops the turn their bot (the Coordinator
 // included) is working on. The turn's workflow listens on a hook named for
@@ -21,6 +21,7 @@ export function coordinatorStopToken(holder: string) {
 export async function stoppedStepText(stream: ReadableStream<CoordinatorWorkflowStreamPart>, id: string): Promise<string> {
   let inTurn = false
   let quietEligible = false
+  let scoped = false
   let text = ''
   const reader = stream.getReader()
   try {
@@ -28,16 +29,26 @@ export async function stoppedStepText(stream: ReadableStream<CoordinatorWorkflow
       const next = await reader.read()
       if (next.done) break
       const part = next.value
-      const type: string = part.type
       if (part.type === 'coordinator-turn-start') {
-        inTurn = part.id === id
+        if (part.id !== id) {
+          // Raw recorded streams have no per-part scope; stop before another turn's raw text.
+          if (inTurn && !scoped) break
+          continue
+        }
+        if (inTurn) continue
+        inTurn = true
         quietEligible = part.quietEligible
+        scoped = part.modelStream === 'scoped-v1'
         text = ''
       } else if (part.type === 'coordinator-turn-stopped') {
         if (part.id === id) break
       } else if (!inTurn) continue
-      else if (type === 'start-step' || part.type === 'reset-step') text = ''
-      else if (part.type === 'text-delta') text += part.text
+      else {
+        const model = coordinatorModelPart(part, id, scoped)
+        const type: string | undefined = model?.type
+        if (type === 'start-step' || type === 'reset-step') text = ''
+        else if (model?.type === 'text-delta') text += model.text
+      }
     }
   } finally { await reader.cancel().catch(() => undefined) }
   // A handoff turn may decline with the quiet sentinel; a partial one is not a reply.
