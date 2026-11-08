@@ -4,6 +4,7 @@ import { createUserSecret, deleteUserSecret, importUserSecrets, listUserSecrets,
 import { withFreshSession } from '@/lib/fresh-session'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
+import type { SecretDeliveryInput } from '@/lib/secrets/delivery'
 
 // 设置 › 密钥与登录 › 我的: the signed-in person's own secrets (lib/secrets/user-store.ts). The user is
 // always the session's; `workspaceId` is only the page's workspace, whose secret names a new
@@ -12,10 +13,10 @@ import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/worksp
 export async function listMySecrets(workspaceId?: string): Promise<SettingsActionResult<{ secrets: UserSecretView[] }>> {
   return settingsWorkspaceAction(async () => ({ secrets: await listUserSecrets((await currentWorkspaceActor(workspaceId)).userId) }))
 }
-async function createMySecretBody(input: { name: string; kind: 'secret' | 'env'; value: string; note?: string; overrideWorkspace?: boolean }, workspaceId?: string): Promise<SettingsActionResult<SavedUserSecretView>> {
+async function createMySecretBody(input: { name: string; kind: 'secret' | 'env'; value: string; note?: string; overrideWorkspace?: boolean; delivery?: SecretDeliveryInput }, workspaceId?: string): Promise<SettingsActionResult<SavedUserSecretView>> {
   return settingsWorkspaceAction(async () => { const actor = await currentWorkspaceActor(workspaceId); return createUserSecret(actor.userId, input, { workspaceId: actor.workspaceId }) })
 }
-async function replaceMySecretBody(input: { id: string; value?: string; note?: string }, workspaceId?: string): Promise<SettingsActionResult<SavedUserSecretView>> {
+async function replaceMySecretBody(input: { id: string; value?: string; note?: string; delivery?: SecretDeliveryInput }, workspaceId?: string): Promise<SettingsActionResult<SavedUserSecretView>> {
   return settingsWorkspaceAction(async () => replaceUserSecret((await currentWorkspaceActor(workspaceId)).userId, input))
 }
 async function deleteMySecretBody(input: { id: string }, workspaceId?: string): Promise<SettingsActionResult<{ id: string }>> {

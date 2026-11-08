@@ -21,9 +21,21 @@ export function withTaskEnv(platform: Record<string, string>, taskEnv: Record<st
   return { env, dropped }
 }
 
+/** Added only by the trusted supervisor after it starts the per-run bridge. */
+export function taskExecutionEnv(platform: Record<string, string>, options: {
+  taskEnv?: Record<string, string>
+  taskSecretEnv?: Record<string, string>
+}): Record<string, string> {
+  const env = withTaskEnv(platform, options.taskEnv).env
+  for (const name of ['MIKKA_SECRET_ENDPOINTS', 'MIKKA_SECRET_UNAVAILABLE']) {
+    const value = options.taskSecretEnv?.[name]
+    if (typeof value === 'string') env[name] = value
+  }
+  return env
+}
+
 /** The assignment as it may be written to disk: without the task's user variables. */
-export function withoutTaskEnv<T extends object>(assignment: T): Omit<T, "taskEnv"> {
-  if (!("taskEnv" in assignment)) return assignment
-  const { taskEnv: _drop, ...rest } = assignment
+export function withoutTaskEnv<T extends object>(assignment: T): Omit<T, "taskEnv" | "taskSecrets"> {
+  const { taskEnv: _drop, taskSecrets: _capabilities, ...rest } = assignment as T & { taskEnv?: unknown; taskSecrets?: unknown }
   return rest
 }

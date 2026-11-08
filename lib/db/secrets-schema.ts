@@ -1,5 +1,6 @@
 // Settings › 密钥与环境 and BYO E2B key. Mirrors drizzle/20261030204835_workspace_secrets_env.sql (MIKKA_DATABASE_URL).
-import { integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import type { SecretDelivery } from '@/lib/secrets/delivery'
 
 export const WORKSPACE_SECRET_KINDS = ['secret', 'env'] as const
 export const WORKSPACE_SECRET_SCOPES = ['workspace', 'repository'] as const
@@ -15,6 +16,8 @@ export const workspaceSecrets = pgTable('workspace_secrets', {
   scopeRef: text('scopeRef').notNull().default(''),
   /** Shown to members and readable by Agents; never part of the value (drizzle/20261102220000_workspace_secret_notes.sql). */
   note: text('note').notNull().default(''),
+  /** Third-party secrets default to protected; kind=env ignores this metadata. */
+  delivery: jsonb('delivery').$type<SecretDelivery>().notNull().default({ mode: 'protected' }),
   ciphertext: text('ciphertext').notNull(),
   iv: text('iv').notNull(),
   keyVersion: integer('keyVersion').notNull(),
@@ -62,6 +65,7 @@ export const userSecrets = pgTable('user_secrets', {
   name: text('name').notNull(),
   kind: text('kind').$type<(typeof WORKSPACE_SECRET_KINDS)[number]>().notNull(),
   note: text('note').notNull().default(''),
+  delivery: jsonb('delivery').$type<SecretDelivery>().notNull().default({ mode: 'protected' }),
   ciphertext: text('ciphertext').notNull(),
   iv: text('iv').notNull(),
   keyVersion: integer('keyVersion').notNull(),
