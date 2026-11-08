@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
+import type { PoolClient } from 'pg'
 import type { DeviceCaller } from '../lib/device-link'
 import type { SecretHttpPolicy } from '../lib/secrets/delivery'
 import { dbUrl, seedAgent, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
@@ -100,6 +101,96 @@ test('protected task Secret claims and renewals against PostgreSQL', { skip: !db
     assert.equal(claims.revision, f.grantInput.revision)
     assert.ok(!JSON.stringify(renewed).includes(f.value))
     assert.ok(!JSON.stringify(renewed).includes(f.value.slice(0, 16)))
+  })
+
+  await t.test('Task deletion serializes with Secret renewal and cannot be followed by a stale new capability', async () => {
+    const f = await fixture()
+    const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
+    const { rows: [task] } = await pool.query('select content from issues where id=$1', [f.issueId])
+    const deletedContent = withIssueMetadata(task.content, { ...readIssueMetadata(task.content), deletedAt: new Date().toISOString() })
+    const state = async () => (await pool.query('select "workspaceId","issueId",status,attempt,"leaseExpiresAt","stopRequestedAt" from agent_runs where id=$1', [f.runId])).rows[0]
+    const before = await state()
+    const writer = await pool.connect()
+    const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
+    const originals = new Map<PoolClient, PoolClient['query']>()
+    let intercepted = 0
+    let pending: ReturnType<typeof f.renew> | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    // Run every query against PostgreSQL. Pause only this fixture's real
+    // execution-identity read, after renewal has obtained its authority rows.
+    const observe = (client: PoolClient) => {
+      if (originals.has(client)) return
+      const query = client.query
+      originals.set(client, query)
+      client.query = ((...args: unknown[]) => {
+        const result = Reflect.apply(query, client, args)
+        if (args[0] !== 'SELECT "ownerId",kind,enabled FROM devices WHERE id=$1'
+          || !Array.isArray(args[1]) || args[1][0] !== f.deviceId) return result
+        intercepted++
+        return Promise.resolve(result).then(async value => {
+          entered.resolve()
+          await release.promise
+          return value
+        })
+      }) as PoolClient['query']
+    }
+    appPool.on('acquire', observe)
+    try {
+      pending = f.renew({}, new Date(f.now.getTime() + 5), Date.now)
+      await Promise.race([entered.promise, pending.then(() => {
+        throw new Error('Renewal ended before the real device authorization query')
+      }), new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Renewal did not reach the real device authorization query')), 5_000)
+      })])
+      if (timer) { clearTimeout(timer); timer = undefined }
+      assert.equal(intercepted, 1)
+      await writer.query('begin')
+      await writer.query("set local lock_timeout='1s'")
+      let deletionCommitted = false
+      try {
+        // Match setIssueDeleted's Task-first lock and metadata update. The
+        // old Run-only renewal lets this commit while its Task snapshot is stale.
+        await writer.query('select id from issues where id=$1 for update', [f.issueId])
+        await writer.query('update issues set content=$2,revision=revision+1,"updatedAt"=now() where id=$1', [f.issueId, deletedContent])
+        await writer.query('commit')
+        deletionCommitted = true
+      } catch (error) {
+        await writer.query('rollback')
+        assert.equal((error as { code?: string }).code, '55P03', 'only a real PostgreSQL Task lock may defer deletion')
+      }
+      release.resolve()
+      const renewed = await pending
+      if (deletionCommitted) {
+        assert.deepEqual(renewed, { taskSecrets: {}, revoked: [f.runId] },
+          'Task deletion committed before issuance; renewal must not return a new capability from its old Task snapshot')
+      } else {
+        assert.deepEqual(renewed.revoked, [])
+        const grants = renewed.taskSecrets[f.runId].grants
+        assert.equal(grants.length, 1)
+        const claims = openEgressCapability(grants[0].capability, f.binding, Date.now(), env)
+        assert.equal(claims.secretId, f.saved.id)
+        assert.equal(claims.revision, f.grantInput.revision)
+        assert.equal(claims.secret, f.value)
+        assert.ok(!JSON.stringify(renewed).includes(f.value))
+        // Once renewal commits, the same ordinary deletion succeeds. Every
+        // subsequent renewal must observe that committed tombstone.
+        await writer.query('begin')
+        await writer.query("set local lock_timeout='1s'")
+        await writer.query('select id from issues where id=$1 for update', [f.issueId])
+        await writer.query('update issues set content=$2,revision=revision+1,"updatedAt"=now() where id=$1', [f.issueId, deletedContent])
+        await writer.query('commit')
+      }
+      await denied(f)
+      assert.deepEqual(await state(), before, 'refused Secret renewal cannot mutate the existing Run or its lease')
+    } finally {
+      if (timer) clearTimeout(timer)
+      release.resolve()
+      await writer.query('rollback')
+      writer.release()
+      await pending?.catch(() => undefined)
+      appPool.off('acquire', observe)
+      for (const [client, query] of originals) client.query = query
+    }
   })
 
   await t.test('cross-owner, device, workspace, repository, token and attempt claims are rejected', async () => {

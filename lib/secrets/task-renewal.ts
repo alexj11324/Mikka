@@ -34,24 +34,28 @@ export async function renewTaskSecretAccess(input: {
     if (!UUID.test(reported.runId) || !input.leases[reported.runId] || !UUID.test(input.caller.tokenId)
       || input.caller.scopeDeviceId && input.caller.scopeDeviceId !== input.deviceId) { revoked.push(reported.runId); continue }
     try {
-      // Read only the persisted tenant before taking its Workspace lease. The
-      // locked APP snapshot below must still match it; tokens cannot reassign it.
-      const [stored] = await db.select({ workspaceId: agentRuns.workspaceId }).from(agentRuns)
+      // Read only the persisted tenant and Task before taking the Workspace
+      // lease. The locked APP snapshot must still match; tokens cannot reassign it.
+      const [stored] = await db.select({ workspaceId: agentRuns.workspaceId, issueId: agentRuns.issueId }).from(agentRuns)
         .where(and(eq(agentRuns.id, reported.runId), eq(agentRuns.userId, input.caller.userId), eq(agentRuns.deviceId, input.deviceId))).limit(1)
-      if (!stored?.workspaceId) { revoked.push(reported.runId); continue }
+      if (!stored?.workspaceId || !stored.issueId) { revoked.push(reported.runId); continue }
       const renewed = await withRunWorkspace(input.caller.userId, stored.workspaceId, async () => {
         const client = await pool.connect()
         try {
           return await withDatabaseClient(client, () => db.transaction(async tx => {
+            // Match claim/completion's Task -> Run order. A soft delete must
+            // finish before this read, or wait until this grant is committed.
+            const [issue] = await tx.select({ id: issues.id, workspaceId: issues.workspaceId,
+              ownershipState: issues.ownershipState, content: issueAttrsContent }).from(issues)
+              .where(eq(issues.id, stored.issueId!)).for('share')
+            if (!issue) return null
             const [row] = await tx.select({ run: agentRuns,
-              issue: { workspaceId: issues.workspaceId, ownershipState: issues.ownershipState, content: issueAttrsContent },
               deviceKind: devices.kind, remoteUrl: deviceRepos.remoteUrl,
               claimOwner: deviceTokens.userId, claimDevice: deviceTokens.boundDeviceId,
               claimWorkspace: deviceTokens.boundWorkspaceId,
               currentDevice: currentToken.boundDeviceId, currentWorkspace: currentToken.boundWorkspaceId,
               currentExpiresAt: currentToken.expiresAt,
             }).from(agentRuns)
-              .innerJoin(issues, eq(issues.id, agentRuns.issueId))
               .innerJoin(devices, and(eq(devices.id, agentRuns.deviceId), eq(devices.ownerId, input.caller.userId), eq(devices.enabled, true), isNull(devices.removedAt)))
               .innerJoin(deviceTokens, and(eq(deviceTokens.id, agentRuns.deviceTokenId), isNull(deviceTokens.revokedAt)))
               .innerJoin(currentToken, and(eq(currentToken.id, input.caller.tokenId), eq(currentToken.userId, input.caller.userId), isNull(currentToken.revokedAt), or(isNull(currentToken.expiresAt), gt(currentToken.expiresAt, now))))
@@ -62,7 +66,8 @@ export async function renewTaskSecretAccess(input: {
             if (!row || row.claimOwner !== input.caller.userId || !row.run.deviceTokenId
               || row.run.leaseExpiresAt?.toISOString() !== input.leases[reported.runId]) return null
             const workspaceId = row.run.workspaceId
-            if (!workspaceId || workspaceId !== stored.workspaceId || !await mayCompleteIssue(row.issue, row.run.userId, workspaceId)
+            if (!workspaceId || workspaceId !== stored.workspaceId || row.run.issueId !== issue.id
+              || !await mayCompleteIssue(issue, row.run.userId, workspaceId)
               || row.run.agentDefinition?.executionIdentity !== undefined && row.run.agentDefinition.executionIdentity?.workspaceId !== workspaceId) return null
             if (row.deviceKind === 'cloud') {
               // The native cloud-token rotation creates a new token ID. Keep the
