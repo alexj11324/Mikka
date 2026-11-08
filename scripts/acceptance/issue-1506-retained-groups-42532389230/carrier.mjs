@@ -29,8 +29,8 @@ function load(descriptor, base = here) {
 }
 
 const mode = process.argv[2]
-assert.ok(['preflight', 'run'].includes(mode))
-if (mode === 'preflight') {
+assert.ok(['carrier-preflight', 'carrier-run'].includes(mode))
+if (mode === 'carrier-preflight') {
   // Same offline import barrier as the old carrier. This is never a model test.
   let networkAttempts = 0
   globalThis.fetch = () => { networkAttempts++; throw Error('offline_network_forbidden') }

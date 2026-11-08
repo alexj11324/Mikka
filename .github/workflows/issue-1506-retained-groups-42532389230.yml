@@ -66,7 +66,7 @@ jobs:
           writeFileSync('driver-source/' + path, bytes)
           NODE
       - name: Load original validators and verify selected original receipts offline
-        run: node scripts/acceptance/issue-1506-retained-groups-42532389230/carrier.mjs preflight
+        run: node scripts/acceptance/issue-1506-retained-groups-42532389230/carrier.mjs carrier-preflight
       - name: Read the existing ACME email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -92,7 +92,7 @@ jobs:
           recursive: false
           include-imports: false
       - name: Invoke only the selected original cleanup CLI
-        run: node scripts/acceptance/issue-1506-retained-groups-42532389230/carrier.mjs run
+        run: node scripts/acceptance/issue-1506-retained-groups-42532389230/carrier.mjs carrier-run
       - name: Retain success failure and original cleanup receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
