@@ -258,11 +258,11 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const browserShown = browserOpen && browserFits
   function showBrowser(next: boolean) { setBrowserOpen(next); if (!next) setBrowserAt(null); try { window.localStorage.setItem('mikka:browser', next ? '1' : '0') } catch { /* storage unavailable */ } }
   // The review page's ⋯ 预览 asks for the column (lib/browser/column.ts), on a page when it names one.
-  const [browserAt, setBrowserAt] = useState<{ url: string; id: number } | null>(null)
+  const [browserAt, setBrowserAt] = useState<{ url: string; width?: number; id: number } | null>(null)
   useEffect(() => {
     const request = (event: Event) => {
-      const { open, url } = (event as CustomEvent<BrowserColumnRequest>).detail
-      if (open && url) setBrowserAt(previous => ({ url, id: (previous?.id ?? 0) + 1 }))
+      const { open, url, width } = (event as CustomEvent<BrowserColumnRequest>).detail
+      if (open && url) setBrowserAt(previous => ({ url, width, id: (previous?.id ?? 0) + 1 }))
       showBrowser(open)
     }
     window.addEventListener(BROWSER_COLUMN_EVENT, request)
