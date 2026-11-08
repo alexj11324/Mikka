@@ -8,7 +8,11 @@ const SHA = /^[0-9a-f]{40}$/
 export const ALEX_OWNER_ID = 'OFtPbAHifGBAOYiek9hd3w'
 
 export async function alexSession(work, { deadlineAt = null, expectedSha = process.env.MIKKA_ACCEPTANCE_SHA,
-  env = process.env, fetchImpl = globalThis.fetch } = {}) {
+  env = process.env, fetchImpl = globalThis.fetch, onSession } = {}) {
+  // The startup/finally receipt is available even when work is never entered.
+  // Only fixed protocol routes and scalar transport metadata may leave here.
+  const diagnostics = { requests: [], signOut: { attempted: false, succeeded: false } }
+  onSession?.(diagnostics)
   const email = env.ACME_DEMO_EMAIL
   const password = env.ACME_DEMO_PASSWORD
   if (!/^[^@\s]+@[^@\s]+$/.test(email ?? '') || typeof password !== 'string' || !password) throw new Error('alex_credentials_missing')
@@ -24,13 +28,22 @@ export async function alexSession(work, { deadlineAt = null, expectedSha = proce
     if (remaining <= 0) throw new Error('acceptance_deadline_exceeded')
     const timeout = AbortSignal.timeout(Math.ceil(remaining))
     const started = performance.now()
-    const response = await fetchImpl(url, {
+    const record = status => {
+      if (!['/mikka/api/auth/sign-in/email', '/mikka/api/auth/get-session', '/mikka/api/auth/sign-out', '/mikka/api/version'].includes(url.pathname)) return
+      diagnostics.requests.push({ path: url.pathname, method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].includes(method) ? method : 'OTHER',
+        status: Number.isInteger(status) && status >= 100 && status <= 599 ? status : null,
+        headersMs: Math.max(0, Math.round(performance.now() - started)) })
+      if (diagnostics.requests.length > 16) diagnostics.requests.shift()
+    }
+    let response
+    try { response = await fetchImpl(url, {
       method, redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       headers: { origin: ORIGIN, 'cache-control': 'no-store',
         ...(cookies.size ? { cookie: [...cookies].map(([key, value]) => `${key}=${value}`).join('; ') } : {}),
         ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...extra },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    })
+    }) } catch (error) { record(null); throw error }
+    record(response.status)
     for (const header of response.headers.getSetCookie()) {
       const pair = header.split(';', 1)[0]
       const at = pair.indexOf('=')
@@ -71,7 +84,11 @@ export async function alexSession(work, { deadlineAt = null, expectedSha = proce
     return await work({ request, json, rpc, requests, identity: { userId: identity.user.id }, version })
   } finally {
     signingOut = true
-    if (cookies.size) await json('/api/auth/sign-out', {}).catch(() => {})
+    if (cookies.size) {
+      diagnostics.signOut.attempted = true
+      try { await json('/api/auth/sign-out', {}); diagnostics.signOut.succeeded = true }
+      catch { /* The bounded request status and false result are the receipt. */ }
+    }
     cookies.clear()
   }
 }

@@ -13,7 +13,7 @@ const PROMPT = '测试群停止：这是一条临时验收消息。被提及的 
 const BOUNDARIES = ['after_send', 'responding_bot', 'private_generation_receipt']
 const fixed = (value, values) => values.includes(value) ? value : 'unknown'
 const fail = code => { throw new Error(code) }
-const ERRORS = new Set([...FIXTURE_ERRORS, 'group_receipt_invalid', 'group_scope_mismatch', 'group_member_mismatch',
+const ERRORS = new Set([...FIXTURE_ERRORS, 'acceptance_http_failed', 'acceptance_rpc_failed', 'acceptance_signout_failed', 'acceptance_deadline_exceeded', 'group_receipt_invalid', 'group_scope_mismatch', 'group_member_mismatch',
   'group_exists', 'group_create_unknown', 'group_not_empty', 'group_send_unknown', 'group_message_invalid',
   'group_state_invalid', 'group_stop_not_observed', 'group_boundary_timeout', 'group_read_limit', 'group_boundary_missed',
   'group_cleanup_pending', 'group_trace_mismatch', 'group_unexpected_delegation', 'group_private_generation_not_observed', 'group_live_scope_invalid',
@@ -120,7 +120,7 @@ export async function runGroupStop({ env = process.env, mode = 'observe', groupR
   const prompt = scenario === 'private'
     ? `测试私聊停止：这是本临时群中的合成计数交流，不是执行任务。被提及的 Bot 请仅向当前另一测试 Bot ${selected.botId} 私下发送一句“请在私聊中从1逐个数到600，用空格分隔”，设置 privateTo 为该 Bot 的 ID。第一条 text 保持一句话，mentions 只允许该对方。对方收到 privatePeer 后只在这次测试私聊中连续数数，privateTo 指向该测试 peer。不要在公开群回复内容，不要创建任务、调用工具、查询真实信息、写文件或联系其他人。`
     : PROMPT
-  let requests = []
+  let requests = [], sessionDiagnostics
   const save = () => {
     report.requests = requests.map(groupRequestMetadata)
     if (!checkpoint) return
@@ -291,10 +291,12 @@ export async function runGroupStop({ env = process.env, mode = 'observe', groupR
       if (failure) throw failure
       if (expectedSha && (await readJson(session, '/api/version')).build !== expectedSha) fail('acceptance_version_changed')
       report.status = mode === 'cleanup' ? 'cleanup_complete' : 'stop_evidence_captured'
-    }, { expectedSha, deadlineAt: began + 210_000 })
-    if (!requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)) fail('acceptance_signout_failed')
+    }, { expectedSha, deadlineAt: began + 210_000,
+      onSession: value => { sessionDiagnostics = value; requests = value.requests } })
+    if (sessionDiagnostics ? !sessionDiagnostics.signOut.succeeded : !requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)) fail('acceptance_signout_failed')
   } catch (error) { report.status = 'failed'; report.error = safeError(error) }
-  report.signedOut = requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)
+  if (sessionDiagnostics) report.sessionSignOut = { ...sessionDiagnostics.signOut }
+  report.signedOut = sessionDiagnostics ? sessionDiagnostics.signOut.succeeded : requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)
   report.finishedAt = new Date().toISOString(); save(); return report
 }
 

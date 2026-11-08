@@ -42,14 +42,17 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
     runtimeBoundary: { classification: 'unverified', executeEntered: 'not_observed',
       required: 'same_build_workflowRunId_callRef_real_tool_start_finish_and_stop_ordering' },
     cleanup: { status: 'not_started', liveClosed: false } }
-  let requests = []
+  let requests = [], sessionDiagnostics
   const save = () => {
     if (!checkpoint) return
     mkdirSync('issue-1506-alex-report', { recursive: true })
-    writeFileSync(`issue-1506-alex-report/coordinator-tool-stop-${report.fixture?.key === 'luna' ? 'luna' : 'haiku'}-${report.requestedCase ?? 'unselected'}-${report.sampleId}.json`, JSON.stringify(report, null, 2) + '\n')
+    writeFileSync(`issue-1506-alex-report/coordinator-tool-stop-${report.fixtureKey ?? 'unselected'}-${report.requestedCase ?? 'unselected'}-${report.sampleId}.json`, JSON.stringify(report, null, 2) + '\n')
   }
   try {
     const expectedSha = requireExactSha(env.MIKKA_ACCEPTANCE_SHA)
+    const fixtureKey = env.MIKKA_FIXTURE_KIND
+    if (fixtureKey !== undefined && !['haiku', 'luna'].includes(fixtureKey)) fail('fixture_key_invalid')
+    report.fixtureKey = fixtureKey ?? 'unselected'
     const requestedCase = env.MIKKA_STOP_CASE ?? 'observe'
     if (!['observe', 'before_tool', 'during_tool'].includes(requestedCase)) fail('case_invalid')
     if (!(streamTimeoutMs > 0 && streamTimeoutMs <= 60_000 && stopTimeoutMs > 0 && stopTimeoutMs <= 20_000)) fail('timeout_invalid')
@@ -229,15 +232,17 @@ export async function runToolStop({ env = process.env, sessionProvider = alexSes
       if (failure) throw failure
       if ((await readJson(session, '/api/version')).build !== expectedSha) fail('acceptance_version_changed')
       report.applicationVersionStable = true; report.status = 'observed'
-    }, { expectedSha, deadlineAt: Date.now() + 180_000 })
-    if (!requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)) fail('acceptance_signout_failed')
+    }, { expectedSha, deadlineAt: Date.now() + 180_000,
+      onSession: value => { sessionDiagnostics = value; requests = value.requests } })
+    if (sessionDiagnostics ? !sessionDiagnostics.signOut.succeeded : !requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)) fail('acceptance_signout_failed')
   } catch (error) { report.status = 'failed'; report.error = code(error) }
   const routes = new Set(['/mikka/api/auth/sign-in/email', '/mikka/api/auth/get-session', '/mikka/api/auth/sign-out',
     '/mikka/api/version', '/mikka/api/workspace/switcher', '/mikka/api/rpc', '/mikka/api/live/ticket', '/mikka/api/coordinator/stream'])
   report.requests = requests.filter(row => routes.has(row.path)).map(({ path, method, status, headersMs }) => ({
     path, method: method === 'POST' ? 'POST' : 'GET', status: Number.isInteger(status) ? status : null, headersMs: number(headersMs),
   }))
-  report.signedOut = requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)
+  if (sessionDiagnostics) report.sessionSignOut = { ...sessionDiagnostics.signOut }
+  report.signedOut = sessionDiagnostics ? sessionDiagnostics.signOut.succeeded : requests.some(row => row.path === '/mikka/api/auth/sign-out' && row.status >= 200 && row.status < 300)
   report.publicRunningCallCount = new Set(report.tools.filter(row => row.state === 'running').map(row => row.callRef)).size
   report.finishedAt = new Date().toISOString(); save(); return report
 }
