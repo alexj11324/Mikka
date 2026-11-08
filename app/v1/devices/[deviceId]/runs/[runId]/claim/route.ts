@@ -13,7 +13,7 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
+import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeLease } from '@mikka/protocol/subscription'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
@@ -485,8 +485,18 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
         runId: current.id, deviceId, deviceTokenId: caller.tokenId, attempt: current.attempt } })
     const assignedEnv = cloudStartupDiagnosticEnv(taskEnv, { deviceKind: device.kind, run: current,
       repository: remoteRepositoryRef(repo.remoteUrl), harness, subscriptionBindingId: subscription?.id })
+    // Reuse the same owner/remote settings already read for this assignment.
+    // No discovery, authorization or provider work is added inside the fence.
+    const initialRepository = device.kind === 'cloud' && repo.remoteUrl &&
+      !current.retryOf && !current.continuesRunId && !current.sessionId &&
+      request.headers.get(INITIAL_REPOSITORY_HEADER) === '1'
+      ? deviceRepoSchema.safeParse({ repoId: repo.id, path: repo.repoPath,
+        name: repo.repoPath.split('/').filter(Boolean).pop() ?? repo.repoPath, remoteUrl: repo.remoteUrl,
+        ...(settings?.setup ? { setup: settings.setup } : {}),
+        ...(settings?.networkAllow ? { networkAllow: settings.networkAllow } : {}) }).data : undefined
     return NextResponse.json({
     ...publication,
+    ...(initialRepository ? { repo: initialRepository } : {}),
     runId, issueId: issueId, deviceId, repoId: repo.id,
     ...(run.agentDefinition?.traceContext ? { traceContext: { ...run.agentDefinition.traceContext, runId } } : {}),
     ...(repo.remoteUrl ? { remoteUrl: repo.remoteUrl, expectedRepoRemote: repo.remoteUrl } : {}),

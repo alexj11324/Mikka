@@ -323,6 +323,16 @@ async function bootstrapFixture(scenario: 'preloaded' | 'fallback' | 'legacy' | 
     if (sql.startsWith('SELECT 1 FROM agent_runs r JOIN thread_machines')) return result([{}])
     if (sql.startsWith('SELECT 1 FROM thread_machines')) return result(scenario === 'lease_lost' ? [] : [{}])
     if (sql === 'SELECT clock_timestamp() AS now') return result([{ now: floor }])
+    if (sql.startsWith('INSERT INTO devices') && sql.includes(';\nINSERT INTO device_repos')) {
+      assert.deepEqual(values, [], 'native batch has no values array')
+      const issued = /INSERT INTO device_tokens [\s\S]*?VALUES \('[a-f0-9-]+'::uuid,'([^']+)'::text,'Thread worker','([a-f0-9]{64})'::text,'([a-f0-9-]{36})'::uuid,'([a-f0-9-]{36})'::uuid,now\(\)\+interval '24 hours'\) RETURNING clock_timestamp\(\) AS now$/.exec(sql)
+      assert.ok(issued, 'the real batched credential statement retains its native types')
+      assert.equal(issued[1], actor.userId); assert.equal(issued[4], actor.workspaceId)
+      tokenHash = issued[2]; credentialDeviceId = issued[3]
+      return ['INSERT','INSERT','UPDATE','UPDATE','INSERT'].map((command,index)=>({
+        command, rowCount:1, rows:index===4?[{now:floor}]:[],
+      }))
+    }
     if (sql.startsWith('INSERT INTO device_tokens')) {
       tokenHash = values[3] as string; credentialDeviceId = values[4] as string
       assert.equal(values[1], actor.userId); assert.equal(values[5], actor.workspaceId)
@@ -416,7 +426,11 @@ test('an unavailable preloader retains the existing user background fallback and
   const fast = await bootstrapFixture('preloaded'), fallback = await bootstrapFixture('fallback')
   assert.ifError(fallback.error)
   assert.equal(fallback.uploads.length, 1); assert.equal(fallback.commands.length, 1)
-  assert.deepEqual(fallback.queries, fast.queries, 'the fast path adds no SQL or authorization work')
+  // Native simple-query SQL contains this invocation's UUIDs/token digest.
+  // Compare full statements, retaining every non-identity literal and predicate.
+  const shape = (sql: string) => sql.replace(/'[a-f0-9-]{36}'::uuid/g, "'<uuid>'::uuid")
+    .replace(/'[a-f0-9]{64}'::text/g, "'<hash>'::text")
+  assert.deepEqual(fallback.queries.map(shape), fast.queries.map(shape), 'the fast path adds no SQL or authorization work')
   assert.ok(fallback.finished); assert.ok(fallback.released)
 })
 

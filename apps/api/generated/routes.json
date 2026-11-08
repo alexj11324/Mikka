@@ -1574,7 +1574,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "f51c8e65daa53269bdf4e857759b0d5300006b5a783f3a9536a904cedf263d44"
+      "sourceHash": "e0818cf6420a3c1ed1fa34e346716a3abb4c1e8ca55d77eff89ae1caaf8a3536"
     },
     {
       "path": "/mikka/api/search",
@@ -2111,7 +2111,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "ce80ed471abf06702435f75404ad634d6c8c4b00b9582f95bf5a95ce7846bb4b"
+      "sourceHash": "ec71fb037453c409b6e16cca45db2a7dc013b674e83aec347657ef620008ac6a"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",

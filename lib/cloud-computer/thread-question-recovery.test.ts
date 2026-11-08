@@ -73,6 +73,14 @@ function fixture() {
     if (sql.startsWith('SELECT * FROM thread_machines')) return result([{ ...machine }])
     if (sql.startsWith('SELECT 1 FROM devices d JOIN agent_runs')) return result(flags.deviceEnabled ? [{}] : [])
     if (/^SELECT 1 FROM (factory_questions|devices|thread_machines|agent_runs)/.test(sql)) return result([{}])
+    if (sql.startsWith('INSERT INTO devices') && sql.includes(';\nINSERT INTO device_repos')) {
+      assert.deepEqual(values, [], 'the native simple-query batch has no bound values')
+      assert.deepEqual(sql.split(';\n').map(statement => /^(INSERT INTO|UPDATE) \w+/.exec(statement)?.[0]),
+        ['INSERT INTO devices', 'INSERT INTO device_repos', 'UPDATE thread_machines', 'UPDATE device_tokens', 'INSERT INTO device_tokens'])
+      return ['INSERT', 'INSERT', 'UPDATE', 'UPDATE', 'INSERT'].map((command, index) => ({
+        command, rowCount: 1, rows: index === 4 ? [{ now: new Date() }] : [],
+      }))
+    }
     if (sql.startsWith('INSERT INTO device_tokens')) return result([{ now: new Date() }])
     if (sql.startsWith('UPDATE thread_machines') || sql.startsWith('WITH locked_run')) {
       if (sql.startsWith('UPDATE thread_machines SET "workerLeaseId"=$2')) {

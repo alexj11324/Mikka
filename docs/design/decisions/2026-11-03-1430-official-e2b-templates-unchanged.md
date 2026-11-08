@@ -13,10 +13,12 @@ snapshot；不得更新或删除官方模板，也不得删减、覆盖其中的
 Node、Mikka worker 源码与构建产物、daemon 依赖、gh 和 desktop 额外依赖预装在
 `/opt/mikka`。保留官方 CLI 的完整安装包、相对目录结构、Node/npm 和系统文件，
 包括文件内容、权限、属主和符号链接。Mikka 的设备身份只在实例启动后写入自己的
-`/home/user/.mikka`，viewer 状态写入 `/run/mikka-viewer`。任务凭证按
-[1800](2026-11-06-1800-machine-is-the-execution-boundary.md) 提前交给已绑定任务的
-实例，官方 CLI 使用正常 HOME 和凭证配置。任何订阅凭证、设备身份、签名密钥或
-工作区数据均不得进入可复用模板。
+`/home/user/.mikka`，viewer 状态写入 `/run/mikka-viewer`。所选原生 CLI 认证与获准的 GitHub 凭据按
+[1800](2026-11-06-1800-machine-is-the-execution-boundary.md) 交给已绑定任务的实例，
+官方 CLI 使用正常 HOME 和凭证配置。其他第三方 API Secret 的交付单独遵循
+[0240 凭据暴露边界](2026-11-08-0240-credential-exposure-boundary.md)，不能解释成
+向 Agent 批量注入所有 Secret。任何订阅凭证、设备身份、签名密钥或工作区数据均
+不得进入可复用模板。
 
 ## 发布门槛
 
@@ -484,7 +486,7 @@ accountInfo 的实际值；只设置 Claim.env 不能生成通过证明。采用
 初始化、错绑或不完整 exact ACK 都不能通过。普通任务不添加
 详细持久化诊断字段，派发入口、六样本分母和 5000ms 判定公式不变。
 
-已安装 SDK 0.3.305 的真实进程/IPC 离线回归只能证明协议与拒绝边界。现有真实
+已安装 SDK 0.3.305 的真实进程/IPC 离线回归只能证明协议与拒绝边界。0479675 已发布的真实
 订阅候选 gate 使用 personal acceptance daemon，继续验证原 FD3 路径；它没有
 bootstrap sidecar，因此不能证明新的匿名采用及环境 OAuth 来源。原有官方文件
 保全和双真实订阅 gate 仍是发布门槛，新的实际采用与耗时还必须由随后相同最终
@@ -493,3 +495,408 @@ bootstrap sidecar，因此不能证明新的匿名采用及环境 OAuth 来源�
 本轮各切片、合成检查和预算边界见
 [候选证据索引](../research/2026-11-07-e2b-startup-overlap-candidate.json)。
 这些实现与本地结果均未被记作五秒达标；生产未通过前 #1505 保持打开。
+
+### 0479675 后继本地候选：Codex 初始化与凭据批次
+
+本候选以已合并的 `0479675e188efeac341b207d8616c4d7b9d4ee23` 为基底，
+合成尚未发布的 Codex 匿名初始化与凭据准备五写批次。基底已合并不代表线上已包含
+这些后继改动。原版 Claude、Codex、desktop 文件保全、fresh receipt、双真实订阅
+及同源发布元组门槛全部保留，没有新的模板快照内 native session 或已分配 VM 池。
+
+新建、从未领取任务的 Codex 实例只在接受 bootstrap 后创建独立原版进程，
+匿名阶段发送 `initialize` / `initialized`，不登录、不建 thread、不发送用户输入。
+随后必须经过原 fresh claim、lease、policy、真实 checkout 与完整配置资格检查，
+才允许一次采用并执行原有 login 和任务流程。正常 HOME 和真实 Git worktree 不变；
+项目配置、版本或绑定不适用时先排空，再走原启动路径。详细边界见
+[1800 决策](2026-11-06-1800-machine-is-the-execution-boundary.md#bootstrap-time-anonymous-codex-initialization)。
+
+凭据准备只把同一事务内原五条 DML 的传输合为一条 PostgreSQL simple-query
+消息，仍执行五条有序语句及后续 fresh rebind；不把一次往返写成一次 SQL。
+精确新凭据时钟仍来自最后 INSERT 的 `clock_timestamp()`。本地协议量正常样本
+从 1788 B 降为 1466 B（−322 B，不含 TCP/TLS/建连）；高膨胀值保留原参数绑定
+路径。早期 SQL 失败可能多发送尚未执行的后续文本，首错截断与整笔回滚保持，
+实际错误前缀账单独保留。
+
+[本候选紧凑证据索引](../research/2026-11-07-codex-initialize-five-write-candidate.json)
+区分原固定提交的验证、合成后的交叉验证和未完成的生产证明。既有 0.166.0
+匿名协议控制没有账号、thread 或 turn 请求；它与本地数据库/类型结果都不能
+替代新候选的真实订阅采用或 dispatch→ACK 五秒成绩。本候选没有新增生产样本，
+没有把协议字节节省计作 ready-pool 已获预算。
+
+### 78c3c13 生产失败后的采用修正
+
+生产 run 42430097946 的六个原样本仍保留失败：Claude/Codex 交替的 dispatch→ACK
+分别为 18845.698、15448、16510.477、14497、14408.969、17929 ms，全部超过
+5000 ms。39 项服务端阶段齐全，但第 4 个 Codex 样本只有工具完成、没有工具后的
+回复，故缺少完整执行证明；原 driver 跳过其 closing pin，实际只有 13/14 次 pin。
+这些记录不能改写成完整 pin 覆盖，也不能因后续本地修复追认通过。
+
+三个 Claude 样本都走了 ordinary_path，实际认证来源为 oauth_descriptor。
+实际 worker/hosted runner 环境的回归复现了两个严格比较差异：匿名启动缺少
+supervisor 生成的 MIKKA_RUN_ID；官方 SDK 首次调用又同时为真实 child env 和
+process.env 增加 CLAUDE_AGENT_SDK_VERSION，而匿名 options 的快照早于它。
+修正只加入绑定 hint 的 runId，并从官方 SDK 本次实际 spawn config 同步这个
+版本字段。完整环境、fresh claim、认证来源、临时目录、单次采用与关闭排空校验
+均保持；不能通过忽略字段或写死版本号来允许采用。冷 SDK、真实 hosted runner
+与不同 runId/版本拒绝均有离线回归；它们不是生产采用或五秒达标证明。
+
+后继 driver 在 initial pin 成功而 closing pin 尚未尝试时，即使执行证明失败也
+补做一次 closing pin，保留原执行错误。closing pin 失败另行记录，清理后中止
+后续派发。正常成功路径的 pin 位置、14 次总数、完整执行证据和 5000 ms 公式
+不变；原 13/14 报告不修改。
+
+另有可独立重放的 Codex 协议边界：空 agentMessage delta 原先会把 item 标为
+已输出，使随后 completed item 的完整文字被丢弃。现在空 delta 不占用该标记；
+非空流式输出与完成消息去重保持。离线真实 adapter/fake-native 回归先失败再通过，
+但没有保留上述生产第 4 例的原生通知流，因此不能把该边界认定为其已证实原因。
+
+[本轮失败与修正证据索引](../research/2026-11-08-e2b-adoption-correction.json)
+区分原始生产失败、源代码复现和后续待完成的发布/生产验证。官方文件校验和、
+Claude/Codex 双真实订阅及最终同一部署元组的全部六次五秒验收继续作为门槛。
+
+
+### 生产关键路径与后继的请求重叠
+
+固定 78c3c13 / run 42430097946 的 16 个不重复区间与原完整公式逐例相加一致。
+本批注册与 claim 的实际重叠为零。单独扣除整个 ensure 的账面余量仍为
+8.780–12.913 秒，因此不能把预热 VM 的局部收益推算为五秒通过；该扣除也不是
+预热池的因果预测。实际阶段与原件摘要见
+[关键路径及后继候选证据](../research/2026-11-08-e2b-startup-roundtrips-candidate.json)。
+
+仅对可信 bootstrap 携带的首次 hosted 仓库任务，daemon 请求把原 claim 已读取的
+仓库设置放入同一最终响应。服务端仍先通过原 fresh 响应栅栏；daemon 仍先处理
+heartbeat、撤销、凭据轮换、卸载及 checkpoint，再采用准确匹配 run/device/repo/remote
+且 schema 有效的一次性设置。它替代该次 listRepos GET，不增加发现或授权查询，
+也不写入恢复 journal。旧服务端、缺失或错绑投影、本地设备、续作等保留原 GET。
+设置的一致性时点是原 claim 的读取；不能声称与稍后第二次 GET 对并发编辑的观察
+时点完全相同。旧服务端首次 GET 现在等待这次 claim 回应后回退；取消仍须中止
+claim 并排空，不能用等待顺序变化掩盖相互等待。
+
+真实隔离 PostgreSQL 的受影响正常 Task 切片从 9 条 SQL 降为 1 条；缺失/完整设置
+返回行分别从 5→0 / 7→1，实际 PostgreSQL 双向消息分别减少 3173 / 3278 B，
+Unicode 大设置场景减少 5077 B。旧 claim＋repos 的 JSON 响应体总量比新 claim
+多 4 B。完整 Task 是未改变的共同前后缀加该切片；这些不是整个 Task 的绝对
+查询数或 HTTP/TCP/TLS 总量，也不代表生产毫秒收益。
+
+下一轮 Git 细分仅沿用已有任务或可信 host 的显式诊断 opt-in，记录 clone、fetch、
+remote HEAD、refs 和本地 Git 的闭式阶段；标签只有 run hash 与 harness，不记录
+命令、远端 URL、路径或凭据。默认执行仍直接调用原 execa，参数、环境、取消和
+超时不变，没有新 SQL、HTTP 或产品轮询。首次并行局部验证的一个子进程排空断言
+曾失败；原日志保留，未放宽断言。随后同断言隔离通过，旧源码 30/30、新源码
+33/33 顺序完整套件通过；这不足以把原失败武断归因为已证实的旧抖动，合成 CI
+仍必须重新通过。该诊断不增加正式 39 项门槛，也不改变派发起点或 ACK 公式。
+
+
+### 提前建立、确认上传后才提交的 worker broker
+
+仅新建仓库 TaskVM 尝试提前启动自有 broker；官方文件、旧 worker/refresh/desktop
+的执行边界不变。loader 验证所选 release 的目录所有权、symlink、worker 标记、
+实际构建能力及 broker 完整字节 SHA 后，才执行 /opt/mikka 内的资源。准备阶段
+不含账号凭据。原 fresh 凭据事务提交后，仍用原 multipart 请求完整上传 bootstrap、
+initial run、Claude 和 Codex 四个文件；只有上传响应成功，才通过已经打开的 E2B
+输入流发送一次长度/摘要及 run/lease/device/workspace/token hash 绑定的 commit。
+完整原子发布、以 user 身份唤醒、旧启动回退、真实匹配注册通知和最后 fresh SQL
+栅栏保持。文件部分写入或上传结果未知都不能发布。
+
+这将后置连接和进程启动提前，不减少正常请求总数：旧、新、legacy 三组均为
+3 请求。实际 SDK 2.61 loopback 的 HTTP 请求行/头/体与响应头/体为
+11796→10847 B（−949 B）；legacy fallback 为 17913 B（+6117 B）。不包含
+TCP/TLS、HTTP2 或 chunk framing，且不是生产省时证明。136 个现有 SQL 调用点
+的完整文本不变；未引入数据库查询、额外数据库写入或产品轮询。
+
+预提交等待、提交后的发布与注册均有独立有界期限。取消通过独立输入流有序发送；
+send 只排队，close 的确认才证明输入传输完成。响应流断开不等于进程已退出。
+提交后若输入流也不可确认，保留失败和原 TaskVM recovery 的清理责任，由有界
+broker 排空其发布子进程；不能只杀父进程后宣称干净。实际进程取消、上传 ACK
+丢失、凭据撤销、错绑/损坏文件、老版本兼容与真实 PG 路径均有回归。
+[broker 候选索引](../research/2026-11-08-worker-bootstrap-broker-candidate.json)
+单列正常预算、失败不确定性和旧版本开销。
+
+### 实际 bootstrap 采用成为双订阅发布门槛
+
+本后继把候选测试接到模板内真正的预载 cloud-worker：先用原注册流程登记候选
+个人设备，暂不 claim；保持原 push socket 在线，正常 Coordinator 为共享冒烟身份
+创建新的只读仓库任务，再由 owner evidence 的显式 opt-in 投影生成 canonical
+提示。投影核对 run、owner、device、workspace 和冻结 execution identity，复用
+原 hint builder，不携带任务凭据或授予执行权限。默认 evidence 的原 SQL/JSON
+完全不变；额外投影仅属于这项明确开启的候选诊断。
+
+辅助脚本来自固定候选 source 的 /opt/mikka 安装，并进入 worker recipe hash，
+不是 runner 临时注入的替代 worker。它保留 VM 内原 bootstrap 凭据字节，先发布
+一次性 sidecar，最后独占发布 bootstrap，再唤醒实际 dist/cloud/cloud-worker.js。
+该进程执行原正常 register、fresh claim、租约、policy、仓库与账号边界。
+helper 的运行依赖从实际安装的 daemon 包作用域解析，不能依赖未安装的根依赖。
+
+发布 reader 要求同 run/harness、恰好一次成功 prewarm/init、真实 bootstrap
+source 及未截断的原时间轴。Claude 另要求实际 accountInfo 的 oauth_environment
+与 claim 来源一致，ordinary FD3 回退不能通过。Codex 的 preparation receipt
+只在真实采用成功后可见；初始化成功而项目、环境或身份拒绝采用时保持缺失。
+Node 验证器、Python release verifier 和最终环境发布都重复核验该证明，官方
+三模板文件校验、双真实订阅、工具后的回复和官方 exact ACK 继续保留。
+
+这是候选真实采用门槛，不能替代正式 cloud-kind Task 的端到端验收。历史 047
+个人 acceptance daemon 的 ordinary 路径成绩仍保留，不能追认为采用成功。
+本地 166 项 Node、Python 32/22/16、25 项 daemon、21 项真实 PG 与类型/lint
+只证明候选实现及拒绝边界；仍需最新合成 head CI、生产真实双订阅和同一最终
+app/deployment/runtime/worker/三模板的全部六次完整派发 ≤5000ms。
+
+
+### GitHub 身份与第一安装页的同 token 读取重叠
+
+原 App 配置和唯一一次 fresh user token 取得后，/user 与第一安装页并发读取。
+两者全部结束后仍先检查 /user 的原错误、合法 ID 和绑定身份，再处理安装结果；
+本 App、suspended、用户 explicit 仓库交集和后续分页顺序不变，不换成公开 repo
+GET，也不并行 model/Profile/queue。第一安装页只消费一次，正常本批仍为三个
+GitHub GET，SQL 和 token 刷新次数不变。
+
+身份拒绝时可能已经多发一个只读 GET（失败前缀 1→2）；快速身份错误也可能
+等另一请求的原有 10 秒截止。原错误优先级和排空保持，不声称失败等待完全不变。
+请求累计 github.ms 在并发后不能作为墙钟耗时再相加。35 项原 transport/fetch
+回归通过；生产节省多少时间仍待新六例测量。
+
+### 合成验证与主干依赖变化
+
+合成后的本地验证包含：发布 Node 168 项、cloud limits 105＋11 项、GitHub 35 项、
+真实 PG Task 121 项、bootstrap 投影 21 项、完整 heartbeat 2 项及 daemon 142 项，
+均通过且无跳过；应用/API/daemon 原类型门槛、65 文件显式 lint 同时通过。
+缺失本地 semver 依赖链接、误用空测试库和旧构建证明脚本中的 probe 文件名错误
+均保留原始失败日志，分别修正环境/使用完整迁移和核验真实产物；没有修改业务
+断言、降低门槛或把缺失 schema 当成产品结果。
+
+随后正常合入主干 3c32675 的 trusted affected CI。它的锁变化使 worker 指纹变化，
+原因是 Vitest/Vite 新解析了 YAML 2.9.0 可选 peer；183 个生产 package/snapshot
+内容与旧锁相同。另在 b75 隔离树用 pnpm 10.34.3 实际 frozen filtered install、
+cloud build 与资源字节核验通过，worker 为
+73be9136ba4b51af098403074f35fc5eecb58fb2。开发 Node 24.22.1 与模板 24.19.0
+不同，因此这仍不替代新 head CI、真实 E2B 和双订阅门槛。最终待生产六例的完整
+派发结果，不将上述局部测试或固定指纹当作五秒成绩。
+
+### 最新完整 CI 的桌面 claim 断言校正
+
+远端 fb77f62ad17d98a21e2798c04d7e9a2cfe0c2e8e 的新 trusted selector 实际选择完整
+85 个 unit task、70 个数据库 suite 与四个 PG shard。其 Node 22 和 daemon 两个
+job 暴露相同的两条桌面 owner 测试错误：新增可选 repository capability 为
+undefined，但旧断言仍只期望三个参数。仅将该断言的第四参显式写为 undefined，
+原 device、run、AbortSignal 和 start 断言全部保留，未改变产品路径。
+
+真实同版本 Node 22.22.1 下，原完整文件 34 通过／2 失败，修正后 36/36 且无跳过；
+两条原 CI 红灯及原日志保留，未把该文件的通过当作全套 CI 已通过。该测试文件
+属于既有 worker 指纹输入，故后继 worker 为
+fc49a8b4933ba6216cc0ebf5b2c941b43fd2144b，不能沿用前版 73be 指纹。已以相同
+受验证锁文件依赖实际重建，两入口、九资源、16 个夹具、资源模式和 12 项语法检查
+通过。本地产物验证器首次对自有依赖 symlink 路径的记账错误也保留；仅按实际目标
+修正记账，没有改变资源或产品断言。详细证明追加到同一候选证据索引；仍须新
+合成 head CI、三模板守恒、真实双订阅与全部六次生产五秒结果。
+
+
+### 单次成员读取、锁内 run 复用与采样隐私
+
+2026-11-08 的后继本地候选去掉 authorizeSubscriptionWorkspace 中仅包围一条
+SELECT 的显式 BEGIN/COMMIT。原 UUID 校验、参数绑定、完整成员条件、FOR SHARE、
+LIMIT 1 与缺行拒绝保持，每个原调用点仍重新查询，不合并两人的授权快照，也不缓存
+前次结果。真实 pg 只有在 ReadyForQuery 后交付成功，查询、提交或连接异常不能
+因为已收到一行而授予权限。原函数没有持锁跨越的业务操作；两种实现都可能在数据库
+释放锁后、调用者恢复前遇到撤销，后续 fresh claim/lease/response fence 继续保留。
+原独立 BEGIN/COMMIT/ROLLBACK 的故障阶段被移除，不声称所有基础设施错误完全同形。
+
+真实隔离 PostgreSQL 18.6 对照中，单次正常校验从 3 条 SQL、3 次发送、585 B
+变为 1 条 SQL、1 次发送、527 B；数据行仍为 1，没有 DML。缺成员拒绝为
+544→482 B，仍不执行下游。原绑定查询支持的空、Unicode、引号、长身份等不增加
+限制。实际双连接覆盖撤销持锁后提交、锁释放后撤销以及仅终止测试自身连接时拒绝。
+已有 Factory 测试夹具增加对同一隔离 Drizzle 实例的 select 绑定，原 transaction
+绑定及 PostgreSQL 17 版本门槛保留。PG17 全套结果仍由新精确 CI 提供。
+
+claim 的 Profile 准入另外复用同一事务刚取得 FOR UPDATE 的 run 行，避免马上重复
+读取同一行。外部调用者保留原自行读取入口；该锁与准入之间不插入业务 await 或写入，
+Profile 来源、凭据和最终响应栅栏保持。在固定本地 acquisition/claim/终态夹具内，
+SQL 170→169、返回行 114→113，Claude/Codex 实际协议量分别减少 306/305 B。
+这是受影响完整夹具，不是实际 provider/model Task 总量。更宽的锁定投影使
+stop-before-lock 的失败前缀增加 1367 B，单列保留；不能把正常净节省外推到每个
+拒绝前缀。
+
+五写批次的复核还发现，现有 egress sampler 会把 SQL 字符串中的 “from 模块名”
+识别成表名。资格检查因此对最终转义文本的全部有序匹配做精确核验，不截断或去重；
+任何额外匹配，包括重复的已知表名，都恢复原五条参数绑定语句，值不改、不拒绝。
+正常 pnpm test 仍为 1466 B；特殊命令恢复到原安全路径的 1831 B，五个首错前缀、
+SQL、参数和回滚结果相同。旧不安全批次的 1509 B 不再记作该场景的节省。
+全局 sampler、采样开关和正常诊断预算不因这个修复改变。
+
+[该批次证据索引](../research/2026-11-08-e2b-membership-and-claim-candidate.json)
+绑定三个独立候选及本地完整合成源。随后正常合入 main 9e18 的 task-secret
+capabilities：新增资源 snapshot/attempt/device-token/workspace/repository fence
+完整保留，初始仓库设置仍只在该最终响应栅栏内同步投影。受保护 Secret 的动态
+taskSecretEnv 仍参加完整环境匹配；不适用匿名接管的任务保留正常启动，不能忽略
+环境差异来追求时延。这里记录本地验证和兼容边界；新 worker 的构建、精确 CI、
+真实模板/双订阅发布及全部六次正式生产计时分别取得证明后才能记为通过。
+
+完整前序 #1683 的 beab 交付另在本方分支合成为 e7c 源，不替代其 owner 的独立
+合并及发布。两个文本冲突分别保留双方测试入口，以及 Codex 已采用进程不重复
+initialized 和恢复必须匹配实际 native version 的检查。新组合实际通过启动/Web
+114 项、daemon 110＋23 项及 app/API/daemon 类型检查；实际 worker 为
+5343beb10c58d3f68a9238a3bca1c24a8546d722，两入口和全部运行资源验证通过。
+先前 e420 的 PG95＋源码夹具36、daemon218及 worker6ded 仍单独绑定原源。
+app 首次缺少 Electron 的类型依赖错误保留，仅链接既有锁定版本后复验；未改产品
+或断言。本地 Node24.22.1 与模板24.19.0 不同，以上仍不替代新精确 CI、真实候选
+订阅采用或正式生产五秒结果。
+
+完整前序随后更新至 `49527b7da0f4ef4791e5bb108c2f83114f150b56`，仅在隔离的
+self-hosted-image CI job 中，服务验收后、安装源码依赖前清理中间 Docker 构建缓存。
+本方正常合入该完整提交；除这项 workflow 和本条证据文档外，相对 e7c 的所有 Git
+blob 完全一致，worker 指纹保持 5343beb。既有本地验证仍绑定原源，不追认为新
+head CI；新远端精确 CI 和真实生产门槛继续分别等待实际结果。
+
+## 2026-11-08：完整上游合流与 Git 分段收据（生产待验）
+
+本轮继续保留完整上游历史：#1688 的 `ec332cb34678e6638931e9b4ad1e9f893b3b303c` 已包含 #1705 的 `cf456f02c643d4e6074ccd7db2f7cee5b32e4f4c`、两处协调器修正和凭据清单分页修正；随后正常合入实际 main `263e7ea37013bd22aa197799a26f1d2e0d1abbf1`。本地产品源 `8870fbf4f97b415386a1b150f2df934f04f269e5` 与合入 main 后的 `ec1dc7dd9cf061f6a90fea372a32641b2db9a93b` 均为 tree `9b6fbdc4238cfc79ea492deda048d04b9c147211`，后一步没有改变任何文件。AGENTS.md 和 CONTRIBUTING.md 未改。本节及配套 [完整源码与 Git 计时证据](../research/2026-11-08-e2b-complete-source-and-git-timing.json) 是发布前验证记录，不能代替新远端候选的 CI 或生产成绩。
+
+证据分别绑定实际执行源：旧远端 `06307cb8` 的 13 个工作流全部成功，50 项检查为 39 成功、11 条件跳过；实际 checkout 为 `c51b48c5`，不把后来同树的合成 ref 冒记为已执行。中间 `aac23ec2` 通过 115 项及三组类型检查，worker 为 `d0f47bcc`。Git 收据后继 `41219130` 实际构建 worker `915cd92e81e56388d8bb2ff19abc919b85ae80e7`，两入口、9 个资源、16 个夹具、12 项语法和 daemon 类型检查通过。最终产品合流 `8870fbf4` 实际通过启动/Web **116/116** 及 app/API 类型检查；其 canonical WORKER_PATHS 与 RECIPE_PATHS 共 **470 个 mode/type/blob/path 对象**逐字等于 `41219130`，官方 fingerprint 命令也实算为同一 `915cd92e…`。构建证明通过明确的输入守恒继承，没有虚报在新 head 重跑构建。开发 Node 24.22.1 与官方模板 Node 24.19.0 的差异仍由发布门槛覆盖。
+
+Git 明细的原缺口已具体定位：`aac23` 的五类 Git 操作仅发 OTel span，正式 raw 没有收据。新增 `RepositoryGitTiming v1` 只在既有诊断 opt-in 中创建，沿原 `data-run-stage(repository)` **同一条事件**返回，不增加事件、SQL、行、HTTP 调用或定时轮询。普通关闭状态连新字段也不出现；原成功/失败事件和 `reportAfter` 授权屏障保持。observer 或计时记录失败不覆盖原 Git 结果或原错误。
+
+收据只包含 run hash、harness、闭式来源/时钟、数值区间、outcome 与截断标记，标签固定为 clone、fetch、remote_head、remote_refs、local；不采集命令、路径、URL、环境或凭据。最多 32 条、收据值最多 8192 B；包含字段封装后，诊断开启时 stage 的 JSON 最多增加 **8212 B**。一个固定示例由 74 B 增为 423 B。这是非零的 UTF-8 JSON 载荷增量，不是完整 HTTP/TLS wire 测量；普通 Task 的默认载荷保持原状。
+
+偏移只使用该次 `prepareRunRepository` 的独立单调时钟原点。覆盖范围是 `RepositoryCache.update` 的已有 Git wrapper；seed、push、baseRef 等其它动作没有被补成已测 Git 子阶段。总时长可能包含凭据或锁等待；区间重叠按区间并集描述，不与 repository 父阶段相加，不拿服务器 `storedAt` 推算 daemon 起点。driver 严格校验闭式键、标签、身份、数值和上限。重复有效收据继续保留第一份，状态取实际保留数据的截断标记，invalid 保持黏性；原 `8df3` 中重复状态不一致的发现和真实 RED 已保留，由 `412191` 修复。
+
+这次只增加可选诊断。原 dispatch 到 ACK 公式、39 阶段、版本 pin、真实 native/tool/post-tool 证明与清理门槛保持。reader 内联在原 driver，未增加 import。正式 workflow 仍 checkout 完整的准确来源；四项核心 source inventory 不是可脱离仓库运行的四文件包。七项 producer provenance 中只有预期的 driver 变化，canonical report producers 和原验收器不变。
+
+上游预算也明确区分：有效订阅省掉无关 hosted-policy SELECT 是上游修正，Promise 只在单次 resolver 中复用；有效显式 API key 原本已在该读取前返回，不重复记减读。Coordinator 无名或歧义仓库发现仍可每次读取使用标记，完整授权列表也可能大于旧 50 条；不能假定模型绝不额外发现仓库。凭据清单分页会增加该列表操作的行和字节，带 cursor 的空页可能再读一次；它没有被这九文件 delta 接入 dispatch/ensure/claim 路径。本方完整正常 Task 的数据库预算以相同完整上游源和实际调用路径比较，不借这些条件性节省或未来任务抵扣。
+
+官方模板仍只增不删，Mikka 文件仍在 /opt/mikka；CLI 文件校验和守恒、真实订阅采用、fresh claim/revoke/最终 fence 均保持发布门槛。原六例正式批次仍为 FAIL，原始报告、13/14 pins 及第 4 例执行/工具后证明缺口不改写。新的远端精确 CI、实际模板与双订阅 bootstrap adoption、配套 READY 部署和同一实际元组六次 ≤5 秒结果尚待取得。达到完整生产验收后才关闭 #1505。
+
+## 2026-11-08 09:14 UTC：发布阻挡的修复和下一轮 CI 诊断（生产待验）
+
+本节继续 #1505 / #1689，不改写前述失败记录。合流后的产品源码为
+`12708943792632cc8c4eff8170692081d45b66ea`，完整保留 #1719 的
+`a1d1578b83f73f7511479869a82da2ffd345a294` 及其 `844b3e5`、`780ebaac`、
+`8bceef7` 祖先。后续发布以实际远端新 head、完整 tree 和 CI 执行 checkout 为准。
+结构化证据见
+[`2026-11-08-e2b-release-diagnostics-and-ci-wire.json`](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)。
+
+### 原 CI 失败继续有效
+
+[CI 42461514081](https://github.com/alexj11324/Mikka/actions/runs/42461514081)
+实际执行 checkout `63c981158675dc2b63fd6a4dcb160a42e060fa1a`，
+tree `76143bea3227aeb72375e89ae29c6545cefdaf8d`；关联 PR head 是 `5c4ad8f`。
+`unlinkedRunCitation` 的 9 条 SQL、932 字节 JSON 行和451字节 action 未增加，
+但实际 socket 入站3244、出站6579，合计9823字节，超过冻结的9326预算。
+后续 build gate 因该 DB shard 失败而失败，不能据此另称编译失败。
+
+同一完整源码在本地精确 PostgreSQL17.11（Debian17.11-1.pgdg13+2）上，
+仅执行原15文件 activity脚本，56/56通过；该 case 实测2639/6337，合计8976字节。
+差额605/242恰与本地新 SCRAM 连接相同；本地另一个 warmup 的两次新连接也解释了
+1210/484增量。**原 CI 没有连接追踪，这只能支持候选机制，不能追认原始因果或冲销失败。**
+本地 Node24.22.1、2vCPU、未运行其他并发DB脚本，与 CI24.22.2 /
+availableParallelism4不同；诊断包装也可能影响调度。
+
+下一轮必要源码批次的 CI 只在既有 `MIKKA_READ_METRICS_TRACE=1` 下增加最多32项匿名
+socket计数、是否新建、当前测量的query数量与截断标志。global totals、
+ALS SQL/row计数、返回对象、原await位置和query callback/Promise体保持原样；
+没有新增等待、网络、SQL或参数/结果/凭据日志。fixture、warmup、测量边界和9326断言均不改。
+它是诊断增量，**不是已证实的产品修复，也不是重跑旧 head 来隐藏失败。**
+
+### 发布构建与权限路径
+
+完整上游 `844b3e5` 仅在已有一次性 Linux Web build runner 清理三个固定闲置SDK目录
+（Android、.NET、GHC），并仅在build step设置4096MB Node old-space和记录容量。
+这是每个 Node 进程的 old-space 上限，不是主机总内存限制；不涉及官方E2B模板文件。
+正常build、类型检查、迁移、main检查、发布权限及最后有效runtime保留规则不变。
+受控私有构建成功的边界由其
+[公开回执](https://github.com/alexj11324/Mikka/pull/1719#issuecomment-6719540665)
+说明；它不替代正式生产发布，也不能证明已遗失原始日志的263生产失败同因。
+
+我方进一步复现：子进程status=1、无spawn error、受保护日志含ENOSPC时，
+旧公开回执遗漏了该码。新增独立 `observedSystemCode` 只接受已有封闭系统码，
+从 `code:` 属性或 `Error: CODE:` 头读取；
+`processErrorCode` 仍只记录启动错误。观察码不等同终止原因，
+未知值保持null，不公开原始行、message、path或stack。
+旧实现真实RED、修复后相关59/59测试GREEN；build/migrate/CLI guards逐字不变。
+
+`8bceef7` 的lease-audit显式执行模式修复及离线依赖解析随完整历史保留：
+只有显式leaseAudit允许其既有Python/tool回执，普通六次启动验收仍保持原readOnly路径；
+不能把本地策略测试写成真实租约生产通过。
+`a1d1578` 仅对Nitro测试自有临时目录删除增加最多3次重试和线性延迟，
+原断言和60秒超时保留；不是整个递归清理600ms硬截止。
+
+### 发布和验收仍未完成
+
+本批没有削弱官方文件守恒、两条真实订阅及实际bootstrap adoption门槛，
+没有修改启动计时公式、39阶段、15 pins /14次实际检查或6个样本分母。
+新生产tuple、正式run和六次耗时仍为空；原六次FAIL原件继续保留。
+必须等本批实际最新head CI、正式Web/E2B发布及资源清理满足原门槛，
+再以同一实际tuple执行Claude×3和Codex×3，全部不超过5000ms并具有真实工具和后续回复。
+完成前不关闭#1505。
+
+### 09:32 UTC 后继：官方 Electron 下载入口
+
+本地正常合流完整 #1719 后继 `5761953f8f39aae8b6fddbe559a07420437d959d`，
+得到产品源码 `702a490b9ca1a0023156cfa8a877854c1c23ec69`。
+此前 a1 的 CI42465512653 中，Desktop job128684501953 与 Image job128684547811
+均在同一固定 Electron45.1.0 linux-x64 ZIP 下载上真实收到HTTP504；
+后续证据审计/聚合失败不能替代这两个首因。
+
+该后继只给两条Linux CI安装入口使用官方GitHub release/asset API，
+保留安装包内固定version/checksums和原安装器校验。API认证不转发到
+仅允许的官方asset重定向域，签名URL及错误原文不输出；不引入镜像源或跳过checksum。
+根侧4/4纯下载协议测试、实际两文件lint、语法、polling/error-cause策略通过；
+没有为此重下二进制或声称新CI/native/macOS已通过。与前述完整worker输入无交叉。
+`35cb728e` 只是上一预发布阶段准备的未引用Git对象，从未更新PR分支或触发CI；
+后续以最终实际发布head为准。
+
+### 2026-11-08 10:37 UTC：官方下载路径、实际入口更正与下一次CI取证
+
+#1689的df0c/tree052c实际CI checkout为日志核实的2699（同树，parents main263+df0c）。11工作流全部终态：9成功/2失败；44checks为33成功/7条件skip/4失败。实际首错是两个CUA固定归档下载HTTP504、Apple打包HTTP504；另一个是Desktop失败引起的汇总拒绝。CUA checksum/tar/driver均未执行；Apple失败URL未记录，先前Electron下载100%不能确定随后失败请求。原失败保留。原unlinkedRunCitation本次9 SQL/932 B JSON/2639+6337=8976 B≤原9326 B；尾部是同次执行汇总，没有socketTrace，不能追认旧9823 B的原因。
+
+完整合入833：单一Electron入口支持darwin/arm64，从锁定npm校验值种入builder checksum缓存，保留校验与API/CDN令牌隔离。6/6已有相关测试、实际两文件97规则lint和语法检查通过；真实builder消费的是合成缓存，不能记为真实macOS或生产通过。
+
+**更正覆盖范围：da9只修旧scripts/e2b/bootstrap-desktop.sh，该文件不在470项canonical inputs，也不是正式入口。**此前把它称为正式bootstrap或指纹变化不成立，已在#1719评论6720281156公开更正。正式INSTANCE_BOOTSTRAP是packages/daemon/scripts/official-e2b-instance-bootstrap.sh，构建器从固定提交读取、复制到/opt/mikka/instance-bootstrap.sh，再按source/worker/kind执行。
+
+e369+e132现已补齐正式入口的GH和desktop CUA两行：仅换同仓库固定asset API326964816/661455608+Accept，保留各自原retry3/connect20/max120、完整SHA、归档位置/tar/symlink/chmod，不搬旧脚本额外flags，不加凭据/helper/镜像或升级版本。CI两处CUA也只换传输。Linux CUA复用既有37,183,089 B完整核验；本方mac CUA53,208,248 B、GH18,151,686 B均匿名完整下载并与原SHA一致，未执行归档，自有临时文件已删除。真正的模板构建、官方文件守恒和双订阅门槛仍不可省略。
+
+main759 E2B42470724724已真实失败：三种模板完成node phase后各四次HTTP504，没有gh phase。curl未打印URL；按精确759源码两个phase之间唯一GH curl归因至GH下载，CUA尚未到达。三候选删除、两次清理stdout均VM空/三名字absent/errors空，双订阅和新公开runtime为0。Web42470724754的Build步骤失败，最后观察标记为typecheck，不能据此确定最终失败子命令；公开事件无具体诊断码，私有详细原因和被mask值保持unknown，不推定为ENOSPC或网络问题。
+
+正式安装器通过WORKER_PATHS的packages/daemon递归进入统一指纹，不是独立RECIPE_PATHS条目。a3→e132的470项中469项相同，仅该脚本变化；worker从915cd变为 **9da70595d61ab946a6b4644f7cb1eaeec1bccc3d**。最终a08源码已实际重新build并用原验证器通过2入口/9资源/16fixtures/12syntax；中间产物与失败原件保留。本地Node24.22.1与模板24.19.0仍有差异，不能据本地构建声称生产成功。
+
+main759 CI另有revokedRunCitation：7 SQL/781 B JSON/2890+5657=8547 B>原7700 B，本次unlinked仍8976通过。旧helper无socketTrace，847 B差值不能直接认作握手。a08只给既有test:activity-actor-db加MIKKA_READ_METRICS_TRACE=1，原Node参数和15文件逐字保留；SQL、预算、warmup、起点、await、并发都不变。输出限匿名数字/至多32条interval及已有测试源码caller，不含SQL/params/行值/地址/凭据。同步诊断可能影响调度，启用它不是修复或追认旧失败。根package只投影packageManager/engines/pnpm进指纹，scripts被排除，因此a08的470项canonical inputs与e132相同，worker仍9da。
+
+待发布组合635d9d7f/tree2a5a4719与实际a08构建同树；本节和[机器回执](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)的officialInstanceBootstrapCorrection随同PR更新。下一head仍须自己的完整CI、实际Web/E2B、官方校验和与真实订阅adoption，再做同tuple六次≤5000ms。没有新增正式六次或性能PASS，#1505保持打开。
+
+### 2026-11-08 11:07 UTC：实际 CI 收尾与 CUA 认证下载后继
+
+ae838974/tree45acc 的实际 CI checkout 是 b73168f0（同树，parents main759+ae838）。截至11:05，10个workflow最新attempt均success；43个checks为35 success、7条件skip和1个macOS CUA非blocking failure，不能称所有checks全绿。主CI42472404087、四组PG、Node22、image、Apple Silicon真实打包/三进程Keychain/native及strict汇总均已成功。Cloud42472403980 attempt1两平台下载HTTP5xx仍保留；外部认领的一次失败jobs重试attempt2中，Linux128709991070完整下载、原SHA校验和真实driver成功，mac128709991144仍在下载阶段HTTP403/curl56，未进入原native测试。日志没有失败redirect hop，不能把403推定为限流或鉴权根因。
+
+本次PG4实际保留53条完整数字socketTrace，其中29条detail记录；106个原始提及包括流式预览和收尾重复，不是106次测量。unlinked为9 SQL/932 B JSON/2639+6337=8976 B≤9326，revoked为7 SQL/781 B JSON/2285+5415=7700 B，均无新socket、未归属statement或截断。它们只证明本次原断言通过；旧9823/8547失败和未证实的因果继续保留，不改预算、不归功于pool或诊断调度。
+
+有必要的后继仅改cloud-computer.yml两条CI下载：使用原contents:read的step级github.token，先转非export变量并unset继承环境；curl 7.83+运行时守卫、-q禁用curlrc、仅HTTPS起始和重定向、最多3次跳转，不使用location-trusted。Authorization仅留同origin，下载后清变量再执行原SHA/tar/vendor。固定asset ID、版本、校验和、Linux blocking/macOS nonblocking、真实driver及10分钟job上限不变。原retry2加retry-all-errors、connect20/max-time120、delay2和retry-max-time180；**180秒只是重试准入窗口，不是完整下载硬截止**。凭据转发边界依据[curl官方CVE修复说明](https://curl.se/docs/CVE-2022-27776.html)及[官方手册](https://curl.se/docs/manpage.html)。
+
+本地固定358a7fcf/tree43cc的14项窄验证覆盖YAML/Bash、逆变换完整workflow相等、版本拒绝、子进程环境隔离和合成TLS的同源/跨host/跨port/降级/重试边界；独立peer无新增源码blocker。使用合成token，无真实GitHub资产请求、DB或worker rebuild；仍需新head的真实认证下载CI证明。root正常合并6a9892c9时仅重叠curl行冲突，按已审blob ea4a5825解决，完整结果tree与358a逐字相同。正式模板安装器不变，470项canonical输入不变，worker仍9da70595。
+
+main759五条publisher及主CI均已终态；Desktop42470724706最后因匹配Web等待40分钟超时，macOS打包job跳过。Web只是Build失败且最后观察标记typecheck，终止子命令未知；不同受控私有构建的成功不冒充生产通过。#1505评论6720577633已明确释放11:00–11:30尾段，本节不预占后续共享窗口。本PR后继仍须自己的exact-head CI和fresh发布/消费者协调，实际Web/E2B、官方文件守恒、真实双订阅bootstrap adoption及同tuple六次≤5000ms均未完成，#1505保持打开。
+
+完整失败原件、SHA和边界见[机器回执](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)的authenticatedCuaCiFollowup；发布后的实际commit另回链到#1689，不能把本地提交当远端运行结果。
+
+### 2026-11-08 11:43 UTC：完整 CI、生产环境对照与有限诊断修补
+
+4d1a868a/tree472748 已完成自己的真实CI：实际checkout1e4d4ac4与PR同树、parents main759+4d1；10个workflow首轮成功，43checks为36 success/7条件skip、0 failure。Linux/macOS认证下载、原SHA和真实driver，四PG、Node22、Apple打包/Keychain/native、image及strict都通过。PG两项原预算仍8976≤9326和7700=7700，旧失败没有冲销。PR当时mergeable=true/clean只属于4d1，不能借给以下必要后继，更不能作为生产五秒结果。
+
+生产排查已区分三种证据：c6ed/42473203908在隔离两库以production flags和真实overlay完成完整构建/254迁移；858/42474639858按正式Vercel文件与非空job优先规则，对实际两个DB只读检查连接、部分权限与history；e676/42475278958则用实际生产build-env和原wrapper，但显式MIGRATE0。最后一轮公开闭式回执为compilerWrapperExit=0、lastTypecheckCommand=frontend、typescriptCodes=[]、migrationSuppressed=true、deployed=false；producer没有单独报告pnpm child exit，不能补造该值，被mask的字节/hash/文本不复原。原owner另外报告原pending JSON表达式的纯SELECT成功，也不等于ALTER/trigger/真实迁移通过。受控检查没有复现旧759失败，原根因仍unknown。
+
+正常合入公开554ad12e（parent ae838）的五文件有限诊断：固定root/API组合或frontend子命令分类，日志顺序前16个unique、格式受限4–5位TS编号后排序，以及migrate固定入口marker。编号并非官方注册表；marker在target解析及MIGRATE0早退之后、guard/SQL之前，既不证明SQL执行，也不覆盖更早的target解析异常。原build执行尾部3633 B逐字保留，guard/target/DDL/退出与私有日志规则不变；复用原作者24/24与两次独立源码peer，没有为此重跑DB。
+
+随后真实TypeScript5.9.3语义错误和彩色formatter证明554会漏掉夹有ANSI的TS2322。7a4d4937仅对扫描行使用Node内建stripVTControlCharacters：旧函数实际RED（[]），同一新回归GREEN（TS2322）；原build-vercel单文件14/14及两个文件语法/lint通过。原Buffer、长度/SHA、枚举/16上限和执行尾部保持不变，测试还核彩色命令/marker与私有片段不外泄。这个诊断缺口不是旧759根因证明。
+
+本地正常合流282497f5/tree4b43425b，470项canonical输入未改，worker仍9da70595；实际worker构建证据仍绑定a08，不冒称重建。上述后继同本节和[机器回执](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)合批后必须完成自己的exact-head CI。#1503已实际启动42475556837/994、消费7e/0aef，至其C清理释放前保持main/生产publisher/共享账号稳定；分支源码与隔离CI继续。正式新APP/DPL/runtime/模板配对、官方文件守恒、真实双订阅采用及同tuple六次≤5000ms仍待实测，#1505保持打开。
+
+### 2026-11-08 12:23 UTC：完整接入新的 main，保留已验证 worker
+
+正式 #1505 验收仍未通过：旧六次完整 dispatch→ACK FAIL 原件不变，本段不是新的生产启动成绩。
+
+- f94ee11c263aecd73f5f672e19d6809937107e65 自己的首轮 CI 已完整闭合：10/10 workflows success，43 checks=36 success+7 原条件 skip、0 fail。实际 checkout cc0c10c223641b8d94cdc6df75c16b129f5d72eb / tree5450578304ea611eaa846747da4935ebbb8560ba，parents=[759,f94]；root 复核全部47份原件、4,139,450 B，manifest SHA256 639ca379ac41e7fe70ceba61bcb4efa1a27ea83d9be648ed4aa9d85278ea26a0。PR离线E2B成功不替代真实订阅或发布。
+- #1736 已实际正常合入 main c275637ed73966875610da7f831548d566868a62，treef2d35d2dcb4070cc86ea4900adabaf114d7b912e，parents=[75930406dda8708a84786475656ae449f5ffda88,7b50a4f5bed14c17a219151587c24c84d133f7f9]。本方完整接入此实际主线，未选择性摘取上游文件。
+- 本地正常merge 27f5d780e1b13cd7fabe864a7677f00d8ae0b882 / tree1e3a92cb3b6b54ea358497cb8ca7d5c7e857d2dd 相对f94严格55文件。交叉历史造成4处文本冲突：3处 incoming 与main759逐blob相同，保留完整f94；package只接受上游 scripts.test:mobile，保留全部本方其他字段。独立临时索引把759→c275完整binary diff三方应用于f94，得到完全相同tree，未改root索引或用ours/theirs策略丢弃上游。
+- 原模板/worker canonical内容未变，实际指纹仍9da70595d61ab946a6b4644f7cb1eaeec1bccc3d，实际构建证据继续绑定a08，不凭文档/上游移动重造一份构建结果。新组合仍须自己的CI；不能借f94旧绿灯发布。1561的独立两文件候选0f453未纳入本次整合。
+- #1503同一GitHub child维护已有实际run42478565749/attempt1成功回执：fixture53a81ba92415a69b2ae59779f5dbd7580e7ee197a1d03391aa6f044617742786，token指纹968e6d51保持，本地expiry16:05:40.679Z、provider17:15:43Z。三次8项idle为0；这不替代模型订阅有效性或事后provider不存在证明。45分钟原正式入口检查针对新诊断scope，不能说成另一个child45分钟门槛。
+- c275自己的Web/E2B/desktop/daemon/image/OTA及CI已实际启动；旧F后验provider清理及明确source/account释放仍未闭合。保留各来源真实结果，之后fresh核main、writer/consumer、完整新组合CI及实际窗口，再正常发布和正式CC×3/CX×3。
+
+本次只追加真实主线整合与门槛状态；官方文件只增不删、原校验和、真实双订阅/sidecar采用、39 stages/14次实际版本检查/原完整公式与5000ms阈值均不变。公开进度见 [PR1689完整f94回执](https://github.com/alexj11324/Mikka/pull/1689#issuecomment-6721326928) 和 [同child维护回执](https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6721380079)。
+
+独立整合复核已闭合（manifest43401fffb3f3cee5eb25be202846cdeba9d0e67a2721283031b8926c8b18f612；固定27f验证9638eb77e5c7f735d30a0584dc5606e49f68a59259b1ba366933e9a3e977a018）：470个原始输入对象中469个逐字相同，唯一变动是package.json的test:mobile脚本；正式worker投影排除此脚本，因此指纹9da相同。这里不把原始blob相同与投影相同混为一谈，也不把静态整合证明称为新CI或运行时通过。
