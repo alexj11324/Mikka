@@ -96,6 +96,15 @@ async function githubRequest(path, authorization, body) {
   return result
 }
 
+export function renewalIdleCounts(row) {
+  const keys = ['activeRuns', 'pendingFactoryTasks', 'pendingSubagents', 'coordinatorLeases',
+    'pendingPublications', 'pendingMerges', 'activeThreadMachines', 'activeCloudMachines']
+  check(object(row) && Object.keys(row).length === keys.length && keys.every(key => Object.hasOwn(row, key)), 'fixture_work_active')
+  const counts = Object.fromEntries(keys.map(key => [key, Number(row[key])]))
+  check(Object.values(counts).every(value => Number.isSafeInteger(value) && value === 0), 'fixture_work_active')
+  return counts
+}
+
 async function idle(query) {
   const { rows: [row] } = await query.query(`WITH fixture_bots AS (SELECT id FROM bots WHERE "workspaceId"=$1),
     fixture_tasks AS (SELECT id,"issueId",status FROM factory_tasks WHERE "botId" IN (SELECT id FROM fixture_bots)),
@@ -112,11 +121,15 @@ async function idle(query) {
       (SELECT count(*) FROM run_publications WHERE ("runId" IN (SELECT id FROM fixture_runs)
         OR "issueId" IN (SELECT "issueId" FROM fixture_tasks))
         AND (status IN ('pending','processing') OR "leaseExpiresAt">now())) AS "pendingPublications",
-      (SELECT count(*) FROM factory_merges WHERE "taskId" IN (SELECT id FROM fixture_tasks) AND status='merging') AS "pendingMerges"`,
-  [WORKSPACE_ID, ACTIVE])
-  const counts = Object.fromEntries(Object.entries(row).map(([key, value]) => [key, Number(value)]))
-  check(Object.values(counts).every(value => Number.isSafeInteger(value) && value === 0), 'fixture_work_active')
-  return counts
+      (SELECT count(*) FROM factory_merges WHERE "taskId" IN (SELECT id FROM fixture_tasks) AND status='merging') AS "pendingMerges",
+      (SELECT count(*) FROM thread_machines WHERE "ownerId"=$3 AND
+        (state='running' OR "workerLeaseUntil">now() OR ("workerLeaseId" IS NOT NULL AND "workerLeaseUntil" IS NULL))) AS "activeThreadMachines",
+      (SELECT count(*) FROM cloud_machines WHERE "ownerId"=$3 AND
+        (state IN ('running','waking') OR "workerLeaseUntil">now() OR "provisionLeaseUntil">now()
+          OR ("workerLeaseId" IS NOT NULL AND "workerLeaseUntil" IS NULL)
+          OR ("provisionLeaseId" IS NOT NULL AND "provisionLeaseUntil" IS NULL))) AS "activeCloudMachines"`,
+  [WORKSPACE_ID, ACTIVE, SMOKE_USER_ID])
+  return renewalIdleCounts(row)
 }
 
 async function matching(query, state, locked = false) {
