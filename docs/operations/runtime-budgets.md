@@ -7,9 +7,17 @@ dispatch/due-work objectives in [observability.md](observability.md).
 
 ## Executable client budgets
 
-现状（非决定）：the browser spec named below no longer runs anywhere
-([decision](../design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)), so the first four budgets are
-not enforced until they move to an API or unit check.
+An idle visible page uses the healthy live channel for invalidation. The
+source-only `pnpm test:idle-budget` check mounts the listed pages with fake
+time and controlled live state, then counts server calls over a minute.
+`tests/idle-request-budget.json` sets their budgets. Every listed page has an
+empty budget map, so unlisted calls have a budget of zero. The polling policy
+also rejects newly introduced polling. A source check establishes that
+controlled component path. A live runtime observation needs its own evidence.
+
+The first four rows below retain the superseded polling-era browser contract.
+`tests/e2e/settings-background-polling.spec.ts` no longer runs and its polling
+cadences must not be restored. The daemon rows remain separate source contracts.
 
 | State | Budget | Check |
 | --- | --- | --- |
@@ -23,7 +31,7 @@ not enforced until they move to an API or unit check.
 | Consecutive transport failures | Existing exponential waits of 1, 2, 4, 8, 16, 30 seconds, capped at 30; success resets the backoff | Same daemon tests |
 | Stop or disconnect | Cancel idle/retry waits; ignore late command results on shutdown; no next request or server queue query after cancellation | Daemon tests and `app/v1/devices/[deviceId]/commands/route.test.ts` |
 
-The browser spec counts real Server Action requests after initialization. It
+The retained browser spec counted Server Action requests after initialization. It
 learns all four board polling actions, then isolates the two shared list actions
 in Artifact view. It checks all four stop behind settings and learns action identities at runtime and stores only counts, budgets, states and
 the tested SHA in `workspace-idle-request-budget`. The range accommodates SWR
@@ -38,8 +46,10 @@ after it commits the work; the daemon then reads it through
 `GET /v1/devices/:deviceId/commands`. `GET /v1/devices/:deviceId/gateway` gives
 the daemon its socket ticket. When `DEVICE_GATEWAY_URL` or
 `DEVICE_GATEWAY_PUSH_SECRET` is unset, or the socket does not open, the daemon
-falls back to the command long-poll. That poll still checks every 2 seconds on
-the server. See the
+falls back to the command long-poll. The current server route subscribes to
+PostgreSQL notifications before its initial read and waits through
+`deviceWorkSubscription`. A lost or unavailable subscription uses the bounded
+`longPollIdleCheck` fallback. The route performs a final read at its deadline. See the
 [decision](../design/decisions/2026-11-03-2030-device-push-gateway.md).
 
 Current daemons no longer poll `GET /v1/devices/:deviceId/fs/requests`. The
@@ -111,7 +121,7 @@ excess request rate or CPU before treating them as a fault.
 
 `scripts/ops/deployment-regression.mjs` runs in the existing Production smoke
 workflow after deployments and on quarter-hour follow-ups. It uses the existing
-Infisical workload identity and Vercel token. Browser smoke retains its daily,
+Infisical workload identity and Vercel token. API smoke retains its daily,
 deployment and manual cadence; the comparison job needs no install or wait loop.
 
 The report pins current and previous production deployment IDs, Git SHAs and

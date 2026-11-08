@@ -1,5 +1,9 @@
 # Issue #1329：按任务难度自动选模型验收记录
 
+> 本文保留当次版本的三路模型证据与失败。现行验收使用共享 SMOKE 账号，
+> 官方 Claude Code 与 Codex 两条订阅路径独立记录。DeepSeek/API-key 路径
+> 已退出合并及验收门槛，后续执行按 [验收指南](../acceptance.md)。
+
 日期：2026-11-05。关联 [issue #1329](https://github.com/alexj11324/Mikka/issues/1329) 与 [PR #1337](https://github.com/alexj11324/Mikka/pull/1337)。已实际验证的源码基线为 head `682c8fab7a12c8a77912b35beda8ad996f984f70`、tree `826c7f62fd6045a260dee5f95b0b8e73d14f0e87`。
 
 **当前状态：`682c8fab` 的类型、lint、UI 与相关定向回归均通过，10 文件定向 DB 为 163/163，Large 完整生产构建成功，GitHub CI 的 8 项 workflow 均通过。该真实构建的 8 张截图已采集完成，全部浏览器诊断指标为 0，八张视觉复核均通过。真实服务验证保留明确的前置阻塞记录。**

@@ -21,8 +21,8 @@ per-call timing evidence before removing that proxy path.
 
 **Scope correction (2026-11-08):** The quoted instruction is retained as
 historical context; it does not authorize disclosing every user/workspace/
-repository Secret to a task Agent. The updated [credential-exposure boundary]
-(2026-11-08-0240-credential-exposure-boundary.md) distinguishes selected
+repository Secret to a task Agent. The updated
+[credential-exposure boundary](2026-11-08-0240-credential-exposure-boundary.md) distinguishes selected
 native CLI/GitHub credentials from other third-party Secrets. No repeated
 per-model/per-tool Mikka control-plane checks are reinstated.
 
