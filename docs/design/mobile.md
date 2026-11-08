@@ -34,7 +34,9 @@ briefing in the morning and see what is waiting on me.
 The app is the system tab bar with four tabs, 对话 · 线程 · 建议 · 设置, and a
 search tab at its trailing end
 ([decision](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md)). Each tab is
-its own Stack with a large title. A chat and a thread open over the tabs, so the
+its own Stack whose root has one title, the system's, centred in the bar's row,
+with its buttons grouped on the right and nothing on the left
+([decision](decisions/2026-11-08-0120-ios-header-like-comma.md)). A chat and a thread open over the tabs, so the
 tab bar hides there. 新建 Bot and 新建群聊 open as form sheets. 线程 and 建议 show
 their counts as the system's tab badges.
 
@@ -83,7 +85,10 @@ The Coordinator gets no other special UI (R-06).
 
 Controls are the system's where iOS has one
 ([decision](decisions/2026-10-31-2200-mobile-native-ios.md)): the top bar is
-the iOS navigation bar with its own bar buttons, menus and back button;
+the iOS navigation bar with its own bar buttons, menus and back button, on the
+page's own background with no material or hairline (content fades under the soft
+top edge; a short page-colour fade below iOS 26). A chat's bar shows the bot's
+name centred;
 capsules and the composer are Liquid Glass on iOS 26.
 
 **线程** (a tab, a large-title page; like the Claude app's Code screen): grouped as on the
@@ -145,7 +150,9 @@ it is one bubble (decisions 2026-10-27).
 
 Colour is restrained: a grey pulsing dot for work in progress; blue only for unread dots and send;
 red only for failure; green for a finished thread and an online machine; PR
-states use GitHub's colours.
+states use GitHub's colours. A task's status glyph carries its state's system
+colour: blue needs you, orange blocked or under way, red failed, green done, grey
+not started or closed ([decision](decisions/2026-11-08-0130-task-state-icon-colours.md)).
 
 Things waiting on the person have no screen of their own: proactive cards sit
 in the Coordinator chat, and waiting threads
