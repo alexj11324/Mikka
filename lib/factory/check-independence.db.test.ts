@@ -587,5 +587,4 @@ test(
   },
 );
 
-// Issue #1699 selected-DB failure probe; never merge.
-throw new Error("ISSUE_1699_SELECTED_DB_FAILURE_PROBE");
+// Issue #1699 synthetic database performance probe; never merge.
