@@ -59,6 +59,8 @@ test('unknown graph and unresolved sources cannot skip jobs', async () => {
 })
 test('docs retain the fast tier but inventory is built before that decision', async () => {
   const r = await pick('docs/dev-workflow.md')
+  assert((await pick('packages/daemon/README.md')).docs_only)
+  assert((await pick('.github/workflows/README.md')).docs_only)
   assert(r.docs_only)
   assert.equal(r.source, false)
   assert.equal(r.units.length, 0)

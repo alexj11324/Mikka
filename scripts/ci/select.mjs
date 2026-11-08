@@ -9,7 +9,7 @@ import tasks from './tasks.json' with { type: 'json' }
 
 export const GLOBAL = /^(?:\.github\/(?!workflows\/README\.md$)|scripts\/|tests\/(?:helpers|support)\/|drizzle\/|patches\/|packages\/(?:config|protocol|subscription-worker)\/|services\/|cloudflare\/|(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|[^/]*config[^/]*|[^/]*lock[^/]*|Dockerfile|docker-compose[^/]*|\.dockerignore|\.npmrc)$|lib\/(?:db(?:\/|\.)|auth|api-auth|fresh-session|credentials\/|secrets\/|permissions|.*authorization|.*tenant|.*scope))/
 // Keep the expression readable without a trailing whitespace token.
-const globalPath = file => GLOBAL.test(file) || /(?:^|\/)(?:package\.json|tsconfig[^/]*\.json)$/.test(file)
+const globalPath = file => !isDocsOnly([file]) && (GLOBAL.test(file) || /(?:^|\/)(?:package\.json|tsconfig[^/]*\.json)$/.test(file))
 export function area(file) {
   if (file.startsWith('apps/mobile/')) return 'mobile'
   if (file.startsWith('apps/desktop/')) return 'desktop'
@@ -72,7 +72,7 @@ export function emit(result, env = process.env) {
     const values = { ...result, db: result.db_suites.length > 0, core: result.units.some(n => n.startsWith('ci-core-')), integration: result.units.some(n => n.startsWith('ci-integration-')) }
     for (const [key, value] of Object.entries(values)) appendFileSync(env.GITHUB_OUTPUT, `${key}=${typeof value === 'object' ? JSON.stringify(value) : value}\n`)
   }
-  const summary = `## Dependency-aware CI selection\n\n${JSON.stringify(result, null, 2)}\n\nInventory validated independently; skipped tasks are outside this affected closure. Full regressions remain available by dispatch/schedule.\n`
+  const summary = `## Dependency-aware CI selection\n\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\`\n\nInventory validated independently; skipped tasks are outside this affected closure. Full regressions remain available by dispatch/schedule.\n`
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, summary)
   console.log(JSON.stringify(result, null, 2))
 }
