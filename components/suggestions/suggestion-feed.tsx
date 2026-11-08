@@ -5,14 +5,14 @@ import { useViewScroll } from '@/lib/hooks/view-state'
 import dynamic from 'next/dynamic'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
-import { RotateCw } from 'lucide-react'
+import { Lightbulb, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { sendSuggestion } from '@/app/actions/coordinator'
 import { coordinatorChatKey } from '@/components/coordinator/coordinator-chat'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { Button } from '@/components/ui/button'
-import { Empty, EmptyDescription, EmptyHeader } from '@/components/ui/empty'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { WorkspaceContentLoading } from '@/components/workspace/workspace-loading'
@@ -94,7 +94,8 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
           className={cn(CARD_FRAME, 'h-auto w-full justify-start hover:bg-muted/40', sending === item.id && 'opacity-60')}>
           <SuggestionCardBody card={item} />
         </Button>)}
-        {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader>{noConnection && <Button variant="secondary" className="rounded-full" onClick={onConnect}>{t('connect')}</Button>}</Empty>}
+        {/* Empty: the rail's own icon and the state as a title, in the upper third, with the one way on (R-40: no explainer). */}
+        {data && !items.length && <Empty className="flex-1 justify-start pt-[12vh]"><EmptyHeader><EmptyMedia variant="icon"><Lightbulb /></EmptyMedia><EmptyTitle>{t('empty')}</EmptyTitle></EmptyHeader>{noConnection && <Button onClick={onConnect}>{t('connect')}</Button>}</Empty>}
       </div>
     </section>
     {/* Half and half until the line between them is dragged (decision 2026-11-01-1310). */}
