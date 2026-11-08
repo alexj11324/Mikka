@@ -23,14 +23,19 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
   The image CI now also runs a packaged Electron against that actual community
   image: explicit server selection, generated-account email login, authenticated
   RPC, built-in live socket, chat submission and a synthetic-model reply. Its
-  receipt and screenshot are retained separately. This new case has not yet
-  passed CI; it does not claim real Google OAuth or subscription acceptance.
+  receipt and screenshot are retained separately. The first complete image run
+  passed the native checks, but its screenshot was obscured by onboarding. The
+  current driver uses the ordinary Skip setup button before taking the image;
+  that revision awaits CI. Neither case claims real Google OAuth or subscription
+  acceptance.
 - #1593: the report parser now retains nine closed validation booleans before
   refusing a native delivery. The historical artifact lacks the report text and
   the original combined assertion cannot identify which invariant failed.
   New receipts distinguish text/byte/digest integrity, issue/source binding,
   Owner choice and Evidence/Risks/Limits sections, without exporting report text.
   The original refusal remains strict; no failure is converted into a pass.
+  A subsequent exact-run, Owner-hash-scoped read-only Neon query identified
+  the historical failure: the final report omitted Limits. See the receipt below.
 - #1212: retain the existing five-minute external PR-state reconciliation when
   a webhook is unavailable. No page or database polling is added.
 - Superseded drafts #1303, #1531, #1538 and #1579 were closed. Their issue
@@ -60,10 +65,10 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
 | --- | --- |
 | #1539 | Connect settings UI to the actions below; real production source toggle/refresh and migration checks. |
 | #1556 | Packaged desktop against the actual community image: email and real Google login, chat/reply and built-in live delivery. Unit transport tests do not replace this. |
-| #1593 | Identify the actual failed delivery invariant in the Claude continuation; rerun both fixed official subscription paths; collect dispatch latency, active keepalive, normal completion/cancellation and remaining external-wait/stage-handoff evidence. |
+| #1593 | Historical failed invariant identified as missing Limits; rerun both fixed official subscription paths; collect dispatch latency, active keepalive, normal completion/cancellation and remaining external-wait/stage-handoff evidence. |
 | #1212 | Production server-side MCP abort and public/private group Stop receipts, including cleanup. |
 | #1560, #1565 | A real assigned thread completed by the daemon on the self-hosted installation; distinguish it from enrollment and transport. |
-| #1561 | Self-hosted idle-minute request/usage measurement. |
+| #1561 | Local backend idle minute passed (below); rendered desktop/Web idle-minute and deployed self-hosted usage evidence remain. |
 | #1562 | Real vault store → Agent autofill, plus plaintext-free logs, on the self-hosted target. |
 | #1563 | Real self-hosted GitHub App clone → push → PR. |
 | #1564 | Screenshots of a genuine cloud-binding flow. |
@@ -92,3 +97,40 @@ CI's first Core unit failure was an outdated readiness-test query fixture,
 which assumed every SELECT read only the saved bot binding. It now models the
 new owner-scoped hosted-setting SELECT and the preferred-order fallback. Its
 four tests and the complete 31-test self-hosted-BYOK suite passed locally.
+
+## Historical Claude delivery diagnosis
+
+At 2026-11-08 00:17 UTC, connected Neon SELECTs were scoped to the exact
+historical issue, continuation and artifact Owner hash. The two run rows share
+the expected Owner and issue. No credentials or report text were retrieved;
+the server computed only booleans, counts and a command digest. No new model
+request was sent and no database write was made.
+
+- Origin: `4aba782a-de0e-4330-8881-040287c92dd3`.
+- Continuation: `b38c04ba-f785-42c0-8b20-5e34e3ac6447`.
+- Case: `8e02b085-565a-460f-be12-d424473f7441`.
+- Delivery seq 23 has exactly one earlier native Bash/Shell input pair.
+- Passed: text, 1606-byte length, SHA256, #1593, exact source SHA, Owner choice,
+  Evidence, Risks, and the original 157-byte marker's digest and size.
+- Failed: Limits. Case-insensitive `limits` and the `limitation` synonym are
+  both absent. There is unverified-language elsewhere; the required section
+  was nevertheless omitted.
+- Native input command SHA256:
+  `02849f351ae93d2f918839cd0a1d6668c631d467ee95ef7197898593f53b5d6a`.
+
+The immediate cause is report completeness, not evidence of a VM resume
+failure. The original case remains failed. The continuation prompt now repeats
+the required final headings and asks the model to check each section before
+delivery. Validation remains unchanged and the regression proves a missing
+Limits section still throws while preserving only its closed diagnosis.
+Full lifecycle acceptance remains independent and incomplete.
+
+## Local idle receipt
+
+Production build `9787d259793ca9156de77dd48059a2d14fd1a7b4`, community edition,
+isolated PG17, built-in scheduler enabled and an authenticated built-in live
+socket held ready: from 2026-11-07 23:46:06.979 to 23:47:06.986 UTC (60,007 ms),
+the instrumented application PG client made 0 calls, received 0 protocol bytes
+and sent 15 protocol bytes; unknown readings: 0. No business reads or live
+events occurred. Counters exclude connection setup, other processes and
+TCP/TLS overhead. This is backend evidence, not a rendered-page idle test.

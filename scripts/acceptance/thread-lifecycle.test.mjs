@@ -702,7 +702,7 @@ test('abort during an awaited pin prevents a new dispatch or answer while cleanu
   assert.ok(f.calls.some(call => call.path === '/api/auth/sign-out'))
 })
 
- test('delivery failure records the failed invariant without disclosing report content', () => {
+test('delivery failure records the failed invariant without disclosing report content', () => {
   const record = fixture(), valid = markerProof(record, 'delivery')
   assert.ok(Object.values(reviewDeliveryValidation(valid, record)).every(Boolean))
   for (const [field, token] of [['issue', '#1593'], ['source', SOURCE], ['ownerChoice', 'owner_choice=provider-receipts'],
@@ -715,4 +715,14 @@ test('abort during an awaited pin prevents a new dispatch or answer while cleanu
   }
   assert.equal(reviewDeliveryValidation({ ...valid, reportSha256: '0'.repeat(64) }, record).digest, false)
   assert.equal(reviewDeliveryValidation({ ...valid, reportBytes: 1 }, record).bytes, false)
+  // The historical Claude continuation omitted Limits; keep its refusal and
+  // preserve the specific diagnosis even though nativeEvidence throws.
+  const missing = { ...valid, reportText: valid.reportText.replace('Limits', 'Outstanding checks') }
+  missing.reportBytes = Buffer.byteLength(missing.reportText)
+  missing.reportSha256 = sha(missing.reportText)
+  const chunks = nativePair(`${record.runId}:delivery`, 'bash', { command: nativeSnapshotCommand(record, 'delivery') },
+    'MIKKA_1593_NATIVE ' + JSON.stringify(missing))
+  assert.throws(() => nativeEvidence({ chunks }, record), /review_delivery_invalid/)
+  assert.deepEqual(Object.entries(record.deliveryValidation).filter(([, ok]) => !ok).map(([name]) => name), ['limits'])
+  assert.doesNotMatch(JSON.stringify(record.deliveryValidation), /Outstanding checks|reportText/)
 })

@@ -244,7 +244,7 @@ function promptFor(record, source) {
     '草稿完成后，原样执行以下原生 shell 命令。它仅建立本案例 marker，并记录当前 HEAD、已有 tracked 文件和状态的实际摘要：', before,
     `然后调用 Mikka 原生 ask_human，kind="decision"，question 必须含 ${record.caseId}；询问 Owner 本报告应优先深入 A) provider receipts / ambiguous pause，还是 B) stale epoch / execution lease；summary 简述已读源码与草稿。这个真正的报告重点由 Owner 决定，现在没有答案。调用后让本次 run 正常退出并等待，不调用 submit。`,
     'Owner 回答并在原 SID 续作后，第一项工作原样执行以下只读命令，证明 marker、原草稿与工作目录仍在：', after,
-    '之后按 Owner 的真实选择完成同一报告，保留上述小节，并加入 Owner 提供的 owner_choice 行；最终文字仍为 300–2400 UTF8 bytes。不要重写 marker。报告应给出至少两个具体可证伪的验收建议及尚缺证据。再原样执行：', delivery,
+    '之后按 Owner 的真实选择完成同一报告，并加入 Owner 提供的 owner_choice 行；最终文字仍为 300–2400 UTF8 bytes。不要重写 marker。报告应给出至少两个具体可证伪的验收建议及尚缺证据。交付前重新检查最终文件：必须保留字面标题 ## Evidence、## Risks、## Limits，每节都有实际内容，尤其不能在续作改写时遗漏 ## Limits；仅在别处写“尚未验证”不替代这个小节。再原样执行：', delivery,
     `最后调用第二个 ask_human(kind="decision")，question 含 ${record.caseId} 和 FINAL_REVIEW_READY，说明报告已经形成，但独立 review/check 阶段尚不能通过本次正常 API 锁定授权小模型，询问先补齐阶段授权还是结束本次审查。summary 给出报告发现。保持 waiting；本任务明确不授权调用 submit，因为 submit 会自动选择尚未固定的后继模型。`,
     `实际源摘录 ${source.path}（整个文件 SHA256 ${source.sha256}）：\n${source.excerpt}`,
   ].join('\n\n')
