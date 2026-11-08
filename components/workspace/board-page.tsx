@@ -232,7 +232,8 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
         </ToggleGroup>}
         {!personalWorkspace && <Separator orientation="vertical" className="mx-1 h-5" />}
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}><ListFilter data-icon="inline-start" />{t('filter')}</DropdownMenuTrigger>
+          {/* On a phone Filter and Display show their icons only, so the toolbar keeps one row (UI audit gap-02, work-12). */}
+          <DropdownMenuTrigger render={<Button variant="outline" size="sm" aria-label={t('filter')} />}><ListFilter data-icon="inline-start" /><span className="max-md:hidden">{t('filter')}</span></DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52"><DropdownMenuGroup>
             {FILTER_FIELDS.map(({ field, icon: Icon }) => field === 'creator'
               ? <DropdownMenuCheckboxItem key={field} checked={filters.creator?.includes(ME) ?? false} closeOnClick={false} onCheckedChange={() => toggleFilter(field, ME)}><Icon />{t(`filterField.${field}`)}</DropdownMenuCheckboxItem>
@@ -257,7 +258,7 @@ export function BoardPage({ issues, userId, workspaceId, personalWorkspace = fal
             <ToggleGroupItem value="list" aria-label={t('viewList')}><List /></ToggleGroupItem>
           </ToggleGroup>
           <Popover>
-            <PopoverTrigger render={<Button variant="outline" size="sm" />}><Settings2 data-icon="inline-start" />{t('display')}</PopoverTrigger>
+            <PopoverTrigger render={<Button variant="outline" size="sm" aria-label={t('display')} />}><Settings2 data-icon="inline-start" /><span className="max-md:hidden">{t('display')}</span></PopoverTrigger>
             <PopoverContent align="end" className="w-80 gap-3">
               <div className="flex items-center justify-between gap-3"><Label>{t('sort')}</Label>
                 <Select value={display.sort} onValueChange={value => setDisplay({ sort: value as Sort })} items={(['priority', 'updated', 'created'] as const).map(value => ({ value, label: t(`sortBy.${value}`) }))}>

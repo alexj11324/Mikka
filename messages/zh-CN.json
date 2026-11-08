@@ -971,6 +971,7 @@
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
+    "loading": "正在加载…",
     "loadingCreate": "正在加载新建任务…",
     "signOutFailed": "退出失败，请稍后重试。",
     "allIssues": "全部任务",

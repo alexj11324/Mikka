@@ -971,6 +971,7 @@
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
+    "loading": "Loading…",
     "loadingCreate": "Loading new task…",
     "signOutFailed": "Sign out failed. Please try again.",
     "allIssues": "All tasks",
