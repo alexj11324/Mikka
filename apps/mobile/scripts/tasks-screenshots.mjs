@@ -1,7 +1,7 @@
 // Expo Web screenshots for #1671's iOS part: lists show tasks only, threads open inside their task.
 // Our own labelled fixtures; no other product's source or wording.
 //
-//   MOBILE_WEB_DIST=/path/to/expo-web-export SCREENSHOT_OUT=/path/to/out node scripts/mobile-tasks-screenshots.mjs
+//   MOBILE_WEB_DIST=/path/to/expo-web-export SCREENSHOT_OUT=/path/to/out node apps/mobile/scripts/tasks-screenshots.mjs
 //
 // Serves the exported apps/mobile web bundle, answers its API with the fixtures below, and writes light and dark
 // frames of the Bot tab, the 任务 tab, a task's detail and an attempt's thread at 393 × 852.

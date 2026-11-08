@@ -206,7 +206,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
       handoffOnly: handoffs.length === events.length,
-      pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier, runId: event.runId, issueId: event.issueId })),
+      pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier })),
       pushHidesText: handoffs.some(carriesCode),
     }
   })
