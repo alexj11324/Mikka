@@ -81,3 +81,5 @@ jobs:
         run: |
           node --test scripts/ops/self-hosted-push-security.test.mjs
           node scripts/ops/self-hosted-push-security.mjs --check
+      - name: Enable only this production project's enhanced push security after the published sender gates
+        run: node scripts/ops/self-hosted-push-security.mjs --apply

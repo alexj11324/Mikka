@@ -81,8 +81,13 @@ async function run(env, apply) {
       && sender.ownerAccount.id === app.ownerAccount.id, 'EXACT_PROJECT_ACCESS')
     report.before = { projectSecurity: app.pushSecurityEnabled, accountSecurity: app.ownerAccount.pushSecurityEnabled }
     if (apply && !app.pushSecurityEnabled) {
+      check((await json('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main')).object?.sha === plan.source
+        && (await json(plan.origin + '/mikka/api/version')).build === plan.source, 'CUTOVER_SOURCE_DRIFT')
+      for (const [name, project] of [['public', plan.publicProject], ['private', plan.privateProject]])
+        check((await vercel(`/v9/projects/${project}`)).targets?.production?.id === report.gates[name].deploymentId, 'CUTOVER_DEPLOYMENT_DRIFT')
       const schema = await gql('query {__schema {mutationType {fields {name type {name ofType {name}}}}}}')
       check(schema.__schema.mutationType.fields.some(f => f.name === 'app' && (f.type.name ?? f.type.ofType?.name) === 'AppMutation'), 'EXPO_MUTATION_SCHEMA')
+      report.mutationAttempted = true
       const result = await gql(`mutation {app {setPushSecurityEnabled(appId:"${plan.appId}",pushSecurityEnabled:true) {id pushSecurityEnabled}}}`)
       check(result.app?.setPushSecurityEnabled?.id === plan.appId && result.app.setPushSecurityEnabled.pushSecurityEnabled === true, 'EXPO_MUTATION_UNCONFIRMED')
       report.mutations = 1
