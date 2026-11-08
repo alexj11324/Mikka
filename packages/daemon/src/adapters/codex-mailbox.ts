@@ -6,13 +6,17 @@ import { assertSafeId } from '../ids'
 import type { RunMailbox } from '../run-mailbox'
 
 type Catalogue = { type: 'function'; name: string; description: string; inputSchema: Record<string, unknown> }[]
-type Receipt = { version: 1; nativeVersion: '0.163.0'; runId: string; threadId: string; historyPath: string; catalogue: Catalogue }
+type NativeVersion = '0.163.0' | '0.166.0'
+type Receipt = { version: 1; nativeVersion: NativeVersion; runId: string; threadId: string; historyPath: string; catalogue: Catalogue }
 const unavailable = () => new Error('Run mailbox requires a verified original Codex thread')
 
-/** The pinned official CLI whose history-copy/resume semantics were exercised. */
-export function codexMailboxResumeVerified(userAgent: unknown): boolean {
+/** Verified official releases whose persisted-tool resume semantics were exercised. */
+export function codexMailboxResumeVersion(userAgent: unknown): NativeVersion | null {
   // initialize prefixes this with clientInfo.name, not a fixed Codex name.
-  return typeof userAgent === 'string' && /^[A-Za-z0-9._-]+\/0\.163\.0(?:\s|$)/.test(userAgent)
+  const version = typeof userAgent === 'string'
+    ? /^[A-Za-z0-9._-]+\/(0\.163\.0|0\.166\.0)(?:\s|$)/.exec(userAgent)?.[1]
+    : undefined
+  return version === '0.163.0' || version === '0.166.0' ? version : null
 }
 
 export function codexMailboxCatalogue(mailbox: RunMailbox): Catalogue {
@@ -63,23 +67,24 @@ function verifyHistory(home: string, path: string, threadId: string, catalogue: 
 }
 
 /**
- * 0.163.0 resumes dynamic tools from the rollout, not resume parameters.
+ * Verified releases resume dynamic tools from the rollout, not resume parameters.
  * The host receipt is a capability record, not a credential or OS boundary;
  * current run checks and the server's mailbox allowlist remain authoritative.
  */
-export function verifyCodexMailboxResume(stateDir: string, sourceRunId: string, home: string, threadId: string, catalogue: Catalogue) {
+export function verifyCodexMailboxResume(stateDir: string, sourceRunId: string, home: string, threadId: string, catalogue: Catalogue): NativeVersion {
   try {
     const dir = lstatSync(join(stateDir, 'codex-mailbox'))
     if (!dir.isDirectory() || dir.isSymbolicLink()) throw unavailable()
     const receipt = readJson(receiptFile(stateDir, sourceRunId), 256 * 1024) as Partial<Receipt> | null
-    if (receipt?.version !== 1 || receipt.nativeVersion !== '0.163.0' || receipt.runId !== sourceRunId || receipt.threadId !== threadId ||
+    if (receipt?.version !== 1 || (receipt.nativeVersion !== '0.163.0' && receipt.nativeVersion !== '0.166.0') || receipt.runId !== sourceRunId || receipt.threadId !== threadId ||
         !isDeepStrictEqual(receipt.catalogue, catalogue) || typeof receipt.historyPath !== 'string') throw unavailable()
     verifyHistory(home, receipt.historyPath, threadId, catalogue)
+    return receipt.nativeVersion
   } catch { throw unavailable() }
 }
 
 /** Record only the actual native response, before this run can send a turn. */
-export function recordCodexMailboxSession(stateDir: string, runId: string, home: string, thread: { id: string; path?: string | null }, catalogue: Catalogue, resumed: boolean) {
+export function recordCodexMailboxSession(stateDir: string, runId: string, home: string, thread: { id: string; path?: string | null }, catalogue: Catalogue, resumed: boolean, nativeVersion: NativeVersion) {
   try {
     if (!thread.id || typeof thread.path !== 'string' || !isAbsolute(thread.path)) throw unavailable()
     const historyPath = relative(home, thread.path).split(sep).join('/')
@@ -91,7 +96,7 @@ export function recordCodexMailboxSession(stateDir: string, runId: string, home:
     mkdirSync(dir, { recursive: true, mode: 0o700 })
     const stat = lstatSync(dir)
     if (!stat.isDirectory() || stat.isSymbolicLink()) throw unavailable()
-    writeJsonAtomic(receiptFile(stateDir, runId), { version: 1, nativeVersion: '0.163.0', runId, threadId: thread.id, historyPath, catalogue } satisfies Receipt)
+    writeJsonAtomic(receiptFile(stateDir, runId), { version: 1, nativeVersion, runId, threadId: thread.id, historyPath, catalogue } satisfies Receipt)
   } catch {
     // A previously supported fresh thread does not become unavailable just
     // because this CLI cannot provide resume evidence. Its later resume still
