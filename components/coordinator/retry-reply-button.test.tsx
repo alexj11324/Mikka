@@ -153,6 +153,7 @@ for (const live of [true, false]) test(`a ${live ? 'current' : 'historical'} clo
   assert.equal(link.getAttribute('href'), '/api/cloud/models/billing?redirect=1')
   assert.equal(link.target, '_blank')
   assert.equal(link.rel, 'noreferrer')
+  assert.equal(link.getAttribute('role'), 'link')
   assert.equal(calls, 0)
   assert.equal(submissions, 0)
 })

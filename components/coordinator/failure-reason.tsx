@@ -20,8 +20,8 @@ const ACTION = 'h-auto px-0 py-0.5 text-xs text-foreground underline'
 /** The current failure and its history share the same explicit cloud recovery. */
 export function CloudFailureAction({ code, fallback }: { code: CloudErrorCode; fallback: ReactNode }) {
   const cloud = useTranslations('Settings.cloud')
-  if (code === 'cloud_quota_exhausted') return <Button variant="link" size="xs" className={ACTION} nativeButton={false} render={<a href={withBasePath('/api/cloud/models/billing?redirect=1')} target="_blank" rel="noreferrer" />}>{cloud('topUp')}</Button>
-  if (['cloud_not_connected', 'cloud_server_revoked', 'cloud_scope_missing'].includes(code)) return <Button variant="link" size="xs" className={ACTION} nativeButton={false} render={<Link href={settingsHref('account')} />}>{cloud('connectAccount')}</Button>
+  if (code === 'cloud_quota_exhausted') return <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<a href={withBasePath('/api/cloud/models/billing?redirect=1')} target="_blank" rel="noreferrer" />}>{cloud('topUp')}</Button>
+  if (['cloud_not_connected', 'cloud_server_revoked', 'cloud_scope_missing'].includes(code)) return <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('account')} />}>{cloud('connectAccount')}</Button>
   return fallback
 }
 
