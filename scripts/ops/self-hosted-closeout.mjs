@@ -437,7 +437,15 @@ async function run(env) {
     privateValues.push(serverKey)
     check(serverKey.length > 30 && !/\s/.test(serverKey), 'SERVER_KEY_RETURN')
     console.log(`::add-mask::${serverKey}`)
-    await screenshot(cloud, 'team-key-once-masked-dark')
+    // This once-only value cannot survive a reload. Match the private UI's
+    // existing boot palette to each emulated OS theme without changing data.
+    for (const colorScheme of ['light', 'dark']) {
+      await cloud.emulateMedia({ colorScheme })
+      await cloud.evaluate(() => document.documentElement.classList.toggle('dark',
+        window.matchMedia('(prefers-color-scheme: dark)').matches))
+      await screenshot(cloud, `team-key-once-masked-${colorScheme}`)
+    }
+    report.checks.onceKeyThemes = ['light', 'dark']
     await cloud.getByRole('dialog').getByRole('button', { name: /^(Done|完成)$/ }).click()
     await localApi('/api/cloud/connect', { action: 'key', key: serverKey })
     check((await localApi('/api/cloud/status')).team.connected, 'TEAM_KEY_BOUND')
