@@ -97,7 +97,8 @@ async function run(env) {
       if (!ready) await delay(2000)
     }
     check(ready, 'IMAGE_SOURCE')
-    const { chromium } = await import('playwright')
+    report.stage = 'browser'
+    const { chromium } = await import('@playwright/test')
     browser = await chromium.launch({ headless: true })
     context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' })
     local = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' })
@@ -105,7 +106,7 @@ async function run(env) {
     const screenshot = async (target, name) => {
       check(/^[a-z0-9-]+$/.test(name), 'ARTIFACT_NAME')
       const path = join(output, `${name}.png`)
-      await target.screenshot({ path, fullPage: true, mask: [target.locator('input[type=password],input[type=email]'),
+      await target.screenshot({ path, fullPage: true, mask: [target.locator('input[type=password],input[type=email],input[readonly]'),
         ...(serverId ? [target.locator(`section[id^="server-"]:not([id="server-${serverId}"])`)] : []),
         target.getByText(env.SMOKE_OWNER_EMAIL, { exact: false })] })
       report.screenshots.push({ name, sha256: digest(await readFile(path)) })
@@ -201,13 +202,15 @@ async function run(env) {
     check(own, 'OWN_CONNECTION')
     report.stage = 'personal-revocation'
     // The exact server card and selected personal workspace constrain the action.
-    await cloud.locator('select').first().selectOption(cloudWorkspaceId)
-    const card = cloud.locator(`#server-${serverId}`)
-    const revoke = card.getByRole('button', { name: /^(Revoke|撤销)$/ })
-    check(await revoke.count() === 1, 'OWN_GRANT_UNAMBIGUOUS')
-    await revoke.click()
-    await cloud.getByRole('dialog').waitFor()
-    await screenshot(cloud, 'personal-revoke-confirm-dark')
+    const prepareRevoke = workspaceId => async p => {
+      await p.locator('select[name=workspace_id]').selectOption(workspaceId)
+      const card = p.locator(`#server-${serverId}`)
+      await card.waitFor()
+      const revoke = card.getByRole('button', { name: /^(Revoke|撤销)$/ })
+      check(await revoke.count() === 1, 'OWN_REVOCATION_UNAMBIGUOUS')
+      await revoke.click(); await p.getByRole('dialog').waitFor()
+    }
+    await both(cloud, manage, 'personal-revoke-confirm', prepareRevoke(cloudWorkspaceId))
     await cloud.getByRole('dialog').getByRole('button', { name: /^(Revoke|撤销)$/ }).click()
     await cloud.getByRole('dialog').waitFor({ state: 'hidden' })
     const rejected = await local.request.get(`${localOrigin}/mikka/api/cloud/models/billing`)
@@ -216,13 +219,64 @@ async function run(env) {
     await both(page, `${localOrigin}/mikka/en/settings?section=account`, 'personal-revoked')
     await localApi('/api/cloud/disconnect', { action: 'personal' })
     report.checks.personalDisconnected = true
-    report.checks.teamKey = { verified: false, reason: 'requires_administrator_of_target_billing_team',
-      targetAdminAvailable: management.workspaces.some(w => w.kind === 'team' && w.name === 'Acme Inc.' && w.role === 'admin') }
+    report.stage = 'team-server-key'
+    // #1564 explicitly requires another billing team for the server-key case.
+    // The main application session remains in the authorized Acme workspace.
+    const teams = management.workspaces.filter(w => w.kind === 'team' && w.role === 'admin')
+    check(teams.length === 1 && teams[0].id !== cloudWorkspaceId, 'ADMIN_BILLING_TEAM_UNAMBIGUOUS')
+    const billingTeam = teams[0].id
+    const keyName = `Closeout ${env.GITHUB_RUN_ID}`
+    await both(cloud, manage, 'team-key-configuration', async p => {
+      await p.locator('select[name=workspace_id]').selectOption(billingTeam)
+      await p.getByRole('button', { name: /^(New server key|新建服务器密钥)$/ }).first().click()
+      const dialog = p.getByRole('dialog')
+      await dialog.locator('#cloud-server-id').fill(serverId)
+      await dialog.locator('#cloud-server-key-name').fill(keyName)
+      await dialog.locator('#cloud-server-key-limit').fill('0.01')
+      for (const name of [/^(Official GitHub App|官方 GitHub App)$/, /^(iOS notifications|iOS 推送)$/]) {
+        const checkbox = dialog.getByRole('checkbox', { name })
+        if (await checkbox.isChecked()) await checkbox.uncheck()
+      }
+      await dialog.getByRole('button', { name: /^(Create key|创建密钥)$/ }).waitFor()
+      // Server lookup must really finish; disabled Create is never bypassed.
+      await p.waitForFunction(() => [...document.querySelectorAll('[role=dialog] button')]
+        .some(b => /^(Create key|创建密钥)$/.test(b.textContent?.trim() ?? '') && !b.disabled))
+    })
+    await cloud.getByRole('dialog').getByRole('button', { name: /^(Create key|创建密钥)$/ }).click()
+    const once = cloud.getByRole('dialog').locator('input[readonly]')
+    await once.waitFor()
+    const serverKey = await once.inputValue()
+    check(serverKey.length > 30 && !/\s/.test(serverKey), 'SERVER_KEY_RETURN')
+    console.log(`::add-mask::${serverKey}`)
+    await screenshot(cloud, 'team-key-once-masked-dark')
+    await cloud.getByRole('dialog').getByRole('button', { name: /^(Done|完成)$/ }).click()
+    await localApi('/api/cloud/connect', { action: 'key', key: serverKey })
+    check((await localApi('/api/cloud/status')).team.connected, 'TEAM_KEY_BOUND')
+    await both(page, `${localOrigin}/mikka/en/settings?section=cloud`, 'team-key-bound')
+    await both(cloud, manage, 'team-key-created', async p => {
+      await p.locator('select[name=workspace_id]').selectOption(billingTeam)
+      await p.locator(`#server-${serverId}`).getByText(keyName, { exact: true }).waitFor()
+    })
+    const teamConnections = await cloudApi(`/mikka/cloud/v1/management/connections?workspace_id=${encodeURIComponent(billingTeam)}`)
+    const ownTeam = teamConnections.servers?.find(s => s.serverId === serverId)
+    check(ownTeam?.keys?.length === 1 && ownTeam.keys[0].name === keyName && ownTeam.keys[0].monthlyLimitMicroUsd === 10_000,
+      'OWN_TEAM_KEY_IDENTITY')
+    await both(cloud, manage, 'team-key-revoke-confirm', prepareRevoke(billingTeam))
+    await cloud.getByRole('dialog').getByRole('button', { name: /^(Revoke|撤销)$/ }).click()
+    await cloud.getByRole('dialog').waitFor({ state: 'hidden' })
+    const teamRejected = await local.request.get(`${localOrigin}/mikka/api/cloud/models/billing`)
+    check(teamRejected.status() === 403 && (await teamRejected.json()).error === 'cloud_server_revoked', 'NEXT_TEAM_REQUEST_REVOCATION')
+    report.checks.teamKey = { verified: true, separateTeam: true, nextRequestRevoked: true, monthlyLimitMicroUsd: 10_000 }
+    await both(page, `${localOrigin}/mikka/en/settings?section=cloud`, 'team-key-revoked')
+    await localApi('/api/cloud/disconnect', { action: 'key' })
     await sourceGuard(env); await privateGuard(env)
-    report.stage = 'completed-personal-binding'
+    report.stage = 'completed'
   } catch (error) {
     // No raw provider, browser, Docker or HTTP response can enter a public log.
     report.failure = /^[A-Z0-9_]+$/.test(error?.message ?? '') ? error.message : 'CLOSEOUT_FAILED'
+    if (['ERR_MODULE_NOT_FOUND', 'ENOENT', 'ECONNREFUSED', 'ENOTFOUND', 'TimeoutError'].includes(error?.code ?? error?.name)) {
+      report.failureDetail = error.code ?? error.name
+    }
     process.exitCode = 1
   } finally {
     if (registered && local) {
@@ -248,7 +302,7 @@ async function run(env) {
   }
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
-  if (process.argv.includes('--check')) { await sourceGuard(process.env); console.log('Immutable public source and CI verified') }
+  if (process.argv.includes('--check')) { await import('@playwright/test'); await sourceGuard(process.env); console.log('Browser dependency, immutable public source and CI verified') }
   else if (process.argv.includes('--private-check')) { await sourceGuard(process.env); await privateGuard(process.env); console.log('Immutable private deployment verified') }
   else await run(process.env)
 }
