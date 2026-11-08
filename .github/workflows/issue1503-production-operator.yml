@@ -102,7 +102,7 @@ jobs:
           NODE_ENV: production
           VERCEL_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 3c1fc27cbfdad438cd16a4f635af80d6224f9788
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 420b1ebe15a8364bed8b626713029601852fb80a
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: claude_code
           MIKKA_1503_CODEX_QUESTION: '0'
@@ -122,7 +122,7 @@ jobs:
           NODE_ENV: production
           VERCEL_ENV: production
           MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 3c1fc27cbfdad438cd16a4f635af80d6224f9788
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: 420b1ebe15a8364bed8b626713029601852fb80a
           MIKKA_1503_SUBMISSION_MODE: explicit_new_task
           MIKKA_1503_HARNESS: codex
           MIKKA_1503_CODEX_QUESTION: '1'
