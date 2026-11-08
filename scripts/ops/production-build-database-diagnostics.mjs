@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const SOURCE = '75930406dda8708a84786475656ae449f5ffda88'
-export const BASE = '19d22245c13f753fcf7d3e925eebfc5aaadc922b'
+export const BASE = 'e9d7777e8bfd60fd702c00cb537906a8c43903e3'
 export const REF = 'refs/heads/ops/production-build-databases-20261108'
 export const FILES = ['.github/workflows/infisical-cloud-capabilities.yml',
   'scripts/ops/production-build-database-diagnostics.mjs', 'scripts/ops/production-build-database-diagnostics.test.mjs']
@@ -16,6 +16,30 @@ const codes = ['28000', '28P01', '3D000', '42501', '53300', '53400', '57014', '5
   'ECONNREFUSED', 'ECONNRESET', 'EAI_AGAIN', 'ENETUNREACH', 'ENOTFOUND', 'ETIMEDOUT', 'CERT_HAS_EXPIRED', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
   'PROBE_SOURCE_SCOPE', 'PROBE_MAIN_CHANGED', 'PROBE_INPUT_REQUIRED', 'PROBE_READ_ONLY_REQUIRED', 'PROBE_HISTORY_INVALID', 'PROBE_METADATA_INVALID']
 export const safeCode = error => codes.includes(error?.code) ? error.code : 'OTHER'
+
+// Match the original builder's file codec and nonempty-job precedence, while
+// reading only the two database keys needed for this read-only diagnostic.
+export function databaseInputs(text, env) {
+  const file = new Map()
+  for (const line of text.split('\n')) {
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line)
+    if (!match || !['MIKKA_DATABASE_URL', 'DATABASE_URL'].includes(match[1])) continue
+    const raw = match[2].trim()
+    let value = raw
+    if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
+      try { value = JSON.parse(raw) } catch { value = raw.slice(1, -1) }
+    } else if (raw.startsWith("'") && raw.endsWith("'") && raw.length >= 2) value = raw.slice(1, -1)
+    file.set(match[1], value)
+  }
+  const values = {}, sources = {}
+  for (const target of ['MIKKA_DATABASE_URL', 'DATABASE_URL']) {
+    if (!file.has(target)) fail('PROBE_INPUT_REQUIRED')
+    values[target] = env[target] || file.get(target)
+    if (!values[target]) fail('PROBE_INPUT_REQUIRED')
+    sources[target] = env[target] ? 'nonempty_job' : 'vercel_file'
+  }
+  return { values, sources }
+}
 
 export function sourceGuard({ env, event, head, parent, changed, source }) {
   if (env.GITHUB_REPOSITORY !== 'alexj11324/Mikka' || env.GITHUB_ACTOR !== 'alexj11324' || env.GITHUB_REF !== REF
@@ -34,15 +58,18 @@ export const METADATA_SQL = `SELECT current_database() AS database, current_user
    WHERE n.nspname='public' AND c.relname IN ('byos_connections','model_api_keys','user')) AS owns_model_tables`
 export const HISTORY_SQL = 'SELECT name FROM schema_migrations ORDER BY name'
 
-export async function inspectTarget(pool, target, files, helpers) {
+export async function inspectTarget(pool, target, files, helpers, observe = () => {}) {
   if (!['MIKKA_DATABASE_URL', 'DATABASE_URL'].includes(target)) fail('PROBE_INPUT_REQUIRED')
+  observe('metadata-select')
   const row = (await pool.query(METADATA_SQL)).rows?.[0]
   if (row?.read_only !== true) fail('PROBE_READ_ONLY_REQUIRED')
   if (typeof row.database !== 'string' || typeof row.role !== 'string' || !Number.isSafeInteger(row.model_tables)) fail('PROBE_METADATA_INVALID')
+  observe('history-select')
   const names = (await pool.query(HISTORY_SQL)).rows.map(row => row.name)
   if (names.length > 1000 || !names.every(name => typeof name === 'string' && /^\d{4,14}_[a-z0-9_-]+\.sql$/.test(name))) fail('PROBE_HISTORY_INVALID')
   const pending = files.filter(file => file.plan.target === target), applied = new Set(names)
   let missing
+  observe('history-validation')
   try {
     helpers.validateScopeMigrationHistory(pending, applied)
     missing = pending.filter(file => !helpers.alreadyApplied(file.name, applied, file.sql)).map(file => file.name)
@@ -69,23 +96,23 @@ async function run() {
   const [connection, order, steps, scope] = await Promise.all([
     load('postgres-connection.mjs'), load('migration-order.mjs'), load('migration-steps.mjs'), load('scope-migration-history.mjs')])
   const { Pool } = createRequire(resolve(sourceRoot, 'package.json'))('pg')
+  const inputs = databaseInputs(readFileSync(resolve(root, '.vercel/.env.production.local'), 'utf8'), env)
   const files = order.orderMigrations(readdirSync(resolve(sourceRoot, 'drizzle')).filter(name => name.endsWith('.sql')))
     .map(name => { const sql = readFileSync(resolve(sourceRoot, 'drizzle', name), 'utf8'); return { name, sql, plan: steps.planMigration(name, sql) } })
   scope.validateScopeMigrationSources(files)
   const receipts = []
   for (const target of ['MIKKA_DATABASE_URL', 'DATABASE_URL']) {
-    let pool
+    let pool, stage = 'connection-input'
     try {
-      if (!env[target]) fail('PROBE_INPUT_REQUIRED')
-      pool = new Pool({ connectionString: connection.directDatabaseURL(env[target]), max: 1,
+      pool = new Pool({ connectionString: connection.directDatabaseURL(inputs.values[target]), max: 1,
         connectionTimeoutMillis: 10000, idleTimeoutMillis: 1000,
         options: '-c default_transaction_read_only=on -c statement_timeout=5000', application_name: 'mikka-build-db-diagnostics' })
       pool.on('error', () => {})
-      receipts.push(await inspectTarget(pool, target, files, { ...order, ...scope }))
-    } catch (error) { receipts.push({ target, status: 'failed', code: safeCode(error) }) }
+      receipts.push(await inspectTarget(pool, target, files, { ...order, ...scope }, value => { stage = value }))
+    } catch (error) { receipts.push({ target, status: 'failed', stage, code: safeCode(error) }) }
     finally { await pool?.end() }
   }
-  console.log(JSON.stringify({ event: 'production_build_db_diagnostics', source: SOURCE, input: 'existing_prod_vercel_secrets',
+  console.log(JSON.stringify({ event: 'production_build_db_diagnostics', source: SOURCE, input: 'original_vercel_pull_and_job_precedence', inputSources: inputs.sources,
     readOnly: true, sqlMutations: 0, modelRequests: 0, receipts }))
   if (receipts.some(row => row.connected !== true)) process.exitCode = 1
 }

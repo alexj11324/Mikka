@@ -400,7 +400,7 @@ jobs:
           secret-path: /vercel
           secret-name: MIKKA_DATABASE_URL
           include-imports: false
-      - name: Read the existing workspace build database input
+      - name: Read the original Vercel pull credential
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -408,9 +408,21 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /vercel
-          secret-name: DATABASE_URL
+          secret-path: /platform
+          secret-name: VERCEL_DEPLOY_TOKEN
           include-imports: false
+      - name: Pull the original production build environment without exposing it
+        run: |
+          umask 077
+          if ! npx --yes vercel@65.4.0 pull --yes --environment=production --token "$VERCEL_TOKEN" > "$RUNNER_TEMP/production-db-vercel-pull.log" 2>&1; then
+            echo '{"event":"production_build_db_diagnostics_failed","code":"PROBE_VERCEL_PULL_FAILED"}'
+            exit 1
+          fi
+          chmod 600 .vercel/.env.production.local
+        env:
+          VERCEL_ORG_ID: team_C7lwxVVvnUicFli6112mvxpv
+          VERCEL_PROJECT_ID: prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH
+          VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
       - name: Inspect both original connections with read-only five-second statements
         run: node scripts/ops/production-build-database-diagnostics.mjs --inspect
         env:
