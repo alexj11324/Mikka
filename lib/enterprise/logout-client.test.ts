@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { enterpriseSignOutStep, parseLogoutTarget, readLogoutTarget, type EnterpriseSignOutStep } from './logout-client'
+import { enterpriseSignOutStep, parseLogoutTarget, readLogoutTarget, submitSignOutForm, type EnterpriseSignOutStep } from './logout-client'
 import { routeEnterpriseSignOut } from '../../hooks/use-enterprise-sign-out'
 
 const origin = 'https://app.example.test'
@@ -81,10 +81,25 @@ test('an enterprise session clears local state once, then leaves through its pro
   assert.deepEqual(order, ['forget', 'navigate'])
 })
 
-test('a SAML session keeps the existing sign-out until its logout endpoint accepts a page navigation', async () => {
-  const saml = server({ 'GET /api/enterprise/logout-target': target({ providerId: 'p', protocol: 'saml' }) })
-  const steps: EnterpriseSignOutStep[] = []; let forgot = 0
-  assert.equal(await routeEnterpriseSignOut({ cookieSession: true, origin, fetch: saml.fetch, forget: async () => { forgot++ }, go: step => { steps.push(step) } }), false)
-  assert.deepEqual(steps, []); assert.equal(forgot, 0)
-  assert.equal(saml.calls.length, 1, 'no SAML logout POST is sent as fetch + JSON')
+test('a SAML session clears local state, then leaves by a native form POST, never fetch + JSON', async () => {
+  const saml = server({ 'GET /api/enterprise/logout-target': target({ providerId: 'acme-saml', protocol: 'saml' }) })
+  const order: string[] = []; const steps: EnterpriseSignOutStep[] = []
+  assert.equal(await routeEnterpriseSignOut({ cookieSession: true, origin, fetch: saml.fetch, forget: async () => { order.push('forget') }, go: step => { order.push(step.kind); steps.push(step) } }), true)
+  assert.deepEqual(order, ['forget', 'form'])
+  assert.deepEqual(steps[0], { kind: 'form', action: '/api/auth/sso/saml2/logout/acme-saml', fields: { callbackURL: `${origin}/sign-in?login=1` } })
+  assert.equal(saml.calls.length, 1, 'only the target read is fetched; the logout POST is the page navigation')
+})
+
+test('the SAML form is a hidden top-level POST of urlencoded fields, submitted once', () => {
+  const appended: unknown[] = []; let submitted = 0
+  const elements: Record<string, unknown>[] = []
+  const doc = {
+    createElement: (tag: string) => { const element: Record<string, unknown> = { tag, children: [] as unknown[], append(child: unknown) { (this.children as unknown[]).push(child) }, submit() { submitted++ } }; elements.push(element); return element },
+    body: { append: (node: unknown) => { appended.push(node) } },
+  } as unknown as Document
+  submitSignOutForm({ kind: 'form', action: '/api/auth/sso/saml2/logout/p', fields: { callbackURL: `${origin}/sign-in?login=1` } }, doc)
+  const form = elements[0]
+  assert.equal(form.tag, 'form'); assert.equal(form.method, 'POST'); assert.equal(form.action, '/api/auth/sso/saml2/logout/p'); assert.equal(form.hidden, true)
+  assert.deepEqual((form.children as Record<string, unknown>[]).map(({ type, name, value }) => ({ type, name, value })), [{ type: 'hidden', name: 'callbackURL', value: `${origin}/sign-in?login=1` }])
+  assert.deepEqual(appended, [form]); assert.equal(submitted, 1)
 })

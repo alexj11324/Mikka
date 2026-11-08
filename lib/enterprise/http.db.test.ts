@@ -672,7 +672,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.deepEqual(reasons, ['oidc_upstream_requested', 'oidc_upstream_returned'])
     assert.equal((await session(oidcCookies))?.user.id, userId, 'the independent OIDC session remains active')
   })
-  await t.test('the account-menu sign-out client follows OIDC RP logout; a SAML form POST from the page is refused before revoking anything (#1669)', async () => {
+  await t.test('the account-menu sign-out client follows OIDC RP logout and submits SAML Single Logout as a native form it follows (#1669)', async () => {
     const { readLogoutTarget, enterpriseSignOutStep } = await import('./logout-client')
     // A browser on the app origin: its cookie jar, Origin on writes, redirects left to the page (never read as JSON).
     const browser = (jar: Cookies) => async (path: string, init?: RequestInit) => {
@@ -706,14 +706,35 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const form = await enterpriseSignOutStep(samlTarget!, { origin: appOrigin })
     assert.equal(form.kind, 'form')
     if (form.kind !== 'form') return
-    // Exactly what the page's form submission sends: urlencoded fields, same-origin Origin and the cookie.
-    // The endpoint answers its 302 only to JSON (Better Auth's default media type), so a page cannot follow it
-    // as a navigation; the account menu keeps the existing sign-out for SAML until this answers a 302.
-    const submitted = await browser(saml.jar)(form.action, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form.fields) })
-    assert.equal(submitted.status, 415, await submitted.clone().text())
-    assert.equal((await session(saml.jar))?.session.id, samlSession.session.id, 'a refused form POST revokes nothing')
-    assert.equal((await session(oidcCookies))?.user.id, userId, 'the independent OIDC session stays intact')
-    await pool.query('delete from session where id=$1', [samlSession.session.id])
+    // Exactly what the page's form submission sends: urlencoded fields, its Origin and the cookie.
+    const submit = (fields: Record<string, string>, options: { origin?: string; cookie?: string; action?: string } = {}) => fetch(new URL(options.action ?? form.action, appOrigin), {
+      method: 'POST', redirect: 'manual', body: new URLSearchParams(fields),
+      headers: { 'content-type': 'application/x-www-form-urlencoded', origin: options.origin ?? appOrigin, ...(options.cookie === '' ? {} : { cookie: options.cookie ?? saml.jar.header() }) },
+    })
+    for (const [why, response] of [
+      ['a foreign Origin', await submit(form.fields, { origin: 'https://foreign.example.invalid' })],
+      ['a foreign return URL', await submit({ callbackURL: 'https://foreign.example.invalid/sign-in' })],
+      ['no session', await submit(form.fields, { cookie: '' })],
+      ['another provider', await submit(form.fields, { action: `/api/auth/sso/saml2/logout/${otherProviderId}` })],
+    ] as const) {
+      assert.ok(response.status >= 400 && response.status < 500, `${why}: ${response.status} ${await response.clone().text()}`)
+      saml.jar.take(response)
+      assert.equal((await session(saml.jar))?.session.id, samlSession.session.id, `${why} revokes nothing`)
+    }
+    const submitted = await submit(form.fields)
+    assert.equal(submitted.status, 302, await submitted.clone().text())
+    saml.jar.take(submitted)
+    assert.equal(await session(saml.jar), null, 'the accepted form revokes the session before the browser leaves for the IdP')
+    assert.equal((await pool.query('select count(*) from session where id=$1', [samlSession.session.id])).rows[0].count, '0')
+    const toIdp = new URL(submitted.headers.get('location')!)
+    assert.equal(toIdp.origin, idpOrigin)
+    const idpReply = await fetch(toIdp)
+    assert.equal(idpReply.status, 200, await idpReply.clone().text())
+    const returned = await fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: { origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(await idpReply.json() as Record<string, string>), redirect: 'manual' })
+    assert.equal(returned.status, 302, await returned.clone().text())
+    assert.equal(returned.headers.get('location'), `${appOrigin}/sign-in?login=1`, 'the IdP returns the browser to sign-in')
+    assert.equal((await session(oidcCookies))?.user.id, userId, 'both sign-outs leave the independent OIDC session intact')
   })
   await t.test('OIDC logout rejects wrong principals, cross-origin starts and client-selected redirects before revoking a session', async () => {
     const login = await oidcLogin(), active = await session(login.jar); assert.ok(active)

@@ -23,19 +23,15 @@ export type EnterpriseSignOutRuntime = {
  * (#1669). Resolves false when there is none (`target: null`), when this runtime
  * has no cookie session to navigate, or when the route cannot be read: the
  * caller then runs the existing sign-out, unchanged. Resolves true once the
- * browser is leaving for the url the OIDC logout returned. A failed OIDC
- * logout POST rejects.
- *
- * SAML also keeps the existing sign-out for now: the SP-initiated logout
- * endpoint answers its 302 only to a JSON POST, which a page cannot follow as
- * a navigation, and refuses the form POST a page can send (415, see
- * lib/enterprise/http.db.test.ts). `enterpriseSignOutStep` already builds that
- * form (`submitSignOutForm`) for when the endpoint accepts it.
+ * browser is leaving: OIDC to the url its 200 JSON logout returned; SAML by a
+ * native top-level form POST (urlencoded) whose 302 to the IdP the browser
+ * follows itself. A failed OIDC logout POST rejects. Sign-in for both
+ * protocols is unrelated: it starts from sign-in/sso's 200 JSON url.
  */
 export async function routeEnterpriseSignOut(runtime: EnterpriseSignOutRuntime): Promise<boolean> {
   if (!runtime.cookieSession) return false
   const target = await readLogoutTarget(runtime.fetch).catch(() => null)
-  if (!target || target.protocol === 'saml') return false
+  if (!target) return false
   const step = await enterpriseSignOutStep(target, { origin: runtime.origin, fetch: runtime.fetch })
   await runtime.forget()
   runtime.go(step)
