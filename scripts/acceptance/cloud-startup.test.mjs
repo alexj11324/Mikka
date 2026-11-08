@@ -1238,3 +1238,61 @@ test('remote authorization after the actual task ACK cannot hide in the preparin
   value.agentAccepted.ms = 3200
   assert.equal(runtimeEvidence(readRuntimeTiming(value, { runIdHash: value.runIdHash, harness: value.harness })).status, 'passed')
 })
+
+test('failed execution keeps all six version brackets without changing the failed proof', async () => {
+  for (const failedSample of [-1, 3]) {
+    const io = fixture({ runtime: true })
+    io.onDetail = (sample, detail) => {
+      if (io.samples.indexOf(sample) !== failedSample || sample.reads <= 1) return
+      sample.finished = true
+      detail.thread.status = 'succeeded'
+      detail.thread.attempts[0].status = 'succeeded'
+      detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta')
+      for (const item of detail.chunks) if (item.chunk.type === 'finish') item.chunk.messageMetadata.mikkaRuntimeTiming.providerOutputChunks = 0
+    }
+    const release = { workerSha: 'a'.repeat(40), sourceCommit: 'b'.repeat(40),
+      templates: { desktop: 'desktop-fixture', claude: 'claude-fixture', codex: 'codex-fixture' } }
+    let checks = 0
+    const report = await runCloudStartup(options(['--runs', '6', '--mode', 'acceptance', '--expected-build', 'BUILD1',
+      '--revision', 'c'.repeat(40), '--bot-id', botId, '--runtime-evidence', 'required', '--official-timing', 'enabled',
+      '--expected-worker-sha', release.workerSha, '--expected-worker-source', release.sourceCommit]),
+    { env, ...io, readWorkerRelease: async () => { checks++; return release } })
+    assert.equal(report.samples.length, 6)
+    assert.equal(checks, 14, 'initial, before/after every attempted sample, and final version checks are retained')
+    assert.equal(report.status, failedSample < 0 ? 'awaiting_server_timings' : 'failed')
+    if (failedSample >= 0) {
+      assert.equal(report.samples[failedSample].error, 'startup_ended_before_execution_proof')
+      assert.equal(report.samples[failedSample].replyVerifiedAfterTool, false)
+      assert.equal(report.samples[failedSample].runtimeEvidence.reason, 'execution_cycle_missing')
+    }
+    assert.ok(report.samples.every(sample => sample.cleanup.status === 'passed'))
+    assert.ok(io.samples.every(sample => sample.deleted && sample.machineEnded))
+    assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
+  }
+})
+
+test('a version change after failed execution stops later dispatches and preserves both failures', async () => {
+  const io = fixture({ runtime: true })
+  io.onDetail = (sample, detail) => {
+    if (io.samples.indexOf(sample) !== 3 || sample.reads <= 1) return
+    sample.finished = true
+    detail.thread.status = 'succeeded'
+    detail.thread.attempts[0].status = 'succeeded'
+    detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta')
+  }
+  const release = { workerSha: 'a'.repeat(40), sourceCommit: 'b'.repeat(40),
+    templates: { desktop: 'desktop-fixture', claude: 'claude-fixture', codex: 'codex-fixture' } }
+  let checks = 0
+  const report = await runCloudStartup(options(['--runs', '6', '--mode', 'acceptance', '--expected-build', 'BUILD1',
+    '--revision', 'c'.repeat(40), '--bot-id', botId, '--runtime-evidence', 'required', '--official-timing', 'enabled',
+    '--expected-worker-sha', release.workerSha, '--expected-worker-source', release.sourceCommit]),
+  { env, ...io, readWorkerRelease: async () => { checks++; return checks >= 9 ? { ...release, workerSha: 'd'.repeat(40) } : release } })
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'startup_worker_release_mismatch')
+  assert.equal(report.batchAborted, 'version_pin_changed')
+  assert.equal(report.samples.length, 4, 'version drift closes the failed sample rather than starting a later sample record')
+  assert.equal(report.samples[3].error, 'startup_ended_before_execution_proof')
+  assert.deepEqual(report.samples[3].versionPinFailure, { phase: 'build_pin', code: 'startup_worker_release_mismatch' })
+  assert.ok(report.samples.every(sample => sample.cleanup.status === 'passed'))
+  assert.ok(io.samples.every(sample => sample.deleted && sample.machineEnded))
+})

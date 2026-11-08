@@ -696,6 +696,8 @@ export class CodexAdapter implements AgentAdapter {
         }
         case "item/agentMessage/delta": {
           const { itemId, delta } = params as DeltaNotification
+          // An empty delta must not hide the completed item's full message.
+          if (typeof delta !== "string" || delta.length === 0) return
           if (!streamed.has(itemId)) {
             streamed.add(itemId)
             queue.chunk({ type: "text-start", id: itemId })

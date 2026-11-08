@@ -755,8 +755,10 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     assert(typeof build === 'string' && (!expectedBuild || build === expectedBuild), 'build_mismatch')
     assert(!record.build || build === record.build, 'build_changed'); record.build = build
   })
+  let initialPinPassed = false, finalPinAttempted = false
   try {
     await pin()
+    initialPinPassed = true
     record.phase = 'session_identity'
     const identity = await client.json('/api/auth/get-session')
     assert(identity.user?.id === scope.ownerId && isSmokeAccountEmail(identity.user.email), 'session_identity_mismatch')
@@ -792,6 +794,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
     record.phase = 'build_pin'
+    finalPinAttempted = true
     await pin()
     record.phase = 'execution_receipt'
     if (runtimeEvidenceMode === 'required') assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
@@ -807,6 +810,12 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.status = 'failed'; record.failure = startupFailure(error, record.phase); record.error = record.failure.code
   }
   finally {
+    // A failed execution still needs its closing version observation. Keep the
+    // original failure, and do not repeat a pin already attempted on success.
+    if (initialPinPassed && !finalPinAttempted) {
+      try { await pin() }
+      catch (error) { record.versionPinFailure = startupFailure(error, 'build_pin'); record.status = 'failed' }
+    }
     if (record.messageSubmittedAt && !record.coordinatorStopped) {
       try { await client.rpc('coordinator.stopCoordinatorTurn', [botId]); record.coordinatorStopped = true }
       catch (error) {
@@ -936,10 +945,12 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, profile, scope, harness, sampleId,
         sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl })
       report.samples.push(sample)
-      if (['startup_build_mismatch', 'startup_build_changed', 'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error)) {
+      const versionFailure = sample.versionPinFailure?.code ?? (['startup_build_mismatch', 'startup_build_changed',
+        'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error) ? sample.error : null)
+      if (versionFailure) {
         report.batchAborted = 'version_pin_changed'
         report.phase = 'build_pin'
-        fail(sample.error.slice('startup_'.length))
+        fail(versionFailure.slice('startup_'.length))
       }
     }
     report.phase = 'build_pin'

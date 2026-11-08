@@ -520,3 +520,34 @@ bootstrap sidecar，因此不能证明新的匿名采用及环境 OAuth 来源�
 匿名协议控制没有账号、thread 或 turn 请求；它与本地数据库/类型结果都不能
 替代新候选的真实订阅采用或 dispatch→ACK 五秒成绩。本候选没有新增生产样本，
 没有把协议字节节省计作 ready-pool 已获预算。
+
+### 78c3c13 生产失败后的采用修正
+
+生产 run 42430097946 的六个原样本仍保留失败：Claude/Codex 交替的 dispatch→ACK
+分别为 18845.698、15448、16510.477、14497、14408.969、17929 ms，全部超过
+5000 ms。39 项服务端阶段齐全，但第 4 个 Codex 样本只有工具完成、没有工具后的
+回复，故缺少完整执行证明；原 driver 跳过其 closing pin，实际只有 13/14 次 pin。
+这些记录不能改写成完整 pin 覆盖，也不能因后续本地修复追认通过。
+
+三个 Claude 样本都走了 ordinary_path，实际认证来源为 oauth_descriptor。
+实际 worker/hosted runner 环境的回归复现了两个严格比较差异：匿名启动缺少
+supervisor 生成的 MIKKA_RUN_ID；官方 SDK 首次调用又同时为真实 child env 和
+process.env 增加 CLAUDE_AGENT_SDK_VERSION，而匿名 options 的快照早于它。
+修正只加入绑定 hint 的 runId，并从官方 SDK 本次实际 spawn config 同步这个
+版本字段。完整环境、fresh claim、认证来源、临时目录、单次采用与关闭排空校验
+均保持；不能通过忽略字段或写死版本号来允许采用。冷 SDK、真实 hosted runner
+与不同 runId/版本拒绝均有离线回归；它们不是生产采用或五秒达标证明。
+
+后继 driver 在 initial pin 成功而 closing pin 尚未尝试时，即使执行证明失败也
+补做一次 closing pin，保留原执行错误。closing pin 失败另行记录，清理后中止
+后续派发。正常成功路径的 pin 位置、14 次总数、完整执行证据和 5000 ms 公式
+不变；原 13/14 报告不修改。
+
+另有可独立重放的 Codex 协议边界：空 agentMessage delta 原先会把 item 标为
+已输出，使随后 completed item 的完整文字被丢弃。现在空 delta 不占用该标记；
+非空流式输出与完成消息去重保持。离线真实 adapter/fake-native 回归先失败再通过，
+但没有保留上述生产第 4 例的原生通知流，因此不能把该边界认定为其已证实原因。
+
+[本轮失败与修正证据索引](../research/2026-11-08-e2b-adoption-correction.json)
+区分原始生产失败、源代码复现和后续待完成的发布/生产验证。官方文件校验和、
+Claude/Codex 双真实订阅及最终同一部署元组的全部六次五秒验收继续作为门槛。
