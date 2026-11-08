@@ -1,7 +1,7 @@
 import 'server-only'
 import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 import { createHash, randomUUID } from 'node:crypto'
-import type { Pool } from 'pg'
+import { escapeLiteral, type Pool, type QueryResult } from 'pg'
 import { FactoryError } from './contract'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { factoryBinding, createFactoryDispatch, type FactoryQueue } from './dispatch'
@@ -9,6 +9,13 @@ import { factoryEventId } from './event-id'
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from './runtime'
 import { notifyQueuedLocalRun } from '../device-gateway-notify'
 import { advanceFactoryRequest, factoryContinuationSource } from './request-epoch'
+
+function isLockResult(value: unknown): value is Pick<QueryResult, 'command' | 'rows'> {
+  if (!value || typeof value !== 'object') return false
+  const result = value as Partial<QueryResult>
+  return result.command === 'SELECT' && Array.isArray(result.rows) && result.rows.length === 1
+    && result.rows[0] !== null && typeof result.rows[0] === 'object' && !Array.isArray(result.rows[0])
+}
 
 /** The initial Profile follows the existing route. The queue rechecks it under lock. */
 export async function factoryTaskNeedsSpec(pool: Pool, userId: string, input: {
@@ -37,8 +44,11 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
   const digest = createHash('sha256').update(JSON.stringify([input.agentId, input.deviceRepoId, input.note ?? null, input.previousRunId ?? null, input.sourceEventId ?? null, input.selection ?? null, ...(input.needsSpec ? [{ needsSpec: true }] : [])])).digest('hex')
   try {
     await tx.query('BEGIN')
-    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['factory-host-dispatch', userId, input.issueId])])
-    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify([userId, input.issueId])])
+    // Native simple-query keeps two statements and the original lock order.
+    // BEGIN stays separate; no policy snapshot moves ahead of a waiting lock.
+    const locks: unknown = await tx.query(`SELECT pg_advisory_xact_lock(hashtextextended(${escapeLiteral(JSON.stringify(['factory-host-dispatch', userId, input.issueId]))},0));
+      SELECT pg_advisory_xact_lock(hashtextextended(${escapeLiteral(JSON.stringify([userId, input.issueId]))},0))`)
+    if (!Array.isArray(locks) || locks.length !== 2 || !locks.every(isLockResult)) throw new TypeError('Invalid Factory dispatch locks')
     const { rows: [receipt] } = await tx.query(`SELECT e.result,e.request->>'digest'=$5 AS same,t.status,t.id AS "taskId" FROM factory_events e JOIN factory_tasks t ON t.id=e."taskId" WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND e."eventId"=$4`, [userId, input.issueId, input.botId, receiptId, digest])
     if (receipt) {
       if (!receipt.same) throw new FactoryError('factoryReplayMismatch')

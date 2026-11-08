@@ -160,7 +160,7 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     assert.match(text(), /Check the login/, 'the running row is open, so its words show as they stream')
     assert.equal(group()?.getAttribute('data-activity-group'), 'running')
     await settle(() => rows().length === 3)
-    assert.deepEqual(rows(), [['done', 'Create taskFix login', null], ['running', 'Start thread', 'running'], ['error', 'Dispatch Factory task· Factory task not found', 'error']],
+    assert.deepEqual(rows(), [['done', 'Create taskFix login', null], ['running', 'Start task', 'running'], ['error', 'Dispatch Factory task· Factory task not found', 'error']],
       'verb and object; an answered error is a failure with its reason')
     assert.doesNotMatch(text(), /dispatch_factory_task|i1|factoryNotFound/, 'raw input and output start closed')
     // Opened, a call says what it did in words first; its raw data is one more click away, under 「Raw data」.
@@ -189,7 +189,7 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     assert.equal(group()?.querySelector('[data-activity-failed]')?.textContent, '2 failed', 'the failure count sits outside the summary, so it never truncates')
     // Stored, a tool that never returned failed: the docs' row for a call that is not streaming.
     await view.render(<ReplyActivity tools={[tools[1]]} />)
-    assert.deepEqual(rows(), [['error', 'Start thread', 'error']])
+    assert.deepEqual(rows(), [['error', 'Start task', 'error']])
     // A tool with nothing to show is a line that does not open.
     await view.render(<ReplyActivity tools={[{ call: 'c4', name: 'create_issue', state: 'done' }]} />)
     assert.equal(view.container.querySelector('[data-activity-tool] button'), null)

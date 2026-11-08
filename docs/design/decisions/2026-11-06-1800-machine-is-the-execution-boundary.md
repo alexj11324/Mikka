@@ -3,6 +3,7 @@
 - Date: 2026-11-06 18:00 UTC
 - Source: Alex's [decision on #1505](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691833153) and [the explicit replacement of the old credential rules](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691871552).
 - Rule: Cloud execution, local daemon execution, credential delivery and startup acceptance.
+- Superseded by (only for non-CLI third-party Secret exposure): [2026-11-08-0240](2026-11-08-0240-credential-exposure-boundary.md). All other execution and performance rules here remain in force.
 - Replaces: the extra runtime isolation, placeholder/provider proxy, per-call remote authorization and credential cleanup requirements in [orchestration §§3, 5–6](../orchestration.md); the corresponding parts of [1312](2026-11-01-1312-cloud-runs-without-docker.md), [2335](2026-11-01-2335-e2b-official-templates.md), [2225](2026-10-31-2225-bindings-belong-to-the-person.md) and [1600](2026-11-02-1600-agents-use-own-github-credential.md). Account ownership, the selected model, billing attribution and workspace sharing rules remain in force.
 
 Alex's words, as recorded in the issue:
@@ -18,19 +19,30 @@ never leaves the server and that the Agent must hold a placeholder while
 Mikka checks and forwards every model request. It also requires before/after
 per-call timing evidence before removing that proxy path.
 
+**Scope correction (2026-11-08):** The quoted instruction is retained as
+historical context; it does not authorize disclosing every user/workspace/
+repository Secret to a task Agent. The updated [credential-exposure boundary]
+(2026-11-08-0240-credential-exposure-boundary.md) distinguishes selected
+native CLI/GitHub credentials from other third-party Secrets. No repeated
+per-model/per-tool Mikka control-plane checks are reinstated.
+
 ## Cloud execution
 
 One thread task owns one E2B VM. That VM is the boundary between tasks; no
 other task or owner uses it. Claude Code and Codex run directly as the
 machine's normal user, with its normal HOME, environment and Git repository.
 Do not add a container, a second sandbox, a shadow `.git`, an isolated HOME,
-an environment allowlist or an isolated GitHub configuration inside it.
+a blanket environment filter around native CLI execution or an isolated
+GitHub configuration inside it. This does **not** exempt unrelated task Secrets
+from scoped, non-readable delivery.
 Verification commands use the same repository too. A read-only task remains
 an instruction to the Agent, not a reason to manufacture another repository.
 
-Prepare the task's real subscription login, GitHub credential and selected
-model key while preparing the machine, or once on the first request that
-needs them. Claude Code connects directly to Anthropic and Codex directly
+Prepare only the task's **selected** native CLI subscription login/model
+key and approved GitHub execution credential while preparing the machine,
+or once on the first request that needs them. Do not treat this as a grant to
+inject all other user/workspace/repository Secrets into the Agent environment;
+those follow [2026-11-08-0240](2026-11-08-0240-credential-exposure-boundary.md). Claude Code connects directly to Anthropic and Codex directly
 to OpenAI; the Agent can use the credential it was given. There is no Mikka
 placeholder, provider-forwarding proxy or extra remote permission check
 before a provider or tool call. The ordinary provider protocol, including
@@ -109,7 +121,8 @@ the superseded placeholder/proxy policy under a new name.
 
 The reusable public template is still software only. Build and publish it
 without any account login, provider key, device identity or workspace data.
-Deliver task credentials only after creating the owner-bound VM. Its normal
+Deliver only approved task CLI/GitHub credentials and scoped third-party
+capabilities after creating the owner-bound VM. Its normal
 private runtime state can remain with that task while paused; it must never
 be published as a reusable template or assigned to another task. At task
 completion reclaim the disposable machine. Do not erase credentials and
@@ -144,3 +157,55 @@ validation, with an explicit `dispatch_run_entry` boundary in the receipt. The
 end is the later of the server execution stage and the official CLI's exact
 task acknowledgement. Legacy measurements that start inside the dispatch body
 are lower bounds and useful phase evidence, not complete-entry acceptance.
+
+## Bootstrap-time anonymous Claude preparation
+
+A fresh TaskVM may initialize one anonymous Claude process after its strict
+bootstrap is accepted, before device registration and run claim complete.
+The template snapshot never contains this process or its native session UUID.
+The server emits the optional, bounded configuration sidecar only when it
+actually creates a new official Claude instance with no existing sandbox or
+device, for a queued first attempt with no prior start, session, token, retry,
+continuation or question-resume state. Retained/adopted machines and runtime
+refreshes remain on the ordinary path. The sidecar is bound to the exact
+bootstrap bytes and run ID; it contains configuration, never account or task
+authority.
+
+The same fresh assignment, policy hash, model/effort, diagnostic scope, normal
+HOME/environment and complete MCP catalogue must match before one adoption.
+Skills and project/local settings are still prepared and verified at the
+final cwd. An isolated owned child executes the existing Mikka MCP backend;
+unbound tools refuse calls, and cancellation kills and drains its process
+group. The original stdio entry uses that same backend. No tool handlers or
+Git semantics are substituted. Only the SDK's specific
+`project_settings_not_claimable` refusal can drain and retry the ordinary
+path after claim; other permission, identity, account and claim failures
+remain failures.
+
+For explicit diagnostics, the same loopback collector is started before the
+anonymous process and transferred once to the matching fresh run. Its actual
+early timestamps remain intact. `preparationTiming.source =
+bootstrap_claude_start` has its own clock and includes the real prewarm and
+claim initialization; it is never rebased into the later `agent_start` root.
+The closed `observedAuthSource` records the actual native account-info source
+(environment OAuth, descriptor OAuth, unspecified non-API-key, or unknown),
+without exporting an arbitrary native string. The closed `claimAuthentication`
+field distinguishes verified
+`oauth_environment`, the original `ordinary_path` fallback, and
+`unverified`. The formal reader rejects missing or unverified authentication
+for this new source, while retaining the original CLI-initialization, exact
+ACK, dispatch-entry and five-second requirements. Ordinary tasks add no
+detailed timing fields.
+
+Installed SDK 0.3.305 documents fresh OAuth/session additions in
+`ClaimOptions.env`; its `AccountInfo.tokenSource` is a string, not a published
+enum, and this package contains no native `cli.js` implementation. The new
+account guard accepts only `firstParty` and the existing non-API-key checks;
+the additional exact `CLAUDE_CODE_OAUTH_TOKEN` source is allowed only after
+this candidate's successful one-shot claim. Offline real-SDK/IPC fixtures
+prove protocol and refusal boundaries, not what an official native binary
+actually reports. The existing subscription candidate gate uses a personal
+acceptance daemon without a bootstrap sidecar and therefore validates the
+original FD3 route. Its success does not validate anonymous adoption. The
+subsequent real production dispatches must exercise and report the actual
+new source; no native-source value or performance saving is inferred.

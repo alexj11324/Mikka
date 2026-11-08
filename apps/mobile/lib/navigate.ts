@@ -14,8 +14,8 @@ export function openChat(href: Href) {
   router.push(href)
 }
 
-/** Where a tapped push opens (lib/push-route.ts): a thread is pushed over what is open; a chat opens over the home screen. */
+/** Where a tapped push opens (lib/push-route.ts): a task or a thread is pushed over what is open; a chat opens over the home screen. */
 export function openPush(href: string) {
-  if (href.startsWith('/thread/')) router.push(href as Href)
+  if (href.startsWith('/thread/') || href.startsWith('/task/')) router.push(href as Href)
   else openChat(href as Href)
 }

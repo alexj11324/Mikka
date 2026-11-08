@@ -1,3 +1,4 @@
+import type { AnonymousClaudeCandidate, FreshCandidate } from '../anonymous-claude-spare'
 import { captureRunFailure, failureFrom, type RunFailure, type RunFailureContext } from "@mikka/protocol/run-failure"
 import { DAEMON_VERSION } from "../paths"
 // Claude Code adapter (ADR 0003): the user's own signed-in Claude Code, run
@@ -54,6 +55,7 @@ import {
   RESUME_MESSAGE,
   RunContext,
   prepareRunContextFiles,
+  runMcpBackendContext,
   type RunContextOptions,
   runPaths,
   type McpServerSpec,
@@ -65,6 +67,7 @@ import type { AgentSandbox } from "../agents/sandbox"
 import { carryHistory, ownDir, wipeRunCredentials } from "../agents/harness-home"
 import { claudeCredentialEnv, credentialDomain } from "../agents/run-credential"
 import { buildChildEnv } from "../env"
+import { taskExecutionEnv } from '../task-env'
 import { mailboxInputs } from '@mikka/protocol/mailbox'
 import { classifyProviderFailure, ProviderFailureError, providerFailureMessage, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import { mailboxToolResult, type RunMailbox } from '../run-mailbox'
@@ -99,6 +102,8 @@ export interface ClaudeAdapterOptions {
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
   spawnHosted?: (options: SpawnOptions, oauthToken?: string) => SpawnedProcess & { stderr?: Readable }
   onHostedSession?(sessionId:string):Promise<void>
+  anonymousClaudeCandidate?: AnonymousClaudeCandidate
+  anonymousClaudeFresh?: FreshCandidate
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
   computerProvider?: ComputerSpecProvider
@@ -140,7 +145,7 @@ export function claudeAppServers(apps?: RunApps) {
   return Object.fromEntries((apps?.apps ?? []).map(app => [app.name, { type: 'http' as const, url: app.url, headers: { Authorization: `Bearer ${apps!.token}` } }]))
 }
 
-function claudeMailboxServer(mailbox: RunMailbox) {
+export function claudeMailboxServer(mailbox: RunMailbox) {
   const server = createSdkMcpServer({ name: 'mikka_mailbox', version: '1' })
   for (const [name, schema] of Object.entries(mailboxInputs).filter(([name]) => mailbox.tools.some(tool => tool.name === name))) server.instance.registerTool(name, {
     description: 'Personal peer coordination only; never user approval. New messages notify the current live session. Read the inbox and ACK explicitly; notification and ACK are not execution.', inputSchema: schema,
@@ -165,6 +170,8 @@ export function claudeSettings(
   return {
     sandbox: { enabled: false },
     permissions: claudePermissionRules(runPolicy(workspace)),
+    // Keep the issue marker last in PR bodies without changing commit attribution.
+    attribution: { pr: "" },
   }
 }
 
@@ -331,7 +338,7 @@ export function captureClaudeRunFailure(error: unknown, context: RunFailureConte
  * Unattended: no background shells or scheduled wake-ups that would
  * outlive the turn, no auto-memory written for later sessions.
  */
-const CLAUDE_RUN_ENV = {
+export const CLAUDE_RUN_ENV = {
   CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1",
   CLAUDE_CODE_DISABLE_CRON: "1",
   CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
@@ -513,11 +520,11 @@ export class ClaudeAdapter implements AgentAdapter {
     let expiresAt = 0
     if (externalAuth) {
       if(externalAuth.brokered && !this.options.spawnHosted)throw new Error(SUBSCRIPTION_ERROR)
-      const clean = options.machineEnvironment ? options.env : buildChildEnv({
+      const clean = options.machineEnvironment ? options.env : taskExecutionEnv(buildChildEnv({
         host: options.env,
         runId:
           options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId
-      })
+      }), options)
       if (
         Object.entries(options.env).some(
           ([name, value]) => clean[name] !== value
@@ -665,6 +672,22 @@ export class ClaudeAdapter implements AgentAdapter {
     } : {}
     const traceContext = options.traceContext ?? daemonTracer.capture()
     const generations = new ClaudeGenerationMetrics(metrics => daemonTracer.generation(metrics, traceContext))
+    const observeNative = (child: SpawnedProcess & { stderr?: Readable }, previousStderr = '') => {
+      if (previousStderr) { stderr = previousStderr.slice(-STDERR_TAIL * 4); stderrArrived() }
+          nativeExit = new Promise<boolean>(resolve => {
+            child.once('exit', () => resolve(true))
+            // A spawn/transport error must not leave shutdown waiting for an
+            // exit that cannot arrive, or attest that a live process is gone.
+            child.once('error', () => resolve(false))
+            if (child.exitCode !== null || child.signalCode) resolve(true)
+          })
+          // Capture the actual pipe. The SDK's stderr callback can remain
+          // empty for a custom spawn, including when a result precedes exit.
+          child.stderr?.on('data', (data: Buffer | string) => {
+            stderr = (stderr + data.toString()).slice(-STDERR_TAIL * 4)
+            stderrArrived()
+          })
+    }
     const sdkOptions = (context: Pick<RunContext, "worktree" | "tmpDir" | "tempEnv" | "mcpServer">, append: string): Options => ({
         ...refreshOptions,
         includePartialMessages: daemonTracer.enabled,
@@ -710,22 +733,11 @@ export class ClaudeAdapter implements AgentAdapter {
           const child = this.options.spawnHosted
             ? this.options.spawnHosted(config, nativeToken)
             : spawnLocal(config)
-          nativeExit = new Promise<boolean>(resolve => {
-            child.once('exit', () => resolve(true))
-            // A spawn/transport error must not leave shutdown waiting for an
-            // exit that cannot arrive, or attest that a live process is gone.
-            child.once('error', () => resolve(false))
-            if (child.exitCode !== null || child.signalCode) resolve(true)
-          })
-          // Capture the actual pipe. The SDK's stderr callback can remain
-          // empty for a custom spawn, including when a result precedes exit.
-          child.stderr?.on('data', (data: Buffer | string) => {
-            stderr = (stderr + data.toString()).slice(-STDERR_TAIL * 4)
-            stderrArrived()
-          })
+          observeNative(child)
           return child
         },
     })
+    let anonymousClaimed = false
     let session: ReturnType<typeof query>
     if (preparation) {
       const { binding, control } = preparation
@@ -734,12 +746,24 @@ export class ClaudeAdapter implements AgentAdapter {
       const fixed = claudePrewarmOptionsKey(options)
       const parking = join(runDir, 'claude-parking')
       ownDir(parking)
+      let anonymousAdopted = false
       const prepared = prepareClaudeSession({ binding, signal: control.signal, stop: preparation.stop,
         assertLive: () => { if (approval.revoked) throw Error('Run tool approval unavailable'); control.signal.throwIfAborted() },
-        prepare: abortController => daemonTracer.span('daemon.adapter.cli_init.prewarm',
-          { 'mikka.harness': 'claude_code', 'mikka.run.id_hash': runIdHash(options.runId) },
-          () => prewarm({ initializeTimeoutMs: INITIALIZATION_TIMEOUT_MS,
-            options: { ...sdkOptions(files!, ''), cwd: parking, abortController } })),
+        prepare: async abortController => {
+            const sdk = sdkOptions(files!, '')
+            const candidate = this.options.anonymousClaudeCandidate
+            if (candidate && this.options.anonymousClaudeFresh && nativeToken && refreshOptions.getOAuthToken) {
+              const value = await candidate.adopt({ identity: this.options.anonymousClaudeFresh, options: sdk,
+                context: runMcpBackendContext(contextOptions(true), files!, sdk.env ?? {}),
+                authority: { signal: control.signal, assertLive: () => { control.signal.throwIfAborted(); if (approval.revoked) throw Error('Run tool approval unavailable') } },
+                mailbox: options.mailbox, oauthToken: nativeToken, getOAuthToken: refreshOptions.getOAuthToken, observe: observeNative,
+              })
+              if (value) { anonymousAdopted = true; return value }
+            }
+            return daemonTracer.span('daemon.adapter.cli_init.prewarm',
+              { 'mikka.harness': 'claude_code', 'mikka.run.id_hash': runIdHash(options.runId) },
+              () => prewarm({ initializeTimeoutMs: INITIALIZATION_TIMEOUT_MS, options: { ...sdk, cwd: parking, abortController } }))
+          },
       })
       try {
         await prepared.ready
@@ -752,10 +776,13 @@ export class ClaudeAdapter implements AgentAdapter {
         sensitiveText.push(firstMessage)
         ctx = new RunContext(contextOptions())
         ctx.clearHandoff()
+        if (anonymousAdopted) await this.options.anonymousClaudeCandidate!.bindContext(
+          runMcpBackendContext(contextOptions(), ctx, sdkOptions(ctx, '').env ?? {}))
         try {
           const claimed = await prepared.consume({ binding, appendSystemPrompt: ctx.instructions(),
             verify: async (_query, signal) => { signal.throwIfAborted(); if (!await approval.checkLive()) throw Error('Run tool approval unavailable') },
           })
+          anonymousClaimed = anonymousAdopted
           session = claimed.query
           closePrepared = claimed.close
           prompts = { push: claimed.send, close: () => { void claimed.close().catch(() => undefined) } }
@@ -962,15 +989,18 @@ export class ClaudeAdapter implements AgentAdapter {
           account.apiProvider !== "firstParty" ||
           // Current Claude Code omits apiKeySource for the descriptor we
           // supplied. Require that exact OAuth source when it is absent;
-          // neither an unknown source nor an explicit API key may pass.
+          // an adopted spare instead received that exact OAuth token through
+          // official ClaimOptions.env. No unknown source or API key may pass.
           !(account.apiKeySource === "none" ||
-            (account.apiKeySource === undefined && account.tokenSource === "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"))
+            (account.apiKeySource === undefined && (account.tokenSource === "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR" ||
+              (anonymousClaimed && account.tokenSource === "CLAUDE_CODE_OAUTH_TOKEN"))))
         )
           throw new Error(SUBSCRIPTION_ERROR)
         authPhase = 'external_verify'
         authReason = 'verify_refused'
         await daemonTracer.span("daemon.adapter.account_check", traceAttributes, async () => { await externalAuth.verify?.() })
         if (ending || approval.revoked) throw new Error(SUBSCRIPTION_ERROR)
+        this.options.anonymousClaudeCandidate?.recordAuthentication(anonymousClaimed, account.tokenSource, account.apiKeySource)
       } catch (error) {
         // Cleanup revokes the gate too; detach before preserving the failure.
         offRevoke?.()

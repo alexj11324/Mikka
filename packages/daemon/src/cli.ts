@@ -1,3 +1,4 @@
+import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
 // `mikka daemon | daemon login | daemon status` (ADR 0004). The desktop app
 // runs the same entry with `daemon --data-dir <userData>`.
 import { parseArgs } from "node:util"
@@ -71,7 +72,7 @@ const defaultIO: CliIO = {
 export async function runCli(
   argv: string[],
   io: CliIO = defaultIO,
-  privateConfig?: { protectionBypass?: string; preloadedModels?: HostedModelProbe; initialRunId?: string; collectCliTiming?: boolean }
+  privateConfig?: { protectionBypass?: string; preloadedModels?: HostedModelProbe; initialRunId?: string; collectCliTiming?: boolean; anonymousClaudeCandidate?: AnonymousClaudeCandidate }
 ): Promise<number | null> {
   const { values, positionals } = parseArgs({
     args: argv,
@@ -233,6 +234,7 @@ export async function runCli(
       hostedSubscriptions: values["hosted-subscriptions"],
       preloadedModels: privateConfig?.preloadedModels,
       initialRunId: privateConfig?.initialRunId,
+      anonymousClaudeCandidate: privateConfig?.anonymousClaudeCandidate,
       collectCliTiming: privateConfig?.collectCliTiming,
       e2bContainerRuntime: values["e2b-container-runtime"],
       cloudComputer: values["e2b-computer"],

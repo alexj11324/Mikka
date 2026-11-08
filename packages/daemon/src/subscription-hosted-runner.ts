@@ -1,3 +1,4 @@
+import type { AnonymousClaudeCandidate, FreshCandidate } from './anonymous-claude-spare'
 // Each hosted task owns its E2B machine. The owner-bound claim supplies
 // credentials once; official CLIs connect directly to their providers and use
 // the machine's normal HOME, environment and working directory Git metadata.
@@ -94,6 +95,7 @@ export async function createHostedBotRunner(host: {
   binaries?: Partial<Record<'codex' | 'claude_code', string>>
   /** Trusted host diagnostic opt-in; never changes the assignment or its authority. */
   collectCliTiming?: boolean
+  anonymousClaudeCandidate?: AnonymousClaudeCandidate
   /** Kept for old trusted worker callers; no inner container is created. */
   dockerSocket?: 'unix:///run/mikka-container/docker.sock'
   computerBroker?: ComputerBroker
@@ -106,6 +108,18 @@ export async function createHostedBotRunner(host: {
   if (host.dockerSocket !== undefined && host.dockerSocket !== 'unix:///run/mikka-container/docker.sock') throw unavailable('host_unsupported')
   const binaries = hostedBinaries(host.binaries)
   if (!binaries.codex && !binaries.claude_code) throw unavailable('cli_missing')
+  const anonymousFor = (assignment: RunAssignment, options: StartOptions) => {
+    const fresh: FreshCandidate = { runId: assignment.runId, deviceId: assignment.deviceId,
+      workspaceId: assignment.subscriptionBinding?.workspaceId ?? '', model: options.model, effort: options.effort,
+      policyHash: options.policyHash, diagnostics: runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming),
+      decisionCatalogue: options.mcp?.decisionCatalogue }
+    const offered = host.anonymousClaudeCandidate?.runId === assignment.runId ? host.anonymousClaudeCandidate : undefined
+    const anonymous = offered && offered.state !== 'closed' && offered.matchesFresh(fresh) &&
+      !assignment.requireSessionResume && !assignment.continuesRunId && !assignment.resumeSessionId && !options.continueSession &&
+      Object.entries(assignment.taskEnv ?? {}).every(([key, value]) => key === 'CLOUD_STARTUP_TIMING' && value === '1') &&
+      !options.apps?.apps.length && !assignment.computer && !options.factoryCheck ? offered : undefined
+    return { anonymous, offered, fresh }
+  }
   const start = async (assignment: RunAssignment, options: StartOptions, preparation?: ClaudePreparation): Promise<AgentSession> => {
       const gate = requireRunToolApproval(options.runId, options.toolApproval)
       const selected = assignment.subscriptionBinding
@@ -135,6 +149,8 @@ export async function createHostedBotRunner(host: {
           throw unavailable('resume_mismatch')
       }
       const trace = { 'mikka.harness': kind, 'mikka.run.id_hash': runIdHash(assignment.runId) }
+      const { anonymous, offered, fresh } = anonymousFor(assignment, options)
+      if (offered && !anonymous) await offered.close()
       const lifetime = new AbortController()
       const children = new Set<ReturnType<typeof spawn>>()
       let cliStarted = 0
@@ -153,9 +169,9 @@ export async function createHostedBotRunner(host: {
         subscription?.close()
         // Publish first: abort callbacks and child exit can re-enter close.
         closing = Promise.resolve().then(async () => {
-          try { await Promise.all([...children].map(child => stopGroup(child))) }
+          try { await Promise.all([...children].map(child => stopGroup(child))); await anonymous?.close() }
           finally {
-            await cliTiming?.close({ cliExitObserved: cliStarted > 0 && cliStarted === cliExited })
+            await cliTiming?.close({ cliExitObserved: (cliStarted > 0 || anonymous?.nativeStarted === true) && cliStarted === cliExited && (!anonymous?.nativeStarted || anonymous.nativeExitObserved) })
             offRevoke()
             preparation?.signal.removeEventListener('abort', abortPreparation)
             // The VM belongs to this task. Keep its last native login for
@@ -236,7 +252,7 @@ export async function createHostedBotRunner(host: {
         } : undefined
         if (runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming)) {
           try {
-            cliTiming = await startCliTimingCollector({ runId: assignment.runId, harness: kind, model: options.model,
+            cliTiming = await anonymous?.takeTiming(fresh) ?? await startCliTimingCollector({ runId: assignment.runId, harness: kind, model: options.model,
               remoteMcpServerCount: options.apps?.apps.length ?? 0, decisionCatalogue: options.mcp?.decisionCatalogue })
           } catch { /* Missing observation is unavailable evidence, not a business or authorization failure. */ }
           assertOpen()
@@ -293,7 +309,7 @@ export async function createHostedBotRunner(host: {
             } } : {}),
           })
           : new ClaudeAdapter({ stateDir: host.stateDir, binary: binaries.claude_code,
-            computerMcp, onHostedSession: record, spawnHosted,
+            computerMcp, onHostedSession: record, spawnHosted, anonymousClaudeCandidate: anonymous, anonymousClaudeFresh: fresh,
             ...(subscription ? { subscriptionAuth: { accountId: subscription.first.accountId, automaticRefresh: true as const,
               token: async () => { assertOpen(); return subscription!.current() },
             } } : {}),
@@ -313,9 +329,9 @@ export async function createHostedBotRunner(host: {
           })
           void finalOptions.catch(() => undefined)
           session = await adapter.startPrepared(runtimeOptions, { ...scope,
-            sessionId: randomUUID(), cwd, deviceId: assignment.deviceId, model: subscription.first.modelId,
+            sessionId: anonymous && anonymous.state !== 'closed' ? anonymous.sessionId : randomUUID(), cwd, deviceId: assignment.deviceId, model: subscription.first.modelId,
             policyHash: options.policyHash ?? null,
-          }, { ...preparation, finalOptions }, async () => { await Promise.all([...children].map(child => stopGroup(child))) })
+          }, { ...preparation, finalOptions }, async () => { await Promise.all([...children].map(child => stopGroup(child))); await anonymous?.close() })
         } else session = previous && !continuation
           ? await adapter.resume(previous.sessionId, runtimeOptions) : await adapter.start(runtimeOptions)
         if (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId) {
@@ -352,8 +368,13 @@ export async function createHostedBotRunner(host: {
         assignment.modelCredential || assignment.requireSessionResume || assignment.continuesRunId || assignment.resumeFrom ||
         assignment.resumeSessionId || options.continueSession || (assignment.github && !assignment.github.token))
         throw unavailable('assignment_invalid')
-      return prepareAgentStart(signal, control => start(assignment, options, control),
-        runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming) ? { runId: assignment.runId, harness: 'claude_code' } : undefined)
+      const { anonymous } = anonymousFor(assignment, options)
+      const prepared = prepareAgentStart(signal, control => {
+        const work = () => start(assignment, options, control)
+        return anonymous ? anonymous.measurePreparation(work) : work()
+      }, runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming) && !anonymous ? { runId: assignment.runId, harness: 'claude_code' } : undefined)
+      return { ready: prepared.ready, start: prepared.start, cancel: prepared.cancel,
+        get preparationTiming() { return anonymous?.preparationTiming ?? prepared.preparationTiming } }
     },
   }
 }

@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { cleanupLifecycleCase, createProviderObserver, isExactNativeCommand, lifecycleHash, MODELS, nativeEvidence, nativeSnapshotCommand,
-  readOptions, runLifecycleCase, runThreadLifecycle, safeError } from './thread-lifecycle.mjs'
+  readOptions, reviewDeliveryValidation, runLifecycleCase, runThreadLifecycle, safeError } from './thread-lifecycle.mjs'
 import { watchRun } from './cloud-startup.mjs'
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
@@ -33,10 +35,38 @@ const nativePair = (callId, toolName, input, output, offset = 0) => [
   { at: new Date(epoch + offset).toISOString(), chunk: { type: 'tool-input-available', toolCallId: callId, toolName, input } },
   { at: new Date(epoch + offset + 1).toISOString(), chunk: { type: 'tool-output-available', toolCallId: callId, output } },
 ]
-const proofChunks = (record, phase, codex = false) => {
-  const output = 'MIKKA_1593_NATIVE ' + JSON.stringify(markerProof(record, phase))
+const proofChunks = (record, phase, codex = false, reportText) => {
+  const proof = markerProof(record, phase)
+  if (reportText !== undefined) Object.assign(proof, { reportText, reportBytes: Buffer.byteLength(reportText), reportSha256: sha(reportText) })
+  const output = 'MIKKA_1593_NATIVE ' + JSON.stringify(proof)
   return nativePair(`${record.runId}:${phase}`, 'bash', { command: nativeSnapshotCommand(record, phase) }, codex ? { exitCode: 0, output } : output)
 }
+
+test('a missing or invalid draft cannot consume the exclusive pre-question marker before a valid retry', () => {
+  for (const invalid of ['missing', 'too-short', 'too-long']) {
+    const root = mkdtempSync(join(tmpdir(), 'mikka-lifecycle-snapshot-'))
+    try {
+      execFileSync('git', ['init', '-q'], { cwd: root })
+      writeFileSync(join(root, 'README.md'), 'Isolated lifecycle snapshot regression.\n')
+      execFileSync('git', ['add', 'README.md'], { cwd: root })
+      execFileSync('git', ['-c', 'user.name=Lifecycle regression', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Initialize isolated fixture'], { cwd: root })
+      const record = fixture(), marker = join(root, `issue-1593-${record.caseId}.marker`)
+      const report = join(root, `issue-1593-${record.caseId}.md`), command = nativeSnapshotCommand(record, 'before_question')
+      if (invalid !== 'missing') writeFileSync(report, invalid === 'too-short' ? 'short' : 'x'.repeat(2401))
+      assert.throws(() => execFileSync('bash', ['-c', command], { cwd: root, stdio: 'pipe' }))
+      assert.equal(existsSync(marker), false, `${invalid} report must not consume the marker`)
+      writeFileSync(report, markerProof(record, 'delivery').reportText)
+      const output = execFileSync('bash', ['-c', command], { cwd: root, encoding: 'utf8', stdio: 'pipe' })
+      const receipt = JSON.parse(output.trim().slice('MIKKA_1593_NATIVE '.length))
+      assert.equal(receipt.caseId, record.caseId)
+      assert.equal(receipt.phase, 'before_question')
+      assert.equal(receipt.markerSha256, record.markerSha256)
+      const original = readFileSync(marker, 'utf8')
+      assert.throws(() => execFileSync('bash', ['-c', command], { cwd: root, stdio: 'pipe' }), 'a second successful snapshot still cannot replace its marker')
+      assert.equal(readFileSync(marker, 'utf8'), original)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  }
+})
 
 test('entry requires main workflow, exact source, runner temp, and the existing smoke identity', () => {
   assert.equal(readOptions(env).reportPath, '/tmp/runner/thread-lifecycle-acceptance/report.json')
@@ -488,7 +518,7 @@ test('live deadline final read is serialized behind the in-flight async observer
   assert.equal(reads, 2); assert.equal(maximum, 1)
 })
 
-function lifecycleClient({ providerBlocked = false, changedSession = false, driftAtAnswer = false, missRunningSample = false,
+function lifecycleClient({ providerBlocked = false, changedSession = false, driftAtAnswer = false, missRunningSample = false, deliveryReportText,
   finishedAt = { origin: new Date(epoch + 20).toISOString(), continuation: new Date(epoch + 40).toISOString() } } = {}) {
   const fixed = fixture(), actions = [], observations = []
   let phase = 'origin', machineState = 'running', answered = false, cancelled = false, pinCalls = 0
@@ -500,7 +530,7 @@ function lifecycleClient({ providerBlocked = false, changedSession = false, drif
       originRunId: final ? fixed.continuationRunId : fixed.runId, originSessionId: 'PRIVATE_NATIVE_SID' } })
   const detail = (runId, terminal = true) => {
     const final = runId === fixed.continuationRunId, record = { ...fixed, runId }
-    const chunks = final ? [...proofChunks(record, 'after_answer', true), ...proofChunks(record, 'delivery', true)] : proofChunks(record, 'before_question')
+    const chunks = final ? [...proofChunks(record, 'after_answer', true), ...proofChunks(record, 'delivery', true, deliveryReportText)] : proofChunks(record, 'before_question')
     chunks.push(...nativePair(`${runId}:ask`, 'mcp__mikka__ask_human', { kind: 'decision', question: question(final).question }, final ? [{ type: 'text', text: 'Recorded' }] : 'Recorded', 10))
     return { thread: { id: runId, status: terminal ? 'stopped' : 'running', finishedAt: new Date(epoch + 999).toISOString(),
       attempts: [{ runId: fixed.runId, status: final || terminal ? 'stopped' : 'running', finishedAt: final || terminal ? finishedAt.origin : null },
@@ -700,4 +730,58 @@ test('abort during an awaited pin prevents a new dispatch or answer while cleanu
   assert.equal(report.cases[0].error, 'lifecycle_interrupted')
   assert.equal(report.cleanup.workspaceRestored, true)
   assert.ok(f.calls.some(call => call.path === '/api/auth/sign-out'))
+})
+
+test('delivery failure records the failed invariant without disclosing report content', () => {
+  const record = fixture(), valid = markerProof(record, 'delivery')
+  assert.ok(Object.values(reviewDeliveryValidation(valid, record)).every(Boolean))
+  for (const [field, token] of [['issue', '#1593'], ['source', SOURCE], ['ownerChoice', 'owner_choice=provider-receipts'],
+    ['evidence', 'Evidence'], ['risks', 'Risks'], ['limits', 'Limits']]) {
+    const text = valid.reportText.replaceAll(token, 'PRIVATE_REPORT')
+    const receipt = reviewDeliveryValidation({ ...valid, reportText: text, reportBytes: Buffer.byteLength(text), reportSha256: sha(text) }, record)
+    assert.equal(receipt[field], false)
+    assert.equal(receipt.bytes, true); assert.equal(receipt.digest, true)
+    assert.doesNotMatch(JSON.stringify(receipt), /PRIVATE_REPORT/)
+  }
+  assert.equal(reviewDeliveryValidation({ ...valid, reportSha256: '0'.repeat(64) }, record).digest, false)
+  assert.equal(reviewDeliveryValidation({ ...valid, reportBytes: 1 }, record).bytes, false)
+  // The historical Claude continuation omitted Limits; keep its refusal and
+  // preserve the specific diagnosis even though nativeEvidence throws.
+  const missing = { ...valid, reportText: valid.reportText.replace('Limits', 'Outstanding checks') }
+  missing.reportBytes = Buffer.byteLength(missing.reportText)
+  missing.reportSha256 = sha(missing.reportText)
+  const chunks = nativePair(`${record.runId}:delivery`, 'bash', { command: nativeSnapshotCommand(record, 'delivery') },
+    'MIKKA_1593_NATIVE ' + JSON.stringify(missing))
+  assert.throws(() => nativeEvidence({ chunks }, record), /review_delivery_invalid/)
+  assert.deepEqual(Object.entries(record.deliveryValidation).filter(([, ok]) => !ok).map(([name]) => name), ['limits'])
+  assert.doesNotMatch(JSON.stringify(record.deliveryValidation), /Outstanding checks|reportText/)
+})
+
+test('continuation report failure retains closed diagnostics on the returned case after cleanup', async () => {
+  const reportText = markerProof(fixture(), 'delivery').reportText.replace('## Limits', '## PRIVATE_UNVERIFIED')
+  const f = lifecycleClient({ deliveryReportText: reportText }), report = await runFixture(f)
+  assert.equal(report.status, 'failed')
+  assert.equal(report.error, 'lifecycle_review_delivery_invalid')
+  assert.equal(report.runId, f.fixed.runId)
+  assert.equal(report.continuationRunId, f.fixed.continuationRunId)
+  assert.equal(report.cleanup.status, 'passed')
+  assert.equal(report.cleanup.provider.state, 'missing')
+  assert.deepEqual(report.cleanup.runIds, [f.fixed.runId, f.fixed.continuationRunId])
+  assert.deepEqual(report.deliveryValidation, {
+    text: true, bytes: true, digest: true, issue: true, source: true,
+    ownerChoice: true, evidence: true, risks: true, limits: false,
+  })
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_|reportText|Native CLI exit/)
+})
+
+test('explicit continuation run scope ignores origin and foreign native delivery pairs', () => {
+  const record = fixture(), missingLimits = markerProof(record, 'delivery').reportText.replace('## Limits', '## PRIVATE_OTHER_RUN')
+  const chunks = [...proofChunks(record, 'delivery', false, missingLimits),
+    ...proofChunks({ ...record, runId: record.continuationRunId }, 'delivery'),
+    ...proofChunks({ ...record, runId: id(90) }, 'delivery', false, missingLimits)]
+  const proof = nativeEvidence({ chunks }, record, record.continuationRunId)
+  assert.deepEqual(Object.keys(proof.snapshots), ['delivery'])
+  assert.equal(proof.snapshots.delivery.toolCallHash, sha(`${record.continuationRunId}:delivery`).slice(0, 16))
+  assert.equal(record.runId, id(11))
+  assert.ok(Object.values(record.deliveryValidation).every(Boolean))
 })
