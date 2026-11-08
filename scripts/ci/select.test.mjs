@@ -126,8 +126,8 @@ test('Nx commands retain Actions fail-fast and pipefail, including multiline ste
 
 for (const [name, source] of [
   ['new.db.test.ts', ''],
-  ['new.test.ts', "import {Pool} from 'pg'"],
-  ['dynamic.test.mjs', "const pg = await import('pg')"],
+  ['new.test.ts', "import {Pool} from " + "'pg'"],
+  ['dynamic.test.mjs', "const pg = await import(" + "'pg')"],
 ]) test(`a new DB test outside legacy inventory roots fails before selection: ${name}`, t => {
   const root = mkdtempSync(join(tmpdir(),'mikka-ci-inventory-'))
   t.after(()=>rmSync(root,{recursive:true,force:true}))
