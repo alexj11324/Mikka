@@ -199,6 +199,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       const url = new URL(request.url)
       const resource = /^\/scim\/([^/]+)(?:\/(.*))?$/.exec(url.pathname)
       const governance = /^\/api\/workspaces\/([^/]+)\/governance(\/usage)?$/.exec(url.pathname)
+      const mobileDetail = /^\/api\/mobile\/tasks\/([^/]+)$/.exec(url.pathname)
       let response: Response
       if (resource) response = await scim(request, resource[1], resource[2]?.split('/') ?? [])
       else if (governance) {
@@ -208,6 +209,8 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
           const route = await import('../../app/api/workspaces/[workspaceId]/governance/route')
           response = request.method === 'GET' ? await route.GET(request, context) : await route.POST(request, context)
         }
+      } else if (mobileDetail && request.method === 'GET') {
+        response = await (await import('../../app/api/mobile/tasks/[id]/route')).GET(request, { params: Promise.resolve({ id: mobileDetail[1] }) })
       } else if (url.pathname === '/api/web/begin') response = await (await import('../../app/api/web/begin/route')).POST(request)
       else if (url.pathname === '/api/web/return') response = await (await import('../../app/api/web/return/route')).GET(request)
       else if (url.pathname === '/api/web/exchange') response = await (await import('../../app/api/web/exchange/route')).POST(request)
@@ -1015,6 +1018,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const previousEdition = process.env.MIKKA_EDITION
     process.env.MIKKA_EDITION = 'cloud'
     const workspaceId = randomUUID(), templateId = randomUUID(), plainSessionId = randomUUID(), plainToken = randomBytes(32).toString('hex')
+    const personalWorkspaceId = randomUUID(), personalTaskId = randomUUID(), organizationTaskId = randomUUID()
     const signedIn = await session(oidcCookies); assert.ok(signedIn)
     const assuredToken = (await pool.query('select token from session where id=$1', [signedIn.session.id])).rows[0].token as string
     await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Governance SSO fixture\',\'team\')', [workspaceId, userId])
@@ -1024,6 +1028,15 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     await pool.query('insert into enterprise_org_policy ("organizationId","enforceSso","allowMachineCredentials") values ($1,true,false)', [organizationId])
     await pool.query('insert into mikka_governance_approval_templates (id,"workspaceId",name,rules,"createdBy") values ($1,$2,\'Read only\',$3,$4)', [templateId, workspaceId, { approvalMode: 'read_only' }, userId])
     await pool.query('insert into session(id,token,"userId","expiresAt","createdAt","updatedAt") values($1,$2,$3,now()+interval \'1 hour\',now(),now())', [plainSessionId, plainToken, userId])
+    await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Mobile Personal fixture\',\'personal\')', [personalWorkspaceId, userId])
+    await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Directory user\',$3,\'admin\',\'active\')', [personalWorkspaceId, userId, email])
+    for (const [id, taskWorkspaceId] of [[personalTaskId, personalWorkspaceId], [organizationTaskId, workspaceId]]) {
+      await pool.query('insert into issues(id,"userId","workspaceId","ownershipState",title,content,status,priority) values($1,$2,$3,\'bound\',\'Mobile cookie fixture\',$4,\'todo\',\'normal\')',
+        [id, userId, taskWorkspaceId, { type: 'doc' }])
+    }
+    const detailCall = (token: string, issueId: string, extraHeaders: Record<string, string> = {}) => fetch(`${appOrigin}/api/mobile/tasks/${issueId}`, {
+      headers: { authorization: `Bearer ${token}`, 'x-mikka-locale': 'en', ...extraHeaders }, signal: AbortSignal.timeout(10_000),
+    })
     const call = (token: string, apply = false, csv = false) => fetch(`${appOrigin}/api/workspaces/${workspaceId}/governance${apply ? '' : `/usage${csv ? '?format=csv' : ''}`}`, {
       method: apply ? 'POST' : 'GET', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       ...(apply ? { body: JSON.stringify({ action: 'apply', templateId }) } : {}), signal: AbortSignal.timeout(10_000),
@@ -1041,6 +1054,34 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       assert.equal((await templateCall(plainToken, templateInput)).status, 403)
       assert.equal((await templateCall(plainToken, { action: 'delete', templateId })).status, 403)
       assert.equal((await pool.query('select count(*) from workspace_computer_policies where "workspaceId"=$1', [workspaceId])).rows[0].count, '0')
+      const personal = await detailCall(plainToken, personalTaskId)
+      assert.equal(personal.status, 200, 'the registered mobile detail route reads this plain session Personal task without a selection cookie')
+      const personalBody = await personal.json()
+      assert.equal(personalBody.task.id, personalTaskId)
+      assert.deepEqual(personalBody.live, { workspaceId: personalWorkspaceId })
+      const workspaceCookie = `mikka-workspace=${workspaceId}`
+      const cookiePersonal = await detailCall(plainToken, personalTaskId, { cookie: workspaceCookie })
+      assert.equal(cookiePersonal.status, 200, 'an unrelated enforced-SSO Workspace cookie must not gate this Personal task')
+      assert.deepEqual(await cookiePersonal.json(), personalBody, 'changing only a Workspace preference preserves every authorized Task projection')
+      const organizationHeaders: Record<string, string>[] = [{}, { cookie: workspaceCookie }]
+      for (const extraHeaders of organizationHeaders) {
+        const denied = await detailCall(plainToken, organizationTaskId, extraHeaders)
+        assert.equal(denied.status, 404, 'the actual Task Organization still requires SSO assurance')
+        assert.deepEqual(await denied.json(), { error: 'issueNotFound' })
+      }
+      const admitted = await detailCall(assuredToken, organizationTaskId, { cookie: workspaceCookie })
+      assert.equal(admitted.status, 200)
+      const admittedBody = await admitted.json()
+      assert.equal(admittedBody.task.id, organizationTaskId)
+      assert.deepEqual(admittedBody.live, { workspaceId })
+      for (const selected of [workspaceId, 'not-a-workspace', randomUUID()]) {
+        const denied = await detailCall(plainToken, personalTaskId, { cookie: workspaceCookie, 'x-mikka-workspace-id': selected })
+        assert.equal(denied.status, 404, 'an explicit inaccessible or invalid Workspace never falls back to the Personal task')
+        assert.deepEqual(await denied.json(), { error: 'issueNotFound' })
+      }
+      const explicitlyPersonal = await detailCall(plainToken, personalTaskId, { cookie: workspaceCookie, 'x-mikka-workspace-id': personalWorkspaceId })
+      assert.equal(explicitlyPersonal.status, 200)
+      assert.deepEqual(await explicitlyPersonal.json(), personalBody)
       assert.equal((await call(assuredToken)).status, 200, 'native bearer retains the real OIDC assurance through the governance lease')
       assert.equal((await call(assuredToken, false, true)).status, 200)
       const summary = await templateCall(assuredToken); assert.equal(summary.status, 200)
@@ -1056,11 +1097,13 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       assert.equal((await templateCall(assuredToken)).status, 403)
       assert.equal((await templateCall(assuredToken, templateInput)).status, 403)
     } finally {
+      await pool.query('delete from issues where id=any($1::uuid[])', [[personalTaskId, organizationTaskId]])
+      await pool.query('delete from workspace_subscription_shares where "ownerId"=$1 and "workspaceId"=$2', [userId, personalWorkspaceId])
       await pool.query('delete from session where id=$1', [plainSessionId])
       await pool.query('delete from workspace_computer_policies where "workspaceId"=$1', [workspaceId])
       await pool.query('delete from enterprise_org_policy where "organizationId"=$1', [organizationId])
       await pool.query('delete from mikka_organization_entitlements where "organizationId"=$1', [organizationId])
-      await pool.query('delete from mikka_workspaces where id=$1', [workspaceId])
+      await pool.query('delete from mikka_workspaces where id=any($1::uuid[])', [[workspaceId, personalWorkspaceId]])
       if (previousEdition === undefined) delete process.env.MIKKA_EDITION
       else process.env.MIKKA_EDITION = previousEdition
     }
