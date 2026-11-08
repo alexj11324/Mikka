@@ -1,5 +1,5 @@
 import 'server-only'
-import { pushInput, pushQuestions, readPush, type InboxEvent } from '@/lib/push-reasons'
+import { pushInput, pushQuestions, pushTask, readPush, type InboxEvent } from '@/lib/push-reasons'
 
 /**
  * Pushes `text` to the person's phones when the Decisions API says it is worth
@@ -13,5 +13,5 @@ export async function pushByDecision(userId: string, botId: string, text: string
   try { answers = await hostedBillingScope.run({ workspaceId: await executionWorkspace(userId, botId), ownerId: userId }, () => decide('push-reply', pushInput(events, text), pushQuestions())) } catch { answers = null }
   const reason = readPush(answers)
   if (reason === null) { console.warn('Phone push skipped: no Decisions answer'); return }
-  if (reason !== 'none') await pushReply(userId, botId, text, [reason])
+  if (reason !== 'none') await pushReply(userId, botId, text, [reason], pushTask(events, reason))
 }
