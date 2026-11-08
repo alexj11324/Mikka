@@ -1,3 +1,4 @@
+import type { AnonymousCodexCandidate } from './anonymous-codex-spare'
 import type { AnonymousClaudeCandidate, FreshCandidate } from './anonymous-claude-spare'
 // Each hosted task owns its E2B machine. The owner-bound claim supplies
 // credentials once; official CLIs connect directly to their providers and use
@@ -96,12 +97,12 @@ export async function createHostedBotRunner(host: {
   /** Trusted host diagnostic opt-in; never changes the assignment or its authority. */
   collectCliTiming?: boolean
   anonymousClaudeCandidate?: AnonymousClaudeCandidate
+  anonymousCodexCandidate?: AnonymousCodexCandidate
   /** Kept for old trusted worker callers; no inner container is created. */
   dockerSocket?: 'unix:///run/mikka-container/docker.sock'
   computerBroker?: ComputerBroker
-  /** Claude's shortcut menu is not exhaustive: a prepared lease may confirm
-   * its exact model through the run's current account catalogue. Codex still
-   * requires its CLI report; neither path substitutes another model. */
+  /** Optional host model probe; hosted subscription admission does not call it
+   * and requires the exact fresh lease model. */
   reportedModels?: (harness: 'codex' | 'claude_code') => Promise<Pick<HarnessInfo, 'models' | 'modelSlots'> | null>
 }) {
   if (process.platform !== 'linux' || process.getuid?.() === 0) throw unavailable('host_unsupported')
@@ -113,7 +114,8 @@ export async function createHostedBotRunner(host: {
       workspaceId: assignment.subscriptionBinding?.workspaceId ?? '', model: options.model, effort: options.effort,
       policyHash: options.policyHash, diagnostics: runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming),
       decisionCatalogue: options.mcp?.decisionCatalogue }
-    const offered = host.anonymousClaudeCandidate?.runId === assignment.runId ? host.anonymousClaudeCandidate : undefined
+    const candidate = assignment.harness === 'codex' ? host.anonymousCodexCandidate : host.anonymousClaudeCandidate
+    const offered = candidate?.runId === assignment.runId ? candidate : undefined
     const anonymous = offered && offered.state !== 'closed' && offered.matchesFresh(fresh) &&
       !assignment.requireSessionResume && !assignment.continuesRunId && !assignment.resumeSessionId && !options.continueSession &&
       Object.entries(assignment.taskEnv ?? {}).every(([key, value]) => key === 'CLOUD_STARTUP_TIMING' && value === '1') &&
@@ -203,6 +205,9 @@ export async function createHostedBotRunner(host: {
         const cwd = preparation ? resolve(options.cwd) : realpathSync(options.cwd)
         const env = Object.fromEntries(Object.entries({ ...process.env, ...options.env, ...assignment.taskEnv })
           .filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+        // Anonymous initialization uses this same trusted diagnostic switch.
+        // Keep its child environment equal without changing any other key.
+        if (runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming)) env.CLOUD_STARTUP_TIMING = '1'
         const selectedGithub = options.github ?? (assignment.github ? { ...assignment.github, issueId: assignment.issueId, runToken: assignment.mcp?.token } : undefined)
         if (selectedGithub) {
           const credential = selectedGithub.token ? selectedGithub : { ...selectedGithub,
@@ -291,6 +296,7 @@ export async function createHostedBotRunner(host: {
         const adapter = kind === 'codex'
           ? new CodexAdapter({ stateDir: host.stateDir, binary: binaries.codex, sandbox: directSpawnOnly,
             spawnCli: codexSpawn, cliTiming, computerMcp, onHostedSession: record,
+            anonymousCodexCandidate: anonymous as AnonymousCodexCandidate | undefined, anonymousCodexFresh: fresh,
             ...(subscription ? { subscriptionAuth: { accountId: subscription.first.accountId,
               token: async () => {
                 assertOpen()
@@ -300,7 +306,7 @@ export async function createHostedBotRunner(host: {
             } } : {}),
           })
           : new ClaudeAdapter({ stateDir: host.stateDir, binary: binaries.claude_code,
-            computerMcp, onHostedSession: record, spawnHosted, anonymousClaudeCandidate: anonymous, anonymousClaudeFresh: fresh,
+            computerMcp, onHostedSession: record, spawnHosted, anonymousClaudeCandidate: anonymous as AnonymousClaudeCandidate | undefined, anonymousClaudeFresh: fresh,
             ...(subscription ? { subscriptionAuth: { accountId: subscription.first.accountId, automaticRefresh: true as const,
               token: async () => { assertOpen(); return subscription!.current() },
             } } : {}),
@@ -320,7 +326,7 @@ export async function createHostedBotRunner(host: {
           })
           void finalOptions.catch(() => undefined)
           session = await adapter.startPrepared(runtimeOptions, { ...scope,
-            sessionId: anonymous && anonymous.state !== 'closed' ? anonymous.sessionId : randomUUID(), cwd, deviceId: assignment.deviceId, model: subscription.first.modelId,
+            sessionId: anonymous && anonymous.state !== 'closed' ? (anonymous as AnonymousClaudeCandidate).sessionId : randomUUID(), cwd, deviceId: assignment.deviceId, model: subscription.first.modelId,
             policyHash: options.policyHash ?? null,
           }, { ...preparation, finalOptions }, async () => { await Promise.all([...children].map(child => stopGroup(child))); await anonymous?.close() })
         } else session = previous && !continuation
@@ -355,14 +361,30 @@ export async function createHostedBotRunner(host: {
     harnesses: Object.keys(binaries).filter(kind => binaries[kind as keyof typeof binaries]) as ('codex' | 'claude_code')[],
     binaries: { ...binaries }, command: runHostedCommand, start,
     prepare(assignment: RunAssignment, options: StartOptions, signal: AbortSignal) {
-      if (assignment.harness !== 'claude_code' || !assignment.subscriptionBinding || !assignment.subscriptionLease ||
+      if (!['claude_code', 'codex'].includes(assignment.harness) || !assignment.subscriptionBinding || !assignment.subscriptionLease ||
         assignment.modelCredential || assignment.requireSessionResume || assignment.continuesRunId || assignment.resumeFrom ||
         assignment.resumeSessionId || options.continueSession || (assignment.github && !assignment.github.token))
         throw unavailable('assignment_invalid')
       const { anonymous } = anonymousFor(assignment, options)
+      if (assignment.harness === 'codex') {
+        const candidate = anonymous as AnonymousCodexCandidate | undefined
+        const prepared = prepareAgentStart(signal, async control => {
+          const stop = () => { void candidate?.close().catch(() => undefined) }
+          control.signal.addEventListener('abort', stop, { once: true })
+          try {
+            control.parked()
+            const final = await control.finalOptions
+            control.signal.throwIfAborted()
+            return await start(assignment, final)
+          } finally { control.signal.removeEventListener('abort', stop) }
+        })
+        return { ready: prepared.ready, start: prepared.start, cancel: async () => {
+          await candidate?.close(); await prepared.cancel()
+        }, get preparationTiming() { return candidate?.preparationTiming } }
+      }
       const prepared = prepareAgentStart(signal, control => {
         const work = () => start(assignment, options, control)
-        return anonymous ? anonymous.measurePreparation(work) : work()
+        return anonymous ? (anonymous as AnonymousClaudeCandidate).measurePreparation(work) : work()
       }, runDiagnosticsEnabled(assignment.taskEnv, host.collectCliTiming) && !anonymous ? { runId: assignment.runId, harness: 'claude_code' } : undefined)
       return { ready: prepared.ready, start: prepared.start, cancel: prepared.cancel,
         get preparationTiming() { return anonymous?.preparationTiming ?? prepared.preparationTiming } }

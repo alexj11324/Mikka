@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { createHash, randomUUID } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -10,9 +10,10 @@ import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
 import type { AnonymousClaudeHint } from '@mikka/protocol/claude-startup'
 import type { Options, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { daemonTracer, runIdHash } from '../src/tracing'
+import { buildChildEnv } from '../src/env'
 
 const cleanups: Array<() => void | Promise<void>> = []
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup() })
+afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); vi.unstubAllEnvs() })
 function fixture(mode = 'normal', diagnostics = false) {
   const root = mkdtempSync(join(tmpdir(), 'anonymous-claude-')), stateDir = join(root, 'adapters'), home = join(root, 'home')
   mkdirSync(home)
@@ -33,7 +34,7 @@ function fixture(mode = 'normal', diagnostics = false) {
       inputSchema: { type: 'object', properties: { idempotencyKey: { type: 'string' } }, required: ['idempotencyKey'], additionalProperties: false },
       annotations: { idempotentHint: true } } } }
   const bootstrap = { sha256: hint.bootstrapSha256, deviceId: randomUUID(), workspaceId: randomUUID() }
-  const env = { HOME: home, PATH: process.env.PATH!, FIXTURE_MODE: mode, FIXTURE_TRACE: trace,
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string')), HOME: home, PATH: process.env.PATH!, FIXTURE_MODE: mode, FIXTURE_TRACE: trace,
     ...(mode.startsWith('source_') ? { FIXTURE_ACCOUNT_SOURCE: mode === 'source_unknown' ? 'unknown' : 'ANTHROPIC_API_KEY' } : {}) }
   const lifetime = new AbortController()
   const start = (overrides: Partial<Parameters<typeof startAnonymousClaude>[0]> = {}) => {
@@ -44,9 +45,15 @@ function fixture(mode = 'normal', diagnostics = false) {
   cleanups.push(() => rmSync(root, { recursive: true, force: true }))
   const events = () => existsSync(trace) ? readFileSync(trace, 'utf8').trim().split('\n').filter(Boolean).map(s => JSON.parse(s)) : []
   const cwd = join(root, 'future-repository'), runDir = join(stateDir, 'runs', runId), tmp = join(runDir, 'tmp'), captures = join(runDir, 'captures')
+  // Match the supervisor's real run environment and the hosted runner's
+  // current machine environment, including SDK-owned process metadata.
+  const runEnv = () => ({
+    ...Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
+    ...env, ...buildChildEnv({ host: env, runId }),
+  })
   function binding(candidate: NonNullable<ReturnType<typeof startAnonymousClaude>>) {
     const options: Options = {
-      includePartialMessages: daemonTracer.enabled, cwd, env: { ...env, ...(diagnostics ? { CLOUD_STARTUP_TIMING: '1' } : {}), MIKKA_POLICY_HASH: policySnapshotHash(policy), ...CLAUDE_RUN_ENV, CLAUDE_CODE_TMPDIR: tmp },
+      includePartialMessages: daemonTracer.enabled, cwd, env: { ...runEnv(), ...(diagnostics ? { CLOUD_STARTUP_TIMING: '1' } : {}), MIKKA_POLICY_HASH: policySnapshotHash(policy), ...CLAUDE_RUN_ENV, CLAUDE_CODE_TMPDIR: tmp },
       settingSources: ['user', 'project', 'local'], settings: { ...claudeSettings(policy), forceLoginMethod: 'claudeai' },
       extraArgs: { 'replay-user-messages': null }, mcpServers: { mikka: { type: 'stdio', command: 'not-spawned', args: [] } },
       strictMcpConfig: false, systemPrompt: { type: 'preset', preset: 'claude_code', append: '' },
@@ -61,7 +68,7 @@ function fixture(mode = 'normal', diagnostics = false) {
       oauthToken: 'anonymous-fixture-not-a-provider-credential',
       getOAuthToken: async () => 'anonymous-fixture-not-a-provider-credential', observe: () => {} }
   }
-  return { root, hint, bootstrap, env, stateDir, lifetime, start, events, binding, cwd, captures, tmp, readyRepository() { mkdirSync(cwd); mkdirSync(captures, { recursive: true }) } }
+  return { root, hint, bootstrap, env, runEnv, stateDir, lifetime, start, events, binding, cwd, captures, tmp, readyRepository() { mkdirSync(cwd); mkdirSync(captures, { recursive: true }) } }
 }
 const empty = { async *[Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> { /* no task input */ } }
 
@@ -108,6 +115,18 @@ it('drains a mismatched immutable environment and never consumes its claim', asy
   expect(candidate.state).toBe('closed')
   expect(f.events().filter(e => e.type === 'claim_session' || e.event === 'user')).toEqual([])
   await expect(candidate.adopt(f.binding(candidate))).rejects.toThrow('already consumed')
+})
+
+it.each(['run_id', 'sdk_version'])('drains a changed %s before claim without relaxing environment equality', async field => {
+  const f = fixture(), candidate = f.start()!
+  await candidate.ready
+  const binding = f.binding(candidate)
+  binding.options.env = field === 'run_id'
+    ? { ...binding.options.env, ...buildChildEnv({ host: binding.options.env, runId: randomUUID() }) }
+    : { ...binding.options.env, CLAUDE_AGENT_SDK_VERSION: 'different-sdk' }
+  expect(await candidate.adopt(binding)).toBeUndefined()
+  expect(candidate.state).toBe('closed')
+  expect(f.events().filter(e => e.type === 'claim_session' || e.event === 'user')).toEqual([])
 })
 
 it('preserves credential-bearing/old-task configurations on the ordinary path without spawn', () => {
@@ -164,7 +183,7 @@ it.each(['normal', 'project_settings', 'refuse_claim', 'normal_diagnostics', 'pr
       children.push(child); return child
     },
   })
-  const options = { runId: f.hint.runId, cwd: f.cwd, env: { ...f.env, ...(f.hint.diagnostics ? { CLOUD_STARTUP_TIMING: '1' } : {}) }, model: f.hint.model, effort: f.hint.effort,
+  const options = { runId: f.hint.runId, cwd: f.cwd, env: { ...f.runEnv(), ...(f.hint.diagnostics ? { CLOUD_STARTUP_TIMING: '1' } : {}) }, model: f.hint.model, effort: f.hint.effort,
     policy: f.hint.policy, policyHash: policySnapshotHash(f.hint.policy), machineEnvironment: true as const,
     kind: 'implement' as const, toolApproval: gate, mcpHttpObservationUrl: timing?.mcpHttpObservationUrl, prompt: 'anonymous local fixture task',
     mcp: { url: 'https://fixture.invalid/api/mcp', token: 'mkw_' + 'A'.repeat(43), decisionCatalogue: f.hint.decisionCatalogue },
@@ -216,9 +235,13 @@ it('rejects a modified adopted temporary directory before claim', async () => {
   expect(f.events().filter(e => e.type === 'claim_session' || e.event === 'user')).toEqual([])
 })
 
-it.each([false, true])('the actual hosted runner adopts one bootstrap process with diagnostics=%s and no credential RPC', async diagnostics => {
+it.each([false, true, 'host'] as const)('the actual hosted runner adopts one bootstrap process with diagnostics=%s and no credential RPC', async diagnosticMode => {
+  const diagnostics = diagnosticMode !== false, hostOnly = diagnosticMode === 'host'
+  // A fresh worker has not invoked query/prewarm before this bootstrap.
+  vi.stubEnv('CLAUDE_AGENT_SDK_VERSION', undefined)
   const f = fixture('normal', diagnostics)
-  const fullEnv = Object.fromEntries(Object.entries({ ...process.env, ...f.env }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+  for (const key of ['HOME', 'PATH', 'FIXTURE_MODE', 'FIXTURE_TRACE'] as const) vi.stubEnv(key, f.env[key])
+  const fullEnv = Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
   const candidate = f.start({ env: fullEnv })!
   await candidate.ready
   const { createHostedBotRunner } = await import('../src/subscription-hosted-runner')
@@ -230,17 +253,19 @@ it.each([false, true])('the actual hosted runner adopts one bootstrap process wi
   let credentialCalls = 0
   const never = async () => { credentialCalls++; throw Error('Unexpected credential RPC') }
   const link = Object.assign(new MemoryServer(f.bootstrap.deviceId).link(), { nativeLease: never, nativeContext: never, nativeRequest: never, githubLease: never })
-  const runner = await createHostedBotRunner({ stateDir: f.stateDir, link, binaries: { claude_code: join(f.root, 'claude') }, anonymousClaudeCandidate: candidate })
+  const runner = await createHostedBotRunner({ stateDir: f.stateDir, link, binaries: { claude_code: join(f.root, 'claude') }, anonymousClaudeCandidate: candidate,
+    ...(hostOnly ? { collectCliTiming: true } : {}) })
   const assignment = {
     runId: f.hint.runId, deviceId: f.bootstrap.deviceId, issueId: randomUUID(), repoId: randomUUID(),
     baseBranch: 'main', harness: 'claude_code' as const, prompt: 'offline local task', model: f.hint.model, effort: f.hint.effort,
-    ...(diagnostics ? { taskEnv: { CLOUD_STARTUP_TIMING: '1' } } : {}),
+    ...(diagnostics && !hostOnly ? { taskEnv: { CLOUD_STARTUP_TIMING: '1' } } : {}),
     subscriptionBinding: { bindingId: randomUUID(), ownerId: randomUUID(), workspaceId: f.bootstrap.workspaceId, consumerId: randomUUID(), route: 'claude_code_cli' as const },
     subscriptionLease: { route: 'claude_code_cli' as const, accountId: 'fixture-account', revision: 1,
       modelId: f.hint.model, accessToken: 'fixture-token', expiresAt: new Date(Date.now() + 3600000).toISOString() },
   }
+  if (hostOnly) expect(assignment.taskEnv).toBeUndefined()
   const gate = new ToolApprovalGate(f.hint.runId, { isLive: () => !f.lifetime.signal.aborted }, 'push')
-  const options = { runId: f.hint.runId, cwd: f.cwd, env: f.env, model: f.hint.model, effort: f.hint.effort,
+  const options = { runId: f.hint.runId, cwd: f.cwd, env: buildChildEnv({ runId: f.hint.runId }), model: f.hint.model, effort: f.hint.effort,
     policy: f.hint.policy, policyHash: policySnapshotHash(f.hint.policy), kind: 'implement' as const,
     toolApproval: gate, prompt: 'offline local task', mcp: { url: 'https://fixture.invalid/api/mcp',
       token: 'mkw_' + 'A'.repeat(43), decisionCatalogue: f.hint.decisionCatalogue }, log: createLogger({ stdout: false }) }

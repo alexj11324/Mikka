@@ -11,11 +11,112 @@ test('official failure evidence retains codes and digests without private source
   assert.equal(result.lastObservedPhase, 'migrate')
   assert.equal(result.databaseCode, '22023')
   assert.equal(result.processErrorCode, 'ENOSPC')
+  assert.equal(result.observedSystemCode, null)
   assert.equal(result.logBytes, log.length)
   assert.match(result.logSha256, /^[a-f0-9]{64}$/)
   assert.equal(JSON.stringify(result).includes('secret-fixture-value'), false)
   assert.equal(JSON.stringify(result).includes('private-renderer-source'), false)
   assert.equal(JSON.stringify(result).includes('/work'), false)
+})
+
+test('child failure observes a closed system-code candidate without a spawn error or private details', () => {
+  for (const line of [
+    "  code: 'ENOSPC', path: '/private/renderer-source'",
+    '  code: "ENOSPC", private-marker',
+    'Error: ENOSPC: no space left on device, write /private/renderer-source',
+  ]) {
+    const log = Buffer.from('private-marker secret-fixture-value\n' + line + '\n')
+    const value = buildFailureEvidence({ result: { status: 1, signal: null },
+      sourceSha: 'a'.repeat(40), overlaySha: 'b'.repeat(40), log })
+    assert.equal(value.exitStatus, 1)
+    assert.equal(value.processErrorCode, null)
+    assert.equal(value.observedSystemCode, 'ENOSPC')
+    assert.equal(value.lastObservedPhase, 'unknown')
+    for (const marker of ['private-marker', 'secret-fixture-value', '/private/', 'renderer-source', 'no space left']) {
+      assert.equal(JSON.stringify(value).includes(marker), false)
+    }
+  }
+})
+
+test('unrecognized or unstructured child text does not become an observed system code', () => {
+  for (const line of [
+    "code: 'PRIVATE_MARKER'",
+    'Error: PRIVATE_MARKER: secret-fixture-value',
+    "code: 'ENOSPC_PRIVATE_MARKER'",
+    'Error: ENOSPC_PRIVATE_MARKER: secret-fixture-value',
+    'private-marker ENOSPC secret-fixture-value',
+  ]) {
+    const value = buildFailureEvidence({ result: { status: 1, signal: null },
+      log: Buffer.from(line) })
+    assert.equal(value.observedSystemCode, null)
+    assert.equal(value.processErrorCode, null)
+    assert.equal(value.lastObservedPhase, 'unknown')
+    assert.equal(JSON.stringify(value).includes('PRIVATE_MARKER'), false)
+    assert.equal(JSON.stringify(value).includes('secret-fixture-value'), false)
+  }
+})
+
+test('compiler observations retain only bounded diagnostic codes and fixed public commands', () => {
+  const log = Buffer.from([
+    '> tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck',
+    '/private/renderer.tsx(1,1): error TS2322: private-source secret-fixture-value',
+    'error TS2307: private module', 'error TS2322: repeated private message',
+    'error TS_PRIVATE: secret-fixture-value', 'error TS123456: private message',
+  ].join('\n'))
+  const result = buildFailureEvidence({ result: { status: 1 }, log })
+  assert.equal(result.lastTypecheckCommand, 'root-and-api')
+  assert.deepEqual(result.typescriptCodes, ['TS2307', 'TS2322'])
+  const frontend = buildFailureEvidence({ result: { status: 1 }, log: Buffer.from(log + '\n> tsc --noEmit -p tsconfig.json\n') })
+  assert.equal(frontend.lastTypecheckCommand, 'frontend')
+  for (const marker of ['private', 'renderer', 'secret-fixture-value', 'TS_PRIVATE', 'TS123456']) assert.equal(JSON.stringify(result).includes(marker), false)
+  const bounded = buildFailureEvidence({ result: { status: 1 }, log: Buffer.from(Array.from({ length: 30 }, (_, n) => `error TS${1000 + n}: private`).join('\n')) })
+  assert.equal(bounded.typescriptCodes.length, 16)
+})
+
+
+test('real TypeScript colored diagnostics retain codes and raw log digests', async () => {
+  const { default: ts } = await import('typescript')
+  const { createHash } = await import('node:crypto')
+  assert.equal(ts.version, '5.9.3')
+  const fileName = '/private/colored-diagnostic-fixture.ts'
+  const source = 'const privateFixtureValue: string = 1\n'
+  const options = { noEmit: true, noLib: true, strict: true, target: ts.ScriptTarget.ES2022 }
+  const host = ts.createCompilerHost(options)
+  host.getSourceFile = (name, version) => name === fileName ? ts.createSourceFile(name, source, version, true) : undefined
+  host.readFile = name => name === fileName ? source : undefined
+  host.fileExists = name => name === fileName
+  const program = ts.createProgram([fileName], options, host)
+  const diagnostics = program.getSemanticDiagnostics(program.getSourceFile(fileName))
+  assert.deepEqual(diagnostics.map(value => value.code), [2322])
+  const colored = ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+    getCurrentDirectory: () => '/private',
+    getCanonicalFileName: name => name,
+    getNewLine: () => '\n',
+  })
+  assert.equal(colored.includes('\x1b['), true)
+  const log = Buffer.from('\x1b[36m> tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck\x1b[0m\n'
+    + colored + '\n\x1b[36mmigrate: starting\x1b[0m\n')
+  const original = Buffer.from(log)
+  const result = buildFailureEvidence({ result: { status: 1 }, log })
+  assert.deepEqual(result.typescriptCodes, ['TS2322'])
+  assert.equal(result.lastTypecheckCommand, 'root-and-api')
+  assert.equal(result.lastObservedPhase, 'migrate')
+  assert.equal(result.logBytes, original.length)
+  assert.equal(result.logSha256, createHash('sha256').update(original).digest('hex'))
+  assert.deepEqual(log, original)
+  for (const marker of ['private', 'colored-diagnostic-fixture', 'privateFixtureValue', '\x1b['])
+    assert.equal(JSON.stringify(result).includes(marker), false)
+})
+
+test('migration entry is observed without requiring an error stack or claiming SQL execution', () => {
+  const result = buildFailureEvidence({ result: { status: 1 }, log: Buffer.from('> mikka@1 typecheck /work\nmigrate: starting\nprivate guard error\n') })
+  assert.equal(result.lastObservedPhase, 'migrate')
+  assert.equal(result.lastTypecheckCommand, null)
+  assert.deepEqual(result.typescriptCodes, [])
+  assert.equal(JSON.stringify(result).includes('private guard'), false)
+  const unknown = buildFailureEvidence({ result: { status: 1 }, log: Buffer.from('private migrate: starting\n> private tsc --noEmit -p tsconfig.json') })
+  assert.equal(unknown.lastObservedPhase, 'unknown')
+  assert.equal(unknown.lastTypecheckCommand, null)
 })
 
 test('unknown failure details remain unknown and a kill signal is not labeled as OOM', () => {
@@ -24,7 +125,7 @@ test('unknown failure details remain unknown and a kill signal is not labeled as
   assert.equal(value.signal, 'SIGKILL')
   assert.equal(value.exitStatus, null)
   assert.equal(value.lastObservedPhase, 'unknown')
-  for (const key of ['sourceSha', 'overlaySha', 'processErrorCode', 'databaseCode', 'networkCode']) assert.equal(value[key], null)
+  for (const key of ['sourceSha', 'overlaySha', 'processErrorCode', 'observedSystemCode', 'databaseCode', 'networkCode']) assert.equal(value[key], null)
   assert.equal(JSON.stringify(value).includes('OOM'), false)
   const absent = buildFailureEvidence({ result: { status: 300, signal: 'SECRET' } })
   assert.equal(absent.logBytes, null)
@@ -140,4 +241,14 @@ test('both selected migration targets fail early with only a key and fixed code'
         { message: 'webDeploy:databaseConnectionUrlInvalid:' + key })
     }
   }
+})
+
+
+test('a real deletion-fence SQLSTATE is retained without exposing its account or database text', () => {
+  const log = Buffer.from("migrate: starting\nerror: private-account-fixture account_deletion_pending\n  code: '55000',\n")
+  const evidence = buildFailureEvidence({ result: { status: 1 }, sourceSha: 'a'.repeat(40), overlaySha: 'b'.repeat(40), log })
+  assert.equal(evidence.lastObservedPhase, 'migrate')
+  assert.equal(evidence.databaseCode, '55000')
+  assert.equal(JSON.stringify(evidence).includes('private-account-fixture'), false)
+  assert.equal(JSON.stringify(evidence).includes('account_deletion_pending'), false)
 })

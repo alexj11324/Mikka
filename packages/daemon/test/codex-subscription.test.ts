@@ -239,3 +239,14 @@ it("keeps notification-only provider details when the failed turn omits its erro
   expect(events.at(-1)).toMatchObject({ type: "exit", outcome: "failed", failureDetails: { runId: options.runId, provider: "codex", category: "subscription", status: 401 } })
   expect(JSON.stringify(events)).not.toContain("fixture-access")
 })
+
+it("retains completed Codex message text when the only streamed delta was empty", async () => {
+  const { adapter, options } = await fixture()
+  const session = await adapter.start({ ...options, prompt: "EMPTY_DELTA_THEN_COMPLETED" })
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  const chunks = events.flatMap(event => event.type === "chunk" ? [event.chunk] : [])
+  expect(chunks.flatMap(chunk => chunk.type === "text-delta" ? [chunk.delta] : []))
+    .toEqual(["Subscription fixture completed"])
+  expect(events.at(-1)).toMatchObject({ type: "exit", outcome: "succeeded" })
+})

@@ -31,12 +31,12 @@ const fail = (code, cause) => { throw new Error(`startup_${code}`, cause ? { cau
 export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'sign_in', 'session_identity', 'workspace_identity',
   'team_selection', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'profile_create', 'profile_validation',
   'chat_model_selection', 'issue_create', 'coordinator_submit', 'coordinator_stream', 'thread_lookup', 'coordinator_stop',
-  'subscription_proof', 'execution_watch', 'execution_receipt', 'cleanup'])
+  'subscription_proof', 'bootstrap_publication', 'execution_watch', 'execution_receipt', 'cleanup'])
 // These are driver-owned codes, never a prefix rule accepting arbitrary error
 // messages. The candidate validator independently projects this same contract.
 export const STARTUP_FAILURE_CODES = Object.freeze([
   'aborted', 'action_refused', 'api_refused', 'bot_create_failed', 'bot_invalid', 'build_changed', 'build_mismatch', 'build_missing',
-  'candidate_target_invalid', 'cleanup_machine_unconfirmed', 'cleanup_scope_mismatch', 'cleanup_terminal_timeout', 'client_required',
+  'bootstrap_publication_failed', 'candidate_target_invalid', 'cleanup_machine_unconfirmed', 'cleanup_scope_mismatch', 'cleanup_terminal_timeout', 'client_required',
   'coordinator_stream_invalid', 'coordinator_stream_too_large', 'coordinator_stream_unavailable', 'daemon_startup_timing_incomplete',
   'diagnostic_bot_required', 'dispatch_not_new', 'dispatch_not_observed', 'dispatch_refused', 'dispatch_run_missing', 'dispatch_timings_required',
   'ended_before_execution_proof', 'execution_device_mismatch', 'execution_timeout', 'factory_list_invalid', 'failed',
@@ -378,8 +378,21 @@ function readStartupTiming(value, record, names = STARTUP_PHASES) {
     ms: value.ms, outcome: value.outcome, phases, truncated: value.truncated }
 }
 
+
+const REPOSITORY_GIT_PHASES = new Set(['clone', 'fetch', 'remote_head', 'remote_refs', 'local'].map(name => `daemon.repository.git.${name}`))
+function readRepositoryTiming(value, record) {
+  if (value?.source !== 'prepare_run_repository' || value.clock !== 'repository_prepare_monotonic'
+    || Object.keys(value).sort().join(',') !== 'clock,endedAt,harness,ms,outcome,phases,runIdHash,source,startedAt,truncated,version'
+    || !Array.isArray(value.phases) || value.phases.length > 32
+    || value.phases.some(phase => !phase || Object.keys(phase).sort().join(',') !== 'endMs,ms,name,outcome,startMs')) return null
+  const timing = readStartupTiming(value, record, REPOSITORY_GIT_PHASES)
+  if (!timing || Buffer.byteLength(JSON.stringify(value)) > 8192) return null
+  return { ...timing, source: value.source, clock: value.clock }
+}
+
 function readPreparationTiming(value, record, stage) {
-  if (!['prepared_agent_start', 'bootstrap_claude_start'].includes(value?.source) || value.harness !== 'claude_code' || !stage) return null
+  if (!['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize'].includes(value?.source) ||
+    value.harness !== (value.source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code') || !stage) return null
   const timing = readStartupTiming(value, record, PREPARATION_PHASES)
   // The task-owned Promise starts before the stage joins it and settles before
   // that join returns. Never rebase its earlier intervals onto the stage root.
@@ -401,6 +414,63 @@ export function hasStartupInitialization(record) {
   return Boolean(prepared && !prepared.truncated && prepared.outcome === 'ok'
     && (prepared.source !== 'bootstrap_claude_start' || (prepared.claimAuthentication === 'ordinary_path' || prepared.claimAuthentication === 'oauth_environment' && prepared.observedAuthSource === 'oauth_environment'))
     && has(prepared, 'daemon.adapter.cli_init.prewarm') && has(prepared, 'daemon.adapter.cli_init'))
+}
+
+/** The template gate requires actual adoption. Production measurement keeps
+ * recording ordinary fallback honestly through hasStartupInitialization. */
+export function bootstrapAdoptionEvidence(record) {
+  const stage = readStartupTiming(record.daemonStartupTiming, record)
+  const prepared = readPreparationTiming(record.daemonPreparationTiming, record, stage)
+  const source = record.harness === 'claude_code' ? 'bootstrap_claude_start' : 'bootstrap_codex_initialize'
+  if (record.startupTimingStatus !== 'complete' || record.preparationTimingStatus !== 'complete'
+    || !stage || !prepared || stage.truncated || prepared.truncated || stage.outcome !== 'ok' || prepared.outcome !== 'ok'
+    || prepared.source !== source || prepared.phases.some(phase => phase.outcome !== 'ok')
+    || ['daemon.adapter.cli_init.prewarm', 'daemon.adapter.cli_init'].some(name =>
+      prepared.phases.filter(phase => phase.name === name).length !== 1)
+    || (record.harness === 'claude_code' && (prepared.claimAuthentication !== 'oauth_environment'
+      || prepared.observedAuthSource !== 'oauth_environment'))) return null
+  return { version: 1, runIdHash: record.runIdHash, harness: record.harness, source,
+    preparationTiming: prepared, startupTiming: stage }
+}
+
+/** Failure-only projection of already observed data; it never authorizes adoption.
+ * Reuse the strict readers so arbitrary chunk fields cannot reach an artifact. */
+export function bootstrapAdoptionDiagnostics(record) {
+  if (typeof record?.runIdHash !== 'string' || !/^[a-f0-9]{16}$/.test(record.runIdHash)
+    || typeof record.harness !== 'string' || !Object.hasOwn(MODELS, record.harness)) return null
+  const stage = readStartupTiming(record.daemonStartupTiming, record)
+  const prepared = readPreparationTiming(record.daemonPreparationTiming, record, stage)
+  const status = value => ['unavailable', 'invalid', 'incomplete', 'truncated', 'complete'].includes(value) ? value : 'unavailable'
+  const source = record.harness === 'claude_code' ? 'bootstrap_claude_start' : 'bootstrap_codex_initialize'
+  return {
+    version: 1, runIdHash: record.runIdHash, harness: record.harness,
+    startupTimingStatus: status(record.startupTimingStatus), preparationTimingStatus: status(record.preparationTimingStatus),
+    startupTiming: stage, preparationTiming: prepared,
+    adoptionChecks: {
+      startupTimingStatus: record.startupTimingStatus === 'complete',
+      preparationTimingStatus: record.preparationTimingStatus === 'complete',
+      startupReceipt: Boolean(stage), preparationReceipt: Boolean(prepared),
+      startupUntruncated: stage?.truncated === false, preparationUntruncated: prepared?.truncated === false,
+      startupOutcome: stage?.outcome === 'ok', preparationOutcome: prepared?.outcome === 'ok',
+      preparationSource: prepared?.source === source,
+      preparationPhases: Boolean(prepared?.phases.every(phase => phase.outcome === 'ok')),
+      prewarmPhaseCount: prepared?.phases.filter(phase => phase.name === 'daemon.adapter.cli_init.prewarm').length === 1,
+      cliInitPhaseCount: prepared?.phases.filter(phase => phase.name === 'daemon.adapter.cli_init').length === 1,
+      claimAuthentication: record.harness !== 'claude_code' || prepared?.claimAuthentication === 'oauth_environment',
+      observedAuthSource: record.harness !== 'claude_code' || prepared?.observedAuthSource === 'oauth_environment',
+    },
+  }
+}
+
+/** Re-check the bounded actual timing proof at each publication boundary. */
+export function readBootstrapAcceptance(value, record) {
+  if (value?.version !== 1 || value.runIdHash !== record.runIdHash || value.harness !== record.harness
+    || !/^[a-f0-9]{64}$/.test(value.bootstrapSha256 ?? '') || !/^[a-f0-9]{64}$/.test(value.hintSha256 ?? '')
+    || Object.keys(value).sort().join(',') !== 'bootstrapSha256,harness,hintSha256,preparationTiming,runIdHash,source,startupTiming,version') return null
+  const adopted = bootstrapAdoptionEvidence({ ...record, startupTimingStatus: 'complete', preparationTimingStatus: 'complete',
+    daemonStartupTiming: value.startupTiming, daemonPreparationTiming: value.preparationTiming })
+  return adopted && value.source === adopted.source ? { ...adopted,
+    bootstrapSha256: value.bootstrapSha256, hintSha256: value.hintSha256 } : null
 }
 
 /** Only post-start provider output counts. Stage/usage/state/status and a bare
@@ -429,6 +499,11 @@ export function observeChunks(record, detail, observedAt) {
       if (['repository', 'worktree', 'agent_start'].includes(data?.stage) && Number.isFinite(data.ms) && typeof data.ok === 'boolean') {
         if (!stages.some(stage => stage.stage === data.stage)) stages.push({ stage: data.stage, ms: data.ms, ok: data.ok,
           ...(Number.isFinite(at) ? { storedAt: iso(at) } : {}) })
+        if (data.stage === 'repository' && data.repositoryTiming !== undefined) {
+          const timing = readRepositoryTiming(data.repositoryTiming, record)
+          if (timing) record.daemonRepositoryTiming ??= timing
+          record.repositoryTimingStatus = record.repositoryTimingStatus === 'invalid' || !timing ? 'invalid' : record.daemonRepositoryTiming.truncated ? 'truncated' : 'complete'
+        }
         if (data.stage === 'agent_start') {
           const timing = readStartupTiming(data.startupTiming, record)
           if (timing) record.daemonStartupTiming ??= timing
@@ -758,7 +833,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   deviceId, agentId, sourceCommit, expectedBuild, repository = REPOSITORY, titlePrefix = '测试 1505',
   sampleId = randomUUID(), timeoutMs = 240000, requireReply = true, minToolCalls = deviceId ? 0 : 1,
   runtimeEvidence: runtimeEvidenceMode = 'optional', officialTiming = 'disabled',
-  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false }) {
+  now = Date.now, WebSocketImpl = globalThis.WebSocket, pinBuild, leaseAudit = false, onCandidateRunQueued }) {
   assert(client && ['request', 'json', 'rpc'].every(key => typeof client[key] === 'function'), 'client_required')
   assert(UUID.test(botId ?? '') && UUID.test(profileId ?? ''), 'fixture_required')
   assert(scope?.ownerId && scope.adminId && scope.ownerId !== scope.adminId && scope.botId === botId
@@ -767,6 +842,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
   assert(repository === REPOSITORY && titlePrefix.includes('测试') && titlePrefix.length <= 80, 'fixture_scope_invalid')
   assert(/^[A-Za-z0-9_-]{1,80}$/.test(sampleId), 'sample_id_invalid')
   assert((!deviceId && !agentId) || (UUID.test(deviceId ?? '') && UUID.test(agentId ?? '')), 'candidate_target_invalid')
+  assert(onCandidateRunQueued === undefined || typeof onCandidateRunQueued === 'function' && deviceId && agentId, 'candidate_target_invalid')
   const record = { sampleId, harness, requestedModel: model, title: `${titlePrefix} ${sampleId} ${harness}`,
     profileId, requireReply, minToolCalls, requireRuntimeReceipt: runtimeEvidenceMode === 'required' || Boolean(deviceId), requireAgentAcceptance: Boolean(deviceId), requireTerminal: Boolean(deviceId) || leaseAudit, requireOfficialTiming: officialTiming === 'enabled',
     requireReplyAfterTool: minToolCalls > 0 && (Boolean(deviceId) || runtimeEvidenceMode === 'required' || leaseAudit),
@@ -776,8 +852,10 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     assert(typeof build === 'string' && (!expectedBuild || build === expectedBuild), 'build_mismatch')
     assert(!record.build || build === record.build, 'build_changed'); record.build = build
   })
+  let initialPinPassed = false, finalPinAttempted = false
   try {
     await pin()
+    initialPinPassed = true
     record.phase = 'session_identity'
     const identity = await client.json('/api/auth/get-session')
     assert(identity.user?.id === scope.ownerId && isSmokeAccountEmail(identity.user.email), 'session_identity_mismatch')
@@ -802,6 +880,16 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.coordinatorStopped = true
     record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
+    if (onCandidateRunQueued) {
+      record.phase = 'bootstrap_publication'
+      try {
+        record.bootstrapPublication = await onCandidateRunQueued({ runId: record.runId, issueId: record.issueId,
+          deviceId, agentId, workspaceId: scope.workspaceId, harness, model })
+        const published = record.bootstrapPublication
+        assert(published?.version === 1 && published.runId === record.runId && published.harness === harness
+          && /^[a-f0-9]{64}$/.test(published.bootstrapSha256 ?? '') && /^[a-f0-9]{64}$/.test(published.hintSha256 ?? ''), 'bootstrap_publication_failed')
+      } catch (error) { fail('bootstrap_publication_failed', error) }
+    }
     record.phase = 'execution_watch'
     await watchRun(client, record, timeoutMs, WebSocketImpl, now, undefined, leaseDriver ? {
       observe: detail => {
@@ -813,6 +901,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.phase = 'subscription_proof'
     await subscriptionProof(client, record, scope, profile)
     record.phase = 'build_pin'
+    finalPinAttempted = true
     await pin()
     record.phase = 'execution_receipt'
     if (runtimeEvidenceMode === 'required') assert(record.runtimeEvidence?.status === 'passed', 'runtime_evidence_failed')
@@ -828,6 +917,12 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
     record.status = 'failed'; record.failure = startupFailure(error, record.phase); record.error = record.failure.code
   }
   finally {
+    // A failed execution still needs its closing version observation. Keep the
+    // original failure, and do not repeat a pin already attempted on success.
+    if (initialPinPassed && !finalPinAttempted) {
+      try { await pin() }
+      catch (error) { record.versionPinFailure = startupFailure(error, 'build_pin'); record.status = 'failed' }
+    }
     if (record.messageSubmittedAt && !record.coordinatorStopped) {
       try { await client.rpc('coordinator.stopCoordinatorTurn', [botId]); record.coordinatorStopped = true }
       catch (error) {
@@ -844,7 +939,7 @@ export async function runSubscriptionCase({ client, botId, profileId, profile, s
 }
 
 export async function runCloudStartup(options, { env = process.env, fetchImpl = fetch, WebSocketImpl = globalThis.WebSocket, now = Date.now,
-  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }) } = {}) {
+  readWorkerRelease = () => readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN, fetchImpl }), onCandidateRunQueued } = {}) {
   const { email, password } = smokeAcceptanceAccount(env)
   assert(typeof WebSocketImpl === 'function', 'node_websocket_required')
   const client = createSessionClient(options.origin, fetchImpl), fixtureId = randomUUID()
@@ -955,12 +1050,14 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
       }
       report.phase = 'profile_validation'
       const sample = await runSubscriptionCase({ client, ...options, botId, profileId: profile.id, profile, scope, harness, sampleId,
-        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl })
+        sourceCommit: options.revision, pinBuild: pin, now, WebSocketImpl, onCandidateRunQueued })
       report.samples.push(sample)
-      if (['startup_build_mismatch', 'startup_build_changed', 'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error)) {
+      const versionFailure = sample.versionPinFailure?.code ?? (['startup_build_mismatch', 'startup_build_changed',
+        'startup_worker_release_mismatch', 'startup_worker_release_changed'].includes(sample.error) ? sample.error : null)
+      if (versionFailure) {
         report.batchAborted = 'version_pin_changed'
         report.phase = 'build_pin'
-        fail(sample.error.slice('startup_'.length))
+        fail(versionFailure.slice('startup_'.length))
       }
     }
     report.phase = 'build_pin'
