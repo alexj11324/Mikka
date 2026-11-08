@@ -20,9 +20,10 @@ mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth:
 let connected: { token: string; githubAccountId: string } | null = null
 let connectionLogin: string | null = null
 let connectConfigured = true
+const connectionToken = mock.fn(async () => connected)
 mock.module(new URL('./connection.ts', import.meta.url).href, { namedExports: {
   githubConnectConfigured: () => connectConfigured,
-  githubConnectionToken: async () => connected,
+  githubConnectionToken: connectionToken,
   githubConnection: async () => connectionLogin ? { githubAccountId: '42', githubLogin: connectionLogin } : null,
   disconnectGitHub: async () => {},
 } })
@@ -32,7 +33,7 @@ const repository = { id: 91, full_name: 'Owner/Project', private: true }
 const installation = { id: 11, app_id: 4840908, suspended_at: null }
 const pullRequest = { number: 7, state: 'open', merged: false, merged_at: null, updated_at: '2026-10-27T12:00:00Z', base: { repo: repository } }
 const json = (value: unknown, next = false) => Response.json(value, { headers: next ? { link: '<https://api.github.com/ignored?cursor=next>; rel="next"' } : {} })
-let answer: (url: URL) => Response = () => { throw new Error('Unexpected GitHub request') }
+let answer: (url: URL) => Response | Promise<Response> = () => { throw new Error('Unexpected GitHub request') }
 const fetchMock = mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(String(input))
   assert.equal(url.origin, 'https://api.github.com')
@@ -55,6 +56,7 @@ beforeEach(() => {
   connected = null
   connectionLogin = null
   connectConfigured = true
+  connectionToken.mock.resetCalls()
   getAccessToken.mock.resetCalls()
   getAccessToken.mock.mockImplementation(async () => ({ accessToken: 'private-test-token' }))
   fetchMock.mock.resetCalls()
@@ -73,6 +75,84 @@ after(() => {
 })
 const paths = () => fetchMock.mock.calls.map(call => new URL(String(call.arguments[0])).pathname)
 const failure = (code: string, status: number) => (error: unknown) => error instanceof access.GitHubAccessError && error.code === code && error.status === status
+
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(accept => { resolve = accept })
+  return { promise, resolve }
+}
+const nextTurn = () => new Promise<void>(resolve => setImmediate(resolve))
+
+test('one fresh token starts identity and the first installation page together, then gates repositories on both', { timeout: 2_000 }, async () => {
+  const userStarted = deferred<void>(), identity = deferred<Response>(), firstPage = deferred<Response>()
+  const previous = answer
+  answer = url => {
+    if (url.pathname === '/user') { userStarted.resolve(); return identity.promise }
+    if (url.pathname === '/user/installations') return firstPage.promise
+    return previous(url)
+  }
+  let completed = false
+  const pending = access.listRepositoriesForUser('person-1').finally(() => { completed = true })
+  try {
+    await userStarted.promise
+    assert.deepEqual(paths(), ['/user', '/user/installations'])
+    assert.equal(connectionToken.mock.callCount(), 1)
+    assert.equal(getAccessToken.mock.callCount(), 1)
+    firstPage.resolve(json({ installations: [installation] }))
+    await nextTurn()
+    assert.equal(completed, false)
+    assert.equal(paths().some(path => path.endsWith('/repositories')), false)
+    identity.resolve(json({ id: 42 }))
+    assert.deepEqual((await pending).repositories.map(repo => repo.fullName), ['Owner/Project'])
+    assert.equal(fetchMock.mock.callCount(), 3)
+  } finally {
+    identity.resolve(json({ id: 42 }))
+    firstPage.resolve(json({ installations: [installation] }))
+    await pending.catch(() => {})
+  }
+})
+
+test('an identity rejection waits for the already-started installation read and keeps identity error priority', { timeout: 2_000 }, async () => {
+  const userStarted = deferred<void>(), firstPage = deferred<Response>()
+  answer = url => {
+    if (url.pathname === '/user') { userStarted.resolve(); return new Response('private identity body', { status: 401 }) }
+    if (url.pathname === '/user/installations') return firstPage.promise
+    throw new Error('Repository read before identity approval')
+  }
+  let completed = false
+  const pending = access.listRepositoriesForUser('person-1')
+  const checked = assert.rejects(pending, failure('githubReconnectRequired', 401)).finally(() => { completed = true })
+  try {
+    await userStarted.promise
+    await nextTurn()
+    assert.deepEqual(paths(), ['/user', '/user/installations'])
+    assert.equal(completed, false)
+    firstPage.resolve(new Response('private installation body', { status: 503 }))
+    await checked
+    assert.equal(fetchMock.mock.callCount(), 2)
+    assert.equal(connectionToken.mock.callCount(), 1)
+  } finally {
+    firstPage.resolve(json({ installations: [] }))
+    await checked
+  }
+})
+
+for (const scenario of [
+  { name: 'identity mismatch wins over installation refusal', identity: () => json({ id: 43 }), installations: () => new Response('private body', { status: 403 }), code: 'githubReconnectRequired', status: 401 },
+  { name: 'malformed identity wins over revoked installation', identity: () => json({ id: [] }), installations: () => new Response('private body', { status: 401 }), code: 'githubUnavailable', status: 502 },
+  { name: 'revoked identity wins over malformed installation', identity: () => new Response('private body', { status: 401 }), installations: () => json({ installations: null }), code: 'githubReconnectRequired', status: 401 },
+  { name: 'valid identity preserves installation refusal', identity: () => json({ id: 42 }), installations: () => new Response('private body', { status: 403 }), code: 'githubRepositoryForbidden', status: 403 },
+]) {
+  test(scenario.name, async () => {
+    connected = { token: 'private-test-token', githubAccountId: '42' }
+    answer = url => url.pathname === '/user' ? scenario.identity() : scenario.installations()
+    await assert.rejects(access.listRepositoriesForUser('person-1'), failure(scenario.code, scenario.status))
+    assert.deepEqual(paths(), ['/user', '/user/installations'])
+    assert.equal(connectionToken.mock.callCount(), 1)
+    assert.equal(getAccessToken.mock.callCount(), 0)
+  })
+}
 
 test('only the current session account is selected, and Better Auth receives its internal id', async () => {
   accounts.unshift({ id: 'other-account', userId: 'other-person', providerId: 'github', accountId: '50' })
@@ -140,6 +220,11 @@ test('all installation and repository pages are read; other apps, suspended inst
   assert.deepEqual(result.installations, ['11', '13'])
   assert.deepEqual(result.repositories.map(repo => repo.id), ['91', '92'])
   assert.equal(fetchMock.mock.callCount(), 6)
+  assert.deepEqual(fetchMock.mock.calls.map(call => { const url = new URL(String(call.arguments[0])); return url.pathname + url.search }), [
+    '/user', '/user/installations?per_page=100&page=1',
+    '/user/installations/11/repositories?per_page=100&page=1', '/user/installations/11/repositories?per_page=100&page=2',
+    '/user/installations?per_page=100&page=2', '/user/installations/13/repositories?per_page=100&page=1',
+  ])
   assert.equal(paths().some(path => path.includes('/12/')), false)
 })
 
@@ -161,7 +246,7 @@ test('missing or revoked token and token/account identity mismatch require recon
   await assert.rejects(access.listAuthorizedRepositories(requestHeaders), failure('githubReconnectRequired', 401))
   answer = () => json({ id: 43 })
   await assert.rejects(access.listAuthorizedRepositories(requestHeaders), failure('githubReconnectRequired', 401))
-  assert.equal(paths().includes('/user/installations'), false)
+  assert.deepEqual(paths(), ['/user', '/user/installations', '/user', '/user/installations'])
 })
 
 test('permissions and upstream faults fail clearly without exposing provider bodies', async () => {

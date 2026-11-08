@@ -64,7 +64,7 @@ export type DaemonStartupTiming = {
 }
 /** A task's early start, including its wait for checkout, with its own clock
  * origin. It is not a child interval of the later agent_start stage. */
-export type DaemonPreparationTiming = DaemonStartupTiming & { source: 'prepared_agent_start' | 'bootstrap_claude_start'; claimAuthentication?: 'oauth_environment' | 'ordinary_path' | 'unverified'; observedAuthSource?: 'oauth_environment' | 'oauth_descriptor' | 'non_api_key_unspecified' | 'unknown' }
+export type DaemonPreparationTiming = DaemonStartupTiming & { source: 'prepared_agent_start' | 'bootstrap_claude_start' | 'bootstrap_codex_initialize'; claimAuthentication?: 'oauth_environment' | 'ordinary_path' | 'unverified'; observedAuthSource?: 'oauth_environment' | 'oauth_descriptor' | 'non_api_key_unspecified' | 'unknown' }
 type StartupScope = {
   runIdHash: string; harness: Harness; startedAt: number; started: number
   phases: DaemonStartupPhase[]; phaseCount: number; truncated: boolean; closed: boolean
@@ -264,7 +264,7 @@ export class DaemonTracer {
   /** A task-local measurement begins at an accepted bootstrap and is entered
    * again only by that same candidate's fresh-claim preparation. Its real
    * earlier clock is retained; no interval is rebased into agent_start. */
-  beginBootstrapPreparation(identity: { runIdHash: string; harness: 'claude_code' }) {
+  beginBootstrapPreparation(identity: { runIdHash: string; harness: 'claude_code' | 'codex' }) {
     const scope: StartupScope = { ...identity, startedAt: Date.now(), started: performance.now(),
       phases: [], phaseCount: 0, truncated: false, closed: false }
     let claimAuthentication: NonNullable<DaemonPreparationTiming['claimAuthentication']> = 'unverified'
@@ -278,7 +278,8 @@ export class DaemonTracer {
       finish: (outcome: 'ok' | 'error') => {
         if (scope.closed) return
         scope.closed = true
-        receipt = { version: 1, source: 'bootstrap_claude_start', ...identity, claimAuthentication, observedAuthSource,
+        receipt = { version: 1, source: identity.harness === 'codex' ? 'bootstrap_codex_initialize' : 'bootstrap_claude_start', ...identity,
+          ...(identity.harness === 'claude_code' ? { claimAuthentication, observedAuthSource } : {}),
           startedAt: scope.startedAt, endedAt: Date.now(), ms: milliseconds(performance.now() - scope.started), outcome,
           phases: scope.phases.sort((a, b) => a.startMs - b.startMs),
           truncated: scope.truncated || scope.phases.length < scope.phaseCount }

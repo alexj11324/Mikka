@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChevronLeft, X } from 'lucide-react-native'
 import { Text } from '@/components/Text'
 import { Spinner } from '@/components/icons'
-import { colors, lift } from '@/lib/theme'
+import { colors, lift, SPACE } from '@/lib/theme'
 
 
 /**
@@ -78,7 +78,7 @@ export function Field({ style, children }: { style: StyleProp<ViewStyle>; childr
 export function Group({ label, children, backgroundColor }: { label?: string; children: ReactNode; backgroundColor?: string }) {
   const items = (Array.isArray(children) ? children : [children]).flat().filter(Boolean)
   return (
-    <View style={{ marginBottom: 20 }}>
+    <View style={{ marginBottom: SPACE.section }}>
       {label ? <Text style={styles.groupLabel}>{label}</Text> : null}
       <View style={[styles.group, backgroundColor ? { backgroundColor } : null]}>
         {items.map((child, index) => (
