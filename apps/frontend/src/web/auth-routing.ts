@@ -25,7 +25,8 @@ export function webAuthentication(location: URL) {
   return {
     mode, next, addAccount: query.addAccount === '1', desktopFlow, webFlow, oauthResume, composioResume,
     desktopRefused: Boolean((desktopFlow || webFlow) && query.oauth),
-    oauthFailed: query.oauth === 'failed' || Boolean(query.error),
+    // A company SSO refusal returns with sso=failed and its own error; the auth-sso slot shows that one.
+    oauthFailed: query.oauth === 'failed' || (Boolean(query.error) && query.sso !== 'failed'),
     oauthAccountNotLinked: oauthAccountNotLinkedProvider(query.error, query.provider),
     continueGoogle: mode === 'sign-in' && query.continue === 'google',
     continueGitHub: mode === 'sign-in' && query.continue === 'github',
