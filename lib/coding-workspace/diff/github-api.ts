@@ -11,14 +11,48 @@ export class GitHubDiffClient {
   constructor(private token: string, readonly budget: RequestBudget) {}
 
   async get(path: string, limit = 4 * 1024 * 1024): Promise<{ value: unknown; next: boolean }> {
-    if (!/^\/repos\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/|$)/.test(path) || path.split(/[/?]/).some(part => part === '.' || part === '..')
-      || path.includes('%') || path.includes('#') || path.includes('\\') || ++this.requests > 48) throw new CodingWorkspaceError('workspace_limit_exceeded')
-    try { remainingRequestBudget(this.budget) } catch { throw new WorkspaceReviewError('workspace_review_github_unavailable') }
+    return this.request(path, 'GET', undefined, limit)
+  }
+
+  /** Only server-owned read documents use this entry point. Partial GraphQL
+   * data is never evidence when any field failed authorization or resolution. */
+  async graphql(query: string, variables: Record<string, unknown>): Promise<unknown> {
+    if (!/^query\b/.test(query.trim()) || /\bmutation\b/.test(query)) throw new CodingWorkspaceError('workspace_invalid_request')
+    const { value } = await this.request('/graphql', 'POST', { query, variables }, 4 * 1024 * 1024)
+    if (!value || typeof value !== 'object') throw new WorkspaceReviewError('workspace_review_github_unavailable')
+    if ('errors' in value && (!Array.isArray(value.errors) || value.errors.length > 0)) {
+      const forbidden = Array.isArray(value.errors) && value.errors.some(error => error && typeof error === 'object'
+        && 'type' in error && ['FORBIDDEN', 'NOT_FOUND', 'UNAUTHORIZED'].includes(String(error.type)))
+      throw new WorkspaceReviewError(forbidden ? 'workspace_review_github_forbidden' : 'workspace_review_github_unavailable')
+    }
+    if (!('data' in value) || !value.data) throw new WorkspaceReviewError('workspace_review_github_unavailable')
+    return value.data
+  }
+
+  /** Call only behind the durable operation invocation gate. No transport
+   * retries: a failed response may still represent an accepted provider write. */
+  async post(path: string, body: Record<string, unknown>): Promise<unknown> {
+    if (!/^\/repos\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pulls\/[1-9]\d*\/(?:reviews|comments\/[1-9]\d*\/replies)$/.test(path))
+      throw new CodingWorkspaceError('workspace_invalid_request')
+    return (await this.request(path, 'POST', body, 1024 * 1024)).value
+  }
+
+  private async request(path: string, method: 'GET' | 'POST', payload: Record<string, unknown> | undefined,
+    limit: number): Promise<{ value: unknown; next: boolean }> {
+    const graphql = path === '/graphql' && method === 'POST'
+    if ((!graphql && (!/^\/repos\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/|$)/.test(path)
+      || path.split(/[/?]/).some(part => part === '.' || part === '..') || path.includes('%') || path.includes('#') || path.includes('\\')))
+      || ++this.requests > 48) throw new CodingWorkspaceError('workspace_limit_exceeded')
+    const body = payload === undefined ? undefined : JSON.stringify(payload)
+    if (body && Buffer.byteLength(body) > 128 * 1024) throw new CodingWorkspaceError('workspace_limit_exceeded')
+    try { remainingRequestBudget(this.budget) } catch (cause) { throw new WorkspaceReviewError('workspace_review_github_unavailable', { cause }) }
     let response: Response
     try {
-      response = await fetch(`https://api.github.com${path}`, { redirect: 'error', credentials: 'omit', cache: 'no-store',
+      response = await fetch(`https://api.github.com${path}`, { method, ...(method === 'POST' ? { body } : {}), redirect: 'error', credentials: 'omit', cache: 'no-store',
         headers: { authorization: `Bearer ${this.token}`, accept: 'application/vnd.github+json',
+          ...(body ? { 'content-type': 'application/json' } : {}),
           'x-github-api-version': '2022-11-28', 'user-agent': 'Mikka' }, signal: requestBudgetSignal(this.budget, 15_000) })
+    // error-cause: transport errors may retain the bearer Authorization header.
     } catch { throw new WorkspaceReviewError('workspace_review_github_unavailable') }
     const reader = response.body?.getReader()
     if (!reader) throw new WorkspaceReviewError('workspace_review_github_unavailable')
@@ -38,6 +72,7 @@ export class GitHubDiffClient {
     } catch (error) {
       await reader.cancel().catch(() => {})
       if (error instanceof CodingWorkspaceError) throw error
+      // error-cause: JSON and stream errors can quote private source or review bodies.
       throw new WorkspaceReviewError('workspace_review_github_unavailable')
     } finally { reader.releaseLock() }
     if (!response.ok) {

@@ -117,6 +117,33 @@ export const reviewBoard = z.strictObject({
 })
 export type ReviewBoard = z.infer<typeof reviewBoard>
 
+const githubId = z.string().regex(/^[1-9]\d{0,39}$/)
+const githubNode = z.string().regex(/^[A-Za-z0-9_=-]{1,200}$/)
+const githubLine = z.number().int().min(1).max(1_000_000).nullable()
+export const githubReviewComment = z.strictObject({
+  id: githubId, nodeId: githubNode, replyToId: githubId.nullable(),
+  body: z.string().max(4000), bodyTruncated: z.boolean(), author: z.string().max(100).nullable(),
+  commitSha: sha.nullable(), originalCommitSha: sha.nullable(), url: z.url(),
+  createdAt: z.iso.datetime(), updatedAt: z.iso.datetime(),
+})
+export const githubReviewThread = z.strictObject({
+  id: githubNode, path, side: z.enum(['LEFT', 'RIGHT']), startSide: z.enum(['LEFT', 'RIGHT']).nullable(),
+  line: githubLine, startLine: githubLine, originalLine: githubLine, originalStartLine: githubLine,
+  subjectType: z.enum(['LINE', 'FILE']), resolved: z.boolean(), outdated: z.boolean(),
+  comments: z.array(githubReviewComment).max(20), nextCursor: z.string().max(4096).nullable(),
+})
+export type GitHubReviewThread = z.infer<typeof githubReviewThread>
+/** Native provider data is never silently copied into the Mikka local board.
+ * Cursors separately paginate threads and a specified thread's comments. */
+export const githubReviewPage = z.strictObject({
+  snapshotId: z.uuid(), sourceVersion: digest, repositoryId: githubId, pullRequestNumber: z.number().int().positive(),
+  observedAt: z.iso.datetime(), headSha: sha, baseSha: sha, isStale: z.boolean(),
+  threads: z.array(githubReviewThread).max(20), nextCursor: z.string().max(4096).nullable(),
+})
+export type GitHubReviewPage = z.infer<typeof githubReviewPage>
+export const githubReviewQuery = z.strictObject({ cursor: z.string().max(4096).optional(), threadId: githubNode.optional() })
+export type GitHubReviewQuery = z.infer<typeof githubReviewQuery>
+
 const request = { requestId: z.uuid(), expectedRevision: z.number().int().nonnegative() }
 export const reviewMutation = z.discriminatedUnion('action', [
   z.strictObject({ ...request, action: z.literal('create'), anchor: reviewAnchor,
@@ -132,8 +159,26 @@ export const reviewBatchRequest = z.strictObject({
   ...request, batchId: z.uuid(), snapshotId: z.uuid(), sourceVersion: digest,
   commentIds: z.array(z.uuid()).max(50), note: z.string().trim().max(4000).optional(),
   failedCheckRefs: z.array(z.string().min(1).max(2000)).max(100),
+  factory: z.strictObject({ taskId: z.uuid(), revision: z.number().int().positive(), attemptId: z.uuid(),
+    candidateId: z.uuid(), sourceEventId: z.uuid() }).optional(),
 }).refine(value => value.commentIds.length > 0 || Boolean(value.note) || value.failedCheckRefs.length > 0)
 export type ReviewBatchRequest = z.infer<typeof reviewBatchRequest>
+
+const githubBatch = { ...request, batchId: z.uuid(), sourceVersion: digest }
+export const githubReviewMutation = z.discriminatedUnion('action', [
+  z.strictObject({ ...githubBatch, action: z.literal('publish'), event: z.enum(['COMMENT', 'REQUEST_CHANGES', 'APPROVE']),
+    commentIds: z.array(z.uuid()).max(50), note: z.string().trim().max(4000) }).refine(value => value.commentIds.length > 0 || Boolean(value.note)),
+  z.strictObject({ ...githubBatch, action: z.literal('reply'), commentId: githubId, body: z.string().trim().min(1).max(4000) }),
+])
+export type GitHubReviewMutation = z.infer<typeof githubReviewMutation>
+export const reviewBatchReceipt = z.strictObject({
+  batchId: z.uuid(), destination: z.enum(['agent', 'github']), state: z.enum(['prepared', 'delivering', 'accepted', 'rejected', 'uncertain']),
+  sourceVersion: digest, revision: z.number().int().nonnegative(),
+  delivery: z.strictObject({ kind: z.enum(['run_message', 'factory_repair', 'github_review', 'github_reply']),
+    id: z.string().min(1).max(1024), url: z.url().max(2048).optional(), runId: z.uuid().optional(),
+    headSha: sha.optional(), commitSha: sha.optional(), outdated: z.boolean().optional() }).nullable(),
+})
+export type ReviewBatchReceipt = z.infer<typeof reviewBatchReceipt>
 
 export const WORKSPACE_REVIEW_ERROR_CODES = [
   'workspace_snapshot_unavailable', 'workspace_snapshot_outdated', 'workspace_review_conflict',

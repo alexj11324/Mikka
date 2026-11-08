@@ -6,7 +6,7 @@ import { runRepositoryIdentity, type RunRepositoryIdentity } from '@mikka/protoc
 import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import { issueForUser } from '../../issue-access'
 import { tokenWorkspace } from '../../tokens/principal'
-import { withWorkspaceAuthority, type WorkspaceAuthorizedActor } from '../authority'
+import { withWorkspaceAuthority, type WorkspaceAuthorizedActor, type WorkspaceAuthorityLease, type WorkspaceAuthorityOptions } from '../authority'
 import { resolveRunWorktree, type WorkspaceActor, type WorkspaceQuery } from '../identity'
 import { diffDigest } from './patch'
 
@@ -91,15 +91,15 @@ async function retainHistoricalBinding(client: PoolClient, actor: ReviewActor, r
 
 /** Review-specific state is built inside the shared final-authority lease. */
 export async function withReviewTransaction<T>(database: Pool, membership: Pool, actor: ReviewActor,
-  runId: string, repoId: string, work: (client: PoolClient, scope: ReviewScope) => Promise<T>,
-  options: { live?: RunWorktreeIdentity; historical?: boolean; signal?: AbortSignal } = {}): Promise<T> {
-  return withWorkspaceAuthority(database, membership, actor, runId, async (client, workspace) => {
+  runId: string, repoId: string, work: (client: PoolClient, scope: ReviewScope, lease: WorkspaceAuthorityLease) => Promise<T>,
+  options: WorkspaceAuthorityOptions & { historical?: boolean } = {}): Promise<T> {
+  return withWorkspaceAuthority(database, membership, actor, runId, async (client, workspace, lease) => {
     if (options.live) await retainBinding(client, workspace, actor, options.live)
     else if (options.historical) await retainHistoricalBinding(client, actor, runId, repoId)
     const scope = await resolveReviewScope(client, workspace, actor, runId, repoId)
     await client.query(`INSERT INTO coding_workspace_review_boards (id,"workspaceId","taskId","runId","repositoryKey")
       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING`,
     [scope.boardId, actor.workspaceId, scope.taskId, scope.taskId ? null : runId, scope.identity.repositoryKey])
-    return work(client, scope)
+    return work(client, scope, lease)
   }, options)
 }

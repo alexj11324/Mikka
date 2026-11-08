@@ -23,6 +23,8 @@ daemon 只传有界 manifest 和完整私有 blob proof；服务器检查 Git ob
 | `GET /{snapshotId}/file` | `path` | `ok,file`，含 format、patch、hunks |
 | `GET /{snapshotId}/review` | `cursor` | `ok,revision,snapshot,comments,nextCursor,permissions` |
 | `POST /{snapshotId}/review` | JSON `{repoId,workspaceId?,mutation}`，最多 32 KiB | `ok,requestId,revision,action` 与操作回执 |
+| `GET /{snapshotId}/github-review` | `cursor?,threadId?` | `ok,review`，GitHub 原生 thread/comment 的独立分页 |
+| `POST /{snapshotId}/github-review` | JSON `{repoId,workspaceId?,mutation}`，仅 browser session | `ok,batch`，持久批次与真实发布回执 |
 
 `auto` 先尝试 owner 当前 live 工作树，再尝试已保留 checkpoint，最后尝试绑定的 GitHub PR。显式 commit 在原工作树不可用时可通过 GitHub 的完整 Git tree/blob 读取；不依赖当前机器。没有相应证据时返回 `availability=unavailable` 及 reason，绝不将旧 gzip patch 当作安全源码，也不编造空 diff。
 
@@ -44,7 +46,21 @@ PR 原生文件最多 3,000 个、每页 100；读取全部页，验证 `changed
 
 读取有一个请求级 30 秒工作预算、累计请求与字节上限，不跟随 provider URL 或重试。凭据刷新有独立 10 秒 GitHub／20 秒 Cloud 网络窗口；开始前预留完整刷新及保存预算，一旦发送旋转 refresh，先完成有限读取与数据库提交，再响应 UI 取消，避免遗失已经轮换的新令牌。
 
-本地 board/comments 继续按 Mikka Task ACL 留存、读取、回复和修改；不会自动导入 GitHub native body/diff hunk，也不因本地修改触发 GitHub 写操作。新建源码行评论仍需当前源码授权和已验证 hunk。GitHub native threads 和发布/回复将使用独立的授权与明确发布回执。
+本地 board/comments 继续按 Mikka Task ACL 留存、读取、回复和修改；不会自动导入 GitHub native body/diff hunk，也不因本地修改触发 GitHub 写操作。新建源码行评论仍需当前源码授权和已验证 hunk。
+
+## GitHub 原生 Review 与持久批次
+
+原生读取使用固定 GraphQL query，一页最多 20 个 thread，每个 thread 一页最多 20 条 comment。外层 thread 与指定 thread 的后续评论分别分页；cursor 绑定 snapshot、完整 sourceVersion、数字 repository ID、PR、观察到的 head/base 和 thread。旧 cursor 不能拼接新 head 的页面。comment ID 保留十进制字符串，拒绝失去精度的数字；返回原 commit、原行号、resolved、outdated、URL，不导入 provider diff hunk。
+
+完整原生正文先经过 owner/viewer 的当前 secret policy，再按 4,000 字符限制返回，并明确 `bodyTruncated`。内存中的私有完整正文验证标记在最终 HTTP 事务中复核；新 secret policy 不能仅重新扫描已截断的片段。
+
+发布 mutation 明确区分 `action=publish` 与 `action=reply`。publish 指定 `event=COMMENT/REQUEST_CHANGES/APPROVE`、本地 `commentIds` 和 note；reply 指定 GitHub 顶层 comment ID 和正文。两者都传 `requestId,expectedRevision,batchId,sourceVersion`。只有当前人的 session 与自己的 GitHub user token 可写；installation token、PAT 或其他用户的连接不能代替。共享 Task 成员可以用自己的 GitHub 权限提交自己可见的评论，但不能选择他人的私有 draft。
+
+准备批次时冻结完整选择集合、锚点、正文、来源与 GitHub account；锁 board、校验 revision、验证完整 source proof，并按 PostgreSQL 实际 JSONB 字节数执行 32 KiB 上限。不截断反馈。重复 requestId 必须保持相同输入；不同 requestId/batchId 的相同语义也返回原批次。当前 source、PR head/base、连接 token、session 与 workspace 权限在实际发送前再次验证。
+
+一次 publish 只发送一个含全部行评论的 Review POST，使用 `commit_id,line,side,start_line,start_side`，不回退到旧 `position`。回复只支持顶层评论。复用既有 operation ledger：独立提交 invocation gate，外部调用与最终 ledger/批次回执投影保持权限租约；投影失败或 COMMIT 不确定不能被标成成功。此类人的直接操作没有伪造的 execution Run。
+
+网络结果不确定后，只做有界正向 readback；不会再次 POST。Review 必须同时匹配批次标记、完整正文、账号、commit、event，以及完整行评论集合的正文、path 和 original 行坐标，才可转 accepted。marker 一致但少评论、错行、错正文或分页未闭合仍不确认。并发提交者返回同一批次的当前状态；负 readback 不能取消另一个已 claim 请求的首次发送资格。accepted 回执包含实际 GitHub object ID、URL、commit 和来源 head；发送后的 head/base 改变单独记录 outdated。
 
 ## Checkpoint 证据与恢复 ACK
 
@@ -82,6 +98,8 @@ daemon receipt 到公开读取之间，同样比较 full-proof 校验时与返�
 
 Files capability 继续为 `x-mikka-coding-workspace: 1`；Diff 独立使用 `x-mikka-coding-workspace-diff: 1`。旧 Files daemon 在 SQL LIMIT 之前排除 Diff command，不能让不认识的 command 阻塞 Stop。
 
-本基础版还需完成并验证：GitHub native review/reply；普通 Run/Factory 的反馈批次与 durable delivery receipt；生产 E2B 与 native CLI 场景。checkpoint producer、GitHub whole-PR/commit 来源与持久化已实现，真实 PG17/HTTP 回归以当前提交的 CI 结果为准。相关 schema/接口预留不能视为功能已经可用。
+本版还需完成并验证：普通 Run/Factory 的反馈投递；生产 E2B 与 native CLI 场景。checkpoint producer、GitHub whole-PR/commit 来源、原生 review/reply 与批次持久化已实现；真实 PG17/HTTP 回归以当前提交的 CI 结果为准。相关 schema/接口预留不能视为功能已经可用。
 
 验证入口：`pnpm test:coding-workspace-diff` 为纯 proof/anchor/撤权回归；daemon 的 `coding-workspace-diff.test.ts` 使用真实临时 Git 仓库；`pnpm test:coding-workspace-db` 在隔离 PostgreSQL 17 中覆盖 persistence、真实 session/PAT/member ACL、评论与真实 TCP API→daemon→receipt 链路。没有数据库时的 SKIP 只证明入口可加载，不算数据库通过。
+
+`github-delivery.db.test.ts` 保留真实批次、ledger、加密 GitHub 连接与权限事务，只替换上游 GitHub 网络；覆盖一次性发布、并发去重、未知结果恢复、撤权、私有草稿、超限和提交故障。`test:approved-writes-db` 的 ledger 子例覆盖无 execution Run 的 session 效果与原子投影。模拟 provider 的数据库测试不等于真实 GitHub 发布验收。

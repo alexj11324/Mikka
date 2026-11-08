@@ -13,6 +13,7 @@ import { readDiffSnapshot, readStoredDiffFile } from './store'
 import { secretMaskerFor } from '../../secrets/runtime'
 import { maskDeep } from '../../secrets/mask'
 import { githubDiffProvider } from './github'
+import { nativeReviewPolicyMatches } from './github-native'
 
 type Context = { params: Promise<{ runId: string; snapshotId?: string }> }
 type Input = { request: Request; actor: ReviewActor; session: ApiSession; deps: DiffDependencies;
@@ -20,7 +21,7 @@ type Input = { request: Request; actor: ReviewActor; session: ApiSession; deps: 
 const responseHeaders = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 const envelope = z.object({ workspaceId: z.uuid().optional(), repoId: z.uuid() }).passthrough()
 
-export function reviewHttp(work: (input: Input) => Promise<unknown>, options: { sourceFile?: boolean } = {}) {
+export function reviewHttp(work: (input: Input) => Promise<unknown>, options: { sourceFile?: boolean; nativeReview?: boolean } = {}) {
   return async (request: Request, context: Context) => {
     const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true, disableRefresh: true } })
     if (!session?.user) return Response.json({ ok: false, code: 'authRequired' }, { status: 401, headers: responseHeaders })
@@ -64,6 +65,7 @@ export function reviewHttp(work: (input: Input) => Promise<unknown>, options: { 
           secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId }),
         ])
         if ((options.sourceFile && (!proofPolicy || proofPolicy !== masks[0]!.sourcePolicy))
+          || (options.nativeReview && !nativeReviewPolicyMatches(value.review, masks))
           || masks.some(mask => !isDeepStrictEqual(maskDeep(value, mask), value)))
           throw new CodingWorkspaceError('workspace_path_unavailable')
         return Response.json({ ok: true, ...value }, { headers: responseHeaders })

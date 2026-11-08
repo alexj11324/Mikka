@@ -37,6 +37,7 @@ async function githubRequest(token: string, path: string, budget?: RequestBudget
       headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'Mikka' },
       cache: 'no-store', redirect: 'error', signal: budget ? requestBudgetSignal(budget) : AbortSignal.timeout(10_000),
     })
+  // error-cause: transport errors may retain the bearer Authorization header.
   } catch { throw new GitHubAccessError('githubUnavailable', 502) }
   if (!response.ok) {
     await response.body?.cancel()
@@ -57,6 +58,7 @@ async function githubRequest(token: string, path: string, budget?: RequestBudget
       chunks.push(part.value)
     }
     return { data: object(JSON.parse(Buffer.concat(chunks).toString('utf8'))), next: /rel="next"/.test(response.headers.get('link') ?? '') }
+  // error-cause: JSON and stream errors can quote private repository or account response bodies.
   } catch { await reader.cancel().catch(() => {}); throw new GitHubAccessError('githubUnavailable', 502) }
   finally { reader.releaseLock() }
 }
@@ -69,7 +71,9 @@ async function userToken(userId: string, headers?: Headers, minValidityMs?: numb
   try { connected = await githubConnectionToken(userId, { ...(minValidityMs === undefined ? {} : { minValidityMs }), ...(budget ? { budget } : {}) }) }
   catch (error) {
     if (error instanceof DOMException || (error && typeof error === 'object' && 'code' in error && ['55P03', '57014'].includes(String(error.code))))
+      // error-cause: connection failures can include encrypted credentials or token refresh parameters.
       throw new GitHubAccessError('githubUnavailable', 502)
+    // error-cause: connection decryption/refresh failures can quote token material.
     throw new GitHubAccessError('githubReconnectRequired', 401)
   }
   if (budget) remainingRequestBudget(budget)
@@ -90,8 +94,11 @@ async function userToken(userId: string, headers?: Headers, minValidityMs?: numb
     if (!access.accessToken) throw new Error('missingToken')
     return { token: access.accessToken, githubAccountId: account.accountId, expiresAt: access.accessTokenExpiresAt ? new Date(access.accessTokenExpiresAt) : null }
   } catch (error) {
+    // error-cause: the auth library's transport failure may retain OAuth request credentials.
     if (error instanceof DOMException) throw new GitHubAccessError('githubUnavailable', 502)
+    // error-cause: the auth library's provider failure can include an OAuth response body.
     if (error && typeof error === 'object' && 'statusCode' in error && typeof error.statusCode === 'number' && error.statusCode >= 500) throw new GitHubAccessError('githubUnavailable', 502)
+    // error-cause: auth/decryption failures can quote the access or refresh token.
     throw new GitHubAccessError('githubReconnectRequired', 401)
   }
 }
@@ -186,6 +193,7 @@ export async function githubRepositoryReadCredential(userId: string, remoteKey: 
 }> {
   if (budget) remainingRequestBudget(budget)
   let repo: ReturnType<typeof githubRepository>
+  // error-cause: repository parsing errors can include a credential-bearing remote URL.
   try { repo = githubRepository(remoteKey) } catch { throw new GitHubAccessError('githubRepositoryForbidden', 403) }
   const cloud = await import('./cloud')
   const fromCloud = await cloud.useCloudGitHub(userId)

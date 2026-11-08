@@ -25,6 +25,7 @@ const pullSchema = z.object({ number: z.number().int().positive(), html_url: z.s
   state: z.enum(['open', 'closed']), merged: z.boolean(), changed_files: z.number().int().nonnegative(),
   base: z.object({ sha, repo: z.object({ id, full_name: z.string() }) }), head: z.object({ sha }) })
 type Pull = z.infer<typeof pullSchema>
+export type GitHubPullGrant = { client: GitHubDiffClient; repositoryId: string; path: string; fullName: string }
 const nativeSchema = z.object({ filename: workspacePath.refine(Boolean), previous_filename: workspacePath.optional(),
   status: z.enum(['added', 'removed', 'modified', 'renamed']), sha,
   additions: z.number().int().nonnegative(), deletions: z.number().int().nonnegative(), patch: z.string().optional() })
@@ -35,6 +36,13 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value)
   if (!parsed.success) throw unavailable()
   return parsed.data
+}
+export async function readGitHubPull(grant: GitHubPullGrant, number: number): Promise<Pull> {
+  const value = parse(pullSchema, (await grant.client.get(`${grant.path}/pulls/${number}`, 512 * 1024)).value)
+  if (value.number !== number || value.base.repo.id !== grant.repositoryId
+    || value.base.repo.full_name.toLowerCase() !== grant.fullName.toLowerCase()
+    || value.html_url.toLowerCase() !== `https://github.com/${grant.fullName}/pull/${number}`.toLowerCase()) throw unavailable()
+  return value
 }
 async function together<T>(promises: Promise<T>[]): Promise<T[]> {
   const results = await Promise.allSettled(promises)
@@ -52,6 +60,7 @@ function candidateRepository(value: string): string {
   try {
     if (value.startsWith('v2/')) { githubRepository(value); return value }
     return normalizeRepository(/^[\w.-]+\/[\w.-]+$/.test(value) ? `https://github.com/${value}.git` : value).key
+  // error-cause: repository parsing errors can include a credential-bearing remote URL.
   } catch { throw unavailable() }
 }
 
@@ -96,7 +105,7 @@ export async function associatedGitHubPull(database: Pick<Pool, 'query'>, scope:
 export function githubDiffProvider(database: Pool, userId: string, signal?: AbortSignal): ExternalDiffProvider {
   const budget: RequestBudget = { deadline: Date.now() + 30_000, signal }
   const checkBudget = () => {
-    try { remainingRequestBudget(budget) } catch { throw new WorkspaceReviewError('workspace_review_github_unavailable') }
+    try { remainingRequestBudget(budget) } catch (cause) { throw new WorkspaceReviewError('workspace_review_github_unavailable', { cause }) }
   }
   const credentials = new Map<string, Promise<{ client: GitHubDiffClient; repositoryId: string; path: string; fullName: string }>>()
   const observations = new Map<string, { stale: boolean }>()
@@ -114,9 +123,10 @@ export function githubDiffProvider(database: Pool, userId: string, signal?: Abor
         } catch (error) {
           if (error instanceof GitHubAccessError)
             throw new WorkspaceReviewError(['githubUnavailable', 'githubNotConfigured'].includes(error.code)
-              ? 'workspace_review_github_unavailable' : 'workspace_review_github_forbidden')
+              ? 'workspace_review_github_unavailable' : 'workspace_review_github_forbidden', { cause: error })
           if (error instanceof CloudServiceError)
-            throw new WorkspaceReviewError(error.code === 'cloud_unavailable' ? 'workspace_review_github_unavailable' : 'workspace_review_github_forbidden')
+            throw new WorkspaceReviewError(error.code === 'cloud_unavailable' ? 'workspace_review_github_unavailable' : 'workspace_review_github_forbidden', { cause: error })
+          // error-cause: credential provider failures can contain tokens or raw provider bodies.
           throw new WorkspaceReviewError('workspace_review_github_unavailable')
         }
       })()
@@ -126,11 +136,7 @@ export function githubDiffProvider(database: Pool, userId: string, signal?: Abor
   }
   type Access = Awaited<ReturnType<typeof access>>
   async function pull(grant: Access, number: number): Promise<Pull> {
-    const value = parse(pullSchema, (await grant.client.get(`${grant.path}/pulls/${number}`, 512 * 1024)).value)
-    if (value.number !== number || value.base.repo.id !== grant.repositoryId
-      || value.base.repo.full_name.toLowerCase() !== grant.fullName.toLowerCase()
-      || value.html_url.toLowerCase() !== `https://github.com/${grant.fullName}/pull/${number}`.toLowerCase()) throw unavailable()
-    return value
+    return readGitHubPull(grant, number)
   }
   async function tree(grant: Access, commit: string) {
     const value = parse(commitSchema, (await grant.client.get(`${grant.path}/git/commits/${commit}`, 512 * 1024)).value)

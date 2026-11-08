@@ -1598,6 +1598,17 @@
       "sourceHash": "14c529aee135056b74f19198d4ba21c99b2737321b52f5e61d3ec64781053289"
     },
     {
+      "path": "/mikka/api/runs/[runId]/workspace/diff/[snapshotId]/github-review",
+      "template": "/api/runs/[runId]/workspace/diff/[snapshotId]/github-review",
+      "source": "app/api/runs/[runId]/workspace/diff/[snapshotId]/github-review/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "8427fd173cf189298e255084e0cdbd1d278a2ada9f166b0de79c91fe2ff26053"
+    },
+    {
       "path": "/mikka/api/runs/[runId]/workspace/diff/[snapshotId]/review",
       "template": "/api/runs/[runId]/workspace/diff/[snapshotId]/review",
       "source": "app/api/runs/[runId]/workspace/diff/[snapshotId]/review/route.ts",

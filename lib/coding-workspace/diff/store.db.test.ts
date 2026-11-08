@@ -532,7 +532,7 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
         prFiles.push(metadata)
       }
       const prInput = (number: number): Parameters<typeof retainDiffSnapshot>[2] => {
-        const sourceAccess: DiffSourceAccess = { ...access, pullRequestNumber: number }
+        const sourceAccess: DiffSourceAccess = { ...access, pullRequestNumber: number, pullRequestBaseSha: baseSha }
         return { revision: manifestRevision('pull_request', baseSha, headSha, result.revision.treeSha, prFiles, sourceAccess),
           files: prFiles, sourceAccess,
           pullRequest: { number, url: `https://github.com/mikka-fixtures/diff-store/pull/${number}`, baseSha, headSha, state: 'open' } }
@@ -541,8 +541,8 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       const first = await retain(firstInput), second = await retain(secondInput)
       assert.notEqual(first.id, second.id); assert.notEqual(first.revision.version, second.revision.version)
       assert.equal((await retain(firstInput)).id, first.id); assert.equal((await retain(secondInput)).id, second.id)
-      assert.deepEqual(first.sourceAccess, { ...access, pullRequestNumber: 101 })
-      assert.deepEqual(second.sourceAccess, { ...access, pullRequestNumber: 102 })
+      assert.deepEqual(first.sourceAccess, { ...access, pullRequestNumber: 101, pullRequestBaseSha: baseSha })
+      assert.deepEqual(second.sourceAccess, { ...access, pullRequestNumber: 102, pullRequestBaseSha: baseSha })
       assert.deepEqual(firstInput.files, secondInput.files, 'PR provenance separates snapshots even when all file versions are identical')
 
       for (const forged of [

@@ -107,12 +107,13 @@ export function startAnonymousCodex(input: {
       '-c', 'shell_environment_policy.set.MIKKA_POLICY_HASH=' + JSON.stringify(fixedEnv.MIKKA_POLICY_HASH),
       ...(timing?.args ?? [])]
     const childEnv = { ...fixedEnv }
-    if (daemonTracer.generationsEnabled && traceContext) {
+    if (daemonTracer.generationsEnabled) {
       const bypass = codexTraceEnvironment(childEnv)
       if (!bypass) throw Error('Anonymous Codex native trace unavailable')
       nativeGenerations = await startCodexGenerationCollector(metrics => {
-        // Before adoption this is the real bootstrap trace; afterward it is the fresh run context.
-        daemonTracer.generation(metrics, traceContext)
+        // A bootstrap can lack a trace carrier. Keep its receiver local until
+        // the fresh adoption supplies the run context; never invent a parent.
+        if (traceContext) daemonTracer.generation(metrics, traceContext)
       })
       args.push(...nativeGenerations.args); Object.assign(childEnv, nativeGenerations.env, bypass)
     }

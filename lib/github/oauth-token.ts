@@ -12,6 +12,7 @@ export async function exchangeGitHubOAuthToken(client: { clientId: string; clien
     method: 'POST', redirect: 'error', credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(10_000),
     headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'Mikka' },
     body: new URLSearchParams({ client_id: client.clientId, client_secret: client.clientSecret, ...params }),
+  // error-cause: OAuth transport errors can retain client secrets and rotating refresh tokens.
   }) } catch { throw new Error('GitHub token exchange failed') }
   const reader = response.body?.getReader()
   if (!reader) throw new Error('GitHub token exchange failed')
@@ -36,6 +37,7 @@ export async function exchangeGitHubOAuthToken(client: { clientId: string; clien
     return token as GitHubOAuthToken
   } catch {
     await reader.cancel().catch(() => {})
+    // error-cause: JSON and stream errors can quote the returned access or refresh token.
     throw new Error('GitHub token exchange failed')
   } finally { reader.releaseLock() }
 }

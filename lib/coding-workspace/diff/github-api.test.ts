@@ -179,3 +179,131 @@ test('malformed success JSON, absent bodies and transport failure cannot become 
     assert.equal(f.calls.length, 1)
   })
 })
+
+const reviewPath = '/repos/fixture/review/pulls/7/reviews'
+const readDocument = 'query WorkspaceRead($text:String) { viewer { login } }'
+
+test('GraphQL reads use the same fixed authenticated origin and encode variables as data', async t => {
+  const variables = { text: '} mutation Forged { deleteRepository }', after: 'opaque/provider/cursor' }
+  const f = fixture(t, (url, init) => {
+    assert.equal(url.href, 'https://api.github.com/graphql'); assert.equal(init.method, 'POST')
+    assert.equal(new Headers(init.headers).get('content-type'), 'application/json')
+    assert.deepEqual(JSON.parse(String(init.body)), { query: readDocument, variables })
+    return Response.json({ data: { viewer: { login: 'fixture' } }, errors: [] }, {
+      headers: { link: '<https://outside.invalid/graphql>; rel="next"' },
+    })
+  })
+  assert.deepEqual(await f.client.graphql(readDocument, variables), { viewer: { login: 'fixture' } })
+  assert.equal(f.calls.length, 1)
+})
+
+test('GraphQL admits explicit read queries only and rejects mutations before fetch', async t => {
+  const f = fixture(t, () => Response.json({ data: {} }))
+  for (const query of ['', '{ viewer { login } }', 'mutation Review { addPullRequestReview }',
+    'subscription Changed { viewer { login } }', 'query Read { viewer { login } } mutation Write { addPullRequestReview }'])
+    await assert.rejects(() => f.client.graphql(query, {}), code('workspace_invalid_request'))
+  assert.equal(f.calls.length, 0)
+})
+
+test('HTTP 200 GraphQL failures reject partial data and redact provider details', async t => {
+  for (const [label, errors, expected] of [
+    ['forbidden', [{ type: 'FORBIDDEN', message: token }], 'workspace_review_github_forbidden'],
+    ['not found', [{ type: 'NOT_FOUND', message: token }], 'workspace_review_github_forbidden'],
+    ['unauthorized', [{ type: 'UNAUTHORIZED', message: token }], 'workspace_review_github_forbidden'],
+    ['other failure', [{ type: 'INTERNAL', message: token }], 'workspace_review_github_unavailable'],
+    ['untyped failure', [{ message: token }], 'workspace_review_github_unavailable'],
+    ['invalid object', { message: token }, 'workspace_review_github_unavailable'],
+    ['invalid null', null, 'workspace_review_github_unavailable'],
+  ] as const) await t.test(label, async t => {
+    const f = fixture(t, () => Response.json({ data: { privatePartial: token }, errors }))
+    await assert.rejects(() => f.client.graphql(readDocument, {}), error => {
+      assert.ok(code(expected)(error)); assert.ok(!String(error).includes(token)); return true
+    })
+    assert.equal(f.calls.length, 1)
+  })
+  for (const response of [{}, { data: null }, [], null]) await t.test(`missing data ${JSON.stringify(response)}`, async t => {
+    const f = fixture(t, () => Response.json(response))
+    await assert.rejects(() => f.client.graphql(readDocument, {}), code('workspace_review_github_unavailable'))
+  })
+})
+
+test('provider POST accepts only review creation and replies with exact decimal comment IDs', async t => {
+  const replyPath = '/repos/fixture/review/pulls/7/comments/9007199254740993/replies'
+  const f = fixture(t, (_url, init) => {
+    assert.equal(init.method, 'POST'); assert.equal(new Headers(init.headers).get('content-type'), 'application/json')
+    return Response.json({ id: '9007199254740994' })
+  })
+  const review = { commit_id: 'a'.repeat(40), event: 'COMMENT', body: 'Explicitly requested review', comments: [] }
+  const reply = { body: 'Explicitly requested reply' }
+  assert.deepEqual(await f.client.post(reviewPath, review), { id: '9007199254740994' })
+  assert.deepEqual(await f.client.post(replyPath, reply), { id: '9007199254740994' })
+  assert.deepEqual(f.calls.map(call => call.url.pathname), [reviewPath, replyPath])
+  assert.deepEqual(f.calls.map(call => JSON.parse(String(call.init.body))), [review, reply])
+})
+
+test('provider POST refuses other operations, external URLs, redirects and path ambiguity', async t => {
+  const f = fixture(t, () => Response.json({}))
+  for (const invalid of ['https://api.github.com' + reviewPath, '//outside.invalid/reviews', '/graphql',
+    '/repos/fixture/review/issues/7/comments', '/repos/fixture/review/pulls/7/comments',
+    '/repos/fixture/review/pulls/7/reviews/1/events', '/repos/fixture/review/pulls/7/reviews/1',
+    '/repos/fixture/review/pulls/0/reviews', '/repos/fixture/review/pulls/-1/reviews',
+    '/repos/fixture/review/pulls/7/comments/0/replies', '/repos/fixture/review/pulls/7/comments/1/replies?extra=1',
+    reviewPath + '?token=outside', reviewPath + '#fragment', reviewPath + '/',
+    '/repos/fixture/../pulls/7/reviews', '/repos/fixture/%2e%2e/pulls/7/reviews',
+    '/repos/fixture/review\\outside/pulls/7/reviews'])
+    await assert.rejects(() => f.client.post(invalid, {}), error => code('workspace_invalid_request')(error) || code('workspace_limit_exceeded')(error))
+  assert.equal(f.calls.length, 0)
+  const redirect = fixture(t, () => new Response('{}', { status: 307, headers: { location: 'https://outside.invalid/write' } }))
+  await assert.rejects(() => redirect.client.post(reviewPath, {}), code('workspace_review_github_unavailable'))
+  assert.equal(redirect.calls.length, 1)
+})
+
+test('GraphQL and provider POST enforce 128 KiB of serialized UTF-8 bytes before sending', async t => {
+  for (const kind of ['graphql', 'review'] as const) await t.test(kind, async t => {
+    const f = fixture(t, () => Response.json({ data: { accepted: true }, id: '123' }))
+    const request = (text: string) => kind === 'graphql' ? f.client.graphql(readDocument, { text }) : f.client.post(reviewPath, { body: text })
+    const payload = kind === 'graphql' ? { query: readDocument, variables: { text: '' } } : { body: '' }
+    const available = 128 * 1024 - Buffer.byteLength(JSON.stringify(payload))
+    await request('x'.repeat(available))
+    assert.equal(Buffer.byteLength(String(f.calls[0]!.init.body)), 128 * 1024)
+    await assert.rejects(() => request('x'.repeat(available + 1)), code('workspace_limit_exceeded'))
+    await assert.rejects(() => request('界'.repeat(Math.floor(available / 3) + 1)), code('workspace_limit_exceeded'))
+    assert.equal(f.calls.length, 1, 'oversized bodies never reach fetch, including multibyte strings')
+  })
+})
+
+test('GraphQL and provider POST retain their own bounded response readers', async t => {
+  for (const [kind, cap] of [['graphql', 4 * 1024 * 1024], ['review', 1024 * 1024]] as const) await t.test(kind, async t => {
+    const stream = streamed(Buffer.alloc(cap + 1, 32)), f = fixture(t, () => stream.response)
+    await assert.rejects(() => kind === 'graphql' ? f.client.graphql(readDocument, {}) : f.client.post(reviewPath, {}), code('workspace_limit_exceeded'))
+    assert.equal(stream.cancelled(), 1); assert.equal(f.calls.length, 1)
+  })
+})
+
+test('an uncertain POST result is never automatically retried', async t => {
+  for (const [label, answer, expected] of [
+    ['transport failure', () => { throw new Error(token) }, 'workspace_review_github_unavailable'],
+    ['timeout', () => { throw new DOMException(token, 'TimeoutError') }, 'workspace_review_github_unavailable'],
+    ['malformed response', () => new Response('accepted but lost JSON ' + token), 'workspace_review_github_unavailable'],
+    ['403', () => Response.json({ message: token }, { status: 403 }), 'workspace_review_github_forbidden'],
+    ['409', () => Response.json({ message: token }, { status: 409 }), 'workspace_snapshot_outdated'],
+    ['422', () => Response.json({ message: token }, { status: 422 }), 'workspace_review_github_unavailable'],
+    ['503', () => Response.json({ message: token }, { status: 503 }), 'workspace_review_github_unavailable'],
+  ] as const) await t.test(label, async t => {
+    const f = fixture(t, answer)
+    await assert.rejects(() => f.client.post(reviewPath, { body: 'One invocation' }), error => {
+      assert.ok(code(expected)(error)); assert.ok(!String(error).includes(token)); return true
+    })
+    assert.equal(f.calls.length, 1)
+  })
+})
+
+test('GET, GraphQL and provider POST share one aggregate invocation budget', async t => {
+  const f = fixture(t, () => Response.json({ data: { accepted: true }, id: '123' }))
+  for (let index = 0; index < 16; index++) {
+    await f.client.get(path); await f.client.graphql(readDocument, {}); await f.client.post(reviewPath, {})
+  }
+  assert.equal(f.calls.length, 48)
+  await assert.rejects(() => f.client.graphql(readDocument, {}), code('workspace_limit_exceeded'))
+  assert.equal(f.calls.length, 48)
+})
