@@ -1,0 +1,6 @@
+{
+  "name": "ci-tasks",
+  "root": "scripts/ci",
+  "projectType": "library",
+  "targets": {}
+}
