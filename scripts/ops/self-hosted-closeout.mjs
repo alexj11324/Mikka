@@ -289,6 +289,7 @@ async function run(env) {
       const ticket = await localApi(`/api/live/ticket?workspace=${workspace.workspace.id}`)
       const liveURL = new URL(ticket.url)
       check(liveURL.origin === localOrigin.replace('https:', 'wss:') && liveURL.pathname.startsWith('/mikka/v1/live/'), 'LOCAL_LIVE_TARGET')
+      liveURL.searchParams.set('revisions', '1')
       modelLive = socketEvents(liveURL.href, ticket.protocol); await modelLive.ready
       await modelLive.next(event => event.type === 'live_ready' && event.version === 2)
       const bot = await localApi('/api/bots', { name: `Cloud reply ${env.GITHUB_RUN_ID}` }, [201])
