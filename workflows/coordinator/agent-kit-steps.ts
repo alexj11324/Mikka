@@ -3,13 +3,13 @@ import { freezeBotModel } from '@/lib/bot-model-selection'
 import { SubscriptionRefusal } from '@mikka/protocol/subscription'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
 import type { CoordinatorRuntime } from '@mikka/protocol/coordinator'
-import { agentKitEnabled, agentKitStore, agentScope, agentKitDefaults } from '@/lib/agent-kit/service'
+import { agentKitEnabled, agentKitStore, agentScope, agentScopeWithBotMetadata, agentKitDefaults } from '@/lib/agent-kit/service'
 import { AgentKitError, type AgentExecution, type AgentScope } from '@/lib/agent-kit/store'
 import type { ToolOutcome } from '@/lib/agent-kit/instrument'
 import type { FailureCode } from '@/lib/agent-kit/improvement'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { personalCoordinatorInstructions } from '@/lib/coordinator/native-prompt'
-import { botInstructions } from '@/lib/coordinator/bot-instructions'
+import { botInstructions, formatBotInstructions } from '@/lib/coordinator/bot-instructions'
 import { assertNativeToolScope, type NativeToolScope } from './tool-scope'
 
 /** A refusal is a decision, not a transient failure: fail the step once with its code, never retry it. */
@@ -32,8 +32,15 @@ export async function beginPreparedAgentExecution(userId: string, botId: string,
   return reserveAgentExecution(userId,botId,holder,round,runtime)
 }
 async function reserveAgentExecution(userId: string, botId: string, holder: string, round: number, runtime: CoordinatorRuntime): Promise<AgentExecution> {
-  const scope = await agentScope(userId,botId)
-  const instructions = await botInstructions(userId,botId,runtime.harness === 'ai_sdk' ? COORDINATOR_INSTRUCTIONS : personalCoordinatorInstructions())
+  let scope: AgentScope, instructions: string
+  if (runtime.harness === 'ai_sdk') {
+    const current = await agentScopeWithBotMetadata(userId,botId)
+    scope = current.scope
+    instructions = formatBotInstructions(COORDINATOR_INSTRUCTIONS,current.bot)
+  } else {
+    scope = await agentScope(userId,botId)
+    instructions = await botInstructions(userId,botId,personalCoordinatorInstructions())
+  }
   const { personalPlugins } = await import('@/lib/plugins/runtime')
   return refusalIsFinal(agentKitStore.beginExecution(scope,`${holder}:${round}`,instructions,() => runtime.harness === 'ai_sdk' ? freezeBotModel(scope,{service:()=>subscriptionRuntime(),workspace:authorizeSubscriptionWorkspace}) : Promise.resolve({harness:runtime.harness,model:'model' in runtime ? runtime.model ?? null : null}),agentKitDefaults(), client => personalPlugins.snapshot(userId,client,scope.workspaceId)))
 }
