@@ -1,6 +1,6 @@
 name: Issue 1506 remaining Stop matrix v2
 
-# Explicitly enabled for one source-bound Stop cohort. No cache cases or MCP are here.
+# Disabled after cohort 42446233565; preserve its original receipts. No cache cases or MCP are here.
 on:
   push:
     branches: [acceptance/issues-1504-1506]
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   stop_matrix:
-    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
+    if: false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     concurrency:
