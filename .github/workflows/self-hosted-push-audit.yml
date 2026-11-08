@@ -59,3 +59,21 @@ jobs:
           include-imports: false
       - name: Read exact EAS project flags with both existing credentials
         run: node scripts/ops/self-hosted-push-project-audit.mjs
+        env:
+          PUSH_SENDER_SOURCE: private
+      - name: Resolve the new public push reference through existing workload delivery
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: EXPO_ACCESS_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Verify the resolved public sender can access the same exact EAS project
+        run: node scripts/ops/self-hosted-push-project-audit.mjs
+        env:
+          PUSH_SENDER_SOURCE: public-reference

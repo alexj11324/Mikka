@@ -7,7 +7,8 @@ assert.equal(process.env.GITHUB_EVENT_NAME, 'push')
 assert.ok(process.env.EXPO_TOKEN && process.env.EXPO_ACCESS_TOKEN)
 const appId = '902ffab1-ed16-482e-8b83-2b7535079810'
 const query = `query { app { byId(appId:"${appId}") {id slug pushSecurityEnabled ownerAccount {id pushSecurityEnabled}} } mutationType: __type(name:"AppMutation") {fields {name type {kind name ofType {kind name}}}} }`
-const report = { scope: 'exact-project-read-only', pushes: 0, mutations: 0, checks: {} }
+const report = { scope: 'exact-project-read-only', senderSource: process.env.PUSH_SENDER_SOURCE,
+  pushes: 0, mutations: 0, checks: {} }
 for (const [name, token] of [['operator', process.env.EXPO_TOKEN], ['sender', process.env.EXPO_ACCESS_TOKEN]]) {
   const r = await fetch('https://api.expo.dev/graphql', { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20_000),
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ query }) })
@@ -21,3 +22,5 @@ for (const [name, token] of [['operator', process.env.EXPO_TOKEN], ['sender', pr
   report.mutationReturnType = body?.data?.mutationType?.fields?.find(f => f.name === 'setPushSecurityEnabled')?.type ?? null
 }
 console.log(JSON.stringify(report))
+assert.ok(Object.values(report.checks).every(value => value.status === 200 && value.appMatches && value.slugMatches && value.errors.length === 0), 'EXACT_PROJECT_ACCESS')
+assert.equal(report.checks.operator.accountHash, report.checks.sender.accountHash, 'SENDER_PROJECT_ACCOUNT')
