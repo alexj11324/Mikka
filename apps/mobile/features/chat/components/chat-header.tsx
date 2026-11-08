@@ -22,7 +22,7 @@ export function ChatHeader({ name, tasks, onTask, onAllTasks, onInfo }: ChatHead
       ],
     }} />
   ) : <Spinner size={14} />
-  return <NavBar material titleView={title} />
+  return <NavBar titleView={title} />
 }
 
 const styles = StyleSheet.create({
