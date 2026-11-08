@@ -37,15 +37,21 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
   // The remembered width is applied on load without a spring.
   const [restored, setRestored] = useState(false)
   const moved = useRef(false)
+  // Whether the width is one the person chose (remembered, dragged, keyed or widened) rather than the default.
+  const chosen = useRef(false)
   const top = Math.max(min, limit)
   const clamp = (value: number) => Math.round(Math.min(top, Math.max(min, value)))
+
+  // A default that arrives after the first render (usePanelInitialWidth) applies until the person chooses a width.
+  // Declared before the restore below, so a remembered width set in the same commit wins.
+  useEffect(() => { if (!chosen.current) setWidth(initial) }, [initial])
 
   useEffect(() => {
     const measure = () => setLimit(maxFor(max))
     measure()
     try {
       const stored = Number(window.localStorage.getItem(storageKey))
-      if (stored) setWidth(stored)
+      if (stored) { chosen.current = true; setWidth(stored) }
     } catch { /* storage unavailable */ }
     const frame = requestAnimationFrame(() => setRestored(true))
     if (typeof max !== 'number') window.addEventListener('resize', measure)
@@ -80,7 +86,7 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
       const delta = (next.clientX - startX) * direction
       // A few pixels of jitter is still a click.
       if (!moved.current && Math.abs(delta) < 3) return
-      if (!moved.current) { moved.current = true; setDragging(true) }
+      if (!moved.current) { moved.current = true; chosen.current = true; setDragging(true) }
       latest = clamp(startWidth + delta)
       setWidth(latest)
     }
@@ -109,11 +115,13 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
     if (next === null) return
     event.preventDefault()
     const value = clamp(next)
+    chosen.current = true
     setWidth(value)
     remember(value)
   }
 
   function reset() {
+    chosen.current = false
     setWidth(initial)
     try { window.localStorage.removeItem(storageKey) } catch { /* storage unavailable */ }
   }
@@ -126,7 +134,7 @@ export function useResizableWidth({ storageKey, min, max, initial, edge }: Optio
   }
 
   /** Sets the width for now without remembering it, as the 加宽 button does. */
-  function resizeTo(next: number) { setWidth(clamp(next)) }
+  function resizeTo(next: number) { chosen.current = true; setWidth(clamp(next)) }
 
   const value = width === null ? null : clamp(width)
   return {
