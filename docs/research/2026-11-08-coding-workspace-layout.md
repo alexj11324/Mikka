@@ -11,7 +11,7 @@
 - **任务上不嵌 diff。** 聊天里的任务卡片、任务面板和「等待你」列表都只显示一行「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败」，加一个「审阅」按钮。
 - **一个整页的审阅页，点一次就进。**
   - 左边窄条是任务的对话，中间是改动的文件，右边是 diff 和行内评论。
-  - 顶栏右侧依次是检查摘要（就地展开）、「要求修改」和「批准合并」。
+  - 顶栏右侧依次是检查摘要（就地展开）和「批准合并」；「发给 Agent」就是唯一的提交，没有单独的「要求修改」。
   - 底部是批次条「发给 Agent」，和「批准合并」在外观上明显不同。
 - **默认看整个 PR 的最终 diff。** 尝试只出现在「活动」里，不作为 diff 的范围。
 - **先例：** Linear 不在 issue 上嵌 diff；它的评审默认看整个 PR，没有仓库文件树，Reviews 是单独的收件箱（https://linear.app/docs/diffs）。
@@ -23,16 +23,26 @@
 | R0b 任务面板：同一行摘要；尝试只在「活动」里 | `1120:432` | `1120:664` | [浅](assets/2026-11-08-ws-r0b-task-panel-light.png) · [深](assets/2026-11-08-ws-r0b-task-panel-dark.png) |
 | R1 审阅页 | `1120:869` | `1120:1231` | [浅](assets/2026-11-08-ws-r1-review-page-light.png) · [深](assets/2026-11-08-ws-r1-review-page-dark.png) |
 | R1b 审阅页 · 检查就地展开 | `1120:1542` | `1120:1895` | [浅](assets/2026-11-08-ws-r1b-review-checks-light.png) · [深](assets/2026-11-08-ws-r1b-review-checks-dark.png) |
-| R2 iPhone 审阅：检查摘要、PR、要求修改 / 批准合并、改动文件 | `1121:54` | `1121:169` | [浅](assets/2026-11-08-ws-r2-iphone-review-light.png) · [深](assets/2026-11-08-ws-r2-iphone-review-dark.png) |
+| R2 iPhone 审阅：检查摘要、批准合并、改动文件 | `1121:54` | `1121:169` | [浅](assets/2026-11-08-ws-r2-iphone-review-light.png) · [深](assets/2026-11-08-ws-r2-iphone-review-dark.png) |
 | R3 iPhone 文件 diff 和行内评论 | `1121:274` | `1121:359` | [浅](assets/2026-11-08-ws-r3-iphone-diff-light.png) · [深](assets/2026-11-08-ws-r3-iphone-diff-dark.png) |
+| R6 运行中、还没开 PR | `1129:24` | `1129:336` | [浅](assets/2026-11-08-ws-r6-running-no-pr-light.png) · [深](assets/2026-11-08-ws-r6-running-no-pr-dark.png) |
+| R7 合并确认（有失败检查） | `1129:622` | `1129:948` | [浅](assets/2026-11-08-ws-r7-merge-confirm-light.png) · [深](assets/2026-11-08-ws-r7-merge-confirm-dark.png) |
+| R8 已合并 | `1129:1274` | `1129:1589` | [浅](assets/2026-11-08-ws-r8-merged-light.png) · [深](assets/2026-11-08-ws-r8-merged-dark.png) |
+| R9 完整日志（底部抽屉「运行日志」） | `1130:2` | `1130:403` | [浅](assets/2026-11-08-ws-r9-full-log-light.png) · [深](assets/2026-11-08-ws-r9-full-log-dark.png) |
+| R10a 预览 · 没有开发服务器 | `1130:738` | `1130:1056` | [浅](assets/2026-11-08-ws-r10a-preview-start-light.png) · [深](assets/2026-11-08-ws-r10a-preview-start-dark.png) |
+| R10b 预览 · 在浏览器栏打开 | `1130:1374` | `1130:1704` | [浅](assets/2026-11-08-ws-r10b-preview-open-light.png) · [深](assets/2026-11-08-ws-r10b-preview-open-dark.png) |
+| R11 队友（没有权限） | `1130:2034` | `1130:2375` | [浅](assets/2026-11-08-ws-r11-teammate-light.png) · [深](assets/2026-11-08-ws-r11-teammate-dark.png) |
+| R12 空和兜底状态 | `1130:2689` | `1130:3038` | [浅](assets/2026-11-08-ws-r12-fallbacks-light.png) · [深](assets/2026-11-08-ws-r12-fallbacks-dark.png) |
+| R2a iPhone 任务详情（摘要行 → R2） | `1131:2` | `1131:152` | [浅](assets/2026-11-08-ws-r2a-iphone-task-light.png) · [深](assets/2026-11-08-ws-r2a-iphone-task-dark.png) |
+| R3b iPhone 加评论 | `1131:224` | `1131:328` | [浅](assets/2026-11-08-ws-r3b-iphone-add-comment-light.png) · [深](assets/2026-11-08-ws-r3b-iphone-add-comment-dark.png) |
 | R4 审阅页 · ⋯ 里勾选「文件」：仓库树（改过的文件标 M）和只读源码 | `1125:22` | `1125:481` | [浅](assets/2026-11-08-ws-r4-all-files-light.png) · [深](assets/2026-11-08-ws-r4-all-files-dark.png) |
 | R5 审阅页 · ⋯ 里勾选「终端」：底部终端抽屉 | `1125:786` | `1125:1163` | [浅](assets/2026-11-08-ws-r5-terminal-drawer-light.png) · [深](assets/2026-11-08-ws-r5-terminal-drawer-dark.png) |
 
 **顶栏审计**（Alex：顶上几行有空位，却放着不重要的东西，重要的反而在下面）。每一行最上面只放最常用的东西，画布上的标注写了每个顶栏放了什么、为什么：
 - **任务面板：** 顶行只有「#1471 标题 · ⋯ ⤢ ✕」。⋯ 菜单里先是代码工具（改动 +42 −7 ⌘⇧B、文件、终端 ⌘J、预览），分隔线下是分支名、复制链接、权限（Alex：「只要求你把这些东西放进省略号里边…不是放在省略号的外边」）。标题下第一行是「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败 ›」，整行点开审阅页。
-- **审阅页顶栏：** 任务标题、检查摘要（就地展开）、要求修改 / 批准合并、⋯、✕；四个代码工具在 ⋯ 里，当前视图打勾。分支名、已看 1/3、快捷键说明都放进 ⋯ 或提示。顶栏上不写 Esc。
+- **审阅页顶栏：** 任务标题、检查摘要（就地展开）、批准合并、⋯、✕；四个代码工具在 ⋯ 里，当前视图打勾。分支名、已看 1/3、快捷键说明都放进 ⋯ 或提示。顶栏上不写 Esc。
 - **窗口栏：** 不变。地球图标留在最右上角（Alex：「浏览器你可以放到最右上角呀」）；移出窗口栏的提议已否决。
-- **iPhone R2：** 一个居中标题，左侧返回，右侧最多一个按钮。第一行是检查摘要和要求修改 / 批准合并，下面直接是改动文件。
+- **iPhone R2：** 一个居中标题，左侧返回，右侧最多一个按钮。第一行是检查摘要和批准合并，下面直接是改动文件。
 
 下文是这个方案之前的调研和草图，保留作为记录。D 帧和 M 帧在 Figma 上已标为「已取代」。
 

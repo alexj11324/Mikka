@@ -309,7 +309,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   2026-11-01: 「自己上传的文件，在资料库里可以删除」;
   [decision](decisions/2026-11-01-2255-library-delete-own-files.md)).
   Exception: a coding task's review page ([2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)) carries
-  actions (line comments, 发给 Agent, 附到评论, 要求修改, 批准合并). On a coding
+  actions (line comments, 发给 Agent, 附到评论, 批准合并). On a coding
   task, the task panel's ⋯ menu also lists the code tools 改动 · 文件 · 终端 ·
   预览, and its PR summary line opens the review page; these only open the
   review page, and the rest of the panel stays read-only.

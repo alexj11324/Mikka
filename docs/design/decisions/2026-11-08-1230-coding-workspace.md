@@ -31,13 +31,23 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 | Frame | What it fixes | Light | Dark |
 |---|---|---|---|
 | R0 入口 | The chat's task card and the window bar's 等待你 list show one line, 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败」, with 「审阅」. One click opens R1. The list's footer shows ⌘⇧B and ⌘K 「审阅 #1471」. | `1120:2` | `1120:227` |
-| R0b 任务面板 | The task detail keeps its current shape. The task detail keeps its current shape. Its header row is `#1471 修复 iOS 登录回调 · ⋯ · ⤢ · ✕`. The ⋯ menu, drawn open, lists the code tools first: 改动 (+42 −7, ⌘⇧B) opens R1, 文件 opens R4, 终端 (⌘J) opens R5 and 预览 opens the dev preview. After a divider come the branch name, 复制链接 and 权限. The first row under the title, above 状态 / Bot / Agent, is 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败 ›」, and the whole line opens R1. A non-coding task's ⋯ has no code tools. Attempts appear only in 活动: 第 1 次尝试 · 失败 · 换 Codex 再试 → 第 2 次尝试 · 完成 · 开了 PR #1471. | `1120:432` | `1120:664` |
+| R0b 任务面板 | The task detail keeps its current shape. Its header row is `#1471 修复 iOS 登录回调 · ⋯ · ⤢ · ✕`. The ⋯ menu, drawn open, lists the code tools first: 改动 (+42 −7, ⌘⇧B) opens R1, 文件 opens R4, 终端 (⌘J) opens R5 and 预览 opens the dev preview. After a divider come the branch name, 复制链接 and 权限. The first row under the title, above 状态 / Bot / Agent, is 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败 ›」, and the whole line opens R1. A non-coding task's ⋯ has no code tools. Attempts appear only in 活动: 第 1 次尝试 · 失败 · 换 Codex 再试 → 第 2 次尝试 · 完成 · 开了 PR #1471. | `1120:432` | `1120:664` |
 | R1 审阅页 | One full page, described below. | `1120:869` | `1120:1231` |
 | R1b 检查展开 | The check summary expands in place: the failing check with a log excerpt, 查看完整日志 and 附到评论; the passing checks in one row. | `1120:1542` | `1120:1895` |
 | R4 文件 | The top bar's ⋯ is open with 文件 checked (Conductor's All files): the repository tree, with changed files marked, and read-only source on the right. | `1125:22` | `1125:481` |
 | R5 终端 | The top bar's ⋯ is open with 终端 checked (or ⌘J): a bottom drawer on the review page. Teammates see the terminal read-only. | `1125:786` | `1125:1163` |
-| R2 iPhone 审阅 | Opened in one tap from the chat card's summary line. Under one centred title, the first row is the check summary (tap to expand) with 要求修改 / 批准合并, then the changed files, and the floating 「N 条评论 · 发给 Agent」 bar. | `1121:54` | `1121:169` |
+| R2 iPhone 审阅 | Opened in one tap from the chat card's summary line. Under one centred title, the first row is the check summary (tap to expand) with 批准合并, then the changed files, and the floating 「N 条评论 · 发给 Agent」 bar. | `1121:54` | `1121:169` |
 | R3 iPhone 文件 diff | A file's diff with inline comments and the floating bar. | `1121:274` | `1121:359` |
+| R3b iPhone 加评论 | Tap a line: a sheet titled 「第 22 行」 with the line, an input and 「加入评论」. The comment joins the floating batch. | `1131:224` | `1131:328` |
+| R2a iPhone 任务详情 | The iOS task detail has the summary row 「PR #1471 · +42 −7 · ⚠ 1 项失败 ›」 under the title; one tap opens R2. | `1131:2` | `1131:152` |
+| R6 运行中、还没开 PR | While the agent runs and before a PR exists, the top bar shows 「运行中 · 还没开 PR」 instead of 批准合并, and the diff is marked 实时 and updates live. The R0 summary line reads 「3 个文件 +42 −7 · 运行中」, without a PR number. | `1129:24` | `1129:336` |
+| R7 合并确认 | 批准合并 with a failing check asks 「还有 1 项检查失败，确定合并？」 with 取消 / 仍然合并. | `1129:622` | `1129:948` |
+| R8 已合并 | After the merge: 「已合并」 in the top bar, the task is 已完成, the batch bar is gone and the comments show as sent. | `1129:1274` | `1129:1589` |
+| R9 完整日志 | 查看完整日志 opens the bottom drawer on its 运行日志 tab, the same drawer as the terminal. | `1130:2` | `1130:403` |
+| R10a 预览 · 未启动 | ⋯ › 预览 with no dev server running: a small panel 「没有运行中的开发服务器」 with 「启动预览」. | `1130:738` | `1130:1056` |
+| R10b 预览 · 已打开 | With a dev server running, the preview opens in the app's browser column (the globe's browser), pointed at this task's machine. | `1130:1374` | `1130:1704` |
+| R11 队友 | Without permission, 批准合并, 发给 Agent and 终端 are disabled and say why: 「只有任务负责人可以合并」, 「只有任务负责人可以发给 Agent」, 「只有任务负责人可以用终端」. | `1130:2034` | `1130:2375` |
+| R12 空和兜底 | Three panels: no changes; a change too big to load at once (per-file 加载); the machine reclaimed, 「机器已回收，显示的是最后一次检查点 / PR 的改动」 with the source and time. | `1130:2689` | `1130:3038` |
 
 ## The review page (R1)
 
@@ -46,11 +56,11 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 - **Right:** the diff, unified or split, with inline comments. A small, collapsed 「按提交筛选」 sits in the diff header, as in Linear, and not in the main toolbar.
 - **Top bar:**
   - On the left: the task title only.
-  - On the right, in this order: the check summary 「⚠ 1 项检查失败 · 5 项通过」, which expands in place (R1b), then 「要求修改」 and 「批准合并」, then ⋯ and ✕.
+  - On the right, in this order: the check summary 「⚠ 1 项检查失败 · 5 项通过」, which expands in place (R1b), then 「批准合并」, then ⋯ and ✕. There is no separate 要求修改: 发给 Agent is the one submit, as GitHub and Linear have one submit-review.
   - The ⋯ menu lists the code tools first, in the task panel's order with the same shortcuts: 改动, 文件, 终端, 预览. The current view is checked. They switch the page between changes, all files, the terminal drawer and the preview.
   - The branch name, the viewed count (已看 1/3), copy link, permissions and shortcut hints go into ⋯ or tooltips. The bar shows no Esc text.
   - 批准合并 is a dark, neutral button with the PR icon. It is never the accent blue that 发给 Agent uses.
-- **Bottom:** the batch bar 「2 条评论 · ios-unit 失败 · 发给 Agent」, in the accent colour. It is visually separate from 批准合并: 发给 Agent sends comments to the agent, and 批准合并 merges the PR.
+- **Bottom:** the batch bar 「2 条评论 · ios-unit 失败 · 写修改意见… · 发给 Agent」, always present, so a general note can be sent with no line comments. 发给 Agent is in the accent colour. It is visually separate from 批准合并: 发给 Agent sends comments to the agent, and 批准合并 merges the PR.
 - **Opening and closing:** it opens from any 审阅 entry or ⌘⇧B, and Esc (when focus is not in a text field) or ✕ closes it. The switch is instant (R-37).
 
 ## Decisions
@@ -62,12 +72,35 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
    - Line comments collect in the batch bar 「N 条评论 · 失败检查」.
    - A failed check is added with 附到评论 from the expanded check summary. It is never sent on its own.
    - Sending posts the batch as one message in the task's conversation, 「你：N 条评论」, with `file:line` quotes. The history stays visible and there is no hidden channel.
+   - 发给 Agent also marks the PR 「需要修改」 (synced to GitHub as request-changes) and starts the next attempt on the same branch.
+   - Pending comments show 编辑 / 删除 on hover.
    - The agent's fix comes back in the same conversation, and the review page refreshes.
-5. **R-51 exception.** Only the review page may carry actions: comment, 发给 Agent, 附到评论, 要求修改 and 批准合并. The task panel stays read-only apart from its summary line and the code tools in its ⋯ menu, which only open the review page.
+5. **R-51 exception.** Only the review page may carry actions: comment, 发给 Agent, 附到评论 and 批准合并. The task panel stays read-only apart from its summary line and the code tools in its ⋯ menu, which only open the review page.
 6. **After a PR exists**, the diff and checks stay in Mikka. 「在 GitHub 打开」 is a secondary link.
 7. **iPhone parity** with R2 and R3: the summary line opens the review screen in one tap, with line comments, 发给 Agent, the checks and the PR actions. There is no terminal and no editor.
 8. **No grey slabs.** Properties are label/value rows on the panel background.
-9. **Top rows carry the important things** (R-91) (Alex: the top rows had room but held low-value items). On every surface the first row holds the task's state and its main action: PR, failed checks and 审阅 next to the task title; checks and 要求修改 / 批准合并 on the review page and on iPhone. Branch names, counts and shortcut hints go into ⋯ or tooltips.
+9. **Top rows carry the important things** (R-91) (Alex: the top rows had room but held low-value items). On every surface the first row holds the task's state and its main action: PR, failed checks and 审阅 next to the task title; checks and 批准合并 on the review page and on iPhone. Branch names, counts and shortcut hints go into ⋯ or tooltips.
+
+## 流程走查
+
+Every state can be reached and left from the screen; none is a dead end.
+
+| State | How you get there | How you leave |
+|---|---|---|
+| Chat card / 等待你 summary line (R0) | The task appears in a bot chat or in ✋ 等待你 | 「审阅」 → R1; the card → the task panel (R0b) |
+| Task panel (R0b) | The chat card, the board, the window bar | Summary line or ⋯ › 改动 → R1; ⋯ › 文件 → R4; ⋯ › 终端 → R5; ⋯ › 预览 → R10a/R10b; ✕ closes |
+| Review page (R1) | 审阅, the summary line, ⋯ › 改动, ⌘⇧B, ⌘K 「审阅 #N」 | ✕ or Esc → where you came from; 批准合并 → R7 or R8; 发给 Agent → stays, a new attempt starts (R6) |
+| Running, no PR (R6) | A running coding task, from any entry | The PR opens → R1; ✕ |
+| Checks expanded (R1b) | Click the check summary | Click it again; 查看完整日志 → R9; 附到评论 → the batch bar |
+| All files (R4) | ⋯ › 文件 | ⋯ › 改动 |
+| Terminal (R5) | ⋯ › 终端 or ⌘J | ⌘J or the drawer's ⌄ |
+| Full log (R9) | 查看完整日志 | The drawer's 终端 tab or ⌄ |
+| Preview (R10a / R10b) | ⋯ › 预览 | 启动预览 → R10b; ✕ on the browser column |
+| Merge confirm (R7) | 批准合并 with a failing check | 取消 → R1; 仍然合并 → R8 |
+| Merged (R8) | A merge | ✕; the task is 已完成 in lists |
+| Teammate (R11) | A teammate opens any entry | ✕; disabled actions say why |
+| Fallbacks (R12) | No changes, a change too big, or the machine reclaimed | Per-file 加载; the source line says which checkpoint or PR is shown |
+| iPhone task (R2a) → review (R2) → diff (R3) → add comment (R3b) | The task, then its summary row, then a file, then a line | Back at each step; 加入评论 → R3; 发给 Agent → the task conversation |
 
 ## Scope
 
