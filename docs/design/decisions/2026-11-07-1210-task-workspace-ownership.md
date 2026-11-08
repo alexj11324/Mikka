@@ -95,6 +95,17 @@ workspace. Scoped PAT/OAuth/run credentials retain their server-verified pin.
 The response confirms the accepted workspace so clients can discard responses
 from a previous workspace or account generation.
 
+For mobile task details, a session request without that explicit header uses the
+task's persisted, bound workspace as its effective workspace. The Personal
+default and a saved workspace cookie remain selection preferences, not credential
+pins. The full authenticated reader first locates an ACL-visible candidate; the
+handler then locks membership in that task's workspace and rereads the task and
+all decorations there. A lock wait must not preserve access after membership is
+revoked. An explicit header still constrains the requested detail, and actual
+PAT/OAuth/Enterprise restrictions remain intact. Lists keep their selected
+workspace filter. This preserves existing native task links without depending
+on a later client header rollout.
+
 Every human Factory adapter preserves the full verified user, including native
 session provenance. Workspace/member admission precedes the application
 transaction, and the selected workspace remains fixed through the handler.
@@ -148,7 +159,7 @@ this work consumes that release and reruns its regression.
 ## Frontend handoff
 
 Claude owns UI implementation. The PR must describe current-workspace task
-creation/list/search/detail behavior, the fixed workspace on task details,
+creation/list/search behavior, the effective workspace on mobile task details,
 optional Team grouping, explicit Linear controls and a metadata-only pending
 ownership workflow. Do not expose unresolved task bodies through a fallback view.
 Later Team and Enterprise PRs provide their own entitlement and administration

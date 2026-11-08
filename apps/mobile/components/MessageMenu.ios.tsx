@@ -1,23 +1,17 @@
-import type { ReactElement } from 'react'
-import { View } from 'react-native'
+import { StyleSheet } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
-import { useRouter } from 'expo-router'
-import { Button, ContextMenu, ControlGroup, Host, RNHostView, Toggle, Text } from '@expo/ui/swift-ui'
+import { Button, ControlGroup, Host, Image, Menu, Text, Toggle } from '@expo/ui/swift-ui'
+import { accessibilityLabel, buttonStyle } from '@expo/ui/swift-ui/modifiers'
 import { tap } from '@/lib/haptics'
-import { holdMessage, REACTIONS, type HeldMessage } from '@/lib/message-actions'
-
-/** Off (2026-11-05): on device the SwiftUI host sized rows wrong and bubbles overlapped; long press uses the sheet until that is fixed. */
-export const NATIVE_MESSAGE_MENU = false
+import { REACTIONS, type HeldMessage } from '@/lib/message-actions'
+import { colors } from '@/lib/theme'
 
 /**
- * A long press on a message lifts it and opens the system context menu, as in Messages (#1386, native first):
- * the reactions first, as two compact rows of three (iOS has no reaction bar on a context menu; this is the closest
- * system layout), then 回复, 复制 and 选择文本. The bubble is hosted inside SwiftUI so the system lifts the real
- * view; its swipe to quote still runs on the React Native side.
+ * ⋯ under a message (Alex 2026-11-08) as the system pull-down menu: the reactions first, as two compact rows of three,
+ * then 回复 (quotes it in the composer), 复制 and 选择文本. A long press no longer opens anything but the selection.
+ * The Host has a fixed frame: one sized by its SwiftUI content can be laid out at zero size (chat-header.ios.tsx).
  */
-export function MessageMenu({ message, children }: { message?: HeldMessage; children: ReactElement }) {
-  const router = useRouter()
-  if (!message) return children
+export function MessageMenu({ message }: { message: HeldMessage }) {
   const react = message.react
   const reaction = (emoji: string) => (
     <Toggle key={emoji} isOn={react?.current === emoji} onIsOnChange={() => { tap(); react?.set(react.current === emoji ? null : emoji) }}>
@@ -25,19 +19,18 @@ export function MessageMenu({ message, children }: { message?: HeldMessage; chil
     </Toggle>
   )
   return (
-    <Host matchContents={{ vertical: true }} style={{ alignSelf: 'stretch' }}>
-      <ContextMenu>
-        <ContextMenu.Trigger>
-          <RNHostView matchContents={{ vertical: true }}><View>{children}</View></RNHostView>
-        </ContextMenu.Trigger>
-        <ContextMenu.Items>
-          {react ? <ControlGroup>{REACTIONS.slice(0, 3).map(reaction)}</ControlGroup> : null}
-          {react ? <ControlGroup>{REACTIONS.slice(3).map(reaction)}</ControlGroup> : null}
-          <Button label="回复" systemImage="arrowshape.turn.up.left" onPress={message.onQuote} />
-          <Button label="复制" systemImage="doc.on.doc" onPress={() => { void Clipboard.setStringAsync(message.text); tap() }} />
-          <Button label="选择文本" systemImage="character.cursor.ibeam" onPress={() => { holdMessage(message); router.push('/message-text') }} />
-        </ContextMenu.Items>
-      </ContextMenu>
+    <Host style={styles.button}>
+      <Menu label={<Image systemName="ellipsis" size={14} color={colors.secondary} />} modifiers={[buttonStyle('plain'), accessibilityLabel('更多')]}>
+        {react ? <ControlGroup>{REACTIONS.slice(0, 3).map(reaction)}</ControlGroup> : null}
+        {react ? <ControlGroup>{REACTIONS.slice(3).map(reaction)}</ControlGroup> : null}
+        <Button label="回复" systemImage="arrowshape.turn.up.left" onPress={() => { tap(); message.onQuote() }} />
+        <Button label="复制" systemImage="doc.on.doc" onPress={() => { void Clipboard.setStringAsync(message.text); tap() }} />
+        {message.onSelect ? <Button label="选择文本" systemImage="character.cursor.ibeam" onPress={() => message.onSelect?.()} /> : null}
+      </Menu>
     </Host>
   )
 }
+
+const styles = StyleSheet.create({
+  button: { width: 32, height: 32 },
+})

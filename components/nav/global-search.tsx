@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Bot, FolderClosed, ListTodo, Plus, RotateCw, Search, SquarePen, Users } from 'lucide-react'
+import { Bot, FileDiff, FolderClosed, ListTodo, Plus, RotateCw, Search, SquarePen, Users } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import type { listProjects } from '@/app/actions/projects'
 import type { Thread } from '@/app/actions/task-runs'
@@ -52,7 +52,7 @@ export function SearchPill({ onSearch }: { onSearch: () => void }) {
  * stay authorized by the server; opening one goes through the destination's own
  * access check.
  */
-export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, threads = [], workspaceId, onChat, onNewBot, onIssue, onProject, onThread, onCreateIssue }: {
+export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, threads = [], workspaceId, onChat, onNewBot, onIssue, onProject, onThread, onCreateIssue, reviewTaskId = null, onReview }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onOpenChangeComplete?: (open: boolean) => void
@@ -71,6 +71,10 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
   onProject: (id: string) => void
   onThread?: (runId: string) => void
   onCreateIssue: () => void
+  /** The task in front of the person: its 「审阅 #N」 is listed with an empty query too. */
+  reviewTaskId?: string | null
+  /** Opens a task's review page; only given when the UI layer has one (review-summary's REVIEW_ENABLED). */
+  onReview?: (issueId: string) => void
 }) {
   const t = useTranslations('Shell')
   const tNav = useTranslations('Nav')
@@ -105,11 +109,15 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
     // i18n-ignore: bilingual search keywords, not rendered
     { value: '新建 bot create new bot', icon: Bot, label: t('newBot.title'), run: onNewBot },
   ].filter(action => shown(`${action.value} ${action.label}`))
+  // 「审阅 #N」 (#1732): the current task's, and with a query any matching task that has a pull request.
+  const reviewRows = onReview ? issues.filter(issue => issue.id === reviewTaskId || (text && issue.metadata.pullRequests?.length))
+    .map(issue => ({ id: issue.id, label: t('reviewTask', { identifier: issue.identifier ?? issue.title }), value: `review ${issue.id} ${issue.identifier ?? ''} ${issue.title}` }))
+    .filter(row => shown(`${row.value} ${row.label}`)) : []
   const coordinatorShown = shown(coordinatorValue)
 
   const failed = search.sources.filter(source => search.state[source].status === 'error' || search.state[source].error)
   const authLost = failed.some(source => search.state[source].error === 'authRequired')
-  const resultCount = (coordinatorShown ? 1 : 0) + botRows.length + historyRows.length + groupRows.length + taskRows.length + threadRows.length + projectRows.length + actions.length
+  const resultCount = (coordinatorShown ? 1 : 0) + botRows.length + historyRows.length + groupRows.length + taskRows.length + threadRows.length + projectRows.length + actions.length + reviewRows.length
   const announce = search.searching ? t('search.searching')
     : search.query.kind === 'tooLong' ? t('search.tooLong')
       : resultCount === 0 ? t('searchEmpty') : t('search.count', { count: resultCount })
@@ -181,7 +189,8 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
             <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{project.name}</span>{project.summary && <span className="truncate text-xs text-muted-foreground">{project.summary}</span>}</span>
           </CommandItem>)}
         </CommandGroup>}
-        {actions.length > 0 && <CommandGroup heading={t('groups.actions')}>
+        {(actions.length > 0 || reviewRows.length > 0) && <CommandGroup heading={t('groups.actions')}>
+          {reviewRows.map(row => <CommandItem key={row.value} value={row.value} onSelect={() => pick(() => onReview?.(row.id))}><FileDiff />{row.label}</CommandItem>)}
           {actions.map(action => <CommandItem key={action.value} value={action.value} onSelect={() => pick(action.run)}><action.icon />{action.label}</CommandItem>)}
         </CommandGroup>}
         {/* Both lines are announced by the status region above, so the listbox stays options only for screen readers. */}
