@@ -44,6 +44,15 @@ class Cookies {
 
 test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revocation', { skip: !target, timeout: 120_000 }, async t => {
   const pool = new Pool({ connectionString: target, max: 4 })
+  // Native HTTP uses the production API request adapters, as the mobile DB fixture does.
+  const requestContext = await import('../../apps/api/src/context')
+  t.mock.module('next/headers', { namedExports: await import('../../apps/api/compat/headers') })
+  t.mock.module('next-intl/server', { namedExports: await import('../../apps/api/compat/intl') })
+  async function withMobileRequest<T>(request: Request, work: () => Promise<T>) {
+    const scope = requestContext.createRequestScope(request)
+    try { return await requestContext.runRequestScope(scope, work) }
+    finally { await scope.after.finish() }
+  }
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   const organizationId = randomUUID(), connectionId = randomUUID(), samlConnectionId = randomUUID(), otherConnectionId = randomUUID()
@@ -210,7 +219,8 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
           response = request.method === 'GET' ? await route.GET(request, context) : await route.POST(request, context)
         }
       } else if (mobileDetail && request.method === 'GET') {
-        response = await (await import('../../app/api/mobile/tasks/[id]/route')).GET(request, { params: Promise.resolve({ id: mobileDetail[1] }) })
+        response = await withMobileRequest(request, async () =>
+          (await import('../../app/api/mobile/tasks/[id]/route')).GET(request, { params: Promise.resolve({ id: mobileDetail[1] }) }))
       } else if (url.pathname === '/api/web/begin') response = await (await import('../../app/api/web/begin/route')).POST(request)
       else if (url.pathname === '/api/web/return') response = await (await import('../../app/api/web/return/route')).GET(request)
       else if (url.pathname === '/api/web/exchange') response = await (await import('../../app/api/web/exchange/route')).POST(request)
