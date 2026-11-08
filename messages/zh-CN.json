@@ -4205,6 +4205,7 @@
       "groupChats": "群聊"
     },
     "newTask": "新建任务",
+    "reviewTask": "审阅 {identifier}",
     "newConversation": "新对话",
     "openList": "展开 Bot 列表",
     "back": "后退",
@@ -5687,6 +5688,14 @@
       "providerOn": "{on}/{total} 个可用",
       "firstModel": "任务先用",
       "keyProvider": "服务商"
+    }
+  },
+  "CodeReview": {
+    "summary": {
+      "pr": "PR #{number}",
+      "files": "{count} 个文件 +{additions} −{deletions}",
+      "failed": "⚠ {count} 项检查失败",
+      "running": "运行中"
     }
   }
 }
