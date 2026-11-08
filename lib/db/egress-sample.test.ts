@@ -1,3 +1,4 @@
+import '../../scripts/credential-diagnostics-offline.mjs'
 import assert from 'node:assert/strict'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { EventEmitter } from 'node:events'
