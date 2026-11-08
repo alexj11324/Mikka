@@ -33,3 +33,16 @@
 html:has(.desktop-offline) {
   scrollbar-gutter: auto;
 }
+
+/* Inside the app the offline card wears the app's own tokens, so it follows the
+ * .dark toggle and the app's neutrals; the standalone native page keeps its own
+ * palette (src/offline.html), which this selector outranks. */
+:root .desktop-offline {
+  --offline-bg: var(--shell-chrome);
+  --offline-card: var(--background);
+  --offline-fg: var(--foreground);
+  --offline-muted: var(--muted-foreground);
+  --offline-border: var(--border);
+  --offline-primary: var(--primary);
+  --offline-primary-fg: var(--primary-foreground);
+}

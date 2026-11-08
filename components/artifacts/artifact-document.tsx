@@ -130,7 +130,7 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
     return () => document.removeEventListener('selectionchange', clear)
   }, [])
 
-  return <div className="min-h-0 flex-1 overflow-y-auto" onMouseUp={readSelection} onKeyUp={readSelection}>
+  return <div className="min-h-0 flex-1 overflow-y-auto scroll-fade-y" onMouseUp={readSelection} onKeyUp={readSelection}>
     <article className="group/doc mx-auto w-full max-w-[40rem] px-6 pt-10 pb-16 md:px-10 has-[[data-slot=artifact-lead]:not(:empty)]:max-w-[56rem]">
       {lead}
       <h1 className="text-2xl font-semibold text-foreground group-has-[[data-slot=artifact-lead]:not(:empty)]/doc:hidden">{title}</h1>

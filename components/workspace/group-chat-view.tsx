@@ -152,7 +152,7 @@ export function GroupChatView({ group, userId, people }: {
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className="relative flex min-h-0 w-full flex-1 flex-col">
     <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
-    <div ref={scroller} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} className="min-h-0 flex-1 overflow-y-auto">
+    <div ref={scroller} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} className="min-h-0 flex-1 overflow-y-auto scroll-fade-y">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
         {blockingCode === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
           : blockingCode ? <div role="alert" className="flex items-center gap-3 py-6 text-sm"><span>{blockingCode === 'unauthorized' ? t('authRequired') : t('loadError')}</span>{blockingCode !== 'unauthorized' && <Button variant="outline" size="sm" onClick={() => { void mutate() }}>{t('retry')}</Button>}</div>

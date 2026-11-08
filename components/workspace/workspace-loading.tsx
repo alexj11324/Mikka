@@ -16,9 +16,10 @@ export function WorkspaceContentLoading() {
 /** The first paint: the same window frame as the app (window bar, rail, one card) so nothing jumps when it arrives. */
 export function WorkspaceLoading() {
   return <div className="flex h-svh flex-col overflow-hidden bg-shell-chrome text-foreground in-data-desktop-translucent:bg-transparent">
-    <div aria-hidden="true" className="hidden h-11 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center gap-3 pr-2 pl-3 md:grid"><span /><Skeleton className="h-7 w-full rounded-full" /><span /></div>
+    {/* bg-muted is the light chrome ground itself: the chrome's placeholders take a step of the text colour instead. */}
+    <div aria-hidden="true" className="hidden h-11 shrink-0 grid-cols-[1fr_minmax(0,26rem)_1fr] items-center gap-3 pr-2 pl-3 md:grid"><span /><Skeleton className="h-7 w-full rounded-full bg-foreground/[0.07]" /><span /></div>
     <div className="flex min-h-0 flex-1 md:pr-2 md:pb-2">
-      <div aria-hidden="true" className="hidden w-17 shrink-0 flex-col items-center gap-1 pt-1 md:flex">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="size-9 rounded-lg" />)}</div>
+      <div aria-hidden="true" className="hidden w-17 shrink-0 flex-col items-center gap-1 pt-1 md:flex">{Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="size-9 rounded-lg bg-foreground/[0.07]" />)}</div>
       <div className="flex min-w-0 flex-1 overflow-hidden bg-background in-data-desktop-translucent:bg-transparent md:rounded-xl md:shadow-xs md:ring-1 md:ring-border">
         {/* split-pane-exempt: the loading placeholder of the bot list, gone before anyone could drag it */}
         <aside aria-hidden="true" className="hidden w-64 shrink-0 flex-col gap-3 border-r p-3 md:flex">
