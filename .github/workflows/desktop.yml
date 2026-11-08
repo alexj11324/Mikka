@@ -190,6 +190,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Keep setup-node 24 in the native installer login shell
         run: node apps/desktop/test/native-node.mjs
+      - name: Prepare the pinned native Electron and builder checksum cache
+        run: node apps/desktop/scripts/install-electron.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - run: pnpm exec playwright install chromium
       - name: Start an independent local PostgreSQL
         run: |

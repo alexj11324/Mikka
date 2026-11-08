@@ -841,3 +841,21 @@ ALS SQL/row计数、返回对象、原await位置和query callback/Promise体保
 没有为此重下二进制或声称新CI/native/macOS已通过。与前述完整worker输入无交叉。
 `35cb728e` 只是上一预发布阶段准备的未引用Git对象，从未更新PR分支或触发CI；
 后续以最终实际发布head为准。
+
+### 2026-11-08 10:37 UTC：官方下载路径、实际入口更正与下一次CI取证
+
+#1689的df0c/tree052c实际CI checkout为日志核实的2699（同树，parents main263+df0c）。11工作流全部终态：9成功/2失败；44checks为33成功/7条件skip/4失败。实际首错是两个CUA固定归档下载HTTP504、Apple打包HTTP504；另一个是Desktop失败引起的汇总拒绝。CUA checksum/tar/driver均未执行；Apple失败URL未记录，先前Electron下载100%不能确定随后失败请求。原失败保留。原unlinkedRunCitation本次9 SQL/932 B JSON/2639+6337=8976 B≤原9326 B；尾部是同次执行汇总，没有socketTrace，不能追认旧9823 B的原因。
+
+完整合入833：单一Electron入口支持darwin/arm64，从锁定npm校验值种入builder checksum缓存，保留校验与API/CDN令牌隔离。6/6已有相关测试、实际两文件97规则lint和语法检查通过；真实builder消费的是合成缓存，不能记为真实macOS或生产通过。
+
+**更正覆盖范围：da9只修旧scripts/e2b/bootstrap-desktop.sh，该文件不在470项canonical inputs，也不是正式入口。**此前把它称为正式bootstrap或指纹变化不成立，已在#1719评论6720281156公开更正。正式INSTANCE_BOOTSTRAP是packages/daemon/scripts/official-e2b-instance-bootstrap.sh，构建器从固定提交读取、复制到/opt/mikka/instance-bootstrap.sh，再按source/worker/kind执行。
+
+e369+e132现已补齐正式入口的GH和desktop CUA两行：仅换同仓库固定asset API326964816/661455608+Accept，保留各自原retry3/connect20/max120、完整SHA、归档位置/tar/symlink/chmod，不搬旧脚本额外flags，不加凭据/helper/镜像或升级版本。CI两处CUA也只换传输。Linux CUA复用既有37,183,089 B完整核验；本方mac CUA53,208,248 B、GH18,151,686 B均匿名完整下载并与原SHA一致，未执行归档，自有临时文件已删除。真正的模板构建、官方文件守恒和双订阅门槛仍不可省略。
+
+main759 E2B42470724724已真实失败：三种模板完成node phase后各四次HTTP504，没有gh phase。curl未打印URL；按精确759源码两个phase之间唯一GH curl归因至GH下载，CUA尚未到达。三候选删除、两次清理stdout均VM空/三名字absent/errors空，双订阅和新公开runtime为0。Web42470724754另在typecheck失败，公开事件无具体诊断码；私有详细原因和被mask值保持unknown，不推定为ENOSPC或网络问题。
+
+正式安装器通过WORKER_PATHS的packages/daemon递归进入统一指纹，不是独立RECIPE_PATHS条目。a3→e132的470项中469项相同，仅该脚本变化；worker从915cd变为 **9da70595d61ab946a6b4644f7cb1eaeec1bccc3d**。最终a08源码已实际重新build并用原验证器通过2入口/9资源/16fixtures/12syntax；中间产物与失败原件保留。本地Node24.22.1与模板24.19.0仍有差异，不能据本地构建声称生产成功。
+
+main759 CI另有revokedRunCitation：7 SQL/781 B JSON/2890+5657=8547 B>原7700 B，本次unlinked仍8976通过。旧helper无socketTrace，847 B差值不能直接认作握手。a08只给既有test:activity-actor-db加MIKKA_READ_METRICS_TRACE=1，原Node参数和15文件逐字保留；SQL、预算、warmup、起点、await、并发都不变。输出限匿名数字/至多32条interval及已有测试源码caller，不含SQL/params/行值/地址/凭据。同步诊断可能影响调度，启用它不是修复或追认旧失败。根package只投影packageManager/engines/pnpm进指纹，scripts被排除，因此a08的470项canonical inputs与e132相同，worker仍9da。
+
+待发布组合635d9d7f/tree2a5a4719与实际a08构建同树；本节和[机器回执](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)的officialInstanceBootstrapCorrection随同PR更新。下一head仍须自己的完整CI、实际Web/E2B、官方校验和与真实订阅adoption，再做同tuple六次≤5000ms。没有新增正式六次或性能PASS，#1505保持打开。

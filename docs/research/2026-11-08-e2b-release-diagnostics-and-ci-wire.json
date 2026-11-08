@@ -209,5 +209,494 @@
       "branchWasUpdated": false,
       "ciWasTriggered": false
     }
+  },
+  "cuaAndDarwinFollowup": {
+    "recordedAt": "2026-11-08T10:16:27Z",
+    "status": "historical_intermediate_superseded_by_official_instance_correction",
+    "sourceBeforeDocumentation": {
+      "head": "91dd75ceb8c6323a046f2c564e55e147708fee96",
+      "tree": "f9a7f6244be980be42f8ec027b6721b204005fe4",
+      "fullUpstreamHead": "833f7d9d05f685eded9081c2a710c1d969f52421",
+      "publicBootstrapHandoff": "da9d8ecc9653a447df9e7d2f14c596ecfc0aee45",
+      "localCuaCiFix": "030fbdc7b9c850123231c3052dd53edc43018b8f"
+    },
+    "publishedDf0c": {
+      "head": "df0c6d02970fce25615ec8d508aa28bece092071",
+      "tree": "052c8901c861dc8494e40280c8b09a135775a3c8",
+      "actualCheckout": "2699a41b555f6a6587f6966d3a7768e624398985",
+      "parents": [
+        "263e7ea37013bd22aa197799a26f1d2e0d1abbf1",
+        "df0c6d02970fce25615ec8d508aa28bece092071"
+      ],
+      "mainCiRun": 42469225732,
+      "originalWireAssertion": {
+        "job": 128696065261,
+        "at": "2026-11-08T10:00:00.8848588Z",
+        "passed": true,
+        "statements": 9,
+        "rowJsonBytes": 932,
+        "receivedBytes": 2639,
+        "writtenBytes": 6337,
+        "totalBytes": 8976,
+        "originalBudgetBytes": 9326,
+        "independentExecutions": 1,
+        "socketTraceObserved": false,
+        "rawSha256": "281c7ae05f9155bc081e481fc0fb9c7919309737f0f22a7252eac0cfbfe12eba",
+        "historical9823FailureUnchanged": true,
+        "historicalCauseStillUnknown": true
+      },
+      "cuaFailures": [
+        {
+          "job": 128695833980,
+          "platform": "linux",
+          "error": "curl22 HTTP504",
+          "observedAttempts": 3,
+          "checksumReached": false,
+          "driverReached": false,
+          "rawSha256": "5ee7dde76bfa305e71520af894ea2722754f8a9711c7e09645dea2724ff0b90e"
+        },
+        {
+          "job": 128695834215,
+          "platform": "darwin",
+          "error": "curl56 HTTP504",
+          "observedAttempts": 1,
+          "checksumReached": false,
+          "driverReached": false,
+          "rawSha256": "e0a9cc8c34f34155f779bc427323594164af199b6a02ee0eb12afc2a72f627d5"
+        }
+      ],
+      "appleFailure": {
+        "job": 128697417045,
+        "step": 14,
+        "at": "2026-11-08T10:10:09.2161780Z",
+        "library": "got11.8.6",
+        "error": "HTTP504",
+        "failedUrl": null,
+        "precedingElectronDownload": "100% progress does not identify the later failed request",
+        "nativeAcceptanceReached": false,
+        "rawSha256": "fe629df3a3fc4a0a58be4635a1fbd77ba6350e0243038a6ca06c9d6f1ced832f"
+      }
+    },
+    "cuaTransport": {
+      "repository": "trycua/cua",
+      "tag": "cua-driver-rs-v0.38.0",
+      "prerelease": true,
+      "ciChangedLines": 2,
+      "bootstrapChangedLines": 1,
+      "authenticationAdded": false,
+      "helperAdded": false,
+      "originalVersionsChecksumsTimeoutsRetriesAndDriverGatesUnchanged": true,
+      "assets": [
+        {
+          "platform": "linux-x86_64",
+          "id": 661455608,
+          "bytes": 37183089,
+          "sha256": "31ab9709dd91ce73677e49b9f3e75c6f0d3e4d9625c286c9e58262bfbea698dd",
+          "downloadEvidence": "https://github.com/alexj11324/Mikka/pull/1719#issuecomment-6720122654",
+          "downloadRepeatedHere": false
+        },
+        {
+          "platform": "darwin-universal",
+          "id": 661454894,
+          "bytes": 53208248,
+          "sha256": "2bb8dc4a7e69185ffd04c4a9c0eab590bd2c54b72c2c1be13ab675be4f487732",
+          "actualAnonymousDownload": {
+            "at": "2026-11-08T10:11:21.781Z",
+            "host": "linux",
+            "exitCode": 0,
+            "archiveExtracted": false,
+            "archiveExecuted": false,
+            "ownedArchiveRemoved": true,
+            "resultSha256": "852bb936c0f38bf4dc91c0aa361036076844942a8ec10e8306888818dd5b1e78"
+          }
+        }
+      ],
+      "workflowReverseReplacementExact": true,
+      "bootstrapReverseReplacementExact": true,
+      "syntaxExitCode": 0,
+      "diffCheckExitCode": 0,
+      "nativePassClaimed": false,
+      "ciFixManifestSha256": "efcf4c64930f90e8a175836fb78a2fa036dd7108575aa38477fe491b375e2720",
+      "rootVerificationSha256": "ef3db7eed67da97dbde24af29b987bf624b4572df48fe355560a2821e3d660e3",
+      "bootstrapPath": "scripts/e2b/bootstrap-desktop.sh",
+      "formalBootstrapCoveredAtThatSource": false
+    },
+    "electron833": {
+      "source": "833f7d9d05f685eded9081c2a710c1d969f52421",
+      "scope": "Extend the single reviewed installer to darwin/arm64, seed the builder checksum cache from the locked npm package and wire native CI/release after cache restore.",
+      "localSource": "6ef869a09e5a72fa7e838ab751bc5aed0f65e9ba",
+      "tests": 6,
+      "passed": 6,
+      "skipped": 0,
+      "actualLintFiles": 2,
+      "lintRules": 97,
+      "lintExitCode": 0,
+      "syntaxExitCode": 0,
+      "realLockedBuilderConsumedSyntheticCacheWithoutNetwork": true,
+      "actualNativeOrProductionPassClaimed": false
+    },
+    "currentInputConservation": {
+      "source": "91dd75ceb8c6323a046f2c564e55e147708fee96",
+      "legacyPath": "scripts/e2b/bootstrap-desktop.sh",
+      "legacyIsCanonicalInput": false,
+      "workerHashAtThatSource": "915cd92e81e56388d8bb2ff19abc919b85ae80e7",
+      "formalInstallerNotYetFixed": true,
+      "newBuildClaimed": false,
+      "scopeCorrection": "The unpublished changedRecipePath and formal coverage characterization was incorrect."
+    },
+    "production": {
+      "newWeb": null,
+      "newE2b": null,
+      "officialFileChecksums": null,
+      "realSubscribedBootstrapAdoption": null,
+      "formalSix": null,
+      "allSixAtMost5000ms": false,
+      "issueClosed": false
+    }
+  },
+  "officialInstanceBootstrapCorrection": {
+    "recordedAt": "2026-11-08T10:37:00Z",
+    "status": "final_candidate_pending_own_ci_and_production",
+    "sourceBeforeDocumentation": {
+      "source": "635d9d7fad47f741df4f97da836ce2266bb291cb",
+      "tree": "2a5a471990b970407923c6c03aa6ee31863e4a00",
+      "parents": [
+        "5b420a475f69760a5bc7356e5c3cb9c20435704f",
+        "a08f722f2a105f84c99c029216cd73bcf481a05d"
+      ],
+      "status": "",
+      "workerHash": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d",
+      "actualBuiltSource": "a08f722f2a105f84c99c029216cd73bcf481a05d",
+      "actualBuiltTree": "2a5a471990b970407923c6c03aa6ee31863e4a00",
+      "buildVerificationSha256": "9f04ad2876d644ca8db552efa387281bd9b4929be19aa1be895b8e4c9a70a798",
+      "originalCommandBodyUnchanged": true,
+      "otherPackageJsonValuesUnchanged": true,
+      "newWorkerHashClaimed": false,
+      "workerHashProjectionExcludesScripts": true,
+      "actualBuildExitCode": 0,
+      "actualVerifierExitCode": 0,
+      "entries": 2,
+      "resources": 9,
+      "fixtures": 16,
+      "syntax": 12,
+      "originalVerifierBodyUnchanged": true,
+      "node": "v24.22.1",
+      "officialTemplateNode": "v24.19.0",
+      "sourceTreeEqualsBuild": true
+    },
+    "fullMain": "75930406dda8708a84786475656ae449f5ffda88",
+    "coverageCorrection": {
+      "legacyHandoff": "da9d8ecc9653a447df9e7d2f14c596ecfc0aee45",
+      "legacyPath": "scripts/e2b/bootstrap-desktop.sh",
+      "legacyIsCanonicalInput": false,
+      "initialFormalCoverageClaimIncorrect": true,
+      "publicCorrection": "https://github.com/alexj11324/Mikka/pull/1719#issuecomment-6720281156",
+      "actualPath": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "actualCallChain": [
+        {
+          "path": "scripts/e2b/build-template.py",
+          "line": 37,
+          "action": "Defines exact instance installer source path"
+        },
+        {
+          "path": "scripts/e2b/build-template.py",
+          "lines": [
+            287,
+            288
+          ],
+          "action": "Reads installer bytes from immutable source commit into instance-bootstrap.sh"
+        },
+        {
+          "path": "scripts/e2b/build-template.py",
+          "lines": [
+            304,
+            305
+          ],
+          "action": "Copies private installer to /opt/mikka/instance-bootstrap.sh"
+        },
+        {
+          "path": "scripts/e2b/build-template.py",
+          "line": 308,
+          "action": "Runs installer with exact source, canonical worker hash and template kind"
+        },
+        {
+          "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "lines": [
+            73,
+            82,
+            83,
+            84,
+            85
+          ],
+          "action": "Install mode downloads pinned GitHub CLI, verifies original digest, extracts and links"
+        },
+        {
+          "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "lines": [
+            165,
+            171,
+            172,
+            173
+          ],
+          "action": "Desktop branch downloads pinned CUA, verifies original digest and extracts"
+        }
+      ]
+    },
+    "installerFix": {
+      "source": {
+        "commit": "e13295e5cae5064677410dfa387b21ece817b3d6",
+        "tree": "59b9fe15d96cd4f0cf88454fec93e67129732b47",
+        "parent": "e3692009266ca4aa5e926150a7e8e362b9c851a0",
+        "workerHash": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d",
+        "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+        "cwd": "/vercel/Mikka-cua-instance-bootstrap",
+        "afterBlob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+        "fileSha256": "6740900ce8fe7367a8e2f980b13556b2ddb3a7d9fbadb49d5eff1482fcbf25f0",
+        "diffSha256": "ce341e452db23af573f2176455fb44e7dbe3bfc6a598a950ca035921ee80b3c7",
+        "reverseSingleSubstitutionEqualsBase": true,
+        "status": ""
+      },
+      "scope": {
+        "base": "a3bba9296df4dd859a26c70e8761e06159517e6c",
+        "normalCommits": [
+          "e3692009266ca4aa5e926150a7e8e362b9c851a0",
+          "e13295e5cae5064677410dfa387b21ece817b3d6"
+        ],
+        "files": 1,
+        "changes": [
+          "formal desktop CUA curl URL plus Accept only",
+          "formal install-mode GitHub CLI curl URL plus Accept only"
+        ],
+        "retained": [
+          "retry 3",
+          "connect timeout 20 seconds",
+          "max time 120 seconds",
+          "archive paths",
+          "existing SHA-256 checks",
+          "tar options",
+          "symlink and chmod behavior",
+          "legacy bootstrap correction",
+          "CI Linux/mac transport correction"
+        ],
+        "tokensAdded": false,
+        "helpersAdded": false,
+        "testsAdded": false,
+        "productionRequests": 0,
+        "vmOrModelActions": 0
+      },
+      "canonicalInputs": {
+        "count": 470,
+        "unchanged": 469,
+        "changedPath": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+        "baseWorker": "915cd92e81e56388d8bb2ff19abc919b85ae80e7",
+        "intermediateWorker": "3bf95e68f1473c74644b1b2594da2019f2054100",
+        "finalWorker": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d",
+        "classification": "Installer is included through WORKER_PATHS packages/daemon recursion; not a separate RECIPE_PATHS entry. Canonical fingerprint covers package sources plus recipe. Legacy bootstrap-desktop.sh is outside this input set."
+      },
+      "validation": {
+        "initialShellSyntax": 0,
+        "finalShellSyntax": 0,
+        "diffCheck": 0,
+        "existingRecipeGuards": 4,
+        "builds": [
+          {
+            "source": "e3692009266ca4aa5e926150a7e8e362b9c851a0",
+            "worker": "3bf95e68f1473c74644b1b2594da2019f2054100",
+            "entries": 2,
+            "resources": 9,
+            "fixtures": 16,
+            "syntax": 12
+          },
+          {
+            "source": "e13295e5cae5064677410dfa387b21ece817b3d6",
+            "worker": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d",
+            "entries": 2,
+            "resources": 9,
+            "fixtures": 16,
+            "syntax": 12
+          }
+        ],
+        "typecheck": {
+          "typecheckSource": "e3692009266ca4aa5e926150a7e8e362b9c851a0",
+          "typecheckResult": "/vercel/ops-1505/cua-instance-bootstrap-fix/worker-build/daemon-types-result.json",
+          "typecheckLog": "/vercel/ops-1505/cua-instance-bootstrap-fix/worker-build/daemon-types.log",
+          "typecheckSourceToFinalChangedPaths": [
+            "packages/daemon/scripts/official-e2b-instance-bootstrap.sh"
+          ],
+          "sameTypeScriptAndTypeConfig": true,
+          "repeatedTypecheck": false,
+          "cloudBundles": [
+            {
+              "path": "cloud-worker.js",
+              "beforeSha256": "8d9b231154db94d97712a0b3ac330541f01db701f83ec4eeb0b2d0ca08de56f6",
+              "afterSha256": "8d9b231154db94d97712a0b3ac330541f01db701f83ec4eeb0b2d0ca08de56f6",
+              "equal": true
+            },
+            {
+              "path": "cloud-model-probe.js",
+              "beforeSha256": "0153603291921b9eeaf346b35a6904849f14b9ecb33f3aa23dec7efc2acbd578",
+              "afterSha256": "0153603291921b9eeaf346b35a6904849f14b9ecb33f3aa23dec7efc2acbd578",
+              "equal": true
+            }
+          ],
+          "capabilityBefore": {
+            "registrationNoticeVersion": 1,
+            "workerSha": "3bf95e68f1473c74644b1b2594da2019f2054100"
+          },
+          "capabilityAfter": {
+            "registrationNoticeVersion": 1,
+            "workerSha": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d"
+          }
+        },
+        "dependencyInstallPerformed": false,
+        "node": "v24.22.1",
+        "officialTemplateNode": "v24.19.0"
+      },
+      "manifestSha256": "0ea4dd3465f98385cb2b6df9091ee58a92449b9f6fb4c82a4d2a8279a0530b85",
+      "ghFullAnonymousDownload": {
+        "startedAt": "2026-11-08T10:24:35.618Z",
+        "finishedAt": "2026-11-08T10:24:35.744Z",
+        "command": "curl",
+        "args": [
+          "-q",
+          "-fLsS",
+          "--proto",
+          "=https",
+          "--proto-redir",
+          "=https",
+          "--connect-timeout",
+          "20",
+          "--max-time",
+          "60",
+          "--max-filesize",
+          "18151686",
+          "-H",
+          "Accept: application/octet-stream",
+          "https://api.github.com/repos/cli/cli/releases/assets/326964816",
+          "-o",
+          "/vercel/ops-1505/gh-instance-bootstrap-fix/gh_2.83.2_linux_amd64.tar.gz",
+          "--write-out",
+          "http=%{http_code} bytes=%{size_download}\n"
+        ],
+        "exitCode": 0,
+        "signal": null,
+        "authenticated": false,
+        "extracted": false,
+        "executed": false,
+        "bytes": 18151686,
+        "sha256": "ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e",
+        "verified": true,
+        "archiveRemoved": true
+      },
+      "rootBuildProofSha256": "4801b35d9301056ff3230aa13ea464e0a1fcdfa09b85050864c0779457f2fb88"
+    },
+    "main759": {
+      "e2b": {
+        "run": 42470724724,
+        "job": 128700724456,
+        "worker": "b2f4086eaf892c8afebb3da06f9f52f53ea09f43",
+        "nodePhaseKinds": 3,
+        "ghPhaseKinds": 0,
+        "http504Count": 12,
+        "failedCurlUrlInferredFromExactSource": true,
+        "curlPrintedUrl": false,
+        "cuaReached": false,
+        "actualSubscriptions": 0,
+        "newPublicRuntime": false,
+        "cleanupJob": 128701487897,
+        "cleanupSuccess": true,
+        "threeCandidatesAbsent": true,
+        "sandboxes": [],
+        "errors": [],
+        "cleanupProof": "two original stdout JSON receipts; artifact ZIP bodies not redownloaded",
+        "rawBuildSha256": "bde0ae56ecc21b0436e710fc8cb13b4ec8f85cec397a7f175f635cb36b33f088",
+        "rootInferenceProofSha256": "a39bbb220a13dd19a8312a915ef1f70a41e5f7aefb5f49ece66bc977b2dfd8bb"
+      },
+      "ci": {
+        "run": 42470724831,
+        "job": 128700809571,
+        "test": "revokedRunCitation",
+        "statements": 7,
+        "rowJsonBytes": 781,
+        "readBytes": 2890,
+        "writtenBytes": 5657,
+        "totalBytes": 8547,
+        "budgetBytes": 7700,
+        "actualHelperHasSocketTrace": false,
+        "unlinkedRunCitationPassed": true,
+        "unlinkedBytes": 8976,
+        "causeUnproved": true,
+        "rawSha256": "f80bad18b9aa6a5540a42703c702186abe9dfc957f2a6cc6045faaaa54a67a72",
+        "downstream": "production-build DB gate and daemon exact-main gate refused; no independent compiler error inferred"
+      },
+      "web": {
+        "run": 42470724754,
+        "job": 128700602291,
+        "lastObservedPhase": "typecheck",
+        "publicDiagnosticCodes": null,
+        "privateDetailedCause": null,
+        "maskedFieldsNotReconstructed": true,
+        "rawSha256": "67e6d585a2cdc22f5488261b873e477578e6632c4eba6919fad79fc294f79928"
+      }
+    },
+    "traceEnable": {
+      "commit": "a08f722f2a105f84c99c029216cd73bcf481a05d",
+      "path": "package.json",
+      "script": "test:activity-actor-db",
+      "prefix": "MIKKA_READ_METRICS_TRACE=1 ",
+      "originalNodeCommandAnd15FilesUnchanged": true,
+      "sqlRowsBudgetsWarmupAwaitAndConcurrencyUnchanged": true,
+      "otherSuitesUnchanged": true,
+      "extraDatabaseOrNetworkCalls": false,
+      "output": "per-process anonymous numeric socket intervals, max32 and existing test-source caller; no SQL, params, row values, address or credential",
+      "limitation": "Synchronous tracing can affect scheduling. This is evidence collection, not a fix or retrospective attribution of either budget failure.",
+      "canonicalRootPackageKeys": [
+        "packageManager",
+        "engines",
+        "pnpm"
+      ],
+      "scriptsExcludedFromFingerprint": true,
+      "canonical470InputsUnchangedFromE132": true,
+      "workerHashStill": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d",
+      "actualA08Build": {
+        "source": "635d9d7fad47f741df4f97da836ce2266bb291cb",
+        "tree": "2a5a471990b970407923c6c03aa6ee31863e4a00",
+        "parents": [
+          "5b420a475f69760a5bc7356e5c3cb9c20435704f",
+          "a08f722f2a105f84c99c029216cd73bcf481a05d"
+        ],
+        "status": "",
+        "workerHash": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d",
+        "actualBuiltSource": "a08f722f2a105f84c99c029216cd73bcf481a05d",
+        "actualBuiltTree": "2a5a471990b970407923c6c03aa6ee31863e4a00",
+        "buildVerificationSha256": "9f04ad2876d644ca8db552efa387281bd9b4929be19aa1be895b8e4c9a70a798",
+        "originalCommandBodyUnchanged": true,
+        "otherPackageJsonValuesUnchanged": true,
+        "newWorkerHashClaimed": false,
+        "workerHashProjectionExcludesScripts": true,
+        "actualBuildExitCode": 0,
+        "actualVerifierExitCode": 0,
+        "entries": 2,
+        "resources": 9,
+        "fixtures": 16,
+        "syntax": 12,
+        "originalVerifierBodyUnchanged": true,
+        "node": "v24.22.1",
+        "officialTemplateNode": "v24.19.0",
+        "sourceTreeEqualsBuild": true
+      },
+      "manifestSha256": "7d30d573343bbaf6ce7a214ff6e9f18a5618925fa762261d8913e76e6a3f83c5",
+      "rootProofSha256": "e8d04f5e79cfb6918863faff81a6e23ebeb3feaafd5e0a9a9f23241f23f242a7"
+    },
+    "acceptance": {
+      "nextExactHeadCi": null,
+      "nextWeb": null,
+      "nextE2b": null,
+      "officialFiles": null,
+      "realSubscriptions": null,
+      "formalSix": null,
+      "allSixAtMost5000ms": false,
+      "issueClosed": false
+    }
   }
 }
