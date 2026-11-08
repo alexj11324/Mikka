@@ -1,6 +1,6 @@
 import 'server-only'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -23,9 +23,23 @@ export async function agentScope(ownerId: string, chatBot: string | null, appCli
     ? (await appClient.query<{ workspaceId: string }>('select "workspaceId" from bots where id=$1 and "ownerId"=$2 for share', [botId, ownerId])).rows[0]
     : (await db.select({ workspaceId:bots.workspaceId }).from(bots).where(and(eq(bots.id,botId),eq(bots.ownerId,ownerId))).limit(1))[0]
   if (!bot) throw new AgentKitError('agentScopeNotFound',404)
+  return activeScope(ownerId, botId, bot.workspaceId, workspaceClient)
+}
+
+/** The same fresh owner-scoped read supplies hosted startup identity and display metadata. */
+export async function agentScopeWithBotMetadata(ownerId: string, botId: string) {
+  const [bot] = await db.select({ workspaceId: bots.workspaceId, name: bots.name,
+    coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
+    .from(bots).where(and(eq(bots.id, botId), eq(bots.ownerId, ownerId))).limit(1)
+  if (!bot) throw new AgentKitError('agentScopeNotFound',404)
+  const scope = await activeScope(ownerId, botId, bot.workspaceId)
+  return { scope, bot: { name: bot.name, coordinator: bot.coordinator } }
+}
+
+async function activeScope(ownerId: string, botId: string, workspaceId: string, workspaceClient?: Pick<PoolClient, 'query'>): Promise<AgentScope> {
   const membership = workspaceClient
-    ? (await workspaceClient.query('select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2 and status=\'active\'', [bot.workspaceId, ownerId])).rows[0]
-    : (await workspaceDb.select({ status:workspaceMembers.status }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId,bot.workspaceId),eq(workspaceMembers.userId,ownerId),eq(workspaceMembers.status,'active'))).limit(1))[0]
+    ? (await workspaceClient.query('select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2 and status=\'active\'', [workspaceId, ownerId])).rows[0]
+    : (await workspaceDb.select({ status:workspaceMembers.status }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId,workspaceId),eq(workspaceMembers.userId,ownerId),eq(workspaceMembers.status,'active'))).limit(1))[0]
   if (!membership) throw new AgentKitError('agentScopeNotFound',404)
-  return { ownerId,botId,workspaceId:bot.workspaceId }
+  return { ownerId,botId,workspaceId }
 }

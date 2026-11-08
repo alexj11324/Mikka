@@ -47,12 +47,13 @@ export function repositoryLines(repositories: readonly Repository[], used: reado
 }
 
 export async function githubContext(userId: string, from: GitHubContextSource = source, timeoutMs = LIST_TIMEOUT_MS, botId?: string): Promise<string> {
-  const connection = await from.connection(userId).catch(() => null)
+  const connectionRead = from.connection(userId).catch(() => null)
   let timer: ReturnType<typeof setTimeout> | undefined
-  const listed = await Promise.race([
+  const listing = Promise.race([
     from.list(userId).then(value => ({ value }), (error: unknown) => ({ failure: failureCode(error) })),
     new Promise<{ failure: null }>(resolve => { timer = setTimeout(() => resolve({ failure: null }), timeoutMs) }),
   ]).finally(() => clearTimeout(timer))
+  const [connection, listed] = await Promise.all([connectionRead, listing])
   if (!connection && 'failure' in listed && listed.failure === 'githubNotConnected') return 'GitHub: not connected. The person connects it in 插件 › GitHub; until then a repository is given as an HTTPS or SSH git URL.'
   const login = connection?.githubLogin ?? ('value' in listed ? listed.value.login : null)
   // With no connection row and no answer from GitHub, nothing about the account is claimed.

@@ -81,3 +81,42 @@ it('a broken observation clock stays missing without changing the callback resul
   expect(result).toBe(7)
   expect(call.snapshot().workers[0]).toMatchObject({ startedMs: null, settledMs: null, identityMs: null, identityLoginMs: null })
 })
+
+
+it('pre-read observation has its own clock interval and never pretends a worker was spawned', async () => {
+  let now = 0
+  const call = new SubscriptionCallTiming(() => now)
+  const pre = call.startStreamPreRead()!
+  const done = pre.worker.beginIdentity()
+  await withSubscriptionTiming(call, () => withSubscriptionWorkerTiming(pre.worker, async () => {
+    const authority = currentSubscriptionWorkerTiming()!.phase('parentAccessAuthority')
+    now = 20; authority()
+    const projection = currentSubscriptionWorkerTiming()!.phase('parentProjectionRead')
+    now = 80; projection()
+  }))
+  done(); pre.finish('ready')
+  now = 100
+  const worker = call.startWorker('executeStream')!
+  const identityDone = worker.beginIdentity()
+  worker.identityMode('parent_snapshot')
+  now = 105; identityDone(); worker.configWrite(); worker.settle('result')
+  const snapshot = call.snapshot()
+  expect(snapshot.workers).toHaveLength(1)
+  expect(snapshot.workers[0]).toMatchObject({ ordinal: 1, method: 'executeStream', startedMs: 100, spawnToConfigWriteMs: 5, identityMs: 5, parentAccessAuthorityCalls: 0, parentProjectionReadCalls: 0 })
+  expect(snapshot.streamPreRead).toEqual({ startedMs: 0, settledMs: 80, outcome: 'ready', identityMs: 80, identityLoginCalls: 0, identityLoginMs: null, parentAccessAuthorityCalls: 1, parentAccessAuthorityMs: 20, parentProjectionReadCalls: 1, parentProjectionReadMs: 60 })
+  expect(call.startStreamPreRead()).toBeUndefined()
+  expect(Object.keys(snapshot.streamPreRead!)).not.toContain('spawnToConfigWriteMs')
+})
+
+it('late identity settlement cannot change an already timed-out pre-read snapshot', () => {
+  let now = 0
+  const call = new SubscriptionCallTiming(() => now)
+  const pre = call.startStreamPreRead()!
+  const done = pre.worker.beginIdentity(), read = pre.worker.phase('parentProjectionRead')
+  now = 35_000; done(); pre.finish('timeout')
+  const frozen = call.snapshot()
+  now = 60_000; read(); done(); pre.finish('ready')
+  expect(call.snapshot()).toEqual(frozen)
+  expect(frozen.streamPreRead).toMatchObject({ outcome: 'timeout', identityMs: 35_000, parentProjectionReadCalls: 1, parentProjectionReadMs: null })
+  expect(frozen.workers).toEqual([])
+})
