@@ -50,8 +50,9 @@ import { rawCliShellAvailable, runPolicy } from "../permissions"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
+import { taskExecutionEnv } from '../task-env'
 import { mailboxToolResult } from '../run-mailbox'
-import { codexMailboxCatalogue, codexMailboxResumeVerified, recordCodexMailboxSession, verifyCodexMailboxResume } from './codex-mailbox'
+import { codexMailboxCatalogue, codexMailboxResumeVersion, recordCodexMailboxSession, verifyCodexMailboxResume } from './codex-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
 import { classifyProviderFailure, ProviderFailureError, providerFailureMessage, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import type {
@@ -369,11 +370,11 @@ export class CodexAdapter implements AgentAdapter {
     const managedAuth = Boolean(externalAuth || brokerAuth)
     if (brokerAuth && (!this.options.spawnCli || externalAuth || options.credential)) throw new Error(SUBSCRIPTION_AUTH_ERROR)
     if (managedAuth) {
-      const clean = options.machineEnvironment ? options.env : buildChildEnv({
+      const clean = options.machineEnvironment ? options.env : taskExecutionEnv(buildChildEnv({
         host: options.env,
         runId:
           options.env.MIKKA_RUN_ID === undefined ? undefined : options.runId
-      })
+      }), options)
       if (
         Object.entries(options.env).some(
           ([name, value]) => clean[name] !== value
@@ -405,11 +406,11 @@ export class CodexAdapter implements AgentAdapter {
       ? { home: options.env.CODEX_HOME ?? join(options.env.HOME, '.codex') }
       : prepareCodexHome(join(runDir, "codex-home"), log)
     if (options.machineEnvironment) mkdirSync(codexHome.home, { recursive: true, mode: 0o700 })
-    if (mailboxCatalogue && threadId) verifyCodexMailboxResume(
+    const mailboxResumeVersion = mailboxCatalogue && threadId ? verifyCodexMailboxResume(
       this.options.stateDir,
       mode === 'continue' ? options.continueSession!.runId : options.runId,
       codexHome.home, threadId, mailboxCatalogue,
-    )
+    ) : null
     const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
     // The official platform package includes code-mode helpers beside Codex.
@@ -898,8 +899,8 @@ export class CodexAdapter implements AgentAdapter {
         "initialize",
       ))
       await rpc.sendNotification("initialized")
-      const mailboxResumeVerified = codexMailboxResumeVerified(initialized.userAgent)
-      if (mailboxCatalogue && mode !== 'new' && !mailboxResumeVerified)
+      const mailboxNativeVersion = codexMailboxResumeVersion(initialized.userAgent)
+      if (mailboxCatalogue && mode !== 'new' && (!mailboxNativeVersion || mailboxNativeVersion !== mailboxResumeVersion))
         throw new Error('Run mailbox requires a verified original Codex thread')
       if (externalAuth) {
         startupPhase = 'oauth_login'
@@ -963,7 +964,7 @@ export class CodexAdapter implements AgentAdapter {
       sessionId = response.thread.id
       if ((options.requireSessionResume || (options.mailbox && threadId)) && sessionId !== threadId)
         throw new Error("Codex resumed a different question thread")
-      if (mailboxCatalogue && mailboxResumeVerified) recordCodexMailboxSession(this.options.stateDir, options.runId, codexHome.home, response.thread, mailboxCatalogue, mode !== 'new')
+      if (mailboxCatalogue && mailboxNativeVersion) recordCodexMailboxSession(this.options.stateDir, options.runId, codexHome.home, response.thread, mailboxCatalogue, mode !== 'new', mailboxNativeVersion)
       runtimeModel = typeof response.model === "string" && response.model ? response.model : null
       if (runtimeModel) options.onRuntimeModel?.(sessionId, runtimeModel)
       if(managedAuth)await this.options.onHostedSession?.(sessionId)

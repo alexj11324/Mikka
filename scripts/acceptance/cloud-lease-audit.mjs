@@ -93,8 +93,15 @@ export async function readDaemonRenewal(sample, { env = process.env, fetchImpl =
 export async function runLeaseAudit(env = process.env, { runStartup = runCloudStartup, readRenewal = readDaemonRenewal } = {}) {
   const applicationSha = auditTarget(env)
   const pluginEvidence = env.DAEMON_RENEWAL_EVIDENCE === 'posthog_plugin'
+  let recovered
+  if (env.LEASE_AUDIT_RECOVERY_RUN && env.LEASE_AUDIT_RECOVERY_RUN !== 'none') {
+    const { recoverInterruptedLeaseAudit } = await import('./cloud-lease-recovery.mjs')
+    recovered = await recoverInterruptedLeaseAudit(env)
+    if (recovered.evidence.status !== 'passed') return { issue: 1598, applicationSha, status: 'blocked', recovery: recovered.evidence }
+  }
   const report = await runStartup({ origin: 'https://app.aspectlylabs.com', runs: 2, harness: 'both',
     mode: 'candidate', strategy: 'derived', revision: applicationSha, expectedBuild: applicationSha,
+    ...(recovered?.botId ? { botId: recovered.botId } : {}),
     timeoutMs: 600000, maxStartupMs: 60000, runtimeEvidence: 'optional', officialTiming: 'disabled', leaseAudit: true }, { env })
   for (const sample of report.samples) {
     if (pluginEvidence) {
@@ -118,6 +125,7 @@ export async function runLeaseAudit(env = process.env, { runStartup = runCloudSt
     && samples.every(sample => sample.status === 'execution_proved_awaiting_server_timing' && sample.cleanup?.status === 'passed')
   const waitingForPlugin = pluginEvidence && executed && report.samples.every(sample => renewedLease(sample.leaseAudit) && completedToolReply(sample))
   return { issue: 1598, applicationSha, startedAt: report.startedAt, finishedAt: report.finishedAt,
+    ...(recovered ? { recovery: recovered.evidence } : {}),
     status: executed && samples.every(sample => sample.naturalRenewalVerified) ? 'passed'
       : waitingForPlugin ? 'awaiting_posthog_plugin' : 'blocked',
     ...(pluginEvidence ? { requiredExternalEvidence: { source: 'posthog_plugin', projectId: 670821,
@@ -125,7 +133,7 @@ export async function runLeaseAudit(env = process.env, { runStartup = runCloudSt
     failure: report.failure, samples, cleanup: report.cleanup }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+async function main() {
   let report
   try { report = await runLeaseAudit() } catch { report = { issue: 1598, status: 'blocked', error: 'lease_audit_failed' } }
   await mkdir('production-lease-audit-report', { recursive: true })
@@ -134,4 +142,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   // A successful collection job is not full acceptance: the explicit pending
   // report still requires plugin spans and naturalRenewalEvidence for both runs.
   if (!['passed', 'awaiting_posthog_plugin'].includes(report.status)) process.exitCode = 1
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  // Startup imports this module's helpers. Finish ESM evaluation before awaiting
+  // the run, or that dynamic import waits on the CLI that is waiting on it.
+  void main().catch(() => {
+    console.error(JSON.stringify({ issue: 1598, status: 'blocked', error: 'lease_audit_report_failed' }))
+    process.exitCode = 1
+  })
 }

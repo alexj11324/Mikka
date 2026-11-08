@@ -6,7 +6,7 @@ import { createTranslator } from 'next-intl'
 import messages from '../messages/en.json'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedRun, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { tokenWorkspace } from '../lib/tokens/principal'
-import { measured } from './helpers/read-metrics'
+import { measured, readMetrics } from './helpers/read-metrics'
 
 test('mobile task endpoints with real task ACL, current workspace membership and run history', { skip: !dbUrl }, async t => {
   let selectedWorkspace = ''
@@ -52,6 +52,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     await pool.query('delete from agent_runs where "userId"=any($1)', [[owner, other]])
     await pool.query('delete from issues where "userId"=any($1)', [[owner, other]])
     await pool.query('delete from mikka_workspaces where "userId"=any($1)', [[owner, other]])
+    await pool.query('delete from issue_prefixes where "userId"=any($1)', [[owner, other]])
     await pool.query('delete from "user" where id=any($1)', [[owner, other]])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
@@ -115,6 +116,47 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     await pool.query(`update issues set status='todo' where id=$1`, [blocker])
     await metadata({ blockedByIds: [blocker], block: { blocked: false, runId: null } })
     assert.deepEqual(await groups(), ['todo', 'todo'], 'an explicitly cleared board block stays clear')
+  })
+  await t.test('an unlinked workspace task keeps its owner number without a repeated empty team read', async () => {
+    const { setIssueTeam } = await import('../app/actions/team-relations')
+    const unlinkedId = await workspaceTask()
+    const { rows: [localTeam] } = await pool.query('select identifier from mikka_teams where id=$1', [team.id])
+    const removed = await setIssueTeam({ issueId: unlinkedId, teamId: null, expectedTeamId: team.id })
+    assert.equal(removed.ok, true)
+    await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2),($3,$4)', [owner, 'MOBI', other, 'OTHR'])
+    const { rows: [numbered] } = await pool.query('select content,scope from issues where id=$1', [unlinkedId])
+    const identifier = 'MOBI-' + numbered.content.attrs.mikka.number
+    assert.equal(numbered.scope, 'workspace')
+    selectedWorkspace = own.id
+    await request(personalTask)
+    const warmup = await request(unlinkedId)
+    assert.equal(warmup.status, 200)
+    assert.equal((await warmup.json()).task.identifier, identifier)
+    const personalRead = await measured(async () => {
+      const response = await request(personalTask)
+      assert.equal(response.status, 200)
+      return response.json()
+    })
+    const unlinkedRead = await measured(async () => {
+      const response = await request(unlinkedId)
+      assert.equal(response.status, 200)
+      return response.json()
+    })
+    assert.equal(unlinkedRead.value.task.identifier, identifier)
+    assert.ok(unlinkedRead.statements <= personalRead.statements,
+      'the same owner and absent team link require no extra database statement for workspace scope')
+    selectedWorkspace = teamWorkspace.id
+    assert.equal((await request(unlinkedId)).status, 404)
+    const linked = await setIssueTeam({ issueId: unlinkedId, teamId: team.id, expectedTeamId: null })
+    assert.equal(linked.ok, true)
+    const relinked = await request(unlinkedId)
+    assert.equal(relinked.status, 200)
+    assert.match((await relinked.json()).task.identifier, new RegExp('^' + localTeam.identifier + '-\\d+$'))
+    selectedWorkspace = own.id
+    assert.equal((await request(unlinkedId)).status, 404, 'a prior negative link read cannot cross a later team boundary')
+    selectedWorkspace = teamWorkspace.id
+    t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'mobile-unlinked-task-detail', scope: 'data-read-path_not_page_http',
+      personal: readMetrics(personalRead), unlinked: readMetrics(unlinkedRead) }))
   })
   await t.test('cross-workspace reads return 404 even for the same owner, and workspace tokens stay scoped', async () => {
     selectedWorkspace = own.id

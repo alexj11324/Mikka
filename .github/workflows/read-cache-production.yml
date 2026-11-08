@@ -24,6 +24,7 @@ permissions:
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('read-cache-production-guards-{0}', github.event.pull_request.number) || 'production-smoke-owner-acceptance' }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   guards:

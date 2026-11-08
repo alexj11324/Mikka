@@ -7,6 +7,7 @@ import { CLIENT_VERSION_HEADER, RUN_CREDENTIALS_HEADER, SUBSCRIPTION_MODEL_CATAL
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device"
+import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 
 import {
   DaemonError,
@@ -128,10 +129,36 @@ describe("HttpServerLink", () => {
       expect(new Headers(init?.headers).get(RUN_CREDENTIALS_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(TEAM_SKILL_HEADER)).toBe('1')
+      expect(new Headers(init?.headers).get(TASK_SECRETS_HEADER)).toBe(TASK_SECRETS_VERSION)
       return json({...assignment('run-1'),continuesRunId:'lost-run',requireWorktreeContinuation:true})
     }) as typeof fetch
     const result=await new HttpServerLink('http://server.test',fetcher).claimRun('dev-1','run-1')
     expect(result.requireWorktreeContinuation).toBe(true)
+  })
+  it('renews task grants through the existing authenticated heartbeat without extra requests', async () => {
+    const grant = { name: 'VENDOR_KEY', capability: 'synthetic-opaque-initial', expiresAt: SOON(), origin: 'https://api.example.com' }
+    const access = { version: 1, endpoint: 'http://server.test/v1/task-secrets/run-1', grants: [grant], unavailable: ['SIGNING_KEY'] }
+    const renewed = { ...access, grants: [{ ...grant, capability: 'synthetic-opaque-renewal' }] }
+    const github = { endpoint: 'http://server.test/api/runs/github-token', repository: 'owner/repo', token: 'synthetic-native-github', expiresAt: null }
+    const modelCredential = { kind: 'provider', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', key: 'synthetic-native-model' }
+    const { fetch, calls } = scripted(call => {
+      if (call.path.endsWith('/register')) return json({ deviceId: 'dev-1', workspaceId: crypto.randomUUID() }, 201)
+      expect(call.auth).toBe('Bearer fixture-task-device-session')
+      if (call.path.endsWith('/claim')) return json({ ...assignment('run-1'), harness: 'codex', taskSecrets: access, github, modelCredential })
+      expect(call.path).toBe('/v1/devices/dev-1/heartbeat')
+      expect(call.body).toMatchObject({ runs: [{ runId: 'run-1', secretCapabilities: [grant.capability] }] })
+      return json({ leases: { 'run-1': grant.expiresAt }, taskSecrets: { 'run-1': renewed } })
+    })
+    const link = new HttpServerLink('http://server.test', fetch)
+    await link.registerDevice('fixture-task-device-session', INFO)
+    const claimed = await link.claimRun('dev-1', 'run-1')
+    expect(claimed.taskSecrets).toEqual(access)
+    expect(claimed.github).toEqual(github)
+    expect(claimed.modelCredential).toEqual(modelCredential)
+    const result = await link.heartbeat('dev-1', { harnesses: [], worktreeDiskBytes: 0,
+      runs: [{ runId: 'run-1', lastProgressAt: new Date().toISOString(), secretCapabilities: claimed.taskSecrets!.grants.map(item => item.capability) }] })
+    expect(result.taskSecrets).toEqual({ 'run-1': renewed })
+    expect(calls).toHaveLength(3)
   })
   it('preserves negotiated catalogue evidence in the natural-expiry lease response', async () => {
     const lease = { route: 'claude_code_cli', modelId: 'claude-haiku-5-5', accountId: 'fixture-account', revision: 1,
