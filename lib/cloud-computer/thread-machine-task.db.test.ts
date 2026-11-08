@@ -1261,6 +1261,89 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       }
     });
 
+
+    for (const mode of ['success', 'upload_failure', 'lease_cancel_after_attestation', 'revoked_before_finish', 'legacy'] as const) await t.test('fresh worker broker transaction and publication boundary: ' + mode, async () => {
+      const savedWorker = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA };
+      process.env.MIKKA_CLOUD_WORKER_URL = 'https://worker.example.invalid/mikka';
+      process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
+      try {
+        const runId = await run(await task()), fixture = fake();
+        let bootstrap: { deviceId: string; credential: string } | undefined, uploaded: UploadedFile[] = [];
+        let reads = 0, commands = 0, streams = 0, commits = 0, uploadCompleted = false;
+        let resolveCompletion!: (value: { stdout: string; stderr: string; exitCode: number }) => void;
+        const completion = new Promise<{ stdout: string; stderr: string; exitCode: number }>(resolve => { resolveCompletion = resolve; });
+        let output: ((value: string) => void) | undefined;
+        const register = async () => {
+          assert.ok(bootstrap);
+          const used = await pool.query('UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id',
+            [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
+          assert.equal(used.rowCount, 1, 'the credential transaction is committed before provider publication');
+          await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1', [bootstrap.deviceId]);
+          if (mode === 'revoked_before_finish') await pool.query('UPDATE device_tokens SET "revokedAt"=clock_timestamp() WHERE "boundDeviceId"=$1', [bootstrap.deviceId]);
+          return { stdout: REGISTRATION_COMPLETE + '\n', stderr: '', exitCode: 0 };
+        };
+        fixture.provider.create = async (_source, op) => ({
+          sandboxId: 'sandbox-' + op,
+          files: {
+            read: async () => { reads++; return 'a'.repeat(40); },
+            write: async (path: string | UploadedFile[], body: unknown) => {
+              uploaded = uploadedFiles(path, body); bootstrap = uploadedBootstrap(path, body);
+              assert.equal(uploaded.length, 4, 'the original bootstrap and three sidecars remain one multipart request');
+              assert.ok(bootstrap);
+              const row = await pool.query('SELECT 1 FROM device_tokens WHERE "boundDeviceId"=$1 AND "tokenHash"=$2', [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
+              assert.equal(row.rowCount, 1, 'a separate PG connection can read the committed credential at upload');
+              if (mode === 'upload_failure') throw Error('upload response lost after provider writes');
+              uploadCompleted = true;
+            },
+          },
+          commands: {
+            run: async (_command: string, options: { background?: boolean; stdin?: boolean; onStdout?: (value: string) => void }) => {
+              commands++;
+              if (!options.background) return register();
+              assert.equal(options.stdin, true); assert.equal(uploadCompleted, false);
+              const row = (await pool.query('SELECT "workerLeaseId","deviceId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+              assert.equal(row.deviceId, null, 'attestation precedes credential device creation');
+              if (mode === 'lease_cancel_after_attestation') await pool.query(`UPDATE thread_machines SET state='ended',"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1`, [runId]);
+              output = options.onStdout;
+              output?.('mikka-worker-broker-attestation ' + JSON.stringify({ version: 1, runId, leaseId: row.workerLeaseId, sourceSha: 'a'.repeat(40), broker: mode !== 'legacy' }) + '\n');
+              if (mode === 'legacy') resolveCompletion({ stdout: '', stderr: '', exitCode: 0 });
+              return { pid: 42, wait: () => completion, disconnect: async () => {}, kill: async () => { resolveCompletion({ stdout: '', stderr: '', exitCode: 1 }); return true; } };
+            },
+            streamInput: () => {
+              streams++;
+              return {
+                send: async (raw: string) => {
+                  const value = JSON.parse(raw); if (value.kind === 'abort') { resolveCompletion({ stdout: '', stderr: '', exitCode: 1 }); return; }
+                  commits++; assert.equal(uploadCompleted, true, 'no commit on the stream before files.write resolves');
+                  assert.equal(value.runId, runId); assert.equal(value.files.length, 4);
+                  for (let i = 0; i < uploaded.length; i++) {
+                    assert.equal(value.files[i].bytes, Buffer.byteLength(uploaded[i].data));
+                    assert.equal(value.files[i].sha256, createHash('sha256').update(uploaded[i].data).digest('hex'));
+                  }
+                  output?.(REGISTRATION_WAITING + '\n'); resolveCompletion(await register());
+                },
+                close: async () => {},
+              };
+            },
+          },
+        }) as never;
+        if (mode === 'success' || mode === 'legacy') {
+          assert.deepEqual(await ensureThreadMachine(pool, actor, runId, fixture.provider), { runId, state: 'running' });
+        } else {
+          await assert.rejects(ensureThreadMachine(pool, actor, runId, fixture.provider),
+            mode === 'upload_failure' ? /upload response lost/ : /provisioning cancelled/);
+          assert.notEqual((await machine(runId)).state, 'running', 'the original final fresh fence still controls success');
+        }
+        assert.equal(reads, 0, 'the live broker replaces the independent marker files.read');
+        assert.equal(commands, mode === 'legacy' ? 2 : 1, 'only an explicitly unsupported release uses the original command');
+        assert.equal(streams, mode === 'legacy' ? 0 : 1);
+        assert.equal(commits, mode === 'success' || mode === 'revoked_before_finish' ? 1 : 0);
+      } finally {
+        if (savedWorker.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = savedWorker.url;
+        if (savedWorker.sha === undefined) delete process.env.MIKKA_CLOUD_WORKER_SHA; else process.env.MIKKA_CLOUD_WORKER_SHA = savedWorker.sha;
+      }
+    });
+
     // The daemon runs every computer action as lease-driver.py under /run/mikka-viewer/1.lock,
     // which reads /run/mikka-viewer/1.json; a snapshot boots with no display and no lease.
     await t.test('a computer task starts display :1 and publishes its lease before the worker is handed a credential', async () => {

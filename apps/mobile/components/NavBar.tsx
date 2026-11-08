@@ -74,7 +74,7 @@ const webItem = (item: BarItem) => 'view' in item
  * material or hairline (Comma, Alex 2026-11-08): content fades out under the top
  * edge, by the system's soft scroll edge on iOS 26 and `TopFade` below it.
  */
-export function NavBar({ title, titleView, left, right, back, large, topTitle, search, background = colors.page }: {
+export function NavBar({ title, titleView, left, right, back, large, topTitle, search, background = colors.page, fade = true }: {
   title?: string
   /** A tab's root (Bot, 任务, 建议, 设置, 搜索): one title, the system's, centred in the bar's row; the buttons grouped
    * on the right; nothing on the left (Alex 2026-11-08, after 「Bot」 showed twice). */
@@ -87,6 +87,8 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
   search?: { placeholder: string; onChange: (text: string) => void }
   /** The page colour the bar fades from below iOS 26 (settings is grouped). */
   background?: string
+  /** False under an opaque header (a form sheet's), where nothing scrolls beneath it. */
+  fade?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -134,7 +136,7 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
       }} />
       {!topTitle && lefts.length ? <Stack.Toolbar placement="left">{lefts.map(nativeItem)}</Stack.Toolbar> : null}
       {rights.length ? <Stack.Toolbar placement="right">{rights.map(nativeItem)}</Stack.Toolbar> : null}
-      {needsTopFade(Platform.OS, Platform.Version) ? <TopFade color={background} /> : null}
+      {fade && needsTopFade(Platform.OS, Platform.Version) ? <TopFade color={background} /> : null}
     </>
   )
 }
