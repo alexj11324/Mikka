@@ -146,6 +146,7 @@ jobs:
       - run: pnpm test:factory-monitor
       - run: pnpm test:execution-rules
       - run: pnpm test:abuse
+      - run: pnpm test:governance
       - run: pnpm test:self-hosting
       - run: pnpm test:self-hosted-byok
       - run: pnpm test:cloud-services
