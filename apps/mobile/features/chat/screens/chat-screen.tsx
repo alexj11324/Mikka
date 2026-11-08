@@ -51,7 +51,6 @@ import { ReadNotice } from '@/components/ReadNotice'
 import { ChatScrollToLatest } from '@/components/ChatScrollToLatest'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import { runInfoLine } from '@/lib/run-info'
-import { webChatPath } from '@/lib/web'
 import { useHome } from '@/lib/home'
 import { colors } from '@/lib/theme'
 
@@ -71,7 +70,6 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
   const [atLatest, setAtLatest] = useState(true)
   const { offset, gesture: timeReveal, scrollLocked } = useTimeReveal()
   const photos = useChatPhotos()
-  const workspaceId = useHome().data?.workspace.id
   // The composer floats over the end of the list; the list leaves room for it.
   const [composerHeight, setComposerHeight] = useState(90)
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
@@ -283,7 +281,7 @@ export function ChatScreen({ botId, name, draft, focus, compose, composerAccesso
         {item.from === 'coordinator' && item.text ? (
           <TimedRow time={time} offset={offset} onQuote={selected ? undefined : () => setQuote(quotable(item.text))} onLongPress={selected ? undefined : () => actions(item.text, item.id, item.position)} menu={message(item.text, item.id, item.position)}>
             {isOpenUI(item.text)
-              ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} webPath={webChatPath(data?.botId ?? botId, workspaceId)} sources={sources} onOpen={open} />
+              ? <OpenUIReply text={item.text} live={index > lastMine && !outbox.length} reply={items.slice(index + 1).find(next => next.from === 'person')?.text} answer={answer} sources={sources} onOpen={open} />
               : <BotBubble>{selected
                 ? <ChatSelectableText text={selected.text} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} />
                 : <Markdown text={item.text} sources={sources} onOpen={open} />}</BotBubble>}

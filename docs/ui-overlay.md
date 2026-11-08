@@ -82,6 +82,43 @@ re-exporting it from `@ui-slot/<name>`, add the name to `UI_SLOTS` and its
 required exports to `UI_SLOT_EXPORTS`, and add a row above. Merge the layer's
 slot only after this repository's slot is on main.
 
+## iOS app
+
+The iOS app (`apps/mobile`) has its own slots, filled from the layer's
+`mobile/` folder. They are React Native components, so they share nothing with
+the web slots but the idea.
+
+| | Open-source build | Official OTA |
+| --- | --- | --- |
+| `MIKKA_MOBILE_OVERLAY_DIR` | unset | `.hosted-ui/mobile`, relative to the repository root and inside it |
+| `@ui-slot/<name>` | `apps/mobile/slots/<name>.tsx` | `$MIKKA_MOBILE_OVERLAY_DIR/slots/<name>.tsx` when the layer has it, else the default |
+| `@hosted/*` | does not resolve | `$MIKKA_MOBILE_OVERLAY_DIR/*` |
+
+`apps/mobile/ui-overlay.js` decides this and `apps/mobile/metro.config.js`
+applies it as Metro's `resolveRequest`. Every other import in a layer file
+resolves as if from `apps/mobile`, so the layer uses the app's `react`,
+`react-native`, `react-native-svg` and `react-native-reanimated` and installs
+no packages of its own. `@/` in the layer is `apps/mobile` (for example
+`@/lib/bot-look`, `@/slots/bot-avatar-contract`). `apps/mobile/tsconfig.json`
+maps `@ui-slot/*` to the defaults, so typecheck always sees the open-source
+build. A set but missing directory fails the bundle.
+
+| Slot | Default | Props | Callers import |
+| --- | --- | --- | --- |
+| `bot-avatar` | the still blob with one eye | `BotAvatarProps` in `apps/mobile/slots/bot-avatar-contract.ts` (`color`, `shape`, `size`; `id` and `coordinator` when the caller has them, as on the web); colours and shapes in `apps/mobile/lib/bot-look.ts` | `BotAvatar` from `@/components/icons` |
+
+Required exports are `MOBILE_SLOT_EXPORTS` in `apps/mobile/ui-overlay.js`;
+the same rule as the web applies (merge the layer's export first).
+
+`mobile-update.yml` reads the existing `HOSTED_UI_READ_KEY` through the main
+OIDC identity on a push to main or a manual run, checks the layer out to
+`.hosted-ui` and sets `MIKKA_MOBILE_OVERLAY_DIR` when it has a `mobile/`
+folder; without the key or the folder the default slots ship. A push to the
+layer's `mobile/` ships by running Mobile OTA update on main by hand. The EAS
+native build (`mobile-native.yml`) builds on Expo's servers from the
+repository alone, so a fresh binary embeds the default slots until it loads
+the production update.
+
 ## Rules for the layer
 
 - **Imports.** BoardUI's own source imports its files with `@/` (for example

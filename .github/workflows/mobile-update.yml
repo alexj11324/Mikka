@@ -6,12 +6,17 @@ name: Mobile OTA update
 # can be opened in a preview build. Production reads the existing Expo token
 # from Infisical using the trusted main workload's OIDC identity. PR previews
 # retain their existing repository-secret delivery; forks cannot publish.
+# Production bundles the private UI layer's mobile/ folder when the existing
+# read key can check it out (docs/ui-overlay.md, 「iOS app」); without it, the
+# app's default slots ship.
 on:
   push:
     branches: [main]
     paths: ['apps/mobile/**', 'packages/protocol/**']
   pull_request:
     paths: ['apps/mobile/**', 'packages/protocol/**']
+  # A push to the private UI layer's mobile/ folder ships through this (docs/ui-overlay.md).
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -43,7 +48,7 @@ jobs:
       - run: pnpm --filter @mikka/mobile typecheck
       - name: Read the existing production Expo credential through OIDC
         if: >-
-          github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' &&
           github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
           github.repository_owner_id == '183887963'
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -57,8 +62,41 @@ jobs:
           secret-name: EXPO_TOKEN
           recursive: false
           include-imports: false
+      - name: Read the private UI checkout credential through OIDC
+        if: env.EXPO_TOKEN != ''
+        continue-on-error: true
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: HOSTED_UI_READ_KEY
+          recursive: false
+          include-imports: false
+      - name: Check out the private UI
+        if: env.EXPO_TOKEN != '' && env.HOSTED_UI_READ_KEY != ''
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: alexj11324/mikka-hosted-ui
+          ref: main
+          ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
+          path: .hosted-ui
+          persist-credentials: false
+      - name: Use the private UI's mobile layer
+        if: env.EXPO_TOKEN != ''
+        run: |
+          echo "HOSTED_UI_READ_KEY=" >> "$GITHUB_ENV"
+          if [ -d .hosted-ui/mobile ]; then
+            echo "MIKKA_MOBILE_OVERLAY_DIR=.hosted-ui/mobile" >> "$GITHUB_ENV"
+            echo "::notice::Bundling the private UI layer at $(git -C .hosted-ui rev-parse HEAD)."
+          else
+            echo "::notice::No private mobile layer; the default slots ship."
+          fi
       - name: Publish to production
-        if: env.EXPO_TOKEN != '' && github.event_name == 'push'
+        if: env.EXPO_TOKEN != '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         working-directory: apps/mobile
         run: npx -y eas-cli@27.2.0 update --channel production --platform ios --message "$(git log -1 --format=%s)" --non-interactive
       - name: Publish to pr-${{ github.event.number }}
