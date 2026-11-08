@@ -35,7 +35,7 @@ export function BotLookEditor({ botId, name, color, shape }: { botId: string; na
 
   return <Popover onOpenChange={open => { if (!open) setError(null) }}>
     <PopoverTrigger render={<Button variant="ghost" aria-label={t('changeAvatar', { name })} className="size-auto rounded-full p-0 hover:bg-transparent aria-expanded:bg-transparent" />}>
-      <BotAvatar color={tone} shape={form} size="profile" />
+      <BotAvatar id={botId} color={tone} shape={form} size="profile" />
     </PopoverTrigger>
     <PopoverContent aria-label={t('changeAvatar', { name })} className="w-130 max-w-[calc(100vw-2rem)] gap-3 rounded-xl p-5 shadow-2xl ring-0">
       <BotLookPicker color={tone} shape={form} onColor={next => { void save({ color: next }) }} onShape={next => { void save({ shape: next }) }} />
