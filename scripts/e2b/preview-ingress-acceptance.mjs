@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Capability spike only: no production data, user task, Agent or model call.
- * This proves actual E2B ingress, SO_MARK, xt_socket and tool availability before
+ * This tests actual E2B ingress, SO_MARK replies and nft frontend availability before
  * the production gateways or their original runtime contracts are changed. */
 import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -9,18 +9,28 @@ import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 const MARKER = 'mikka-synthetic-socket-mark-probe-v1'
+const PROVIDER_CONTROL = 'mikka-synthetic-provider-control-v1'
 const PURPOSE = 'mikka-preview-ingress-spike'
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
 const ID = /^[A-Za-z0-9_-]{1,128}$/
 const SHA = /^[a-f0-9]{40}$/
 const NAMES = ['userLoopback4', 'userPublic4', 'userLoopback6', 'rootMarked']
+const KERNEL_OPTIONS = ['CONFIG_MODULES', 'CONFIG_NETFILTER_XT_MATCH_SOCKET', 'CONFIG_NF_SOCKET_IPV4',
+  'CONFIG_NF_SOCKET_IPV6', 'CONFIG_NF_TABLES', 'CONFIG_NFT_META', 'CONFIG_NFT_CT']
+const RULE_FAILURE_FLAGS = ['unsupportedRevision', 'missingKernelModule', 'missingExtension',
+  'operationNotSupported', 'permissionDenied', 'invalidArgument']
 const REFUSALS = new Set(['root_required', 'socket_mark_unavailable', 'user_identity_invalid', 'user_fixture_start_timeout',
   'user_fixture_invalid', 'ports_invalid', 'operation_invalid', 'probe_internal_failure',
   'preview_ingress_process_ended', 'preview_ingress_phase_timeout', 'preview_ingress_phase_invalid',
-  'preview_ingress_positive_control_failed',
+  'preview_ingress_positive_control_failed', 'outbound_target_invalid', 'outbound_probe_failed',
+  'provider_control_failed',
   ...['ipv4', 'ipv6'].flatMap(family => ['tool_missing_', 'chain_unavailable_', 'socket_match_unavailable_',
+    'nft_backend_unavailable_', 'reply_rule_unavailable_', 'output_unavailable_',
     'reject_unavailable_', 'input_unavailable_', 'rule_unverified_'].map(prefix => prefix + family))])
 const safeCode = error => REFUSALS.has(error?.message) ? error.message : 'preview_ingress_probe_failed'
+const providerListeners = value => Object.fromEntries(['49983', '50005'].map(port => [port, {
+  listening: value?.[port]?.listening === true, allRoot: value?.[port]?.allRoot === true,
+}]))
 
 async function sample(sandbox, port, fetchImpl) {
   try {
@@ -35,7 +45,10 @@ export async function probeMarkedIngress(sandbox, sourceCommit, fetchImpl = fetc
   const source = await readFile(new URL('./preview-ingress-probe.py', import.meta.url), 'utf8')
   const report = { sourceCommit, sandboxId: sandbox.sandboxId, templateId: (await sandbox.getInfo()).templateId,
     probeSha256: createHash('sha256').update(source).digest('hex'), observedAt: new Date().toISOString(),
-    before: {}, after: {}, replacement: null, passed: false, rulesRemoved: false }
+    policy: 'nft_output_reply_mark', policyScope: 'owned_fixture_ports_only',
+    preListenerIsolationProven: false, agentPrivilegeBoundaryProven: false,
+    before: {}, after: {}, outbound: null, providerControlRoundTrip: false, providerListenersPreserved: false,
+    replacement: null, passed: false, rulesRemoved: false }
   await sandbox.commands.run('install -d -m 755 /opt/mikka/ingress-probe', { user: 'root', timeoutMs: 10_000 })
   await sandbox.files.write('/opt/mikka/ingress-probe/probe.py', source, { user: 'root' })
   await sandbox.commands.run('chmod 755 /opt/mikka/ingress-probe/probe.py', { user: 'root', timeoutMs: 5_000 })
@@ -69,9 +82,21 @@ export async function probeMarkedIngress(sandbox, sourceCommit, fetchImpl = fetc
   const phase = async expected => {
     const value = await receive()
     if (value.capabilities) report.capabilities = { netAdmin: value.capabilities?.netAdmin === true, netRaw: value.capabilities?.netRaw === true }
-    if (value.tools) report.tools = Object.fromEntries(['iptables', 'ip6tables'].map(name => [name, { present: value.tools?.[name]?.present === true,
+    if (value.tools) report.tools = Object.fromEntries(['iptables', 'ip6tables', 'nft'].map(name => [name, { present: value.tools?.[name]?.present === true,
       source: value.tools?.[name]?.source === 'private' ? 'private' : 'system',
-      version: /^\d+\.\d+\.\d+$/.test(value.tools?.[name]?.version ?? '') ? value.tools[name].version : null }]))
+      version: /^\d+\.\d+\.\d+$/.test(value.tools?.[name]?.version ?? '') ? value.tools[name].version : null,
+      backend: ['nf_tables', 'legacy'].includes(value.tools?.[name]?.backend) ? value.tools[name].backend : 'unknown' }]))
+    if (value.kernel) report.kernel = {
+      release: /^[A-Za-z0-9_.+-]{1,128}$/.test(value.kernel.release ?? '') ? value.kernel.release : null,
+      configSource: ['proc', 'boot'].includes(value.kernel.configSource) ? value.kernel.configSource : 'unavailable',
+      options: Object.fromEntries(KERNEL_OPTIONS.map(name => [name,
+        ['y', 'm', 'n'].includes(value.kernel.options?.[name]) ? value.kernel.options[name] : 'unknown'])),
+    }
+    if (value.ruleFailure) report.ruleFailure = {
+      exitCode: Number.isInteger(value.ruleFailure.exitCode) && value.ruleFailure.exitCode >= 0
+        && value.ruleFailure.exitCode <= 255 ? value.ruleFailure.exitCode : null,
+      ...Object.fromEntries(RULE_FAILURE_FLAGS.map(name => [name, value.ruleFailure[name] === true])),
+    }
     if (value.phase === 'failed') throw new Error(REFUSALS.has(value.code) ? value.code : 'probe_internal_failure')
     if (value.phase !== expected) throw new Error('preview_ingress_phase_invalid')
     return value
@@ -79,18 +104,30 @@ export async function probeMarkedIngress(sandbox, sourceCommit, fetchImpl = fetc
   try {
     const ready = await phase('ready')
     const ports = ready.ports
-    if (!ports?.rootMarked || !ports.userLoopback4 || !ports.userPublic4 || Object.keys(ports).some(name => !NAMES.includes(name))
-      || Object.values(ports).some(port => !Number.isInteger(port) || port <= 1024 || port >= 65536)
+    if (NAMES.some(name => !ports?.[name]) || Object.keys(ports).some(name => !NAMES.includes(name))
+      || Object.values(ports).some(port => !Number.isInteger(port) || port <= 1024 || port >= 65536 || [49983, 50005].includes(port))
       || new Set(Object.values(ports)).size !== Object.keys(ports).length) throw new Error('ports_invalid')
     report.user = { canSetSocketMark: ready.user?.canSetSocketMark === true,
-      sudoNonInteractiveRoot: ready.user?.sudoNonInteractiveRoot === true }
+      sudoNonInteractiveRoot: ready.user?.sudoNonInteractiveRoot === true,
+      noNewPrivileges: typeof ready.user?.noNewPrivileges === 'boolean' ? ready.user.noNewPrivileges : null }
+    report.providerListenersBefore = providerListeners(ready.providerListeners)
     // Single bounded setup delay for envd's documented listener scan.
     await new Promise(accept => setTimeout(accept, 1500))
     for (const [name, port] of Object.entries(ports)) report.before[name] = await sample(sandbox, port, fetchImpl)
-    if (!report.before.rootMarked.markerMatched || !report.before.userPublic4.markerMatched) throw new Error('preview_ingress_positive_control_failed')
+    if (NAMES.some(name => !report.before[name].markerMatched)) throw new Error('preview_ingress_positive_control_failed')
     await process.sendStdin('protect\n')
     const protectedReply = await phase('protected')
     report.rules = { ipv4: protectedReply.rules?.ipv4 === true, ipv6: protectedReply.rules?.ipv6 === true }
+    report.providerListenersAfter = providerListeners(protectedReply.providerListeners)
+    report.providerListenersPreserved = ['49983', '50005'].every(port =>
+      ['listening', 'allRoot'].every(field => report.providerListenersBefore[port][field] === report.providerListenersAfter[port][field]))
+    const provider = await sandbox.commands.run(`printf '${PROVIDER_CONTROL}'`, { user: 'user', timeoutMs: 10_000 })
+    report.providerControlRoundTrip = provider.stdout === PROVIDER_CONTROL
+    if (!report.providerControlRoundTrip || !report.providerListenersPreserved) throw new Error('provider_control_failed')
+    await process.sendStdin(`outbound https://${sandbox.getHost(ports.rootMarked)}/\n`)
+    const outbound = await phase('outbound')
+    report.outbound = { status: Number.isInteger(outbound.status) && outbound.status >= 100 && outbound.status <= 599 ? outbound.status : null,
+      markerMatched: outbound.markerMatched === true }
     for (const [name, port] of Object.entries(ports)) report.after[name] = await sample(sandbox, port, fetchImpl)
     await process.sendStdin('replace\n')
     const replacement = await phase('replaced')
@@ -100,8 +137,10 @@ export async function probeMarkedIngress(sandbox, sourceCommit, fetchImpl = fetc
     const finished = await phase('finished')
     report.rulesRemoved = finished.rulesRemoved === true
     report.passed = report.capabilities.netAdmin && report.rules.ipv4 && report.rules.ipv6
+      && ['iptables', 'ip6tables'].every(name => report.tools[name].backend === 'nf_tables')
+      && report.providerControlRoundTrip && report.providerListenersPreserved && report.outbound.markerMatched
       && report.after.rootMarked.markerMatched && !report.user.canSetSocketMark
-      && NAMES.filter(name => name !== 'rootMarked' && ports[name]).every(name => !report.after[name].markerMatched)
+      && NAMES.filter(name => name !== 'rootMarked').every(name => !report.after[name].markerMatched)
       && !report.replacement.markerMatched && report.rulesRemoved
     return report
   } catch (error) {
@@ -111,6 +150,10 @@ export async function probeMarkedIngress(sandbox, sourceCommit, fetchImpl = fetc
   } finally {
     try { await process.sendStdin('finish\n') } catch { /* VM teardown below remains mandatory. */ }
     await Promise.race([completion, new Promise(accept => setTimeout(accept, 1000))])
+    // A rule insertion can fail before the normal finish phase. The owned VM
+    // still must be killed, but retain its independent rule-cleanup receipt.
+    const finished = receipts.findLast(value => value.phase === 'finished')
+    if (finished) report.rulesRemoved = finished.rulesRemoved === true
   }
 }
 

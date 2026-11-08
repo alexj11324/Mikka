@@ -1,9 +1,10 @@
-"""Disposable, synthetic socket-mark probe. Never run in an existing task VM.
+"""Disposable, synthetic reply-mark probe. Never run in an existing task VM.
 
-Only the explicitly created fixture ports enter its temporary INPUT chain.
+Only the explicitly created fixture ports enter its temporary OUTPUT chain.
 E2B envd, provider MCP, viewers and unrelated traffic are untouched. Commands
 arrive over the root process's SDK stdin; no public control endpoint is added.
 """
+import gzip
 import http.server
 import json
 import os
@@ -17,10 +18,15 @@ import socket
 import subprocess
 import sys
 import threading
+import urllib.request
+from urllib.parse import urlsplit
 
 MARKER = b'mikka-synthetic-socket-mark-probe-v1'
 MARK = 0x4D4B5056
 TOOL_PATH = '/opt/mikka/runtime/netfilter/sbin:/opt/mikka/runtime/netfilter/bin:/opt/mikka/runtime/iptables/sbin:/opt/mikka/runtime/iptables/bin:/usr/sbin:/sbin:/usr/bin:/bin'
+KERNEL_OPTIONS = ('CONFIG_MODULES', 'CONFIG_NETFILTER_XT_MATCH_SOCKET',
+                  'CONFIG_NF_SOCKET_IPV4', 'CONFIG_NF_SOCKET_IPV6',
+                  'CONFIG_NF_TABLES', 'CONFIG_NFT_META', 'CONFIG_NFT_CT')
 
 
 class Refused(Exception):
@@ -37,17 +43,79 @@ def capabilities():
     return {'netAdmin': bool(effective & (1 << 12)), 'netRaw': bool(effective & (1 << 13))}
 
 
+def provider_listeners():
+    owners = {49983: set(), 50005: set()}
+    for table in ('/proc/net/tcp', '/proc/net/tcp6'):
+        try:
+            rows = Path(table).read_text().splitlines()[1:]
+        except OSError:
+            continue
+        for row in rows:
+            fields = row.split()
+            if len(fields) < 10 or fields[3] != '0A':
+                continue
+            port = int(fields[1].split(':')[1], 16)
+            if port in owners:
+                owners[port].add(int(fields[7]))
+    return {str(port): {'listening': bool(uids), 'allRoot': bool(uids) and uids == {0}}
+            for port, uids in owners.items()}
+
+
 def tools():
     result = {}
-    for name in ('iptables', 'ip6tables'):
+    for name in ('iptables', 'ip6tables', 'nft'):
         path = shutil.which(name, path=TOOL_PATH)
-        receipt = {'present': path is not None, 'source': 'private' if path and path.startswith('/opt/mikka/') else 'system', 'version': None}
+        receipt = {'present': path is not None, 'source': 'private' if path and path.startswith('/opt/mikka/') else 'system',
+                   'version': None, 'backend': 'unknown'}
         if path:
             response = subprocess.run([path, '--version'], capture_output=True, timeout=5, check=False)
             version = re.search(rb'v([0-9]+\.[0-9]+\.[0-9]+)', response.stdout)
             receipt['version'] = version.group(1).decode() if version else None
+            receipt['backend'] = ('nf_tables' if b'(nf_tables)' in response.stdout else
+                                  'legacy' if b'(legacy)' in response.stdout else 'unknown')
         result[name] = receipt
     return result
+
+
+def kernel():
+    release = os.uname().release
+    if not re.fullmatch(r'[A-Za-z0-9_.+-]{1,128}', release):
+        release = None
+    result = {'release': release, 'configSource': 'unavailable',
+              'options': {name: 'unknown' for name in KERNEL_OPTIONS}}
+    candidates = [('proc', Path('/proc/config.gz'))]
+    if release:
+        candidates.append(('boot', Path('/boot') / ('config-' + release)))
+    for source, path in candidates:
+        try:
+            with (gzip.open(path, 'rb') if source == 'proc' else path.open('rb')) as handle:
+                data = handle.read(1024 * 1024 + 1)
+            if len(data) > 1024 * 1024:
+                continue
+            text = data.decode('ascii')
+        except (OSError, UnicodeError, EOFError):
+            continue
+        result['configSource'] = source
+        for name in KERNEL_OPTIONS:
+            selected = re.search(r'^' + re.escape(name) + r'=([ymn])$', text, re.M)
+            result['options'][name] = selected.group(1) if selected else (
+                'n' if re.search(r'^# ' + re.escape(name) + r' is not set$', text, re.M) else 'unknown')
+        break
+    return result
+
+
+def rule_failure(returncode, stderr):
+    # Never emit the command, chain name, raw stderr or arbitrary exception text.
+    # Keep the observations independent: several kernels print both a revision
+    # warning and a userspace extension error for the same failed insertion.
+    text = stderr[:16384].lower()
+    return {'exitCode': returncode if 0 <= returncode <= 255 else None,
+            'unsupportedRevision': bool(re.search(rb'revision [0-9]+ not supported', text)),
+            'missingKernelModule': b'missing kernel module' in text,
+            'missingExtension': b"couldn't load match" in text or b'could not load match' in text,
+            'operationNotSupported': b'operation not supported' in text,
+            'permissionDenied': b'permission denied' in text or b'operation not permitted' in text,
+            'invalidArgument': b'invalid argument' in text}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -100,8 +168,45 @@ def as_user(port=None):
         except OSError:
             pass
     emit(phase='user_ready', ports={name: server.server_address[1] for name, server in servers.items()},
-         capabilities=capabilities(), canSetSocketMark=marker_allowed, sudoNonInteractiveRoot=sudo_root)
+         capabilities=capabilities(), canSetSocketMark=marker_allowed, sudoNonInteractiveRoot=sudo_root,
+         noNewPrivileges=bool(re.search(r'^NoNewPrivs:\s*1$', Path('/proc/self/status').read_text(), re.M)))
     signal.pause()
+
+
+def outbound(url):
+    if os.geteuid() == 0:
+        raise Refused('user_identity_invalid')
+    try:
+        request = urllib.request.Request(url, headers={'Connection': 'close'})
+        with urllib.request.urlopen(request, timeout=10) as response:
+            emit(phase='user_outbound', status=response.status, markerMatched=response.read(len(MARKER) + 1) == MARKER)
+    except Exception:
+        emit(phase='user_outbound', status=None, markerMatched=False)
+
+
+def user_outbound(url, port):
+    target = urlsplit(url)
+    # The only outbound target is this probe's own marked fixture through E2B's
+    # public ingress, never an arbitrary host supplied to a product endpoint.
+    if (target.scheme != 'https' or target.username or target.password or target.port
+            or target.path != '/' or target.query or target.fragment
+            or not target.hostname or not target.hostname.endswith('.e2b.app')
+            or not target.hostname.startswith(str(port) + '-')
+            or not re.fullmatch(r'[A-Za-z0-9.-]{1,253}', target.hostname)):
+        raise Refused('outbound_target_invalid')
+    user = pwd.getpwnam('user')
+    reply = subprocess.run([sys.executable, str(Path(__file__).resolve()), 'outbound', url],
+                           user=user.pw_uid, group=user.pw_gid, extra_groups=[], cwd=user.pw_dir,
+                           stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                           env={'PATH': '/usr/bin:/bin', 'HOME': user.pw_dir, 'PYTHONDONTWRITEBYTECODE': '1'},
+                           timeout=15, check=False)
+    if reply.returncode or len(reply.stdout) > 4096:
+        raise Refused('outbound_probe_failed')
+    value = json.loads(reply.stdout)
+    if value.get('phase') != 'user_outbound':
+        raise Refused('outbound_probe_failed')
+    return {'status': value.get('status') if type(value.get('status')) is int else None,
+            'markerMatched': value.get('markerMatched') is True}
 
 
 def user_process(port=None):
@@ -125,14 +230,22 @@ def user_process(port=None):
 
 class Policy:
     def __init__(self, ports):
+        ports = tuple(ports)
+        if (not ports or len(ports) > 15 or any(type(port) is not int or not 1024 < port < 65536
+                                               or port in (49983, 50005) for port in ports)):
+            raise Refused('ports_invalid')
         self.chain = 'MKPV_' + os.urandom(5).hex()
         self.ports = ','.join(str(port) for port in sorted(set(ports)))
         self.created = []
         self.linked = []
+        self.failure = None
 
     def command(self, program, arguments):
-        return subprocess.run([program, '--wait', '5', *arguments], stdin=subprocess.DEVNULL,
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=7, check=False).returncode
+        reply = subprocess.run([program, '--wait', '5', *arguments], stdin=subprocess.DEVNULL,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=7, check=False)
+        if reply.returncode:
+            self.failure = rule_failure(reply.returncode, reply.stderr)
+        return reply.returncode
 
     def install(self):
         proof = {}
@@ -140,19 +253,23 @@ class Policy:
             program = shutil.which(name, path=TOOL_PATH)
             if not program:
                 raise Refused('tool_missing_' + family)
+            version = subprocess.run([program, '--version'], capture_output=True, timeout=5, check=False)
+            if version.returncode or b'(nf_tables)' not in version.stdout:
+                raise Refused('nft_backend_unavailable_' + family)
             if self.command(program, ['--new-chain', self.chain]):
                 raise Refused('chain_unavailable_' + family)
             self.created.append(program)
-            marked = ['-p', 'tcp', '-m', 'socket', '--nowildcard', '--restore-skmark', '-m', 'mark', '--mark', str(MARK), '-j', 'ACCEPT']
-            if self.command(program, ['--append', self.chain, *marked]):
-                raise Refused('socket_match_unavailable_' + family)
-            if self.command(program, ['--append', self.chain, '-p', 'tcp', '-j', 'REJECT', '--reject-with', 'tcp-reset']):
-                raise Refused('reject_unavailable_' + family)
-            jump = ['!', '-i', 'lo', '-p', 'tcp', '-m', 'multiport', '--dports', self.ports, '-j', self.chain]
-            if self.command(program, ['--insert', 'INPUT', '1', *jump]):
-                raise Refused('input_unavailable_' + family)
+            # nf_tables translates these userspace matches to native ct/meta
+            # expressions. No xt_socket lookup or socket kernel module is used.
+            blocked = ['-p', 'tcp', '-m', 'conntrack', '--ctdir', 'REPLY', '-m', 'mark', '!', '--mark', str(MARK),
+                       '-j', 'REJECT', '--reject-with', 'tcp-reset']
+            if self.command(program, ['--append', self.chain, *blocked]):
+                raise Refused('reply_rule_unavailable_' + family)
+            jump = ['!', '-o', 'lo', '-p', 'tcp', '-m', 'multiport', '--sports', self.ports, '-j', self.chain]
+            if self.command(program, ['--insert', 'OUTPUT', '1', *jump]):
+                raise Refused('output_unavailable_' + family)
             self.linked.append((program, jump))
-            if self.command(program, ['--check', 'INPUT', *jump]) or self.command(program, ['--check', self.chain, *marked]):
+            if self.command(program, ['--check', 'OUTPUT', *jump]) or self.command(program, ['--check', self.chain, *blocked]):
                 raise Refused('rule_unverified_' + family)
             proof[family] = True
         return proof
@@ -160,7 +277,7 @@ class Policy:
     def close(self):
         okay = True
         for program, jump in reversed(self.linked):
-            okay = self.command(program, ['--delete', 'INPUT', *jump]) == 0 and okay
+            okay = self.command(program, ['--delete', 'OUTPUT', *jump]) == 0 and okay
         for program in reversed(self.created):
             okay = self.command(program, ['--flush', self.chain]) == 0 and okay
             okay = self.command(program, ['--delete-chain', self.chain]) == 0 and okay
@@ -171,7 +288,7 @@ class Policy:
 def root_probe():
     if os.geteuid() != 0:
         raise Refused('root_required')
-    diagnostic = {'capabilities': capabilities(), 'tools': tools()}
+    diagnostic = {'capabilities': capabilities(), 'tools': tools(), 'kernel': kernel()}
     children = []
     marked = policy = None
     try:
@@ -185,11 +302,14 @@ def root_probe():
         if len(set(ports.values())) != len(ports) or any(type(port) is not int or not 1024 < port < 65536 for port in ports.values()):
             raise Refused('ports_invalid')
         policy = Policy(ports.values())
-        emit(phase='ready', ports=ports, user={key: user[key] for key in ('capabilities', 'canSetSocketMark', 'sudoNonInteractiveRoot')}, **diagnostic)
+        emit(phase='ready', ports=ports, providerListeners=provider_listeners(),
+             user={key: user[key] for key in ('capabilities', 'canSetSocketMark', 'sudoNonInteractiveRoot', 'noNewPrivileges')}, **diagnostic)
         for line in sys.stdin:
             operation = line.strip()
             if operation == 'protect':
-                emit(phase='protected', rules=policy.install())
+                emit(phase='protected', rules=policy.install(), providerListeners=provider_listeners())
+            elif operation.startswith('outbound ') and len(operation) < 512 and marked:
+                emit(phase='outbound', **user_outbound(operation[len('outbound '):], marked.server_address[1]))
             elif operation == 'replace':
                 port = marked.server_address[1]
                 marked.shutdown(); marked.server_close(); marked = None
@@ -202,7 +322,8 @@ def root_probe():
                 raise Refused('operation_invalid')
         return True
     except Exception as error:
-        emit(phase='failed', code=str(error) if isinstance(error, Refused) else 'probe_internal_failure', **diagnostic)
+        emit(phase='failed', code=str(error) if isinstance(error, Refused) else 'probe_internal_failure',
+             ruleFailure=policy.failure if policy else None, **diagnostic)
         return False
     finally:
         if marked:
@@ -218,6 +339,8 @@ if __name__ == '__main__':
     try:
         if len(sys.argv) > 1 and sys.argv[1] == 'user':
             as_user(int(sys.argv[2]) if len(sys.argv) > 2 else None)
+        elif len(sys.argv) == 3 and sys.argv[1] == 'outbound':
+            outbound(sys.argv[2])
         else:
             sys.exit(0 if root_probe() else 1)
     except Exception as error:
