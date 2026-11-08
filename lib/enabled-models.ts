@@ -5,18 +5,20 @@ import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { WorkspaceError } from './workspace-error'
 import { reconcileSubscriptionModels, type ModelSettings } from './enabled-models-policy'
+import { modelDisplayName } from './model-display-name'
 
 type Scope = { ownerId: string; workspaceId: string }
 export type ModelSourceKind = 'subscription' | 'api_key' | 'hosted'
 export interface EnabledModelsSource {
   id: string; kind: ModelSourceKind
-  models: { id: string; enabled: boolean; fresh: boolean }[]
+  models: { id: string; family: string | null; enabled: boolean; fresh: boolean }[]
   enabledCount: number; total: number; freshCount: number; autoEnable?: boolean
   refreshedAt: string | null; refreshError: 'invalid' | 'unavailable' | null
 }
 type SourceRow = { id: string; kind: ModelSourceKind; ids: string[]; settings: ModelSettings | null; refreshedAt: string | null; refreshError: EnabledModelsSource['refreshError'] }
 const project = (row: SourceRow): EnabledModelsSource => {
-  const models = row.ids.map(id => ({ id, enabled: row.settings?.models[id]?.enabled ?? true, fresh: row.settings?.models[id]?.fresh ?? false }))
+  const models = row.ids.map(id => ({ id, family: modelDisplayName(id).family,
+    enabled: row.settings?.models[id]?.enabled ?? true, fresh: row.settings?.models[id]?.fresh ?? false }))
   return { id: row.id, kind: row.kind, models, total: models.length, enabledCount: models.filter(item => item.enabled).length,
     freshCount: models.filter(item => item.fresh).length, ...(row.kind === 'subscription' ? { autoEnable: row.settings?.autoEnable ?? true } : {}),
     refreshedAt: row.refreshedAt, refreshError: row.refreshError }

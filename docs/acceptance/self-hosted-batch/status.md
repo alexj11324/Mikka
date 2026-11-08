@@ -46,6 +46,13 @@ one PR. This file is a coverage ledger, not a claim of production acceptance.
 - Superseded drafts #1303, #1531, #1538 and #1579 were closed. Their issue
   acceptance status was not changed.
 
+The final requirement audit also adds the source model's `family` field to the
+settings projection. It reuses the existing #1530 classification, returns null
+for unknown IDs, and preserves the raw ID and existing selection policy. Ten
+family/default unit cases, the actual PG17 migration/refresh/toggle/ownership
+suite, source lint and the repository's complete three-stage typecheck pass.
+The additive response shape is recorded in enabled-models-api.md.
+
 ## Evidence reviewed
 
 - [Lifecycle run 42416273179](https://github.com/alexj11324/Mikka/actions/runs/42416273179):

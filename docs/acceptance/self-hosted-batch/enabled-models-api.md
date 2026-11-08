@@ -22,7 +22,7 @@ An API key with no reported models offers no selectable models.
 interface EnabledModelsSource {
   id: string // subscription/key UUID, or 'hosted'
   kind: 'subscription' | 'api_key' | 'hosted'
-  models: {id: string; enabled: boolean; fresh: boolean}[] // raw model IDs
+  models: {id: string; family: string | null; enabled: boolean; fresh: boolean}[] // raw model IDs
   enabledCount: number
   total: number
   freshCount: number
@@ -34,7 +34,10 @@ interface EnabledModelsSource {
 
 The existing `model_settings` live invalidation refreshes both settings and bot
 pickers after the transaction commits, including authorized shared users.
-Display names and family grouping remain the frontend's existing responsibility.
+The family field reuses the existing model-display-name classification (Opus,
+Sonnet, Haiku, Fable, GPT, DeepSeek). Unrecognized IDs return null. Model display
+names and ordering remain the frontend's existing responsibility; the backend
+does not invent a second family parser or return a formatted model name.
 
 Subscription settings are account-scoped, just like their credential: a toggle
 applies wherever the owner shares that source. Automatic release selection
