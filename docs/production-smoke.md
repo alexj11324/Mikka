@@ -15,7 +15,7 @@ signs in and reads.
 | Made | 2026-10-30, through `/api/auth/sign-up/email`; verified from the Gmail inbox |
 | Acceptance workspace | Alex's **Acme Inc.** team, selected through normal workspace membership and administrator verification |
 | Browser conversation | The selected team's existing Coordinator; its Computer tab needs no separate bot fixture |
-| Historical API-only fixture | `Smoke Bot` in the original personal workspace; used only by the legacy API-only driver described below |
+| API-only computer probe | The selected team's unique existing Coordinator, identified by the authorized bot-list marker rather than its display name |
 | Credentials | Infisical `prod:/` (the root, which holds nothing else and syncs nowhere): `SMOKE_OWNER_EMAIL`, `SMOKE_OWNER_PASSWORD` |
 
 The `+mikka-smoke` tag ([`lib/smoke-account.ts`](../lib/smoke-account.ts)) grants
@@ -52,10 +52,13 @@ operation names; it contains no Playwright exception, locator value, page text,
 screenshot or trace. A failed run is not evidence that any particular earlier
 UI assertion passed unless the recorded stage establishes it.
 
-### Legacy API-only smoke
+### API-only smoke
 
 [`scripts/ops/production-smoke.mjs`](../scripts/ops/production-smoke.mjs) signs in
 through the HTTP API, checks the session, loads the shell HTML and reads. It
+uses the normal team-selection helper and its private workspace cookie, verifies
+the exact owner/workspace on `bots.pollBots`, and reads the unique Coordinator's
+runtime list. It
 uses Node 24 without a browser. It sends no message, boots no computer and
 calls no model or E2B provider.
 
@@ -64,9 +67,8 @@ calls no model or E2B provider.
 - Reports, without failing: whether the credential vault, approved writes and
   the cloud computer are on. The table lands in the job summary.
 
-This API-only driver still finds the historical `Smoke Bot` by name and reads
-its runtime list; it does not select or establish the browser's shared-team
-scope. It is not a substitute for team-bound acceptance. Its computer probe
+The API-only driver has the same verified shared-team scope as normal acceptance;
+it requires no historical personal `Smoke Bot` fixture or display name. Its computer probe
 checks the authenticated API and server kill switch. It does not assert that a
 machine can boot, that the computer tab renders or that a model can run. Those
 require separate active acceptance. Reports contain only capability names and

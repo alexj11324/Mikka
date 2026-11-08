@@ -36,16 +36,18 @@ search tab at its trailing end
 ([decision](decisions/2026-11-06-1300-ios-comma-tabs-accepted.md); tab names and
 the 任务 tab since [2026-11-07](decisions/2026-11-07-2045-tasks-only-threads-inside.md)).
 Lists show tasks only; a thread opens from its task's 活动, pushed over the task.
-The Bot tab's large title sits in the top bar's own row with a **+** on the right
-(新建 Bot, 新建群聊); there is no workspace menu, and workspaces switch only in
-设置 › 工作区. The 任务 tab groups its tasks 等待你 · 进行中 · 待办 · 已完成; each row carries its
-own state's icon, the raised hand only for 等你处理
-(a task has one conversation, and every tab's title sits in the top row: [2300](decisions/2026-11-07-2300-one-conversation-per-task.md))
-([states and icons](decisions/2026-11-07-2230-one-icon-per-task-state.md)), and no coloured dots; its + creates a task. The
-paragraphs below on the 对话 bar's workspace menu and on the 线程 tab and its
-segment are replaced by this. Each tab is
-its own Stack with a large title. A chat and a thread open over the tabs, so the
-tab bar hides there. 新建 Bot and 新建群聊 open as form sheets. 线程 and 建议 show
+The Bot tab has a **+** on the right (新建 Bot, 新建群聊); there is no workspace
+menu, and workspaces switch only in 设置 › 工作区. The 任务 tab groups its tasks
+等待你 · 进行中 · 待办 · 已完成; each row carries its own state's icon, the raised hand
+only for 等你处理 (a task has one conversation:
+[2300](decisions/2026-11-07-2300-one-conversation-per-task.md))
+([states and icons](decisions/2026-11-07-2230-one-icon-per-task-state.md)), and no
+coloured dots; its + creates a task. The paragraphs below on the 对话 bar's
+workspace menu and on the 线程 tab and its segment are replaced by this. Each tab is
+its own Stack whose root has one title, the system's, centred in the bar's row,
+with its buttons grouped on the right and nothing on the left
+([decision](decisions/2026-11-08-0120-ios-header-like-comma.md)). A chat and a thread open over the tabs, so the
+tab bar hides there. 新建 Bot and 新建群聊 open as form sheets. 任务 and 建议 show
 their counts as the system's tab badges.
 
 **对话** (designs 01–05) is a messaging app's chat list under the large title 对话.
@@ -59,8 +61,9 @@ their counts as the system's tab badges.
   time (a working bot says 进行中), newest first (the web bot list, R-01; R-06).
   Rows have no separators; the pressed surface sits 10 pt in from each side.
 - Each chat row taps open with the system's link transition. A long press opens its menu over a live preview. A
-  swipe left shows two capsules, 置顶 and 隐藏, and a full swipe pins. Chats cannot be dragged to reorder (Alex, 2026-11-07)
-  ([decision](decisions/2026-11-05-2010-ios-home-list-interactions.md)). Sections fold. The unread count or waiting
+  swipe left shows two capsules, 置顶 and 隐藏, and a full swipe pins
+  ([decision](decisions/2026-11-05-2010-ios-home-list-interactions.md)). Chats and pins are not dragged: the list
+  stays newest first (Alex 2026-11-07, which supersedes that decision's drag). Sections fold. The unread count or waiting
   mark sits on the right under the time. Hidden chats are listed under 隐藏的聊天 at the foot.
 - 「重启以更新」 shows above the list once an update has downloaded
   ([decision](decisions/2026-10-31-2010-ota-updates.md)).
@@ -92,7 +95,10 @@ The Coordinator gets no other special UI (R-06).
 
 Controls are the system's where iOS has one
 ([decision](decisions/2026-10-31-2200-mobile-native-ios.md)): the top bar is
-the iOS navigation bar with its own bar buttons, menus and back button;
+the iOS navigation bar with its own bar buttons, menus and back button, on the
+page's own background with no material or hairline (content fades under the soft
+top edge; a short page-colour fade below iOS 26). A chat's bar shows the bot's
+name centred;
 capsules and the composer are Liquid Glass on iOS 26.
 
 **线程** (a tab, a large-title page; like the Claude app's Code screen): grouped as on the
@@ -154,7 +160,9 @@ it is one bubble (decisions 2026-10-27).
 
 Colour is restrained: a grey pulsing dot for work in progress; blue only for unread dots and send;
 red only for failure; green for a finished thread and an online machine; PR
-states use GitHub's colours.
+states use GitHub's colours. A task's status glyph carries its state's system
+colour: blue needs you, orange blocked or under way, red failed, green done, grey
+not started or closed ([decision](decisions/2026-11-08-0130-task-state-icon-colours.md)).
 
 Things waiting on the person have no screen of their own: proactive cards sit
 in the Coordinator chat, and waiting threads

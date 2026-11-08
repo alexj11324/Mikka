@@ -94,17 +94,15 @@ cannot.
    daemon from source and the local database ([`docs/dev-workflow.md`](docs/dev-workflow.md)). CI is the
    final gate; do not wait on it, a merge or a deploy to check what you can
    check here.
-2. **Every pull request and push to main** (minutes, CI, `ui-policy.yml`):
-   unit tests, lint, type checks (in "Source checks"), daemon checks,
-   database migrations and integration tests such as thread privacy. PR checks
-   run against GitHub's synthetic merge candidate. Same-repository branch pushes
-   without a PR do not run a duplicate blocking suite. Database suites are
-   partitioned across four isolated PostgreSQL jobs; every shard validates the
-   complete inventory before running its share sequentially, and the protected
-   gate "Production build and browser interactions" requires every shard to
-   succeed. CI runs no production build: Vercel builds `main`, and a failed
-   build there leaves production on the last good deployment and is fixed
-   forward. Vercel does not build pull requests.
+2. **Every pull request and push to main** (CI, `ui-policy.yml`): trusted
+   Nx Core selection runs affected unit, daemon and PostgreSQL suites plus the
+   existing source/security policies. PR checks use GitHub's synthetic merge
+   candidate; the full DB inventory is validated even when execution is skipped.
+   Selected DB suites keep PG17 isolation, clone databases and strict no-skip
+   summaries across 1–4 dynamic shards. Required gate names stay stable; every
+   selected lane must succeed. Weekly and manual runs cover the full inventory.
+   CI builds no Web production artifact: Vercel builds `main`. See
+   [selection, trust and fallback rules](docs/ci/incremental.md).
 3. **No browser tests**, in CI or locally. Acceptance runs locally through
    the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
    with screenshots of a local production build (`next build`, `next start`). `browser-gate.yml` only keeps the protected
@@ -116,13 +114,12 @@ cannot.
    [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
    [`design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md`](docs/design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
 
-A pull request that only changes documentation — non-executable Markdown in
-`docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`,
-the pull request template, or the README diagrams (`docs/assets/*.svg` and their generator scripts) — skips the unit and
-database jobs. The required status checks report success from small gate jobs
-(also on a docs-only main push). Other changes retain every source, migration
-and database integration gate. Test selection is printed in the Changed files
-job and its summary.
+Documentation-only regular files retain a fast path after full DB inventory
+validation. Unknown files, deletions/renames, mode changes, shared/security,
+migration and CI configuration changes conservatively expand validation.
+Classification and skip reasons appear in CI Summary; no PR-provided selector
+can authorize its own skipped work. Details and inspection commands:
+[Dependency-aware CI](docs/ci/incremental.md).
 
 ### Before asking Alex: look at how leading products do it
 

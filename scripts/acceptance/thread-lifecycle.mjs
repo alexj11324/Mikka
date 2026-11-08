@@ -171,14 +171,22 @@ export function isExactNativeCommand(command, expected) {
     && ['-c', '-lc'].includes(words[1]) && words[2].trim() === expected.trim()
 }
 
+export function reviewDeliveryValidation(value, record) {
+  const text = typeof value.reportText === 'string' ? value.reportText : ''
+  return { text: typeof value.reportText === 'string', bytes: Buffer.byteLength(text) === value.reportBytes,
+    digest: sha(text) === value.reportSha256, issue: text.includes('#1593'), source: text.includes(record.sourceCommit),
+    ownerChoice: text.includes('owner_choice=provider-receipts'), evidence: text.includes('Evidence'),
+    risks: text.includes('Risks'), limits: text.includes('Limits') }
+}
+
 /** Tool pairs only: ordinary assistant text cannot satisfy any native proof. */
-export function nativeEvidence(detail, record) {
+export function nativeEvidence(detail, record, expectedRunId = record.runId) {
   const inputs = new Map(), pairs = []
   for (const [index, item] of (detail.chunks ?? []).entries()) {
     const chunk = item.chunk, id = chunk?.toolCallId
     if (typeof id !== 'string' || id.length > 500) continue
     const prefix = id.slice(0, 36)
-    if (UUID.test(prefix) && id[36] === ':' && prefix !== record.runId) continue
+    if (UUID.test(prefix) && id[36] === ':' && prefix !== expectedRunId) continue
     if (chunk.type === 'tool-input-available') {
       assert(!inputs.has(id), 'duplicate_native_tool_input')
       inputs.set(id, { index, chunk, at: item.at })
@@ -205,9 +213,12 @@ export function nativeEvidence(detail, record) {
       assert(SHA.test(value.head ?? '') && ['rootSha256', 'trackedSha256', 'statusSha256', 'markerSha256', 'reportSha256'].every(key => DIGEST.test(value[key] ?? ''))
         && value.markerSha256 === record.markerSha256 && value.markerBytes === record.markerBytes
         && Number.isSafeInteger(value.reportBytes) && value.reportBytes >= 300 && value.reportBytes <= 2400, 'native_snapshot_mismatch')
-      if (value.phase === 'delivery') assert(typeof value.reportText === 'string' && Buffer.byteLength(value.reportText) === value.reportBytes
-        && sha(value.reportText) === value.reportSha256
-        && ['#1593', record.sourceCommit, 'owner_choice=provider-receipts', 'Evidence', 'Risks', 'Limits'].every(text => value.reportText.includes(text)), 'review_delivery_invalid')
+      if (value.phase === 'delivery') {
+        // Retain closed diagnostics before throwing. A failed report must tell
+        // integrity failures from missing content without exporting its text.
+        record.deliveryValidation = reviewDeliveryValidation(value, record)
+        assert(Object.values(record.deliveryValidation).every(Boolean), 'review_delivery_invalid')
+      }
       snapshots[value.phase] = { phase: value.phase, head: value.head, rootSha256: value.rootSha256, trackedSha256: value.trackedSha256,
         statusSha256: value.statusSha256, markerSha256: value.markerSha256, markerBytes: value.markerBytes,
         reportSha256: value.reportSha256, reportBytes: value.reportBytes, toolCallHash: sha(pair.id).slice(0, 16), commandSha256: sha(command),
@@ -229,10 +240,11 @@ function promptFor(record, source) {
     `为 Mikka issue #1593 形成真正有用的生命周期验收审查报告。案例 ${record.caseId}，发布源 ${record.sourceCommit}。`,
     '这是非 repository 的普通 Factory 交付工作区；只在当前 canonical 工作目录创建下述报告与 marker。不要访问 HOME、秘密/环境变量、外部网络或其他目录，不创建新仓库、远程 repo、PR，不提交/推送 Git，不派发其他 agents。不要改配置或其他文件。',
     `先根据下面实际源代码摘录写 issue-1593-${record.caseId}.md 草稿，300–2400 UTF8 bytes，用简短英文减少编码开销。标题含 #1593 和完整发布源 SHA；包含 Evidence、Risks、Limits 小节，至少列出真实 native exit、provider pause ack 丢失、原 VM/SID 连续性及 checkpoint 清理边界。区分代码推断与实际观测，不能声称尚未执行的验收通过。`,
+    '本任务的三段验证脚本各自必须独占一次原生 shell 工具调用：command 只能是给出的该段脚本全文。报告创建/修改必须使用另外的工具调用；不得把 cat/heredoc 写报告、cd、管道、其他前后命令或多个验证脚本拼进同一次调用。',
     '草稿完成后，原样执行以下原生 shell 命令。它仅建立本案例 marker，并记录当前 HEAD、已有 tracked 文件和状态的实际摘要：', before,
     `然后调用 Mikka 原生 ask_human，kind="decision"，question 必须含 ${record.caseId}；询问 Owner 本报告应优先深入 A) provider receipts / ambiguous pause，还是 B) stale epoch / execution lease；summary 简述已读源码与草稿。这个真正的报告重点由 Owner 决定，现在没有答案。调用后让本次 run 正常退出并等待，不调用 submit。`,
     'Owner 回答并在原 SID 续作后，第一项工作原样执行以下只读命令，证明 marker、原草稿与工作目录仍在：', after,
-    '之后按 Owner 的真实选择完成同一报告，保留上述小节，并加入 Owner 提供的 owner_choice 行；最终文字仍为 300–2400 UTF8 bytes。不要重写 marker。报告应给出至少两个具体可证伪的验收建议及尚缺证据。再原样执行：', delivery,
+    '之后按 Owner 的真实选择完成同一报告，并加入 Owner 提供的 owner_choice 行；最终文字仍为 300–2400 UTF8 bytes。不要重写 marker。报告应给出至少两个具体可证伪的验收建议及尚缺证据。交付前重新检查最终文件：必须保留字面标题 ## Evidence、## Risks、## Limits，每节都有实际内容，尤其不能在续作改写时遗漏 ## Limits；仅在别处写“尚未验证”不替代这个小节。再原样执行：', delivery,
     `最后调用第二个 ask_human(kind="decision")，question 含 ${record.caseId} 和 FINAL_REVIEW_READY，说明报告已经形成，但独立 review/check 阶段尚不能通过本次正常 API 锁定授权小模型，询问先补齐阶段授权还是结束本次审查。summary 给出报告发现。保持 waiting；本任务明确不授权调用 submit，因为 submit 会自动选择尚未固定的后继模型。`,
     `实际源摘录 ${source.path}（整个文件 SHA256 ${source.sha256}）：\n${source.excerpt}`,
   ].join('\n\n')
@@ -451,7 +463,7 @@ export async function runLifecycleCase({ client, botId, profile, scope, harness,
       noAbort(signal)
       if (TERMINAL.has(detail.thread?.status)) record.terminal.continuation = terminalObservation(detail, record.continuationRunId, now)
       const snapshot = await factorySnapshot(client, record, hooks)
-      const proof = nativeEvidence(detail, { ...record, runId: record.continuationRunId })
+      const proof = nativeEvidence(detail, record, record.continuationRunId)
       const machine = await readMachine(client, record, scope, observeProvider, TERMINAL.has(detail.thread?.status) ? 'after_delivery' : 'resumed_running', hooks.checkActive)
       if (!snapshot || !TERMINAL.has(detail.thread?.status)) return false
       const question = await client.json(`/api/factory/questions/${record.questionId}`)

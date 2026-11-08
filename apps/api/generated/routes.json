@@ -1397,7 +1397,16 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "f70c1813cd999755d4b8b3201de2d5910fa9e18d56bf871c42bed8a3cb9c6234"
+      "sourceHash": "29e9a97e8ee17faddd912f0536d4699079f0dcb7b008715dde2ab31fd0f4ac2a"
+    },
+    {
+      "path": "/mikka/api/mobile/tasks/[id]",
+      "template": "/api/mobile/tasks/[id]",
+      "source": "app/api/mobile/tasks/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "3fbc57e4441f475055d471553a8578d73d81f0971fbfd98397e6aa0e92dd4dbc"
     },
     {
       "path": "/mikka/api/mobile/threads",

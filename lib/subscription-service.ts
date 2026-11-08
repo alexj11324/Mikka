@@ -273,6 +273,26 @@ export class SubscriptionService {
     const row = await this.repository.connection(ownerId, binding.connectionId)
     return run({ use, modelId: binding.modelId, access: () => this.access(use), worker: this.worker(this.repository.scope(row)).forUse(use) })
   }
+  /** Fresh allowance for model admission, under the same owner custody as Usage.
+   * Settings-only account/profile reads and account writes stay in usage(). */
+  async allowance(ownerId: string, id: string, signal?: AbortSignal): Promise<void> {
+    const row = await this.repository.connection(ownerId, id)
+    if (row.state !== 'connected') return
+    try {
+      const result = await this.worker(this.repository.scope(row)).call<Pick<WorkerUsage, 'status' | 'body'>>('allowance', { revision: Number(row.epoch) }, signal)
+      const quota = quotaSnapshotSchema.parse(await this.quota(row.provider, result))
+      const plan = result.body && typeof result.body === 'object' && 'plan_type' in result.body ? result.body.plan_type : undefined
+      // Only the already-returned, allowlisted Codex quota plan is new metadata.
+      // Claude and missing/unknown plans keep the current DB value in the same
+      // epoch-fenced UPDATE, including a Settings change during this await.
+      const hasPlan = row.provider === 'codex' && result.status === 200 && typeof plan === 'string'
+        && ['plus', 'pro', 'free', 'team', 'business', 'enterprise', 'go'].includes(plan) && typeof quota.plan === 'string' && quota.plan.length > 0
+      await this.repository.saveQuota(row, quota, hasPlan ? undefined : { preservePlan: true })
+    } catch {
+      const now = await this.repository.connection(ownerId, id).catch(() => null)
+      if (now && now.state !== row.state) await (await import('./live/lists')).ownerSettingsChanged(this.repository.pool, ownerId)
+    }
+  }
   /** The owner's own Settings read: no binding, a connected revision only.
    * Never throws for a provider or worker failure: the row degrades instead,
    * keeping the last known email. */

@@ -1,4 +1,8 @@
 {
+  "MobileTaskSchedule": {
+    "daily": "Every day at {time}",
+    "interval": "Every {minutes, plural, one {1 minute} other {# minutes}}"
+  },
   "Common": {
     "appUpdated": "Mikka has been updated",
     "refresh": "Refresh",
@@ -3437,7 +3441,7 @@
         "update_issue": "Update task",
         "list_issues": "Look up tasks",
         "get_issue": "Look up tasks",
-        "dispatch_run": "Start thread",
+        "dispatch_run": "Start task",
         "dispatch_bot_computer": "Start on computer",
         "list_runs": "Look up threads",
         "get_run": "Look up threads",
@@ -3466,7 +3470,7 @@
         "append_notion_paragraph": "Write to Notion",
         "list_drive_files": "Look up Drive",
         "dispatch_factory_task": "Dispatch Factory task",
-        "dispatch_factory_run": "Dispatch thread",
+        "dispatch_factory_run": "Dispatch task",
         "get_factory_task": "Look up Factory task",
         "list_factory_requests": "Look up Factory requests",
         "list_factory_questions": "Look up Factory questions",
@@ -3485,7 +3489,7 @@
         "load_skill": "Load skill"
       },
       "summary": {
-        "dispatch": "{count, plural, one {Dispatched # thread} other {Dispatched # threads}}",
+        "dispatch": "{count, plural, one {Dispatched # task} other {Dispatched # tasks}}",
         "dispatchFactory": "{count, plural, one {Dispatched # Factory task} other {Dispatched # Factory tasks}}",
         "wake": "{count, plural, one {Woke a computer} other {Woke computers # times}}",
         "messageThread": "{count, plural, one {Messaged a thread} other {Sent # thread messages}}",
@@ -4182,9 +4186,9 @@
       "unconfirmed": "Group creation not confirmed",
       "reviewGroups": "View group chats"
     },
-    "searchPlaceholder": "Search bots, chats, groups, tasks, threads and projects",
+    "searchPlaceholder": "Search bots, chats, groups, tasks and projects",
     "searchLabel": "Search everything",
-    "searchDescription": "Search conversations, group chats, tasks, threads and projects. Use the arrow keys to choose and Enter to open.",
+    "searchDescription": "Search conversations, group chats, tasks and projects. Use the arrow keys to choose and Enter to open.",
     "searchEmpty": "Nothing matches",
     "groups": {
       "bots": "Bots",
@@ -4240,6 +4244,84 @@
         "saved": "Saved"
       },
       "threads": "Threads",
+      "tasks": "Tasks",
+      "back": "Back",
+      "allTasks": "All tasks",
+      "allTasksPending": "All tasks, {count} waiting for you",
+      "closeAllTasks": "Close all tasks",
+      "noTasks": "No tasks yet",
+      "taskGroup": {
+        "pending": "Waiting for you",
+        "running": "In progress",
+        "todo": "To do",
+        "done": "Done"
+      },
+      "task": {
+        "properties": "Properties",
+        "status": "Status",
+        "priority": "Priority",
+        "bot": "Dispatched by",
+        "agent": "Agent",
+        "description": "Description",
+        "noDescription": "No description",
+        "activity": "Activity",
+        "attempt": "Attempt {n}",
+        "created": "Created the task",
+        "createdBy": "{name} created the task",
+        "dispatchedTask": "{bot} dispatched this task · {time}",
+        "divider": "Attempt {n} {outcome} · retrying with {agent}",
+        "dividerOutcome": {
+          "failed": "failed",
+          "blocked": "was blocked",
+          "other": "ended"
+        },
+        "replaced": "Started a new thread",
+        "openPage": "Open task page",
+        "more": "More",
+        "comment": "Comment",
+        "commentOnPage": "Comment on the task page",
+        "loadFailed": "Couldn't load the task",
+        "retry": "Retry",
+        "notFound": "This task isn't in your list",
+        "state": {
+          "waiting": "Needs you",
+          "blocked": "Blocked",
+          "failed": "Failed",
+          "running": "Running",
+          "queued": "Queued",
+          "todo": "To do",
+          "idle": "Not now",
+          "done": "Done",
+          "canceled": "Canceled",
+          "duplicate": "Duplicate"
+        },
+        "reason": {
+          "needsReply": "Needs your reply",
+          "running": "Running",
+          "confirm": "Needs your confirmation",
+          "review": "Needs review",
+          "failed": "Failed",
+          "blocked": "Blocked",
+          "quota": "Out of quota",
+          "paused": "Paused",
+          "notStarted": "Not started",
+          "idle": "On hold",
+          "canceled": "Canceled",
+          "duplicate": "Duplicate",
+          "merged": "PR merged"
+        },
+        "result": {
+          "running": "Running",
+          "needsReply": "Needs your reply",
+          "paused": "Paused",
+          "failed": "Failed",
+          "blocked": "Blocked",
+          "replaced": "Replaced",
+          "done": "Done",
+          "idle": "On hold",
+          "ended": "Ended"
+        }
+      },
       "prs": "PRs",
       "computer": "Computer",
       "routines": "Routines",
