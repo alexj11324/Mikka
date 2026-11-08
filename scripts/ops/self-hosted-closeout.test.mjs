@@ -15,7 +15,7 @@ test('only the exact authorized workload can touch production', () => {
 test('invalid workload fails before credentials or any network access', async () => {
   const env = { ...valid, GITHUB_REF: 'refs/heads/unsafe' }
   for (const name of ['GITHUB_TOKEN', 'SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD', 'VERCEL_TEAM_TOKEN']) {
-    Object.defineProperty(env, name, { get() { assert.fail('credential read before source authorization') } })
+    Object.defineProperty(env, name, { get() { return assert.fail('credential read before source authorization') } })
   }
   await assert.rejects(sourceGuard(env))
 })

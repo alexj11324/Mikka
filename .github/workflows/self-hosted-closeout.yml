@@ -31,7 +31,7 @@ jobs:
           node scripts/ops/self-hosted-closeout.mjs --check
       - name: Prepare exact published image and disposable browser infrastructure
         run: |
-          docker pull ghcr.io/alexj11324/mikka:3c32675c99d32f9c84a9b5e4bc48e59231baa4d8
+          docker pull ghcr.io/alexj11324/mikka@sha256:301113622ec68830cf21b5f075b2ec1abb24d3bceb8117954168abc34d550f75
           docker pull postgres:17-alpine
           docker pull axllent/mailpit:v1.27.4
           pnpm exec playwright install --with-deps chromium
@@ -84,7 +84,7 @@ jobs:
           include-imports: false
       - name: Exercise real email login, consent, binding, management and revocation
         timeout-minutes: 15
-        run: node --import tsx scripts/ops/self-hosted-closeout.mjs
+        run: timeout --signal=TERM --kill-after=3m 10m node --import tsx scripts/ops/self-hosted-closeout.mjs
       - name: Upload only closed receipt and masked actual screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

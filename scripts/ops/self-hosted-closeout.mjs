@@ -48,19 +48,30 @@ async function run(env) {
   const root = join(env.RUNNER_TEMP, `mikka-closeout-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`)
   const output = resolve('.artifacts/self-hosted-closeout')
   await mkdir(root, { recursive: true, mode: 0o700 }); await mkdir(output, { recursive: true })
-  const report = { source: plan.source, cloudSource: plan.cloudSource, workflowSource: env.GITHUB_SHA,
+  const report = { source: plan.source, imageDigest: plan.imageDigest, cloudSource: plan.cloudSource, workflowSource: env.GITHUB_SHA,
     started: new Date().toISOString(), stage: 'guards', checks: {}, screenshots: [], cleanup: {} }
   const project = `closeout-${env.GITHUB_RUN_ID}-${env.GITHUB_RUN_ATTEMPT}`
   let tunnel, browser, context, local, serverId, cloudUserId, cloudWorkspaceId, cloudCsrf, localOrigin
   let registered = false
+  let interrupted = false, cleaning = false
+  const signal = () => {
+    interrupted = true; process.exitCode = 1
+    // Interrupt browser operations while retaining the real session's request
+    // context for revoking this fixture and signing out in finally.
+    for (const ctx of [local, context]) for (const page of ctx?.pages() ?? []) void page.close().catch(() => {})
+  }
+  process.once('SIGTERM', signal); process.once('SIGINT', signal)
+  const privateValues = [env.SMOKE_OWNER_EMAIL, env.SMOKE_OWNER_PASSWORD]
   const composePath = join(root, 'compose.json')
   const compose = (...args) => docker('compose', '-f', composePath, '-p', project, ...args)
   const cloudApi = async (path, body) => {
+    check(!interrupted || cleaning, 'INTERRUPTED')
     const r = await context.request.fetch(`${plan.publicOrigin}${path}`, { method: body ? 'POST' : 'GET',
-      ...(body ? { data: body, headers: { Origin: plan.publicOrigin, 'X-CSRF-Token': cloudCsrf } } : {}) })
+      ...(body ? { data: body, headers: { Origin: plan.publicOrigin, ...(cloudCsrf ? { 'X-CSRF-Token': cloudCsrf } : {}) } } : {}) })
     check(r.ok(), `CLOUD_HTTP_${r.status()}`); return r.json()
   }
   const localApi = async (path, body, accepted = [200]) => {
+    check(!interrupted || cleaning, 'INTERRUPTED')
     const r = await local.request.fetch(`${localOrigin}/mikka${path}`, { method: body ? 'POST' : 'GET',
       ...(body ? { data: body, headers: { Origin: localOrigin } } : {}) })
     check(accepted.includes(r.status()), `LOCAL_HTTP_${r.status()}`)
@@ -71,6 +82,7 @@ async function run(env) {
     check(env.SMOKE_OWNER_EMAIL && env.SMOKE_OWNER_PASSWORD, 'SMOKE_CREDENTIALS')
     report.stage = 'fixture'
     const password = randomBytes(24).toString('hex')
+    privateValues.push(password)
     console.log(`::add-mask::${password}`)
     tunnel = spawn(join(env.RUNNER_TEMP, 'cloudflared'), ['tunnel', '--url', 'http://127.0.0.1:3000', '--no-autoupdate'], { env: { PATH: env.PATH }, stdio: ['ignore', 'ignore', 'pipe'] })
     localOrigin = await new Promise((accept, reject) => {
@@ -84,7 +96,7 @@ async function run(env) {
       postgres: { image: 'postgres:17-alpine', environment: { POSTGRES_DB: 'mikka_e2e', POSTGRES_USER: 'mikka', POSTGRES_PASSWORD: password },
         healthcheck: { test: ['CMD-SHELL', 'pg_isready -U mikka -d mikka_e2e'], interval: '3s', timeout: '3s', retries: 30 } },
       mailpit: { image: 'axllent/mailpit:v1.27.4', ports: ['127.0.0.1:8025:8025'], environment: { MP_DISABLE_VERSION_CHECK: 'true', MP_QUIET: 'true' } },
-      app: { image: `ghcr.io/alexj11324/mikka:${plan.source}`, init: true, ports: ['127.0.0.1:3000:3000'], volumes: ['data:/data'],
+      app: { image: `ghcr.io/alexj11324/mikka@${plan.imageDigest}`, init: true, ports: ['127.0.0.1:3000:3000'], volumes: ['data:/data'],
         environment: { DATABASE_URL: db, MIKKA_DATABASE_URL: db, BETTER_AUTH_URL: localOrigin, MIKKA_COMMUNITY_UI: '1',
           SMTP_URL: 'smtp://mailpit:1025', MIKKA_EMAIL_FROM: 'Closeout <login@selfhost.example.test>' },
         depends_on: { postgres: { condition: 'service_healthy' }, mailpit: { condition: 'service_started' } } }
@@ -97,6 +109,7 @@ async function run(env) {
       if (!ready) await delay(2000)
     }
     check(ready, 'IMAGE_SOURCE')
+    check(!interrupted, 'INTERRUPTED')
     report.stage = 'browser'
     const { chromium } = await import('@playwright/test')
     browser = await chromium.launch({ headless: true })
@@ -104,6 +117,7 @@ async function run(env) {
     local = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' })
     const page = await local.newPage(), cloud = await context.newPage()
     const screenshot = async (target, name) => {
+      check(!interrupted, 'INTERRUPTED')
       check(/^[a-z0-9-]+$/.test(name), 'ARTIFACT_NAME')
       const path = join(output, `${name}.png`)
       await target.screenshot({ path, fullPage: true, mask: [target.locator('input[type=password],input[type=email],input[readonly]'),
@@ -120,6 +134,7 @@ async function run(env) {
     }
     report.stage = 'local-auth'
     const email = `closeout-${randomUUID()}@selfhost.example.test`, secret = randomBytes(24).toString('base64url')
+    privateValues.push(email, secret)
     console.log(`::add-mask::${secret}`)
     await localApi('/api/auth/sign-up/email', { name: 'Self-hosted closeout', email, password: secret }, [200, 201])
     let message
@@ -216,6 +231,10 @@ async function run(env) {
     const rejected = await local.request.get(`${localOrigin}/mikka/api/cloud/models/billing`)
     check(rejected.status() === 403 && (await rejected.json()).error === 'cloud_server_revoked', 'NEXT_REQUEST_REVOCATION')
     report.checks.nextRequestRevoked = true
+    await both(cloud, manage, 'personal-authorization-revoked', async p => {
+      await p.locator('select[name=workspace_id]').selectOption(cloudWorkspaceId)
+      await p.locator(`#server-${serverId}`).waitFor({ state: 'hidden' })
+    })
     await both(page, `${localOrigin}/mikka/en/settings?section=account`, 'personal-revoked')
     await localApi('/api/cloud/disconnect', { action: 'personal' })
     report.checks.personalDisconnected = true
@@ -246,6 +265,7 @@ async function run(env) {
     const once = cloud.getByRole('dialog').locator('input[readonly]')
     await once.waitFor()
     const serverKey = await once.inputValue()
+    privateValues.push(serverKey)
     check(serverKey.length > 30 && !/\s/.test(serverKey), 'SERVER_KEY_RETURN')
     console.log(`::add-mask::${serverKey}`)
     await screenshot(cloud, 'team-key-once-masked-dark')
@@ -267,18 +287,35 @@ async function run(env) {
     const teamRejected = await local.request.get(`${localOrigin}/mikka/api/cloud/models/billing`)
     check(teamRejected.status() === 403 && (await teamRejected.json()).error === 'cloud_server_revoked', 'NEXT_TEAM_REQUEST_REVOCATION')
     report.checks.teamKey = { verified: true, separateTeam: true, nextRequestRevoked: true, monthlyLimitMicroUsd: 10_000 }
+    await both(cloud, manage, 'team-key-authorization-revoked', async p => {
+      await p.locator('select[name=workspace_id]').selectOption(billingTeam)
+      await p.locator(`#server-${serverId}`).waitFor({ state: 'hidden' })
+    })
     await both(page, `${localOrigin}/mikka/en/settings?section=cloud`, 'team-key-revoked')
     await localApi('/api/cloud/disconnect', { action: 'key' })
+    await localApi('/api/cloud/disconnect', { action: 'server' })
+    registered = false; report.cleanup.serverDisconnected = true
+    check(!(await localApi('/api/cloud/status')).registered, 'SERVER_DISCONNECTED')
+    await both(page, `${localOrigin}/mikka/en/settings?section=cloud`, 'server-disconnected')
+    const logs = compose('logs', '--no-color', 'app')
+    for (const ctx of [local, context]) for (const cookie of await ctx.cookies()) privateValues.push(cookie.value)
+    check(!privateValues.some(v => typeof v === 'string' && v.length >= 8 && logs.includes(v)), 'APPLICATION_LOG_SECRET_OR_PII')
+    report.checks.applicationLogs = { noFixtureCredentialsOrEmails: true, rawLogsPublished: false }
     await sourceGuard(env); await privateGuard(env)
     report.stage = 'completed'
   } catch (error) {
     // No raw provider, browser, Docker or HTTP response can enter a public log.
     report.failure = /^[A-Z0-9_]+$/.test(error?.message ?? '') ? error.message : 'CLOSEOUT_FAILED'
+    if (error?.code === 'team_workspace_failed') {
+      const { publicTeamWorkspaceFailure } = await import('../acceptance/team-workspace.mjs')
+      report.failure = 'TEAM_WORKSPACE_FAILED'; report.failureDetail = publicTeamWorkspaceFailure(error).detail
+    }
     if (['ERR_MODULE_NOT_FOUND', 'ENOENT', 'ECONNREFUSED', 'ENOTFOUND', 'TimeoutError'].includes(error?.code ?? error?.name)) {
       report.failureDetail = error.code ?? error.name
     }
     process.exitCode = 1
   } finally {
+    cleaning = true
     if (registered && local) {
       try { await localApi('/api/cloud/disconnect', { action: 'server' }); registered = false; report.cleanup.serverDisconnected = true }
       catch { report.cleanup.serverDisconnected = false; process.exitCode = 1 }
@@ -295,6 +332,7 @@ async function run(env) {
     if (browser) { await browser.close(); report.cleanup.browser = true }
     try { compose('down', '--volumes', '--remove-orphans'); report.cleanup.fixture = true } catch { report.cleanup.fixture = false; process.exitCode = 1 }
     if (tunnel) { tunnel.kill('SIGTERM'); report.cleanup.tunnel = true }
+    process.off('SIGTERM', signal); process.off('SIGINT', signal)
     await rm(root, { recursive: true, force: true })
     report.finished = new Date().toISOString()
     await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
