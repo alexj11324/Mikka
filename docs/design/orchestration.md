@@ -120,8 +120,12 @@ one protocol the person picked. Nothing picks an Agent from a model's name
 Claude Code 或 Codex。」 (Alex, R-05)
 
 **A user's computer or server is a runner, just like E2B.** Each runner
-receives the task's resolved authority and real credentials during preparation.
-The machine executes the assignment directly; lifecycle messages report progress
+receives the task's resolved authority, the selected native CLI/GitHub
+credentials, and scoped third-party API capabilities during preparation;
+it must not automatically inherit all user/workspace/repository Secrets.
+The [credential exposure decision](decisions/2026-11-08-0240-credential-exposure-boundary.md)
+specifies the target boundary; the old runtime env-injection path still
+requires migration. The machine executes the assignment directly; lifecycle messages report progress
 and deliver stops, without a permission round trip before each tool or model call
 ([1800](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md)).
 
@@ -151,12 +155,15 @@ and deliver stops, without a permission round trip before each tool or model cal
   slots come from the actual Agent installed on that runner. A failed cloud
   boot self-check marks the runner unhealthy so its runs can be placed again.
 - **Tools and providers.** Claude Code uses `bypassPermissions`; Codex uses
-  approvals `never`. The real selected provider credential goes to the CLI:
+  approvals `never`. Only the real selected provider credential goes to the CLI:
   Claude Code talks to Anthropic and Codex to OpenAI directly. No placeholder,
   provider proxy or extra permission-preflight request is inserted before a
   call. Connected apps still make their normal authenticated operation through
   Mikka's MCP entry; that operation does not acquire another permission gate
-  first. Revocation pushes a stop to the task or reclaims its VM (§6).
+  first. Third-party API Secrets use the separate [non-readable capability
+  boundary](decisions/2026-11-08-0240-credential-exposure-boundary.md) where
+  supported, without adding a Mikka control-plane authorization round trip
+  to each tool call. Revocation pushes a stop to the task or reclaims its VM (§6).
 
 ## 4. Machine selection and fallback
 

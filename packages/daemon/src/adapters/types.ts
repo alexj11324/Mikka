@@ -109,6 +109,10 @@ export interface SessionOptions {
   cwd: string
   /** Clean env from `buildChildEnv`; spawn with `extendEnv: false`. */
   env: Record<string, string>
+  /** Explicit server-admitted variables; never inherited from a local host. */
+  taskEnv?: Record<string, string>
+  /** Supervisor-created loopback SDK endpoints; no raw protected values. */
+  taskSecretEnv?: Record<string, string>
   log: Logger
   /** Domains the repo lets this run reach, on top of the harness's own. */
   networkAllow?: readonly string[]

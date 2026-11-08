@@ -13,10 +13,12 @@ snapshot；不得更新或删除官方模板，也不得删减、覆盖其中的
 Node、Mikka worker 源码与构建产物、daemon 依赖、gh 和 desktop 额外依赖预装在
 `/opt/mikka`。保留官方 CLI 的完整安装包、相对目录结构、Node/npm 和系统文件，
 包括文件内容、权限、属主和符号链接。Mikka 的设备身份只在实例启动后写入自己的
-`/home/user/.mikka`，viewer 状态写入 `/run/mikka-viewer`。任务凭证按
-[1800](2026-11-06-1800-machine-is-the-execution-boundary.md) 提前交给已绑定任务的
-实例，官方 CLI 使用正常 HOME 和凭证配置。任何订阅凭证、设备身份、签名密钥或
-工作区数据均不得进入可复用模板。
+`/home/user/.mikka`，viewer 状态写入 `/run/mikka-viewer`。所选原生 CLI 认证与获准的 GitHub 凭据按
+[1800](2026-11-06-1800-machine-is-the-execution-boundary.md) 交给已绑定任务的实例，
+官方 CLI 使用正常 HOME 和凭证配置。其他第三方 API Secret 的交付单独遵循
+[0240 凭据暴露边界](2026-11-08-0240-credential-exposure-boundary.md)，不能解释成
+向 Agent 批量注入所有 Secret。任何订阅凭证、设备身份、签名密钥或工作区数据均
+不得进入可复用模板。
 
 ## 发布门槛
 
@@ -685,3 +687,60 @@ fc49a8b4933ba6216cc0ebf5b2c941b43fd2144b，不能沿用前版 73be 指纹。已�
 通过。本地产物验证器首次对自有依赖 symlink 路径的记账错误也保留；仅按实际目标
 修正记账，没有改变资源或产品断言。详细证明追加到同一候选证据索引；仍须新
 合成 head CI、三模板守恒、真实双订阅与全部六次生产五秒结果。
+
+
+### 单次成员读取、锁内 run 复用与采样隐私
+
+2026-11-08 的后继本地候选去掉 authorizeSubscriptionWorkspace 中仅包围一条
+SELECT 的显式 BEGIN/COMMIT。原 UUID 校验、参数绑定、完整成员条件、FOR SHARE、
+LIMIT 1 与缺行拒绝保持，每个原调用点仍重新查询，不合并两人的授权快照，也不缓存
+前次结果。真实 pg 只有在 ReadyForQuery 后交付成功，查询、提交或连接异常不能
+因为已收到一行而授予权限。原函数没有持锁跨越的业务操作；两种实现都可能在数据库
+释放锁后、调用者恢复前遇到撤销，后续 fresh claim/lease/response fence 继续保留。
+原独立 BEGIN/COMMIT/ROLLBACK 的故障阶段被移除，不声称所有基础设施错误完全同形。
+
+真实隔离 PostgreSQL 18.6 对照中，单次正常校验从 3 条 SQL、3 次发送、585 B
+变为 1 条 SQL、1 次发送、527 B；数据行仍为 1，没有 DML。缺成员拒绝为
+544→482 B，仍不执行下游。原绑定查询支持的空、Unicode、引号、长身份等不增加
+限制。实际双连接覆盖撤销持锁后提交、锁释放后撤销以及仅终止测试自身连接时拒绝。
+已有 Factory 测试夹具增加对同一隔离 Drizzle 实例的 select 绑定，原 transaction
+绑定及 PostgreSQL 17 版本门槛保留。PG17 全套结果仍由新精确 CI 提供。
+
+claim 的 Profile 准入另外复用同一事务刚取得 FOR UPDATE 的 run 行，避免马上重复
+读取同一行。外部调用者保留原自行读取入口；该锁与准入之间不插入业务 await 或写入，
+Profile 来源、凭据和最终响应栅栏保持。在固定本地 acquisition/claim/终态夹具内，
+SQL 170→169、返回行 114→113，Claude/Codex 实际协议量分别减少 306/305 B。
+这是受影响完整夹具，不是实际 provider/model Task 总量。更宽的锁定投影使
+stop-before-lock 的失败前缀增加 1367 B，单列保留；不能把正常净节省外推到每个
+拒绝前缀。
+
+五写批次的复核还发现，现有 egress sampler 会把 SQL 字符串中的 “from 模块名”
+识别成表名。资格检查因此对最终转义文本的全部有序匹配做精确核验，不截断或去重；
+任何额外匹配，包括重复的已知表名，都恢复原五条参数绑定语句，值不改、不拒绝。
+正常 pnpm test 仍为 1466 B；特殊命令恢复到原安全路径的 1831 B，五个首错前缀、
+SQL、参数和回滚结果相同。旧不安全批次的 1509 B 不再记作该场景的节省。
+全局 sampler、采样开关和正常诊断预算不因这个修复改变。
+
+[该批次证据索引](../research/2026-11-08-e2b-membership-and-claim-candidate.json)
+绑定三个独立候选及本地完整合成源。随后正常合入 main 9e18 的 task-secret
+capabilities：新增资源 snapshot/attempt/device-token/workspace/repository fence
+完整保留，初始仓库设置仍只在该最终响应栅栏内同步投影。受保护 Secret 的动态
+taskSecretEnv 仍参加完整环境匹配；不适用匿名接管的任务保留正常启动，不能忽略
+环境差异来追求时延。这里记录本地验证和兼容边界；新 worker 的构建、精确 CI、
+真实模板/双订阅发布及全部六次正式生产计时分别取得证明后才能记为通过。
+
+完整前序 #1683 的 beab 交付另在本方分支合成为 e7c 源，不替代其 owner 的独立
+合并及发布。两个文本冲突分别保留双方测试入口，以及 Codex 已采用进程不重复
+initialized 和恢复必须匹配实际 native version 的检查。新组合实际通过启动/Web
+114 项、daemon 110＋23 项及 app/API/daemon 类型检查；实际 worker 为
+5343beb10c58d3f68a9238a3bca1c24a8546d722，两入口和全部运行资源验证通过。
+先前 e420 的 PG95＋源码夹具36、daemon218及 worker6ded 仍单独绑定原源。
+app 首次缺少 Electron 的类型依赖错误保留，仅链接既有锁定版本后复验；未改产品
+或断言。本地 Node24.22.1 与模板24.19.0 不同，以上仍不替代新精确 CI、真实候选
+订阅采用或正式生产五秒结果。
+
+完整前序随后更新至 `49527b7da0f4ef4791e5bb108c2f83114f150b56`，仅在隔离的
+self-hosted-image CI job 中，服务验收后、安装源码依赖前清理中间 Docker 构建缓存。
+本方正常合入该完整提交；除这项 workflow 和本条证据文档外，相对 e7c 的所有 Git
+blob 完全一致，worker 指纹保持 5343beb。既有本地验证仍绑定原源，不追认为新
+head CI；新远端精确 CI 和真实生产门槛继续分别等待实际结果。

@@ -70,8 +70,15 @@ test('credential preparation retains five PostgreSQL writes in one message when 
     }
     const proxy = (client: PoolClient) => {
       const calls: { text:string;values:unknown[]|undefined }[] = []
-      const wrapped = { query(text:string, values?:unknown[]) { calls.push({text,values}); return client.query(text,values) } } as Pick<PoolClient,'query'>
-      return {client:wrapped,calls}
+      const returnedRows:number[]=[]
+      const wrapped = { query(text:string, values?:unknown[]) {
+        calls.push({text,values})
+        return client.query(text,values).then(result=>{
+          returnedRows.push((Array.isArray(result)?result:[result]).reduce((sum,one)=>sum+one.rows.length,0))
+          return result
+        })
+      } } as Pick<PoolClient,'query'>
+      return {client:wrapped,calls,returnedRows}
     }
     await t.test('normal path sends one simple-query message with five native result sets', async () => {
       await reset()
@@ -89,6 +96,7 @@ test('credential preparation retains five PostgreSQL writes in one message when 
     })
     for (const [name, changes] of [
       ['normal',{}],
+      ['SQL-shaped private command',{verifyCommand:'python -c "from private_fixture_module import value"'}],
       ['null repository fields',{baseBranch:null,verifyCommand:null,remoteUrl:null}],
       ['undefined matches null',{baseBranch:undefined,verifyCommand:undefined,remoteUrl:undefined}],
       ['quotes, backslashes, Unicode and SQL-shaped text',{repoPath:"repo/'\\'; DROP TABLE devices; --",baseBranch:"b'\\x",verifyCommand:"printf '秘密\\n'; true",remoteUrl:"https://github.com/a/b'\\q"}],
@@ -156,6 +164,42 @@ test('credential preparation retains five PostgreSQL writes in one message when 
         }
       }finally{await pool.query('DROP TRIGGER wait_machine ON thread_machines;DROP FUNCTION wait_before_machine()')}
     })
+    await t.test('SQL-shaped command privacy fallback keeps real stored values and five bound samples',async()=>{
+      const {describeSample}=await import('../db/egress-sample')
+      for(const verifyCommand of ['python -c "from private_fixture_module import value"', "printf '\\\\'; FrOm ONLY \"private_escaped_module\""]){
+        const p={...input,verifyCommand};await reset(p)
+        const client=await pool.connect()
+        try{
+          await client.query('BEGIN')
+          const calls:{text:string;values:unknown[]|undefined}[]=[]
+          const samples:ReturnType<typeof describeSample>[]=[]
+          const wrapped={query:async(text:string,values?:unknown[])=>{
+            const result=await client.query(text,values)
+            calls.push({text,values});samples.push(describeSample(text,result,null));return result
+          }} as Pick<PoolClient,'query'>
+          await prepareThreadRegistration(wrapped,p)
+          assert.equal(calls.length,5)
+          assert(calls.every(call=>Array.isArray(call.values)))
+          assert(!JSON.stringify(samples).includes('private_'))
+          assert.deepEqual((await client.query('SELECT step FROM statement_log ORDER BY n')).rows.map(row=>row.step),steps)
+          assert.equal((await client.query('SELECT "verifyCommand" FROM device_repos WHERE id=$1',[p.repoId])).rows[0].verifyCommand,verifyCommand)
+          assert.equal((await client.query('SELECT "lastUsedAt" FROM device_tokens WHERE id=$1',[p.tokenId])).rows[0].lastUsedAt,null)
+        }finally{await client.query('ROLLBACK');client.release()}
+      }
+    })
+    for(const step of steps)await t.test('privacy fallback preserves original first-error prefix and rollback: '+step,async()=>{
+      const p={...input,verifyCommand:'python -c "from private_fixture_module import value"'}
+      for(const write of [original,prepareThreadRegistration]){
+        await reset(p);const before=await state(pool);const client=await pool.connect()
+        try{
+          await client.query('BEGIN');await client.query("SELECT set_config('test.fail_step',$1,true)",[step])
+          await assert.rejects(write(client,p),(e:unknown)=>Boolean(e&&typeof e==='object'&&'code'in e&&e.code==='P0001'))
+          await client.query('ROLLBACK')
+          assert.deepEqual(await state(pool),before)
+          assert.equal(Number((await pool.query('SELECT last_value FROM step_sequence')).rows[0].last_value),steps.indexOf(step)+1)
+        }finally{await client.query('ROLLBACK');client.release()}
+      }
+    })
     await t.test('high escaping expansion and large text retain the original bound protocol',async()=>{
       for(const verifyCommand of ["'\\".repeat(2000),'x'.repeat(70000)]){
         const p={...input,verifyCommand};await reset(p)
@@ -180,7 +224,7 @@ test('credential preparation retains five PostgreSQL writes in one message when 
       }
     })
     await t.test('records actual PostgreSQL wire bytes, result rows and failure prefixes',async()=>{
-      type Wire = {sentBytes:number;receivedBytes:number}
+      type Wire = {sentBytes:number;receivedBytes:number;receivedFrames:Record<string,{count:number;bytes:number}>}
       type Channel = {
         write:(chunk:Uint8Array|string,...args:unknown[])=>boolean
         on:(event:'data',listener:(chunk:Buffer)=>void)=>unknown
@@ -190,7 +234,23 @@ test('credential preparation retains five PostgreSQL writes in one message when 
       const channel=(client as unknown as {connection:{stream:Channel}}).connection.stream
       const nativeWrite=channel.write.bind(channel)
       let current: Wire|null=null
-      const receive=(chunk:Buffer)=>{if(current)current.receivedBytes+=chunk.length}
+      let pendingFrames=Buffer.alloc(0)
+      let drained:(()=>void)|null=null
+      const receive=(chunk:Buffer)=>{
+        if(current)current.receivedBytes+=chunk.length
+        pendingFrames=Buffer.concat([pendingFrames,chunk])
+        while(pendingFrames.length>=5){
+          const size=pendingFrames.readUInt32BE(1)+1
+          if(pendingFrames.length<size)break
+          if(current){
+            const kind=String.fromCharCode(pendingFrames[0])
+            const frame=current.receivedFrames[kind]??={count:0,bytes:0}
+            frame.count++;frame.bytes+=size
+          }
+          pendingFrames=pendingFrames.subarray(size)
+        }
+        drained?.()
+      }
       channel.write=(chunk,...args)=>{if(current)current.sentBytes+=typeof chunk==='string'?Buffer.byteLength(chunk):chunk.byteLength;return nativeWrite(chunk,...args)}
       channel.on('data',receive)
       try{
@@ -201,22 +261,36 @@ test('credential preparation retains five PostgreSQL writes in one message when 
           ['owner_quote_expansion',{ownerId:"'\\".repeat(2000)},''],
           ['repository_quote_expansion',{verifyCommand:"'\\".repeat(2000)},''],
           ['large_bound_fallback',{verifyCommand:'x'.repeat(70000)},''],
+          ['privacy_bound_fallback',{verifyCommand:'python -c "from private_fixture_module import value"'},''],
+          ...steps.map((step,i)=>['privacy_failure_'+(i+1),{verifyCommand:'python -c "from private_fixture_module import value"'},step] as const),
           ...steps.map((step,i)=>['failure_'+(i+1),{},step] as const),
         ] satisfies (readonly [string,Partial<ThreadRegistrationPreparation>,string])[]){
           const p={...input,...change};await reset(p)
-          const reports:{name:string;calls:number;sentBytes:number;receivedBytes:number;totalBytes:number;errorCode:string|null}[]=[]
+          const reports:{name:string;calls:number;bound:boolean;returnedRows:number;sentBytes:number;receivedBytes:number;receivedFrames:Wire['receivedFrames'];totalBytes:number;errorCode:string|null}[]=[]
+          const requests:{text:string;values:unknown[]|undefined}[][]=[]
           await client.query('BEGIN');await client.query("SELECT set_config('test.fail_step',$1,true)",[failStep]);await client.query('SAVEPOINT before_write')
           for(const [name,write] of [['original',original],['candidate',prepareThreadRegistration]] as const){
             const seen=proxy(client);let errorCode:string|null=null
-            current={sentBytes:0,receivedBytes:0}
+            current={sentBytes:0,receivedBytes:0,receivedFrames:{}}
             try{await write(seen.client,p)}catch(e){errorCode=e&&typeof e==='object'&&'code'in e?String(e.code):'unknown'}
+            // pg rejects on ErrorResponse before the final ReadyForQuery may
+            // arrive. Drain that existing reply; do not issue a measurement query.
+            if((current.receivedFrames.Z?.count??0)<seen.calls.length)await new Promise<void>(resolve=>{
+              drained=()=>{
+                if(current&&(current.receivedFrames.Z?.count??0)>=seen.calls.length){drained=null;resolve()}
+              }
+              drained()
+            })
             const counts=current;current=null
-            reports.push({name,calls:seen.calls.length,...counts,totalBytes:counts.sentBytes+counts.receivedBytes,errorCode})
+            requests.push(seen.calls)
+            reports.push({name,calls:seen.calls.length,bound:seen.calls.every(call=>Array.isArray(call.values)),returnedRows:seen.returnedRows.reduce((sum,n)=>sum+n,0),...counts,totalBytes:counts.sentBytes+counts.receivedBytes,errorCode})
             await client.query('ROLLBACK TO SAVEPOINT before_write')
           }
           await client.query('ROLLBACK')
           assert.equal(reports[0].errorCode,reports[1].errorCode)
-          const fallback=reports[1].calls===5
+          const fallback=reports[1].bound
+          if(fallback)assert.deepEqual(requests[1],requests[0],'fallback retains exact original SQL, values and error prefix')
+          assert.equal(reports[0].returnedRows,reports[1].returnedRows)
           if(!failStep){
             assert(reports[1].sentBytes<=reports[0].sentBytes,'the pure byte selector must never enlarge a complete successful request')
             if(fallback)assert.equal(reports[1].sentBytes,reports[0].sentBytes)
@@ -224,7 +298,7 @@ test('credential preparation retains five PostgreSQL writes in one message when 
           }
           t.diagnostic(JSON.stringify({metric:'credential_batch_wire',scenario,protocol:'PostgreSQL messages; excludes TCP/TLS/startup',statements:5,executedDml:failStep?steps.indexOf(failStep)+1:5,fallback,reports,sentDelta:reports[1].sentBytes-reports[0].sentBytes,totalDelta:reports[1].totalBytes-reports[0].totalBytes}))
         }
-      }finally{current=null;channel.write=nativeWrite;channel.off('data',receive);await client.query('ROLLBACK');client.release()}
+      }finally{drained=null;current=null;channel.write=nativeWrite;channel.off('data',receive);await client.query('ROLLBACK');client.release()}
     })
     await t.test('existing account deletion guard waits and rejects both forms before any writes',async()=>{
       for(const write of [original,prepareThreadRegistration]){
@@ -306,4 +380,62 @@ test('existing SQL telemetry removes all batch values and counts its native resu
   await prepareThreadRegistration(client,input)
   const output=JSON.stringify({attrs:sanitizeAttributes({'db.query.text':text}),sample:describeSample(text,results as never,null)})
   for(const marker of ['PRIVATE_OWNER','PRIVATE_PATH','PRIVATE_BRANCH','PRIVATE_COMMAND','PRIVATE_REMOTE',input.tokenSha256])assert.equal(output.includes(marker),false)
+})
+
+
+test('credential batching keeps SQL-shaped private values out of the real sample table projection',async t=>{
+  const {describeSample}=await import('../db/egress-sample')
+  const base:ThreadRegistrationPreparation={
+    runId:randomUUID(),deviceId:randomUUID(),repoId:randomUUID(),ownerId:'fixture-owner',workspaceId:randomUUID(),
+    repoPath:'v2/github.com/fixture/repository',baseBranch:'main',verifyCommand:'pnpm test',
+    remoteUrl:'https://github.com/fixture/repository',tokenId:randomUUID(),tokenSha256:'e'.repeat(64),
+  }
+  const allowedTables=new Set(['devices','SET','device_repos','thread_machines','device_tokens'])
+  const cases:[string,Partial<ThreadRegistrationPreparation>][]=[
+    ['Python import command',{verifyCommand:'python -c "from private_fixture_module import value"'}],
+    ['mixed case and ONLY',{verifyCommand:'echo FrOm ONLY "private_only_module"'}],
+    ['newline and quoted identifier',{verifyCommand:'echo join\n"private_join_module"'}],
+    ['Unicode whitespace',{verifyCommand:'echo into\u00a0private_space_module'}],
+    ['escaped quote and backslash',{verifyCommand:"printf '\\\\'; from \"private_escaped_module\""}],
+    ['owner value',{ownerId:'owner update private_owner_fragment'}],
+    ['repository path',{repoPath:'path/from private_path_fragment'}],
+    ['branch value',{baseBranch:'branch join private_branch_fragment'}],
+    ['remote URL value',{remoteUrl:'https://example.invalid/?q=from private_remote_fragment'}],
+    ['token hash input',{tokenSha256:'hash into private_hash_fragment'}],
+    ['run UUID input',{runId:'invalid from private_run_fragment'}],
+    ['device UUID input',{deviceId:'invalid from private_device_fragment'}],
+    ['repo UUID input',{repoId:'invalid from private_repo_fragment'}],
+    ['workspace UUID input',{workspaceId:'invalid from private_workspace_fragment'}],
+    ['token UUID input',{tokenId:'invalid from private_token_fragment'}],
+    ['known table name still comes from a value',{verifyCommand:'echo from devices'}],
+    ['duplicate static table names are not deduplicated',{verifyCommand:'echo from devices join device_tokens'}],
+    ['matches beyond the sampler six-name projection',{verifyCommand:'echo from private_a join private_b into private_c update private_d from private_e join private_f from private_g'}],
+  ]
+  for(const [name,change]of cases)await t.test(name,async()=>{
+    const input={...base,...change},before={...input}
+    const results=['INSERT','INSERT','UPDATE','UPDATE','INSERT'].map((command,i)=>({command,rowCount:1,rows:i===4?[{now:new Date('2026-11-08T00:00:00Z')}]:[],fields:[],oid:0}))
+    const calls:{text:string;values:unknown[]|undefined}[]=[]
+    const samples:ReturnType<typeof describeSample>[]=[]
+    const client={query:async(text:string,values?:unknown[])=>{
+      const result=values?results[calls.length]:results
+      calls.push({text,values});samples.push(describeSample(text,result as never,null));return result
+    }} as unknown as Pick<PoolClient,'query'>
+    await prepareThreadRegistration(client,input)
+    assert.equal(calls.length,5,'unsafe literal qualification falls back to all five original bound queries')
+    assert(calls.every(call=>Array.isArray(call.values)))
+    assert(samples.flatMap(sample=>sample.tables).every(table=>allowedTables.has(table)))
+    assert(!JSON.stringify(samples).includes('private_'),'real sample projection contains no synthetic private fragment')
+    assert.deepEqual(input,before,'qualification must not rewrite any input')
+  })
+  for(const verifyCommand of ['pnpm test',"printf 'from'","printf 'xfrom private_safe_word'",'echo FROM'])await t.test('ordinary command remains one batch: '+verifyCommand,async()=>{
+    let calls=0
+    const results=['INSERT','INSERT','UPDATE','UPDATE','INSERT'].map((command,i)=>({command,rowCount:1,rows:i===4?[{now:new Date()}]:[],fields:[],oid:0}))
+    const client={query:async(text:string,values?:unknown[])=>{
+      calls++;assert.equal(values,undefined)
+      assert.deepEqual(describeSample(text,results,null).tables,['devices','SET','device_repos','thread_machines','device_tokens'])
+      return results
+    }} as unknown as Pick<PoolClient,'query'>
+    await prepareThreadRegistration(client,{...base,verifyCommand})
+    assert.equal(calls,1)
+  })
 })

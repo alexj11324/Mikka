@@ -20,13 +20,20 @@ const { content: _content, ...issueColumnsWithoutBody } = getTableColumns(issues
  * workspace and deletion rules, with a fixed number of queries whatever the
  * count. `teams`: a membership read made earlier in this same operation.
  */
-export async function issuesForUser(reader: IssueReader, ids: readonly string[], includeDeleted = false, executor: Pick<typeof db, 'select'> = db, options: { withoutBody?: boolean; teams?: readonly TeamScope[] } = {}) {
+export async function issuesForUser(reader: IssueReader, ids: readonly string[], includeDeleted = false, executor: Pick<typeof db, 'select'> = db, options: { withoutBody?: boolean; teams?: readonly TeamScope[]; identifierTeams?: Map<string, { key: string; number: number }> } = {}) {
   const wanted = [...new Set(ids)].filter(id => z.uuid().safeParse(id).success)
   const found = new Map<string, typeof issues.$inferSelect>()
   if (!wanted.length) return found
   const acting = actingContext.getStore()
   const workspaceId = typeof reader === 'string' ? (acting?.userId === reader ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
-  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, { onlyIssueIds: wanted, teams: options.teams })
+  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, {
+    onlyIssueIds: wanted, teams: options.teams, ...(options.identifierTeams ? { withIdentifierTeams: true } : {}),
+  })
+  if (options.identifierTeams && visibility.taskTeams) {
+    // This operation's complete later read can also remove an earlier link.
+    for (const id of wanted) options.identifierTeams.delete(id)
+    for (const [id, team] of visibility.taskTeams) options.identifierTeams.set(id, team)
+  }
   const rows = options.withoutBody
     ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrsContent } }).from(issues).where(and(inArray(issues.id, wanted), visibility.predicate))
     : await executor.select({ issue: issues }).from(issues).where(and(inArray(issues.id, wanted), visibility.predicate))

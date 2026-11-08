@@ -113,6 +113,12 @@ INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch","verify
 UPDATE thread_machines SET "deviceId"=${device},"repoId"=${repo} WHERE "runId"=${literal(p.runId,'uuid')};
 UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=${device};
 INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES (${literal(p.tokenId,'uuid')},${owner},'Thread worker',${literal(p.tokenSha256,'text')},${device},${literal(p.workspaceId,'uuid')},now()+interval '24 hours') RETURNING clock_timestamp() AS now`
+  // The existing egress sampler scans SQL literals too. Only this batch's exact
+  // static match sequence (including ON CONFLICT's UPDATE SET) may be sampled.
+  // Inspect escaped SQL without truncation or deduplication; extra value matches
+  // retain all five original bound statements, regardless of sampling settings.
+  const tables = [...text.matchAll(/\b(?:from|join|into|update)\s+(?:only\s+)?"?([A-Za-z_][A-Za-z0-9_]*)"?/gi)].map(match => match[1])
+  if (tables.join(',') !== 'devices,SET,device_repos,thread_machines,device_tokens,device_tokens') return null
   return Buffer.byteLength(text) + 6 <= boundRequestFloor ? text : null
 }
 

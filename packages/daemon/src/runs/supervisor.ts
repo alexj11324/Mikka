@@ -33,6 +33,9 @@ import { runCriterion, reviewVerdict } from "@mikka/protocol/run"
 // its report keeps `not_run`, and the server may open only a draft PR.
 import { quotaStopApplies } from "./quota-exhausted"
 import { runApps, runMcp } from '../agents/run-apps'
+import { startTaskSecretBridge, type TaskSecretBridge } from '../task-secret-bridge'
+import { taskExecutionEnv } from '../task-env'
+import type { TaskSecretAccess } from '@mikka/protocol/task-secrets'
 import { materializeChatFiles } from '../agents/chat-files'
 import { splitChatFiles, type ChatFileDownload } from '@mikka/protocol/chat-attachments'
 import { fixedCheckSnapshot } from "./check"
@@ -214,6 +217,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface ActiveRun {
+  secretBridge?: TaskSecretBridge
   runtimeTiming?: RunRuntimeObservation
   github?: PreparedRunGitHub
   toolApproval?: ToolApprovalGate
@@ -308,7 +312,23 @@ export class RunSupervisor {
     return [...this.active].map(([runId, run]) => ({
       runId,
       lastProgressAt: new Date(run.lastProgressAt).toISOString(),
+      ...(this.deps.journal.get(runId)?.assignment.taskSecrets?.grants.length ? {
+        secretCapabilities: this.deps.journal.get(runId)!.assignment.taskSecrets!.grants.map(grant => grant.capability),
+      } : {}),
     }))
+  }
+
+  /** The heartbeat response is trusted server data. Never persist its bearers. */
+  renewTaskSecrets(values: Record<string, TaskSecretAccess> | undefined) {
+    for (const [runId, access] of Object.entries(values ?? {})) {
+      const active = this.active.get(runId)
+      const assignment = this.deps.journal.get(runId)?.assignment
+      if (!active || active.forcedStop || !assignment?.taskSecrets || access.endpoint !== assignment.taskSecrets.endpoint) continue
+      // Unavailable names were fixed at claim. Any delivery change stops this
+      // run; renewal need not reload the rest of the owner's Secret inventory.
+      assignment.taskSecrets = { ...access, unavailable: assignment.taskSecrets.unavailable }
+      for (const grant of access.grants) this.addCredential(runId, 'TASK_SECRET_CAPABILITY', grant.capability)
+    }
   }
 
   /** Applies leases renewed by the server's heartbeat answer. */
@@ -597,6 +617,7 @@ export class RunSupervisor {
     }), ...(assignment.modelCredential ? [{ name: "MODEL_API_KEY", value: assignment.modelCredential.key }] : []),
       ...(assignment.subscriptionLease ? [{ name: "SUBSCRIPTION_ACCESS_TOKEN", value: assignment.subscriptionLease.accessToken }] : []),
       ...(assignment.github?.token ? [{ name: "GITHUB_TOKEN", value: assignment.github.token }] : []),
+      ...(assignment.taskSecrets?.grants.map(grant => ({ name: 'TASK_SECRET_CAPABILITY', value: grant.capability })) ?? []),
     ])
     if (masker) this.maskers.set(assignment.runId, masker)
     let repo: DeviceRepo
@@ -664,6 +685,10 @@ export class RunSupervisor {
       let repo: DeviceRepo
       try { repo = this.deps.repository(entry.assignment) } catch {
         this.finish(entry.assignment.runId, 'error', 'Repository unavailable; dispatch a new thread with a repository URL.')
+        continue
+      }
+      if (entry.taskSecretsWithheld && !entry.assignment.taskSecrets && !entry.assignment.taskEnv) {
+        this.finish(entry.assignment.runId, 'blocked', 'task_secret_unavailable')
         continue
       }
       if (entry.assignment.skillReceipt) {
@@ -1406,6 +1431,7 @@ export class RunSupervisor {
         }
       })
       .finally(async () => {
+        run.secretBridge?.close()
         run.repositoryPreparing?.abort.abort()
         await Promise.all([run.repositoryPreparing?.done.catch(() => undefined), this.closePrepared(run)])
         run.toolApproval?.revoke()
@@ -1525,6 +1551,7 @@ export class RunSupervisor {
     }
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
+    run.secretBridge = await startTaskSecretBridge({ current: () => assignment.taskSecrets, signal: run.abort.signal })
     const baseOptions = {
       traceContext: daemonTracer.capture(),
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
@@ -1539,10 +1566,12 @@ export class RunSupervisor {
       kind: assignment.kind,
       factoryCheck: assignment.factoryCheck,
       verifyCommand: assignment.verifyCommand,
-      env: buildChildEnv({
+      env: taskExecutionEnv(buildChildEnv({
         adapterAllow: adapter.envAllow,
         runId,
-      }),
+      }), { taskEnv: assignment.taskEnv, taskSecretEnv: run.secretBridge?.env }),
+      taskEnv: assignment.taskEnv,
+      taskSecretEnv: run.secretBridge?.env,
       log,
       networkAllow: repo.networkAllow,
       policy: assignment.policy,
@@ -1584,7 +1613,7 @@ export class RunSupervisor {
           return mailbox.request(body, signal)
         } }
         return this.deps.prepareSubscription!(assignment, { ...baseOptions, cwd: this.deps.worktrees.pathFor(runId),
-          mailbox: guarded, toolApproval, prompt: assignment.prompt }, signal)
+          mailbox: guarded, toolApproval, prompt: [assignment.prompt, run.secretBridge?.instructions].filter(Boolean).join('\n\n') }, signal)
       })
       void run.sessionPreparing.catch(() => undefined)
     }
@@ -1690,7 +1719,7 @@ export class RunSupervisor {
     if (toolApproval) {
       try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
     }
-    let prompt = assignment.prompt
+    let prompt = [assignment.prompt, run.secretBridge?.instructions].filter(Boolean).join('\n\n')
     let followUp = assignment.followUp
     if (splitChatFiles(prompt).files.length || followUp && splitChatFiles(followUp).files.length) {
       if (!this.deps.downloadChatFile || !this.deps.adapterStateDir) throw Error('Run attachments unavailable')

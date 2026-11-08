@@ -72,6 +72,14 @@ function fixture(mode = 'normal', diagnostics = false) {
 }
 const empty = { async *[Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> { /* no task input */ } }
 
+it('disables only PR attribution in the anonymous native SDK prewarm', async () => {
+  const f = fixture(), candidate = f.start()!
+  await candidate.ready
+  expect(candidate.state).toBe('parked')
+  // Read the real SDK's process arguments, not the shared settings factory.
+  expect(f.events().find(e => e.event === 'spawn').attribution).toEqual({ pr: '' })
+})
+
 it('prepares with no task/account frame before checkout, then late-binds one real context and OAuth claim', async () => {
   const f = fixture(), candidate = f.start()!
   await candidate.ready

@@ -3,6 +3,7 @@
 - Date: 2026-11-06 18:00 UTC
 - Source: Alex's [decision on #1505](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691833153) and [the explicit replacement of the old credential rules](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691871552).
 - Rule: Cloud execution, local daemon execution, credential delivery and startup acceptance.
+- Superseded by (only for non-CLI third-party Secret exposure): [2026-11-08-0240](2026-11-08-0240-credential-exposure-boundary.md). All other execution and performance rules here remain in force.
 - Replaces: the extra runtime isolation, placeholder/provider proxy, per-call remote authorization and credential cleanup requirements in [orchestration §§3, 5–6](../orchestration.md); the corresponding parts of [1312](2026-11-01-1312-cloud-runs-without-docker.md), [2335](2026-11-01-2335-e2b-official-templates.md), [2225](2026-10-31-2225-bindings-belong-to-the-person.md) and [1600](2026-11-02-1600-agents-use-own-github-credential.md). Account ownership, the selected model, billing attribution and workspace sharing rules remain in force.
 
 Alex's words, as recorded in the issue:
@@ -18,19 +19,30 @@ never leaves the server and that the Agent must hold a placeholder while
 Mikka checks and forwards every model request. It also requires before/after
 per-call timing evidence before removing that proxy path.
 
+**Scope correction (2026-11-08):** The quoted instruction is retained as
+historical context; it does not authorize disclosing every user/workspace/
+repository Secret to a task Agent. The updated [credential-exposure boundary]
+(2026-11-08-0240-credential-exposure-boundary.md) distinguishes selected
+native CLI/GitHub credentials from other third-party Secrets. No repeated
+per-model/per-tool Mikka control-plane checks are reinstated.
+
 ## Cloud execution
 
 One thread task owns one E2B VM. That VM is the boundary between tasks; no
 other task or owner uses it. Claude Code and Codex run directly as the
 machine's normal user, with its normal HOME, environment and Git repository.
 Do not add a container, a second sandbox, a shadow `.git`, an isolated HOME,
-an environment allowlist or an isolated GitHub configuration inside it.
+a blanket environment filter around native CLI execution or an isolated
+GitHub configuration inside it. This does **not** exempt unrelated task Secrets
+from scoped, non-readable delivery.
 Verification commands use the same repository too. A read-only task remains
 an instruction to the Agent, not a reason to manufacture another repository.
 
-Prepare the task's real subscription login, GitHub credential and selected
-model key while preparing the machine, or once on the first request that
-needs them. Claude Code connects directly to Anthropic and Codex directly
+Prepare only the task's **selected** native CLI subscription login/model
+key and approved GitHub execution credential while preparing the machine,
+or once on the first request that needs them. Do not treat this as a grant to
+inject all other user/workspace/repository Secrets into the Agent environment;
+those follow [2026-11-08-0240](2026-11-08-0240-credential-exposure-boundary.md). Claude Code connects directly to Anthropic and Codex directly
 to OpenAI; the Agent can use the credential it was given. There is no Mikka
 placeholder, provider-forwarding proxy or extra remote permission check
 before a provider or tool call. The ordinary provider protocol, including
@@ -109,7 +121,8 @@ the superseded placeholder/proxy policy under a new name.
 
 The reusable public template is still software only. Build and publish it
 without any account login, provider key, device identity or workspace data.
-Deliver task credentials only after creating the owner-bound VM. Its normal
+Deliver only approved task CLI/GitHub credentials and scoped third-party
+capabilities after creating the owner-bound VM. Its normal
 private runtime state can remain with that task while paused; it must never
 be published as a reusable template or assigned to another task. At task
 completion reclaim the disposable machine. Do not erase credentials and
