@@ -41,10 +41,10 @@ export async function listIssueConnections(id: string) {
  * every other task of the owner stays in Postgres. `all`: every task of the
  * owner, for copying a whole subtask tree.
  */
-async function issueConnections(id: string, reach: 'linked' | 'all') {
-  const { issue, user } = await requireIssueAccessWithoutBody(id)
+async function issueConnections(id: string, reach: 'linked' | 'all', authorized?: Awaited<ReturnType<typeof requireIssueAccessWithoutBody>>) {
+  const { issue, user } = authorized ?? await requireIssueAccessWithoutBody(id)
   return db.transaction(async tx => {
-  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
+  const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   await requireCurrentIssueWorkspace(user, issue.workspaceId)
   let candidates: string[] | undefined
@@ -61,7 +61,6 @@ async function issueConnections(id: string, reach: 'linked' | 'all') {
   }
   // Only each row's metadata is used: read the body's attrs, never every task's whole body.
   const rows = await tx.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
-    .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
     .where(and(eq(issues.userId, issue.userId), candidates ? inArray(issues.id, candidates) : undefined, issueVisibilityPredicate(user.id, { allowedIds: [], workspaceIds: [issue.workspaceId!] }))).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
   // Whole-tree copying consumes structure only. The public linked view reuses
@@ -158,9 +157,12 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
     const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), kind: z.enum(['child', 'duplicate']), title: z.string().trim().min(1).max(200).optional(), includeSubissues: z.boolean().optional() }).safeParse(input)
     if (!parsed.success) return { error: 'issueTitleInvalid' }
     const t = await getTranslations('IssueDetail')
-    const { issue, user } = await requireIssueAccess(input.id)
+    const authorized = await requireIssueAccessWithoutBody(input.id)
+    const { issue, user } = authorized
     if (!issue.workspaceId || issue.ownershipState !== 'bound') throw new ActionFailureError('workspaceAccessDenied')
-    const accessible = input.includeSubissues ? await issueConnections(issue.id, 'all') : []
+    // This entry read belongs to the same operation. The relation snapshot
+    // still locks the Task and rechecks current membership before traversing.
+    const accessible = input.includeSubissues ? await issueConnections(issue.id, 'all', authorized) : []
     try {
       const result = await withIssueWorkspace(user, issue.workspaceId, workspace => db.transaction(async tx => {
         for (const owner of [...new Set([issue.userId, user.id])].sort()) await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${owner}, 0))`)
@@ -187,13 +189,16 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
           while (queue.length) {
             const parentId = queue.shift()!
             for (const item of accessible.filter(row => row.metadata.parentId === parentId && !mapping.has(row.id))) {
-              const [original] = await tx.select().from(issues).where(and(eq(issues.id, item.id), eq(issues.userId, source.userId))).for('update')
+              const [original] = await tx.select({ title: issues.title, content: issues.content, priority: issues.priority,
+                workspaceId: issues.workspaceId, ownershipState: issues.ownershipState, scopeVersion: issues.scopeVersion })
+                .from(issues).where(and(eq(issues.id, item.id), eq(issues.userId, source.userId))).for('update')
               if (!original || original.workspaceId !== workspace.id || original.ownershipState !== 'bound' || original.scopeVersion !== item.scopeVersion) continue
               const currentMetadata = readIssueMetadata(original.content)
               if (currentMetadata.deletedAt || currentMetadata.parentId !== parentId) continue
               const id = crypto.randomUUID()
               const copyMetadata = { ...currentMetadata, number: await allocateIssueNumbers(tx, ownerId), parentId: mapping.get(parentId)!, blockedByIds: [], relatedIds: [], duplicateOfId: null, favoriteUserIds: [], subscriberUserIds: [], deletedAt: null, assignee: source.userId === user.id ? currentMetadata.assignee : null, delegate: source.userId === user.id ? currentMetadata.delegate : null }
-              const [copy] = await tx.insert(issues).values({ id, userId: ownerId, ...ownership, title: original.title, content: withIssueMetadata(original.content, copyMetadata), status: 'todo', priority: original.priority, revision: 1 }).returning()
+              const [copy] = await tx.insert(issues).values({ id, userId: ownerId, ...ownership, title: original.title, content: withIssueMetadata(original.content, copyMetadata), status: 'todo', priority: original.priority, revision: 1 })
+                .returning({ id: issues.id, title: issues.title, content: issues.content, status: issues.status, priority: issues.priority })
               await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: id, userId: ownerId, revision: 1, title: copy.title, content: copy.content, status: copy.status, priority: copy.priority, ...activityActor(user.id) })
               await issueListChanged(tx, copy.id)
               mapping.set(item.id, id); queue.push(item.id)

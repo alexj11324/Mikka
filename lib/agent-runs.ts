@@ -338,13 +338,11 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 }
 
 /** Which runs `userId` may see: their own (on no task or a visible task) and teammates' runs on shared visible tasks. */
-async function runVisibilityPredicate(reader: IssueReader, input: { issueId?: string; runIds?: string[]; teams?: readonly TeamScope[] }) {
+async function runVisibilityPredicate(reader: IssueReader) {
   const userId = typeof reader === 'string' ? reader : reader.id
-  // Asked about one task or known runs: only their tasks' team links are read.
-  const onlyIssueIds = input.issueId ? [input.issueId]
-    : input.runIds ? [...new Set((await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, input.runIds))).flatMap(row => row.issueId ? [row.issueId] : []))]
-    : undefined
-  const visibility = await issueVisibility(reader, false, undefined, db, { onlyIssueIds, teams: input.teams })
+  // Current tenant membership and the joined Task authorize the Run. Team
+  // naming rows and a preliminary Run-to-Task lookup do not enter this gate.
+  const visibility = await issueVisibility(reader, false, undefined, db, { withTeamLinks: false })
   const tenant = visibility.workspaceIds.length ? inArray(agentRuns.workspaceId, visibility.workspaceIds) : sql`false`
   const task = and(visibility.predicate, eq(agentRuns.workspaceId, issues.workspaceId))
   return and(tenant, or(and(eq(agentRuns.userId, userId), or(isNull(agentRuns.issueId), task)), task))
@@ -356,10 +354,10 @@ async function runVisibilityPredicate(reader: IssueReader, input: { issueId?: st
  * `threadName` reads (`threadNameHead`), and a teammate's run named by its harness
  * as `workspaceRunView` does. No report, error or provenance.
  */
-export async function visibleRunNames(reader: IssueReader, runIds: string[], teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
+export async function visibleRunNames(reader: IssueReader, runIds: string[], _teams?: readonly TeamScope[]): Promise<{ id: string; own: boolean; agentName: string; harness: string; promptHead: string | null }[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   if (!runIds.length || runIds.some(id => !z.uuid().safeParse(id).success)) return []
-  const visible = await runVisibilityPredicate(reader, { runIds, teams })
+  const visible = await runVisibilityPredicate(reader)
   const rows = await db.select({ id: agentRuns.id, ownerId: agentRuns.userId, agentName: runBotName, harness: runViewColumns.harness,
     promptHead: sql<string | null>`case when agent_runs."userId" = ${userId} then ${threadNameHead} end` }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId))
@@ -369,12 +367,13 @@ export async function visibleRunNames(reader: IssueReader, runIds: string[], tea
 
 /** Every surface uses this gate. Workspace membership never grants run control,
  * personal agent/session access, or raw transcript access.
+ * `teams` remains a legacy compatibility hint with no authorization role.
  * `brief`: the list projection (`runBriefViewColumns`), for callers that show a run's name, state and summary only. */
 export async function visibleRuns(reader: IssueReader, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number; brief?: boolean; teams?: readonly TeamScope[] } = {}): Promise<RunView[]> {
   const userId = typeof reader === 'string' ? reader : reader.id
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
-  const visible = await runVisibilityPredicate(reader, input)
+  const visible = await runVisibilityPredicate(reader)
   const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns),
     failureDetails: input.brief ? runFailureBrief : sql<RunFailure | CompactRunFailure | null>`case when ${agentRuns.userId}=${userId} then ${agentRuns.failureDetails} else ${runFailureBrief} end`, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))

@@ -160,6 +160,32 @@ to execute a Run with a configured Environment. Old Runs with no Environment
 snapshot keep their original behavior only while still permitted; they do
 not silently acquire a new setup recipe.
 
+Selected Environments use the same Task Secret delivery boundary as ordinary
+Tasks ([Secret delivery](../security/task-secret-delivery.md)). Workspace and
+repository values are limited to the selected `secretIds` and their current
+Workspace/repository scope. Environment variables are applied first, followed
+by the selected values and the existing personal-owner override order; an
+Environment variable cannot downgrade a selected protected Secret. Only ordinary
+`kind=env` and explicitly approved `direct` values enter `taskEnv`. `protected`
+values use the existing sealed capability and trusted local SDK bridge. A
+protected entry without a supported HTTP delivery policy is reported as
+`unavailable`; it never falls back to plaintext delivery.
+
+The daemon's `x-mikka-task-secrets: 1` capability is independent of
+`x-mikka-project-environment: 1`. A selected Environment containing protected
+or unavailable Secrets still requires Task Secret support; the Environment
+header alone cannot opt into direct delivery. GitHub and the selected CLI
+model/subscription credentials retain their existing native delivery.
+
+The final claim response rechecks the effective Secret metadata/revisions and
+the selected Environment variables/reference IDs, in addition to the resource
+lease's current Environment identity/revision check. A removed reference,
+changed selection or revoked authority refuses the response. Heartbeat renewal
+and Secret invalidation retain the admitted selection/effective-name precedence.
+Output masking uses its canonical Workspace/owner and retains the existing
+broader redaction set; masking never grants access. Secret values and capabilities
+remain outside persisted Project/Run configuration snapshots.
+
 | Error code | Client behavior |
 | --- | --- |
 | `workspaceAccessDenied` | Clear inaccessible current-Workspace content; choose an authorized context |
@@ -167,6 +193,8 @@ not silently acquire a new setup recipe.
 | `projectResourceConflict` / `projectSaveConflict` / `issueOutdated` | Reload current revision before another explicit edit |
 | `projectRepositoryDenied` | Choose a currently permitted repository/branch; a binding alone cannot fix GitHub authorization |
 | `projectEnvironmentUnavailable` | Choose an active compatible Environment or update the daemon when required |
+| `daemonUpgradeRequired` | Update the daemon to support protected Task Secrets; Environment support alone is insufficient |
+| `task_secret_unavailable` | Refresh the current Secret configuration or selected references; never retry with plaintext fallback |
 | `teamArchived` | Keep history readable; restore or choose another active Team for a new link |
 | `teamPersonalWorkspace` | Personal Workspaces cannot create Teams |
 | `teamDeleteReferenced` | Use archive/remove grouping or resolve the displayed references |

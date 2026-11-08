@@ -18,7 +18,8 @@ const { content: _content, ...issueColumnsWithoutBody } = getTableColumns(issues
 /**
  * `issueForUser` for many tasks in one read: the same visibility, token
  * workspace and deletion rules, with a fixed number of queries whatever the
- * count. `teams`: a membership read made earlier in this same operation.
+ * count. `teams` is a legacy compatibility hint; each read checks current
+ * canonical Workspace membership independently of that hint.
  */
 export async function issuesForUser(reader: IssueReader, ids: readonly string[], includeDeleted = false, executor: Pick<typeof db, 'select'> = db, options: { withoutBody?: boolean; teams?: readonly TeamScope[] } = {}) {
   const wanted = [...new Set(ids)].filter(id => z.uuid().safeParse(id).success)
@@ -26,7 +27,9 @@ export async function issuesForUser(reader: IssueReader, ids: readonly string[],
   if (!wanted.length) return found
   const acting = actingContext.getStore()
   const workspaceId = typeof reader === 'string' ? (acting?.userId === reader ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
-  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, { onlyIssueIds: wanted, teams: options.teams })
+  // Canonical tenant authorization does not consume Team naming/grouping rows.
+  // The exact token/link consistency check below remains a separate read.
+  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, { onlyIssueIds: wanted, withTeamLinks: false })
   const rows = options.withoutBody
     ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrsContent } }).from(issues).where(and(inArray(issues.id, wanted), visibility.predicate))
     : await executor.select({ issue: issues }).from(issues).where(and(inArray(issues.id, wanted), visibility.predicate))

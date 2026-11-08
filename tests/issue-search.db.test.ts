@@ -179,6 +179,18 @@ test('Telegram command reads retain issued numbers, personal binding and exact h
         assert.ok(current.bytes + current.bytesWritten <= totalBytes, label + ' exceeds the original total socket bytes')
       })
     }
+    // /link authorizes the exact Task inside its conversation update. Neither
+    // an alias nor a known UUID may update this row after a permission failure.
+    const conversation = async () => (await pool.query('select * from telegram_conversations where "threadId"=$1', [threadId])).rows[0]
+    const beforeDeniedLink = await conversation()
+    assert.equal(beforeDeniedLink.issueId, mine)
+    const deleted = randomUUID()
+    await pool.query('insert into issues (id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) values ($1,$2,$3,\'bound\',\'Deleted Telegram fixture\',$4,\'todo\',\'normal\',\'personal\')',
+      [deleted, owner, personal, { type: 'doc', attrs: { mikka: { number: 103, deletedAt: '2026-11-08T00:00:00.000Z' } }, content: [] }])
+    for (const target of ['TLGX-102', mineLinked, 'OTHR-201', otherLinked, 'TLGX-103', deleted]) {
+      assert.equal(await telegram('/link ' + target), messages.TelegramBot.taskUnavailable)
+      assert.deepEqual(await conversation(), beforeDeniedLink, 'a denied alias/UUID must not change the existing conversation')
+    }
   } finally {
     translations.restore()
     // Retain only synthetic fixture rows for the paired old/new wire review.
@@ -313,12 +325,16 @@ test('identifier reads reuse immutable authorized rows across mixed workspace ba
     for (const issueId of ids) {
       const id = randomUUID()
       artifactIds.push(id)
-      await pool.query('insert into artifacts (id,"userId",kind,title,"issueId","latestVersion") values ($1,$2,\'markdown\',\'Identifier read artifact\',$3,1)', [id, owner, issueId])
+      await pool.query('insert into artifacts (id,"userId",kind,title,"issueId","latestVersion") values ($1,$2,\'markdown\',$4,$3,1)', [id, owner, issueId, issueId === theirs ? 'Private task artifact' : 'Identifier read artifact'])
       await pool.query('insert into artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") values ($1,$2,1,$3,\'fixture\',\'fixture\',7,\'CI\')', [randomUUID(), id, `ci/identifier-read/${id}.md`])
     }
     const artifactMixed = await measured(() => listArtifacts(owner))
     assert.equal(artifactMixed.value.find(row => row.issueId === mine)?.issueKey, identity(mine))
-    assert.equal(artifactMixed.value.find(row => row.issueId === theirs)?.issueKey, null, 'artifact ownership does not expose another owner\'s unlinked task')
+    assert.equal(artifactMixed.value.find(row => row.issueId === theirs), undefined, 'artifact ownership cannot expose a Task or Artifact in another personal Workspace')
+    const artifactResponse = JSON.stringify(artifactMixed.value)
+    for (const hidden of [theirs, artifactIds[ids.indexOf(theirs)], identity(theirs), 'Private task artifact']) {
+      assert.ok(!artifactResponse.includes(hidden), 'the inaccessible artifact and its Task identity stay absent from the response')
+    }
     assert.equal(artifactMixed.value.find(row => row.issueId === theirsLinked)?.issueKey, identity(theirsLinked))
     // Standalone Node has no Next intl-config alias. Use the real translator
     // and repository catalog at this UI boundary; database/naming code stays real.

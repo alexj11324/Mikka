@@ -12,7 +12,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
-import { issueMembers, issues, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
+import { issues, telegramConversations, telegramLinkTokens, telegramLinks } from '@/lib/db/schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { userActor } from '@/lib/activity-actor'
@@ -129,28 +129,51 @@ function statusLabel(status: string, t: Translator) {
   }
 }
 
+const issueColumns = { id: issues.id, userId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status,
+  content: issueAttrsContent, updatedAt: issues.updatedAt, issuedIdentifier: issues.issuedIdentifier,
+}
+// Match readIssueMetadata's legacy fallback even when the newer JSON key is
+// explicitly null. This predicate also guards the atomic /link write below.
+const liveMetadata = sql`coalesce(nullif(${issues.content}->'attrs'->'mikka', 'null'::jsonb), ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`
+
+async function permittedTeamIssueIds(userId: string, issueIds: string[]) {
+  const scope = await numberedIssueTeamScope(userId, issueIds, { withWorkspaceMembership: true })
+  const linked = new Set(scope.links.map(link => link.issueId))
+  // This explicit mode preserves issueTeamAccess's workspace membership rule.
+  const allowed = scope.workspaceMemberAllowed!
+  return new Set(issueIds.filter(id => isIssueTeamAccessAllowed({ linked: linked.has(id), allowed: allowed.has(id) })))
+}
+
 async function findAccessibleIssues(tx: Transaction, userId: string, workspaceId: string, match?: { id: string }) {
-  const metadata = sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')`
-  const rows = await tx.select({ id: issues.id, userId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status,
-    content: issueAttrsContent, updatedAt: issues.updatedAt, issuedIdentifier: issues.issuedIdentifier,
-  }).from(issues)
-    .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
+  const rows = await tx.select(issueColumns).from(issues)
     .where(and(
-      (await issueVisibility(userId, false, workspaceId)).predicate,
+      (await issueVisibility(userId, false, workspaceId, tx, { withTeamLinks: false })).predicate,
       match ? eq(issues.id, match.id) : undefined,
-      sql`${metadata}->>'deletedAt' is null`,
+      liveMetadata,
     ))
     .orderBy(desc(issues.updatedAt))
     .limit(match ? 3 : 10)
   // Recheck exactly these candidates in one current Workspace read, retaining
   // Telegram's existing linked-task permission rule without per-Task queries.
-  const scope = await numberedIssueTeamScope(userId, rows.map(issue => issue.id), { withWorkspaceMembership: true })
-  const linked = new Set(scope.links.map(link => link.issueId))
-  // This explicit mode preserves issueTeamAccess's workspace membership rule.
-  const allowed = scope.workspaceMemberAllowed!
-  return rows.flatMap(issue => isIssueTeamAccessAllowed({ linked: linked.has(issue.id), allowed: allowed.has(issue.id) })
+  const allowed = await permittedTeamIssueIds(userId, rows.map(issue => issue.id))
+  return rows.flatMap(issue => allowed.has(issue.id)
     && !readIssueMetadata(issue.content).deletedAt
     ? [issue] : [])
+}
+
+async function linkAccessibleIssue(tx: Transaction, userId: string, workspaceId: string, issueId: string, threadId: string) {
+  if (!(await permittedTeamIssueIds(userId, [issueId])).has(issueId)) return null
+  // The alias is only a UUID hint. Reapply current canonical tenant and live
+  // Task predicates in the write itself, under the existing Workspace lease
+  // and locked conversation; RETURNING avoids a separate candidate read.
+  const [issue] = await tx.update(telegramConversations).set({ issueId: issues.id, updatedAt: new Date() })
+    .from(issues).where(and(
+      eq(telegramConversations.threadId, threadId), eq(telegramConversations.userId, userId),
+      eq(issues.id, issueId),
+      (await issueVisibility(userId, false, workspaceId, tx, { withTeamLinks: false })).predicate,
+      liveMetadata,
+    )).returning(issueColumns)
+  return issue ?? null
 }
 
 async function handleCommand(tx: Transaction, conversation: typeof telegramConversations.$inferSelect, userId: string, workspaceId: string, command: { name: string; args: string }, t: Translator): Promise<string | { reply: string; issueId: string }> {
@@ -216,10 +239,8 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
         if (resolved.kind === 'missing') return t('taskUnavailable')
         issueId = resolved.issueId
       }
-      const [issue] = await findAccessibleIssues(tx, userId, workspaceId, { id: issueId })
+      const issue = await linkAccessibleIssue(tx, userId, workspaceId, issueId, conversation.threadId)
       if (!issue) return t('taskUnavailable')
-      await tx.update(telegramConversations).set({ issueId: issue.id, updatedAt: new Date() })
-        .where(eq(telegramConversations.threadId, conversation.threadId))
       return t('linked', { issue: await issueLabel(tx, issue), title: issue.title })
     }
     case 'status': {
