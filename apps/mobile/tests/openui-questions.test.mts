@@ -47,7 +47,7 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 after(() => browser.happyDOM.close())
 const render = async (allowCustom: boolean) => {
   const value = `root = BeQuestions("测试背景", [{id:"start", title:"先做什么？", options:[{value:"a", label:"整理收件箱"}, {value:"b", label:"查看日程"}], allowCustom:${allowCustom}}])`
-  await act(async () => root.render(createElement(OpenUIReply, { text: value, live: true, answer: async words => { answers.push(words); return accepted }, webPath: null, sources: {}, onOpen: () => {} })))
+  await act(async () => root.render(createElement(OpenUIReply, { text: value, live: true, answer: async words => { answers.push(words); return accepted }, sources: {}, onOpen: () => {} })))
 }
 const button = (label: string) => [...container.querySelectorAll('button')].find(button => button.textContent === label)!
 

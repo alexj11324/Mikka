@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 import { ChevronRight } from 'lucide-react-native'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
-import { colors, LIST_INSET } from '@/lib/theme'
+import { colors, LIST_INSET, SPACE } from '@/lib/theme'
 import type { HomeItem } from '../model/home-list'
 
 /** A section's header: its name (Comma design 01); a tap folds it, and a folded section shows a chevron and its unread count. */
@@ -21,7 +21,7 @@ export function SectionHeader({ section, onToggle }: { section: Extract<HomeItem
 }
 
 const styles = StyleSheet.create({
-  header: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: LIST_INSET, paddingRight: LIST_INSET, paddingTop: 14, paddingBottom: 4 },
+  header: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: LIST_INSET, paddingRight: LIST_INSET, paddingTop: SPACE.section - 8, paddingBottom: 6 },
   title: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.secondary },
   fill: { flex: 1 },
   unread: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
