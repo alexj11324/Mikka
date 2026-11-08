@@ -193,6 +193,8 @@ test('build diagnostics retain bounded type/status/host phase evidence without c
 test('ingress command diagnostics retain only known observations without copying private process data', () => {
   const value = fixtureReceipts(), privateText = 'synthetic-private-netfilter-argument'
   const command = { family: 'ipv6', operation: 'provider_rule', failureKind: 'exit', returnCode: 2,
+    extension: 'multiport', revision: 1,
+    unsupportedExtensions: [{ extension: 'multiport', revision: 1 }],
     unsupportedRevision: false, missingKernelModule: false, missingExtension: true,
     operationNotSupported: false, permissionDenied: false, invalidArgument: false }
   const event = { phase: 'ingress', detail: 'command', command: { ...command,
@@ -216,11 +218,30 @@ test('ingress command diagnostics retain only known observations without copying
     assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0], { phase: 'ingress', detail: 'command' })
     assert.equal(JSON.stringify(result).includes(privateText), false)
   }
-  for (const key of Object.keys(command)) {
+  for (const key of Object.keys(command).filter(key => !['extension', 'revision', 'unsupportedExtensions'].includes(key))) {
     event.command = Object.fromEntries(Object.entries(command).filter(([name]) => name !== key))
     result = summarizeAcceptance(context, value)
     assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0], { phase: 'ingress', detail: 'command' })
   }
+  for (const [extension, revision, expectedExtension] of [[privateText, 1, 'unknown'], ['owner', privateText, 'owner'],
+    ['owner', true, 'owner'], ['owner', 256, 'owner'], [undefined, undefined, 'unknown']]) {
+    event.command = { ...command, extension, revision }
+    result = summarizeAcceptance(context, value)
+    assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0].command,
+      { ...command, extension: expectedExtension, revision: null })
+    assert.equal(JSON.stringify(result).includes(privateText), false)
+  }
+  event.command = { ...command, unsupportedExtensions: [
+    { extension: 'owner', revision: 1, stderr: privateText }, { extension: 'multiport', revision: 1 },
+    { extension: 'owner', revision: 1 }, { extension: privateText, revision: 1 },
+    { extension: 'mark', revision: privateText }, { extension: 'conntrack', revision: 256 },
+    ...Array.from({ length: 20 }, () => ({ extension: 'tcp', revision: 0 })),
+  ] }
+  result = summarizeAcceptance(context, value)
+  assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0].command.unsupportedExtensions,
+    [{ extension: 'conntrack', revision: null }, { extension: 'mark', revision: null },
+      { extension: 'multiport', revision: 1 }, { extension: 'owner', revision: 1 }])
+  assert.equal(JSON.stringify(result).includes(privateText), false)
 })
 
 test('a failed status lookup preserves the original failure and only exact-identity status metadata', () => {
