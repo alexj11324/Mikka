@@ -313,7 +313,15 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
         requests.push(pending)
       }
       const deadline = Date.now() + 3000
-      while (Number((await pool.query(`select count(*) from pg_stat_activity where application_name=$1 and $2=any(pg_blocking_pids(pid))`, [scope, blockerPid])).rows[0].count) < 2) {
+      // PostgreSQL may queue the second row waiter behind the first waiter.
+      // Follow that real lock chain instead of requiring two direct blockers.
+      while (Number((await pool.query(`with recursive blocked(pid) as (
+        select $2::integer
+        union
+        select activity.pid from pg_stat_activity activity
+          join blocked parent on parent.pid=any(pg_blocking_pids(activity.pid))
+          where activity.application_name=$1
+        ) select count(*) from blocked where pid<>$2::integer`, [scope, blockerPid])).rows[0].count) < 2) {
         assert.equal(settled, 0, 'both requests reach the real canonical Organization row lock')
         assert.ok(Date.now() < deadline, 'the two database waits become observable')
         await delay(10)

@@ -33,8 +33,10 @@ export async function othersMayUse(query: Query, ownerId: string, workspaceId: s
  * share first: the deterministic order a bot without its own subscription uses.
  */
 export async function pooledOwners(query: Query, runOwnerId: string, workspaceId: string): Promise<string[]> {
-  if (!(await memberSubscriptionsAllowed(query, workspaceId))) return []
   const owners = (await query.query<{ ownerId: string }>('SELECT "ownerId" FROM workspace_subscription_shares WHERE "workspaceId"=$1 AND "allowOthers" AND "ownerId"<>$2 ORDER BY "createdAt","ownerId"', [workspaceId, runOwnerId])).rows.map(row => row.ownerId)
+  // No borrowed source means no sharing decision. Actual lenders still pass
+  // the current Workspace policy and each Organization approval below.
+  if (!owners.length || !(await memberSubscriptionsAllowed(query, workspaceId))) return []
   const allowed = await Promise.all(owners.map(ownerId => organizationResourceAllowed(workspaceId, 'subscription', ownerId, ownerId)))
   return owners.filter((_, index) => allowed[index])
 }
