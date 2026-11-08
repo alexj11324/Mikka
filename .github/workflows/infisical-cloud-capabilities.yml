@@ -223,53 +223,130 @@ jobs:
       github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
-      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions')
+      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production') && startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 35
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       actions: read
+      id-token: write
+    env:
+      # Exact formally released main containing1692; verify all four gates before credentials.
+      MIKKA_COMMUNITY_REVISION: __FINAL_MAIN_SHA__
+      MIKKA_COMMUNITY_CANDIDATE: '0'
+      MIKKA_COMMUNITY_PROVIDER: both
+      MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION: 9ea7b2cd61deb724f20330906f86df6df2cd9828
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 2
           persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
-      - name: Verify source and access-only boundaries before reading metadata
+      - name: Check the source and access-only fixture boundary before authentication
         run: |
           node --test scripts/ops/self-hosting-release.test.mjs scripts/ops/self-hosting-subscription-acceptance.test.mjs
           node scripts/ops/self-hosting-release.mjs --preflight
-      - name: Read only the exact closed failed runtime diagnostics
+      - name: Verify the exact served main release and all four completed gates before credentials
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           node --input-type=module <<'JS'
-          import {createHash} from 'node:crypto'
-          import {execFileSync} from 'node:child_process'
-          const need=(ok,code)=>{if(!ok)throw Error('GATE_READBACK_'+code)}
-          try {
-           const root='https://api.github.com/repos/alexj11324/Mikka'
-           const get=async path=>{const r=await fetch(root+path,{redirect:'error',signal:AbortSignal.timeout(20000),headers:{authorization:'Bearer '+process.env.GITHUB_TOKEN,accept:'application/vnd.github+json'}});need(r.ok,'API_HTTP_'+r.status);return r.json()}
-           const [run,artifact]=await Promise.all([get('/actions/runs/42439132774'),get('/actions/artifacts/13602906938')])
-           need(run.id===42439132774&&run.run_attempt===2&&run.head_sha==='3c32675c99d32f9c84a9b5e4bc48e59231baa4d8'&&run.head_branch==='main'&&run.event==='push'&&run.path==='.github/workflows/e2b-official-runtime.yml','SOURCE')
-           need(artifact.id===13602906938&&artifact.name==='e2b-template-subscription-diagnostics-42439132774-2'&&!artifact.expired&&artifact.size_in_bytes===1885&&artifact.digest==='sha256:adc58216e5da83ab64b5dd6c6d32a639164ad4d87f9a6ca689e091a246c046e5'&&artifact.workflow_run?.id===run.id&&artifact.workflow_run?.head_sha===run.head_sha,'ARTIFACT')
-           const redirect=await fetch(root+'/actions/artifacts/13602906938/zip',{redirect:'manual',signal:AbortSignal.timeout(20000),headers:{authorization:'Bearer '+process.env.GITHUB_TOKEN,accept:'application/vnd.github+json'}})
-           need(redirect.status===302,'REDIRECT')
-           const location=new URL(redirect.headers.get('location'))
-           need(location.protocol==='https:'&&!location.username&&!location.password&&(/\.blob\.core\.windows\.net$/.test(location.hostname)||/\.githubusercontent\.com$/.test(location.hostname)||location.hostname==='productionresultssa0.blob.core.windows.net'),'DOWNLOAD_HOST')
-           const download=await fetch(location,{redirect:'error',signal:AbortSignal.timeout(20000)})
-           need(download.ok,'DOWNLOAD_HTTP')
-           const bytes=Buffer.from(await download.arrayBuffer());need(bytes.length===1885&&createHash('sha256').update(bytes).digest('hex')==='adc58216e5da83ab64b5dd6c6d32a639164ad4d87f9a6ca689e091a246c046e5','DIGEST')
-           const py="import sys,zipfile,io\nz=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))\nn=z.namelist()\nassert len(n)==1 and n[0]=='subscription-diagnostics.json'\nx=z.getinfo(n[0]); assert x.file_size<262144\nsys.stdout.write(z.read(n[0]).decode('utf-8'))"
-           const raw=JSON.parse(execFileSync('python3',['-c',py],{input:bytes,encoding:'utf8',maxBuffer:262144,env:{PATH:process.env.PATH}}))
-           need(raw.version===1&&raw.status==='failed'&&Array.isArray(raw.candidates)&&raw.candidates.length<=2,'PROJECTION')
-           const word=v=>typeof v==='string'&&/^[a-z][a-z0-9_]{0,95}$/.test(v)?v:null
-           const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v)?v:null
-           const ver=v=>typeof v==='string'&&/^[0-9]+\.[0-9]+\.[0-9]+$/.test(v)?v:null
-           const candidates=raw.candidates.map(c=>({kind:['claude','codex'].includes(c.kind)?c.kind:null,stage:word(c.stage),code:word(c.code),sampleStatus:word(c.sampleStatus),sampleError:word(c.sampleError),cleanupErrors:Array.isArray(c.cleanupErrors)?c.cleanupErrors.map(word):[],failure:c.failure?{phase:word(c.failure.phase),code:word(c.failure.code),httpStatus:Number.isInteger(c.failure.httpStatus)?c.failure.httpStatus:null}:null,observation:c.observation?{lastStatus:word(c.observation.lastStatus),agentStart:c.observation.agentStart===true,providerChunk:c.observation.providerChunk===true,replyVerified:c.observation.replyVerified===true,replyVerifiedAfterTool:c.observation.replyVerifiedAfterTool===true,successfulTool:c.observation.successfulTool===true,runtimeTimingStatus:word(c.observation.runtimeTimingStatus),expectedAgentAck:c.observation.expectedAgentAck===true,cliInit:c.observation.cliInit?{outcome:word(c.observation.cliInit.outcome),ms:typeof c.observation.cliInit.ms==='number'?c.observation.cliInit.ms:null}:null,runtimeEvidence:c.observation.runtimeEvidence?{status:word(c.observation.runtimeEvidence.status),reason:word(c.observation.runtimeEvidence.reason)}:null}:null,fixture:c.fixture?{issueId:uuid(c.fixture.issueId),runId:uuid(c.fixture.runId)}:null,candidateProof:c.candidateProof?{harness:word(c.candidateProof.harness),version:ver(c.candidateProof.version),sourceCommit:c.candidateProof.sourceCommit==='3c32675c99d32f9c84a9b5e4bc48e59231baa4d8'?c.candidateProof.sourceCommit:null,workerSha:c.candidateProof.workerSha==='d382cd600e4e72e04282ccaa7de7bcac22e19377'?c.candidateProof.workerSha:null}:null,passedReceipt:c.passedReceipt?{status:word(c.passedReceipt.status),harness:word(c.passedReceipt.harness),officialCliVersion:ver(c.passedReceipt.officialCliVersion),replyVerified:c.passedReceipt.replyVerified===true,replyVerifiedAfterTool:c.passedReceipt.replyVerifiedAfterTool===true}:null,cleanupFailures:Array.isArray(c.cleanupFailures)?c.cleanupFailures.map(f=>({step:word(f.step),code:word(f.code),httpStatus:Number.isInteger(f.httpStatus)?f.httpStatus:null})):[]}))
-           console.log(JSON.stringify({kind:'runtime-subscription-diagnostics-readback',sourceCommit:run.head_sha,runId:run.id,runAttempt:run.run_attempt,artifactId:artifact.id,artifactDigest:artifact.digest,status:raw.status,code:word(raw.code),candidates,productionSecretValuesRequested:false}))
-          } catch(e) { console.error(/^GATE_READBACK_[A-Z0-9_]+$/.test(e?.message??'')?e.message:'GATE_READBACK_FAILED');process.exitCode=1 }
-          
+          const sha = process.env.MIKKA_COMMUNITY_REVISION
+          if (!/^[a-f0-9]{40}$/.test(sha) || process.env.MIKKA_COMMUNITY_CANDIDATE !== '0' || process.env.MIKKA_COMMUNITY_PROVIDER !== 'both') throw Error('COMMUNITY_RELEASE_PIN_REQUIRED')
+          const get = async path => {
+            const response = await fetch('https://api.github.com/repos/alexj11324/Mikka/' + path, {
+              redirect:'error', signal:AbortSignal.timeout(20000),
+              headers:{authorization:'Bearer '+process.env.GITHUB_TOKEN,accept:'application/vnd.github+json'} })
+            if (!response.ok) throw Error('COMMUNITY_RELEASE_METADATA_HTTP_'+response.status)
+            return response.json()
+          }
+          const [main,runs,pr,ancestry] = await Promise.all([get('git/ref/heads/main'),get('actions/runs?head_sha='+sha+'&event=push&branch=main&per_page=100'),get('pulls/1692'),get('compare/93165f4ad0cc5b375e1e49ecafa267209729fb0e...'+sha)])
+          if (pr.head?.sha !== '93165f4ad0cc5b375e1e49ecafa267209729fb0e' || !['ahead','identical'].includes(ancestry.status) || ancestry.behind_by !== 0 || ancestry.merge_base_commit?.sha !== '93165f4ad0cc5b375e1e49ecafa267209729fb0e') throw Error('COMMUNITY_REPLAY_FIX_NOT_IN_RELEASE')
+          const live = await fetch('https://app.aspectlylabs.com/mikka/api/version',{redirect:'error',headers:{'cache-control':'no-store'},signal:AbortSignal.timeout(20000)})
+          if (!live.ok || (await live.json()).build !== sha) throw Error('COMMUNITY_PUBLIC_BUILD_CHANGED')
+          const workflows = ['CI','Web deploy','E2B additive runtime release','Self-hosted image']
+          const receipt = workflows.map(name => {
+            const run = runs.workflow_runs?.find(r=>r.head_sha===sha && r.head_branch==='main' && r.event==='push' && r.name===name && r.status==='completed' && r.conclusion==='success')
+            if (!run) throw Error('COMMUNITY_RELEASE_NOT_READY_'+name.replaceAll(' ','_').toUpperCase())
+            return {workflow:name,run:run.id}
+          })
+          console.log(JSON.stringify({kind:'community-release-gate',revision:sha,gitMain:main.object?.sha,sharedServedBuild:sha,status:'passed',workflows:receipt,credentialsDelivered:false}))
           JS
+      - name: Prepare the exact released source and immutable public image before credentials
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          if (!/^[a-f0-9]{40}$/.test(process.env.MIKKA_COMMUNITY_REVISION)) throw Error('COMMUNITY_SOURCE_PIN_REQUIRED')
+          JS
+          git fetch --depth=1 origin "$MIKKA_COMMUNITY_REVISION"
+          git worktree add --detach "$RUNNER_TEMP/mikka-community-source" "$MIKKA_COMMUNITY_REVISION"
+          pnpm --dir "$RUNNER_TEMP/mikka-community-source" install --frozen-lockfile
+          docker pull "ghcr.io/alexj11324/mikka:$MIKKA_COMMUNITY_REVISION"
+          curl --fail --silent --show-error --location --max-time 60 https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 -o "$RUNNER_TEMP/mikka-cloudflared"
+          node --input-type=module <<'JS'
+          import { readFileSync, chmodSync } from 'node:fs'
+          import { createHash } from 'node:crypto'
+          const file = process.env.RUNNER_TEMP + '/mikka-cloudflared'
+          if (createHash('sha256').update(readFileSync(file)).digest('hex') !== '1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872') throw Error('TUNNEL_DIGEST')
+          chmodSync(file, 0o700)
+          JS
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Complete both independent official subscription threads on the released community installation
+        timeout-minutes: 18
+        run: node scripts/ops/self-hosting-subscription-acceptance.mjs
+      - name: Independently reclaim only this run's access folder and machines
+        if: always()
+        run: node scripts/ops/self-hosting-subscription-acceptance.mjs --cleanup
+      - name: Retain only the closed acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: community-subscriptions-${{ github.run_id }}
+          path: .artifacts/self-hosting/community-subscriptions.json
+          if-no-files-found: warn
+          retention-days: 14
+
+# Community preparation redirects were verified on the exact published core image.
+
+# Staging checkpoint: access-only fixture constraints and owned volume cleanup verified.
+
+# Public bridge protocol covers published ce67; native/full-thread acceptance follows 1668.
+
+# Community run awaits exact a23 Web/E2B/image readiness; includes native authentication fix1668.
+
+# Source projection read uses the live configured access project and existing custody identity.
+
+# Production Secret selector values stay in Infisical; Vercel supplies only named variable metadata.
+
+# Per-provider model selection verifies exactly the original small subscription before dispatch.
+
+# Repository failures retain only fixed classifications; cleanup awaits the terminal live push.
+
+# Verify the normal fixture reader before VMs; source-only error matches retain no runtime messages.
+
+# Lease diagnosis uses the frozen authority function read-only and unchanged heartbeat responses.
+
+# Isolated stop-writer observation retains fixed query kinds/fingerprints only, never SQL or arguments.
+
+# Compare only owner-event provenance booleans; verify enabled Manifest preparation without creating an App.

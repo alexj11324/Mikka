@@ -272,7 +272,7 @@ export async function runCommunity(env = process.env) {
     const expectedWorker = (await execute('python3', ['scripts/e2b/build-template.py', '--worker-hash', '--source-ref', revision], { cwd: source })).stdout.trim()
     check(expectedWorker === sourceConfig.workerSha, 'WORKER_VERSION')
     report.publicBuild = (await cloud.json('/api/version')).build
-    const sharedBuilds = [revision, env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION, '4221d9c06da079321d4fe2803879ba82043d7a1f', '0479675e188efeac341b207d8616c4d7b9d4ee23', 'ad7f0d0434e7d4a2527d868c4830d009b28a9d7f', '78c3c13d35c2c664113a140bccb3db4ae9606021']
+    const sharedBuilds = [revision]
     check(env.MIKKA_COMMUNITY_SHARED_COMPATIBLE_REVISION === '9ea7b2cd61deb724f20330906f86df6df2cd9828' && sharedBuilds.includes(report.publicBuild), 'PUBLIC_VERSION')
     report.sharedControlPlaneCompatibility = env.MIKKA_COMMUNITY_CANDIDATE === '1' ? 'candidate18199_shared047_mobile_docs_only' : 'exact_release_image_and_served_control_plane'
     privatePool = new Pool({ connectionString: database, max: 1, ssl: { rejectUnauthorized: true } })
@@ -620,7 +620,8 @@ export async function runCommunity(env = process.env) {
         check(finalFactory && sha(finalFactory.sourceEventId).slice(0, 16) === acceptedEpochHash
           && !/Superseded by an authenticated owner request/.test(finalFactory.reason ?? ''), 'ACCEPTED_EPOCH_REPLAYED')
         Object.assign(row, { status: 'passed', runId, issueId, successfulTool: true, replyAfterTool: true, terminal: record.lastStatus,
-          credentialType: evidence.credentialType, subscriptionRoute: evidence.subscriptionRoute, acceptedEpochPreserved: true })
+          credentialType: evidence.credentialType, subscriptionRoute: evidence.subscriptionRoute, acceptedEpochPreserved: true,
+          replySource: record.replySource === 'submitted_report' ? 'submitted_report' : 'assistant_text' })
       } catch (error) {
         row.code = /^(COMMUNITY_[A-Z0-9_]+|startup_[a-z0-9_]{1,80})$/.test(error?.message ?? '') ? error.message : 'COMMUNITY_THREAD_FAILED'; row.errorClass = error?.constructor?.name === 'CommandExitError' ? 'CommandExitError' : 'Error'
         if (runId && issueId) {
@@ -738,5 +739,3 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
 // Community release pin contains native-auth fix1668; production writers must complete before activation.
 
 // Published artifact and actual served control-plane build identify this run; unserved Git HEAD is metadata only.
-
-// Read only the immutable 3c runtime attempt2 closed diagnostic; application secrets are not requested.

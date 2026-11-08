@@ -185,4 +185,4 @@ test('the authorized normal source check precedes the immutable credential snaps
   await assert.rejects(readCheckedSourceMetadata({rpc:()=>assert.fail('invalid scope')},'invalid',workspaceId,()=>assert.fail('invalid scope')),/CHECKED_SOURCE_SCOPE/)
 })
 
-// Read only the immutable 3c runtime attempt2 closed diagnostic; application secrets are not requested.
+// Final receipt uses both original subscriptions on the exact formally released main image and served control plane.
