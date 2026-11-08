@@ -1,7 +1,6 @@
 name: Self-hosted image
 on:
-  pull_request:
-  merge_group:
+  workflow_call:
   push:
     branches: [main]
     tags: ['v*']
@@ -12,7 +11,11 @@ concurrency:
   group: self-hosted-image-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 jobs:
+  changes:
+    uses: ./.github/workflows/ci-selection.yml
   image:
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -54,6 +57,11 @@ jobs:
       - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
         run: docker compose exec -T app node scripts/acceptance/self-hosted-services.mjs
+      - name: Reclaim intermediate build cache before installing source dependencies
+        run: |
+          df -h /
+          docker builder prune --all --force
+          df -h /
       - name: Install the same-revision source daemon dependencies
         uses: ./.github/actions/pnpm-install
         env:
