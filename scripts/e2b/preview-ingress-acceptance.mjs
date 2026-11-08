@@ -189,7 +189,10 @@ async function main(args) {
       try { cleanup = await cleanupOwnedProbe(journal, sourceCommit, await import('e2b'), apiOptions) }
       catch { cleanup = { stopped: false, outcome: 'cleanup_failed', scopeVerified: false } }
     }
-    await writeReceipt(output, { version: 1, purpose: PURPOSE, sourceCommit, cleanup })
+    const binding = journal?.sourceCommit === sourceCommit && UUID.test(journal.fixtureId ?? '')
+      && ID.test(journal.requestedTemplate ?? '') && (journal.sandboxId === null || ID.test(journal.sandboxId ?? ''))
+      ? { fixtureId: journal.fixtureId, requestedTemplate: journal.requestedTemplate, sandboxId: journal.sandboxId } : {}
+    await writeReceipt(output, { version: 1, purpose: PURPOSE, sourceCommit, ...binding, cleanup })
     if (!cleanup.stopped) throw new Error('preview_ingress_cleanup_failed')
     return
   }
@@ -200,17 +203,18 @@ async function main(args) {
     requestedTemplate: template, sandboxId: null }
   // Do not replace another attempt's cleanup target.
   await writeFile(journalPath, JSON.stringify(journal) + '\n', { mode: 0o600, flag: 'wx' })
-  const report = { version: 1, purpose: PURPOSE, sourceCommit, requestedTemplate: template,
+  const report = { version: 1, purpose: PURPOSE, sourceCommit, fixtureId: journal.fixtureId, requestedTemplate: template,
     templateScope: ['claude', 'codex'].includes(template) ? 'official_alias_resolved_by_provider' : 'explicit_template_id',
     maximumLifetimeMs: 180_000, passed: false }
   let failure
   try {
-    const sandbox = await Sandbox.create(template, { ...apiOptions,
+    const sandbox = await Sandbox.create(template, { ...apiOptions, requestTimeoutMs: 45_000,
       proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy,
       timeoutMs: 180_000, lifecycle: { onTimeout: 'kill', autoResume: false }, network: { allowPublicTraffic: true },
       metadata: cleanupMetadata(journal) })
     if (!ID.test(sandbox.sandboxId ?? '')) throw new Error('preview_ingress_cleanup_scope')
     journal.sandboxId = sandbox.sandboxId
+    report.sandboxId = sandbox.sandboxId
     await writeReceipt(journalPath, journal)
     Object.assign(report, await probeMarkedIngress(sandbox, sourceCommit))
   } catch (error) {
