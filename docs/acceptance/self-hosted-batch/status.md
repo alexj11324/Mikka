@@ -157,6 +157,14 @@ This adds a provider-failure contract variant; the ordinary version-bound Web
 and E2B release gates still apply. Historical model-not-reported error rendering
 remains solely for existing receipts; new dispatches do not emit that refusal.
 
+The first full CI run of this follow-up exposed eight old model-report
+assumptions in the Coordinator prompt, difficulty routing and startup recovery
+database fixtures. The fixtures now distinguish missing credential injection
+from a non-exhaustive CLI model list. All 35 cases in those three real-PG suites
+pass, retaining out-of-list refusal, quota/pause/offline exclusion, fixed model
+identity, Factory task ancestry and original Owner-event checks. No production
+behavior was changed to preserve the superseded report gate.
+
 ## Local idle receipt
 
 Production build `9787d259793ca9156de77dd48059a2d14fd1a7b4`, community edition,
