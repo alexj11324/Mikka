@@ -137,3 +137,5 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     default: return null
   }
 }
+
+// Issue #1699 synthetic web performance probe; never merge.
