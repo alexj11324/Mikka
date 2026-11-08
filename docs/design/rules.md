@@ -309,8 +309,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   2026-11-01: 「自己上传的文件，在资料库里可以删除」;
   [decision](decisions/2026-11-01-2255-library-delete-own-files.md)).
   Exception: a coding task's review page ([2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)) carries
-  actions (line comments, 发给 Agent, 附到评论, 要求修改, 批准合并). The task
-  panel itself stays read-only apart from its 「审阅」 entry.
+  actions (line comments, 发给 Agent, 附到评论, 要求修改, 批准合并). On a coding
+  task, the task panel's header row also carries the code tool buttons
+  改动 · 文件 · 终端 · 预览, which open the review page; the rest of the panel
+  stays read-only.
 - **R-52** Every thread list, web and phone, groups its rows in this order:
   等待你（N）, 进行中（N）, 受阻（N）, 空闲（N）, 已解决（N）
   (Waiting for you, Running, Blocked, Idle, Resolved;
@@ -374,9 +376,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   thread that did the work, and the task page has a 验收 button that opens it
   (decision `2026-11-04-2200-factory-flow-like-warp.md`; it replaces the 「验收」
   tab of 2026-10-30).
-- **R-57** The local 浏览器 opens from ⌘K 「打开浏览器」 or ⌘⇧O; it is no
-  longer a globe toggle in the top bar ([2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md); it replaced the
-  icon-only globe at the right of the top bar). Turned on, it opens a right column with
+- **R-57** The local 浏览器 is an icon-only globe toggle at the right of the
+  top bar, with no 「浏览器」 label. Turned on, it opens a right column with
   the browser (URL bar and page). Selecting an element and annotating it puts
   a chip 「1 · <element> · <action> · <note>」 into the current chat's
   composer. The 浏览器 is the person's own and app-wide; it is not a bot's
@@ -622,8 +623,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-34** Status colours come only from the StatusBadge set (Figma
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,
-  forward, centred search pill that opens ⌘K, and the ✋ 等待你 count at the
-  right; the 浏览器 opens from ⌘K, R-57), 68px icon rail, in this order: 主页, 建议, 看板, 插件,
+  forward, centred search pill that opens ⌘K, the 浏览器 globe toggle at the
+  right, R-57), 68px icon rail, in this order: 主页, 建议, 看板, 插件,
   Artifact; and one rounded content card. Rail items are icons only: no text
   under the icon; the name shows as a tooltip on hover and stays the item's
   accessible name (Alex, #580; restored 2026-11-01 after #747 brought the
@@ -674,8 +675,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   to edge; buttons and switches inside it stay separately clickable.
   `pnpm lint:ui` fails a frame inside a frame as `style/nested-frame`.
 - **R-91** Top rows carry the important things. The first row of a panel,
-  page or screen holds the object's state and its main action (for a coding
-  task: PR, failed checks and 「审阅」, right under the title). Secondary
+  page or screen holds the object's state and its main actions (for a coding
+  task: the tool buttons 改动 +N −M · 文件 · 终端 · 预览 in the header row, and
+  PR and failed checks right under the title). Secondary
   actions, branch names, counts and shortcut hints go into 「⋯」 or a
   tooltip, not a row of their own (Alex, 2026-11-08; [2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)).
 
