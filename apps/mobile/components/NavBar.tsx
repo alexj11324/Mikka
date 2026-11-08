@@ -6,6 +6,8 @@ import { BackButton, Header, RoundButton } from '@/components/ui'
 import { Text } from '@/components/Text'
 import { colors, font } from '@/lib/theme'
 import { WebBarMenu } from '@/components/WebBarMenu'
+import { navBarOptions, needsTopFade } from '@/components/nav-bar-options'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
 /** An SF Symbol name, as the toolbar takes it. */
 type SFSymbol = Extract<NonNullable<ComponentProps<typeof Stack.Toolbar.MenuAction>['icon']>, string>
@@ -62,21 +64,20 @@ const webItem = (item: BarItem) => 'view' in item
  * The screen's top bar. On iOS it is the system navigation bar: transparent
  * over the content with the system's scroll-edge effect, its buttons and menus
  * UIKit bar items (Liquid Glass on iOS 26), the system back button and swipe
- * on pushed pages, a large title where `large`, the title in the top row
- * beside the buttons where `topTitle` (a tab's root, 2026-11-07), and the
+ * on pushed pages, a large title where `large`, one centred title with the
+ * buttons grouped on the right where `topTitle` (a tab's root), and the
  * system search field where `search`. The web build, used for screenshot checks, draws the same
  * bar in React Native (`Header`).
  *
  * A screen's scroll view sets `contentInsetAdjustmentBehavior="automatic"` so
- * its content starts below the bar and scrolls under it. `material` gives the
- * bar the system chrome material and a hairline, so long text scrolled under it
- * never shows through on any iOS version (Figma 843:2 #4; chats).
+ * its content starts below the bar and scrolls under it. The bar has no
+ * material or hairline (Comma, Alex 2026-11-08): content fades out under the top
+ * edge, by the system's soft scroll edge on iOS 26 and `TopFade` below it.
  */
-export function NavBar({ title, titleView, left, right, back, large, topTitle, search, material }: {
+export function NavBar({ title, titleView, left, right, back, large, topTitle, search, background = colors.page }: {
   title?: string
-  /** A tab's root (Bot, 任务, 建议, 设置, 搜索): the title sits in the bar's own row on the left, the buttons on the
-   * right, and stays there on scroll on the `material` bar (Alex 2026-11-07, decisions/2026-11-07-2045). Not iOS's
-   * large title, which puts the title on a second row under the buttons. */
+  /** A tab's root (Bot, 任务, 建议, 设置, 搜索): one title, the system's, centred in the bar's row; the buttons grouped
+   * on the right; nothing on the left (Alex 2026-11-08, after 「Bot」 showed twice). */
   topTitle?: boolean
   titleView?: ReactNode
   left?: BarItem | BarItem[]
@@ -84,7 +85,8 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
   back?: () => void
   large?: boolean
   search?: { placeholder: string; onChange: (text: string) => void }
-  material?: boolean
+  /** The page colour the bar fades from below iOS 26 (settings is grouped). */
+  background?: string
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -127,34 +129,43 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
   return (
     <>
       <Stack.Screen options={{
-        title: title ?? '',
-        // A top-row title is the leading bar item below, so the centre stays empty.
-        headerTitle: topTitle ? () => null : titleView ? () => titleView : undefined,
-        headerLargeTitle: large && !topTitle,
-        // A tab's root keeps its row over the list on the same chrome material as the tab bar, so rows scrolled under it
-        // never show through the title or its buttons (Alex 2026-11-07, TestFlight: rows ran into 对话 and the + button).
-        ...(material || topTitle ? { headerBlurEffect: 'systemChromeMaterial' as const, headerShadowVisible: true, scrollEdgeEffects: { top: 'hidden' as const, bottom: 'soft' as const } } : {}),
+        ...navBarOptions({ title, titleView, large, topTitle }),
         ...(search ? { headerSearchBarOptions: { placeholder: search.placeholder, hideWhenScrolling: false, onChangeText: event => search.onChange(event.nativeEvent.text), onCancelButtonPress: () => search.onChange('') } } : {}),
       }} />
-      {topTitle ? (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.View hidesSharedBackground>
-            <Text accessibilityRole="header" numberOfLines={1} style={styles.topTitle}>{title}</Text>
-          </Stack.Toolbar.View>
-        </Stack.Toolbar>
-      ) : lefts.length ? <Stack.Toolbar placement="left">{lefts.map(nativeItem)}</Stack.Toolbar> : null}
+      {!topTitle && lefts.length ? <Stack.Toolbar placement="left">{lefts.map(nativeItem)}</Stack.Toolbar> : null}
       {rights.length ? <Stack.Toolbar placement="right">{rights.map(nativeItem)}</Stack.Toolbar> : null}
+      {needsTopFade(Platform.OS, Platform.Version) ? <TopFade color={background} /> : null}
     </>
   )
 }
 
-/** The web build's top row for a tab's root: the title on the left, the buttons on the right, under the safe area. */
+/** The web build's top row for a tab's root, as iOS draws it: one title centred, the buttons on the right. */
 function TopRow({ title, right }: { title: string; right: ReactNode[] }) {
   const insets = useSafeAreaInsets()
   return (
-    <View style={[styles.topRow, { paddingTop: insets.top + 8 }]}>
-      <Text accessibilityRole="header" numberOfLines={1} style={[styles.topTitle, { flex: 1 }]}>{title}</Text>
+    <View style={[styles.topRow, { paddingTop: insets.top + 6 }]}>
+      <Text accessibilityRole="header" numberOfLines={1} style={styles.topTitle}>{title}</Text>
       <View style={styles.topButtons}>{right}</View>
+    </View>
+  )
+}
+
+/** Below iOS 26: the page colour fading out under the bar, so rows scrolled up never run into its title or buttons. */
+function TopFade({ color }: { color: string }) {
+  const insets = useSafeAreaInsets()
+  const height = insets.top + 44 + 20
+  return (
+    <View pointerEvents="none" style={[styles.fade, { height }]}>
+      <Svg width="100%" height={height}>
+        <Defs>
+          <LinearGradient id="navFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={color} stopOpacity={1} />
+            <Stop offset={String((insets.top + 44) / height)} stopColor={color} stopOpacity={0.85} />
+            <Stop offset="1" stopColor={color} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height={height} fill="url(#navFade)" />
+      </Svg>
     </View>
   )
 }
@@ -165,10 +176,11 @@ export const underBar = ios ? { contentInsetAdjustmentBehavior: 'automatic' as c
 const styles = StyleSheet.create({
   largeTitle: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 8, fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: 0.4, color: colors.text },
   viewButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  /** The top-row title: as big as fits the bar's 44 pt row beside its buttons. */
-  topTitle: { fontSize: 30, lineHeight: 36, fontWeight: '700', letterSpacing: 0.3, color: colors.text },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 8, minHeight: 44 },
-  topButtons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  /** A tab root's title: the system navigation title (17 pt semibold), centred in the row. */
+  topTitle: { position: 'absolute', left: 96, right: 96, bottom: 8, textAlign: 'center', fontSize: 17, lineHeight: 28, fontWeight: '600', color: colors.text },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16, paddingBottom: 6, minHeight: 50 },
+  topButtons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  fade: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   search: { paddingHorizontal: 16, paddingBottom: 12 },
   searchInput: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: colors.bubble, color: colors.text, fontFamily: font, fontSize: 16 },
 })
