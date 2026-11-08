@@ -2,6 +2,8 @@ name: Trusted CI selection
 on:
   workflow_call:
     outputs:
+      full:
+        value: ${{ jobs.select.outputs.full }}
       docs_only:
         value: ${{ jobs.select.outputs.docs_only }}
       core:
@@ -34,6 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 7
     outputs:
+      full: ${{ steps.select.outputs.full }}
       docs_only: ${{ steps.select.outputs.docs_only }}
       core: ${{ steps.select.outputs.core }}
       integration: ${{ steps.select.outputs.integration }}
