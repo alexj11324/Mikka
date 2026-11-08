@@ -172,10 +172,21 @@ for (const app of ['github', 'linear', 'telegram'] as const) {
 }
 
 
-test('Linear flag evaluation failure is unreadable even when its HTTP response succeeds', async () => {
+test('an unreadable Linear flag (PostHog timeout, quota) is no read failure: the row keeps its state, else paused', async () => {
   linearResponse = { ok: true, data: { enabled: false, state: 'unavailable' } }
-  assert.deepEqual(await fetchOwnAppStates({ linear: 'connected' }), { states: { github: 'connected', linear: 'connected', telegram: 'connected' }, failed: ['linear'] })
+  assert.deepEqual(await fetchOwnAppStates({ linear: 'connected' }), { states: { github: 'connected', linear: 'connected', telegram: 'connected' }, failed: [] })
+  assert.deepEqual(await fetchOwnAppStates(), { states: { github: 'connected', linear: 'paused', telegram: 'connected' }, failed: [] })
   assert.equal(linear.mock.callCount(), 0)
+})
+
+test('without PostHog the status route says disabled, so Linear shows paused with no banner', async () => {
+  linearResponse = { ok: true, data: { enabled: false, state: 'disabled' } }
+  assert.deepEqual(await fetchOwnAppStates(), { states: { github: 'connected', linear: 'paused', telegram: 'connected' }, failed: [] })
+})
+
+test('a malformed answer from our own status endpoint is still a read failure', async () => {
+  linearResponse = { ok: true, data: { state: 'enabled' } }
+  assert.deepEqual(await fetchOwnAppStates({ linear: 'connected' }), { states: { github: 'connected', linear: 'connected', telegram: 'connected' }, failed: ['linear'] })
 })
 
 test('revalidation reads the existing SWR cache so a failed refresh retains its connected row', async () => {
