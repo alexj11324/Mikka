@@ -31,10 +31,11 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 | Frame | What it fixes | Light | Dark |
 |---|---|---|---|
 | R0 入口 | The chat's task card and the window bar's 等待你 list show one line, 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败」, with 「审阅」. One click opens R1. The list's footer shows ⌘⇧B and ⌘K 「审阅 #1471」. | `1120:2` | `1120:227` |
-| R0b 任务面板 | The task detail keeps its current shape and gains the same line with 「审阅」. Attempts appear only in 活动: 第 1 次尝试 · 失败 · 换 Codex 再试 → 第 2 次尝试 · 完成 · 开了 PR #1471. | `1120:432` | `1120:664` |
+| R0b 任务面板 | The task detail keeps its current shape. Its top row holds the title, then 「PR #1471 · ⚠ 1 项检查失败 · 审阅」, then ⋯ ⤢ ✕ on the right; the branch name moves into ⋯. Attempts appear only in 活动: 第 1 次尝试 · 失败 · 换 Codex 再试 → 第 2 次尝试 · 完成 · 开了 PR #1471. | `1120:432` | `1120:664` |
 | R1 审阅页 | One full page, described below. | `1120:869` | `1120:1231` |
 | R1b 检查展开 | The check summary expands in place: the failing check with a log excerpt, 查看完整日志 and 附到评论; the passing checks in one row. | `1120:1542` | `1120:1895` |
-| R2 iPhone 审阅 | Opened in one tap from the chat card's summary line. It shows the check summary row (tap to expand), the PR, 要求修改 / 批准合并, the changed files, and the floating 「N 条评论 · 发给 Agent」 bar. | `1121:54` | `1121:169` |
+| R2 iPhone 审阅 | Opened in one tap from the chat card's summary line. Under one centred title, the first row is the check summary (tap to expand) with 要求修改 / 批准合并, then the changed files, and the floating 「N 条评论 · 发给 Agent」 bar. | `1121:54` | `1121:169` |
+| 提议：地球图标移出窗口栏 | A separate proposal for Alex. The window bar keeps only ⌘K search and the ✋ 等待你 count; the browser opens from ⌘K 「打开浏览器」 or ⋯. It changes the current product and is not part of this decision until Alex approves it. | `1123:78` | `1123:306` |
 | R3 iPhone 文件 diff | A file's diff with inline comments and the floating bar. | `1121:274` | `1121:359` |
 
 ## The review page (R1)
@@ -43,8 +44,9 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 - **Middle:** the changed files only, grouped by folder, each with `+N −M`. Mark as viewed.
 - **Right:** the diff, unified or split, with inline comments. A small, collapsed 「按提交筛选」 sits in the diff header, as in Linear, and not in the main toolbar.
 - **Top bar:**
-  - On the left: the title and the PR number.
-  - On the right, in this order: the check summary 「⚠ 1 项检查失败 · 5 项通过」, which expands in place (R1b), then 「要求修改」 and 「批准合并」, then ✕ (Esc).
+  - On the left: the task title only.
+  - On the right, in this order: the check summary 「⚠ 1 项检查失败 · 5 项通过」, which expands in place (R1b), then 「要求修改」 and 「批准合并」, then ⋯ and ✕.
+  - The branch name, the viewed count (已看 1/3) and shortcut hints go into ⋯ or tooltips. The bar shows no Esc text.
   - 批准合并 is a dark, neutral button with the PR icon. It is never the accent blue that 发给 Agent uses.
 - **Bottom:** the batch bar 「2 条评论 · ios-unit 失败 · 发给 Agent」, in the accent colour. It is visually separate from 批准合并: 发给 Agent sends comments to the agent, and 批准合并 merges the PR.
 - **Opening and closing:** it opens from any 审阅 entry or ⌘⇧B, and Esc (when focus is not in a text field) or ✕ closes it. The switch is instant (R-37).
@@ -63,6 +65,7 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 6. **After a PR exists**, the diff and checks stay in Mikka. 「在 GitHub 打开」 is a secondary link.
 7. **iPhone parity** with R2 and R3: the summary line opens the review screen in one tap, with line comments, 发给 Agent, the checks and the PR actions. There is no terminal and no editor.
 8. **No grey slabs.** Properties are label/value rows on the panel background.
+9. **Top rows carry the important things** (Alex: the top rows had room but held low-value items). On every surface the first row holds the task's state and its main action: PR, failed checks and 审阅 next to the task title; checks and 要求修改 / 批准合并 on the review page and on iPhone. Branch names, counts and shortcut hints go into ⋯ or tooltips.
 
 ## Scope
 
