@@ -633,7 +633,7 @@ export async function subscriptionProof(client, record, scope, profile) {
       profileVersion: profile.version, profileDigest: profile.digest, access: 'workspace_share' } }
 }
 
-export async function cleanupCase(client, record, target, { timeoutMs = 60000, WebSocketImpl = globalThis.WebSocket, now = Date.now } = {}) {
+export async function cleanupCase(client, record, target, { timeoutMs = 60000, WebSocketImpl = globalThis.WebSocket, now = Date.now, preserveIssue = false } = {}) {
   const cleanup = record.cleanup ??= { status: 'running', errors: [] }
   const runIds = new Set(record.runId ? [record.runId] : [])
   let runsEnded = true, machinesEnded = true
@@ -718,12 +718,13 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
   }
   // Failed Factory cancellation can leave a producer able to create another
   // attempt. Keep the issue accessible for recovery even if known runs ended.
-  if (record.issueId && runsEnded && factoryCancelled && machinesEnded) await step('taskDeleted', async () => {
+  if (record.issueId && !preserveIssue && runsEnded && factoryCancelled && machinesEnded) await step('taskDeleted', async () => {
     const { issue } = await client.rpc('issues.getIssue', [record.issueId])
     assert(issue?.id === record.issueId && issue.title === record.title, 'cleanup_scope_mismatch')
     await client.rpc('issue-operations.setIssueDeleted', [{ id: issue.id, revision: issue.revision }])
   })
-  if (!runsEnded || !factoryCancelled || !machinesEnded || cleanup.errors.length) cleanup.retainedFixture = { issueId: record.issueId, runIds: [...runIds] }
+  if (preserveIssue) cleanup.taskRetained = true
+  if (preserveIssue || !runsEnded || !factoryCancelled || !machinesEnded || cleanup.errors.length) cleanup.retainedFixture = { issueId: record.issueId, runIds: [...runIds] }
   cleanup.status = cleanup.errors.length ? 'failed' : 'passed'
 }
 

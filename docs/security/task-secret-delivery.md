@@ -35,6 +35,14 @@ direct exposure. Ordinary `kind=env` entries retain their behavior. A person who
 chooses direct mode accepts that the Agent and same-permission host processes
 can read that value; masking does not change that fact.
 
+Protection applies to claims issued by the new server to a compatible daemon.
+This migration does not stop already-running tasks or erase plaintext delivered
+by an earlier claim. Those tasks must finish, or be explicitly stopped and
+started under a new claim, before relying on the new delivery boundary.
+Plaintext already copied to files, logs or snapshots remains known. Revoking
+or rotating it at the upstream provider is required if that prior authority
+must be withdrawn; masking is not retrospective protection.
+
 ## Protocol and trust boundary
 
 Claim resolves owner, workspace, exact repository, run, device and claim
@@ -59,6 +67,12 @@ private/reserved addresses and DNS rebinding. The actual TLS connection must use
 the address checked by the egress handler. Request and response sizes and time
 are bounded. Error and trace output contains closed error codes, not URLs,
 headers, capabilities or credential-bearing exception messages.
+
+Paths containing semicolons (matrix/path parameters) are unsupported: some
+upstreams remove them before resolving dot segments, which could otherwise
+escape an approved prefix. Ordinary query parameters remain supported as part
+of the approved API's authority; path/method filtering does not establish that
+every business operation expressible through those parameters is safe.
 
 Capabilities expire no later than the current run lease (90 seconds). Renewal
 uses the existing authenticated device heartbeat and only a successfully
@@ -231,10 +245,19 @@ credentials and require a fresh task claim instead of resuming from disk.
   credential or raw canary is included in the evidence. This is an isolated
   process reproduction, not a production database/claim measurement.
 - `packages/daemon/test/task-secret-child.test.ts` starts the actual supervisor,
-  bridge and two real SDK subprocesses, renews the opaque grant between calls,
-  and reads the actual journal/outbox files. Neither canary nor capability is
-  in the child environment or persisted journal. Native credential options
-  retain their existing path. The in-test upstream is explicitly synthetic.
+  bridge and two real Node HTTP-client subprocesses, renews the opaque grant
+  between `fetch` calls, and reads the actual journal/outbox files. Neither
+  canary nor capability is in the complete supervisor child environment or
+  persisted journal. Native credential options retain their existing path.
+  This test remains compatible with the daemon's Node 18 matrix.
+- `tests/task-secret-sdk.test.ts` separately runs the installed
+  `@ai-sdk/openai-compatible` / `ai` SDK in real Node subprocesses under the
+  root Node 24 target. Non-streaming `generateText` calls use the real bridge,
+  dummy key and ordinary SDK transport before and after grant renewal. The
+  child receives only the bridge environment, public dummy key and test mode. This
+  proves installed SDK compatibility with a synthetic third-party endpoint
+  returning standard JSON, without changing request-header restrictions.
+  Neither process fixture exercises a live vendor or native model connection.
 - `lib/secrets/egress-http.bench.ts` measures a real local HTTP data-plane hop
   plus the same local TLS fixture used by the direct comparison. The fixture
   transport maps a fixed public DNS test result to loopback only inside the
@@ -252,6 +275,45 @@ The third-party data plane adds one forwarding hop and no database/remote
 authorization lookup. Claims with configured saved variables recheck metadata
 at their final fence; protected runs recheck authority and metadata during the
 existing heartbeat. These control-plane costs are separate from API-call cost.
+
+## External acceptance workflow
+
+`task-secret-acceptance.yml` runs after a successful official runtime release
+only when the first-parent source diff touches the Secret implementation or
+its acceptance driver. Before checkout and before each existing OIDC credential
+read, it verifies the official workflow, repository, current main, source and
+run attempt. The unique release artifact, archive digest, published templates,
+computed worker hash and public Web build must agree. An unrelated release does
+not start model tasks, and an incomplete publication cannot supply guessed pins.
+
+The native cases use the existing smoke account and fixed Claude Code/Codex
+subscriptions. Each owns one uniquely named branch and draft PR in
+`alexj11324/Mikka-handoff`, then verifies closure and branch deletion without
+merging. A separate disposable E2B fixture holds independent random test keys
+and a synthetic canary. The task executes the actual bridge and egress source,
+but this is not a production Secret Store/claim test. Its timing baseline is a
+public unauthenticated route on the same fixture, not a production vendor or
+native-model before/after measurement. Ambiguous Git cleanup retains its exact
+target and Mikka Issue for recovery instead of deleting an unverified resource.
+
+A separate serialized job reuses the existing `run-observability` driver and
+its original ACME demo account for the full Factory Artifact flow: execution,
+independent review, exact artifact bytes and normal Owner acceptance. It uses
+both fixed subscriptions without browser submission or settings preparation;
+existing profile, subscription and paid-fallback preflight blockers remain.
+The original driver selects that account's personal workspace without restoring
+the prior workspace selection. It retains its existing temporary Profile/model
+cleanup and does not change credential values or scopes. Manual Factory runs
+also require the explicit `factory_acceptance` input.
+
+Read the native and Factory reports together. The native report's remaining
+evidence list identifies coverage outside that driver; a separate Factory
+receipt can satisfy that item. Neither report certifies production-store
+canaries, PostHog absence, or arbitrary screenshots/checkpoints/templates.
+The production-canary option currently returns a concrete change/cleanup plan
+before account access and is blocked pending the review required by #1712 for
+production credential changes. No production Secret Store write is hidden in
+these acceptance jobs.
 
 ## Evidence required before completion
 

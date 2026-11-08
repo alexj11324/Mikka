@@ -69,9 +69,10 @@ function requestTarget(claims: EgressCapabilityClaims, input: EgressHttpRequest)
     || input.path.length > 8 * 1024 || !input.path.startsWith('/') || input.path.startsWith('//')
     || /[\\#\s]/u.test(input.path) || hasControl(input.path)) throw egressError('invalid_request')
   const pathname = input.path.split('?')[0]
-  // Encoded routing characters and dot segments can be interpreted differently
-  // by upstream routers. Version 1 supports unencoded paths and normal queries.
-  if (pathname.includes('%') || pathname.includes('//') || pathname.split('/').some(part => part === '.' || part === '..'))
+  // Upstreams may strip semicolon path parameters before normalizing dot
+  // segments: /v1/..;/admin must not bypass an approved /v1 prefix. Version 1
+  // supports unencoded paths without matrix parameters and normal queries.
+  if (pathname.includes('%') || pathname.includes(';') || pathname.includes('//') || pathname.split('/').some(part => part === '.' || part === '..'))
     throw egressError('destination_denied')
   const url = new URL(input.path, claims.http.origin)
   if (url.protocol !== 'https:' || url.origin !== claims.http.origin || `${url.pathname}${url.search}` !== input.path

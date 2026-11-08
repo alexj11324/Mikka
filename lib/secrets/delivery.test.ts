@@ -62,7 +62,8 @@ test('protected policy is constrained to HTTPS origin, safe header and bounded m
     assert.equal(secretHttpPolicy.safeParse({ ...http, origin }).success, false, origin)
   }
   for (const path of ['', '//evil.example/path', '/v1/../admin', '/v1/./admin', '/v1/%2e%2e/admin',
-    '/v1/%252fadmin', '/v1?key=secret', '/v1#frag', '/v1\\admin', '/v1\nadmin', '/v1 admin']) {
+    '/v1/%252fadmin', '/v1/..;/admin', '/v1/.;/admin', '/v1/items;kind=admin',
+    '/v1?key=secret', '/v1#frag', '/v1\\admin', '/v1\nadmin', '/v1 admin']) {
     assert.equal(secretHttpPolicy.safeParse({ ...http, rules: [{ method: 'GET', path, match: 'prefix' }] }).success, false, path)
   }
   for (const invalid of [{ header: 'cookie' }, { prefix: 'Bearer \r\nX-Other: value' }, { rules: [] },

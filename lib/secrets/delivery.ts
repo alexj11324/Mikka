@@ -12,10 +12,10 @@ const origin = z.string().max(2048).refine(value => {
 }, 'an HTTPS origin without credentials, path, query or fragment is required').transform(value => new URL(value).origin)
 
 const path = z.string().min(1).max(2048).refine(value => {
-  if (!value.startsWith('/') || value.startsWith('//') || /[\\%?#\s]/u.test(value)
+  if (!value.startsWith('/') || value.startsWith('//') || /[\\%;?#\s]/u.test(value)
     || Array.from(value).some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) return false
   return !value.split('/').some(part => part === '.' || part === '..')
-}, 'an absolute path without encoding, dot segments, query or fragment is required')
+}, 'an absolute path without encoding, matrix parameters, dot segments, query or fragment is required')
 
 export const secretHttpPolicy = z.object({
   origin,

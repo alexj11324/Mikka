@@ -77,6 +77,23 @@ test('origin, path and method cannot be widened by URL parsing or a prefix colli
   assert.equal(f.targets[0].url.search, '?cursor=a%2Fb')
 })
 
+test('matrix parameters and URL-normalized paths cannot escape an approved prefix; query parameters remain supported', async () => {
+  const broadPrefix = issueEgressCapability({ ...grantInput, http: { ...grantInput.http,
+    rules: [{ method: 'GET', path: '/v1', match: 'prefix' }],
+  } }, now, env).capability
+  const f = fixture()
+  for (const path of ['/v1/..;/admin', '/v1/.;/admin', '/v1/items;kind=admin',
+    '/v1//admin', '/v1/./admin', '/v1/items/../admin', '/v1/全角', '/v1/．．/admin',
+    '/v1/%2fadmin', '/v1/%252e%252e/admin']) {
+    await assert.rejects(f.run({ ...request, capability: broadPrefix, path }), reason('destination_denied'), path)
+  }
+  assert.deepEqual(f.hosts, [], 'refuse before DNS lookup')
+  assert.equal(f.targets.length, 0, 'no credential-bearing transport is started')
+  await f.run({ ...request, capability: broadPrefix, path: '/v1/items?filter=a;b&cursor=%E4%B8%AD%E6%96%87' })
+  assert.equal(f.targets[0].url.pathname, '/v1/items')
+  assert.equal(f.targets[0].url.search, '?filter=a;b&cursor=%E4%B8%AD%E6%96%87')
+})
+
 test('authentication, host, proxy, cookie and duplicate headers cannot enter the upstream request', async () => {
   const f = fixture()
   for (const name of ['authorization', 'AUTHORIZATION', 'x-api-key', 'api-key', 'x-goog-api-key', 'host', 'cookie', 'proxy-authorization', 'x-forwarded-host', 'content-length', 'transfer-encoding', 'connection', 'accept-encoding'])

@@ -44,7 +44,7 @@ interface ChildCapture {
   body: string
 }
 
-const SDK_CHILD = `
+const HTTP_CHILD = `
 const endpoints = JSON.parse(process.env.MIKKA_SECRET_ENDPOINTS);
 const response = await fetch(endpoints.SERVICE_API_KEY + '/v1/widgets', {
   method: 'POST',
@@ -54,10 +54,10 @@ const response = await fetch(endpoints.SERVICE_API_KEY + '/v1/widgets', {
 process.stdout.write(JSON.stringify({ env: { ...process.env }, status: response.status, body: await response.text() }));
 `
 
-async function sdkChild(options: StartOptions): Promise<ChildCapture> {
+async function httpChild(options: StartOptions): Promise<ChildCapture> {
   // Use the real supervisor's complete child environment. Filtering it here
   // would conceal a runtime leak; the only addition is the public SDK dummy.
-  const { stdout, stderr } = await execute(process.execPath, ['--input-type=module', '-e', SDK_CHILD], {
+  const { stdout, stderr } = await execute(process.execPath, ['--input-type=module', '-e', HTTP_CHILD], {
     cwd: options.cwd,
     env: { ...options.env, SDK_KEY: 'mikka-protected' },
     encoding: 'utf8', timeout: 10_000, maxBuffer: 256 * 1024,
@@ -123,11 +123,11 @@ it('a real supervisor child uses renewed opaque grants while native credentials 
   })) vi.stubEnv(name, value)
   const parentEnv = { ...process.env }
   const root = tempDir('task-secret-child-')
-  const repo = { repoId: 'repo', name: 'SDK fixture', path: await makeRepo() }
+  const repo = { repoId: 'repo', name: 'HTTP-client fixture', path: await makeRepo() }
   const server = new MemoryServer('device')
   server.addRepo('device', repo)
   const runId = server.queueRun('device', { issueId: 'issue', repoId: repo.repoId, baseBranch: 'main', harness: 'mock',
-    prompt: 'Exercise the protected third-party SDK.', taskSecrets: access,
+    prompt: 'Exercise the protected third-party HTTP client.', taskSecrets: access,
     modelCredential: { kind: 'api_key', key: nativeModel },
     github: { endpoint: 'https://mikka.invalid/api/runs/github-token', repository: 'owner/repo', token: nativeGit, expiresAt: null },
   })
@@ -146,19 +146,19 @@ it('a real supervisor child uses renewed opaque grants while native credentials 
   const start = async (options: StartOptions): Promise<AgentSession> => {
     starts.push(options)
     try {
-      const first = await sdkChild(options)
+      const first = await httpChild(options)
       captures.push(first)
       firstChild.resolve(first)
       await continueRun.promise
-      captures.push(await sdkChild(options))
-      return { sessionId: 'real-sdk-child',
-        async *events() { yield { type: 'exit', outcome: 'succeeded', report: { summary: 'Protected child SDK accepted.' } } },
+      captures.push(await httpChild(options))
+      return { sessionId: 'real-http-child',
+        async *events() { yield { type: 'exit', outcome: 'succeeded', report: { summary: 'Protected child HTTP client accepted.' } } },
         async send() {}, async cancel() {},
       }
     } catch (error) { firstChild.reject(error); throw error }
   }
   const adapter: AgentAdapter = { harness: 'mock', capabilities: { supportsResume: false, supportsInterject: false },
-    envAllow: [], start, async resume() { throw new Error('A fresh SDK fixture must not resume') },
+    envAllow: [], start, async resume() { throw new Error('A fresh HTTP-client fixture must not resume') },
   }
   const supervisor = new RunSupervisor({ journal, outbox, log, adapterStateDir: join(root, 'adapters'),
     worktrees: new WorktreeManager(join(root, 'worktrees')), adapters: new Map([['mock', adapter]]),
@@ -166,7 +166,7 @@ it('a real supervisor child uses renewed opaque grants while native credentials 
   })
   cleanups.push(async () => { continueRun.resolve(); await supervisor.stop(); await outbox.close() })
   supervisor.start(assignment)
-  await Promise.race([firstChild.promise, supervisor.idle().then(() => { throw new Error('Run ended before the SDK child reported its environment') })])
+  await Promise.race([firstChild.promise, supervisor.idle().then(() => { throw new Error('Run ended before the HTTP child reported its environment') })])
   const beforeRenewal = readFileSync(file, 'utf8')
   expect(supervisor.heartbeatRuns().find(run => run.runId === runId)?.secretCapabilities).toEqual([initialCapability])
   const renewed = taskSecretAccessSchema.parse({ ...access, grants: [{ ...access.grants[0], capability: renewedCapability,
@@ -190,7 +190,7 @@ it('a real supervisor child uses renewed opaque grants while native credentials 
     expect(capture.env.MIKKA_SECRET_ENDPOINTS).toBe(starts[0].taskSecretEnv?.MIKKA_SECRET_ENDPOINTS)
     expect(Object.keys(capture.env).filter(name => /SECRET|(?:TOKEN|API_KEY)$/.test(name))).toEqual(['MIKKA_SECRET_ENDPOINTS'])
     for (const hidden of [canary, initialCapability, renewedCapability, nativeModel, nativeGit])
-      expect(JSON.stringify(capture).includes(hidden), 'The SDK child received a hidden credential').toBe(false)
+      expect(JSON.stringify(capture).includes(hidden), 'The HTTP child received a hidden credential').toBe(false)
   }
   expect(egressCalls.map(call => call.capability)).toEqual([initialCapability, renewedCapability])
   expect(providerCalls).toEqual(Array.from({ length: 2 }, () => ({ authorization: `Bearer ${canary}`, body: '{"source":"real-node-child"}' })))
