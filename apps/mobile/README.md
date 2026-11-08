@@ -159,6 +159,10 @@ revision. See [mobile UI slots](../../docs/ui-overlay.md).
 
 ### Native iOS build and TestFlight submission
 
+`existing_build_id` recovery accepts builds from the `production` profile.
+The `hosted-production` path creates and submits a build with its verified private
+UI archive in the same workflow run.
+
 `.github/workflows/mobile-native.yml` uses EAS CLI 27.2.0 with the production
 profiles in `eas.json`. It runs on main changes to `app.json`, `app.config.ts`
 or `eas.json` under `apps/mobile`, or through `workflow_dispatch` on main.
