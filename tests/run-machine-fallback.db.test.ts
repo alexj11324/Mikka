@@ -265,7 +265,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     return { botId, cloudDevice }
   }
 
-  for (const profileMode of ['default', 'inherit', 'fixed'] as const) await t.test(`${profileMode} startup recovery keeps its role and tries the next runnable local model`, async () => {
+  for (const profileMode of ['default', 'inherit', 'fixed'] as const) await t.test(`${profileMode} startup recovery keeps its role and credential model despite a different local shortcut report`, async () => {
     const who = await person(`profile-startup-${profileMode}`)
     await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [who.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 701 + ['default', 'inherit', 'fixed'].indexOf(profileMode) } } })])
     const { botId } = await cloudReady(who)
@@ -283,9 +283,9 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const original = await resolveModelDispatch(pool, dispatchScope, null, 'cloud', undefined, { bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
     assert.equal(original.kind, 'cloud'); if (original.kind !== 'cloud') assert.fail('fixture cloud target')
     const exact = await resolveModelDispatch(pool, dispatchScope, null, undefined, undefined, { withoutCloud: true, exactEntry: original.entry, bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
-    assert.equal(exact.kind, 'none', 'the old exact-source recovery cannot run cloud-only model A locally')
+    assert.equal(exact.kind === 'device' && exact.model, 'gpt-5', 'an eligible local Agent can run the exact authorized cloud model')
     const preferred = await resolveModelDispatch(pool, dispatchScope, null, undefined, undefined, { withoutCloud: true, bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
-    assert.equal(preferred.kind === 'device' && preferred.model, 'gpt-5-local', 'the existing preferred order admits local model B')
+    assert.equal(preferred.kind === 'device' && preferred.model, 'gpt-5', 'the first credential model remains preferred locally')
     const profiles = await import('../lib/factory/agent-profile')
     let profileId: string | undefined
     if (profileMode !== 'default') {
@@ -298,15 +298,12 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const sourceEventId = randomUUID()
     await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"deliveredAt") VALUES ($1::uuid,$2,$3,'user_message',$1::text,$4,now())`, [sourceEventId, who.id, botId, JSON.stringify({ text: 'Run the recovery role.', ...(profileId ? { profileId } : {}) })])
     const result = await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', profileId, sourceEventId, requestKey: `startup:${randomUUID()}` }, undefined, botId) as unknown as { runId?: string; error?: string; fallback?: string }
-    if (profileMode === 'fixed') {
-      assert.equal(result.error, 'machineUnavailable', JSON.stringify(result))
-      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1 AND "deviceId"=$2`, [who.id, deviceId])).rows[0].n, 0)
-    } else {
+    {
       assert.ok(result.runId, JSON.stringify(result)); assert.equal(result.fallback, 'cloudUnavailable')
       const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [result.runId])).rows[0]
-      assert.equal(run.deviceId, deviceId); assert.equal(run.agentDefinition.model, 'gpt-5-local')
+      assert.equal(run.deviceId, deviceId); assert.equal(run.agentDefinition.model, 'gpt-5')
       assert.equal(run.agentDefinition.agentProfile.profileId, profileId ?? 'default')
-      assert.equal(run.agentDefinition.agentProfile.targetEntry.model, 'gpt-5-local')
+      assert.equal(run.agentDefinition.agentProfile.targetEntry.model, 'gpt-5')
       assert.deepEqual(run.agentDefinition.agentProfile.targetEntry, run.agentDefinition.modelDispatch.entry)
       assert.equal(run.agentDefinition.profileOriginRunId, undefined)
       const source = await pool.query('SELECT "connectionId" FROM byos_bindings WHERE id=$1', [run.agentDefinition.subscription.bindingId])
@@ -319,8 +316,8 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const tasks = (await pool.query(`SELECT t.id,t."sourceEventId",t.status,a."runId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE t."userId"=$1 AND t."issueId"=$2`, [who.id, who.issueId])).rows
     assert.equal(tasks.length, 1, 'startup recovery keeps the original Factory task')
     assert.equal(tasks[0].sourceEventId, sourceEventId, 'it never manufactures a replacement user request')
-    assert.equal(tasks[0].status, profileMode === 'fixed' ? 'blocked' : 'running')
-    if (profileMode !== 'fixed') {
+    assert.equal(tasks[0].status, 'running')
+    {
       assert.equal(tasks[0].runId, result.runId)
       const ancestry = (await pool.query('SELECT "continuesRunId","sessionId" FROM agent_runs WHERE id=$1', [result.runId])).rows[0]
       const failedCloud = (await pool.query(`SELECT r.id FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [who.id])).rows[0]

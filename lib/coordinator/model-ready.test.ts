@@ -12,6 +12,10 @@ let fallback: { key: UsableApiKey; model: string } | null = null
 const scopes: Array<{ ownerId: string; workspaceId: string }> = []
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: { query: async (sql: string, args: unknown[]) => {
   assert.match(sql, /^SELECT /, 'readiness never writes a default or clones a binding')
+  if (sql.includes("to_jsonb(u)->>'hostedModelEnabled'")) {
+    assert.deepEqual(args, ['alice'])
+    return { rows: [{ enabled: true }] }
+  }
   assert.deepEqual(args, ['alice', workspaceId, botId])
   return { rows: selected === undefined ? [] : [{ bindingId: selected }] }
 } } } })
@@ -33,7 +37,7 @@ mock.module(new URL('../quota-fallback.ts', import.meta.url).href, { namedExport
 // The existing core hosted ledger admits an unmetered community default;
 // readiness must still reject that default when no provider is configured.
 mock.module(new URL('../points-fallback.ts', import.meta.url).href, { namedExports: {
-  hostedPointsRefusal: async () => null, pointsFallback: async () => { throw new Error('unexpected points fallback') },
+  hostedPointsRefusal: async () => null, pointsFallback: async () => null,
 } })
 let botModelReady: typeof import('./model-ready')['botModelReady']
 before(async () => { process.env.MIKKA_EDITION = 'community'; ({ botModelReady } = await import('./model-ready')) })

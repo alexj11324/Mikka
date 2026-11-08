@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
@@ -74,4 +75,62 @@ test('routing settings default on, preserve saved lists and isolate owner/worksp
   assert.deepEqual(retained.entries, customized.entries, 'toggle never rewrites or expands a customized list')
   await assert.rejects(changeOrder(pool, scope, { kind: 'autoRouting', enabled: 'false' as unknown as boolean }))
   assert.equal((await readOrder(pool, scope, candidates)).autoModelRouting, true)
+})
+
+
+test('enabled-model backfill preserves deletion fences and supports split app databases', { skip: !dbUrl }, async t => {
+  const { Pool } = await import('pg')
+  const migration = await readFile(new URL('../drizzle/20261108120101_enabled_models.sql', import.meta.url), 'utf8')
+  const guardMigration = await readFile(new URL('../drizzle/20261031050732_workspace_deletion_guards.sql', import.meta.url), 'utf8')
+  for (const guarded of [true, false]) await t.test(guarded ? 'retained guarded subscriptions' : 'no workspace guard table', async t => {
+    const pool = new Pool({ connectionString: dbUrl, max: 1 }), client = await pool.connect()
+    const schema = 'enabled_models_' + randomUUID().replaceAll('-', '')
+    t.after(async () => {
+      try {
+        await client.query('RESET search_path')
+        await client.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`)
+      } finally { client.release(); await pool.end() }
+    })
+    await client.query(`CREATE SCHEMA "${schema}"`)
+    // No public fallback: the split-database case must really lack the guard table.
+    await client.query(`SET search_path TO "${schema}"`)
+    await client.query(`CREATE TABLE byos_connections(id uuid PRIMARY KEY,"workspaceId" text NOT NULL,"modelCatalog" jsonb,"modelSettings" jsonb);
+      CREATE TABLE byos_bindings("connectionId" uuid,"modelId" text);
+      CREATE TABLE model_api_keys(id uuid PRIMARY KEY,"ownerId" text,models jsonb,"modelsError" text);
+      CREATE TABLE "user"(id text PRIMARY KEY);`)
+    const ordinary = randomUUID(), fenced = randomUUID(), retained = randomUUID(), ordinaryWorkspace = randomUUID(), fencedWorkspace = randomUUID()
+    const retainedSettings = { autoEnable: false, models: { 'retained-original': { enabled: false, manual: true } } }
+    await client.query(`INSERT INTO byos_connections VALUES($1,$2,'{"models":["ordinary-original"]}',NULL),
+      ($3,$4,'{"models":["fenced-original"]}',NULL),($5,$4,'{"models":["retained-original"]}',$6)`,
+    [ordinary, ordinaryWorkspace, fenced, fencedWorkspace, retained, retainedSettings])
+    await client.query('INSERT INTO byos_bindings VALUES($1,$2)', [ordinary, 'ordinary-bound'])
+    const key = randomUUID()
+    await client.query(`INSERT INTO model_api_keys VALUES($1,'synthetic-owner','["key-original"]',NULL)`, [key])
+    await client.query(`INSERT INTO "user" VALUES('synthetic-owner')`)
+    if (guarded) {
+      await client.query(guardMigration)
+      await client.query('INSERT INTO account_deletion_workspace_guards VALUES($1,$2)', [fencedWorkspace, randomUUID()])
+    }
+    // The production executor sends each file as one query, not one transaction per statement.
+    await client.query(migration)
+    const rows = (await client.query('SELECT id,"modelSettings" AS settings FROM byos_connections')).rows
+    const settings = (id: string) => rows.find(row => row.id === id)?.settings
+    assert.equal(settings(ordinary).autoEnable, true)
+    assert.deepEqual(Object.keys(settings(ordinary).models).sort(), ['ordinary-bound', 'ordinary-original'])
+    if (guarded) {
+      assert.equal(settings(fenced), null)
+      assert.deepEqual(settings(retained), retainedSettings)
+      await assert.rejects(client.query('UPDATE byos_connections SET "modelSettings"=$2 WHERE id=$1', [fenced, {}]), { code: '55000' })
+      assert.equal((await client.query('SELECT count(*)::int AS n FROM account_deletion_workspace_guards')).rows[0].n, 1)
+    } else {
+      assert.equal(settings(fenced).models['fenced-original'].enabled, true)
+      assert.equal((await client.query("SELECT to_regclass('account_deletion_workspace_guards') AS guard")).rows[0].guard, null)
+    }
+    await client.query(`UPDATE model_api_keys SET models='["key-original","key-new"]' WHERE id=$1`, [key])
+    const savedKey = (await client.query('SELECT "modelSettings" AS settings FROM model_api_keys WHERE id=$1', [key])).rows[0].settings
+    assert.equal(savedKey.models['key-original'].enabled, true)
+    assert.equal(savedKey.models['key-new'].enabled, false)
+    assert.equal(savedKey.models['key-new'].fresh, true)
+    assert.equal((await client.query('SELECT "hostedModelEnabled" AS enabled FROM "user"')).rows[0].enabled, true)
+  })
 })

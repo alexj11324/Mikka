@@ -744,3 +744,22 @@ test('large runtime reports cross jobs only as immutable artifact files', () => 
   assert.match(web, /name: Require one immutable runtime release artifact reference\n        if: inputs\.runtime-refresh == true/)
   assert.match(web, /name: Download the complete verified runtime release report\n        if: inputs\.runtime-refresh == true/)
 })
+
+test('duplicate required step cannot hide a failure or pending record behind one success', async () => {
+  const outcomes = []
+  for (const duplicate of [
+    { status: 'completed', conclusion: 'failure' },
+    { status: 'pending', conclusion: null },
+  ]) {
+    const job = buildJob()
+    job.steps.push({ ...job.steps[1], ...duplicate })
+    const fixture = webFixture({ job })
+    const result = await fixture.run().then(() => 'accepted', error => error.message)
+    outcomes.push({ status: duplicate.status, result, elapsed: fixture.elapsed(),
+      publicReads: fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length })
+  }
+  assert.deepEqual(outcomes, [
+    { status: 'completed', result: 'webDeploy:matchingWebBuildSkippedOrIncomplete', elapsed: 0, publicReads: 0 },
+    { status: 'pending', result: 'webDeploy:matchingWebBuildSkippedOrIncomplete', elapsed: 0, publicReads: 0 },
+  ])
+})

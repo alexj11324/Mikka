@@ -23,6 +23,14 @@ on:
       - 'scripts/e2b/validate-template-subscriptions.mjs'
       - 'scripts/e2b/cleanup-template-candidates.py'
       - 'scripts/e2b/runtime-report.mjs'
+      - 'scripts/e2b/acceptance-daemon.mts'
+      - 'scripts/e2b/acceptance-bootstrap.mts'
+      - 'lib/captures/bootstrap-evidence.ts'
+      - 'app/api/runs/[runId]/evidence/route.ts'
+      # The wildcard also matches Next route brackets as literal directory names.
+      - 'app/api/runs/**/evidence/route.ts'
+      - 'lib/computer/claude-startup-hint.ts'
+      - 'lib/computer/codex-startup-hint.ts'
       - 'scripts/acceptance/cloud-startup.mjs'
       - 'scripts/acceptance/cloud-startup.test.mjs'
       - 'scripts/acceptance/cloud-startup-evidence.mjs'
@@ -66,8 +74,10 @@ jobs:
           node-version: 24
       - name: Install only the offline gate test dependencies
         run: |
-          npm install --prefix "$RUNNER_TEMP/runtime-gate-tests" --ignore-scripts --no-audit --no-fund 'tsx@4.23.15' '@opentelemetry/sdk-trace-base@2.12.0'
+          npm install --prefix "$RUNNER_TEMP/runtime-gate-tests" --ignore-scripts --no-audit --no-fund 'tsx@4.23.15' '@opentelemetry/sdk-trace-base@2.12.0' 'zod@4.6.7'
           ln -s "$RUNNER_TEMP/runtime-gate-tests/node_modules" node_modules
+          mkdir -p node_modules/@mikka
+          ln -s "$GITHUB_WORKSPACE/packages/protocol" node_modules/@mikka/protocol
       - run: node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
       - run: python3 scripts/e2b/official-files.test.py

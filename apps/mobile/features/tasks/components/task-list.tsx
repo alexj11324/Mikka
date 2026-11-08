@@ -14,7 +14,7 @@ import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { tasksLive } from '@/lib/live-keys'
 import { useHome } from '@/lib/home'
 import { tap } from '@/lib/haptics'
-import { colors, LIST_INSET, ROW_SURFACE_INSET } from '@/lib/theme'
+import { colors, LIST_INSET, ROW_SURFACE_INSET, SPACE } from '@/lib/theme'
 import { rowState, taskListRows, type TaskFilter, type TaskListRow } from '../model/task-groups'
 import { BOARD_LABEL, GROUP_LABEL, STATE_LABEL, TaskGroupIcon, TaskStateIcon } from './task-icons'
 
@@ -58,7 +58,8 @@ export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFi
   )
 }
 
-/** A group's bar: grey and rounded, its icon, name and count; a tap folds or opens it. */
+/** A group's header (Comma 15): its icon, name and count in the secondary colour on the page, no fill (Alex 2026-11-08:
+ * no grey slabs), lined up with the rows' icons; a tap folds or opens it. */
 export function TaskGroupBar({ id, count, folded, onToggle }: { id: TaskGroup; count: number; folded: boolean; onToggle: () => void }) {
   const Chevron = folded ? ChevronRight : ChevronDown
   return (
@@ -98,14 +99,16 @@ export function TaskRowView({ task }: { task: Task }) {
   )
 }
 
+/** A group bar adds only what the rows' own 15 pt padding leaves: 30 pt from the last row's text to the next bar, and
+ * the first row's padding alone (about 12–15 pt) under the bar. */
 const styles = StyleSheet.create({
   center: { paddingTop: 40, alignItems: 'center' },
   empty: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 36, marginHorizontal: ROW_SURFACE_INSET, marginTop: 12, marginBottom: 2, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous', backgroundColor: colors.bubble },
-  barTitle: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.text },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, marginHorizontal: ROW_SURFACE_INSET, marginTop: SPACE.section - SPACE.rowY, marginBottom: 0, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
+  barTitle: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.secondary },
   barCount: { fontSize: 15, lineHeight: 20, color: colors.secondary, fontVariant: ['tabular-nums'] },
   fill: { flex: 1 },
-  row: { justifyContent: 'center', gap: 2, minHeight: 48, paddingVertical: 8, marginHorizontal: ROW_SURFACE_INSET, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
+  row: { justifyContent: 'center', gap: SPACE.lineGap, minHeight: SPACE.rowMin, paddingVertical: SPACE.rowY, marginHorizontal: ROW_SURFACE_INSET, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
   line: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   key: { fontSize: 14, color: colors.secondary, fontVariant: ['tabular-nums'] },
   title: { flex: 1, minWidth: 0, fontSize: 16, lineHeight: 21 },
