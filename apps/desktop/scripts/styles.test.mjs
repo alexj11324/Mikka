@@ -19,6 +19,6 @@ test('the native shared palette retains the web build color space for neutral co
   assert.equal(declarations.get(':root/--sidebar'), 'lab(98.26% 0 0)')
   assert.equal(declarations.get('.dark/--sidebar-primary'), 'lab(36.9089% 35.0961 -85.6872)')
   assert.equal(declarations.get('.dark/--sidebar'), 'lab(1.3738% 0 0)')
-  assert.match(declarations.get(':root/--sidebar-primary-soft'), /color-mix\(in oklch,\s*var\(--sidebar-primary\)\s*15%,\s*var\(--sidebar\)\)/)
-  assert.match(declarations.get('.dark/--sidebar-primary-soft'), /color-mix\(in oklch,\s*var\(--sidebar-primary\)\s*40%,\s*var\(--sidebar\)\)/)
+  assert.match(declarations.get(':root/--sidebar-primary-soft'), /color-mix\(in oklab,\s*var\(--sidebar-primary\)\s*15%,\s*var\(--sidebar\)\)/)
+  assert.match(declarations.get('.dark/--sidebar-primary-soft'), /color-mix\(in oklab,\s*var\(--sidebar-primary\)\s*40%,\s*var\(--sidebar\)\)/)
 })

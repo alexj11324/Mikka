@@ -885,6 +885,8 @@
     "sandboxUsernsSpec": "Ubuntu 对这项设置的说明",
     "sandboxDetail": "错误：{detail}",
     "sandboxFix": "修复方法",
+    "noAgentYet": "还没装 Agent",
+    "howToInstall": "怎么装",
     "installAgent": "安装方法",
     "copyInstall": "复制 {command}",
     "commands": {
@@ -2526,6 +2528,8 @@
       "byBot": "按 Bot",
       "byMember": "按成员",
       "exportCsv": "导出 CSV",
+      "runs": "运行次数",
+      "runsPerDay": "每天的运行次数",
       "threads": "新线程",
       "runTime": "运行时长",
       "runSeconds": "运行秒数",
@@ -2559,6 +2563,7 @@
     },
     "billing": {
       "loading": "正在加载计费",
+      "loadFailed": "读不到计费信息",
       "plan": "方案",
       "team": "Team",
       "free": "免费",
@@ -4204,6 +4209,7 @@
       "groupChats": "群聊"
     },
     "newTask": "新建任务",
+    "reviewTask": "审阅 {identifier}",
     "newConversation": "新对话",
     "openList": "展开 Bot 列表",
     "back": "后退",
@@ -4233,6 +4239,7 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
+      "overview": "概览",
       "allThreads": "全部线程",
       "allThreadsWaiting": "全部线程，{count} 条等你",
       "tabs": "右栏内容",
@@ -5740,6 +5747,20 @@
       "failed": "操作失败，请重试"
     }
   },
+  "HostedConnections": {
+    "appsTitle": "应用",
+    "appsNote": "你已连接的应用。Bot 只能在你开启时使用它们。",
+    "addMore": "在插件中添加",
+    "emptyNote": "在插件中连接 GitHub、Linear、Slack 等应用后，会在这里出现。",
+    "state": {
+      "on": "已开启",
+      "off": "已停用",
+      "expired": "需要重新连接",
+      "connected": "已连接",
+      "paused": "已暂停",
+      "pending": "读取中"
+    }
+  },
   "HostedSettings": {
     "back": "返回",
     "general": {
@@ -5787,6 +5808,14 @@
       "providerOn": "{on}/{total} 个可用",
       "firstModel": "任务先用",
       "keyProvider": "服务商"
+    }
+  },
+  "CodeReview": {
+    "summary": {
+      "pr": "PR #{number}",
+      "files": "{count} 个文件 +{additions} −{deletions}",
+      "failed": "⚠ {count} 项检查失败",
+      "running": "运行中"
     }
   }
 }

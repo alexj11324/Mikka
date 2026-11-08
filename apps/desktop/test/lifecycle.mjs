@@ -155,7 +155,17 @@ async function selectFixture(page) {
   await page.waitForFunction(() => document.documentElement.lang === 'en' || document.documentElement.lang === 'zh-CN')
   const locale = await page.evaluate(() => document.documentElement.lang)
   await page.getByRole('button', { name: menuNames[locale], exact: true }).first().click()
-  await page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true }).click()
+  const item = page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true })
+  if (await item.getAttribute('aria-current') === 'true') await item.click()
+  else {
+    // The switch action assigns a new document after its async write/cache clear,
+    // even at the same URL. Arm its fresh load before the click; the old document
+    // can still satisfy the chat locators while that navigation is pending.
+    await Promise.all([
+      page.waitForEvent('domcontentloaded', { timeout: 60_000 }),
+      item.click(),
+    ])
+  }
   await usable(page)
   return locale
 }
