@@ -66,6 +66,7 @@ stub('./service.ts', {
   agentKitEnabled: () => { flagReads++; return enabled },
   agentKitDefaults: () => definition,
   agentScope: async (...args: unknown[]) => { calls.push({ name: 'scope', args }); return scope },
+  agentScopeWithBotMetadata: async (...args: unknown[]) => { calls.push({ name: 'scope', args }); return {scope,bot:{name:'synthetic',coordinator:true}} },
   agentKitStore: {
     beginExecution: (...args: Parameters<AgentKitStore['beginExecution']>) => fixture.store.beginExecution(...args),
     finishExecution: (...args: Parameters<AgentKitStore['finishExecution']>) => fixture.store.finishExecution(...args),
@@ -75,7 +76,7 @@ stub('./service.ts', {
 })
 stub('../bot-model-selection.ts', { freezeBotModel: async () => { resolutions++; return runtime } })
 stub('../subscription-runtime.ts', { authorizeSubscriptionWorkspace: forbidden, subscriptionRuntime: forbidden })
-stub('../coordinator/bot-instructions.ts', { botInstructions: async () => host })
+stub('../coordinator/bot-instructions.ts', { botInstructions: async () => host, formatBotInstructions: () => host })
 stub('../coordinator/instructions.ts', { COORDINATOR_INSTRUCTIONS: 'synthetic host' })
 stub('../coordinator/native-prompt.ts', { personalCoordinatorInstructions: () => 'synthetic native' })
 stub('../plugins/runtime.ts', { personalPlugins: { snapshot: async () => { plugins++; return { servers: [], skills: [] } } } })

@@ -6,20 +6,30 @@ import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import type { CredentialScope } from '../packages/daemon/src/subscription-worker-client'
 import { currentSubscriptionWorkerTiming } from '../packages/daemon/src/subscription-worker-timing'
 
+// Only an authorized connected row without a published projection may use the
+// existing custody migration. A rejected lookup is never a preparation hint.
+export class AccessProjectionMissing extends CodedError {
+  constructor() { super('subscription_access_unavailable', { detail: 'projection_missing' }) }
+}
+
 export async function authorizedAccessName(database: Pick<Pool, 'query'>, scope: CredentialScope, use: { bindingId: string; consumerId: string; runId?: string }, revision: unknown,
-  member: (userId: string, workspaceId: string) => Promise<void> = async () => { throw new Error('subscription_access_unavailable') }): Promise<string> {
+  member: (userId: string, workspaceId: string) => Promise<void> = async () => { throw new Error('subscription_access_unavailable') }, allowMissingProjection = false): Promise<string> {
   const timingDone = currentSubscriptionWorkerTiming()?.phase('parentAccessAuthority')
   try {
     if (!Number.isSafeInteger(revision) || Number(revision) < 1) throw new Error('subscription_access_unavailable')
-    const { rows } = await database.query(`select c."accessSecretName",b."workspaceId",(select r."userId" from agent_runs r where r.id=$8) as "runOwner" from byos_connections c join byos_bindings b on b."connectionId"=c.id where c.id=$1 and c."ownerId"=$2 and c."workspaceId"=$3 and c.provider=$4 and c.epoch=$5 and c.state in ('connected','refreshing','publication_pending') and b.id=$6 and b."ownerId"=$2 and b."consumerId"=$7 and b."connectionRevision"=$5 and ($8::uuid is null or exists(select 1 from agent_runs r join byos_native_runs n on n."runId"=r.id where r.id=$8 and ${runMayUseCredentialSql('$2', 'r."userId"', 'b."workspaceId"')} and r."agentId"::text=$7 and n."bindingId"=b.id and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null))`, [scope.connectionId, scope.ownerId, scope.workspaceId, scope.provider, revision, use.bindingId, use.consumerId, use.runId ?? null])
-    const name = rows[0]?.accessSecretName
-    if (typeof name !== 'string') throw new Error('subscription_access_unavailable')
+    const { rows } = await database.query(`select c."accessSecretName"${allowMissingProjection ? ',c.state' : ''},b."workspaceId",(select r."userId" from agent_runs r where r.id=$8) as "runOwner" from byos_connections c join byos_bindings b on b."connectionId"=c.id where c.id=$1 and c."ownerId"=$2 and c."workspaceId"=$3 and c.provider=$4 and c.epoch=$5 and c.state in ('connected','refreshing','publication_pending') and b.id=$6 and b."ownerId"=$2 and b."consumerId"=$7 and b."connectionRevision"=$5 and ($8::uuid is null or exists(select 1 from agent_runs r join byos_native_runs n on n."runId"=r.id where r.id=$8 and ${runMayUseCredentialSql('$2', 'r."userId"', 'b."workspaceId"')} and r."agentId"::text=$7 and n."bindingId"=b.id and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null))`, [scope.connectionId, scope.ownerId, scope.workspaceId, scope.provider, revision, use.bindingId, use.consumerId, use.runId ?? null])
+    const row = rows[0]
+    if (!row) throw new Error('subscription_access_unavailable')
+    const name = row.accessSecretName
+    if (typeof name !== 'string' && !allowMissingProjection) throw new Error('subscription_access_unavailable')
     // A teammate's run on a shared subscription: both must still be active members (workspace database).
     const runOwner = rows[0].runOwner
     if (typeof runOwner === 'string' && runOwner !== scope.ownerId) {
       try { await member(runOwner, String(rows[0].workspaceId)); await member(scope.ownerId, String(rows[0].workspaceId)) }
       catch (error) { throw new CodedError('subscription_access_unavailable', { detail: 'member_inactive', cause: error }) }
     }
+    if (allowMissingProjection && row.state === 'connected' && (name === null || name === '')) throw new AccessProjectionMissing()
+    if (typeof name !== 'string') throw new Error('subscription_access_unavailable')
     return name
   } finally { timingDone?.() }
 }
