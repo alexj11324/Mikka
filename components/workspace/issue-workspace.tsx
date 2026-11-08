@@ -19,6 +19,9 @@ import type { LegacyChatRequest } from './legacy-chat-archive'
 import { TeamHome } from '@/components/teams/team-home'
 import { AppFrame, AppShellContent, SignOutBoundary, WindowBar } from '@/components/app-shell'
 import * as settingsFrameSlot from '@ui-slot/settings-frame'
+import * as reviewSummarySlot from '@ui-slot/review-summary'
+import { ReviewPage } from '@ui-slot/review-page'
+import { closeReview, openReview, useReviewPage } from '@/hooks/code-review/use-review-page'
 import { IssueList } from './issue-list'
 import { BoardPage } from './board-page'
 import { NewTaskDialog } from '@/components/coordinator/new-task-dialog'
@@ -102,6 +105,8 @@ const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module
 // OWN_SETTINGS_FRAME is optional (lib/ui-overlay.mjs UI_SLOT_EXPORTS): a layer without it keeps the workspace frame.
 const ownSettingsFrame = (settingsFrameSlot as { OWN_SETTINGS_FRAME?: boolean }).OWN_SETTINGS_FRAME === true
 const { SettingsFrame } = settingsFrameSlot
+// REVIEW_ENABLED is optional too: a layer without the review page (and the default) adds no ⌘⇧B and no 「审阅 #N」.
+const reviewEnabled = (reviewSummarySlot as { REVIEW_ENABLED?: boolean }).REVIEW_ENABLED === true
 const SettingsRouteContent = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsRouteContent), { loading: WorkspaceContentLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
@@ -527,6 +532,22 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // A task beside the centre (decision 2026-11-07-2045); not when the same task is the centre page.
   const taskShown = taskId && taskId !== selected ? taskId : null
   const rightTaken = browserShown || !!threadShown || !!threadsView || !!taskShown
+  // The task in front of the person, for ⌘⇧B and ⌘K 「审阅 #N」: the task beside the centre, the open thread's, else the task page.
+  const reviewTarget = taskShown ?? shownThread?.issueId ?? selected
+  const review = useReviewPage()
+  useEffect(() => {
+    if (!reviewEnabled || !reviewTarget) return
+    const target = reviewTarget
+    function shortcut(event: KeyboardEvent) {
+      if (event.isComposing || event.keyCode === 229 || inSettings.current) return
+      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.altKey || event.key.toLowerCase() !== 'b') return
+      if (document.querySelector('[role="dialog"][data-open], [role="alertdialog"][data-open]')) return
+      event.preventDefault()
+      openReview(target)
+    }
+    window.addEventListener('keydown', shortcut)
+    return () => window.removeEventListener('keydown', shortcut)
+  }, [reviewTarget])
   // On a phone the chat's pill sits in its header and opens the right column as a page over the chat (R-82).
   const chatHeading = isConversation ? <ConversationPillButton name={activeBot ? activeBot.name : i18nText('Nav.coordinator')} avatar={<BotAvatar {...(activeBot ? { id: activeBot.id, color: activeBot.color, shape: activeBot.shape } : COORDINATOR_AVATAR)} size="pill" />} onOpen={() => setPanelSheet(true)} />
     : groupPanel ? <ConversationPillButton name={groupPanel.title || i18nText('GroupChat.untitled')} avatar={<GroupPillAvatar id={groupPanel.id} title={groupPanel.title || i18nText('GroupChat.untitled')} />} onOpen={() => setPanelSheet(true)} /> : undefined
@@ -541,7 +562,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     <NewBotDialog open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />
     {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={coordinatorSummary?.line ? chatPreview(coordinatorSummary.line) ?? i18nText('Nav.cardPreview') : undefined} issues={tasks} projects={projects} threads={threads} onThread={runId => openThread(runId)} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}
+      reviewTaskId={reviewEnabled ? reviewTarget : null} onReview={reviewEnabled ? openReview : undefined}
       onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('projects'), issue: null, project: id }); setTeamId(null); setProjectId(id) }) }} />}
+    {/* One review page for the app (R1), whichever entry opened it; the default slot draws nothing. */}
+    {review.taskId && <ReviewPage taskId={review.taskId} onClose={closeReview} />}
   </>
   // Both Settings entry paths leave through the same mounted workspace shell.
   const leaveSettings = (destination: RailDestination) => {
