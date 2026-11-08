@@ -59,6 +59,48 @@ test('desktop account context reads only the current browser owner\'s active loc
   } finally { browserOwner = null }
 }))
 
+test('owner token pagination preserves microsecond ordering and rejects foreign or malformed anchors', () => run(async () => {
+  const { pool } = await import('./db')
+  const { GET } = await import('../app/api/device-tokens/route')
+  const owner = `pages-${randomUUID()}`, foreign = `foreign-${randomUUID()}`
+  const previousOwner = browserOwner
+  const request = (query = '') => new Request('http://localhost/mikka/api/device-tokens' + query)
+  try {
+    await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash",name,"createdAt","revokedAt")
+      SELECT gen_random_uuid(),$1,'hash-must-not-leak-' || $1 || n,'Fixture',
+        '2026-11-08T00:00:00Z'::timestamptz + (n % 3)*interval '1 microsecond',now()
+      FROM generate_series(1,263) n`, [owner])
+    const foreignId = randomUUID()
+    await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash",name) VALUES($1,$2,'foreign-hash','Foreign')`, [foreignId, foreign])
+    browserOwner = null
+    assert.equal((await GET(request())).status, 401)
+    browserOwner = owner
+    const found: string[] = [], pages: number[] = []
+    let cursor: string | null = null
+    do {
+      const response = await GET(request(cursor ? '?cursor=' + cursor : ''))
+      assert.equal(response.status, 200)
+      assert.equal(response.headers.get('Cache-Control'), 'private, no-store')
+      const page = await response.json()
+      assert.equal(JSON.stringify(page).includes('hash-must-not-leak'), false)
+      assert.ok(page.tokens.every((row: { name: string }) => row.name === 'Fixture'))
+      pages.push(page.tokens.length); found.push(...page.tokens.map((row: { id: string }) => row.id))
+      cursor = page.nextCursor
+    } while (cursor)
+    assert.deepEqual(pages, [100, 100, 63])
+    const expected = await pool.query('SELECT id FROM device_tokens WHERE "userId"=$1 ORDER BY "createdAt" DESC,id', [owner])
+    assert.deepEqual(found, expected.rows.map(row => row.id))
+    assert.equal(new Set(found).size, 263)
+    for (const query of ['?cursor=', '?cursor=not-a-uuid', '?cursor=' + foreignId, '?cursor=' + randomUUID(),
+      '?cursor=' + found[0] + '&cursor=' + found[1]]) {
+      assert.equal((await GET(request(query))).status, 400)
+    }
+  } finally {
+    browserOwner = previousOwner
+    await pool.query('DELETE FROM device_tokens WHERE "userId"=ANY($1::text[])', [[owner, foreign]])
+  }
+}))
+
 test('registration grant is user-bound, expires, and has one concurrent winner', () => run(async () => {
   const { pool } = await import('./db')
   const token = await mintDeviceEnrollment('owner-a')
@@ -83,7 +125,7 @@ test('daemon acceptance follows real local enrollment and owner routes without a
   const previousOwner = browserOwner
   try {
     browserOwner = owner
-    assert.deepEqual(await (await readTokens(request())).json(), { tokens: [] })
+    assert.deepEqual(await (await readTokens(request())).json(), { tokens: [], nextCursor: null })
     const credential = await consumeDeviceEnrollment(await mintDeviceEnrollment(owner))
     assert.ok(credential)
     const { tokens } = await (await readTokens(request())).json()
@@ -101,7 +143,7 @@ test('daemon acceptance follows real local enrollment and owner routes without a
     assert.equal(enrollmentToken((await (await readTokens(request())).json()).tokens).boundDeviceId, null,
       'registering a local device links device_token_devices instead of assigning a cloud scope')
     browserOwner = `foreign-${owner}`
-    assert.deepEqual(await (await readTokens(request())).json(), { tokens: [] })
+    assert.deepEqual(await (await readTokens(request())).json(), { tokens: [], nextCursor: null })
     assert.throws(() => checkOwnedEnrollment(account, browserOwner!, deviceId), /OWNER_DEVICE/)
     browserOwner = owner
     await consumeDeviceEnrollment(await mintDeviceEnrollment(owner))

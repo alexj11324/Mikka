@@ -41,7 +41,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const migrations = orderMigrations((await readdir(directory)).filter(file => file.endsWith('.sql')))
-    const boundary = '20261107180000_task_workspace_ownership.sql'
+    const boundary = '20261108120200_task_workspace_ownership.sql'
     for (const pool of [app, workspace]) await pool.query('CREATE TABLE schema_migrations (name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
     const migrate = async (names: string[]) => {
       for (const name of names) {
@@ -94,7 +94,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
     const { issueForUser } = await import('../lib/issue-access')
     const { activeTaskWorkspaces, withTaskWorkspace } = await import('../lib/task-workspace')
     const { tokenWorkspace } = await import('../lib/tokens/principal')
-    const { readArtifact, readArtifactContent, createShare, sharedArtifact } = await import('../lib/artifacts/store')
+    const { readArtifact, readArtifactContent, listArtifacts, listRunArtifacts, createShare, sharedArtifact } = await import('../lib/artifacts/store')
     const { artifactOutsideToken, runOutsideToken } = await import('../lib/tokens/scope')
     const { actAs } = await import('../lib/acting-user')
     const { enterprisePrincipal } = await import('../lib/enterprise/principal')
@@ -119,6 +119,20 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.equal(await issueForUser({ id: owner, [tokenWorkspace]: beta }, teamless), null)
       assert.equal((await issueForUser({ id: owner, [tokenWorkspace]: alpha }, teamless))?.id, teamless)
       await assert.rejects(withTaskWorkspace({ id: owner, [tokenWorkspace]: alpha }, beta, async () => assert.fail('wrong tenant write')), /workspaceAccessDenied/)
+    })
+    await t.test('direct task-only citations preserve the reader workspace pin without a run lookup', async () => {
+      const { citationSources } = await import('../lib/coordinator/store')
+      // The owner belongs to both tenants; only the complete reader carries
+      // the selected tenant. Empty run IDs exercise the direct-task prefetch.
+      const citations = [`[[issue:${teamless}]]`]
+      const denied = await citationSources({ id: owner, [tokenWorkspace]: beta }, citations, [])
+      assert.deepEqual(denied, {}, 'a beta-pinned owner must not learn an alpha task through citation prefetch')
+      const allowed = await citationSources({ id: owner, [tokenWorkspace]: alpha }, citations, [])
+      assert.deepEqual(Object.keys(allowed), [teamless])
+      const task = allowed[teamless]
+      assert.ok(task?.kind === 'issue')
+      assert.equal(task.id, teamless)
+      assert.equal(task.title, 'No Team required')
     })
     await t.test('lists, search and push targets use the tenant even for one account in both workspaces', async () => {
       const { issues: table } = await import('../lib/db/schema')
@@ -173,6 +187,14 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.equal(await artifactOutsideToken({ id: owner, [tokenWorkspace]: beta }, artifact), true)
       assert.equal(await readArtifact({ id: owner, [tokenWorkspace]: beta }, artifact), null)
       assert.equal((await readArtifactContent({ id: owner, [tokenWorkspace]: alpha }, artifact, 1))?.content, 'tenant content')
+      const alphaReader = { id: owner, [tokenWorkspace]: alpha }, betaReader = { id: owner, [tokenWorkspace]: beta }
+      const own = await listArtifacts(alphaReader)
+      assert.deepEqual(own.map(row => row.id), [artifact])
+      assert.match(own[0].issueKey ?? '', /^GOV-[1-9]\d*$/)
+      assert.deepEqual(await listArtifacts(betaReader), [], 'the same owner cannot list Alpha artifacts through a Beta pin')
+      assert.deepEqual((await listRunArtifacts(alphaReader, runA)).map(row => row.id), [artifact])
+      assert.deepEqual(await listRunArtifacts(betaReader, runA), [])
+      assert.deepEqual(await listArtifacts({ id: member, [tokenWorkspace]: alpha }), [], 'Workspace membership does not widen the artifact owner ACL')
     })
     await t.test('conversation envelopes use persisted mailbox tenancy; mismatched run or sender writes leave no message', async () => {
       const inbox = randomUUID(), sender = randomUUID(), outside = randomUUID(), otherOwner = randomUUID()
@@ -254,6 +276,8 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.ok(link); assert.ok(await sharedArtifact(link.token))
       await workspace.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner])
       assert.equal(await readArtifact(owner, artifact), null)
+      assert.deepEqual(await listArtifacts({ id: owner, [tokenWorkspace]: alpha }), [], 'a later list rechecks membership instead of retaining an earlier proof')
+      assert.deepEqual(await listRunArtifacts({ id: owner, [tokenWorkspace]: alpha }, runA), [])
       assert.equal(await sharedArtifact(link.token), null)
       assert.equal((await activeTaskWorkspaces(owner, beta))[0]?.id, beta)
       assert.equal((await activeTaskWorkspaces(owner, personal))[0]?.id, personal)

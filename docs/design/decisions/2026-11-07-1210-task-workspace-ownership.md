@@ -110,7 +110,7 @@ membership, the receiving session's owner and expiry, and the token's unchanged
 session binding. Membership/session/token locks protect the accepted delivery.
 The paid plan never determines whether these isolation checks apply.
 
-The additive `20261107180002_phone_push_session.sql` migration leaves historical
+The additive `20261108120202_phone_push_session.sql` migration leaves historical
 session bindings NULL. Those destinations remain inactive until the existing
 native registration endpoint binds them; no user-wide session guess is allowed.
 A cold application launch or signing out and back in re-registers through the

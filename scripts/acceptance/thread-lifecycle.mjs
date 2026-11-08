@@ -106,6 +106,10 @@ export function nativeSnapshotCommand({ caseId, sourceCommit, markerValue }, pha
     'root = pathlib.Path.cwd().resolve()',
     "assert subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).decode().strip() == str(root)",
     "assert not marker.is_symlink() and not report.is_symlink()",
+    // A rejected draft must not leave the exclusive marker behind: a model
+    // can then correct the report and execute this same frozen command.
+    'body = report.read_bytes()',
+    'assert 300 <= len(body) <= 2400',
     ...(phase === 'before_question' ? ["with marker.open('xb') as stream: stream.write(expected)"] : []),
     'assert marker.read_bytes() == expected',
     "git = lambda *args: subprocess.check_output(['git', *args])",
@@ -115,8 +119,6 @@ export function nativeSnapshotCommand({ caseId, sourceCommit, markerValue }, pha
     "        file = root / name.decode('utf-8')",
     '        assert file.is_file() and not file.is_symlink() and file.stat().st_size <= 4194304',
     "        tracked.update(name + b'\\0' + hashlib.sha256(file.read_bytes()).digest())",
-    'body = report.read_bytes()',
-    'assert 300 <= len(body) <= 2400',
     "value = dict(caseId=case_id, phase=phase, head=git('rev-parse', 'HEAD').decode().strip(),",
     "    rootSha256=hashlib.sha256(str(root).encode()).hexdigest(), trackedSha256=tracked.hexdigest(),",
     "    statusSha256=hashlib.sha256(git('status', '--porcelain=v1', '-z', '--untracked-files=all')).hexdigest(),",

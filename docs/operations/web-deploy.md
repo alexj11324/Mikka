@@ -194,6 +194,13 @@ mislabel a previously built overlay. After upload, the public route must match
 both the public source and the overlay before the Web queue is released.
 The existing runtime-refresh caller follows the same official build path.
 
+The disposable official Linux runner removes only its unused preinstalled
+Android, .NET and GHC SDKs before the build. It retains the workspace,
+dependencies, Node/pnpm and Docker resources. The build uses a 4096 MB V8 heap;
+the original compile, typecheck and migration sequence remains unchanged.
+Filesystem space/inode counts and aggregate function-output size are recorded
+without listing private output files or emitting compiler diagnostics.
+
 Private `main` pushes trigger its `official-mikka.yml`. Through the same
 Infisical identity (bound to the private repository's numeric ID and immutable
 main subject) it reads the existing dispatch identity at `dev:/github/GH_TOKEN`
@@ -233,6 +240,10 @@ alone: their recorded overlay SHAs may differ.
   compiled Web assets go to Vercel; signed installers go to GitHub Releases.
 - Official compiler diagnostics are captured on the ephemeral runner, because
   errors may quote private source. They are neither printed nor uploaded.
+  A failed build emits only a closed receipt: public and overlay revisions,
+  exit status, allowlisted signal/error codes, the last observed public build
+  phase, and protected-log byte count/SHA256. The phase can be `unknown`, and
+  SIGKILL alone is not an OOM diagnosis. No raw output, message or stack is emitted.
 - The live Web builder is Vite + Nitro, both with `sourcemap: false`;
   `next.config.mjs` is a legacy path, not the production compiler. Before
   upload, `hosted-ui.mjs audit` checks Vercel's public static tree for raw UI

@@ -10,6 +10,7 @@ import { createWorkspaceSecret, deleteWorkspaceSecret, importWorkspaceSecrets, l
 import type { WorkspaceRole } from '@/lib/secrets/permissions'
 import { settingsWorkspaceAction } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
+import type { SecretDeliveryInput } from '@/lib/secrets/delivery'
 
 // 设置 › 密钥与环境. Permission tiers: lib/secrets/permissions.ts (members: repo-scoped entries; admins: everything). All values (secret and env) are write-only: responses carry name/kind/scope only.
 // Writes are audited inside their transaction (lib/secrets/audit.ts). `workspaceId` is the workspace the settings page shows.
@@ -24,10 +25,10 @@ export async function listSecrets(workspaceId?: string): Promise<SettingsActionR
   return withActor(async (u, w) => { const [secrets, role] = await Promise.all([listWorkspaceSecrets(u, w), workspaceRole(u, w)]); return { secrets, role } }, workspaceId)
 }
 type ScopeInput = { type: 'workspace' } | { type: 'repository'; repository: string }
-async function createSecretBody(input: { name: string; kind: 'secret' | 'env'; value: string; note?: string; scope?: ScopeInput }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
+async function createSecretBody(input: { name: string; kind: 'secret' | 'env'; value: string; note?: string; scope?: ScopeInput; delivery?: SecretDeliveryInput }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
   return withActor((u, w, audit) => createWorkspaceSecret(u, w, input, audit), workspaceId)
 }
-async function replaceSecretBody(input: { id: string; value?: string; note?: string; scope?: ScopeInput }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
+async function replaceSecretBody(input: { id: string; value?: string; note?: string; scope?: ScopeInput; delivery?: SecretDeliveryInput }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
   return withActor((u, w, audit) => replaceWorkspaceSecret(u, w, input, audit), workspaceId)
 }
 /** Bulk add from a .env text (≤ 2 MB), one kind and scope for all of it. Returns names and line errors, never values. */

@@ -372,7 +372,8 @@ it('keeps the uninstall grace credential through gateway command rejection, hear
   Reflect.set(daemon, 'runnerReport', async () => undefined)
   Reflect.set(daemon, 'worktrees', { diskUsage: async () => 0 })
   Reflect.set(daemon, 'rescanHarnesses', () => {})
-  Object.assign(Reflect.get(daemon, 'supervisor'), { renewLeases: () => {}, activeRunIds: () => [] })
+  const renewTaskSecrets = vi.fn()
+  Object.assign(Reflect.get(daemon, 'supervisor'), { renewLeases: () => {}, renewTaskSecrets, activeRunIds: () => [] })
   const events: string[] = []
   const link = Reflect.get(daemon, 'options').link as ServerLink
   link.heartbeat = vi.fn(async (_id, status) => {
@@ -394,6 +395,8 @@ it('keeps the uninstall grace credential through gateway command rejection, hear
   await daemon.stop()
   await Promise.resolve()
   expect(events).toEqual(['uninstall', 'receipt', 'service', 'cleared'])
+  expect(renewTaskSecrets).toHaveBeenCalledOnce()
+  expect(renewTaskSecrets).toHaveBeenCalledWith(undefined)
   expect(fetch).toHaveBeenCalledOnce()
   expect(rejected).not.toHaveBeenCalled()
   expect(credentialAtUninstall).toBe('fixture')
