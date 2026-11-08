@@ -463,6 +463,63 @@
       "missing local dependency link",
       "missing local migration fixture",
       "proof script output filename"
-    ]
+    ],
+    "node22CiCorrection": {
+      "manifestSha256": "05906991c86edafe40dad236b8995cc552c2df596d832199368ffce1a3a7d9fe",
+      "originalHead": "fb77f62ad17d98a21e2798c04d7e9a2cfe0c2e8e",
+      "syntheticCheckout": "29ea335c536fdf9a8be8f28b752ea0eaf5ac1f5e",
+      "originalCI": {
+        "head": "fb77f62ad17d98a21e2798c04d7e9a2cfe0c2e8e",
+        "syntheticCheckout": "29ea335c536fdf9a8be8f28b752ea0eaf5ac1f5e",
+        "node22": {
+          "run": 42441099358,
+          "job": 128610304931,
+          "version": "v22.22.1",
+          "failed": 2,
+          "passed": 1490,
+          "skipped": 2
+        },
+        "daemon": {
+          "run": 42441099462,
+          "job": 128610466610,
+          "failed": 2,
+          "passed": 1490,
+          "skipped": 2
+        },
+        "sameFailures": [
+          "commands-polling.test.ts:329 task-owner",
+          "commands-polling.test.ts:329 shared-subscription-owner"
+        ]
+      },
+      "node": "v22.22.1",
+      "old": {
+        "passed": 34,
+        "failed": 2,
+        "skipped": 0
+      },
+      "fixed": {
+        "passed": 36,
+        "failed": 0,
+        "skipped": 0
+      },
+      "path": "packages/daemon/test/commands-polling.test.ts",
+      "change": "Explicitly assert desktop claim's fourth optional repository-capability argument is undefined; retain the same device, run, AbortSignal and start assertions.",
+      "productChanged": false,
+      "isolatedCommit": "1738bd7a352ce84e2487cbea764178261c271209",
+      "isolatedTree": "9d6a3554134f99f6104c5309e0dd94a69c23cd43",
+      "patchSha256": "524c7b48dd62656257b7bae64d196960f8ac4171881c6e381278d17eb158c83b",
+      "workerSha": "fc49a8b4933ba6216cc0ebf5b2c941b43fd2144b",
+      "cloudBuild": {
+        "node": "v24.22.1",
+        "buildExit": 0,
+        "verificationExit": 0,
+        "bundles": 2,
+        "copiedResources": 9,
+        "fixtures": 16,
+        "syntaxChecks": 12
+      },
+      "retainedVerifierFailure": "Local owned dependency symlink bookkeeping corrected to the observed exact target; no product or artifact checks weakened.",
+      "next": "Fresh combined-head CI and all live release/production gates remain required."
+    }
   }
 }

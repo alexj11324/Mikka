@@ -668,3 +668,20 @@ cloud build 与资源字节核验通过，worker 为
 73be9136ba4b51af098403074f35fc5eecb58fb2。开发 Node 24.22.1 与模板 24.19.0
 不同，因此这仍不替代新 head CI、真实 E2B 和双订阅门槛。最终待生产六例的完整
 派发结果，不将上述局部测试或固定指纹当作五秒成绩。
+
+### 最新完整 CI 的桌面 claim 断言校正
+
+远端 fb77f62ad17d98a21e2798c04d7e9a2cfe0c2e8e 的新 trusted selector 实际选择完整
+85 个 unit task、70 个数据库 suite 与四个 PG shard。其 Node 22 和 daemon 两个
+job 暴露相同的两条桌面 owner 测试错误：新增可选 repository capability 为
+undefined，但旧断言仍只期望三个参数。仅将该断言的第四参显式写为 undefined，
+原 device、run、AbortSignal 和 start 断言全部保留，未改变产品路径。
+
+真实同版本 Node 22.22.1 下，原完整文件 34 通过／2 失败，修正后 36/36 且无跳过；
+两条原 CI 红灯及原日志保留，未把该文件的通过当作全套 CI 已通过。该测试文件
+属于既有 worker 指纹输入，故后继 worker 为
+fc49a8b4933ba6216cc0ebf5b2c941b43fd2144b，不能沿用前版 73be 指纹。已以相同
+受验证锁文件依赖实际重建，两入口、九资源、16 个夹具、资源模式和 12 项语法检查
+通过。本地产物验证器首次对自有依赖 symlink 路径的记账错误也保留；仅按实际目标
+修正记账，没有改变资源或产品断言。详细证明追加到同一候选证据索引；仍须新
+合成 head CI、三模板守恒、真实双订阅与全部六次生产五秒结果。
