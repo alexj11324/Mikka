@@ -12,6 +12,8 @@ import { CardButton } from '@/components/cards'
 import { currentAccount, servers } from '@/lib/config'
 import { selectMobileAccount } from '@/lib/server-actions'
 import { serverCopy as copy } from '@/lib/server-copy'
+import { openPrivacyPolicy } from '@/lib/web'
+import messages from '../../../messages/zh-CN.json'
 
 /**
  * Sign in, with the web's words (messages/zh-CN.json Auth): Google and GitHub
@@ -93,6 +95,9 @@ export function SignIn() {
         <Text style={styles.or}>{copy.savedAccounts}</Text>
         {state.accounts.filter(saved => saved.user && saved.id !== account.id).map(saved => <CardButton key={saved.id} label={`${saved.user!.email} · ${saved.server.name}`} disabled={busy} onPress={() => void select(saved.id)} />)}
       </View> : null}
+      <Pressable accessibilityRole="link" onPress={() => void openPrivacyPolicy()} style={({ pressed }) => [{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.6 }]}>
+        <Text style={styles.or}>{messages.Common.privacyPolicy}</Text>
+      </Pressable>
       {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
       </ScrollView>
     </KeyboardAvoidingView>
