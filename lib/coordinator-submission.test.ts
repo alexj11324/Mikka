@@ -176,6 +176,9 @@ test('unexpected stored scope and database failures are never accepted as a dupl
 let userId: string | null = 'owner'
 let current = fixture()
 let actionHeaders=new Headers()
+let actionWorkspace = PROFILE_WORKSPACE
+let workspaceReads = 0
+const botResolutions: { botId: string | null | undefined; workspaceId: string | null }[] = []
 const callbacks: Array<() => unknown> = []
 let POST: (request: Request) => Promise<Response>
 let sendCoordinatorMessage: typeof import('../app/actions/coordinator').sendCoordinatorMessage
@@ -213,7 +216,9 @@ before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => userId ? { user: { id: userId }, session: { id: 'synthetic-browser-session' } } : null } } } })
   mock.module('@/lib/workspace-access', { namedExports: { loadWorkspaceContext: async (_requested: unknown, user: { id: string }) => {
     assert.equal(user.id, userId)
-    return { workspace: { id: PROFILE_WORKSPACE } }
+    assert.equal(_requested, undefined, 'the expected workspace never becomes a selection or authorization source')
+    workspaceReads++
+    return { workspace: { id: actionWorkspace } }
   } } })
   // Match the real transaction: a readiness refusal after claiming the actual
   // suggestion bot rolls back both the dismissal and any inserted message.
@@ -232,7 +237,7 @@ before(async () => {
       return suggestion
     },
   } })
-  mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { coordinatorBot: async () => ({ botId: COORDINATOR_BOT, workspaceId: 'a4000000-0000-4000-8000-0000000c0de2' }), chatBotId: async (_owner: string, botId: string | null | undefined) => botId ?? COORDINATOR_BOT, openChatBotId: async (_user: unknown, botId: string | null | undefined) => botId ?? COORDINATOR_BOT } })
+  mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { coordinatorBot: async () => ({ botId: COORDINATOR_BOT, workspaceId: 'a4000000-0000-4000-8000-0000000c0de2' }), chatBotId: async (_owner: string, botId: string | null | undefined, workspaceId: string | null) => { botResolutions.push({ botId, workspaceId }); return botId ?? COORDINATOR_BOT }, openChatBotId: async (_user: unknown, botId: string | null | undefined) => { botResolutions.push({ botId, workspaceId: actionWorkspace }); return botId ?? COORDINATOR_BOT } } })
   mock.module('@/lib/request-log', { namedExports: { noteLogRpcAction: () => {}, noteLogUser: () => undefined, withRequestLog: (_path: string, handler: unknown) => handler } })
   mock.module('@/lib/coordinator/store', { namedExports: {
     chatView: async () => { chatReadTrace.push('view'); return chatSnapshot() },
@@ -256,6 +261,48 @@ before(async () => {
   ;({ sendCoordinatorMessage, sendSuggestion, retryCoordinatorTurn, getCoordinatorChat, pollCoordinatorChat } = await import('../app/actions/coordinator'))
 })
 const request = (body: unknown) => new Request('https://synthetic.example/api/coordinator/messages', { method: 'POST', body: JSON.stringify(body) })
+
+test('a captured workspace mismatch refuses before Coordinator resolution, message insertion or wake', async () => {
+  for (const botId of [null, COORDINATOR_BOT]) {
+    current = fixture(); callbacks.length = 0; userId = 'owner'; workspaceReads = 0; botResolutions.length = 0
+    const result = await sendCoordinatorMessage('captured task', null, botId, submissionId, undefined, undefined, undefined, undefined, undefined, CHAT_HOME)
+    assert.deepEqual(result, { error: 'workspaceAccessDenied', params: undefined })
+    assert.equal(workspaceReads, 1)
+    assert.deepEqual(botResolutions, [], 'a mismatch must not ensure/create even the default Coordinator')
+    assert.deepEqual(current.trace, []); assert.equal(current.rows.size, 0); assert.equal(callbacks.length, 0)
+  }
+  workspaceReads = 0
+  assert.deepEqual(await sendCoordinatorMessage('captured task', null, null, submissionId, undefined, undefined, undefined, undefined, undefined, 'invalid'), { error: 'validationGeneric', params: undefined })
+  assert.equal(workspaceReads, 0); assert.equal(current.rows.size, 0); assert.equal(callbacks.length, 0)
+})
+
+test('matching captured workspaces keep one trusted resolution and immutable retry scope', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'; workspaceReads = 0; botResolutions.length = 0
+  const send = () => sendCoordinatorMessage('captured task', null, null, submissionId, undefined, undefined, undefined, undefined, undefined, PROFILE_WORKSPACE.toUpperCase())
+  assert.deepEqual(await send(), { queued: true })
+  assert.equal(workspaceReads, 1)
+  assert.deepEqual(botResolutions, [{ botId: null, workspaceId: PROFILE_WORKSPACE }])
+  const saved = structuredClone([...current.rows.values()])
+  assert.equal(saved.length, 1); assert.equal(saved[0].botId, COORDINATOR_BOT)
+  assert.deepEqual(saved[0].payload, { text: 'captured task' }, 'the client expectation does not become persisted authority')
+  workspaceReads = 0; botResolutions.length = 0
+  actionWorkspace = CHAT_HOME
+  try {
+    assert.deepEqual(await send(), { error: 'workspaceAccessDenied', params: undefined })
+    assert.equal(workspaceReads, 1); assert.deepEqual(botResolutions, [])
+    assert.deepEqual([...current.rows.values()], saved); assert.equal(callbacks.length, 1)
+  } finally { actionWorkspace = PROFILE_WORKSPACE }
+  assert.deepEqual(await send(), { queued: true })
+  assert.deepEqual([...current.rows.values()], saved, 'returning to the original workspace replays the same event')
+})
+
+test('a matching expectation does not authorize a same-owner Bot in another workspace', async () => {
+  current = fixture(); callbacks.length = 0; userId = 'owner'
+  const botId = 'b4000000-0000-4000-8000-000000000098'
+  current.botRows.set(botId, { id: botId, name: 'Other workspace Bot', ownerId: 'owner', workspaceId: CHAT_HOME })
+  assert.deepEqual(await sendCoordinatorMessage('captured task', null, botId, submissionId, undefined, undefined, undefined, undefined, undefined, PROFILE_WORKSPACE), { error: 'botNotFound', params: undefined })
+  assert.equal(current.rows.size, 0); assert.equal(callbacks.length, 0)
+})
 
 test('both shared chat readers keep the owner live scope and an observed lease without duplicate body reads', async () => {
   current = fixture(); userId = 'owner'; enabled = true; retryWorking = true; chatHome = CHAT_HOME; chatReadTrace.length = 0
@@ -655,4 +702,30 @@ test('an explicit Profile keeps workspace-default placement and the normal task 
     assert.deepEqual(await send(), { error: 'issueToolsDisabled', params: undefined })
     assert.equal(current.rows.size, 1); assert.equal(callbacks.length, wakes)
   } finally { enabled = true; profileRows.clear(); overrideDeploymentSwitch('issueTools', undefined) }
+})
+
+test('the composer transport carries an explicit expectation and preserves legacy argument length', async () => {
+  const { createElement } = await import('react')
+  const { renderToStaticMarkup } = await import('react-dom/server')
+  const actions = await import('../app/actions/coordinator')
+  const sent: unknown[][] = []
+  const action = mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
+    ...actions, sendCoordinatorMessage: async (...args: Parameters<typeof sendCoordinatorMessage>) => { sent.push(args); return { queued: true as const } },
+  } })
+  const client = mock.module(new URL('./auth-client.ts', import.meta.url).href, { namedExports: {
+    authClient: { getSession: async () => ({ data: { user: { id: 'owner' } }, error: null }) },
+  } })
+  const translations = mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+  try {
+    const { useCoordinatorSubmit } = await import('../components/coordinator/use-coordinator-submit')
+    const held: { composer?: ReturnType<typeof useCoordinatorSubmit> } = {}
+    function Probe() { held.composer = useCoordinatorSubmit(); return null }
+    renderToStaticMarkup(createElement(Probe))
+    assert.ok(held.composer)
+    assert.equal((await held.composer.submit('legacy message', { botId: COORDINATOR_BOT })).kind, 'accepted')
+    assert.equal(sent[0].length, 9, 'omission remains compatible with an older nine-argument transport schema')
+    assert.equal((await held.composer.submit('captured message', { botId: COORDINATOR_BOT, expectedWorkspaceId: PROFILE_WORKSPACE })).kind, 'accepted')
+    assert.equal(sent[1].length, 10); assert.equal(sent[1][9], PROFILE_WORKSPACE)
+    assert.equal(sent[1][2], COORDINATOR_BOT)
+  } finally { translations.restore(); client.restore(); action.restore() }
 })
