@@ -22,7 +22,7 @@ runs:
       shell: bash
       env:
         INSTALL_PROFILE: ${{ inputs.profile }}
-        ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ inputs.skip-electron == 'true' && '1' || '' }}
+        ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ inputs.skip-electron == 'true' && '1' || env.ELECTRON_SKIP_BINARY_DOWNLOAD || '' }}
       run: node scripts/ci/dependency-cache.mjs
     - name: Restore exact installed dependencies
       id: modules
@@ -52,7 +52,7 @@ runs:
       shell: bash
       env:
         INSTALL_PROFILE: ${{ inputs.profile }}
-        ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ inputs.skip-electron == 'true' && '1' || '' }}
+        ELECTRON_SKIP_BINARY_DOWNLOAD: ${{ inputs.skip-electron == 'true' && '1' || env.ELECTRON_SKIP_BINARY_DOWNLOAD || '' }}
       run: |
         case "$INSTALL_PROFILE" in
           full) pnpm install --frozen-lockfile ;;

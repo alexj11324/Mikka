@@ -78,4 +78,10 @@ test('installed cache writes are main-only and a miss installs; hits do not inst
   for (const hit of ['true', 'false', undefined]) assert.equal(evaluate(install.if, { steps: { modules: { outputs: { 'cache-hit': hit } } } }), hit !== 'true')
   const restore = action.runs.steps.find(step => step.id === 'modules')
   assert(!restore.with['restore-keys'], 'installed modules never use partial key matches')
+  const fingerprint = action.runs.steps.find(step => step.id === 'modules-key')
+  for (const [optIn, inherited, expected] of [['true', '', '1'], ['false', '1', '1'], ['false', undefined, '']]) {
+    const context = { inputs: { 'skip-electron': optIn }, env: { ELECTRON_SKIP_BINARY_DOWNLOAD: inherited } }
+    assert.equal(evaluate(install.env.ELECTRON_SKIP_BINARY_DOWNLOAD, context), expected)
+    assert.equal(evaluate(fingerprint.env.ELECTRON_SKIP_BINARY_DOWNLOAD, context), expected)
+  }
 })
