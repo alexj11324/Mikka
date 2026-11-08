@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { uuid } from 'expo'
 import { Spinner } from '@/components/icons'
+import { ListTopFade } from '@/components/NavBar'
 import { runIcon } from '@/lib/thread-icon'
 import { Arrival, BotBubble, EventLine, MessageActions, MessageRow, MyBubble, OutgoingBubble, Reactions, ThreadCard, TimeSeparator, useChatPhotos } from '@/components/chat'
 import { myReaction, toggled, withMine } from '@/lib/reactions'
@@ -280,7 +281,6 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           <MessageRow align="right" onSelect={item.text && !selected ? () => toggleSelection(item.position, item.text) : undefined}>
             <MyBubble text={item.text} photos={photos(item.id, item.images)} selecting={selected ? <ChatSelectableText text={selected.text} color={colors.onAccent} onSelect={onSelected} onRect={rect => { selectionRect.current = rect }} /> : undefined} />
             {chips(item.id, 'right')}
-            {item.text && !selected ? <MessageActions align="right" message={message(item.text, item.id, item.position)} /> : null}
           </MessageRow>
         ) : null}
         {item.from === 'coordinator' && item.text ? (
@@ -343,6 +343,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
         {data?.failure && !working ? <FailedReply key={`${botId}:${JSON.stringify(data.failure)}`} failure={data.failure} botId={botId} onQueued={reload} modelChoice={typeof composerAccessory === 'function' ? composerAccessory(false) : composerAccessory} /> : null}
         {pending.data ? <PendingActions items={pending.data} focus={focus} reload={pending.reload} onFocusLayout={focus ? showFocus : undefined} /> : null}
           </>} />
+        <ListTopFade color={colors.page} />
       </View>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />

@@ -202,8 +202,9 @@ export function TimeSeparator({ label }: { label: string }) {
 }
 
 /**
- * The row under a message (Alex 2026-11-08): ⋯ holds its reactions, 回复, 复制 and 选择文本 (MessageMenu); under the
- * bot's latest reply 复制 sits beside it, as in ChatGPT and Claude.
+ * The row under a bot's reply, or another member's message in a group (Alex 2026-11-08): ⋯ holds its reactions,
+ * 回复, 复制 and 选择文本 (MessageMenu); under the bot's latest reply 复制 sits beside it, as in ChatGPT and Claude. The
+ * person's own messages have no row: a long press selects their words.
  */
 export function MessageActions({ message, align = 'left', copy }: { message: HeldMessage; align?: 'left' | 'right'; copy?: boolean }) {
   return (
