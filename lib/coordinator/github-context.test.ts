@@ -159,3 +159,16 @@ test('repository use, push ordering and allowed models cannot invalidate the ear
     assert.notDeepEqual(changed[1], original[1], 'current repository/model facts remain current')
   }
 })
+
+test('connection and repository listing start together without changing the output or adding reads', async () => {
+  const connection = Promise.withResolvers<{ githubLogin: string } | null>()
+  const order: string[] = []
+  const turn = githubContext('alex', {
+    connection: () => { order.push('connection'); return connection.promise },
+    list: async () => { order.push('list'); return { login: 'fallback', installationAccounts: ['octo'], repositories: [] } },
+    used: async () => { throw new Error('empty list must not read workspace use') },
+  })
+  try { assert.deepEqual([...order], ['connection', 'list'], 'github_independent_reads_still_serial') }
+  finally { connection.resolve({ githubLogin: 'octo' }) }
+  assert.equal(await turn, "GitHub: the person's connected GitHub account is @octo.\nThe Mikka GitHub App is installed on @octo and reaches 0 repositories.\nNever ask which account or owner a repository is under: look it up with find_repository, or pass the name the person used to dispatch_run.")
+})
