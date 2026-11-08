@@ -6,6 +6,7 @@ import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { createFileMention, resolveFileMentions, mentionCommand } from '@/lib/coding-workspace/mentions'
 import { submitFileMentions } from '@/lib/coding-workspace/submit'
+import { workspaceReadResponse } from '@/lib/coding-workspace/response'
 import { ActionFailureError } from '@/lib/action-error'
 import { workspaceJSON, workspaceErrorStatus, workspaceSessionStillValid } from '@/lib/coding-workspace/http'
 
@@ -26,12 +27,15 @@ export async function POST(request: Request, context: { params: Promise<{ runId:
     if (input.action === 'create') {
       const mention = await createFileMention(pool, workspacePool, actor, runId, input.repoId, input.selection, request.signal)
       if (!await workspaceSessionStillValid(request, session)) return Response.json({ ok: false, code: 'authRequired' }, { status: 401, headers })
-      return Response.json({ ok: true, mention }, { status: 201, headers })
+      return await workspaceReadResponse(pool, workspacePool, request, session, actor, mention,
+        () => Response.json({ ok: true, mention }, { status: 201, headers }))
     }
     if (input.action === 'submit' && session.tokenWorkspaceId) return Response.json({ ok: false, code: 'workspace_not_found' }, { status: 403, headers })
     const resolved = await resolveFileMentions(pool, workspacePool, actor, runId, input.repoId, input.ids, request.signal)
     if (!await workspaceSessionStillValid(request, session)) return Response.json({ ok: false, code: 'authRequired' }, { status: 401, headers })
-    if (input.action === 'resolve') return Response.json(resolved, { headers })
+    if (input.action === 'resolve') {
+      return await workspaceReadResponse(pool, workspacePool, request, session, actor, resolved, () => Response.json(resolved, { headers }))
+    }
     const result = await submitFileMentions(pool, workspacePool, { ...actor, sessionId: session.session.id },
       { runId, repoId: input.repoId, text: input.text, requestId: input.requestId }, resolved, request.signal)
     return Response.json({ ok: true, ...result }, { headers })

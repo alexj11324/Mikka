@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { CodingWorkspaceError, WORKSPACE_MENTION_TTL_MS, workspaceContextSelection, workspaceFileSelection,
   type WorkspaceReadResult } from '@mikka/protocol/coding-workspace'
 import { resolveRunWorktree, type WorkspaceActor, type WorkspaceQuery } from './identity'
-import { requestWorkspaceRead } from './requests'
+import { copyWorkspaceResultMaskPolicy, requestWorkspaceRead } from './requests'
 
 const selection = z.union([workspaceContextSelection.options[0], workspaceContextSelection.options[1]])
 export const mentionCommand = z.discriminatedUnion('action', [
@@ -40,7 +40,7 @@ export async function createFileMention(database: Pool, membership: WorkspaceQue
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [id, actor.userId, actor.workspaceId, runId, repoId, result.identity.bindingId, JSON.stringify(files), expiresAt])
     await client.query('COMMIT')
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
-  return { id, runId, repoId, selection: input, files, revision: result.revision, omitted: result.omitted, expiresAt: expiresAt.toISOString() }
+  return copyWorkspaceResultMaskPolicy(result, { id, runId, repoId, selection: input, files, revision: result.revision, omitted: result.omitted, expiresAt: expiresAt.toISOString() })
 }
 
 export async function resolveFileMentions(database: Pool, membership: WorkspaceQuery, actor: WorkspaceActor,
@@ -56,7 +56,7 @@ export async function resolveFileMentions(database: Pool, membership: WorkspaceQ
   const files = wanted.flatMap(id => z.array(workspaceFileSelection).min(1).max(20).parse(byId.get(id)!.files))
   if (files.length > 20) throw new CodingWorkspaceError('workspace_limit_exceeded')
   const result = contextResult(await requestWorkspaceRead(database, membership, actor, runId, repoId, { kind: 'context', selection: { kind: 'resolved', files } }, signal))
-  return { ids: wanted, ...result }
+  return copyWorkspaceResultMaskPolicy(result, { ids: wanted, ...result })
 }
 
 /** Explicitly selected source context, delivered through the existing thread

@@ -9,7 +9,8 @@ import { promisify } from 'node:util'
 import { Pool } from 'pg'
 import { runAssignmentSchema } from '@mikka/protocol'
 import { remoteKey } from '@mikka/protocol/repository'
-import { CodingWorkspaceError, WORKSPACE_MAX_FILE_BYTES, type WorkspaceReadRequest, type WorkspaceReadReceipt } from '@mikka/protocol/coding-workspace'
+import { CodingWorkspaceError, WORKSPACE_MAX_FILE_BYTES, type WorkspaceReadCommand, type WorkspaceReadRequest,
+  type WorkspaceReadReceipt, type WorkspaceReadResult } from '@mikka/protocol/coding-workspace'
 import { readWorkspaceReceipt } from '../../packages/daemon/src/coding-workspace/files'
 import type { JournalEntry } from '../../packages/daemon/src/runs/journal'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -48,11 +49,18 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
     mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
     // Only external gateway delivery is replaced. SQL, LISTEN/NOTIFY, source
     // authority, secret masking and the daemon filesystem handler stay real.
-    const wakes: string[] = []
+    const wakes: string[] = [], wakeBarriers = new Map<string, Promise<void>>()
     const gateway = await import('../device-gateway-notify')
-    mock.module('../device-gateway-notify', { namedExports: { ...gateway, wakeDeviceWorkNow: async (deviceId: string) => { wakes.push(deviceId) } } })
+    mock.module('../device-gateway-notify', { namedExports: { ...gateway, wakeDeviceWorkNow: async (deviceId: string) => {
+      wakes.push(deviceId); await wakeBarriers.get(deviceId)
+    } } })
     const { resolveRunWorktree } = await import('./identity')
-    const { requestWorkspaceRead, pendingWorkspaceReads, finishWorkspaceRead } = await import('./requests')
+    const { requestWorkspaceRead, pendingWorkspaceReads, finishWorkspaceRead, workspaceResultMaskPolicy,
+      copyWorkspaceResultMaskPolicy, assertWorkspaceResultMaskPolicy } = await import('./requests')
+    const { withWorkspaceAuthority } = await import('./authority')
+    const { validateWorkspaceReceipt } = await import('./receipt')
+    const { secretMaskerFor } = await import('../secrets/runtime')
+    const { maskDeep } = await import('../secrets/mask')
     const { createFileMention, resolveFileMentions } = await import('./mentions')
     const { submitFileMentions } = await import('./submit')
     const { ActionFailureError } = await import('../action-error')
@@ -117,6 +125,45 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
         assert.ok(wakes.includes(f.deviceId), 'the push wake is sent while the HTTP request waits')
         return { value: result.value, command, receipt }
       } finally { controller.abort(); subscription.close(); await outcome }
+    }
+    async function registerOwnerSecret(value: string) {
+      const { sealSecret, userSecretAad } = await import('../secrets/crypto')
+      const row = { id: randomUUID(), userId: owner, name: `CODING_WORKSPACE_POLICY_${randomUUID().replaceAll('-', '').toUpperCase()}`, kind: 'secret' }
+      const sealed = sealSecret(value, userSecretAad(row))
+      await pool.query('INSERT INTO user_secrets(id,"userId",name,kind,ciphertext,iv,"keyVersion") VALUES($1,$2,$3,$4,$5,$6,$7)',
+        [row.id, row.userId, row.name, row.kind, sealed.ciphertext, sealed.iv, sealed.keyVersion])
+      return row.id
+    }
+    /** Hold only the external wake completion. The request, receipt validation,
+     * encrypted secret write and consumption all use their real PG paths. */
+    async function afterStoredRead<T>(f: Fixture, start: (signal: AbortSignal) => Promise<T>, afterStored:
+      (command: WorkspaceReadCommand, receipt: WorkspaceReadReceipt, stored: { result: WorkspaceReadResult; maskPolicy: string | null }) => Promise<void>) {
+      const subscription = await subscribeShared(pool, DEVICE_WORK_CHANNEL, [f.deviceId])
+      assert.ok(subscription)
+      const barrier = Promise.withResolvers<void>(), controller = new AbortController()
+      wakeBarriers.set(f.deviceId, barrier.promise)
+      const outcome = start(controller.signal).then(value => ({ ok: true as const, value }), error => ({ ok: false as const, error }))
+      try {
+        assert.equal(await subscription.next(5000), 'notified', 'real queue commit is observed without polling')
+        const commands = await pendingWorkspaceReads(pool, pool, f.caller, f.deviceId)
+        assert.equal(commands.length, 1)
+        const command = commands[0]!, receipt = await readWorkspaceReceipt(command, f.entry)
+        assert.equal(await finishWorkspaceRead(pool, pool, f.caller, f.deviceId, command.id, receipt), true)
+        const stored = (await pool.query<{ result: WorkspaceReadResult; maskPolicy: string | null }>(
+          'SELECT result,"maskPolicy" FROM coding_workspace_requests WHERE id=$1', [command.id])).rows[0]
+        assert.ok(stored?.result.ok, 'the complete real source proof was accepted before the policy change')
+        assert.match(stored.maskPolicy ?? '', /^[a-f0-9]{64}$/)
+        assert.equal(stored.maskPolicy, (await secretMaskerFor({ workspaceId, ownerId: owner })).sourcePolicy)
+        assert.equal('maskPolicy' in stored.result, false, 'the policy is private database metadata')
+        await afterStored(command, receipt, stored)
+        barrier.resolve()
+        const result = await outcome
+        assert.equal((await pool.query('SELECT 1 FROM coding_workspace_requests WHERE id=$1', [command.id])).rowCount, 0)
+        if (!result.ok) throw result.error
+        return result.value
+      } finally {
+        barrier.resolve(); wakeBarriers.delete(f.deviceId); controller.abort(); subscription.close(); await outcome
+      }
     }
     async function submissionFixture(cloud = false) {
       const f = await fixture(cloud)
@@ -506,6 +553,170 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
           { kind: 'file', path: 'src/example.ts', range: { startLine: line, endLine: line } }, signal)), errorCode('workspace_path_unavailable'))
         assert.equal((await pool.query('SELECT 1 FROM coding_workspace_mentions WHERE "runId"=$1', [f.runId])).rowCount, 0)
       } finally { await pool.query('DELETE FROM user_secrets WHERE id=$1', [row.id]) }
+    })
+
+    await t.test('a real secret registered after receipt storage invalidates every successful result before the waiter can consume partial source', async () => {
+      const f = await fixture(), secretLines = [`receipt-window-first-${randomUUID()}`, `receipt-window-second-${randomUUID()}`]
+      const secret = secretLines.join('\n'), source = `public before\n${secret}\npublic after\n`
+      await writeFile(join(f.worktree, 'src/example.ts'), source)
+      const requests: WorkspaceReadRequest[] = [
+        { kind: 'file', path: 'src/example.ts', range: { startLine: 2, endLine: 2 } },
+        { kind: 'file', path: 'src/example.ts', range: { startLine: 3, endLine: 3 } },
+        { kind: 'search', query: 'example', limit: 10 },
+        { kind: 'context', selection: { kind: 'file', path: 'src/example.ts', range: { startLine: 2, endLine: 2 } } },
+        { kind: 'tree', path: 'src', limit: 100 },
+      ]
+      for (const request of requests) {
+        let secretId: string | undefined
+        try {
+          await assert.rejects(() => afterStoredRead(f,
+            signal => requestWorkspaceRead(pool, pool, actor, f.runId, f.repoId, request, signal),
+            async (command, receipt, stored) => {
+              assert.deepEqual(stored.result, receipt.result)
+              if (stored.result.ok && stored.result.kind === 'file') {
+                assert.equal(stored.result.content, secretLines[request.kind === 'file' && request.range?.startLine === 3 ? 1 : 0])
+                assert.equal(Buffer.from(receipt.files[0]!.base64, 'base64').toString('utf8'), source)
+              }
+              secretId = await registerOwnerSecret(secret)
+              const freshMask = await secretMaskerFor({ workspaceId, ownerId: owner })
+              assert.notEqual(freshMask.sourcePolicy, stored.maskPolicy)
+              assert.notEqual(freshMask(secret), secret, 'the fresh masker loads the real encrypted multiline value')
+              assert.deepEqual(maskDeep(stored.result, freshMask), stored.result, 'masking only the public fragments would still leak these separate ranges')
+              if (request.kind === 'file' || request.kind === 'context') assert.deepEqual(validateWorkspaceReceipt(command.request, command.identity, receipt, freshMask),
+                { ok: false, code: 'workspace_path_unavailable' }, 'rechecking the complete proof would refuse the new secret')
+            }), errorCode('workspace_path_unavailable'))
+          assert.equal((await pool.query('SELECT 1 FROM coding_workspace_requests WHERE "runId"=$1', [f.runId])).rowCount, 0)
+        } finally { if (secretId) await pool.query('DELETE FROM user_secrets WHERE id=$1', [secretId]) }
+      }
+      assert.equal((await pool.query('SELECT 1 FROM coding_workspace_mentions WHERE "runId"=$1', [f.runId])).rowCount, 0)
+    })
+
+    await t.test('a successful receipt without its private policy fails closed even when its selected text is otherwise unchanged', async () => {
+      const f = await fixture()
+      await assert.rejects(() => afterStoredRead(f,
+        signal => requestWorkspaceRead(pool, pool, actor, f.runId, f.repoId,
+          { kind: 'file', path: 'src/example.ts', range: { startLine: 1, endLine: 1 } }, signal),
+        async command => {
+          await pool.query('UPDATE coding_workspace_requests SET "maskPolicy"=NULL WHERE id=$1', [command.id])
+        }), errorCode('workspace_path_unavailable'))
+      assert.equal((await pool.query('SELECT 1 FROM coding_workspace_requests WHERE "runId"=$1', [f.runId])).rowCount, 0)
+    })
+
+    await t.test('final source assertions and derived mentions preserve private proof policy and refuse a later multiline secret', async () => {
+      const f = await fixture(), selection = { kind: 'file' as const, path: 'src/example.ts', range: { startLine: 1, endLine: 1 } }
+      const { value } = await exchange(f, signal => requestWorkspaceRead(pool, pool, actor, f.runId, f.repoId, selection, signal))
+      assert.ok(value.ok && value.kind === 'file')
+      const { value: mention } = await exchange(f, signal => createFileMention(pool, pool, actor, f.runId, f.repoId, selection, signal))
+      const { value: resolved } = await exchange(f, signal => resolveFileMentions(pool, pool, actor, f.runId, f.repoId, [mention.id], signal))
+      const policy = (await secretMaskerFor({ workspaceId, ownerId: owner })).sourcePolicy
+      assert.ok(policy)
+      const copied = copyWorkspaceResultMaskPolicy(value, { ...value })
+      for (const result of [value, mention, resolved, copied]) {
+        assert.equal(workspaceResultMaskPolicy(result), policy, 'derived DTOs retain the full-proof policy')
+        assert.ok(!JSON.stringify(result).includes(policy), 'the private marker is absent from API JSON')
+        assert.equal(workspaceResultMaskPolicy({ ...result }), undefined, 'the marker is non-enumerable')
+        await assertWorkspaceResultMaskPolicy(result, actor)
+      }
+      await assert.rejects(() => assertWorkspaceResultMaskPolicy(JSON.parse(JSON.stringify(value)), actor), errorCode('workspace_path_unavailable'))
+      const secret = (await readFile(join(f.worktree, 'src/example.ts'), 'utf8')).trimEnd()
+      const secretId = await registerOwnerSecret(secret)
+      try {
+        const freshMask = await secretMaskerFor({ workspaceId, ownerId: owner })
+        assert.notEqual(freshMask.sourcePolicy, policy)
+        assert.equal(freshMask(value.content!), value.content, 'a final partial-text mask cannot detect the full multiline value')
+        assert.deepEqual(maskDeep(resolved, freshMask), resolved)
+        for (const result of [value, mention, resolved, copied])
+          await assert.rejects(() => assertWorkspaceResultMaskPolicy(result, actor), errorCode('workspace_path_unavailable'))
+      } finally { await pool.query('DELETE FROM user_secrets WHERE id=$1', [secretId]) }
+    })
+
+    await t.test('a secret registered after mention resolution rolls back submission before commit and missing private evidence cannot enqueue context', async () => {
+      const { f, resolved, submitActor } = await submissionFixture()
+      const input = { runId: f.runId, repoId: f.repoId, text: 'Explain the selected source', requestId: randomUUID() }
+      await assertWorkspaceResultMaskPolicy(resolved, actor)
+      await assert.rejects(() => submitFileMentions(pool, pool, submitActor, input, { ...resolved }), errorCode('workspace_path_unavailable'))
+      assert.equal((await pool.query('SELECT 1 FROM run_messages WHERE "runId"=$1', [f.runId])).rowCount, 0)
+      const secret = (await readFile(join(f.worktree, 'src/example.ts'), 'utf8')).trimEnd()
+      const secretId = await registerOwnerSecret(secret)
+      try {
+        const freshMask = await secretMaskerFor({ workspaceId, ownerId: owner })
+        assert.deepEqual(maskDeep(resolved, freshMask), resolved, 'the selected first line does not reveal that the two-line source is now secret')
+        await assert.rejects(() => submitFileMentions(pool, pool, submitActor, input, resolved), errorCode('workspace_path_unavailable'))
+        assert.equal((await pool.query('SELECT 1 FROM run_messages WHERE "runId"=$1', [f.runId])).rowCount, 0,
+          'the real inbox write is rolled back with its transaction')
+        assert.equal((await pool.query('SELECT 1 FROM coding_workspace_requests WHERE "runId"=$1', [f.runId])).rowCount, 0)
+      } finally { await pool.query('DELETE FROM user_secrets WHERE id=$1', [secretId]) }
+    })
+
+    await t.test('final authority locks block Stop and revocation while real secret loading waits, then release promptly', { timeout: 20_000 }, async () => {
+      const f = await fixture(), { auth } = await import('../auth')
+      const session = await (await auth.$context).internalAdapter.createSession(owner)
+      assert.ok(session)
+      const { value } = await exchange(f, signal => requestWorkspaceRead(pool, pool, actor, f.runId, f.repoId,
+        { kind: 'file', path: 'src/example.ts', range: { startLine: 1, endLine: 1 } }, signal))
+      assert.ok(value.ok && value.kind === 'file')
+      const authorized = { ...actor, credential: { kind: 'session' as const, id: session.id } }
+      const stop = `WITH locked AS (SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE NOWAIT)
+        UPDATE agent_runs r SET "stopRequestedAt"=clock_timestamp() FROM locked WHERE r.id=locked.id`
+      const revoke = `WITH locked AS (SELECT id FROM "session" WHERE id=$1 FOR UPDATE NOWAIT)
+        DELETE FROM "session" s USING locked WHERE s.id=locked.id`
+      const suspend = `WITH locked AS (SELECT "workspaceId","userId" FROM mikka_workspace_members
+        WHERE "workspaceId"=$1 AND "userId"=$2 FOR UPDATE NOWAIT)
+        UPDATE mikka_workspace_members m SET status='suspended' FROM locked
+        WHERE m."workspaceId"=locked."workspaceId" AND m."userId"=locked."userId"`
+      const blocker = await pool.connect(), entered = Promise.withResolvers<void>(), controller = new AbortController()
+      let held = false, maskCompleted = false, suspended = false
+      let pending: Promise<{ ok: true; response: Response } | { ok: false; error: unknown }> | undefined
+      try {
+        await blocker.query('BEGIN'); held = true
+        await blocker.query('LOCK TABLE user_secrets IN ACCESS EXCLUSIVE MODE')
+        pending = withWorkspaceAuthority(pool, pool, authorized, f.runId, async () => {
+          const maskRead = secretMaskerFor({ workspaceId, ownerId: owner })
+          entered.resolve()
+          const mask = await maskRead
+          maskCompleted = true
+          assert.equal(mask.sourcePolicy, workspaceResultMaskPolicy(value))
+          return Response.json(value)
+        }, { live: value.identity, signal: controller.signal }).then(response => ({ ok: true as const, response }), error => ({ ok: false as const, error }))
+        await Promise.race([entered.promise, pending.then(result => {
+          if (!result.ok) throw result.error
+          assert.fail('the real secret read must remain blocked before response serialization')
+        })])
+        for (const [sql, values] of [[stop, [f.runId]], [revoke, [session.id]], [suspend, [workspaceId, owner]]] as const)
+          await assert.rejects(pool.query(sql, [...values]), { code: '55P03' }, 'actual writers cannot bypass the held read authority')
+        assert.equal(maskCompleted, false, 'the full asynchronous secret read remains inside the authorization locks')
+        assert.equal((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [f.runId])).rows[0].stopRequestedAt, null)
+        assert.equal((await pool.query('SELECT 1 FROM "session" WHERE id=$1', [session.id])).rowCount, 1)
+        assert.equal((await pool.query('SELECT status FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner])).rows[0].status, 'active')
+        await blocker.query('ROLLBACK'); held = false
+        let timer: ReturnType<typeof setTimeout> | undefined
+        try {
+          const result = await Promise.race([pending, new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(() => reject(new Error('authority read did not finish after releasing the secret lock')), 5000)
+          })])
+          if (!result.ok) throw result.error
+          assert.equal(result.response.status, 200)
+          assert.deepEqual(await result.response.json(), value)
+        } finally { if (timer) clearTimeout(timer) }
+        assert.equal(maskCompleted, true)
+        assert.equal((await pool.query(stop, [f.runId])).rowCount, 1, 'Stop takes effect as soon as final read authority is released')
+        await assert.rejects(() => withWorkspaceAuthority(pool, pool, authorized, f.runId, async () => {
+          assert.fail('stopped authority cannot expose a second source response')
+        }, { live: value.identity }), errorCode('workspace_machine_unavailable'))
+        await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1', [f.runId])
+        assert.equal((await pool.query(revoke, [session.id])).rowCount, 1)
+        await assert.rejects(() => withWorkspaceAuthority(pool, pool, authorized, f.runId, async () => {
+          assert.fail('a revoked session cannot expose a second source response')
+        }, { live: value.identity }), errorCode('workspace_not_found'))
+        suspended = (await pool.query(suspend, [workspaceId, owner])).rowCount === 1
+        assert.equal(suspended, true, 'membership revocation is also released after response construction')
+      } finally {
+        controller.abort()
+        if (held) await blocker.query('ROLLBACK')
+        blocker.release()
+        if (pending) await pending
+        if (suspended) await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner])
+      }
     })
 
     await t.test('revocation after delivery is rechecked before source reaches the waiting requester', async () => {
