@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Window } from 'happy-dom'
 import { captureParityReadReceipts, parityBotReadKeys } from './parity-reads.mjs'
-import { observeReads, pageReady } from './parity-page-ready.mjs'
+import { observeReads, pageReady, selectParityWorkspace } from './parity-page-ready.mjs'
 import { compareImages } from './parity-images.mjs'
 
 const ids = { coordinator: 'coordinator-bot', bot: 'bot', coordinatorUser: 'c1', coordinatorReply: 'c2', botUser: 'b1', botReply: 'b2' }
@@ -179,6 +179,71 @@ function artifactPage(t, { reply = true, frameReady = true } = {}) {
 }
 
 const nextTurn = () => new Promise(resolve => setImmediate(resolve))
+
+function workspacePage({ current = false, clickError } = {}) {
+  const document = Promise.withResolvers()
+  const calls = { menu: 0, item: 0, document: 0, menuReady: 0, observedBeforeClick: false }
+  const menu = { first: () => menu, click: async () => { calls.menu++ }, waitFor: async () => { calls.menuReady++ } }
+  const item = { getAttribute: async name => { assert.equal(name, 'aria-current'); return current ? 'true' : null }, click: async () => {
+    calls.item++
+    calls.observedBeforeClick = calls.document === 1
+    if (clickError) throw clickError
+  } }
+  const page = {
+    getByRole: role => { assert.ok(['button', 'menuitem'].includes(role)); return role === 'button' ? menu : item },
+    // Both the old and new documents have this URL and the same ready menu.
+    waitForURL: async predicate => { assert.equal(predicate(new URL('http://localhost:3000/mikka/en')), true) },
+    waitForEvent: event => { assert.equal(event, 'domcontentloaded'); calls.document++; return document.promise },
+  }
+  const start = () => selectParityWorkspace(page, { menuName: 'Workspace', workspaceName: 'Fixture', basePath: '/mikka' })
+  return { calls, document, start }
+}
+
+test('workspace selection waits for the new document even when its URL and old DOM already match', { timeout: 1000 }, async () => {
+  const f = workspacePage()
+  let completed = false
+  const result = f.start().then(() => { completed = true })
+  await nextTurn()
+  assert.equal(completed, false, 'The old matching URL must not complete a real workspace switch')
+  assert.equal(f.calls.observedBeforeClick, true, 'Observe the new document before the single switch click')
+  assert.equal(f.calls.item, 1)
+  assert.equal(f.calls.menuReady, 0)
+  f.document.resolve()
+  await result
+  assert.equal(completed, true)
+  assert.equal(f.calls.menuReady, 1)
+})
+
+test('the already-selected workspace closes its menu once without awaiting a nonexistent navigation', async () => {
+  const f = workspacePage({ current: true })
+  await f.start()
+  assert.equal(f.calls.item, 1)
+  assert.equal(f.calls.document, 0)
+  assert.equal(f.calls.menuReady, 1)
+})
+
+test('workspace selection preserves a failed document wait and never retries the switch', async () => {
+  const f = workspacePage()
+  const failed = new Error('DOCUMENT_LOAD_FAILED')
+  const result = f.start()
+  const rejected = assert.rejects(result, error => error === failed)
+  void rejected.catch(() => {})
+  await nextTurn()
+  if (f.calls.document) f.document.reject(failed)
+  await rejected
+  assert.equal(f.calls.item, 1)
+  assert.equal(f.calls.menuReady, 0)
+})
+
+test('workspace selection preserves click failures while its pending document observer is safely settled', async () => {
+  const failed = new Error('WORKSPACE_CLICK_FAILED')
+  const f = workspacePage({ clickError: failed })
+  await assert.rejects(f.start(), error => error === failed)
+  if (f.calls.document) f.document.reject(new Error('DOCUMENT_LOAD_TIMEOUT'))
+  await nextTurn()
+  assert.equal(f.calls.item, 1)
+  assert.equal(f.calls.menuReady, 0)
+})
 
 for (const name of ['artifact-markdown', 'artifact-html']) {
   test(`${name} waits for both visible thread cards, not background or partial matches`, { timeout: 1000 }, async t => {
