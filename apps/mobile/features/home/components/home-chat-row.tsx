@@ -14,7 +14,6 @@ import { colors, ROW_SURFACE_INSET } from '@/lib/theme'
 import { armedAt, settleSwipe, SWIPE_REVEAL } from '../model/pin-swipe'
 import type { HomeChat, useHomeChats } from '../model/use-home-chats'
 import { ChatBadge } from './chat-badge'
-import { useChatDrag } from './chat-drag'
 import { ChatLink } from './chat-link'
 
 type Actions = ReturnType<typeof useHomeChats>
@@ -22,8 +21,7 @@ type Actions = ReturnType<typeof useHomeChats>
 /**
  * A chat on the home list (#1408 Phase 2b). A tap opens it with the system's link transition; a long press opens its
  * menu over a live preview of the chat (chat-menu.tsx). A swipe to the left shows two capsules, 置顶 and 隐藏 (Comma
- * design 03), and pins on release past the full mark, with a tick as it crosses (pin-swipe.ts); a swipe to the right only closes an open row. Holding 250 ms and moving drags it instead (chat-drag.tsx): the two race, and the
- * first to start wins.
+ * design 03), and pins on release past the full mark, with a tick as it crosses (pin-swipe.ts); a swipe to the right only closes an open row. Chats are not dragged (Alex 2026-11-07).
  */
 export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat; actions: Actions; openKey: string | null; onOpen: (key: string | null) => void }) {
   const reduceMotion = useReducedMotionPreference()
@@ -31,7 +29,6 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
   const start = useSharedValue(0)
   const armed = useSharedValue(false)
   const [open, setOpen] = useState(false)
-  const drag = useChatDrag(chat.key, 'list')
   const blocked = actions.pinsFull && !chat.pinned
 
   const settleTo = useCallback((to: number) => {
@@ -43,7 +40,7 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
   // One row is open at a time: another row opening, or the list scrolling, closes this one.
   useEffect(() => { if (open && openKey !== chat.key) close() }, [chat.key, close, open, openKey])
   const opened = useCallback((value: boolean) => { setOpen(value); if (value) onOpen(chat.key) }, [chat.key, onOpen])
-  // A press that ends a swipe or a drag is not a tap. iOS cancels the press itself; the web build does not.
+  // A press that ends a swipe is not a tap. iOS cancels the press itself; the web build does not.
   const swiping = useRef(false)
   const setSwiping = useCallback((value: boolean) => { swiping.current = value }, [])
   const endSwipe = useCallback(() => { setTimeout(() => { swiping.current = false }, 0) }, [])
@@ -71,7 +68,6 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
       else if (outcome === 'open') { settleTo(-SWIPE_REVEAL); scheduleOnRN(opened, true) }
       else { settleTo(0); scheduleOnRN(opened, false) }
     }), [armed, blocked, chat.key, offset, onOpen, open, opened, pin, settleTo, start])
-  const gesture = useMemo(() => Gesture.Race(drag.gesture, swipe), [drag.gesture, swipe])
 
   const moved = useAnimatedStyle(() => ({ transform: [{ translateX: offset.get() }] }))
   return (
@@ -79,11 +75,11 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
       <SwipeActions chat={chat} offset={offset} blocked={blocked}
         onPin={() => { close(); if (blocked) warn(); else pin() }}
         onHide={() => { close(); void actions.setHidden(chat, true) }} />
-      <GestureDetector gesture={gesture}>
-        <Reanimated.View ref={drag.ref} collapsable={false} style={[styles.surface, moved]}>
+      <GestureDetector gesture={swipe}>
+        <Reanimated.View style={[styles.surface, moved]}>
           {/* The side margin sits on a plain View: on iOS the press is inside a Link, which may not pass a style on. */}
           <View style={styles.inset}>
-            <ChatLink chat={chat} actions={actions} ignore={() => swiping.current || drag.active()} style={({ pressed }) => [styles.press, pressed && { backgroundColor: colors.pressed }]}>
+            <ChatLink chat={chat} actions={actions} ignore={() => swiping.current} style={({ pressed }) => [styles.press, pressed && { backgroundColor: colors.pressed }]}>
               <ChatRowContent row={chat.row} badge={<ChatBadge chat={chat} />} />
             </ChatLink>
           </View>

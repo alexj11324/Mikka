@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChatTool } from './context'
-import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, toolUnknown } from './tool-activity'
+import { dispatchedRunId, toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, toolUnknown } from './tool-activity'
 
 const tool = (name: string, extra: Partial<ChatTool> = {}): ChatTool => ({ call: name, name, state: 'done', ...extra })
 
@@ -72,4 +72,13 @@ test('a call to a tool the bot does not have is known as such, so its made-up na
   assert.equal(toolUnknown(tool('get_issue', { state: 'error', output: 'boom' })), false)
   // Only a call that failed: a tool that merely mentions the class in a result is not unknown.
   assert.equal(toolUnknown(tool('web_search', { output: raw })), false)
+})
+
+test('dispatchedRunId reads the thread a dispatch started, and nothing for other calls', () => {
+  const runId = '0b8f4d3e-1c2a-4b5d-8e9f-001122334455'
+  assert.equal(dispatchedRunId({ name: 'dispatch_run', output: JSON.stringify({ runId, status: 'queued' }) }), runId)
+  assert.equal(dispatchedRunId({ name: 'dispatch_bot_computer', output: JSON.stringify({ runId }) }), runId)
+  assert.equal(dispatchedRunId({ name: 'dispatch_factory_run', output: JSON.stringify({ runId }) }), null)
+  assert.equal(dispatchedRunId({ name: 'get_issue', output: JSON.stringify({ runId }) }), null)
+  assert.equal(dispatchedRunId({ name: 'dispatch_run', output: undefined }), null)
 })

@@ -4,8 +4,8 @@ import { endsSelection, quotedMessage, selectedPart, selectionQuote, SELECTION_A
 import { nextQueueCheck, QUEUED_AFTER_MS, queuedItems, queuePreview } from '../features/chat/model/chat-queue.ts'
 import { cardAnchor, cardHeight, rowWindow } from '../features/chat/model/chat-attachment-card.ts'
 import { dismisses, fittedRect, frameSize, galleryRows, layerPose, loadedAspect, pageTurn, stackCard, throwsCard } from '../features/chat/model/chat-image-geometry.ts'
-import { menuThreads } from '../features/chat/model/chat-header-menu.ts'
-import type { ChatItem, Thread } from '../lib/types.ts'
+import { menuTasks } from '../features/chat/model/chat-header-menu.ts'
+import type { ChatItem, Task } from '../lib/types.ts'
 
 test('a selection capsule sends a Markdown quote of the selection, then its instruction', () => {
   assert.equal(quotedMessage('第一行\n第二行', '解释这段。'), '> 第一行\n> 第二行\n\n解释这段。')
@@ -86,10 +86,11 @@ test('the viewer fits, pages, closes and grids', () => {
   assert.deepEqual(galleryRows(4), [[0, 1], [2, 3]])
 })
 
-test('the title menu lists open threads first, a few of them', () => {
-  const thread = (id: string, group: Thread['group']): Thread => ({ id, name: id, status: 'running', by: '', harness: '', device: null, createdAt: '', finishedAt: null, group })
-  const page = { threads: [thread('a', 'running'), thread('b', 'resolved'), thread('c', 'waiting')] }
-  assert.deepEqual(menuThreads(page).map(item => item.id), ['a', 'c'])
-  assert.deepEqual(menuThreads({ threads: [thread('b', 'resolved')] }).map(item => item.id), ['b'])
-  assert.deepEqual(menuThreads(null), [])
+test('the title menu lists the bot\'s open tasks, waiting ones first, a few of them', () => {
+  const task = (id: string, status: string, bot = 'b1'): Task => ({ id, identifier: null, title: id, status, priority: 'normal', owner: null, updatedAt: '', bot: { id: bot, name: '' } })
+  const tasks = [task('a', 'doing'), task('b', 'done'), task('c', 'review'), task('d', 'todo', 'other')]
+  assert.deepEqual(menuTasks(tasks, 'b1').map(item => item.id), ['c', 'a'])
+  assert.deepEqual(menuTasks([task('b', 'done')], 'b1').map(item => item.id), ['b'])
+  assert.deepEqual(menuTasks(null, 'b1'), [])
+  assert.deepEqual(menuTasks(tasks, null), [])
 })

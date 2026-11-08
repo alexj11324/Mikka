@@ -13,8 +13,10 @@ export function pushBelongsToAccount(data: unknown, account: { id: string; serve
 /**
  * Where a tapped push opens, from its `data` (lib/mobile-push.ts on the
  * server): a proposal waiting for the person opens its chat scrolled to that
- * card; a finished thread opens the thread; anything else opens the chat it
- * came from. Fields the server does not send yet are simply absent.
+ * card; a thread of a task (等你回复, 待审阅) opens its task, which then opens
+ * that attempt (2026-11-07: a thread opens only inside its task); a thread
+ * without a task opens the thread; anything else opens the chat it came from.
+ * Fields the server does not send yet are simply absent.
  */
 export function pushTarget(data: unknown): string {
   const fields = data && typeof data === 'object' ? data as Record<string, unknown> : {}
@@ -23,6 +25,8 @@ export function pushTarget(data: unknown): string {
   const action = id(fields.pendingActionId)
   if (action) return `${chat}?action=${action}`
   const run = id(fields.runId)
+  const task = id(fields.issueId)
+  if (task) return run ? `/task/${task}?attempt=${run}` : `/task/${task}`
   if (run) return `/thread/${run}`
   return chat
 }

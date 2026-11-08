@@ -52,7 +52,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     subscriptionRuntime: () => useServiceUsage ? subscriptionModule.subscriptionRuntime() : ({
       member: subscriptionModule.authorizeSubscriptionWorkspace,
       workspace: subscriptionModule.authorizeSubscriptionWorkspace,
-      usage: async (ownerId: string, connectionId: string, signal: AbortSignal) => {
+      allowance: async (ownerId: string, connectionId: string, signal: AbortSignal) => {
         usageCalls.push({ ownerId, connectionId })
         assert.equal(signal.aborted, false)
         await usageProbe(ownerId, connectionId, signal)
@@ -1198,7 +1198,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     t.after(() => { for (const [key, value] of Object.entries(originalRuntime)) if (value === undefined) delete process.env[key]; else process.env[key] = value })
     let quotaReads = 0, preflightUnlocked = false
     t.mock.method(SubscriptionWorkerClient.prototype, 'call', async function<T>(method: string, input: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
-      assert.equal(method, 'usage', 'the quota preflight cannot send inference or acquire a new binding')
+      assert.equal(method, 'allowance', 'the quota preflight cannot send inference or acquire a new binding')
       assert.equal(input.revision, 1); assert.ok(signal); assert.equal(signal.aborted, false)
       quotaReads++
       // The actual service/repository parse and save the synthetic provider

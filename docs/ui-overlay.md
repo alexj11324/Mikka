@@ -26,6 +26,8 @@ A missing directory, or one outside the repository, fails the build.
 
 | Slot | Default | Props | Callers import |
 | --- | --- | --- | --- |
+| `all-threads` | 全部线程's window-bar button and the right column it opens | `AllThreadsToggleProps`, `AllThreadsColumnProps` in `components/slots/all-threads-contract.ts` (`pending` is the 待处理 task count for a layer that lists tasks) | `AllThreadsToggle`, `AllThreadsColumn` from `@/components/nav/all-threads` |
+| `bot-tasks` | the bot panel's 线程 tab: the threads it dispatched in R-52's groups | `BotTasksProps` in `components/slots/bot-tasks-contract.ts`; tasks from `tasksOf` (`hooks/use-bot-tasks.ts`); optional `LISTS_TASKS` (`true`: the tab reads 任务) | `ContextPanel` |
 | `bot-avatar` | bloub blob | `BotAvatarProps` in `components/slots/bot-avatar-contract.ts` (`id` is the bot's id when the caller has one; `coordinator` is set by `COORDINATOR_AVATAR`) | `BotAvatar`, `CoordinatorAvatar`, `colorFor`, `COORDINATOR_AVATAR` from `@/components/nav/bot-avatar` |
 | `chat-message` | today's message rows (`Message`, `Bubble`, `ReplyWaiting`) | `ChatMessageProps`, `ChatWaitingProps` in `components/slots/chat-message-contract.ts`; also exports `CHAT_SURFACE` | `coordinator-chat.tsx`, through `@ui-slot/chat-message` |
 | `chat-composer` | the Grok-style composer (attach and the model chip on the left, send or stop on the right) | `ChatComposerProps` in `components/slots/chat-composer-contract.ts`; what it does comes from `useChatComposer` (`hooks/use-chat-composer.ts`) | `ChatComposer` from `@/components/coordinator/chat-composer` |
@@ -44,6 +46,10 @@ A missing directory, or one outside the repository, fails the build.
 | `settings-privacy` | 数据与隐私 body (data export, shared links) | `SettingsPrivacyProps` in `components/slots/settings-privacy-contract.ts` | `PrivacySettings` from `@/components/settings/privacy-settings` |
 | `settings-secrets` | 密钥与登录 / 密钥与环境 body (my secrets and logins, workspace secrets) | `SettingsSecretsProps` in `components/slots/settings-secrets-contract.ts` | `SecretsPage` from `@/components/settings/secrets-page` |
 | `settings-security` | 安全 body (password, signed-in devices, Google sign-in) | `SettingsSecurityProps` in `components/slots/settings-security-contract.ts` | `SettingsView` |
+| `task-column` | a task open in the right column beside the centre (`?task=`, decision 2026-11-07-2045): its title and threads; the default layer never opens one | `TaskColumnProps` in `components/slots/task-column-contract.ts`; threads from `useIssueThreads`; `openThread`, `closeTask` move between it and its threads | `TaskColumn` from `@/components/workspace/task-column` |
+| `task-conversation` | a thread on a task, opened as the task's one conversation (#1681): its attempts oldest first, scrolled to the one opened | `TaskConversationProps` in `components/slots/task-conversation-contract.ts`; no required exports; optional `TaskConversation` (`null` or missing: a thread opens alone), built from `IssueThreadPanel`'s `before`, `focusRunId` and `transcriptOnly` | `ThreadColumn` |
+| `thread-card` | a thread a reply dispatched, as a card under that reply | `ThreadCardProps` in `components/slots/thread-card-contract.ts` (`onOpenTask` opens its task for a layer whose card is the task's) | `ThreadCard` from `@/components/coordinator/thread-card` |
+| `thread-header` | a thread panel's header row (←, title, where it runs, Artifact, stop, open task, ✕) and the status line above its transcript | `ThreadHeaderProps`, `ThreadStatusLineProps` in `components/slots/thread-header-contract.ts`; the panel passes its widgets and actions, the slot lays them out | `ThreadHeader`, `ThreadStatusLine` from `@/components/workspace/thread-header` |
 
 A slot changes how something looks, never what it does. Data, state and
 behaviour stay in this repository and reach the slot as props. A layer slot

@@ -5,23 +5,24 @@ import { WebBarMenu } from '@/components/WebBarMenu'
 import { Spinner } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { colors } from '@/lib/theme'
-import { THREAD_SYMBOL } from '@/features/chat/model/chat-header-menu'
+import { taskSymbol } from '@/features/chat/model/chat-header-menu'
+import { displayTitle } from '@/lib/display-title'
 import type { ChatHeaderProps } from './chat-header.types'
 
 /** The chat's bar on the web build: the same title menu as iOS (chat-header.ios.tsx), drawn as a panel. */
-export function ChatHeader({ name, threads, onThread, onAllThreads, onInfo }: ChatHeaderProps) {
+export function ChatHeader({ name, tasks, onTask, onAllTasks, onInfo }: ChatHeaderProps) {
   const title = name ? (
     <WebBarMenu plain item={{
       icon: 'chevron.down', label: name, onOpen: () => {},
       web: <View style={styles.title}><Text style={styles.name} numberOfLines={1}>{name}</Text><ChevronDown size={14} color={colors.secondary} strokeWidth={2.4} /></View>,
       items: [
-        ...(threads ?? []).map(thread => ({ label: thread.name, icon: THREAD_SYMBOL[thread.status], onPress: () => onThread(thread.id) })),
-        { label: '全部线程', icon: 'checklist', onPress: onAllThreads },
+        ...(tasks ?? []).map(task => ({ label: displayTitle(task.title), icon: taskSymbol(task), onPress: () => onTask(task.id) })),
+        { label: '全部任务', icon: 'checklist', onPress: onAllTasks },
         { label: '资料', icon: 'person.crop.circle', onPress: onInfo },
       ],
     }} />
   ) : <Spinner size={14} />
-  return <NavBar material titleView={title} />
+  return <NavBar titleView={title} />
 }
 
 const styles = StyleSheet.create({

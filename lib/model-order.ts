@@ -189,7 +189,7 @@ const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, con
   await service.member(scope.ownerId, scope.workspaceId)
   await service.workspace(credentialOwnerId, scope.workspaceId)
   if (credentialOwnerId !== scope.ownerId && !(await (await import('./personal-policy')).othersMayUse(query, credentialOwnerId, scope.workspaceId))) throw new ActionFailureError('executionAccountUnavailable')
-  await service.usage(credentialOwnerId, connectionId, signal)
+  await service.allowance(credentialOwnerId, connectionId, signal)
 }
 
 /** Each entry's credential, read now. Dispatch refreshes missing/stale allowance
