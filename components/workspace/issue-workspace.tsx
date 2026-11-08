@@ -256,10 +256,15 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // Below lg the toggle is hidden, so the browser counts as closed and the right panel stays.
   const browserFits = useBrowserFits()
   const browserShown = browserOpen && browserFits
-  function showBrowser(next: boolean) { setBrowserOpen(next); try { window.localStorage.setItem('mikka:browser', next ? '1' : '0') } catch { /* storage unavailable */ } }
-  // The review page's ⋯ 预览 asks for the column (lib/browser/column.ts).
+  function showBrowser(next: boolean) { setBrowserOpen(next); if (!next) setBrowserAt(null); try { window.localStorage.setItem('mikka:browser', next ? '1' : '0') } catch { /* storage unavailable */ } }
+  // The review page's ⋯ 预览 asks for the column (lib/browser/column.ts), on a page when it names one.
+  const [browserAt, setBrowserAt] = useState<{ url: string; id: number } | null>(null)
   useEffect(() => {
-    const request = (event: Event) => showBrowser((event as CustomEvent<BrowserColumnRequest>).detail.open)
+    const request = (event: Event) => {
+      const { open, url } = (event as CustomEvent<BrowserColumnRequest>).detail
+      if (open && url) setBrowserAt(previous => ({ url, id: (previous?.id ?? 0) + 1 }))
+      showBrowser(open)
+    }
     window.addEventListener(BROWSER_COLUMN_EVENT, request)
     return () => window.removeEventListener(BROWSER_COLUMN_EVENT, request)
   }, [])
@@ -631,7 +636,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
         <IssueList issues={filtered} searching={!!query || view !== 'all'} onOpen={openFromList} onCreate={() => create()} />
       </>}
     </AppShellContent>
-    {browserShown && (besideReview || (!threadShown && !threadsView)) && <BrowserPane onClose={() => showBrowser(false)} />}
+    {browserShown && (besideReview || (!threadShown && !threadsView)) && <BrowserPane openAt={browserAt} onClose={() => showBrowser(false)} />}
     {threadShown && !besideReview && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
     {taskShown && !threadShown && !besideReview && <TaskColumn issueId={taskShown} issue={tasks.find(task => task.id === taskShown)} threads={threads} overList={!!threadsView} />}
     {threadsView && !threadShown && !taskShown && !besideReview && <AllThreadsColumn view={threadsView} threads={threads} issues={tasks} loading={threadsLoading} />}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
-import { getReviewDiff, getReviewFile, getReviewSummary, mergeReview, openReviewTerminal, REVIEW_ENDPOINTS, ReviewRequestError, sendToAgent, terminalEvent } from './client'
+import { getReviewDiff, getReviewFile, getReviewPreview, getReviewSummary, mergeReview, openReviewTerminal, REVIEW_ENDPOINTS, ReviewRequestError, sendToAgent, terminalEvent } from './client'
 import type { ReviewSummary } from './contract'
 
 const TASK = '6f1c8a52-1b0e-4c3a-9d2f-0a1b2c3d4e5f'
@@ -124,4 +124,16 @@ test('the terminal: 404 is no terminal, 403 a refusal, and a stream yields its e
   const events = []
   if (opened.kind === 'open') for await (const event of opened.events) events.push(event)
   assert.deepEqual(events, [{ type: 'output', text: 'a' }, { type: 'output', text: 'b' }, { type: 'ended', exitCode: 0 }])
+})
+
+test('the preview: a running dev server gives its address; none, or no endpoint (404), is not running', async () => {
+  answer(200, { running: true, url: 'http://127.0.0.1:8081/' })
+  assert.deepEqual(await getReviewPreview(TASK), { running: true, url: 'http://127.0.0.1:8081/' })
+  assert.equal(calls[0].url, `/api/tasks/${TASK}/review/preview`)
+  answer(200, { running: false })
+  assert.deepEqual(await getReviewPreview(TASK), { running: false })
+  answer(404, { error: 'not_found' })
+  assert.deepEqual(await getReviewPreview(TASK), { running: false })
+  answer(500, { error: 'boom' })
+  await assert.rejects(getReviewPreview(TASK), ReviewRequestError)
 })

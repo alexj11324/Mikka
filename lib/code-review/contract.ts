@@ -155,3 +155,10 @@ export type ReviewTerminalEvent = { type: 'output'; text: string } | { type: 'en
  * was reclaimed (409).
  */
 export type ReviewTerminalRefusal = 'no_endpoint' | 'denied' | 'reclaimed'
+
+/**
+ * The task's dev preview (R10a, R10b; #1724, #1733): GET …/review/preview. With a dev server running on the task's
+ * machine, its address for the browser column; without one, R10a 「没有运行中的开发服务器」. Planned; a server without
+ * the endpoint (404) reads as no dev server. Starting one (启动预览) needs POST …/review/preview/start, not planned yet.
+ */
+export type ReviewPreview = { running: true; url: string } | { running: false }

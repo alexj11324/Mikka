@@ -62,7 +62,7 @@ const LOCATION_SCRIPT = `(${locationScript.toString()})()`
  * the person drag a box over the frame instead: the note carries the URL and
  * that box, nothing read from the page.
  */
-export function BrowserPane({ onClose }: { onClose: () => void }) {
+export function BrowserPane({ onClose, openAt = null }: { onClose: () => void; openAt?: { url: string; id: number } | null }) {
   const t = useTranslations('Browser')
   const tCommon = useTranslations('Common')
   const tRoles = useTranslations('Artifact.roles')
@@ -119,8 +119,18 @@ export function BrowserPane({ onClose }: { onClose: () => void }) {
     remember(href)
   }
 
-  // Reopening the browser comes back to the last page.
+  // Asked for a page (the review page's 预览): it opens there, each time it is asked.
+  const opened = useRef<number | null>(null)
   useEffect(() => {
+    if (!openAt || opened.current === openAt.id) return
+    opened.current = openAt.id
+    const src = normalizeAddress(openAt.url, window.location.origin)
+    if (src) load(src, true)
+  }, [openAt])
+
+  // Reopening the browser comes back to the last page, unless it was asked for one.
+  useEffect(() => {
+    if (opened.current !== null) return
     let saved: string | null = null
     try { saved = window.localStorage.getItem(STORAGE_KEY) } catch { /* storage unavailable */ }
     const src = saved ? normalizeAddress(saved, window.location.origin) : null

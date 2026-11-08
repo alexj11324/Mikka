@@ -11,6 +11,7 @@ import {
   type ReviewDiff,
   type ReviewFile,
   type ReviewFileRead,
+  type ReviewPreview,
   type ReviewRead,
   type ReviewSubmission,
   type ReviewSummary,
@@ -39,6 +40,8 @@ export const REVIEW_ENDPOINTS = {
   terminal: (taskId: string) => `${task(taskId)}/terminal`,
   /** POST { data } → 204 */
   terminalInput: (taskId: string) => `${task(taskId)}/terminal/input`,
+  /** GET → { running: true, url } | { running: false } | 404 (no preview: read as not running) */
+  preview: (taskId: string) => `${task(taskId)}/preview`,
 } as const
 
 /** A review response that was not what the contract says: a failed request, or a body of the wrong shape. */
@@ -244,4 +247,16 @@ export async function openReviewTerminal(taskId: string, signal: AbortSignal): P
 export async function sendReviewTerminalInput(taskId: string, data: string): Promise<void> {
   const reply = await request(REVIEW_ENDPOINTS.terminalInput(taskId), { method: 'POST', json: { data } })
   if (reply.status < 200 || reply.status >= 300) throw new ReviewRequestError(reply.status, reply.body)
+}
+
+const previewSchema = z.union([
+  z.object({ running: z.literal(true), url: z.string().min(1) }),
+  z.object({ running: z.literal(false) }),
+]) satisfies z.ZodType<ReviewPreview>
+
+/** The task's dev preview (R10a, R10b): its address, or no dev server (also when the server has no preview, 404). */
+export async function getReviewPreview(taskId: string): Promise<ReviewPreview> {
+  const reply = await request(REVIEW_ENDPOINTS.preview(taskId))
+  if (reply.status === 404) return { running: false }
+  return parse(previewSchema, reply)
 }
