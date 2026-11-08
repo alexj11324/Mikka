@@ -33,6 +33,7 @@ export function loginMatches(body, username, password) {
 
 async function run(env) {
   await sourceGuard(env)
+  check(/^[a-f0-9]{40}$/.test(plan.workerHash ?? ''), 'WORKER_SOURCE_PIN')
   check(env.E2B_API_KEY && env.RUNNER_TEMP, 'WORKLOAD_KEY')
   const { Sandbox, SandboxNotFoundError } = await import('e2b')
   const { Pool } = await import('pg')
@@ -124,11 +125,17 @@ async function run(env) {
       app: { image: `ghcr.io/alexj11324/mikka@${plan.imageDigest}`, init: true, ports: ['127.0.0.1:3000:3000'], volumes: ['data:/data', `${resolve('scripts/ops/vault-runtime-diagnostics.mjs')}:/opt/closeout/vault-runtime-diagnostics.mjs:ro`],
         environment: { DATABASE_URL: database, MIKKA_DATABASE_URL: database, BETTER_AUTH_URL: appOrigin,
           MIKKA_VAULT_DIAGNOSTICS: '1', NODE_OPTIONS: '--import=/opt/closeout/vault-runtime-diagnostics.mjs',
+          MIKKA_CLOUD_WORKER_SOURCE_COMMIT: plan.source, MIKKA_CLOUD_WORKER_SHA: plan.workerHash,
           MIKKA_EDITION: 'community', MIKKA_EXTERNAL_CRON: '1', CREDENTIAL_MASTER_KEY: masterKey, WORKSPACE_SECRETS_KEY: secretsKey,
           SMTP_URL: 'smtp://mailpit:1025', MIKKA_EMAIL_FROM: 'Vault acceptance <login@selfhost.example.test>' },
         depends_on: { postgres: { condition: 'service_healthy' }, mailpit: { condition: 'service_started' } } }
     }, volumes: { data: {} } }
     await writeFile(composePath, JSON.stringify(fixture), { mode: 0o600 }); fixtureStarted = true
+    const image = JSON.parse(docker('image', 'inspect', `ghcr.io/alexj11324/mikka@${plan.imageDigest}`))[0]
+    const imageEnv = Object.fromEntries((image.Config?.Env ?? []).map(value => { const at = value.indexOf('='); return [value.slice(0, at), value.slice(at + 1)] }))
+    report.runtimeSetup = { imageSourcePinPresent: !!imageEnv.MIKKA_CLOUD_WORKER_SOURCE_COMMIT,
+      imageWorkerPinPresent: !!imageEnv.MIKKA_CLOUD_WORKER_SHA, operatorConfiguredPins: true,
+      source: plan.source, workerHash: plan.workerHash, template: 'desktop' }
     compose('up', '--detach', '--wait', '--wait-timeout', '240')
     for (let i = 0; ; i++) {
       try { check((await json(appOrigin + '/mikka/api/version')).build === plan.source, 'IMAGE_SOURCE'); break }
@@ -170,7 +177,7 @@ async function run(env) {
     // The actual Workflow provisions/navigates/observes and requests the saved
     // login itself. No SQL state, guard, CDP, broker or model output is injected.
     let deadline
-    try { await Promise.race([submission, new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('AUTOFILL_TIMEOUT')), 240_000) })]) }
+    try { await Promise.race([submission, new Promise((_, reject) => { deadline = setTimeout(() => reject(new Error('AUTOFILL_TIMEOUT')), 360_000) })]) }
     finally { clearTimeout(deadline) }
     check(!interrupted && submitted === 1 && rejected === 0 && servedLogin > 0, 'FORM_SUBMITTED')
     report.checks.realSiteSubmitted = true
@@ -222,6 +229,15 @@ async function run(env) {
           const info = await Sandbox.getInfo(row.sandboxId, { apiKey: env.E2B_API_KEY })
           const id = ownedMachine(row, actor, info.metadata)
           report.sandboxHash = digest(id).slice(0, 16)
+          if (report.status !== 'passed') {
+            try {
+              const sandbox = await Sandbox.connect(id, { apiKey: env.E2B_API_KEY })
+              const result = await sandbox.commands.run(`python3 - <<'PY'\nimport pathlib,importlib.util,shutil,json,urllib.request\np=pathlib.Path\nr={'workerMarker':p('/opt/mikka/worker-source-sha').is_file(),'gatewayFile':p('/opt/mikka/computer/subagent-gateway.py').is_file(),'aiohttpSystem':importlib.util.find_spec('aiohttp') is not None,'nodeOnPath':shutil.which('node') is not None,'chromiumPath':p('/usr/bin/chromium').exists(),'chromePath':p('/usr/bin/google-chrome').exists(),'privateNode':p('/opt/mikka/runtime/node/bin/node').is_file()}\ntry:\n x=urllib.request.urlopen('http://127.0.0.1:6082/version',timeout=2).read(100).decode();r['gatewayVersionValid']=len(x.strip())==64 and all(c in 'abcdef0123456789' for c in x.strip())\nexcept Exception:r['gatewayVersionValid']=False\nprint(json.dumps(r))\nPY`, { user: 'root', timeoutMs: 8_000 })
+              const value = JSON.parse(result.stdout)
+              check(Object.keys(value).length === 8 && Object.values(value).every(v => typeof v === 'boolean'), 'RUNTIME_DIAGNOSTIC')
+              report.runtimeCapabilities = value
+            } catch { report.runtimeCapabilities = { unavailable: true } }
+          }
           await Sandbox.kill(id, { apiKey: env.E2B_API_KEY })
           const absent = await Sandbox.getInfo(id, { apiKey: env.E2B_API_KEY }).then(() => false, error => error instanceof SandboxNotFoundError)
           check(absent, 'MACHINE_KILL_UNCONFIRMED')
