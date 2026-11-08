@@ -8,12 +8,12 @@ import { dirname, join, resolve, posix } from 'node:path'
 import { stripTypeScriptTypes } from 'node:module'
 
 // Local content review base, not a claim that this commit has been published.
-export const LIVE_SOURCE_CONTENT_BASE = '0d379dd92fd2d7b3f2b307030c3bcd8234426d0e'
+export const LIVE_SOURCE_CONTENT_BASE = 'a23b2e0b48dc5cb2dac8bb9ecde734a03537339e'
 // Exact explicitly supplied application source; no deployment claim. The future workflow/control remain disabled
 // until the separately verified production application SHA is supplied.
-export const LIVE_SOURCE_COMMIT = 'ce67afe931e9b9d6e7b0d346a62aa4d9751195c8'
+export const LIVE_SOURCE_COMMIT = '90f405ee966b9b9d5e31561e899a3c891f831e10'
 export const LIVE_SOURCE_HASHES = Object.freeze({
-  'lib/live/channel.ts': '8b8a6234419847d84bb0d6ed72145ce7b52883d818f84bfe9d217592cae3176b',
+  'lib/live/channel.ts': '7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede',
   'lib/live/tab-share.ts': '38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f',
   'lib/live/revisions.ts': 'bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328',
   'lib/live/events.ts': 'd32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5',

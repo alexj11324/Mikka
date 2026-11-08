@@ -285,3 +285,81 @@ for (const order of ['after', 'before', 'later-revision']) test(
       source.close()
     }
   })
+
+
+// #1665: use the compiled, pinned LiveChannel and real read-observer proof.
+// This offline platform sends no HTTP/model traffic and does not fabricate read freshness.
+for (const scenario of ['other-kind', 'own-kind', 'reconnect', 'before-open']) test(
+  'per-kind late read keeps exact coverage: ' + scenario,
+  { skip: !sourceRoot }, async () => {
+    const source = prepare(sourceRoot)
+    const [{ LiveChannel }, { acceptSWRRead, observeSWRRead, readFresh }] = await Promise.all([
+      import(pathToFileURL(source.directory + '/lib/live/channel.mjs').href),
+      import(pathToFileURL(source.directory + '/lib/swr/read-observer.mjs').href),
+    ])
+    const settle = async () => { for (let i = 0; i < 8; i++) await Promise.resolve() }
+    let now = 1_800_000_000_000, nextTimer = 0, requests = 0
+    const timers = new Map(), sockets = [], cache = new Map()
+    const key = 'late-chat', value = { items: ['synthetic-authorized'] }
+    class Socket {
+      onopen = null; onmessage = null; onclose = null; onerror = null; readyState = 0
+      open() {
+        this.readyState = 1; this.onopen?.(new Event('open'))
+        this.packet({ type: 'live_ready', version: 1, kinds: ['factory_task', 'bot_chat'] })
+      }
+      packet(data) { this.onmessage?.({ data: JSON.stringify(data) }) }
+      close() { this.readyState = 3; this.onclose?.({}) }
+      send(data) {
+        assert.equal(data, 'ping')
+        this.onmessage?.({ data: 'pong' })
+      }
+    }
+    const channel = new LiveChannel({
+      ticket: async () => ({ url: 'wss://offline.invalid/socket', protocol: 'synthetic-ticket', expiresAt: now + 600_000 }),
+      socket: () => { const socket = new Socket(); sockets.push(socket); return socket },
+      visible: () => true, watchVisibility: () => () => {}, now: () => now, monotonicNow: () => now,
+      later: (callback, milliseconds) => { const id = ++nextTimer; timers.set(id, { at: now + milliseconds, callback }); return id },
+      cancel: timer => { timers.delete(timer) },
+    })
+    const advance = async milliseconds => {
+      const until = now + milliseconds
+      for (;;) {
+        const next = [...timers].sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0]
+        if (!next || next[1].at > until) break
+        now = next[1].at; timers.delete(next[0]); next[1].callback(); await settle()
+      }
+      now = until; await settle()
+    }
+    const open = async () => { await settle(); sockets.at(-1).open(); await advance(100) }
+    const commit = async () => {
+      const data = await observeSWRRead(cache, key, async () => { requests++; return value })
+      acceptSWRRead(cache, key, data)
+      cache.set(key, { data })
+      await settle()
+    }
+    channel.subscribe('factory_task', BOT_IDS[1], ['initial-fixture-key'], () => {})
+    try {
+      if (scenario === 'before-open') await commit()
+      await open()
+      if (scenario !== 'before-open') await commit()
+      if (scenario === 'reconnect') {
+        sockets[0].close(); await advance(1_000); await open()
+      } else if (scenario !== 'before-open') {
+        sockets.at(-1).packet({ kind: scenario === 'other-kind' ? 'factory_task' : 'bot_chat', id: BOT_IDS[0] })
+      }
+      channel.subscribe('bot_chat', BOT_IDS[0], [key], (_key, _required, _reuse, after) => {
+        assert.equal(typeof after, 'number')
+        return readFresh(cache, key, after, commit, () => true, () => true)
+      })
+      await advance(100)
+      assert.equal(requests, scenario === 'other-kind' ? 1 : 2,
+        'only a continuously covered read with no matching-kind invalidation is reusable')
+      assert.equal(cache.get(key).data, value, 'only the actually accepted response was committed')
+      assert.equal(sockets.length, scenario === 'reconnect' ? 2 : 1)
+    } finally {
+      channel.dispose()
+      assert.equal(timers.size, 0, 'owned offline timers must be cleared')
+      assert.equal(sockets.every(socket => socket.readyState === 3), true)
+      source.close()
+    }
+  })

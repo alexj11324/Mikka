@@ -1,22 +1,22 @@
-# Coordinator 后续验收：禁用准备稿（batch1615 V2）
+# Coordinator 后续验收：禁用准备稿（first-text-next V1）
 
-本稿由新的离线恢复准备器生成。旧执行环境不可用，不能将本稿或新四文件哈希冒充旧准备器的字节恢复。
+本稿是基于 e6f84d617581ade6ddb247176c34048cab749c04 禁用验收树的增量适配，保留既有 driver 修正和最新 Node.js/PostgreSQL 工具提示词，不回灌历史 checkpoint。
 本稿没有执行生产登录、模型、SQL、部署或控制激活，也不构成新的生产通过证明。
 
 ## 源码与禁用边界
 
-应用源码输入：ce67afe931e9b9d6e7b0d346a62aa4d9751195c8，tree：f6b538c3c4f04c6ac67100f1dbcf78f473e0a3d4。
+应用源码输入：90f405ee966b9b9d5e31561e899a3c891f831e10，tree：3fd2406ea41629ff669a6a5dfc0ef19be7338630。
 这只是不可变 Git 源码绑定；真实 production alias、READY、公开版本及发布配置需由执行者另行核实。
 
-十二个来源 pin 均按实际应用 Git blob 校验：原十项，加上实际 read-observer 运行时依赖和 components/swr-defaults.tsx 接线来源。只接受已审 ad224/a65 漂移及 0d379dd92fd2d7b3f2b307030c3bcd8234426d0e 中 channel、use-live-key、read-observer、SWR defaults 的精确字节；不自动接纳 db988 或未来变更。decoder 固定 490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4。加载器只将相对导入解析到已固定的运行时模块，拒绝未列目标、外部包和越界路径。Hook、Coordinator 组件和 SWR defaults 仅核来源，不在 Node 渲染 React。
+十二个来源 pin 均按实际应用 Git blob 校验：原十项，加上实际 read-observer 运行时依赖和 components/swr-defaults.tsx 接线来源。保留原已审十二维内容，仅将 channel 更新到 #1665 / afae721f6730434ded6be932a7f9dd585c22ee49 的每 kind watermark；a23b2e0b48dc5cb2dac8bb9ecde734a03537339e 与 f14fc28c199be3c8c85ad26a77ef65222e92bfea 的十二项逐字相同。未知漂移仍拒绝。decoder 固定 490572a956f7675c1305f15394d75e1f6634cf3440da17fb3376dfb5189cf4e4。加载器只将相对导入解析到已固定的运行时模块，拒绝未列目标、外部包和越界路径。Hook、Coordinator 组件和 SWR defaults 仅核来源，不在 Node 渲染 React。
 
-本版明确输出十一条路径：原八条，加 live-worker.mjs、live-worker-offline.mjs、live-consumer.test.mjs。worker 使用实际源码 readBoundary/readFresh/observeSWRRead/acceptSWRRead/failSWRRead，读取正常 RPC 快照后才接受并提交同一对象；保留 owner/namespace、required+held+local revision、local-write identity 与关闭守卫。离线平台夹具的 fixture-read 命令只在测试模块中，生产 worker 不接收该命令。没有复制或改写产品算法。
+本版明确只输出四条路径：live-source.mjs、issue-1506-alex-continue.yml、LIVE-ACCEPTANCE.md、live-consumer.test.mjs。当前 worker/offline-worker 与最新四个 Stop driver/test 原字节保护，未改其运行时接口。worker 使用实际源码 readBoundary/readFresh/observeSWRRead/acceptSWRRead/failSWRRead，读取正常 RPC 快照后才接受并提交同一对象；保留 owner/namespace、required+held+local revision、local-write identity 与关闭守卫。离线平台夹具的 fixture-read 命令只在测试模块中，生产 worker 不接收该命令。没有复制或改写产品算法。
 
 继续使用原 ACME 自有工作区与 Haiku/Luna retained fixture receipt，不重建、不重新选模型。普通停止/工具未覆盖修正来自独立恢复 checkpoint 344fafb353d1128f89475bc827a404eff4520451，其四文件已单独离线 RED→14/14 GREEN；本稿没有新增生产 Stop 成绩。
 
-continue.json 完全保留 fcce 原件：enabled=false、phase=tool、expectedSha=null、cacheTurns=3。continuation workflow 的 MIKKA_STOP_CASE 仍是 during_tool。
+continue.json 完全保留 e6 原件：enabled=false、phase=cache-live、expectedSha=null、cacheTurns=3、liveTabs=3、delayOneReturnedResult=true。continuation workflow 的 MIKKA_STOP_CASE 仍是 during_tool。
 presence workflow 保持原 literal false 和空应用 SHA；legacy resume workflow/control 原样，不给没有 enabled 字段的旧控制文件添加或修改字段。
-MCP workflow 保留 literal false、12 分钟 timeout 和原 reader/cleanup 路径，只清空旧应用 SHA。MCP 四个支持文件原样。
+MCP workflow 原字节保留：literal false、空应用 SHA、12 分钟 timeout 和原 reader/cleanup 路径不变。MCP 四个支持文件原样。
 
 ## 下一次缓存阶段的固定分母
 
@@ -39,3 +39,7 @@ MCP workflow 保留 literal false、12 分钟 timeout 和原 reader/cleanup 路�
 服务端日志遵守既定最多 cache6+ordinaryStop2 共8个 exact-wrun 请求、每个一次 limit100；没有新增查询预算。rawCache 是 SDK 兼容 usage 边界，不是原 provider HTTP 字节；missing 不证明 provider 没返回。各独立时钟不跨钟相减，嵌套跨度不相加。
 
 MCP 是独立、仍禁用的三 reader 阶段：latest、90s quiet、headers后5s abort；0模型、0业务写工具/聊天任务写入、0Stop、0MCP DELETE。正常 OAuth 创建/撤销会改变其授权记录，不能称所有 DB 零 mutation。未来实际执行需单独激活、服务器证据与授权清理，当前没有该通过证明。
+
+## 本次源码兼容边界
+
+连接 readiness 建立连续覆盖起点；后续 push 只推进其 kind 的 watermark。未发生 bot_chat 失效的已接受读取可供晚订阅复用；bot_chat 自己的新事件、断线重连或连接前读取仍要求新读。新增离线回归使用实际编译的 LiveChannel/read-observer，不改产品算法；原三独立 worker、旧响应跨新 revision 的拒绝、same-realm 在途读与 socket/error 清理断言保留。模板 LIVE_SOURCE_COMMIT=null 默认拒绝运行；未来实际合并/稳定部署的完整 SHA/tree 必须由 root 核对后显式传入。a23/afae/f14 的离线证据不代表它们已用于新生产验收。

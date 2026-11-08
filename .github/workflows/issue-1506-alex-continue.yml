@@ -16,12 +16,17 @@ permissions:
 concurrency:
   group: production-smoke-owner-acceptance
   cancel-in-progress: false
+  queue: max
 
 jobs:
   baseline:
     if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: web-deploy-production
+      cancel-in-progress: false
+      queue: max
     env:
       MIKKA_STOP_CASE: during_tool
     steps:
@@ -39,7 +44,7 @@ jobs:
         if: steps.control.outputs.enabled == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ce67afe931e9b9d6e7b0d346a62aa4d9751195c8
+          ref: 90f405ee966b9b9d5e31561e899a3c891f831e10
           path: live-source
           persist-credentials: false
       - name: Verify the continuation and actual-source live harness offline
