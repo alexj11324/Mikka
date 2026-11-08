@@ -164,6 +164,10 @@ jobs:
     needs: [validate, await-web]
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       id-token: write

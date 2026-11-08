@@ -433,6 +433,35 @@ export function bootstrapAdoptionEvidence(record) {
     preparationTiming: prepared, startupTiming: stage }
 }
 
+/** Failure-only projection of already observed data; it never authorizes adoption.
+ * Reuse the strict readers so arbitrary chunk fields cannot reach an artifact. */
+export function bootstrapAdoptionDiagnostics(record) {
+  if (typeof record?.runIdHash !== 'string' || !/^[a-f0-9]{16}$/.test(record.runIdHash)
+    || typeof record.harness !== 'string' || !Object.hasOwn(MODELS, record.harness)) return null
+  const stage = readStartupTiming(record.daemonStartupTiming, record)
+  const prepared = readPreparationTiming(record.daemonPreparationTiming, record, stage)
+  const status = value => ['unavailable', 'invalid', 'incomplete', 'truncated', 'complete'].includes(value) ? value : 'unavailable'
+  const source = record.harness === 'claude_code' ? 'bootstrap_claude_start' : 'bootstrap_codex_initialize'
+  return {
+    version: 1, runIdHash: record.runIdHash, harness: record.harness,
+    startupTimingStatus: status(record.startupTimingStatus), preparationTimingStatus: status(record.preparationTimingStatus),
+    startupTiming: stage, preparationTiming: prepared,
+    adoptionChecks: {
+      startupTimingStatus: record.startupTimingStatus === 'complete',
+      preparationTimingStatus: record.preparationTimingStatus === 'complete',
+      startupReceipt: Boolean(stage), preparationReceipt: Boolean(prepared),
+      startupUntruncated: stage?.truncated === false, preparationUntruncated: prepared?.truncated === false,
+      startupOutcome: stage?.outcome === 'ok', preparationOutcome: prepared?.outcome === 'ok',
+      preparationSource: prepared?.source === source,
+      preparationPhases: Boolean(prepared?.phases.every(phase => phase.outcome === 'ok')),
+      prewarmPhaseCount: prepared?.phases.filter(phase => phase.name === 'daemon.adapter.cli_init.prewarm').length === 1,
+      cliInitPhaseCount: prepared?.phases.filter(phase => phase.name === 'daemon.adapter.cli_init').length === 1,
+      claimAuthentication: record.harness !== 'claude_code' || prepared?.claimAuthentication === 'oauth_environment',
+      observedAuthSource: record.harness !== 'claude_code' || prepared?.observedAuthSource === 'oauth_environment',
+    },
+  }
+}
+
 /** Re-check the bounded actual timing proof at each publication boundary. */
 export function readBootstrapAcceptance(value, record) {
   if (value?.version !== 1 || value.runIdHash !== record.runIdHash || value.harness !== record.harness
