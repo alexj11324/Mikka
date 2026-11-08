@@ -65,11 +65,7 @@ export interface OrderView {
   first: { kind: 'cloud' } | { kind: 'device'; id: string; name: string; server: boolean } | null
   /** Devices that can run the same list now, including credential readiness. */
   readyDeviceIds: string[]
-  /**
-   * 设备 › 能跑: per local device, the allowed models it can run, whatever its
-   * 参与调度 or whether it is online (those have their own lines there).
-   */
-  deviceModels: Record<string, string[]>
+
 }
 
 /** The prompt's display facts; never a model admission or dispatch authority. */
@@ -175,7 +171,12 @@ export async function readOrder(query: Query, scope: OrderScope, candidates?: (O
     return { ...settings, entries: list.map(item => ({ id: `default:${encodeURIComponent(entryKey(item))}`, harness: item.harness, model: item.model, source: item.source })) }
   }
   const { rows } = await query.query<EntryRow>(
-    'SELECT id,harness,model,"sourceKind","sourceId"::text AS "sourceId" FROM model_order_entries WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',
+    `SELECT e.id,e.harness,e.model,e."sourceKind",e."sourceId"::text AS "sourceId" FROM model_order_entries e
+      LEFT JOIN byos_connections c ON e."sourceKind"='subscription' AND c.id=e."sourceId"
+      LEFT JOIN model_api_keys k ON e."sourceKind"='api_key' AND k.id=e."sourceId"
+      WHERE e."ownerId"=$1 AND e."workspaceId"=$2
+      AND COALESCE((COALESCE(to_jsonb(c)->'modelSettings',to_jsonb(k)->'modelSettings')->'models'->e.model->>'enabled')::boolean,true)
+      ORDER BY e.position,e.id`,
     [scope.ownerId, scope.workspaceId])
   return { ...settings, entries: rows.map(toEntry) }
 }
@@ -300,16 +301,13 @@ export async function checkOrderQuota(query: Query, scope: OrderScope, connectio
  * A run not yet ended counts toward its device's load (pickDevice).
  */
 export async function poolDevices(query: Query, ownerId: string): Promise<(PoolDevice & { lastSeenAt: number | null })[]> {
-  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number; subscriptionModels: Record<string, string[]> }>(
+  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
     `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d.harnesses,d."deviceType",d."createdAt",
-      (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns",
-      COALESCE((SELECT jsonb_object_agg(c.id::text,c."modelCatalog"->'models') FROM byos_connections c
-        WHERE c."ownerId"=$1 AND c.provider='claude' AND c.state='connected' AND c.paused=false AND c."removedAt" IS NULL
-          AND c."modelCatalog"->>'revision'=c.epoch::text AND jsonb_typeof(c."modelCatalog"->'models')='array'), '{}'::jsonb) AS "subscriptionModels"
+      (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns"
     FROM devices d WHERE d."ownerId"=$1 AND d.kind='local' AND d."removedAt" IS NULL ORDER BY d."lastSeenAt" DESC NULLS LAST,d.id`, [ownerId])
   const presence = await deviceOnlineStates(rows)
   return rows.map(row => ({
-    id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [], subscriptionModels: row.subscriptionModels ?? {},
+    id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [],
     server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(), lastSeenAt: row.lastSeenAt?.getTime() ?? null,
   }))
 }
@@ -377,8 +375,6 @@ export async function orderView(query: Query, scope: OrderScope, readDevices: ()
     },
     first: plan.kind === 'cloud' ? { kind: 'cloud' } : firstDevice ? { kind: 'device', id: firstDevice.id, name: firstDevice.name, server: firstDevice.server } : null,
     readyDeviceIds: devices.filter(device => planDispatch({ entries: runnable, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),
-    deviceModels: Object.fromEntries(devices.map(device => [device.id,
-      [...new Set(order.entries.filter(entry => deviceModel({ ...device, enabled: true, online: true }, entry)).map(entry => entry.model))]])),
     entries: context.entries,
     candidates: context.candidates,
   }

@@ -182,7 +182,8 @@ class Browser:
         self.guard_file=self.path/'guard'
         if self.guard_file.exists(): self.guard='locked'
     async def start(self):
-        self.process=await asyncio.create_subprocess_exec('node','/opt/mikka/computer/subagent-cdp.mjs',self.grant['subagentId'],*([str(self.grant['display'])] if self.grant.get('display') else []),stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
+        node='/opt/mikka/runtime/node/bin/node'
+        self.process=await asyncio.create_subprocess_exec(node if Path(node).is_file() else 'node','/opt/mikka/computer/subagent-cdp.mjs',self.grant['subagentId'],*([str(self.grant['display'])] if self.grant.get('display') else []),stdout=asyncio.subprocess.DEVNULL,stderr=asyncio.subprocess.DEVNULL)
         for _ in range(100):
             try: self.reader,self.writer=await asyncio.open_unix_connection(str(self.path/'cdp.sock'),limit=4*1024*1024);break
             except (FileNotFoundError,ConnectionRefusedError): await asyncio.sleep(.1)

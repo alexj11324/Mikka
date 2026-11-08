@@ -624,16 +624,18 @@ test('provider failure continues the same task through its authorized preferred 
     assert.equal(continuation.agentDefinition.modelDispatch.entry.model, 'fixture-codex-a')
   })
 
-  for (const status of [429, 502]) await t.test(`terminal HTTP ${status} advances after native short retries, and the same harness resumes its session`, async () => {
+  for (const status of [404, 429, 502]) await t.test(`terminal HTTP ${status} advances after native short retries, and the same harness resumes its session`, async () => {
     const { p, second } = await twoModels(`provider-transient-${status}`, true)
     const runId = await running(p)
-    const failure: ProviderFailure = { kind: 'unavailable', retryable: true, status, code: status === 429 ? 'rate_limit' : 'server_error' }
+    const failure: ProviderFailure = status === 404 ? { kind: 'model', retryable: false, status, code: 'model_not_found' }
+      : { kind: 'unavailable', retryable: true, status, code: status === 429 ? 'rate_limit' : 'server_error' }
     await end(p, runId, failure)
     const original = await row(runId)
     const [continuation, ...extra] = await children(runId)
     assert.ok(continuation)
     assert.equal(extra.length, 0)
     assert.deepEqual(original.report.providerFailure, failure)
+    if (status === 404) assert.equal((await order.orderView(pool, scope(p))).entries.find(entry => entry.model === original.agentDefinition.model)?.block, null, 'model refusal never marks the catalogue entry yellow')
     assert.equal(original.report.modelFallback.fallback, 'unavailable')
     assert.equal(continuation.agentDefinition.apiKey.keyId, second.id)
     assert.equal(continuation.attempt, original.attempt, 'provider retries do not spend the code repair budget')

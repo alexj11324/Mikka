@@ -1,5 +1,6 @@
 import * as taskDomainActions from '@/app/actions/task-domain'
 import * as projectResourcesActions from '@/app/actions/project-resources'
+import * as enabledModels from '@/app/actions/enabled-models'
 import 'server-only'
 import { desktopActionSchemas, type DesktopActionName } from './schemas'
 import { desktopBootstrap, desktopSession, desktopAccounts, desktopWorkspaceLink } from './bootstrap'
@@ -164,6 +165,11 @@ const functions = {
   'model-api-keys.createApiKey': actions18.createApiKey,
   'model-api-keys.deleteApiKey': actions18.deleteApiKey,
   'model-api-keys.updateApiKeyShare': actions18.updateApiKeyShare,
+  'enabled-models.getEnabledModels': enabledModels.getEnabledModels,
+  'enabled-models.setModelEnabled': enabledModels.setModelEnabled,
+  'enabled-models.setAllModelsEnabled': enabledModels.setAllModelsEnabled,
+  'enabled-models.setAutoEnable': enabledModels.setAutoEnable,
+  'enabled-models.markModelsSeen': enabledModels.markModelsSeen,
   'model-order.getModelOrder': actions19.getModelOrder,
   'model-order.checkModelOrderQuota': actions19.checkModelOrderQuota,
   'model-order.refreshSubscriptionModels': actions19.refreshSubscriptionModels,

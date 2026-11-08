@@ -258,3 +258,10 @@ test('a stream opened at send joins a turn that already holds the chat and names
   assert.equal(response.headers.get('x-mikka-stream-run'), 'wrun_owner')
   assert.deepEqual(getRun.mock.calls.map(c => c.arguments[0]), ['wrun_owner'])
 })
+
+test('a version 2 cursor replays after stopped-text projection boundaries change', async () => {
+  const oldKey = createHash('sha256').update(JSON.stringify(['wrun_owner', fingerprints, 2])).digest('hex')
+  const response = await call({ after: '2' }, { 'x-mikka-stream-key': oldKey })
+  assert.equal(response.headers.get('x-mikka-stream-reset'), '1')
+  assert.deepEqual((await events(response)).map(event => event.type), ['start', 'text', 'committed'])
+})

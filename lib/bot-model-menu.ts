@@ -1,4 +1,5 @@
 import "server-only";
+import { hostedModelEnabled } from "./enabled-models";
 import type { Pool } from "pg";
 import { z } from "zod";
 import { ActionFailureError } from "./action-error";
@@ -90,7 +91,7 @@ export async function botModelMenu(
   const local = !isCloudEdition();
   const target = local ? await defaultModelTarget(scope.ownerId) : null;
   const { points, trialLeft } = local ? { points: 0, trialLeft: 0 } : await hostedPointsHere(scope.workspaceId);
-  const usable = local ? target !== null : points > 0 || trialLeft > 0;
+  const usable = await hostedModelEnabled(pool, scope.ownerId) && (local ? target !== null : points > 0 || trialLeft > 0);
   const hostedSource = local ? target?.kind === "cloud" ? "cloud" as const : "self-hosted" as const : undefined;
   const hostedOption = { ...HOSTED, ...(hostedSource ? { hostedSource } : {}) };
   const groups: BotModelMenuGroup[] = [

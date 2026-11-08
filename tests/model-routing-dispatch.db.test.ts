@@ -206,9 +206,9 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
     }
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [claude.id, JSON.stringify([{ ...claude.report[0], models: ['claude-opus-5-5', 'claude-sonnet-5-5'] }])])
     try {
-      // Haiku is no longer reported: light rises to the nearest higher tier, never past it.
+      // Missing device shortcuts do not remove an authorized credential model from routing.
       const probe = decisionFixture('claude-haiku-5-5', 'easy', 'medium')
-      assert.equal(localTarget(await route(probe.decision)).model, 'claude-sonnet-5-5')
+      assert.equal(localTarget(await route(probe.decision)).model, 'claude-haiku-5-5')
     } finally { await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [claude.id, JSON.stringify(claude.report)]) }
   })
 

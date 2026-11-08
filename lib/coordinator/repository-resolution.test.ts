@@ -100,7 +100,7 @@ test('find_repository lists the user\'s own repositories, matches a name, and an
   assert.deepEqual(await findRepository('alex', '  ', lister()), { total: 3, repositories: [{ fullName: 'alexj11324/Mikka_test', description: null, homepage: null }, { fullName: 'alexj11324/Mikka', description: null, homepage: null }, { fullName: 'mikka-org/web', description: null, homepage: null }] })
   const many = mock.fn<RepositoryLister>(async () => repos(...Array.from({ length: 70 }, (_, index) => `o/r${index}`)))
   const listed = await findRepository('alex', undefined, many) as { total: number; repositories: unknown[] }
-  assert.deepEqual([listed.total, listed.repositories.length], [70, 50])
+  assert.deepEqual([listed.total, listed.repositories.length], [70, 70])
   assert.deepEqual(await findRepository('alex', 'mikka test', lister()), { match: 'one', repository: 'alexj11324/Mikka_test', description: null, homepage: null })
   assert.deepEqual(await findRepository('alex', 'ALEXJ11324/mikka_test', lister()), { match: 'one', repository: 'alexj11324/Mikka_test', description: null, homepage: null })
   assert.deepEqual(await findRepository('alex', 'https://github.com/mikka-org/web.git', lister()), { match: 'one', repository: 'mikka-org/web', description: null, homepage: null })
@@ -146,4 +146,41 @@ test('sameRepository tells a named repository from the thread\'s', async () => {
   assert.equal(await sameRepository('alex', 'mikka-web', 'https://github.com/alexj11324/Mikka.git', acme()), false)
   assert.equal(await sameRepository('alex', 'alexj11324/Mikka', 'https://github.com/alexj11324/Mikka.git', acme()), true)
   assert.equal(await sameRepository('alex', 'Mikka', 'https://github.com/alexj11324/Mikka.git', acme()), null, 'a name several fit is not one repository yet')
+})
+
+test('on-demand discovery preserves every repository beyond 300 and marks only fresh authorized workspace candidates', async () => {
+  const many = Array.from({ length: 321 }, (_, index) => ({
+    fullName: 'octo/repository-' + index,
+    description: 'Repository number ' + index,
+    homepage: 'https://example.test/' + index,
+  }))
+  const list = mock.fn<RepositoryLister>(async () => ({ repositories: many }))
+  const context = mock.fn(async () => ({ used: ['octo/repository-320', 'someone/forbidden'] }))
+  const found = await findRepository('alex', undefined, list, context) as {
+    total: number; repositories: { fullName: string; description: string | null; homepage: string | null; usedByThisWorkspace: boolean }[]
+  }
+  assert.equal(found.total, 321)
+  assert.equal(found.repositories.length, 321)
+  assert.deepEqual(found.repositories[0], { ...many[320], usedByThisWorkspace: true })
+  assert.ok(found.repositories.some(repository => repository.fullName === 'octo/repository-319'))
+  assert.ok(found.repositories.every(repository => repository.fullName.startsWith('octo/')))
+  assert.equal(found.repositories.filter(repository => repository.usedByThisWorkspace).length, 1)
+  assert.deepEqual(list.mock.calls.map(call => call.arguments), [['alex']])
+  assert.equal(context.mock.callCount(), 1)
+})
+
+test('workspace discovery orders ambiguous names but neither authorizes nor silently picks a repository', async () => {
+  const context = mock.fn(async () => ({ used: ['alexj11324/mikka-web', 'foreign/private'] }))
+  const found = await findRepository('alex', 'Mikka', acme(), context) as {
+    match: string; candidates: { fullName: string; usedByThisWorkspace: boolean }[]
+  }
+  assert.equal(found.match, 'several')
+  assert.deepEqual(found.candidates.map(item => [item.fullName, item.usedByThisWorkspace]), [
+    ['alexj11324/mikka-web', true], ['alexj11324/Mikka', false], ['acme/mikka-enterprise', false],
+  ])
+  const unavailable = mock.fn<RepositoryLister>(async () => { throw accessError('githubReconnectRequired') })
+  const refusedContext = mock.fn(async () => { throw new Error('must not query workspace after a listing refusal') })
+  assert.deepEqual(await findRepository('alex', undefined, unavailable, refusedContext), { error: 'githubReconnectRequired' })
+  assert.equal(unavailable.mock.callCount(), 1, 'discovery adds no retry')
+  assert.equal(refusedContext.mock.callCount(), 0)
 })
