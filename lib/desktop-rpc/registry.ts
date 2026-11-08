@@ -1,3 +1,5 @@
+import * as taskDomainActions from '@/app/actions/task-domain'
+import * as projectResourcesActions from '@/app/actions/project-resources'
 import 'server-only'
 import { desktopActionSchemas, type DesktopActionName } from './schemas'
 import { desktopBootstrap, desktopSession, desktopAccounts, desktopWorkspaceLink } from './bootstrap'
@@ -197,6 +199,16 @@ const functions = {
   'team-relations.setIssueTeam': actions27.setIssueTeam,
   'team-relations.listProjectTeams': actions27.listProjectTeams,
   'team-relations.setProjectTeams': actions27.setProjectTeams,
+  'task-domain.getTaskPresentation': taskDomainActions.getTaskPresentation,
+  'teams.getTeamLifecycleImpact': actions28.getTeamLifecycleImpact,
+  'teams.getTeamLifecycleAudit': actions28.getTeamLifecycleAudit,
+  'teams.archiveTeam': actions28.archiveTeam,
+  'teams.restoreTeam': actions28.restoreTeam,
+  'teams.removeTeamGrouping': actions28.removeTeamGrouping,
+  'project-resources.listProjectResources': projectResourcesActions.listProjectResources,
+  'project-resources.saveEnvironment': projectResourcesActions.saveEnvironment,
+  'project-resources.saveProjectResources': projectResourcesActions.saveProjectResources,
+  'project-resources.saveWorkspaceRepositoryPolicy': projectResourcesActions.saveWorkspaceRepositoryPolicy,
   'teams.listTeams': actions28.listTeams,
   'teams.loadTeamDirectory': actions28.loadTeamDirectory,
   'teams.saveTeam': actions28.saveTeam,

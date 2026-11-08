@@ -22,6 +22,7 @@ const CJK = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han
 export type SearchQuery =
   | { kind: 'recent' }
   | { kind: 'number'; number: number }
+  | { kind: 'identifier'; identifier: string }
   | { kind: 'title'; text: string }
 
 export class SearchInputError extends Error {
@@ -33,8 +34,9 @@ export function parseSearchQuery(raw: string | null | undefined): SearchQuery {
   const text = (raw ?? '').trim()
   if (!text) return { kind: 'recent' }
   if (text.length > 200) throw new SearchInputError('searchQueryTooLong')
-  const number = /^(?:(?:ORV|MIK)-)?([1-9]\d{0,8})$/i.exec(text)
+  const number = /^([1-9]\d{0,8})$/.exec(text)
   if (number) return { kind: 'number', number: Number(number[1]) }
+  if (/^[a-z][a-z0-9_]{0,63}-[1-9]\d{0,15}$/i.test(text)) return { kind: 'identifier', identifier: text.toUpperCase() }
   if ([...text].length === 1 && !CJK.test(text)) throw new SearchInputError('searchQueryTooShort')
   return { kind: 'title', text }
 }
@@ -158,6 +160,9 @@ export function escapeLike(text: string) {
 export function searchCondition(query: SearchQuery): SQL | undefined {
   // Number and substring lookups have dedicated expression / pg_trgm indexes.
   if (query.kind === 'number') return sql`(${meta}->>'number') = ${String(query.number)}`
+  if (query.kind === 'identifier') return sql`(${issues.issuedIdentifier}=${query.identifier} OR EXISTS (
+    SELECT 1 FROM task_identifier_aliases a WHERE a."issueId"=${issues.id} AND a."workspaceId"=${issues.workspaceId} AND a.identifier=${query.identifier}
+  ))`
   if (query.kind === 'title') return sql`${issues.title} ilike ${'%' + escapeLike(query.text) + '%'}`
   return undefined
 }
@@ -199,6 +204,20 @@ export async function searchIssues(db: Db, input: { userId: string; params: Sear
   const anchors = [...new Set([params.issueId, params.excludeId].filter((id): id is string => !!id))]
   const anchorRows = anchors.length ? await db.select().from(issues).where(and(idIn(issues.id, anchors), predicate)) : []
   if (anchorRows.length !== anchors.length) throw new ActionFailureError('issueNotFound')
+  let candidatePredicate = predicate
+  let query = params.query
+  if (query.kind === 'identifier') {
+    const { resolveTaskIdentifierAlias } = await import('@/lib/task-identity-store')
+    const resolved = await resolveTaskIdentifierAlias({ workspaceId: input.workspaceId, identifier: query.identifier }, db)
+    if (resolved.kind === 'found') {
+      candidatePredicate = and(predicate, eq(issues.id, resolved.issueId))!
+      query = { kind: 'recent' }
+    } else if (resolved.kind === 'missing' && /^(ORV|MIK)-[1-9]\d{0,8}$/.test(query.identifier)) {
+      // The pre-prefix UI accepted ORV/MIK plus the owner's numeric counter.
+      // Retain that search only when there is no real identifier to resolve.
+      query = { kind: 'number', number: Number(query.identifier.split('-')[1]) }
+    } else return { items: [] as SearchResultItem[], nextCursor: null, truncated: false }
+  }
   const currentRow = anchorRows.find(row => row.id === params.issueId)
   const current = currentRow ? { id: currentRow.id, ownerId: currentRow.userId, metadata: readIssueMetadata(currentRow.content) } : null
   const excluded = new Set<string>()
@@ -214,7 +233,7 @@ export async function searchIssues(db: Db, input: { userId: string; params: Sear
     }
   }
   const members = current && current.ownerId !== userId ? await memberIssueIds(db, current.ownerId, userId) : []
-  const rows = await fetchCandidates(db, { userId, visibility: predicate, excludedIds: [...excluded], query: params.query, cursor: params.cursor, limit: params.limit + 1 })
+  const rows = await fetchCandidates(db, { userId, visibility: candidatePredicate, excludedIds: [...excluded], query, cursor: params.cursor, limit: params.limit + 1 })
   const page = rows.slice(0, params.limit)
   const identifiers = await taskIdentifiers(page.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: row.metadata.number })))
   return {

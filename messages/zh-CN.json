@@ -1085,6 +1085,15 @@
     "allStatuses": "全部状态"
   },
   "Errors": {
+    "projectRepositoryDenied": "此仓库或目标分支不在工作区或项目允许的范围内。",
+    "projectEnvironmentUnavailable": "所选环境或其所需资源无法用于本次运行。",
+    "projectResourceConflict": "资源配置已被更新，请刷新后重试。",
+    "teamArchived": "此团队已归档，请恢复后再分配新工作。",
+    "teamPersonalWorkspace": "只有共享工作区支持创建团队。",
+    "teamDeleteReferenced": "此团队仍关联任务、项目或运行历史。请归档或移除分组以保留这些工作。",
+    "teamLifecycleConflict": "团队已发生变化，请刷新并重新查看影响范围。",
+    "projectArchived": "此项目已归档，请恢复后再开始新工作。",
+    "projectDeleteNotEmpty": "此项目仍有任务、关联或历史记录。请使用归档保留这些工作。",
     "botNotFound": "这个 Bot 不在当前工作区。",
     "executionPlaceInvalid": "请选择可用设备或云端。",
     "executionHarnessUnavailable": "所选设备上没有这个 Agent。",

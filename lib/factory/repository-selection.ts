@@ -56,9 +56,20 @@ export async function switchFactoryRepository(pool: Pool, tx: PoolClient, store:
   if (!selection) return refuse('The execution’s frozen model is unavailable; no fallback was selected.')
   const { rows: [source] } = await tx.query(`SELECT d.kind,b."workspaceId",b."botId" AS "runtimeBotId",a.harness FROM devices d JOIN agents a ON a.id=$2 AND a."userId"=$3 LEFT JOIN computer_run_bindings b ON b."runId"=$1 AND b."ownerId"=$3 WHERE d.id=$4 AND d."ownerId"=$3 AND d.enabled=true`, [run.id, run.agentId, task.userId, run.deviceId])
   if (!source || source.harness !== run.agentDefinition?.harness) return refuse('The execution device, harness or owner authority is unavailable.')
+  if (!task.workspaceId) return refuse('The task workspace is unavailable.')
   const cloud = source.kind === 'cloud'
   const runtime = cloud ? (await tx.query(`SELECT r."agentId",a."deviceId" FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId" WHERE r."botId"=$1 AND r."ownerId"=$2 AND r."workspaceId"=$3 AND r.harness=$4`, [source.runtimeBotId, task.userId, source.workspaceId, source.harness])).rows[0] : { agentId: run.agentId, deviceId: run.deviceId }
   if (!runtime) return refuse('The original execution runtime is unavailable.')
+  // GitHub access is necessary but cannot enlarge tenant/project policy.
+  try {
+    const { withProjectExecution } = await import('@/lib/project-resources/store')
+    await withProjectExecution({ userId: task.userId, workspaceId: task.workspaceId, issueId: task.issueId,
+      repositoryKey: target.key, baseBranch: null, runtime: cloud ? 'cloud' : 'local', harness: source.harness }, async () => undefined, true)
+  } catch (error) {
+    const { ActionFailureError } = await import('@/lib/action-error')
+    if (!(error instanceof ActionFailureError)) throw error
+    return refuse('The selected repository or environment is outside the current workspace or project policy.')
+  }
   const repo = await ensureDeviceRepository(task.userId, runtime.deviceId, target.remoteUrl, tx)
   const ended = await store.apply(task.userId, factoryBinding(task), factoryEventId('repository-selection', run.id), {
     action: 'finish', status: 'blocked', reason: 'The executing Agent selected another authorized repository.', evidence: [],

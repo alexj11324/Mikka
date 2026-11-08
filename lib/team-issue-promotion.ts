@@ -1,13 +1,13 @@
 import 'server-only'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
 import { issues, issueVersions, teamIssuePromotions } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
-import { teams, teamIssues, teamIssuePromotionReceipts, teamProjects } from '@/lib/db/team-schema'
+import { withTeamWorkspace } from '@/lib/team-workspace'
+import { teams, teamIssues, teamIssuePromotionReceipts } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
-import { projects } from '@/lib/db/projects'
 import { lockTeamRelations } from '@/lib/team-access'
 import { userActor, type ActivityActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
@@ -20,7 +20,7 @@ class PromotionError extends Error { constructor(readonly code: Code) { super(co
 async function allowedTeam(tx: WorkspaceTx, userId: string, teamId: string) {
   const [team] = await tx.select({ id: teams.id, workspaceId: teams.workspaceId }).from(teams)
     .innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, teams.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
-    .where(eq(teams.id, teamId)).for('update').limit(1)
+    .where(and(eq(teams.id, teamId), isNull(teams.archivedAt))).for('update').limit(1)
   if (!team) throw new PromotionError('teamIssueAccessDenied')
   return team
 }
@@ -35,7 +35,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
   const { requestId, issueId, revision, teamId, expectedTeamId } = parsed.data
   let promotionStarted = false
   try {
-    await workspaceDb.transaction(async workspace => {
+    await withTeamWorkspace(userId, teamId, async workspace => {
       await lockTeamRelations(workspace)
       const team = await allowedTeam(workspace, userId, teamId)
       const [current] = await workspace.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).for('update')
@@ -48,11 +48,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
           const old = await allowedTeam(workspace, userId, current.teamId)
           if (old.workspaceId !== team.workspaceId) throw new PromotionError('teamIssueChanged')
         }
-        const containing = await workspace.select({ id: projects.id }).from(projects).where(sql`${projects.issueIds} @> ${JSON.stringify([issueId])}::jsonb`)
-        if (containing.length) {
-          const links = await workspace.select().from(teamProjects).where(inArray(teamProjects.projectId, containing.map(p => p.id)))
-          if (links.length && !links.some(link => link.teamId === teamId)) throw new PromotionError('teamIssueChanged')
-        }
+
       }
       const completed = await db.transaction(async tx => {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`team-issue-promotion:${requestId}`}, 0))`)
@@ -76,7 +72,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         await workspace.insert(teamIssuePromotionReceipts).values({ requestId, issueId, teamId, workspaceId: team.workspaceId, ownerId: userId })
       }
     })
-    return await workspaceDb.transaction(async workspace => {
+    return await withTeamWorkspace(userId, teamId, async workspace => {
       await lockTeamRelations(workspace)
       const team = await allowedTeam(workspace, userId, teamId)
       const [link] = await workspace.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).for('update')

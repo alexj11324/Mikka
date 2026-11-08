@@ -1,3 +1,4 @@
+import { withTaskEnv } from './task-env'
 // One `git worktree` per run under the daemon's data dir (R4, R11, R12).
 // Local callers pass daemon-owned clone caches, never user checkouts.
 import {
@@ -211,7 +212,8 @@ export class WorktreeManager {
   async bootstrap(
     worktree: string,
     repoPath: string,
-    recipe: SetupRecipe | undefined
+    recipe: SetupRecipe | undefined,
+    taskEnv?: Record<string, string>
   ): Promise<"skipped" | "done"> {
     if (!recipe || !recipe.approved) return "skipped"
     const repoReal = realpathSync(repoPath)
@@ -248,7 +250,7 @@ export class WorktreeManager {
       await execa(recipe.command, {
         shell: true,
         cwd: worktree,
-        env: buildChildEnv(),
+        env: withTaskEnv(buildChildEnv(), taskEnv).env,
         extendEnv: false,
         stdio: "ignore",
       })

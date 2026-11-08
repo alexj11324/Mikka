@@ -1,7 +1,7 @@
 import 'server-only'
 // Workspace and repository secrets are enabled whenever the deployment has its
 // encryption key. Choosing BYO or platform E2B billing does not disable secret protection.
-import { and, eq, or } from 'drizzle-orm'
+import { and, eq, or, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { userSecrets, workspaceSecrets } from '@/lib/db/secrets-schema'
 import { openSecret, secretAad, SecretsKeyMissingError, userSecretAad } from './crypto'
@@ -112,6 +112,24 @@ export async function taskSecretInjection(workspaceId: string, repository: strin
 /** Task env (NAME -> value) only; see taskSecretInjection. */
 export async function taskSecretEnv(workspaceId: string, repository: string | null, env: Env = process.env, skipped?: { actorId: string; audit: SecretAuditHook }): Promise<Record<string, string>> {
   return (await taskSecretInjection(workspaceId, repository, env, skipped)).env
+}
+
+/** A selected Environment admits exactly these existing workspace references.
+ * Values are opened at claim, kept out of the frozen definition, and masked by
+ * the same daemon/server path as ordinary task secrets. Removed references fail closed. */
+export async function environmentSecretInjection(workspaceId: string, repository: string | null,
+  configuration: { variables: Record<string, string>; secretIds: string[] }, env: Env = process.env, ownerId?: string) {
+  const ids = [...new Set(configuration.secretIds)]
+  if (ids.length && !workspaceSecretsConfigured(env)) throw new E2BKeyError('e2b_unavailable', 'secrets key missing')
+  const scope = repository ? or(eq(workspaceSecrets.scopeType, 'workspace'), and(eq(workspaceSecrets.scopeType, 'repository'), eq(workspaceSecrets.scopeRef, repository.toLowerCase()))) : eq(workspaceSecrets.scopeType, 'workspace')
+  const rows = ids.length ? await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), inArray(workspaceSecrets.id, ids), scope))) : []
+  if (rows.length !== ids.length) throw new E2BKeyError('e2b_unavailable', 'environment secret reference unavailable')
+  const merged = new Map<string, RuntimeSecret>(Object.entries(configuration.variables).map(([name, value]) => [name, { name, value, kind: 'env' }]))
+  for (const row of rows.toSorted((a, b) => Number(a.scopeType === 'repository') - Number(b.scopeType === 'repository'))) merged.set(row.name, openRuntime(row, env))
+  if (ownerId && workspaceSecretsConfigured(env)) for (const secret of await loadUserRuntimeSecrets(ownerId, env)) merged.set(secret.name, secret)
+  const secrets = [...merged.values()]
+  const injected = await reservedInjectionFilter(workspaceId, secrets)
+  return { env: injected, secretNames: secrets.filter(secret => secret.kind === 'secret' && Object.hasOwn(injected, secret.name)).map(secret => secret.name) }
 }
 
 /** #438 C: E2B keys are masked like secrets: every member's own key (keys are personal). */

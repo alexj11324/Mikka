@@ -202,6 +202,9 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
   routing?: ModelRoutingSnapshot;
   subscriptionBindingId?: string; cloud: boolean; botId: string | null; workspaceId: string;
 }): Promise<Continuation | null> {
+  if (!original.workspaceId) throw new ActionFailureError('executionAccountUnavailable')
+  const { withProjectResourceLease } = await import('./project-resources/store')
+  return withProjectResourceLease(original.userId, original.workspaceId, async () => {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -267,6 +270,12 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
         }
         const queued = await readSource(client, source.userId, runId)
         if (!queued?.agentDefinition) throw new ActionFailureError('runInvalid')
+        if (source.agentDefinition.projectExecution) {
+          const { assertFrozenProjectExecution } = await import('./project-resources/store')
+          if (!queued.agentDefinition.projectExecution) throw new ActionFailureError('projectEnvironmentUnavailable')
+          assertFrozenProjectExecution(source.agentDefinition.projectExecution, queued.agentDefinition.projectExecution)
+        }
+        if (queued.baseBranch !== source.baseBranch) throw new ActionFailureError('projectRepositoryDenied')
         const prompt = providerContinuationPrompt(source.prompt)
         const definition = providerContinuationDefinition(source.agentDefinition, queued.agentDefinition, prompt, policyCeiling)
         const identity = await freezeExecutionIdentity(client, { ...queued, agentDefinition: definition }, undefined, source.agentDefinition.executionIdentity?.workspaceId)
@@ -297,6 +306,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
     await client.query('COMMIT')
     return continuation
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  })
 }
 
 /** The existing dispatcher retains all owner, workspace, location and device

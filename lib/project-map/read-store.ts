@@ -32,7 +32,7 @@ export async function collectMapFacts(database: Database, scope: ProjectScope, p
   if (!result || !Array.isArray(result.rows) || result.rows.length !== 10 || result.rows.slice(2).some(rows => !Array.isArray(rows))
     || !Number.isSafeInteger(bytes) || bytes < 0 || bytes > MAP_METADATA_BYTES) throw new MapReadError('map_too_large', { detail: 'limit' })
   const related = result.rows.slice(3, 8) as [MapFacts['candidates'], MapFacts['checks'], MapFacts['artifacts'], Publication[], Omit<DecisionFact, 'sources'>[]]
-  const issues = decodeMapRows<MapFacts['issues'][number]>(result.rows[0], 'issues', scope.issueIds, 100)
+  const issues = decodeMapRows<MapFacts['issues'][number]>(result.rows[0], 'issues', scope.issueIds, MAP_NODE_LIMIT)
   const runs = decodeMapRows<MapFacts['runs'][number]>(result.rows[1], 'runs', scope.issueIds, MAP_NODE_LIMIT)
   const factoryVersions = bounded(result.rows[2])
   const candidates = bounded(related[0]), checks = bounded(related[1]), artifacts = bounded(related[2]), decisions = bounded(related[4])

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedProject, seedProjectTasks, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { ProjectMapError, recordDecisionSchema, type RecordDecisionInput } from './contracts'
 
@@ -43,7 +43,7 @@ test('project decisions: real PostgreSQL authority, atomic appends, retries and 
   const projectId = await seedProject(connection, owner, [])
   const sharedProject = await seedProject(connection, owner, [{ teamId: team.id, workspaceId: teamWorkspace.id }])
   const issueId = await seedIssue(connection, owner)
-  await connection.query('update workspace_projects set "issueIds"=$2 where id=$1', [projectId, JSON.stringify([issueId])])
+  await seedProjectTasks(connection, projectId, [issueId])
   const botId = await seedBot(connection, personal.id, owner)
   const agentId = await seedAgent(connection, owner)
   const human = { kind: 'human' as const, user: owner, workspaceId: personal.id }

@@ -1,6 +1,7 @@
+import { saveEnvironmentInput, projectResourcesInput, workspaceRepositoryPolicyInput } from '@/lib/project-resources/contracts'
 import { z } from 'zod'
 import { projectInput, projectPatch } from '@/lib/project-input'
-import { assigneeSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
+import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
 import { ISSUE_STATUS_CODES, ISSUE_PRIORITY_CODES } from '@/lib/issue-meta'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
@@ -33,6 +34,7 @@ const document = z.object({ type: z.literal('doc'), content: z.array(json).optio
   .refine(value => JSON.stringify(value).length <= 250_000)
 const metadata = object({
   assignee: assigneeSchema.pick({ kind: true, id: true }).strict().nullable().optional(),
+  delegate: delegateSchema.pick({ kind: true, id: true }).strict().nullable().optional(),
   project: text(100).trim().min(1).nullable().optional(), labels: z.array(labelSchema.strict()).max(12).optional(),
   pullRequests: z.array(pullRequestSchema.strict()).max(10).optional(), dueDate: z.iso.date().nullable().optional(),
   estimate: z.number().int().min(0).max(100).nullable().optional(),
@@ -86,6 +88,16 @@ const readBatch: z.ZodType = tuple(z.array(object({ action: z.enum(READ_BATCH_AC
  * checked here before the original action performs its ownership checks. */
 export const desktopActionSchemas = {
   'desktop.readBatch': readBatch,
+  'task-domain.getTaskPresentation': oneId,
+  'teams.getTeamLifecycleImpact': oneId,
+  'teams.getTeamLifecycleAudit': tuple(uuid, uuid),
+  'teams.archiveTeam': oneId,
+  'teams.restoreTeam': oneId,
+  'teams.removeTeamGrouping': tuple(uuid, text(120)),
+  'project-resources.listProjectResources': tuple(uuid, uuid.optional()),
+  'project-resources.saveEnvironment': tuple(saveEnvironmentInput),
+  'project-resources.saveProjectResources': tuple(projectResourcesInput),
+  'project-resources.saveWorkspaceRepositoryPolicy': tuple(workspaceRepositoryPolicyInput),
   'desktop.bootstrap': inWorkspace,
   'desktop.session': none,
   'desktop.accounts': none,

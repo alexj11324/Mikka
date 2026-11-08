@@ -54,7 +54,8 @@ async function withQuotaRunWorkspace<T>(userId: string, runId: string, work: (wo
     throw new ActionFailureError('runNotFound')
   const reader = { id: userId, [tokenWorkspace]: workspaceId,
     ...(acting?.enterprisePrincipal ? { [enterprisePrincipal]: acting.enterprisePrincipal } : {}) }
-  const run = () => actAs(reader, () => work(workspaceId), acting?.actor)
+  const { withProjectResourceLease } = await import('./project-resources/store')
+  const run = () => actAs(reader, () => withProjectResourceLease(reader, workspaceId, () => work(workspaceId)), acting?.actor)
   const borrowed = borrowTaskWorkspaceMembership(userId, workspaceId)
   if (borrowed) {
     try { await borrowed.check(); return await run() }

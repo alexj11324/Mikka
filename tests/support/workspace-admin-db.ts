@@ -82,9 +82,19 @@ export async function seedTeamIssue(pool: Pool, workspaceId: string, teamId: str
 
 export async function seedProject(pool: Pool, userId: string, links: Array<{ teamId: string; workspaceId: string }>) {
   const id = randomUUID()
-  await pool.query(`insert into workspace_projects (id,"userId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) values ($1,$2,'P','','','planned','none','','','','','[]',1)`, [id, userId])
+  const workspaceId = links[0]?.workspaceId ?? await seedPersonalWorkspace(pool, userId)
+  if (links.some(link => link.workspaceId !== workspaceId)) throw new Error('Project fixture cannot cross workspaces')
+  await pool.query(`insert into workspace_projects (id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) values ($1,$2,$3,'P','','','planned','none','','','','','[]',1)`, [id, userId, workspaceId])
   for (const link of links) await pool.query('insert into mikka_team_projects ("projectId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id, link.teamId, link.workspaceId, userId])
   return id
+}
+
+
+/** Canonical relation fixtures; no production write to the retired JSON cache. */
+export async function seedProjectTasks(pool: Pool, projectId: string, issueIds: string[]) {
+  await pool.query('delete from workspace_project_tasks where "projectId"=$1', [projectId])
+  for (const issueId of issueIds) await pool.query(`insert into workspace_project_tasks("projectId","issueId","workspaceId")
+    select p.id,i.id,p."workspaceId" from workspace_projects p join issues i on i.id=$2 and i."workspaceId"=p."workspaceId" and i."ownershipState"='bound' where p.id=$1`, [projectId, issueId])
 }
 
 export const count = async (pool: Pool, text: string, params: unknown[]) => Number((await pool.query<{ n: string }>(`select count(*)::text as n from ${text}`, params)).rows[0].n)
