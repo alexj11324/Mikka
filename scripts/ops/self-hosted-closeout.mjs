@@ -98,9 +98,11 @@ async function run(env) {
       postgres: { image: 'postgres:17-alpine', environment: { POSTGRES_DB: 'mikka_e2e', POSTGRES_USER: 'mikka', POSTGRES_PASSWORD: password },
         healthcheck: { test: ['CMD-SHELL', 'pg_isready -U mikka -d mikka_e2e'], interval: '3s', timeout: '3s', retries: 30 } },
       mailpit: { image: 'axllent/mailpit:v1.27.4', ports: ['127.0.0.1:8025:8025'], environment: { MP_DISABLE_VERSION_CHECK: 'true', MP_QUIET: 'true' } },
-      app: { image: `ghcr.io/alexj11324/mikka@${plan.imageDigest}`, init: true, ports: ['127.0.0.1:3000:3000'], volumes: ['data:/data'],
+      app: { image: `ghcr.io/alexj11324/mikka@${plan.imageDigest}`, init: true, ports: ['127.0.0.1:3000:3000'],
+        volumes: ['data:/data', `${resolve('scripts/ops/model-wire-diagnostics.mjs')}:/opt/closeout/model-wire-diagnostics.mjs:ro`],
         environment: { DATABASE_URL: db, MIKKA_DATABASE_URL: db, BETTER_AUTH_URL: localOrigin, MIKKA_COMMUNITY_UI: '1',
           MIKKA_EXTERNAL_CRON: '1',
+          MIKKA_MODEL_WIRE_DIAGNOSTICS: '1', NODE_OPTIONS: '--import=/opt/closeout/model-wire-diagnostics.mjs',
           SMTP_URL: 'smtp://mailpit:1025', MIKKA_EMAIL_FROM: 'Closeout <login@selfhost.example.test>' },
         depends_on: { postgres: { condition: 'service_healthy' }, mailpit: { condition: 'service_started' } } }
     }, volumes: { data: {} } }
@@ -485,6 +487,11 @@ async function run(env) {
       try {
         const messages = JSON.parse(await readFile(resolve('messages/en.json'), 'utf8'))
         const logs = compose('logs', '--no-color', 'app')
+        report.modelWireShapes = logs.split('\n').flatMap(line => {
+          try { const value = JSON.parse(line.slice(line.indexOf('{'))); return value?.kind === 'closeout_model_wire_shape' && value.version === 1 ? [value] : [] }
+          catch { return [] }
+        }).slice(0, 8)
+        report.fixtureFetchInstrumentation = true
         report.appLogCodes = Object.keys(messages.RunErrors).filter(code => code.length > 5 && logs.includes(code))
         const sdkErrors = Object.keys(await import('ai')).filter(name => name.endsWith('Error'))
         report.appLogErrorNames = ['ModelAdmissionError', 'CloudServiceError', 'CodedError', 'TypeError', 'ReferenceError',
@@ -524,6 +531,7 @@ async function run(env) {
     console.log(JSON.stringify({ stage: report.stage, failure: report.failure, failureDetail: report.failureDetail,
       failureFrame: report.failureFrame,
       coordinatorObservations: report.coordinatorObservations, appLogCodes: report.appLogCodes, appLogErrorNames: report.appLogErrorNames,
+      modelWireShapes: report.modelWireShapes,
       consentPosts: report.consentPosts, consentStatuses: report.consentStatuses, checks: report.checks, cleanup: report.cleanup }))
   }
 }

@@ -29,7 +29,7 @@ jobs:
       - uses: ./.github/actions/pnpm-install
       - name: Verify source guards before all production credentials
         run: |
-          node --test scripts/ops/self-hosted-closeout.test.mjs
+          node --test scripts/ops/self-hosted-closeout.test.mjs scripts/ops/model-wire-diagnostics.test.mjs
           node scripts/ops/self-hosted-closeout.mjs --check
       - name: Prepare exact published image and disposable browser infrastructure
         run: |
