@@ -464,13 +464,14 @@ dbTest('account deletion preserves task run and Factory history through DELETE u
   const subject = 'test-run-history-' + randomUUID(), peer = 'test-run-peer-' + randomUUID()
   const agent = randomUUID(), device = randomUUID(), sharedBot = randomUUID(), personalBot = randomUUID(), coordinator = randomUUID()
   const taskIds: string[] = [], workspaceIds: string[] = [], artifactIds: string[] = [], captureIds: string[] = [], runIds: string[] = []
-  const factoryIds: string[] = [], sourceEvents: string[] = [], operationIds: string[] = []
+  const factoryIds: string[] = [], sourceEvents: string[] = [], operationIds: string[] = [], mailboxIds: string[] = []
   const removedObjects: string[] = []
   t.after(async () => {
     await scope.run(async () => {
       await pool.query('DELETE FROM factory_tasks WHERE id=ANY($1::uuid[])', [factoryIds])
       await pool.query('DELETE FROM artifacts WHERE id=ANY($1::uuid[])', [artifactIds])
-      await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [runIds])
+      await pool.query('DELETE FROM run_messages WHERE "runId"=ANY($1::uuid[])', [runIds])
+      await pool.query('WITH removed_mailboxes AS (DELETE FROM session_mailboxes WHERE id=ANY($2::uuid[]) RETURNING id) DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [runIds, mailboxIds])
       await pool.query('DELETE FROM coordinator_events WHERE id=ANY($1::uuid[])', [sourceEvents])
       await pool.query('DELETE FROM bots WHERE id=ANY($1::uuid[])', [[sharedBot, personalBot, coordinator]])
       await pool.query('DELETE FROM agents WHERE id=$1', [agent])
@@ -537,6 +538,14 @@ dbTest('account deletion preserves task run and Factory history through DELETE u
       await pool.query('INSERT INTO run_capture_shares(id,"captureId","tokenHash","createdBy") VALUES($1,$2,$3,$4)', [randomUUID(), run.capture, randomUUID(), subject])
     }
     const byName = (name: string) => fixtures.find(run => run.name === name)!
+    const mailboxFixtures = [byName('shared-no-bot'), byName('personal-no-bot')].map(run => ({ id: randomUUID(), run }))
+    for (const { id, run } of mailboxFixtures) {
+      mailboxIds.push(id)
+      await pool.query('INSERT INTO session_mailboxes(id,"userId","workspaceId",kind,"sessionKey","latestRunId","wakeBudget") VALUES($1,$2,$3,\'run\',$4,$5,3)', [id, subject, run.workspaceId, run.id, run.id])
+      await pool.query('UPDATE agent_runs SET "mailboxId"=$1 WHERE id=$2', [id, run.id])
+      await pool.query('UPDATE run_messages SET "mailboxId"=$1 WHERE "runId"=$2', [id, run.id])
+    }
+    await pool.query('UPDATE agent_runs SET "retryOf"=$1,"continuesRunId"=$1,"threadReplacedBy"=$1 WHERE id=$2', [byName('personal-bot').id, byName('personal-no-bot').id])
     const direct = [
       { id: randomUUID(), issueId: artifactOnlyTask, workspaceId: shared, keep: true, key: 'fixture/history/' + subject + '/direct-shared.md' },
       { id: randomUUID(), issueId: personalTask, workspaceId: personal, keep: false, key: 'fixture/history/' + subject + '/direct-personal.md' },
@@ -626,6 +635,9 @@ dbTest('account deletion preserves task run and Factory history through DELETE u
     assert.equal((await pool.query('SELECT count(*)::int n FROM run_tokens WHERE "userId"=$1', [subject])).rows[0].n, 0)
     assert.equal((await pool.query('SELECT count(*)::int n FROM artifact_shares WHERE "createdBy"=$1', [subject])).rows[0].n, 0)
     assert.equal((await pool.query('SELECT count(*)::int n FROM run_capture_shares WHERE "createdBy"=$1', [subject])).rows[0].n, 0)
+    assert.deepEqual((await pool.query('SELECT id,"latestRunId",disabled,"wakeBudget" FROM session_mailboxes WHERE id=ANY($1::uuid[])', [mailboxIds])).rows,
+      [{ id: mailboxFixtures[0].id, latestRunId: byName('shared-no-bot').id, disabled: true, wakeBudget: 0 }], 'only the disabled Shared history mailbox survives the actual Run/mailbox cycle deletion')
+    assert.equal((await pool.query('SELECT "mailboxId" FROM agent_runs WHERE id=$1', [byName('shared-no-bot').id])).rows[0].mailboxId, mailboxFixtures[0].id)
     assert.deepEqual((await pool.query('SELECT id FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [runIds])).rows.map(row => row.id), [...keptRuns].sort())
     assert.deepEqual((await pool.query('SELECT id FROM artifacts WHERE id=ANY($1::uuid[]) ORDER BY id', [artifactIds])).rows.map(row => row.id), [...keptArtifacts].sort())
     assert.deepEqual((await pool.query('SELECT id FROM run_captures WHERE id=ANY($1::uuid[]) ORDER BY id', [captureIds])).rows.map(row => row.id), [...keptCaptures].sort())
@@ -687,6 +699,8 @@ dbTest('account deletion preserves task run and Factory history through DELETE u
     assert.equal(await readArtifact(reader(subject, shared), direct[0].id), null)
     await assert.rejects(pool.query("INSERT INTO run_tokens(id,\"runId\",\"userId\",\"tokenHash\",\"expiresAt\") VALUES($1,$2,$3,$4,now()+interval '1 hour')",
       [randomUUID(), byName('shared-no-bot').id, subject, randomUUID()]), /account_deletion_pending/, 'kept history cannot mint a new execution credential for the deleted subject')
+    await assert.rejects(pool.query('INSERT INTO run_messages(id,"runId","userId","mailboxId",text) VALUES($1,$2,$3,$4,\'Must remain fenced\')',
+      [randomUUID(), byName('shared-no-bot').id, subject, mailboxFixtures[0].id]), { code: '55000', message: 'account_deletion_pending' }, 'the disabled history mailbox cannot receive a new message for the deleted subject')
     const foreignKeys = (await pool.query("SELECT conname FROM pg_constraint WHERE conrelid='run_publications'::regclass AND contype='f' ORDER BY conname")).rows.map(row => row.conname)
     assert.ok(!foreignKeys.includes('run_publications_userId_fkey'))
     assert.ok(foreignKeys.includes('run_publications_runId_fkey')); assert.ok(foreignKeys.includes('run_publications_issueId_fkey'))
