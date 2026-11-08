@@ -4,11 +4,10 @@ import { ChatMessageList, type ChatListHandle } from '@/features/chat/components
 import { groupPagePath, mergeGroupHistory, mergeGroupRead, type GroupRead } from '@/features/chat/model/chat-pages'
 import { latestOwnIndex } from '@/features/chat/model/chat-layout'
 import { useReducedMotionPreference } from '@/lib/reduced-motion'
-import { GestureDetector } from 'react-native-gesture-handler'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BotAvatar, Spinner } from '@/components/icons'
-import { BotBubble, CopyButton, MyBubble, Reactions, TimedRow, useTimeReveal } from '@/components/chat'
+import { BotBubble, MessageActions, MessageRow, MyBubble, Reactions, TimeSeparator } from '@/components/chat'
 import { Markdown } from '@/components/Markdown'
 import { NavBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
@@ -21,7 +20,7 @@ import { ChatScrollToLatest } from '@/components/ChatScrollToLatest'
 import { apiCache } from '@/lib/api-cache'
 import { groupReactionPaths, mergeGroupMessages } from '@/lib/group-history'
 import { api } from '@/lib/api'
-import { clockTime } from '@/lib/clock'
+import { separatorLabel, startsGroup } from '@/lib/chat-time'
 import { mentionsIn } from '@/lib/group'
 import { useHome } from '@/lib/home'
 import { holdMessage, type HeldMessage } from '@/lib/message-actions'
@@ -47,7 +46,6 @@ export default function GroupChat() {
   const list = useRef<ChatListHandle>(null)
   const [atLatest, setAtLatest] = useState(true)
   const reduceMotion = useReducedMotionPreference()
-  const { offset, gesture: timeReveal, scrollLocked } = useTimeReveal()
   const apiContext = apiCache.context()
   const [composerHeight, setComposerHeight] = useState(90)
   const [text, setText] = useState('')
@@ -158,27 +156,34 @@ export default function GroupChat() {
   }
 
   const held = (words: string, messageId: string): HeldMessage => ({ text: plainText(words), onQuote: () => setQuote(quotable(words)), react: { current: myReaction(reactions[messageId]), set: emoji => void react(messageId, emoji) } })
-  const actions = (words: string, messageId: string) => {
+  // A long press selects the words: a group has no in-place selection, so they open selectable (app/message-text.tsx).
+  const select = (words: string, messageId: string) => {
     holdMessage(held(words, messageId))
-    router.push('/message')
+    router.push('/message-text')
   }
   const chips = (messageId: string, align?: 'right') => <Reactions reactions={reactions[messageId]} align={align} onToggle={emoji => void react(messageId, toggled(reactions[messageId], emoji))} />
 
   const renderMessage = (message: GroupMessage, index: number) => {
-    const time = clockTime(message.createdAt)
+    const separator = startsGroup(message.createdAt, messages[index - 1]?.createdAt) ? <TimeSeparator label={separatorLabel(message.createdAt)} /> : null
     if (message.authorType === 'user' && message.authorId === me) {
       return (
-        <TimedRow time={time} offset={offset} align="right" onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)} menu={held(message.body, message.id)}>
-          <MyBubble text={message.body} />{chips(message.id, 'right')}
-        </TimedRow>
+        <View>
+          {separator}
+          <MessageRow align="right" onSelect={() => select(message.body, message.id)}>
+            <MyBubble text={message.body} />{chips(message.id, 'right')}
+            <MessageActions align="right" message={held(message.body, message.id)} />
+          </MessageRow>
+        </View>
       )
     }
     const author = member(message.authorType, message.authorId)
     const previous = messages[index - 1]
     const first = !previous || previous.authorType !== message.authorType || previous.authorId !== message.authorId
     return (
-      <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(message.body))} onLongPress={() => actions(message.body, message.id)} menu={held(message.body, message.id)}>
-        {first ? (
+      <View>
+      {separator}
+      <MessageRow onSelect={() => select(message.body, message.id)}>
+        {first || separator ? (
           <View style={styles.author}>
             {message.authorType === 'user' ? null : <BotAvatar color={author?.color} shape={author?.shape} size={20} />}
             <Text style={styles.authorName}>{author?.name ?? (message.authorType === 'user' ? '成员' : 'Bot')}</Text>
@@ -186,17 +191,17 @@ export default function GroupChat() {
         ) : null}
         <BotBubble><Markdown text={message.body} /></BotBubble>
         {chips(message.id)}
-        {message.authorType === 'user' ? null : <CopyButton text={plainText(message.body)} />}
-      </TimedRow>
+        <MessageActions message={held(message.body, message.id)} copy={message.authorType !== 'user'} />
+      </MessageRow>
+      </View>
     )
   }
 
   return (
     <View style={styles.screen}>
       <NavBar title={title} />
-      <GestureDetector gesture={timeReveal}>
       <View style={{ flex: 1, overflow: 'hidden' }}>
-        <ChatMessageList ref={list} testID="group-chat-scroll" data={messages} scrollEnabled={!scrollLocked} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
+        <ChatMessageList ref={list} testID="group-chat-scroll" data={messages} scrollEnabled bottomInset={composerHeight} onAtLatestChange={setAtLatest}
           keyOf={message => message.id} renderItem={renderMessage} anchorIndex={anchorIndex}
           onStartReached={before ? () => void loadEarlier() : undefined}
           header={<>
@@ -216,7 +221,6 @@ export default function GroupChat() {
         {stopFailed ? <StopFailed busy={stopping} onRetry={() => void stop()} /> : null}
           </>} />
       </View>
-      </GestureDetector>
       <ChatScrollToLatest visible={!atLatest} bottom={composerHeight + 12} onPress={() => list.current?.toLatest()} />
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
