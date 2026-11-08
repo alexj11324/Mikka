@@ -1,13 +1,13 @@
 # Review a coding task's changes on one review page, opened from a one-line summary
 
 - Date: 2026-11-08
-- Status: draft. The coordinator reviews it before it is accepted.
+- Status: accepted. Alex approved the R0–R3 design, including the globe proposal: 「可以」 (2026-11-08, relayed by the coordinator).
 - Source:
   - Alex approved the research and sketches (「可以，先做调研和草图」).
   - Alex on sending comments: 「评论单独做一个发给 agent 的按钮」.
   - Alex on attempts: 「不管第一次还是第二次尝试，改的都是同一个工作区，应该只有最后一次」.
   - The coordinator simplified the layout after [Linear Diffs](https://linear.app/docs/diffs) and settled the remaining points from [the research](../../research/2026-11-08-coding-workspace-layout.md).
-- Rule: R-51 (exception below); R-37 and R-40 still hold.
+- Rule: R-51 (exception added), R-57 and R-35 (the globe leaves the window bar), R-91 (new: top rows carry the important things); R-37 and R-40 still hold.
 - Replaces:
   - The 改动 tab appearing only when the run saved a checkpoint, and files only linking out to GitHub once a PR exists (`components/workspace/thread-changes.tsx`, `lib/thread-changes.ts`).
   - The earlier sketches D0–D5 and M0–M4 on the same Figma page, now marked 已取代.
@@ -35,7 +35,7 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 | R1 审阅页 | One full page, described below. | `1120:869` | `1120:1231` |
 | R1b 检查展开 | The check summary expands in place: the failing check with a log excerpt, 查看完整日志 and 附到评论; the passing checks in one row. | `1120:1542` | `1120:1895` |
 | R2 iPhone 审阅 | Opened in one tap from the chat card's summary line. Under one centred title, the first row is the check summary (tap to expand) with 要求修改 / 批准合并, then the changed files, and the floating 「N 条评论 · 发给 Agent」 bar. | `1121:54` | `1121:169` |
-| 提议：地球图标移出窗口栏 | A separate proposal for Alex. The window bar keeps only ⌘K search and the ✋ 等待你 count; the browser opens from ⌘K 「打开浏览器」 or ⋯. It changes the current product and is not part of this decision until Alex approves it. | `1123:78` | `1123:306` |
+| 地球图标移出窗口栏 | Accepted with the rest. The window bar keeps only ⌘K search and the ✋ 等待你 count; the browser opens from ⌘K 「打开浏览器」 or ⌘⇧O. | `1123:78` | `1123:306` |
 | R3 iPhone 文件 diff | A file's diff with inline comments and the floating bar. | `1121:274` | `1121:359` |
 
 ## The review page (R1)
@@ -65,7 +65,8 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 6. **After a PR exists**, the diff and checks stay in Mikka. 「在 GitHub 打开」 is a secondary link.
 7. **iPhone parity** with R2 and R3: the summary line opens the review screen in one tap, with line comments, 发给 Agent, the checks and the PR actions. There is no terminal and no editor.
 8. **No grey slabs.** Properties are label/value rows on the panel background.
-9. **Top rows carry the important things** (Alex: the top rows had room but held low-value items). On every surface the first row holds the task's state and its main action: PR, failed checks and 审阅 next to the task title; checks and 要求修改 / 批准合并 on the review page and on iPhone. Branch names, counts and shortcut hints go into ⋯ or tooltips.
+9. **The globe leaves the window bar.** The window bar keeps ⌘K search and the ✋ 等待你 count. The app-wide browser (R-57) opens from ⌘K 「打开浏览器」 or ⌘⇧O.
+10. **Top rows carry the important things** (R-91) (Alex: the top rows had room but held low-value items). On every surface the first row holds the task's state and its main action: PR, failed checks and 审阅 next to the task title; checks and 要求修改 / 批准合并 on the review page and on iPhone. Branch names, counts and shortcut hints go into ⋯ or tooltips.
 
 ## Scope
 
@@ -84,7 +85,7 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 - 按提交筛选 in the diff header.
 - Undo a file or hunk.
 
-**P2 (optional)**
+**P2 (optional; how it relates to the wider #1720 Epic is still to be settled)**
 - A repository file tree and read-only source.
 - A terminal (task owner only; teammates read-only; no secret files, [2026-11-08-0240](2026-11-08-0240-credential-exposure-boundary.md)).
 - A dev-server preview.

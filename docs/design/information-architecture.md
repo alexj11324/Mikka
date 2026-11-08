@@ -206,7 +206,7 @@ Window bar (44px, R-35)
 ├── ⌘K search pill              global
 ├── [打开右栏]                   when the right column is closed
 ├── 全部线程                     target, top bar global entry (in progress, another session)
-└── 浏览器 globe                 R-57
+└── ✋ 等待你 count; 浏览器 opens from ⌘K (R-57, 2026-11-08-1230)
 Icon rail (68px, icons only, R-35)
 ├── 主页 ─ bot list | chat | right column
 ├── 建议 ─ cards | Coordinator chat (R-55)
@@ -233,7 +233,7 @@ Card
 
 | Element | ≥ 1280 | 768–1279 | < 768 (phone web) |
 | --- | --- | --- | --- |
-| Window bar (back, ⌘K, panel, globe) | Shown | Shown | Hidden (`components/app-shell.tsx:55`, `md:grid`) |
+| Window bar (back, ⌘K, panel, ✋ 等待你) | Shown | Shown | Hidden (`components/app-shell.tsx:55`, `md:grid`) |
 | Icon rail | Shown | Shown | Hidden (`icon-rail.tsx:52`); its items move to the bot list's footer with the account menu (`bot-list.tsx:184-187`) |
 | Bot list | Column, collapsible | Column, collapsible | Off-canvas sheet behind the header button |
 | Right column (概览, 全部线程) | Inline (`context-panel.tsx`, `xl:flex`) | Sheet over the content (`issue-workspace.tsx:180`) | No opener: `openPanel` is called only from the window bar (gap G2) |
