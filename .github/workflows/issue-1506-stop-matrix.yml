@@ -27,7 +27,7 @@ jobs:
       queue: max
       cancel-in-progress: false
     env:
-      ACCEPTANCE_SHA: '' # Bind the exact prepared source commit after offline review.
+      ACCEPTANCE_SHA: 'ab2fc19909a83b16c3276b0b2353f6055572283b' # Bind the exact prepared source commit after offline review.
       APP_SHA: 'bb5d1f9e224aea395b9c45823960e8ad10f1a099' # Root binds once; never resolve a moving branch during this job.
       MIKKA_LIVE_SOURCE_ROOT: ${{ github.workspace }}/live-source
     steps:
