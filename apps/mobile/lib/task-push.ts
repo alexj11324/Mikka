@@ -9,24 +9,34 @@ export function taskPushHref(target: TaskPushTarget): string {
   return `/task/${target.issueId}?workspace=${target.workspaceId}${target.runId ? `&attempt=${target.runId}` : ''}`
 }
 
-export type TaskPushResult = 'opened' | 'refused' | 'signedOut' | 'superseded'
+export type TaskPushResult = 'opened' | 'refused' | 'signedOut' | 'superseded' | 'stale'
+
+/** The account and cache context (lib/api-cache.ts) an action owns; the context moves on every switch and sign-out. */
+export type TaskPushOwner = { account: string; context: number }
 
 export interface TaskPushDeps {
   /** The workspace the server has selected now: a fresh GET /api/mobile/settings. Throws when it cannot be read. */
   current: () => Promise<string>
-  /** Saves the pick the way 设置 › 工作区 does (lib/api.ts saveWorkspace). */
-  save: (id: string) => Promise<void>
-  /** The account/workspace context (lib/api-cache.ts): it moves on every switch and sign-out. */
-  context: () => number
+  /**
+   * Saves the pick the way 设置 › 工作区 does (lib/api.ts saveWorkspace), only while `owner` is still current. Returns
+   * the context this save itself produced, or null when it wrote nothing or the context moved meanwhile.
+   */
+  save: (id: string, owner: TaskPushOwner) => Promise<number | null>
+  /** The current account and context. */
+  owner: () => TaskPushOwner
   open: (href: string) => void
   /**
    * Brief feedback after a stop (「无法确认工作区」). It never opens anything; `retry`, when given, taps the same push
-   * again. Not called for a 401 (the app's sign-in handling takes over) or a tap superseded by a newer one.
+   * again. Not called for a 401 (the app's sign-in handling takes over), a tap superseded by a newer one, or an action
+   * stopped because the account or workspace changed under it.
    */
   unconfirmed: (retry?: () => void) => void
 }
 
 const status = (error: unknown) => error && typeof error === 'object' ? (error as { status?: unknown }).status : undefined
+const same = (a: TaskPushOwner, b: TaskPushOwner) => a.account === b.account && a.context === b.context
+/** Thrown inside the switch when the action no longer owns its context; it stops every later stage. */
+const STALE = new Error('taskPushStale')
 
 /**
  * Opens tapped task pushes in their own workspace (#1659 item 4), one at a time, in three steps:
@@ -34,32 +44,53 @@ const status = (error: unknown) => error && typeof error === 'object' ? (error a
  * 2. the workspace selection is read fresh and, when it is another workspace, switched through the existing switch
  *    (lib/workspace-switch.ts), which reads the selection back and restores the old one when the server refuses;
  * 3. only a confirmed selection opens the task.
+ * Every stage is bound to the account and context the action owns. It starts with the ones current at the tap; its
+ * own save hands it the exact context that save produced, and nothing else does. A read that answers, or fails, after
+ * the account or context moved (the person picked a workspace, another account was selected, a sign-out) stops the
+ * action ('stale') before any save or rollback, so a stale action never writes a selection, never restores an old
+ * `previous` into a new context and never opens. A refusal within the owned context still restores the previous pick.
  * A refused or unreadable confirmation stops: nothing opens and no other workspace is tried; the person sees
- * `unconfirmed` with a retry. A newer tap supersedes an older one still waiting, and a selection that moved while
- * confirming (another switch, a sign-out) stops it too. `invalid` refuses a push whose task target is malformed.
+ * `unconfirmed` with a retry. A newer tap supersedes an older one still waiting. `invalid` refuses a push whose task
+ * target is malformed.
  */
 export function taskPushOpener(deps: TaskPushDeps) {
   let latest = 0
   let queue: Promise<unknown> = Promise.resolve()
   const confirm = async (target: TaskPushTarget, ticket: number): Promise<TaskPushResult> => {
     if (ticket !== latest) return 'superseded'
-    let fence = deps.context()
-    let signedOut = false
+    let owned = deps.owner()
+    let stale = false, signedOut = false
+    const owns = () => !stale && same(deps.owner(), owned)
     const current = async () => {
-      try { return await deps.current() } catch (error) { if (status(error) === 401) signedOut = true; throw error }
+      const asked = owned
+      try {
+        const value = await deps.current()
+        if (!owns() || !same(owned, asked)) { stale = true; throw STALE }
+        return value
+      } catch (error) {
+        if (error !== STALE) {
+          if (!same(deps.owner(), asked)) stale = true
+          else if (status(error) === 401) signedOut = true
+        }
+        throw error
+      }
+    }
+    // The save and the switch's rollback alike: written only in the owned context, which then becomes the one it made.
+    const save = async (id: string) => {
+      if (!owns()) { stale = true; throw STALE }
+      const produced = await deps.save(id, owned)
+      if (produced === null) { stale = true; throw STALE }
+      owned = { account: owned.account, context: produced }
     }
     let selected: string
-    try { selected = await current() } catch { return signedOut ? 'signedOut' : 'refused' }
+    try { selected = await current() } catch { return stale ? 'stale' : signedOut ? 'signedOut' : 'refused' }
     if (selected !== target.workspaceId) {
-      const failed = await switchWorkspace({ id: target.workspaceId, name: '' }, selected, {
-        // The fence is the context the confirmed save made; any later move belongs to someone else.
-        save: async id => { await deps.save(id); fence = deps.context() },
-        current,
-      })
+      const failed = await switchWorkspace({ id: target.workspaceId, name: '' }, selected, { save, current })
+      if (stale) return 'stale'
       if (signedOut) return 'signedOut'
       if (failed) return 'refused'
     }
-    if (deps.context() !== fence) return 'refused'
+    if (!owns()) return 'stale'
     if (ticket !== latest) return 'superseded'
     deps.open(taskPushHref(target))
     return 'opened'

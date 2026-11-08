@@ -63,7 +63,7 @@ test('a legacy task push without a workspaceId field still opens /task/{id}', ()
 test('a refused push shows the feedback through the opener and opens nothing', () => {
   const feedback: unknown[] = [], opened: string[] = []
   const opener = taskPushOpener({ current: async () => assert.fail('nothing to confirm'), save: async () => assert.fail('nothing to save'),
-    context: () => 0, open: href => { opened.push(href) }, unconfirmed: retry => { feedback.push(retry) } })
+    owner: () => ({ account: 'A', context: 0 }), open: href => { opened.push(href) }, unconfirmed: retry => { feedback.push(retry) } })
   const stop = watchPushes(href => { opened.push(href) }, target => { void opener.open(target) }, () => { opener.invalid() })
   tap(response({ botId: bot, workspaceId: 'bad', issueId: task }))
   tap(response({ botId: bot, workspaceId: alpha, issueId: 'bad' }))

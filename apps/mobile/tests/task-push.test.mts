@@ -23,8 +23,12 @@ function workspaces(selected: string, members = [alpha, beta, gamma]) {
   const state = { cookie: selected, server: selected, context: 0, saves: [] as string[], opened: [] as string[], reads: 0, feedback: [] as ((() => void) | undefined)[] }
   const deps = {
     current: async () => { state.reads++; return state.server },
-    save: async (id: string) => { state.saves.push(id); state.cookie = id; state.server = members.includes(id) ? id : state.server; state.context++ },
-    context: () => state.context,
+    save: async (id: string, owner: { account: string; context: number }) => {
+      if (owner.account !== 'A' || owner.context !== state.context) return null
+      state.saves.push(id); state.cookie = id; state.server = members.includes(id) ? id : state.server
+      return ++state.context
+    },
+    owner: () => ({ account: 'A', context: state.context }),
     open: (href: string) => { state.opened.push(href) },
     unconfirmed: (retry?: () => void) => { state.feedback.push(retry) },
   }
@@ -109,7 +113,7 @@ test('the feedback offers a retry that runs the same confirmation again', async 
   assert.equal(await open({ workspaceId: alpha, issueId: task, runId: null }), 'refused')
   assert.deepEqual(state.opened, [], 'the feedback does not change the stop')
   // Access is granted meanwhile; 重试 confirms Alpha fresh and opens the task.
-  deps.save = async (id: string) => { state.saves.push(id); state.cookie = id; state.server = id; state.context++ }
+  deps.save = async (id: string) => { state.saves.push(id); state.cookie = id; state.server = id; return ++state.context }
   const retry = state.feedback[0]
   assert.ok(retry)
   retry()
@@ -147,10 +151,13 @@ test('a selection that moves while the switch is confirmed stops the open', asyn
   const pending = open({ workspaceId: alpha, issueId: task, runId: null })
   await new Promise(done => setImmediate(done))
   // The person picks Gamma in 设置 › 工作区 meanwhile.
-  await deps.save(gamma)
+  state.cookie = gamma; state.server = gamma; state.context++
   confirm.resolve(alpha)
-  assert.equal(await pending, 'refused')
+  assert.equal(await pending, 'stale')
   assert.deepEqual(state.opened, [])
+  assert.deepEqual(state.saves, [alpha], 'no rollback is written over the person\'s pick')
+  assert.equal(state.cookie, gamma)
+  assert.deepEqual(state.feedback, [])
 })
 
 test('a newer tap supersedes an older one still confirming', async () => {

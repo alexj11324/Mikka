@@ -2,6 +2,7 @@ import { Alert } from 'react-native'
 import messages from '../../../messages/zh-CN.json'
 import { api, saveWorkspace, savedWorkspace } from '@/lib/api'
 import { apiCache } from '@/lib/api-cache'
+import { currentAccount } from '@/lib/config'
 import { openPush } from '@/lib/navigate'
 import type { TaskPushTarget } from '@/lib/push-route'
 import { readTaskInWorkspace, taskPushOpener } from '@/lib/task-push'
@@ -18,7 +19,13 @@ function unconfirmed(retry?: () => void) {
     : undefined)
 }
 
-const opener = taskPushOpener({ current: currentWorkspace, save: saveWorkspace, context: () => apiCache.context(), open: openPush, unconfirmed })
+const opener = taskPushOpener({
+  current: currentWorkspace,
+  save: saveWorkspace,
+  owner: () => ({ account: currentAccount().id, context: apiCache.context() }),
+  open: openPush,
+  unconfirmed,
+})
 
 /** A tapped task push (lib/push.ts): confirm its workspace, then open the task (lib/task-push.ts). */
 export function openTaskPush(target: TaskPushTarget) {
