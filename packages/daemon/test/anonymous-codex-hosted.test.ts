@@ -18,7 +18,7 @@ import { worktreeGitWritePaths } from '../src/agents/publish'
 import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
 const closing: Array<() => Promise<unknown>> = []
 afterEach(async () => { for (const close of closing.splice(0).reverse()) await close(); cleanupTempDirs() })
-async function fixture(diagnostics = false) {
+async function fixture(diagnostics = false, hostOnly = false) {
   const root = tempDir('codex-bootstrap-hosted-'), home = join(root, 'home'), stateDir = join(home, '.mikka', 'worker', 'adapters')
   mkdirSync(home); mkdirSync(stateDir, { recursive: true })
   const repositoryRoot = join(home, '.mikka', 'repos', 'repo'); mkdirSync(join(home, '.mikka', 'repos'), { recursive: true }); renameSync(await makeRepo(), repositoryRoot)
@@ -38,7 +38,7 @@ async function fixture(diagnostics = false) {
       inputSchema: { type: 'object' as const }, annotations: { idempotentHint: true as const } } }
   const assignment: RunAssignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main',
     harness: 'codex', prompt: 'hello', model: 'fixture-model', policy,
-    ...(diagnostics ? { taskEnv: { CLOUD_STARTUP_TIMING: '1' } } : {}),
+    ...(diagnostics && !hostOnly ? { taskEnv: { CLOUD_STARTUP_TIMING: '1' } } : {}),
     mcp: { url: 'https://mikka.invalid/api/mcp', token: 'synthetic-mcp-token', decisionCatalogue },
     subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId, consumerId: randomUUID(), route: 'codex_cli' },
     subscriptionLease: { route: 'codex_cli', accountId: 'fixture-account', revision: 2, modelId: 'fixture-model',
@@ -53,15 +53,18 @@ async function fixture(diagnostics = false) {
   const options = { runId, cwd, gitWritePaths, prompt: 'hello', model: assignment.model, policy, policyHash, toolApproval: gate,
     mcp: assignment.mcp, env: { ...env, ...buildChildEnv({ host: env, runId }) }, log: createLogger({ level: 'silent' }) }
   const link = new MemoryServer(deviceId).link()
-  const runner = await createHostedBotRunner({ stateDir, link, binaries: { codex: binary }, anonymousCodexCandidate: candidate })
+  const runner = await createHostedBotRunner({ stateDir, link, binaries: { codex: binary }, anonymousCodexCandidate: candidate,
+    ...(hostOnly ? { collectCliTiming: true } : {}) })
   return { root, home, cwd, repositoryRoot, stateDir, assignment, options, candidate, gate, runner,
     wire: () => existsSync(trace) ? readFileSync(trace, 'utf8').trim().split('\n').map(line => JSON.parse(line)) : [] }
 }
 const collect = async (session: Awaited<ReturnType<Awaited<ReturnType<typeof createHostedBotRunner>>['start']>>) => {
   const events = []; for await (const event of session.events()) events.push(event); return events
 }
-it.each([false, true])('adopts one initialized child, retains original login/thread/turn and its late MCP context (diagnostics=%s)', async diagnostics => {
-  const f = await fixture(diagnostics); await f.candidate.ready
+it.each([false, true, 'host'] as const)('adopts one initialized child, retains original login/thread/turn and its late MCP context (diagnostics=%s)', async diagnosticMode => {
+  const diagnostics = diagnosticMode !== false, hostOnly = diagnosticMode === 'host'
+  const f = await fixture(diagnostics, hostOnly); await f.candidate.ready
+  if (hostOnly) expect(f.assignment.taskEnv).toBeUndefined()
   expect(f.wire().every(frame => ['initialize', 'initialized'].includes(frame.method))).toBe(true)
   const observation = diagnostics ? runRuntimeTimings.begin(f.assignment.runId, f.assignment.deviceId, 'codex') : undefined
   const prepared = f.runner.prepare(f.assignment, { ...f.options, cwd: join(f.root, 'not-yet-checked-out') }, new AbortController().signal)

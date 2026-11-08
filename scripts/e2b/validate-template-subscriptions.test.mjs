@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { candidateReceipt, validateTemplateSubscriptions, validateSubscriptionFiles } from './validate-template-subscriptions.mjs'
-import { observeChunks, bootstrapAdoptionEvidence } from '../acceptance/cloud-startup.mjs'
+import { observeChunks, bootstrapAdoptionEvidence, bootstrapAdoptionDiagnostics } from '../acceptance/cloud-startup.mjs'
 import { createHash } from 'node:crypto'
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -248,7 +248,11 @@ test('a real receipt rejection persists its run hash and reason without provider
     const raw = await readFile(diagnostics, 'utf8'), value = JSON.parse(raw)
     assert.equal(value.status, 'failed')
     assert.equal(value.code, 'template_gate_subscription_or_cleanup_failed')
-    const { candidateProof, ...failed } = value.candidates[0]
+    const { candidateProof, bootstrapDiagnostics, ...failed } = value.candidates[0]
+    assert.equal(bootstrapDiagnostics.startupTimingStatus, 'complete')
+    assert.equal(bootstrapDiagnostics.preparationTimingStatus, 'complete')
+    assert.equal(bootstrapDiagnostics.bindingChecks, null)
+    assert.ok(Object.values(bootstrapDiagnostics.adoptionChecks).every(Boolean))
     assert.deepEqual(failed, { kind: 'claude', stage: 'receipt', code: 'template_gate_official_agent_acceptance_missing',
       runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16),
       sampleStatus: 'execution_proved_awaiting_server_timing', sampleError: 'startup_failed', cleanupErrors: [],
@@ -686,4 +690,205 @@ test('bootstrap projection, repeated publication and VM proof failures still rec
     assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
     assert.deepEqual(fixture.events.slice(-2), ['restored-workspace', 'signed-out'])
   }
+})
+
+test('bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'template-bootstrap-failure-'))
+  const secret = 'private_bootstrap_hint_token_prompt_must_not_escape'
+  try {
+    const fixture = candidateFixture(async options => {
+      const value = accepted(options.harness), sample = value.samples[0]
+      sample.lastStatus = 'succeeded'
+      sample.runtimeTimingStatus = 'complete'
+      sample.daemonStartupTiming.privateValue = secret
+      sample.daemonPreparationTiming.privateValue = secret
+      sample.daemonPreparationTiming.phases[0].command = secret
+      if (options.harness === 'claude_code') {
+        sample.daemonPreparationTiming.claimAuthentication = 'ordinary_path'
+        sample.daemonPreparationTiming.observedAuthSource = 'oauth_descriptor'
+      } else sample.preparationTimingStatus = 'invalid'
+      return value
+    })
+    const input = join(root, 'candidate.json'), output = join(root, 'accepted.json'), diagnostics = join(root, 'diagnostics.json')
+    await writeFile(input, JSON.stringify(report))
+    await assert.rejects(validateSubscriptionFiles(input, output, diagnostics, fixture.options), /template_gate_subscription_or_cleanup_failed/)
+    const raw = await readFile(diagnostics, 'utf8'), value = JSON.parse(raw)
+    assert.equal(value.status, 'failed')
+    for (const row of value.candidates) {
+      assert.equal(row.stage, 'receipt')
+      assert.equal(row.code, 'template_gate_bootstrap_adoption_missing')
+      assert.equal(row.observation.cliInit, null)
+      assert.equal(row.observation.replyVerifiedAfterTool, true)
+      assert.equal(row.observation.expectedAgentAck, true)
+      assert.equal(row.observation.runtimeEvidence.status, 'passed')
+      const detail = row.bootstrapDiagnostics
+      assert.ok(detail, 'the failed artifact must retain strict startup/preparation evidence, not only cliInit:null')
+      assert.equal(detail.startupTimingStatus, 'complete')
+      assert.equal(detail.preparationTimingStatus, row.kind === 'claude' ? 'complete' : 'invalid')
+      assert.equal(detail.startupTiming.startedAt, 1200)
+      assert.equal(detail.preparationTiming.startedAt, 1000)
+      assert.equal(detail.preparationTiming.phases.length, 2)
+      assert.equal(detail.projectionTruncated, false)
+      assert.ok(Object.values(detail.bindingChecks).every(value => value === true))
+      if (row.kind === 'claude') {
+        assert.equal(detail.adoptionChecks.claimAuthentication, false)
+        assert.equal(detail.adoptionChecks.observedAuthSource, false)
+      } else assert.equal(detail.adoptionChecks.preparationTimingStatus, false)
+      assert.ok(Buffer.byteLength(JSON.stringify(detail)) <= 32768)
+    }
+    assert.ok(!raw.includes(secret))
+    assert.ok(!raw.includes('privateValue'))
+    assert.ok(!raw.includes('command'))
+    await assert.rejects(stat(output), { code: 'ENOENT' })
+    assert.equal(fixture.events.filter(event => event === 'removed').length, 2)
+    assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
+    assert.deepEqual(fixture.events.slice(-2), ['restored-workspace', 'signed-out'])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+test('bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption', () => {
+  const privateValue = 'private_diagnostic_input_must_not_escape'
+  const cases = [
+    record => { record.startupTimingStatus = privateValue },
+    record => { record.preparationTimingStatus = privateValue },
+    record => { record.daemonStartupTiming.runIdHash = '0'.repeat(16) },
+    record => { record.daemonPreparationTiming.harness = 'unknown-private-harness' },
+    record => { record.daemonPreparationTiming.source = privateValue },
+    record => { record.daemonPreparationTiming.phases = Array.from({ length: 65 }, () => ({ ...record.daemonPreparationTiming.phases[0] })) },
+    record => { record.daemonPreparationTiming.phases[0].name = privateValue },
+    record => { record.daemonPreparationTiming.phases[0].ms = Number.NaN },
+    record => { record.daemonPreparationTiming.startedAt = record.daemonStartupTiming.startedAt + 1 },
+    record => { record.daemonPreparationTiming.observedAuthSource = privateValue },
+    record => { record.daemonPreparationTiming.claimAuthentication = 'ordinary_path' },
+    record => { record.daemonPreparationTiming.truncated = true },
+    record => { record.daemonPreparationTiming.phases.push({ ...record.daemonPreparationTiming.phases[0] }) },
+  ]
+  for (const mutate of cases) {
+    const record = { ...accepted('claude_code').samples[0], runIdHash: hash(RUN).slice(0, 16) }
+    record.daemonStartupTiming.privateValue = privateValue
+    record.daemonPreparationTiming.privateValue = privateValue
+    mutate(record)
+    const result = bootstrapAdoptionDiagnostics(record)
+    assert.equal(bootstrapAdoptionEvidence(record), null)
+    assert.equal(Object.values(result.adoptionChecks).every(Boolean), false)
+    assert.ok(!JSON.stringify(result).includes(privateValue))
+    assert.ok(!JSON.stringify(result).includes('privateValue'))
+    assert.ok(Buffer.byteLength(JSON.stringify(result)) <= 32768)
+  }
+  for (const harness of ['claude_code', 'codex']) {
+    const record = { ...accepted(harness).samples[0], runIdHash: hash(RUN).slice(0, 16) }
+    const result = bootstrapAdoptionDiagnostics(record)
+    assert.ok(bootstrapAdoptionEvidence(record))
+    assert.ok(Object.values(result.adoptionChecks).every(Boolean))
+    for (const field of ['daemonStartupTiming', 'daemonPreparationTiming']) {
+      record[field].phases = Array.from({ length: 64 }, () => ({
+        name: 'daemon.adapter.workspace.shadow_clone', startMs: 0, endMs: 1, ms: 1, outcome: 'ok', ignored: privateValue.repeat(1000),
+      }))
+    }
+    const bounded = bootstrapAdoptionDiagnostics(record)
+    assert.equal(bounded.startupTiming.phases.length, 64)
+    assert.equal(bounded.preparationTiming.phases.length, 64)
+    assert.ok(Buffer.byteLength(JSON.stringify(bounded)) <= 32768)
+    assert.ok(!JSON.stringify(bounded).includes(privateValue))
+  }
+})
+
+test('bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values', async () => {
+  const secret = 'private_hint_or_credential_must_not_escape'
+  for (const [mutate, expected] of [
+    [sample => { sample.bootstrapPublication.runId = DEVICE }, 'publicationRun'],
+    [sample => { sample.bootstrapPublication.harness = 'private-harness' }, 'publicationHarness'],
+    [sample => { sample.bootstrapPublication.bootstrapSha256 = secret }, 'publicationBootstrapDigest'],
+    [sample => { sample.bootstrapPublication.hintSha256 = secret }, 'publicationHintDigest'],
+    [sample => { sample.bootstrapPublication.token = secret }, 'publicationShape'],
+  ]) {
+    const diagnostics = []
+    const fixture = candidateFixture(async options => {
+      const value = accepted(options.harness)
+      mutate(value.samples[0])
+      return value
+    })
+    await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }),
+      /template_gate_subscription_or_cleanup_failed/)
+    assert.equal(diagnostics.length, 2)
+    for (const row of diagnostics) {
+      assert.equal(row.code, 'template_gate_bootstrap_adoption_missing')
+      assert.equal(row.bootstrapDiagnostics.bindingChecks[expected], false)
+      assert.ok(Object.values(row.bootstrapDiagnostics.adoptionChecks).every(Boolean))
+      const encoded = JSON.stringify(row.bootstrapDiagnostics)
+      for (const forbidden of [secret, 'private-harness', DEVICE, RUN, 'bootstrapSha256', 'hintSha256']) assert.ok(!encoded.includes(forbidden))
+    }
+    assert.equal(fixture.events.filter(event => event === 'removed').length, 2)
+    assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
+    assert.deepEqual(fixture.events.slice(-2), ['restored-workspace', 'signed-out'])
+  }
+})
+
+test('successful candidate gate adds no failure diagnostics and keeps the original accepted receipt', async () => {
+  const diagnostics = [], fixture = candidateFixture(async options => accepted(options.harness))
+  const result = await validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) })
+  assert.equal(diagnostics.length, 2)
+  for (const row of diagnostics) {
+    assert.equal(row.code, 'passed')
+    assert.ok(!Object.hasOwn(row, 'bootstrapDiagnostics'))
+    const harness = row.kind === 'claude' ? 'claude_code' : 'codex'
+    assert.deepEqual(result.subscriptionAcceptance[row.kind], candidateReceipt(report, row.kind,
+      { ...proof, bootstrapReceipt: bootstrapReceipt(harness) }, accepted(harness)))
+  }
+})
+
+test('failure projection distinguishes the closed 3c production shapes using synthetic identities', async () => {
+  // Timings/shape only: root-owned 1557 projection SHA a1a8c078a8bcf1d438ec2625b1586576e219b74f1ca0c7478bad0d15bb7cd649.
+  // This constructed fixture is not a new production sample: identity, statuses and successful tool evidence use this file's fakes.
+  const diagnostics = [], fixture = candidateFixture(async options => {
+    const value = accepted(options.harness), sample = value.samples[0]
+    const base = { version: 1, runIdHash: hash(RUN).slice(0, 16), harness: options.harness, outcome: 'ok', truncated: false }
+    if (options.harness === 'claude_code') {
+      sample.daemonStartupTiming = { ...base, startedAt: 1794152294827, endedAt: 1794152294998, ms: 170.639, phases: [] }
+      sample.daemonPreparationTiming = { ...base, startedAt: 1794152290901, endedAt: 1794152294997, ms: 4095.802,
+        source: 'bootstrap_claude_start', claimAuthentication: 'ordinary_path', observedAuthSource: 'oauth_descriptor',
+        phases: [
+          { name: 'daemon.adapter.cli_init.prewarm', startMs: 28.874, endMs: 1144.728, ms: 1115.854, outcome: 'ok' },
+          { name: 'daemon.adapter.cli_init.prewarm', startMs: 3091.484, endMs: 3909.583, ms: 818.099, outcome: 'ok' },
+          { name: 'daemon.adapter.cli_init', startMs: 4093.413, endMs: 4094.363, ms: 0.95, outcome: 'ok' },
+          { name: 'daemon.adapter.account_check.account_info', startMs: 4094.391, endMs: 4094.881, ms: 0.49, outcome: 'ok' },
+          { name: 'daemon.adapter.account_check', startMs: 4094.898, endMs: 4095.297, ms: 0.399, outcome: 'ok' },
+        ] }
+    } else {
+      sample.daemonStartupTiming = { ...base, startedAt: 1794152357965, endedAt: 1794152359362, ms: 1397.424, phases: [] }
+      delete sample.daemonPreparationTiming
+      sample.preparationTimingStatus = 'unavailable'
+    }
+    return value
+  })
+  await assert.rejects(validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) }),
+    /template_gate_subscription_or_cleanup_failed/)
+  assert.equal(diagnostics.length, 2)
+  for (const row of diagnostics) {
+    assert.equal(row.code, 'template_gate_bootstrap_adoption_missing')
+    assert.equal(row.observation.cliInit, null)
+    assert.equal(row.observation.expectedAgentAck, true)
+    assert.equal(row.observation.replyVerifiedAfterTool, true)
+    const detail = row.bootstrapDiagnostics
+    assert.deepEqual(detail.startupTiming.phases, [])
+    assert.ok(Object.values(detail.bindingChecks).every(Boolean))
+    if (row.kind === 'claude') {
+      assert.equal(detail.startupTiming.ms, 170.639)
+      assert.equal(detail.preparationTiming.ms, 4095.802)
+      assert.deepEqual(detail.preparationTiming.phases.map(phase => phase.ms), [1115.854, 818.099, 0.95, 0.49, 0.399])
+      assert.equal(detail.adoptionChecks.prewarmPhaseCount, false)
+      assert.equal(detail.adoptionChecks.claimAuthentication, false)
+      assert.equal(detail.adoptionChecks.observedAuthSource, false)
+      assert.equal(detail.adoptionChecks.cliInitPhaseCount, true)
+    } else {
+      assert.equal(detail.startupTiming.ms, 1397.424)
+      assert.equal(detail.preparationTiming, null)
+      assert.equal(detail.preparationTimingStatus, 'unavailable')
+      assert.equal(detail.adoptionChecks.preparationReceipt, false)
+      assert.equal(detail.adoptionChecks.preparationTimingStatus, false)
+    }
+  }
+  assert.equal(fixture.events.filter(event => event === 'removed').length, 2)
+  assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
+  assert.deepEqual(fixture.events.slice(-2), ['restored-workspace', 'signed-out'])
 })
