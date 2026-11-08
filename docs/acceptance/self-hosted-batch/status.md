@@ -398,7 +398,7 @@ pass. Final image CI and the resulting runtime remain verification gates.
 After main9e's migration20261108120000 merged first, source CI correctly
 refused this PR's older pending migration number. A read-only production
 journal query confirms neither the old nor new enabled-model migration was
-applied. The same SQL is renamed to20261108120001 under the repository's
+applied. The same SQL is renamed to20261108120101 under the repository's
 merge-order rule; all open PR migration names were checked for collision.
 The complete source lint,55 migration regressions and the renamed actual-PG17
 enabled-model suite pass. Historical migration SQL and applied receipts are

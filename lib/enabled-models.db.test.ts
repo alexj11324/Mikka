@@ -29,7 +29,7 @@ test('migration, toggles, source ownership, fresh keys, dispatch filters and row
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","modelCatalog") VALUES ($1,'owner',$2)`, [source, { revision: '1', models: ['claude-opus-4-5', 'claude-opus-4-6'] }])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","consumerId","workspaceId","modelId",route,"connectionId","connectionRevision") VALUES ($1,'owner','bot',$2,'claude-opus-4-5','claude_cpa',$3,1)`, [binding, workspaceId, source])
     await pool.query(`INSERT INTO model_api_keys (id,"ownerId",models) VALUES ($1,'owner','["old"]')`, [key])
-    await pool.query(await readFile(new URL('../drizzle/20261108120001_enabled_models.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261108120101_enabled_models.sql', import.meta.url), 'utf8'))
     let view = await readEnabledModels(pool, scope)
     assert.equal(view.sources.find(item => item.id === source)?.enabledCount, 2, 'legacy old releases stay available')
     assert.deepEqual(view.sources.find(item => item.id === source)?.models.map(({ id, family }) => ({ id, family })), [
