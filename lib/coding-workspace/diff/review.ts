@@ -45,6 +45,10 @@ export async function readReviewBoard(deps: DiffDependencies, actor: ReviewActor
     secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: scope.identity.ownerId }),
     secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId }),
   ])
+  // Local collaboration has its own Task ACL even when GitHub access was
+  // removed. It returns no native provider body or source patch, and its
+  // retained source metadata still obeys the current secret policy.
+  if (masks.some(mask => !isDeepStrictEqual(maskDeep(snapshot, mask), snapshot))) throw new CodingWorkspaceError('workspace_path_unavailable')
   const selected = page.comments.slice(0, 100)
   const comments = selected.map(row => {
     const { cursorTime: _cursor, ...value } = row

@@ -39,6 +39,10 @@ export const diffFileMetadata = z.strictObject({
   unavailableReason: z.enum(['file_type', 'custom_conversion', 'unmerged_index', 'conversion_limit']).optional(),
   /** Opaque stat/content fence for live files whose bytes exceed the read cap. */
   workingVersion: digest.optional(),
+  /** Native patch identity is retained without retaining unverified text.
+   * Page is only a bounded locator, never a source/permission capability. */
+  github: z.strictObject({ repositoryId: z.string().regex(/^[1-9]\d{0,39}$/),
+    patchSha256: digest.nullable(), page: z.number().int().min(1).max(30).nullable() }).optional(),
 })
 export type DiffFileMetadata = z.infer<typeof diffFileMetadata>
 /** The same material is hashed by the daemon and the server. It deliberately
@@ -48,8 +52,16 @@ export function diffFileVersionMaterial(repoId: string, revision: Pick<DiffRevis
   file: Omit<DiffFileMetadata, 'fileVersion' | 'additions' | 'deletions' | 'binary'>, retainedPatch?: string) {
   return JSON.stringify([repoId, revision.baseSha, revision.headSha, file.path, file.previousPath,
     file.status, file.oldBlob, file.newBlob, file.oldMode, file.newMode, file.workingVersion ?? null,
-    file.rawBlob ?? null, file.unavailableReason ?? null, retainedPatch ?? null])
+    file.rawBlob ?? null, file.unavailableReason ?? null, retainedPatch ?? null,
+    ...(file.github ? [file.github.repositoryId, file.github.patchSha256] : [])])
 }
+export const diffSourceAccess = z.strictObject({ kind: z.literal('github'), repositoryId: z.string().regex(/^[1-9]\d{0,39}$/),
+  pullRequestNumber: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  pullRequestBaseSha: sha.optional(),
+  /** All native PR files were reconciled with complete immutable Git trees.
+   * This proves the manifest, separately from counts.complete (loaded patches). */
+  manifestComplete: z.literal(true) })
+export type DiffSourceAccess = z.infer<typeof diffSourceAccess>
 export const diffSnapshot = z.strictObject({
   id: z.uuid(), identity: runRepositoryIdentity, taskId: z.uuid().nullable(), revision: diffRevision,
   observedAt: z.iso.datetime(), isStale: z.boolean(), availability: z.enum(['available', 'empty', 'unavailable']),
@@ -57,7 +69,11 @@ export const diffSnapshot = z.strictObject({
   counts: z.strictObject({ files: z.number().int().nonnegative().max(WORKSPACE_DIFF_MAX_FILES),
     additions: z.number().int().nonnegative(), deletions: z.number().int().nonnegative(), complete: z.boolean() }),
   policy: z.enum(['combined_working_tree', 'retained_checkpoint', 'explicit_commits', 'whole_pull_request']),
+  sourceAccess: diffSourceAccess.optional(),
+  factory: z.strictObject({ taskId: z.uuid(), candidateId: z.uuid(), producerRunId: z.uuid(), sha }).optional(),
   pullRequest: z.strictObject({ number: z.number().int().positive(), url: z.url(), headSha: sha,
+    /** GitHub's target tip at capture; revision.baseSha is the verified diff base. */
+    baseSha: sha.optional(),
     state: z.enum(['open', 'closed', 'merged']) }).nullable(),
 })
 export type DiffSnapshot = z.infer<typeof diffSnapshot>
@@ -137,7 +153,7 @@ export const workspaceDiffReadRequest = z.discriminatedUnion('kind', [
       ? value.baseSha === undefined && value.headSha === undefined : Boolean(value.baseSha && value.headSha)),
   z.strictObject({ kind: z.literal('diff_file'), snapshotId: z.uuid(), revision: diffRevision,
     file: diffFileMetadata }).refine(value => ['working', 'commit'].includes(value.revision.source)
-      && value.revision.baseSha !== null && value.revision.headSha !== null),
+      && value.revision.baseSha !== null && value.revision.headSha !== null && value.file.github === undefined),
 ])
 export type WorkspaceDiffReadRequest = z.infer<typeof workspaceDiffReadRequest>
 const wireObservation = { ok: z.literal(true), identity: runWorktreeIdentity, revision: diffRevision,

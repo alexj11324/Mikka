@@ -12,6 +12,7 @@ import type { DiffDependencies } from './service'
 import { readDiffSnapshot, readStoredDiffFile } from './store'
 import { secretMaskerFor } from '../../secrets/runtime'
 import { maskDeep } from '../../secrets/mask'
+import { githubDiffProvider } from './github'
 
 type Context = { params: Promise<{ runId: string; snapshotId?: string }> }
 type Input = { request: Request; actor: ReviewActor; session: ApiSession; deps: DiffDependencies;
@@ -35,7 +36,8 @@ export function reviewHttp(work: (input: Input) => Promise<unknown>, options: { 
       const workspace = await loadWorkspaceContext(input.workspaceId, session.user)
       const actor: ReviewActor = { userId: session.user.id, workspaceId: workspace.workspace.id, credential: session.tokenWorkspaceId
         ? { kind: 'pat', id: z.uuid().parse(session.session.id.slice(4)) } : { kind: 'session', id: session.session.id } }
-      const result = await work({ request, actor, session, deps: { database: pool, membership: workspacePool },
+      const result = await work({ request, actor, session, deps: { database: pool, membership: workspacePool,
+        external: githubDiffProvider(pool, actor.userId, request.signal) },
         runId, repoId: input.repoId, snapshotId, input })
       if (!await workspaceSessionStillValid(request, session)) return Response.json({ ok: false, code: 'authRequired' }, { status: 401, headers: responseHeaders })
       // The provider/device wait has ended. Hold current authority through the

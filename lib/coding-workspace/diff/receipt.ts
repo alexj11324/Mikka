@@ -13,13 +13,15 @@ export function validateDiffReceipt(request: WorkspaceDiffReadRequest, receipt: 
   if (!result.ok) return proofs.length ? null : result
   if (!isDeepStrictEqual(maskDeep(result, mask), result)) return { ok: false, code: 'workspace_path_unavailable' }
   if (result.kind === 'diff_snapshot' && request.kind === 'diff_snapshot') {
-    if (proofs.length || new Set(result.files.map(file => file.path)).size !== result.files.length) return null
+    if (proofs.length || result.files.some(file => file.github !== undefined)
+      || new Set(result.files.map(file => file.path)).size !== result.files.length) return null
     if (result.files.some(file => file.fileVersion !== diffFileVersion(result.identity.repoId, result.revision, file))) return null
     if (result.revision.version !== diffDigest(JSON.stringify([result.revision.source, result.revision.baseSha, result.revision.headSha,
       result.revision.treeSha, result.files.map(file => file.fileVersion)]))) return null
     return result
   }
-  if (result.kind !== 'diff_file' || request.kind !== 'diff_file' || !isDeepStrictEqual(result.file, request.file)
+  if (result.kind !== 'diff_file' || request.kind !== 'diff_file' || result.file.github !== undefined || request.file.github !== undefined
+    || !isDeepStrictEqual(result.file, request.file)
     || result.patch !== null || result.hunks.length) return null
   const { file } = request
   const unavailable = [file.oldMode, file.newMode].some(mode => mode !== null && !['100644', '100755'].includes(mode))

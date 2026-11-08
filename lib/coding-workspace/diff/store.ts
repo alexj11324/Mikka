@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 import type { PoolClient } from 'pg'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
-import { diffFileMetadata, diffFilePatch, diffSnapshot, WorkspaceReviewError,
-  type DiffFileMetadata, type DiffFilePage, type DiffFilePatch, type DiffRevision, type DiffSnapshot } from '@mikka/protocol/coding-workspace-review'
+import { diffFileMetadata, diffFilePatch, diffSnapshot, diffSourceAccess, WorkspaceReviewError,
+  type DiffFileMetadata, type DiffFilePage, type DiffFilePatch, type DiffRevision, type DiffSnapshot, type DiffSourceAccess } from '@mikka/protocol/coding-workspace-review'
 import { maskDeep, type Masker } from '../../secrets/mask'
 import type { WorkspaceQuery } from '../identity'
 import { assertDiffPatchSafe, diffDigest, diffFileVersion } from './patch'
@@ -20,20 +20,29 @@ function maskPolicy(mask: Masker): string {
 const policy = { working: 'combined_working_tree', checkpoint: 'retained_checkpoint', commit: 'explicit_commits', pull_request: 'whole_pull_request' } as const
 
 export function manifestRevision(source: DiffRevision['source'], baseSha: string | null, headSha: string | null,
-  treeSha: string | null, files: DiffFileMetadata[]): DiffRevision {
+  treeSha: string | null, files: DiffFileMetadata[], access?: DiffSourceAccess): DiffRevision {
   return { source, baseSha, headSha, treeSha,
-    version: diffDigest(JSON.stringify([source, baseSha, headSha, treeSha, files.map(file => file.fileVersion)])) }
+    version: diffDigest(JSON.stringify([source, baseSha, headSha, treeSha, files.map(file => file.fileVersion),
+      ...(access ? [[access.kind, access.repositoryId, access.pullRequestNumber ?? null, access.pullRequestBaseSha ?? null, access.manifestComplete]] : [])])) }
 }
 
 export async function retainDiffSnapshot(client: PoolClient, scope: ReviewScope, input: {
-  revision: DiffRevision; files: DiffFileMetadata[]; pullRequest?: DiffSnapshot['pullRequest'];
+  revision: DiffRevision; files: DiffFileMetadata[]; pullRequest?: DiffSnapshot['pullRequest']; sourceAccess?: DiffSourceAccess; factory?: DiffSnapshot['factory'];
   patches?: Map<string, DiffFilePatch>; observedAt?: string; reason?: DiffSnapshot['reason'];
 }, mask: Masker): Promise<DiffSnapshot> {
   const { identity } = scope, files = input.files.map(file => diffFileMetadata.parse(file))
+  const access = input.sourceAccess ? diffSourceAccess.parse(input.sourceAccess) : undefined
+  if (access ? !['commit', 'pull_request'].includes(input.revision.source)
+    || files.some(file => file.github?.repositoryId !== access.repositoryId || file.rawBlob !== undefined || file.rawSize !== undefined || file.workingVersion !== undefined)
+    || (input.revision.source === 'pull_request' ? !input.pullRequest || input.pullRequest.number !== access.pullRequestNumber
+      : access.pullRequestNumber !== undefined || access.pullRequestBaseSha !== undefined || Boolean(input.pullRequest))
+    : Boolean(input.pullRequest) || input.revision.source === 'pull_request' || files.some(file => file.github !== undefined)) throw unavailable()
+  if (access?.pullRequestBaseSha !== input.pullRequest?.baseSha
+    || (input.factory && (!access || input.factory.sha !== input.revision.headSha))) throw unavailable()
   if (files.length > 20_000 || new Set(files.map(file => file.path)).size !== files.length
     || Buffer.byteLength(JSON.stringify(files)) > 1536 * 1024) throw new CodingWorkspaceError('workspace_limit_exceeded')
   if (files.some(file => file.fileVersion !== diffFileVersion(identity.repoId, input.revision, file))
-    || input.revision.version !== manifestRevision(input.revision.source, input.revision.baseSha, input.revision.headSha, input.revision.treeSha, files).version)
+    || input.revision.version !== manifestRevision(input.revision.source, input.revision.baseSha, input.revision.headSha, input.revision.treeSha, files, access).version)
     throw unavailable()
   if (!isDeepStrictEqual(maskDeep(files, mask), files)) throw new CodingWorkspaceError('workspace_path_unavailable')
   await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`workspace-snapshots:${identity.runId}`])
@@ -41,7 +50,10 @@ export async function retainDiffSnapshot(client: PoolClient, scope: ReviewScope,
     WHERE "runId"=$1 AND "repoId"=$2 AND source=$3 AND version=$4`, [identity.runId, identity.repoId, input.revision.source, input.revision.version])
   if (existing) {
     const saved = diffSnapshot.parse(existing.snapshot)
-    if (!isDeepStrictEqual(saved.identity, scope.identity) || saved.taskId !== scope.taskId) throw unavailable()
+    if (!isDeepStrictEqual(saved.identity, scope.identity) || saved.taskId !== scope.taskId
+      || !isDeepStrictEqual(saved.sourceAccess, access)
+      || !isDeepStrictEqual(saved.factory, input.factory)
+      || (saved.pullRequest?.number ?? null) !== (input.pullRequest?.number ?? null)) throw unavailable()
     return saved
   }
   const count = await client.query<{ count: number }>('SELECT count(*)::int AS count FROM coding_workspace_snapshots WHERE "runId"=$1', [identity.runId])
@@ -79,9 +91,10 @@ export async function retainDiffSnapshot(client: PoolClient, scope: ReviewScope,
   const snapshot = diffSnapshot.parse({ id, identity, taskId: scope.taskId, revision: input.revision,
     observedAt: input.observedAt ?? new Date().toISOString(), isStale: input.revision.source === 'checkpoint',
     availability: input.reason ? 'unavailable' : files.length ? 'available' : 'empty', reason: input.reason ?? null,
-    counts: { files: files.length, additions: rows.reduce((sum, row) => sum + (row.patch?.file.additions ?? 0), 0),
-      deletions: rows.reduce((sum, row) => sum + (row.patch?.file.deletions ?? 0), 0), complete },
-    policy: policy[input.revision.source], pullRequest: input.pullRequest ?? null })
+    counts: { files: files.length, additions: rows.reduce((sum, row) => sum + (row.patch?.file.additions ?? row.metadata.additions), 0),
+      deletions: rows.reduce((sum, row) => sum + (row.patch?.file.deletions ?? row.metadata.deletions), 0), complete },
+    policy: policy[input.revision.source], pullRequest: input.pullRequest ?? null, ...(access ? { sourceAccess: access } : {}),
+    ...(input.factory ? { factory: input.factory } : {}) })
   if (!isDeepStrictEqual(maskDeep(snapshot, mask), snapshot)) throw new CodingWorkspaceError('workspace_path_unavailable')
   await client.query(`INSERT INTO coding_workspace_snapshots (id,"runId","repoId","ownerId","workspaceId","boardId",source,version,snapshot)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [id, identity.runId, identity.repoId, identity.ownerId, identity.workspaceId,
@@ -95,8 +108,8 @@ export async function retainDiffSnapshot(client: PoolClient, scope: ReviewScope,
 export async function readDiffSnapshot(database: WorkspaceQuery, scope: ReviewScope, id: string): Promise<DiffSnapshot> {
   const { rows: [row] } = await database.query<{ snapshot: unknown; files: number; additions: number; deletions: number; complete: boolean }>(
     `SELECT s.snapshot,count(f.path)::int AS files,
-      coalesce(sum((f.patch->'file'->>'additions')::int),0)::int AS additions,
-      coalesce(sum((f.patch->'file'->>'deletions')::int),0)::int AS deletions,
+      coalesce(sum(coalesce((f.patch->'file'->>'additions')::int,(f.metadata->>'additions')::int)),0)::int AS additions,
+      coalesce(sum(coalesce((f.patch->'file'->>'deletions')::int,(f.metadata->>'deletions')::int)),0)::int AS deletions,
       coalesce(bool_and(f.patch IS NOT NULL AND f.patch->>'format' IN ('text','binary')) FILTER (WHERE f.path IS NOT NULL),true) AS complete
       FROM coding_workspace_snapshots s LEFT JOIN coding_workspace_snapshot_files f ON f."snapshotId"=s.id
       WHERE s.id=$1 AND s."runId"=$2 AND s."repoId"=$3 AND s."boardId"=$4 AND s."workspaceId"=$5 GROUP BY s.id`,

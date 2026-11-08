@@ -10,7 +10,7 @@ Git 内建 CRLF→LF 转换以实际 attributes、core.autocrlf 和 index 内容
 
 daemon 只传有界 manifest 和完整私有 blob proof；服务器检查 Git object hash、UTF-8、完整源码中的秘密，再构造 patch/hunk。公开响应和数据库不保存 blob/base64 proof。文件最多 1 MiB，patch 最多 512 KiB，manifest 最多 20,000 个文件且 1.5 MiB；限额结果有明确状态，不声称完整。
 
-快照与评论独立于 device/device_repo 的寿命。精确历史绑定只能由一次真实 live resolution 建立。Task 下同工作区且当前能访问 Task 的成员可读已保留历史；taskless Run 仍仅 owner。live daemon 访问保持 owner 与原 claim-token/device/worktree 身份，不扩大既有 private thread ACL。
+快照与评论独立于 device/device_repo 的寿命。历史绑定可以由真实 live resolution 建立，也可以从原 Run 仍保留的实际 repository 行、冻结 workspace 与 admission/publication 仓库声明验证后建立。后者不要求旧设备启用或旧 daemon token 有效；调用者 repoId 仅用于相等校验。设备已物理删除且从未冻结绑定时，不能恢复的原 repoId 明确拒绝，不以当前同名仓库重建历史。Task 下同工作区且当前能访问 Task 的成员可读历史；taskless Run 仍仅 owner。live daemon 访问保持 owner 与原 claim-token/device/worktree 身份，不扩大既有 private thread ACL。
 
 ## HTTP 合同
 
@@ -24,11 +24,27 @@ daemon 只传有界 manifest 和完整私有 blob proof；服务器检查 Git ob
 | `GET /{snapshotId}/review` | `cursor` | `ok,revision,snapshot,comments,nextCursor,permissions` |
 | `POST /{snapshotId}/review` | JSON `{repoId,workspaceId?,mutation}`，最多 32 KiB | `ok,requestId,revision,action` 与操作回执 |
 
-`auto` 先尝试 owner 当前 live 工作树，再尝试已保留 checkpoint，最后尝试绑定的 PR provider。checkpoint 已接入现有 daemon producer；GitHub provider 尚未接入。没有相应证据时返回 `availability=unavailable` 及 reason，绝不将旧 gzip patch 当作安全源码，也不编造空 diff。
+`auto` 先尝试 owner 当前 live 工作树，再尝试已保留 checkpoint，最后尝试绑定的 GitHub PR。显式 commit 在原工作树不可用时可通过 GitHub 的完整 Git tree/blob 读取；不依赖当前机器。没有相应证据时返回 `availability=unavailable` 及 reason，绝不将旧 gzip patch 当作安全源码，也不编造空 diff。
 
 快照含 frozen Run/repository identity、taskId、source/baseSha/headSha/treeSha/version、observedAt、isStale、availability/reason、counts.complete 与 comparison policy。working 的 treeSha 为 null；HEAD 与临时工作树树对象不可混淆。旧 patch 是历史事实；缓存缺失时不能拿当前文件填充旧版本。
 
 每个文件含 path/previousPath、status、前后 blob/mode/size、fileVersion、additions/deletions/binary 与当前 viewer 的 reviewed/reviewedAt。尚未生成 patch 时 counts 不声明完整。分页 cursor 同时绑定 source version、board revision、筛选模式和位置；变化返回冲突，调用方重新读取第一页。
+
+## GitHub 来源与按需 patch
+
+每次 HTTP 请求的 GitHub provider 绑定当前查看者。普通连接使用同一个本人 token 完成 GitHub 身份、本人与 Mikka App 的 live repository 交集及精确仓库 ID 检查；Cloud 只为该查看者和冻结仓库请求读取凭证。Run owner 只用于查原发布回执，不用于替成员读取私有 GitHub 数据。仓库名称仍相同而数字 ID 改变、撤权、404、403、限流、网络失败都明确拒绝，不返回空文件集合。
+
+PR 只来自精确 `run_publications` host 回执；Factory review/verify Run 沿原 attempt/candidate 找原 producer，不按 Task 选择最新 PR 或候选。快照可携带 `factory={taskId,candidateId,producerRunId,sha}`；实际 PR head 已超出该 candidate 时，不将后继代码标为原 candidate。
+
+GitHub 快照携带 `sourceAccess={kind:'github',repositoryId,manifestComplete:true,pullRequestNumber?,pullRequestBaseSha?}`。它参与整个快照版本，防止 GitHub commit fallback 与相同 SHA 的本地快照去重后丢失权限约束。`pullRequest.baseSha` 是当次 GitHub PR 的目标分支 tip；`revision.baseSha` 是本次完整文件清单与原生 hunk 检验所用的比较基点。两者独立冻结。原生每文件 metadata 含 repository ID、patch SHA-256 和有界页码；页码仅为 locator，不赋予权限，也不影响 fileVersion。
+
+PR 原生文件最多 3,000 个、每页 100；读取全部页，验证 `changed_files`、重复路径、前后页和完整 immutable Git tree 的变更集合。compare API 的 merge-base 只作为候选，不用其最多 300 个 files 代替完整 PR。Git tree 截断、来源矛盾或受保护路径发生变化时拒绝整份 capture；不通过过滤文件制造完整性。`sourceAccess.manifestComplete` 表示文件清单已闭合，`counts.complete` 仍表示所有 patch 已加载且可读；二者不同。
+
+每文件按需读取固定 blob OID，并验证完整字节 hash、大小、UTF-8 和 secret policy。PR patch 必须匹配原生摘要，并逐行验证原生 hunk 的精确旧/新坐标、所有省略的未变区间及 EOF；无法证明候选基点时该文件明确不可用，不以本地重算 hunk 代替 GitHub anchor。缺原生 patch、binary、symlink、gitlink 和超限文件不产生可评论的伪锚点。前后 PR base/head 变化时返回过期；已安全保留的旧 patch 仍是旧版本的历史记录，读取也必须重新验证当前查看者的 GitHub 权限。
+
+读取有一个请求级 30 秒工作预算、累计请求与字节上限，不跟随 provider URL 或重试。凭据刷新有独立 10 秒 GitHub／20 秒 Cloud 网络窗口；开始前预留完整刷新及保存预算，一旦发送旋转 refresh，先完成有限读取与数据库提交，再响应 UI 取消，避免遗失已经轮换的新令牌。
+
+本地 board/comments 继续按 Mikka Task ACL 留存、读取、回复和修改；不会自动导入 GitHub native body/diff hunk，也不因本地修改触发 GitHub 写操作。新建源码行评论仍需当前源码授权和已验证 hunk。GitHub native threads 和发布/回复将使用独立的授权与明确发布回执。
 
 ## Checkpoint 证据与恢复 ACK
 
@@ -66,6 +82,6 @@ daemon receipt 到公开读取之间，同样比较 full-proof 校验时与返�
 
 Files capability 继续为 `x-mikka-coding-workspace: 1`；Diff 独立使用 `x-mikka-coding-workspace-diff: 1`。旧 Files daemon 在 SQL LIMIT 之前排除 Diff command，不能让不认识的 command 阻塞 Stop。
 
-本基础版还需完成并验证：GitHub whole-PR/source 与 native review/reply；普通 Run/Factory 的反馈批次与 durable delivery receipt；生产 E2B 与 native CLI 场景。checkpoint producer 与原子持久化已实现，真实 PG17/HTTP 回归以当前提交的 CI 结果为准。相关 schema/接口预留不能视为功能已经可用。
+本基础版还需完成并验证：GitHub native review/reply；普通 Run/Factory 的反馈批次与 durable delivery receipt；生产 E2B 与 native CLI 场景。checkpoint producer、GitHub whole-PR/commit 来源与持久化已实现，真实 PG17/HTTP 回归以当前提交的 CI 结果为准。相关 schema/接口预留不能视为功能已经可用。
 
 验证入口：`pnpm test:coding-workspace-diff` 为纯 proof/anchor/撤权回归；daemon 的 `coding-workspace-diff.test.ts` 使用真实临时 Git 仓库；`pnpm test:coding-workspace-db` 在隔离 PostgreSQL 17 中覆盖 persistence、真实 session/PAT/member ACL、评论与真实 TCP API→daemon→receipt 链路。没有数据库时的 SKIP 只证明入口可加载，不算数据库通过。

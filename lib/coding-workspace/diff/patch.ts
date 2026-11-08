@@ -22,7 +22,7 @@ export function gitBlobHash(bytes: Buffer, objectId: string) {
   return createHash(objectId.length === 64 ? 'sha256' : 'sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
 }
 
-function sourceText(bytes: Buffer | null, objectId: string | null, mask: Masker): string | null {
+export function sourceText(bytes: Buffer | null, objectId: string | null, mask: Masker): string | null {
   if (objectId === null) {
     if (bytes !== null) throw new WorkspaceReviewError('workspace_snapshot_unavailable')
     return ''

@@ -8,6 +8,7 @@ import { readGitHubAppConfig } from './app-config'
 import { githubRepository } from './run-pull-request'
 import { GitHubAccessError } from './user-access-error'
 import type { AuthorizedGitHubRepository } from './user-access'
+import { remainingRequestBudget, type RequestBudget } from '../request-budget'
 
 type Installation = { id: string; accountId: string; accountLogin: string; accountType: 'User' | 'Organization' }
 type InstallationRow = { installation_id: string; account_id: string; account_login: string; account_type: Installation['accountType']; github_account_id: string | null }
@@ -25,8 +26,9 @@ export async function useCloudGitHub(userId: string): Promise<boolean> {
   return true
 }
 
-async function cloudJson(userId: string, path: string, init?: RequestInit): Promise<Record<string, unknown>> {
-  return readCloudJson(await cloudRequest(userId, 'github', path, init))
+async function cloudJson(userId: string, path: string, init?: RequestInit, budget?: RequestBudget): Promise<Record<string, unknown>> {
+  if (budget) remainingRequestBudget(budget)
+  return readCloudJson(await cloudRequest(userId, 'github', path, init, budget))
 }
 
 export async function beginCloudGitHubInstallation(userId: string): Promise<string | null> {
@@ -40,9 +42,9 @@ export async function beginCloudGitHubInstallation(userId: string): Promise<stri
   return url.href
 }
 
-async function installations(userId: string): Promise<{ installations: Installation[]; githubAccountId: string | null } | null> {
+async function installations(userId: string, budget?: RequestBudget): Promise<{ installations: Installation[]; githubAccountId: string | null } | null> {
   let value: Record<string, unknown>
-  try { value = await cloudJson(userId, '/v1/github/installations') }
+  try { value = await cloudJson(userId, '/v1/github/installations', undefined, budget) }
   catch (error) { if (error instanceof CloudServiceError && error.code === 'cloud_not_connected') return null; throw error }
   if (!Array.isArray(value.installations) || value.installations.length > 1000 || value.githubAccountId !== null && !isId(value.githubAccountId)
     || typeof value.subject !== 'string' || !/^(?:user|workspace):\S{1,256}$/.test(value.subject) || [...value.subject].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
@@ -56,6 +58,10 @@ async function installations(userId: string): Promise<{ installations: Installat
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    if (budget) {
+      const timeout = String(Math.min(2000, remainingRequestBudget(budget)))
+      await client.query("SELECT set_config('lock_timeout',$1,true),set_config('statement_timeout',$1,true)", [timeout])
+    }
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('mikka_cloud_github_user:'||$1,0))", [userId])
     // Metadata is a local discovery cache, never authorization for minting a provider token.
     await client.query('DELETE FROM cloud_github_installations WHERE user_id=$1 AND NOT installation_id=ANY($2::text[])', [userId, list.map(item => item.id)])
@@ -67,8 +73,8 @@ async function installations(userId: string): Promise<{ installations: Installat
   return { installations: list, githubAccountId: value.githubAccountId as string | null }
 }
 
-async function mint(userId: string, installationId: string, repositories?: string[]) {
-  const result = await cloudJson(userId, '/v1/github/installation-token', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ installationId, ...(repositories ? { repositories } : {}) }) })
+async function mint(userId: string, installationId: string, repositories?: string[], budget?: RequestBudget) {
+  const result = await cloudJson(userId, '/v1/github/installation-token', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ installationId, ...(repositories ? { repositories } : {}) }) }, budget)
   const expires = typeof result.expiresAt === 'string' ? Date.parse(result.expiresAt) : NaN
   // Installation credentials are opaque (RFC 6750 b64token), not a fixed
   // ghs_ prefix/length. Preserve the header-safe alphabet and bounded size.
@@ -78,19 +84,20 @@ async function mint(userId: string, installationId: string, repositories?: strin
 
 /** The selected native token goes straight into gh's normal credential file.
  * This is called during preparation and natural expiry renewal, never per git/gh operation. */
-export async function cloudGitHubCredential(userId: string, remoteKey?: string): Promise<{ token: string; expiresAt: Date; githubAccountId?: string; installationId: string } | null> {
+export async function cloudGitHubCredential(userId: string, remoteKey?: string, budget?: RequestBudget): Promise<{ token: string; expiresAt: Date; githubAccountId?: string; installationId: string } | null> {
+  if (budget) remainingRequestBudget(budget)
   if (!await useCloudGitHub(userId)) return null
   if (!remoteKey) throw new GitHubAccessError('githubRepositoryForbidden', 403)
   const repo = githubRepository(remoteKey)
   let { rows } = await pool.query<InstallationRow>('SELECT * FROM cloud_github_installations WHERE user_id=$1 AND lower(account_login)=lower($2)', [userId, repo.owner])
   if (!rows.length) {
-    if (!await installations(userId)) return null
+    if (!await installations(userId, budget)) return null
     rows = (await pool.query<InstallationRow>('SELECT * FROM cloud_github_installations WHERE user_id=$1 AND lower(account_login)=lower($2)', [userId, repo.owner])).rows
   }
   if (rows.length !== 1) throw new GitHubAccessError('githubRepositoryForbidden', 403)
   const row = rows[0]
   // The broker rechecks the exact server/credential/workspace binding here, even for stale local metadata.
-  const credential = await mint(userId, row.installation_id, [repo.repo])
+  const credential = await mint(userId, row.installation_id, [repo.repo], budget)
   return { ...credential, ...(row.github_account_id ? { githubAccountId: row.github_account_id } : {}) }
 }
 

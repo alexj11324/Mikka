@@ -14,7 +14,7 @@ import { latestDiffSnapshot, manifestRevision, readDiffSnapshot, readDiffFilePag
 
 export interface ExternalDiffProvider {
   capture(scope: ReviewScope, selection: Extract<DiffSelection, { source: 'commit' | 'pull_request' }>, mask: Masker): Promise<Parameters<typeof retainDiffSnapshot>[2]>
-  verify(scope: ReviewScope, snapshot: DiffSnapshot): Promise<void>
+  verify(scope: ReviewScope, snapshot: DiffSnapshot): Promise<void | { isStale: boolean }>
   file(scope: ReviewScope, snapshot: DiffSnapshot, file: DiffFileMetadata, mask: Masker): Promise<DiffFilePatch>
 }
 
@@ -23,6 +23,10 @@ export type DiffDependencies = { database: Pool; membership: Pool; external?: Ex
 export async function ensureReviewScope(deps: DiffDependencies, actor: ReviewActor, runId: string, repoId: string, signal?: AbortSignal) {
   try { return await resolveReviewScope(deps.database, deps.membership, actor, runId, repoId) }
   catch (error) { if (!(error instanceof CodingWorkspaceError) || error.code !== 'workspace_not_found') throw error }
+  try {
+    return await withReviewTransaction(deps.database, deps.membership, actor, runId, repoId, async (_client, scope) => scope,
+      { historical: true, signal })
+  } catch (error) { if (!(error instanceof CodingWorkspaceError) || error.code !== 'workspace_not_found') throw error }
   const live = await resolveRunWorktree(deps.database, deps.membership, actor, runId, repoId)
   return withReviewTransaction(deps.database, deps.membership, actor, runId, repoId, async (_client, scope) => scope, { live: live.identity, signal })
 }
@@ -98,13 +102,14 @@ export async function captureDiffSnapshot(deps: DiffDependencies, actor: ReviewA
 export async function diffPage(deps: DiffDependencies, actor: ReviewActor, runId: string, repoId: string, input: {
   snapshotId?: string; selection?: DiffSelection; cursor?: string; limit?: number; unreviewed?: boolean;
 }, signal?: AbortSignal) {
-  const snapshot = input.snapshotId ? await readDiffSnapshot(deps.database,
+  let snapshot = input.snapshotId ? await readDiffSnapshot(deps.database,
     await resolveReviewScope(deps.database, deps.membership, actor, runId, repoId), input.snapshotId)
     : await captureDiffSnapshot(deps, actor, runId, repoId, input.selection ?? { source: 'auto' }, signal)
   const scope = await resolveReviewScope(deps.database, deps.membership, actor, runId, repoId)
-  if (snapshot.pullRequest) {
+  if (snapshot.sourceAccess || snapshot.pullRequest) {
     if (!deps.external) throw new WorkspaceReviewError('workspace_review_github_unavailable')
-    await deps.external.verify(scope, snapshot)
+    const verified = await deps.external.verify(scope, snapshot)
+    if (verified) snapshot = { ...snapshot, isStale: verified.isStale }
   }
   // Remote waits happen above. Resolve and lock membership, task visibility
   // and the real credential again before returning any retained projection.
@@ -126,7 +131,7 @@ export async function diffFile(deps: DiffDependencies, actor: ReviewActor, runId
   snapshotId: string, path: string, signal?: AbortSignal): Promise<DiffFilePatch> {
   const scope = await resolveReviewScope(deps.database, deps.membership, actor, runId, repoId)
   const snapshot = await readDiffSnapshot(deps.database, scope, snapshotId)
-  if (snapshot.pullRequest) {
+  if (snapshot.sourceAccess || snapshot.pullRequest) {
     if (!deps.external) throw new WorkspaceReviewError('workspace_review_github_unavailable')
     await deps.external.verify(scope, snapshot)
   }
@@ -138,7 +143,7 @@ export async function diffFile(deps: DiffDependencies, actor: ReviewActor, runId
   if (current.patch) return current.patch
   let patch: DiffFilePatch
   let verifiedPolicy = mask.sourcePolicy
-  if (snapshot.pullRequest && deps.external) patch = await deps.external.file(scope, snapshot, current.file, mask)
+  if ((snapshot.sourceAccess || snapshot.pullRequest) && deps.external) patch = await deps.external.file(scope, snapshot, current.file, mask)
   else if (['working', 'commit'].includes(snapshot.revision.source) && scope.identity.ownerId === actor.userId) {
     const result = await requestWorkspaceRead(deps.database, deps.membership, actor, runId, repoId,
       { kind: 'diff_file', snapshotId, revision: snapshot.revision, file: current.file }, signal)

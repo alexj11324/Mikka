@@ -14,7 +14,7 @@ import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
 import { remoteKey } from '@mikka/protocol/repository'
 import { CodingWorkspaceError, workspaceReadReceipt, type WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
 import { CHECKPOINT_REVIEW_MAX_PROOF_BYTES, checkpointReviewEvidence, WorkspaceReviewError,
-  type DiffFileMetadata, type DiffFilePatch, type DiffSnapshot } from '@mikka/protocol/coding-workspace-review'
+  type DiffFileMetadata, type DiffFilePatch, type DiffSnapshot, type DiffSourceAccess } from '@mikka/protocol/coding-workspace-review'
 import { readWorkspaceDiffReceipt } from '../../../packages/daemon/src/coding-workspace/diff'
 import { takeCheckpoint } from '../../../packages/daemon/src/agents/checkpoint'
 import type { JournalEntry } from '../../../packages/daemon/src/runs/journal'
@@ -61,14 +61,14 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
     mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const { resolveRunWorktree } = await import('../identity')
     const { resolveReviewScope, withReviewTransaction } = await import('./authority')
-    const { retainDiffSnapshot, readDiffSnapshot, latestDiffSnapshot, readDiffFilePage, readStoredDiffFile, retainDiffFilePatch } = await import('./store')
+    const { manifestRevision, retainDiffSnapshot, readDiffSnapshot, latestDiffSnapshot, readDiffFilePage, readStoredDiffFile, retainDiffFilePatch } = await import('./store')
     const { validateDiffReceipt } = await import('./receipt')
-    const { validateReviewAnchor } = await import('./patch')
+    const { diffFileVersion, validateReviewAnchor } = await import('./patch')
     const { secretMaskerFor } = await import('../../secrets/runtime')
     const { newDeviceToken, hashDeviceToken, issueDeviceToken } = await import('../../device-link')
     const { POST: checkpointPOST } = await import('../../../app/v1/runs/[runId]/checkpoint/route')
     const { prepareCheckpointReview, retainCheckpointReview } = await import('./checkpoint')
-    const { diffPage, diffFile } = await import('./service')
+    const { diffPage, diffFile, ensureReviewScope } = await import('./service')
     appPool = (await import('../../db')).pool; workspacePool = (await import('../../workspace-db')).workspacePool
 
     async function session(userId: string) {
@@ -164,6 +164,18 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       return { snapshot, files: result.files }
     }
     const scopeFor = (f: Fixture, who = f.who) => resolveReviewScope(pool, pool, who, f.runId, f.repoId)
+    const ensureScope = (f: Fixture, who = f.who, repoId = f.repoId) => ensureReviewScope(
+      { database: pool, membership: pool }, who, f.runId, repoId)
+    async function assertUnbound(f: Fixture) {
+      assert.equal((await pool.query('SELECT 1 FROM coding_workspace_bindings WHERE "runId"=$1', [f.runId])).rowCount, 0)
+      assert.equal((await pool.query('SELECT 1 FROM coding_workspace_review_boards WHERE "runId"=$1 OR "taskId"=$2',
+        [f.runId, f.taskId])).rowCount, 0)
+    }
+    async function stopWithoutLiveToken(f: Fixture) {
+      await pool.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=now(),"finishedAt"=now(),
+        "leaseExpiresAt"=now()-interval '1 minute' WHERE id=$1`, [f.runId])
+      await pool.query(`UPDATE device_tokens SET "revokedAt"=now(),"expiresAt"=now()-interval '1 minute' WHERE id=$1`, [f.tokenId])
+    }
     const read = (f: Fixture, id: string, who = f.who) => withReviewTransaction(pool, pool, who, f.runId, f.repoId,
       (client, scope) => readDiffSnapshot(client, scope, id))
     async function retire(f: Fixture) {
@@ -477,6 +489,82 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       await assert.rejects(() => resolveRunWorktree(pool, pool, f.who, f.runId, f.repoId), code('workspace_not_found'))
     })
 
+    await t.test('identical real Git commits from local and GitHub origins, and distinct PRs, retain separate immutable snapshots', async () => {
+      const f = await fixture()
+      await git(f.worktree, 'add', '--all'); await git(f.worktree, 'commit', '-qm', 'immutable source provenance fixture')
+      const headSha = await git(f.worktree, 'rev-parse', 'HEAD'), baseSha = f.entry.baseCommit!
+      const request = { kind: 'diff_snapshot', source: 'commit', baseSha, headSha } as const
+      const receipt = workspaceReadReceipt.parse(await readWorkspaceDiffReceipt(command(f, request), f.entry, f.repository))
+      const mask = await maskFor(f), result = validateDiffReceipt(request, receipt, mask)
+      assert.ok(result?.ok && result.kind === 'diff_snapshot')
+      assert.equal(result.revision.source, 'commit'); assert.equal(result.files.length, 3)
+      assert.ok(result.files.every(file => file.github === undefined))
+      const retain = (input: Parameters<typeof retainDiffSnapshot>[2]) => withReviewTransaction(pool, pool, f.who, f.runId, f.repoId,
+        (client, scope) => retainDiffSnapshot(client, scope, input, mask), { live: f.identity })
+      const localInput = { revision: result.revision, files: result.files }
+      const local = await retain(localInput)
+      assert.equal((await retain(localInput)).id, local.id)
+      assert.equal(local.sourceAccess, undefined)
+
+      const access: DiffSourceAccess = { kind: 'github', repositoryId: '61393725', manifestComplete: true }
+      const githubFiles = result.files.map(file => {
+        const metadata: DiffFileMetadata = { ...file, github: { repositoryId: access.repositoryId, patchSha256: null, page: null } }
+        metadata.fileVersion = diffFileVersion(f.repoId, result.revision, metadata)
+        return metadata
+      })
+      const githubInput = { revision: manifestRevision('commit', baseSha, headSha, result.revision.treeSha, githubFiles, access),
+        files: githubFiles, sourceAccess: access }
+      const remote = await retain(githubInput)
+      assert.notEqual(remote.id, local.id); assert.notEqual(remote.revision.version, local.revision.version)
+      assert.equal((await retain(githubInput)).id, remote.id)
+      assert.deepEqual(remote.sourceAccess, access)
+      assert.deepEqual([remote.revision.baseSha, remote.revision.headSha, remote.revision.treeSha],
+        [local.revision.baseSha, local.revision.headSha, local.revision.treeSha])
+      assert.deepEqual(githubFiles.map(file => [file.path, file.oldBlob, file.newBlob]), result.files.map(file => [file.path, file.oldBlob, file.newBlob]))
+
+      const prFiles: DiffFileMetadata[] = []
+      for (const file of githubFiles) {
+        const native = await git(f.worktree, 'diff', '--no-ext-diff', '--no-textconv', '--unified=3', baseSha, headSha, '--', file.path)
+        const start = native.indexOf('@@ ')
+        assert.ok(start >= 0, 'the fixture patch comes from these same real immutable Git commits')
+        const metadata: DiffFileMetadata = { ...file, github: { repositoryId: access.repositoryId, patchSha256: hash(native.slice(start)), page: 1 } }
+        metadata.fileVersion = diffFileVersion(f.repoId, result.revision, metadata)
+        prFiles.push(metadata)
+      }
+      const prInput = (number: number): Parameters<typeof retainDiffSnapshot>[2] => {
+        const sourceAccess: DiffSourceAccess = { ...access, pullRequestNumber: number }
+        return { revision: manifestRevision('pull_request', baseSha, headSha, result.revision.treeSha, prFiles, sourceAccess),
+          files: prFiles, sourceAccess,
+          pullRequest: { number, url: `https://github.com/mikka-fixtures/diff-store/pull/${number}`, baseSha, headSha, state: 'open' } }
+      }
+      const firstInput = prInput(101), secondInput = prInput(102)
+      const first = await retain(firstInput), second = await retain(secondInput)
+      assert.notEqual(first.id, second.id); assert.notEqual(first.revision.version, second.revision.version)
+      assert.equal((await retain(firstInput)).id, first.id); assert.equal((await retain(secondInput)).id, second.id)
+      assert.deepEqual(first.sourceAccess, { ...access, pullRequestNumber: 101 })
+      assert.deepEqual(second.sourceAccess, { ...access, pullRequestNumber: 102 })
+      assert.deepEqual(firstInput.files, secondInput.files, 'PR provenance separates snapshots even when all file versions are identical')
+
+      for (const forged of [
+        { ...githubInput, sourceAccess: undefined },
+        { ...githubInput, files: result.files },
+        { ...githubInput, revision: local.revision },
+        { ...githubInput, sourceAccess: { ...access, repositoryId: '61393726' } },
+        { ...firstInput, sourceAccess: undefined },
+        { ...firstInput, sourceAccess: { ...access, pullRequestNumber: 102 } },
+        { ...firstInput, pullRequest: secondInput.pullRequest },
+      ]) await assert.rejects(() => retain(forged), code('workspace_snapshot_unavailable'))
+      const rows = (await pool.query('SELECT id,source,version,snapshot FROM coding_workspace_snapshots WHERE "runId"=$1 ORDER BY id', [f.runId])).rows
+      assert.equal(rows.length, 4, 'rejected provenance creates no extra artifact or replacement')
+      assert.deepEqual(rows.map(row => row.id).sort(), [local.id, remote.id, first.id, second.id].sort())
+      for (const snapshot of [local, remote, first, second]) {
+        const loaded = await read(f, snapshot.id)
+        assert.deepEqual(loaded.sourceAccess, snapshot.sourceAccess)
+        assert.equal(loaded.revision.version, snapshot.revision.version)
+        assert.equal(loaded.pullRequest?.number, snapshot.pullRequest?.number)
+      }
+    })
+
     await t.test('task members read retained artifacts only; a taskless Run and live machine authority remain owner-only', async () => {
       const shared = await fixture(), captured = await capture(shared, true), reviewer = actor(member, shared.where)
       await assert.rejects(() => withReviewTransaction(pool, pool, reviewer, shared.runId, shared.repoId,
@@ -510,13 +598,115 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
       await assert.rejects(() => read(f, snapshot.id, reviewer), code('workspace_not_found'))
     })
 
-    await t.test('an ended legacy Run cannot manufacture a missing binding from current repository or Task visibility', async () => {
+    await t.test('a stopped Run first freezes its original review scope without a checkpoint or usable daemon token', async () => {
       const f = await fixture()
+      await assertUnbound(f)
+      await stopWithoutLiveToken(f)
+      await assert.rejects(() => resolveRunWorktree(pool, pool, f.who, f.runId, f.repoId), code('workspace_not_found'))
+      const scope = await ensureScope(f)
+      assert.deepEqual(scope.identity, { version: 1, runId: f.runId, repoId: f.repoId, ownerId: f.person.id,
+        workspaceId: f.where.id, repositoryKey: remoteKey(remote) })
+      assert.equal(scope.taskId, f.taskId); assert.equal(scope.status, 'stopped'); assert.equal(scope.stopped, true)
+      assert.deepEqual(await ensureScope(f), scope, 'the first historical binding is reused without another live resolution')
+      assert.deepEqual((await pool.query(`SELECT "runId","repoId","ownerId","workspaceId","repositoryKey"
+        FROM coding_workspace_bindings WHERE "runId"=$1`, [f.runId])).rows,
+      [{ runId: f.runId, repoId: f.repoId, ownerId: f.person.id, workspaceId: f.where.id, repositoryKey: remoteKey(remote) }])
+      assert.deepEqual((await pool.query(`SELECT id,"workspaceId","taskId","runId","repositoryKey"
+        FROM coding_workspace_review_boards WHERE id=$1`, [scope.boardId])).rows,
+      [{ id: scope.boardId, workspaceId: f.where.id, taskId: f.taskId, runId: null, repositoryKey: remoteKey(remote) }])
+      for (const table of ['run_checkpoints', 'coding_workspace_checkpoint_reviews', 'coding_workspace_snapshots'])
+        assert.equal((await pool.query(`SELECT 1 FROM ${table} WHERE "runId"=$1`, [f.runId])).rowCount, 0,
+          'historical scope creation requires no checkpoint and invents no source evidence')
+    })
+
+    await t.test('a Task member can first open a soft-removed device history without gaining live or taskless authority', async () => {
+      const f = await fixture(), reviewer = actor(member, f.where)
+      await assertUnbound(f)
+      await stopWithoutLiveToken(f)
+      await pool.query('UPDATE agents SET "deviceId"=NULL WHERE "deviceId"=$1', [f.deviceId])
+      await pool.query('UPDATE devices SET enabled=false,"removedAt"=now() WHERE id=$1', [f.deviceId])
+      const scope = await ensureScope(f, reviewer)
+      assert.equal(scope.identity.ownerId, f.person.id); assert.equal(scope.identity.repoId, f.repoId)
+      assert.equal(scope.identity.workspaceId, f.where.id); assert.equal(scope.taskId, f.taskId)
+      assert.equal(scope.status, 'stopped'); assert.equal(scope.stopped, true)
+      assert.deepEqual(await scopeFor(f, reviewer), scope)
+      assert.deepEqual((await pool.query('SELECT "deviceId","deviceRepoId" FROM agent_runs WHERE id=$1', [f.runId])).rows,
+        [{ deviceId: f.deviceId, deviceRepoId: f.repoId }], 'soft removal retains the original host repository identity')
+      for (const who of [f.who, reviewer])
+        await assert.rejects(() => resolveRunWorktree(pool, pool, who, f.runId, f.repoId), code('workspace_not_found'))
+      const personal = await fixture({ task: false })
+      await stopWithoutLiveToken(personal)
+      await assert.rejects(() => ensureScope(personal, actor(member, personal.where)), code('workspace_not_found'))
+      await assertUnbound(personal)
+      assert.equal((await ensureScope(personal)).identity.ownerId, personal.person.id)
+    })
+
+    await t.test('only an exact Run publication can supply missing historical repository admission evidence', async () => {
+      const f = await fixture(), other = await fixture()
+      await stopWithoutLiveToken(f)
+      await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.runId,
+        { executionIdentity: { workspaceId: f.where.id } }])
+      await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey")
+        VALUES ($1,$2,$3,$4,$5)`, [f.runId, f.person.id, other.taskId, remote, remoteKey(remote)])
+      await assert.rejects(() => ensureScope(f), code('workspace_not_found'))
+      await assertUnbound(f)
+      await pool.query('UPDATE run_publications SET "issueId"=$2,"userId"=$3 WHERE "runId"=$1', [f.runId, f.taskId, stranger.id])
+      await assert.rejects(() => ensureScope(f), code('workspace_not_found'))
+      await assertUnbound(f)
+      await pool.query('UPDATE run_publications SET "userId"=$2 WHERE "runId"=$1', [f.runId, f.person.id])
+      const scope = await ensureScope(f, actor(member, f.where))
+      assert.equal(scope.identity.repositoryKey, remoteKey(remote)); assert.equal(scope.identity.ownerId, f.person.id)
+      assert.equal(scope.taskId, f.taskId); assert.equal(scope.status, 'stopped')
+    })
+
+    await t.test('first historical binding rejects caller-selected repositories, other tenants and conflicting frozen evidence', async () => {
+      const f = await fixture(), alternative = await fixture()
+      await stopWithoutLiveToken(f)
+      for (const [who, repoId] of [[actor(member, otherWorkspace), f.repoId], [actor(stranger, f.where), f.repoId],
+        [f.who, alternative.repoId]] as const) {
+        await assert.rejects(() => ensureScope(f, who, repoId), code('workspace_not_found'))
+        await assertUnbound(f)
+      }
+      const original = { executionIdentity: { workspaceId: f.where.id },
+        repositoryAdmission: { workspaceId: f.where.id, remoteKey: remoteKey(remote) } }
+      for (const definition of [
+        { ...original, repositoryAdmission: { ...original.repositoryAdmission, remoteKey: remoteKey('https://github.com/mikka-fixtures/another.git') } },
+        { ...original, repositoryAdmission: { ...original.repositoryAdmission, workspaceId: otherWorkspace.id } },
+        { ...original, executionIdentity: { workspaceId: otherWorkspace.id } },
+        { repositoryAdmission: { remoteKey: remoteKey(remote) } },
+        { executionIdentity: original.executionIdentity },
+      ]) {
+        await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.runId, definition])
+        await assert.rejects(() => ensureScope(f), code('workspace_not_found'))
+        await assertUnbound(f)
+      }
+      await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.runId, original])
+      await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey")
+        VALUES ($1,$2,$3,$4,$5)`, [f.runId, f.person.id, f.taskId, 'https://github.com/mikka-fixtures/another.git',
+        remoteKey('https://github.com/mikka-fixtures/another.git')])
+      await assert.rejects(() => ensureScope(f), code('workspace_not_found'))
+      await assertUnbound(f)
+      await pool.query('DELETE FROM run_publications WHERE "runId"=$1', [f.runId])
+      await pool.query('UPDATE device_repos SET "remoteUrl"=$2 WHERE id=$1', [f.repoId, 'https://github.com/mikka-fixtures/another.git'])
+      await assert.rejects(() => ensureScope(f), code('workspace_not_found'))
+      await assertUnbound(f)
+      await pool.query('UPDATE device_repos SET "remoteUrl"=$2 WHERE id=$1', [f.repoId, remote])
+      await pool.query('UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [f.runId, alternative.repoId])
+      await assert.rejects(() => ensureScope(f, f.who, alternative.repoId), code('workspace_not_found'))
+      await assertUnbound(f)
+    })
+
+    await t.test('an unbound Run whose device was physically deleted cannot acquire history from a same-name replacement repository', async () => {
+      const f = await fixture()
+      await assertUnbound(f)
       await retire(f)
       await assert.rejects(() => scopeFor(f), code('workspace_not_found'))
       await assert.rejects(() => withReviewTransaction(pool, pool, f.who, f.runId, f.repoId,
         async () => undefined, { live: f.identity }), code('workspace_not_found'))
-      assert.equal((await pool.query('SELECT 1 FROM coding_workspace_bindings WHERE "runId"=$1', [f.runId])).rowCount, 0)
+      const replacement = await fixture()
+      for (const who of [f.who, actor(member, f.where)]) for (const repoId of [f.repoId, replacement.repoId])
+        await assert.rejects(() => ensureScope(f, who, repoId), code('workspace_not_found'))
+      await assertUnbound(f)
     })
 
     await t.test('snapshot identity is immutable and comments cannot join a snapshot or thread from another board', async () => {
@@ -593,6 +783,7 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
     await t.test('real review mutations preserve private drafts, author permissions, idempotent receipts and versioned per-viewer Reviewed state', async () => {
       const { readReviewBoard, mutateReview } = await import('./review')
       const deps = { database: pool, membership: pool }, f = await fixture(), { snapshot, files } = await capture(f, true)
+      assert.equal(snapshot.sourceAccess, undefined); assert.ok(files.every(file => file.github === undefined))
       const reviewer = actor(member, f.where), scope = await scopeFor(f), mask = await maskFor(f)
       const anchorFor = async (path: string) => {
         const { patch } = await readStoredDiffFile(pool, scope, snapshot, path, mask)

@@ -31,7 +31,7 @@ export function prepareCheckpointReview(checkpoint: RunCheckpoint, repoId: strin
   if (!proof.revision.headSha || !mask.sourcePolicy || new Set(proof.files.map(file => file.path)).size !== proof.files.length) return result
   if (Buffer.byteLength(JSON.stringify(proof.files)) > 1536 * 1024) return { ...result, reason: 'too_large' }
   const revision = manifestRevision('checkpoint', proof.revision.baseSha, proof.revision.headSha, proof.revision.treeSha, proof.files)
-  if (!isDeepStrictEqual(revision, proof.revision) || proof.files.some(file => file.rawBlob || file.rawSize !== undefined || file.workingVersion
+  if (!isDeepStrictEqual(revision, proof.revision) || proof.files.some(file => file.github !== undefined || file.rawBlob || file.rawSize !== undefined || file.workingVersion
     || file.fileVersion !== diffFileVersion(repoId, revision, file)) || !isDeepStrictEqual(maskDeep(proof.files, mask), proof.files)) return result
   const regular = (mode: string | null) => mode === null || mode === '100644' || mode === '100755'
   const eligible = proof.files.filter(file => regular(file.oldMode) && regular(file.newMode)

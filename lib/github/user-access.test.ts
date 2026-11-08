@@ -1,9 +1,16 @@
 import '../../tests/support/server-only.mjs'
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
+import type { RequestBudget } from '../request-budget'
 
 const originalAppId = process.env.GITHUB_APP_ID
-mock.module(new URL('./cloud.ts', import.meta.url).href, { namedExports: { cloudGitHubRepositories: async () => null, cloudGitHubCredential: async () => null, useCloudGitHub: async () => false } })
+let cloudMode = false
+let cloudCredential: { token: string; expiresAt: Date; installationId: string; githubAccountId?: string } | null = null
+const cloudMint = mock.fn(async (_userId: string, _remoteKey?: string, _budget?: RequestBudget) => cloudCredential)
+const cloudRepositories = mock.fn(async () => null)
+mock.module(new URL('./cloud.ts', import.meta.url).href, { namedExports: {
+  cloudGitHubRepositories: cloudRepositories, cloudGitHubCredential: cloudMint, useCloudGitHub: async () => cloudMode,
+} })
 mock.module(new URL('./app-config.ts', import.meta.url).href, { namedExports: { readGitHubAppConfig: async () => ({ id: process.env.GITHUB_APP_ID ?? null }) } })
 const requestHeaders = new Headers({ cookie: 'test-session' })
 let user: string | null = 'person-1'
@@ -20,7 +27,7 @@ mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth:
 let connected: { token: string; githubAccountId: string } | null = null
 let connectionLogin: string | null = null
 let connectConfigured = true
-const connectionToken = mock.fn(async () => connected)
+const connectionToken = mock.fn(async (_userId: string, _options?: { minValidityMs?: number; budget?: RequestBudget }) => connected)
 mock.module(new URL('./connection.ts', import.meta.url).href, { namedExports: {
   githubConnectConfigured: () => connectConfigured,
   githubConnectionToken: connectionToken,
@@ -34,10 +41,11 @@ const installation = { id: 11, app_id: 4840908, suspended_at: null }
 const pullRequest = { number: 7, state: 'open', merged: false, merged_at: null, updated_at: '2026-10-27T12:00:00Z', base: { repo: repository } }
 const json = (value: unknown, next = false) => Response.json(value, { headers: next ? { link: '<https://api.github.com/ignored?cursor=next>; rel="next"' } : {} })
 let answer: (url: URL) => Response | Promise<Response> = () => { throw new Error('Unexpected GitHub request') }
+let expectedToken = 'private-test-token'
 const fetchMock = mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = new URL(String(input))
   assert.equal(url.origin, 'https://api.github.com')
-  assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer private-test-token')
+  assert.equal(new Headers(init?.headers).get('authorization'), `Bearer ${expectedToken}`)
   assert.equal(init?.redirect, 'error')
   assert.equal(init?.cache, 'no-store')
   return answer(url)
@@ -54,9 +62,16 @@ beforeEach(() => {
   sessionUsers = []
   accounts = [{ id: 'internal-account', userId: user, providerId: 'github', accountId: '42' }]
   connected = null
+  cloudMode = false
+  cloudCredential = null
+  expectedToken = 'private-test-token'
+  cloudMint.mock.resetCalls()
+  cloudMint.mock.mockImplementation(async () => cloudCredential)
+  cloudRepositories.mock.resetCalls()
   connectionLogin = null
   connectConfigured = true
   connectionToken.mock.resetCalls()
+  connectionToken.mock.mockImplementation(async () => connected)
   getAccessToken.mock.resetCalls()
   getAccessToken.mock.mockImplementation(async () => ({ accessToken: 'private-test-token' }))
   fetchMock.mock.resetCalls()
@@ -64,6 +79,7 @@ beforeEach(() => {
     if (url.pathname === '/user') return json({ id: 42 })
     if (url.pathname === '/user/installations') return json({ installations: [installation] })
     if (url.pathname === '/user/installations/11/repositories') return json({ repositories: [repository] })
+    if (url.pathname === '/repos/owner/project') return json(repository)
     if (url.pathname === '/repos/Owner/Project/pulls/7') return json(pullRequest)
     throw new Error(`Unexpected path ${url.pathname}`)
   }
@@ -83,6 +99,99 @@ function deferred<T>() {
   return { promise, resolve }
 }
 const nextTurn = () => new Promise<void>(resolve => setImmediate(resolve))
+
+test('an exact repository read uses one viewer token for live user/App intersection and the final repository identity', async () => {
+  connected = { token: 'private-test-token', githubAccountId: '42' }
+  const budget = { deadline: Date.now() + 25_000, signal: new AbortController().signal }
+  const credential = await access.githubRepositoryReadCredential('person-1', 'v2/github.com/owner/project', budget)
+  assert.deepEqual(credential, { token: 'private-test-token', githubAccountId: '42', kind: 'user', repository: {
+    id: '91', installationId: '11', fullName: 'Owner/Project', htmlUrl: 'https://github.com/Owner/Project', private: true,
+  } })
+  assert.deepEqual(paths(), ['/user', '/user/installations', '/user/installations/11/repositories', '/repos/owner/project'])
+  assert.deepEqual(connectionToken.mock.calls.map(call => call.arguments), [['person-1', { budget }]])
+  assert.equal(getAccessToken.mock.callCount(), 0)
+  assert.equal(cloudMint.mock.callCount(), 0)
+  assert.equal(cloudRepositories.mock.callCount(), 0, 'an exact read does not discover unrelated cloud repositories')
+  assert.ok(fetchMock.mock.calls.every(call => call.arguments[1]?.signal instanceof AbortSignal))
+})
+
+test('an unselected exact repository never receives a credential, even if another repository is authorized', async () => {
+  await assert.rejects(access.githubRepositoryReadCredential('person-1', 'v2/github.com/owner/unselected'), failure('githubRepositoryForbidden', 403))
+  assert.deepEqual(paths(), ['/user', '/user/installations', '/user/installations/11/repositories'])
+  assert.equal(cloudMint.mock.callCount(), 0)
+})
+
+test('a repository name reused for a different GitHub ID is refused after the live intersection', async () => {
+  const previous = answer
+  answer = url => url.pathname === '/repos/owner/project' ? json({ ...repository, id: 92 }) : previous(url)
+  await assert.rejects(access.githubRepositoryReadCredential('person-1', 'v2/github.com/owner/project'), failure('githubRepositoryForbidden', 403))
+  assert.equal(paths().at(-1), '/repos/owner/project')
+  assert.equal(connectionToken.mock.callCount(), 1)
+})
+
+test('a cloud read mints only the frozen repository with the caller budget and then verifies its actual identity', async () => {
+  cloudMode = true
+  expectedToken = 'installation-read-fixture'
+  cloudCredential = { token: expectedToken, installationId: '22', githubAccountId: '42', expiresAt: new Date(Date.now() + 3_600_000) }
+  const budget = { deadline: Date.now() + 25_000 }
+  const credential = await access.githubRepositoryReadCredential('person-1', 'v2/github.com/owner/project', budget)
+  assert.equal(credential.kind, 'installation')
+  assert.equal(credential.repository.id, '91')
+  assert.equal(credential.repository.installationId, '22')
+  assert.equal(credential.token, expectedToken)
+  assert.deepEqual(cloudMint.mock.calls.map(call => call.arguments), [['person-1', 'v2/github.com/owner/project', budget]])
+  assert.deepEqual(paths(), ['/repos/owner/project'])
+  assert.equal(cloudRepositories.mock.callCount(), 0)
+  assert.equal(connectionToken.mock.callCount(), 0)
+  assert.equal(getAccessToken.mock.callCount(), 0)
+})
+
+test('a refused cloud mint never falls back to a local user credential', async () => {
+  cloudMode = true
+  const refusal = new Error('Fixture broker refusal')
+  cloudMint.mock.mockImplementation(async () => { throw refusal })
+  await assert.rejects(access.githubRepositoryReadCredential('person-1', 'v2/github.com/owner/project'), error => error === refusal)
+  assert.equal(connectionToken.mock.callCount(), 0)
+  assert.equal(getAccessToken.mock.callCount(), 0)
+  assert.equal(fetchMock.mock.callCount(), 0)
+})
+
+test('a cloud installation credential can never supply a missing human write identity', async () => {
+  cloudMode = true
+  cloudCredential = { token: 'installation-read-fixture', installationId: '22', expiresAt: new Date(Date.now() + 3_600_000) }
+  accounts = []
+  await assert.rejects(access.githubTokenForUser('person-1'), failure('githubNotConnected', 409))
+  assert.equal(cloudMint.mock.callCount(), 0)
+  assert.equal(fetchMock.mock.callCount(), 0)
+})
+
+test('cancellation observed after credential persistence prevents downstream GitHub reads', async () => {
+  const controller = new AbortController(), reason = new DOMException('Fixture request cancelled', 'AbortError')
+  connectionToken.mock.mockImplementation(async () => {
+    controller.abort(reason)
+    return { token: 'private-test-token', githubAccountId: '42' }
+  })
+  await assert.rejects(access.githubRepositoryReadCredential('person-1', 'v2/github.com/owner/project', {
+    deadline: Date.now() + 25_000, signal: controller.signal,
+  }), error => error === reason)
+  assert.equal(connectionToken.mock.callCount(), 1)
+  assert.equal(fetchMock.mock.callCount(), 0)
+  assert.equal(getAccessToken.mock.callCount(), 0)
+})
+
+test('the repository authorization chain has one aggregate page budget before an exact read', async () => {
+  answer = url => {
+    if (url.pathname === '/user') return json({ id: 42 })
+    if (url.pathname === '/user/installations') return json({ installations: [installation] })
+    if (url.pathname === '/user/installations/11/repositories') return json({ repositories: [] }, true)
+    throw new Error('No exact repository request may escape an incomplete authorization catalogue')
+  }
+  await assert.rejects(access.githubRepositoryReadCredential('person-1', 'v2/github.com/owner/project', {
+    deadline: Date.now() + 25_000,
+  }), failure('githubUnavailable', 502))
+  assert.equal(fetchMock.mock.callCount(), 100)
+  assert.equal(paths().some(path => path.startsWith('/repos/')), false)
+})
 
 test('one fresh token starts identity and the first installation page together, then gates repositories on both', { timeout: 2_000 }, async () => {
   const userStarted = deferred<void>(), identity = deferred<Response>(), firstPage = deferred<Response>()

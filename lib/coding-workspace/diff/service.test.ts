@@ -4,10 +4,11 @@ import { EventEmitter } from 'node:events'
 import test from 'node:test'
 import type { Pool, PoolClient } from 'pg'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
-import type { DiffFileMetadata, DiffFilePatch, DiffRevision, DiffSnapshot } from '@mikka/protocol/coding-workspace-review'
+import type { DiffFileMetadata, DiffFilePatch, DiffRevision, DiffSnapshot, DiffSourceAccess } from '@mikka/protocol/coding-workspace-review'
 import { runSecretMasker, secretMaskerFor, workspaceSecretMasker } from '../../secrets/runtime'
 import { reviewBoardId, type ReviewActor, type ReviewScope } from './authority'
-import { buildDiffFilePatch, diffFileVersion, gitBlobHash } from './patch'
+import { buildDiffFilePatch, diffDigest, diffFileVersion, gitBlobHash } from './patch'
+import { buildGitHubFilePatch } from './github-patch'
 import { diffFile, diffPage, type DiffDependencies } from './service'
 import { manifestRevision, retainDiffSnapshot } from './store'
 
@@ -29,7 +30,7 @@ class Client extends EventEmitter {
   release() { this.removeAllListeners() }
 }
 
-async function fixture() {
+async function fixture(source: 'commit' | 'pull_request' = 'pull_request', origin: 'local' | 'github' = 'github') {
   const runId = randomUUID(), repoId = randomUUID(), workspaceId = randomUUID()
   const actor: ReviewActor = { userId: 'diff-service-owner', workspaceId, credential: { kind: 'session', id: randomUUID() } }
   const identity = { version: 1 as const, runId, repoId, workspaceId, ownerId: actor.userId,
@@ -88,17 +89,23 @@ async function fixture() {
   const database = { query, connect: async () => new Client(query) } as unknown as Pool
   const mask = await secretMaskerFor({ workspaceId, ownerId: actor.userId })
   const before = Buffer.from('before\n'), after = Buffer.from('retained visible source\n')
-  const initial: DiffRevision = { source: 'pull_request', baseSha: 'a'.repeat(40), headSha: 'b'.repeat(40),
+  const initial: DiffRevision = { source, baseSha: 'a'.repeat(40), headSha: 'b'.repeat(40),
     treeSha: 'c'.repeat(40), version: '0'.repeat(64) }
+  const sourceAccess: DiffSourceAccess | undefined = origin === 'github' ? { kind: 'github', repositoryId: '61393725',
+    ...(source === 'pull_request' ? { pullRequestNumber: 1 } : {}), manifestComplete: true } : undefined
+  const nativePatch = '@@ -1 +1 @@\n-before\n+retained visible source\n'
   const file: DiffFileMetadata = { path: 'demo.txt', previousPath: null, status: 'modified',
     oldBlob: gitBlobHash(before, initial.baseSha!), newBlob: gitBlobHash(after, initial.headSha!), oldMode: '100644', newMode: '100644',
-    oldSize: before.length, newSize: after.length, additions: 0, deletions: 0, binary: false, fileVersion: '0'.repeat(64) }
+    oldSize: before.length, newSize: after.length, additions: 0, deletions: 0, binary: false, fileVersion: '0'.repeat(64),
+    ...(sourceAccess ? { github: { repositoryId: sourceAccess.repositoryId,
+      patchSha256: source === 'pull_request' ? diffDigest(nativePatch) : null, page: source === 'pull_request' ? 1 : null } } : {}) }
   file.fileVersion = diffFileVersion(repoId, initial, file)
-  const revision = manifestRevision(initial.source, initial.baseSha, initial.headSha, initial.treeSha, [file])
-  const patch = buildDiffFilePatch({ snapshotId: randomUUID(), sourceVersion: revision.version, file, before, after }, mask)
+  const revision = manifestRevision(initial.source, initial.baseSha, initial.headSha, initial.treeSha, [file], sourceAccess)
+  const patchInput = { snapshotId: randomUUID(), sourceVersion: revision.version, file, before, after }
+  const patch = source === 'pull_request' ? buildGitHubFilePatch({ ...patchInput, nativePatch }, mask) : buildDiffFilePatch(patchInput, mask)
   const saved = await retainDiffSnapshot(new Client(query) as unknown as PoolClient, scope, { revision, files: [file],
-    patches: new Map([[file.path, patch]]), pullRequest: { number: 1, url: 'https://github.com/mikka-fixtures/review-race/pull/1',
-      headSha: revision.headSha!, state: 'open' } }, mask)
+    sourceAccess, patches: new Map([[file.path, patch]]), pullRequest: source === 'pull_request'
+      ? { number: 1, url: 'https://github.com/mikka-fixtures/review-race/pull/1', headSha: revision.headSha!, state: 'open' } : null }, mask)
   const entered = deferred(), release = deferred()
   const deps: DiffDependencies = { database, membership: database, external: {
     async verify() { entered.resolve(); await release.promise },
@@ -127,12 +134,12 @@ test('retained Diff responses recheck authority after provider verification', { 
       const token = `ghp_${'A'.repeat(36)}`
       assert.ok(masks.every(mask => !mask(token).includes(token)), 'the no-secret policy still applies default credential detection')
     })
-    for (const kind of ['file', 'page'] as const) {
+    for (const source of ['commit', 'pull_request'] as const) for (const kind of ['file', 'page'] as const) {
       const read = (f: Awaited<ReturnType<typeof fixture>>) => kind === 'file'
         ? diffFile(f.deps, f.actor, f.runId, f.repoId, f.snapshot.id, 'demo.txt')
         : diffPage(f.deps, f.actor, f.runId, f.repoId, { snapshotId: f.snapshot.id })
-      await t.test(`${kind}: an unchanged authority returns the real retained projection`, async () => {
-        const f = await fixture(), pending = read(f)
+      await t.test(`${source} ${kind}: an unchanged authority returns the real retained projection`, async () => {
+        const f = await fixture(source), pending = read(f)
         await f.entered.promise
         f.release.resolve()
         const value = await pending
@@ -142,8 +149,8 @@ test('retained Diff responses recheck authority after provider verification', { 
         assert.ok(f.state.protectedReads > 0)
       })
       for (const revoked of ['member', 'session'] as const) {
-        await t.test(`${kind}: ${revoked} revoked while verify waits cannot receive retained source`, async () => {
-          const f = await fixture(), pending = read(f)
+        await t.test(`${source} ${kind}: ${revoked} revoked while verify waits cannot receive retained source`, async () => {
+          const f = await fixture(source), pending = read(f)
           const rejection = assert.rejects(pending, denied)
           await f.entered.promise
           f.state[revoked] = false
@@ -153,6 +160,14 @@ test('retained Diff responses recheck authority after provider verification', { 
         })
       }
     }
+    for (const kind of ['file', 'page'] as const) await t.test(`local ${kind}: retained authority does not require a GitHub provider`, async () => {
+      const f = await fixture('commit', 'local'), deps = { ...f.deps, external: undefined }
+      assert.equal(f.snapshot.sourceAccess, undefined)
+      const value = kind === 'file' ? await diffFile(deps, f.actor, f.runId, f.repoId, f.snapshot.id, 'demo.txt')
+        : await diffPage(deps, f.actor, f.runId, f.repoId, { snapshotId: f.snapshot.id })
+      assert.ok(JSON.stringify(value).includes('demo.txt'))
+      assert.ok(f.state.protectedReads > 0)
+    })
   } finally {
     if (previous === undefined) delete process.env.WORKSPACE_SECRETS_KEY
     else process.env.WORKSPACE_SECRETS_KEY = previous

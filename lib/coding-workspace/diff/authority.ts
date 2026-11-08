@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { CodingWorkspaceError, type RunWorktreeIdentity } from '@mikka/protocol/coding-workspace'
 import { runRepositoryIdentity, type RunRepositoryIdentity } from '@mikka/protocol/coding-workspace-review'
+import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import { issueForUser } from '../../issue-access'
 import { tokenWorkspace } from '../../tokens/principal'
 import { withWorkspaceAuthority, type WorkspaceAuthorizedActor } from '../authority'
@@ -61,12 +62,40 @@ async function retainBinding(database: WorkspaceQuery, membership: WorkspaceQuer
     throw new CodingWorkspaceError('workspace_version_conflict')
 }
 
+/** A stopped Run can be reviewed for the first time without an active daemon
+ * token. Its original tenant and repository must still be provable from host
+ * records; neither a current Task link nor a caller-selected repo can supply
+ * missing provenance. A physically deleted, never-recorded repo stays absent. */
+async function retainHistoricalBinding(client: PoolClient, actor: ReviewActor, runId: string, expectedRepoId: string) {
+  const { rows: [row] } = await client.query<{
+    ownerId: string; repoId: string; repositoryKey: string; remoteUrl: string | null;
+    frozenWorkspace: string | null; admissionWorkspace: string | null; frozenKey: string | null; publicationKey: string | null;
+  }>(`SELECT r."userId" AS "ownerId",p.id AS "repoId",p."repoPath" AS "repositoryKey",p."remoteUrl",
+    r."agentDefinition"#>>'{executionIdentity,workspaceId}' AS "frozenWorkspace",
+    r."agentDefinition"#>>'{repositoryAdmission,workspaceId}' AS "admissionWorkspace",
+    r."agentDefinition"#>>'{repositoryAdmission,remoteKey}' AS "frozenKey",publication."remoteKey" AS "publicationKey"
+    FROM agent_runs r JOIN device_repos p ON p.id=r."deviceRepoId" AND p."userId"=r."userId" AND p."deviceId"=r."deviceId"
+    JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
+    LEFT JOIN run_publications publication ON publication."runId"=r.id AND publication."userId"=r."userId" AND publication."issueId"=r."issueId"
+    WHERE r.id=$1 FOR SHARE OF p,d`, [runId])
+  const workspaceId = row?.frozenWorkspace ?? row?.admissionWorkspace
+  if (!row || row.repoId !== expectedRepoId || !workspaceId || workspaceId !== actor.workspaceId
+    || [row.frozenWorkspace, row.admissionWorkspace].some(value => value && value !== workspaceId)
+    || !(row.frozenKey ?? row.publicationKey)
+    || [row.frozenKey, row.publicationKey].some(value => value && value !== row.repositoryKey)
+    || !repositoryBindingMatches(row.repositoryKey, row.remoteUrl, { allowFile: true })) throw denied()
+  await client.query(`INSERT INTO coding_workspace_bindings ("runId","repoId","ownerId","workspaceId","repositoryKey")
+    VALUES ($1,$2,$3,$4,$5) ON CONFLICT ("runId","repoId") DO NOTHING`,
+  [runId, row.repoId, row.ownerId, workspaceId, row.repositoryKey])
+}
+
 /** Review-specific state is built inside the shared final-authority lease. */
 export async function withReviewTransaction<T>(database: Pool, membership: Pool, actor: ReviewActor,
   runId: string, repoId: string, work: (client: PoolClient, scope: ReviewScope) => Promise<T>,
-  options: { live?: RunWorktreeIdentity; signal?: AbortSignal } = {}): Promise<T> {
+  options: { live?: RunWorktreeIdentity; historical?: boolean; signal?: AbortSignal } = {}): Promise<T> {
   return withWorkspaceAuthority(database, membership, actor, runId, async (client, workspace) => {
     if (options.live) await retainBinding(client, workspace, actor, options.live)
+    else if (options.historical) await retainHistoricalBinding(client, actor, runId, repoId)
     const scope = await resolveReviewScope(client, workspace, actor, runId, repoId)
     await client.query(`INSERT INTO coding_workspace_review_boards (id,"workspaceId","taskId","runId","repositoryKey")
       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING`,
