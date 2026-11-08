@@ -6009,7 +6009,7 @@
     "templates": {
       "title": "Approval templates",
       "description": "Save an agent approval mode and permissions as a template, and apply it to the whole workspace when needed.",
-      "applyNote": "Applying replaces the workspace's agent policy and stops runs that don't fit it. Deleting a template doesn't undo a policy already applied.",
+      "applyNote": "Applying replaces this workspace's agent policy and stops this workspace's active runs that hold permissions on a computer. Deleting a template doesn't undo a policy already applied.",
       "count": "{count} of {limit} templates",
       "empty": "No approval templates yet.",
       "create": "New template",

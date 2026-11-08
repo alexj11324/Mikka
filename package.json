@@ -221,7 +221,7 @@
     "test:cloud-services": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.test.ts lib/cloud-services/model.test.ts lib/cloud-services/model-billing.test.ts components/settings/cloud-settings.test.tsx",
     "test:cloud-services-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-services/client.db.test.ts lib/mobile-push-delivery.db.test.ts",
     "test:enterprise-db": "node --experimental-test-module-mocks --test-force-exit --import ./scripts/server-test.mjs --import tsx --test lib/enterprise/http.db.test.ts lib/enterprise/governance.db.test.ts lib/enterprise/live-authority.db.test.ts lib/enterprise/audit-outbox.db.test.ts lib/enterprise/execution-authority.db.test.ts",
-    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts lib/enterprise/protocol.test.ts lib/enterprise/logout-client.test.ts"
+    "test:governance": "node --import ./tests/support/server-only.mjs --import tsx --test lib/governance/policy.test.ts lib/enterprise/protocol.test.ts lib/enterprise/logout-client.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test hooks/settings/use-workspace-governance.test.tsx"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.121",

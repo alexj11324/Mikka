@@ -7,6 +7,7 @@ import type { WorkspaceSettings } from '@/lib/workspace-access'
 import { prefetchConnectedApps } from '@/lib/settings-prefetch'
 import { fetchSettingsData, fetchTeamDirectory, fetchTeamMembers, memberSettingsKey, settingsReadOptions, teamDirectoryKey, teamMembersKey } from '@/lib/settings-data'
 import { useLiveKeys } from '@/hooks/use-live-key'
+import { governanceLiveKey } from '@/hooks/settings/use-workspace-governance'
 import { ListReadScopeError, listReadDeadline, liveListReadOptions, UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'
 
 export function SettingsDataPreloader({ ownerId, userKey, workspaceId, onWorkspaceResolved }: { ownerId: string; userKey: string; workspaceId?: string; onWorkspaceResolved: (id: string) => void }) {
@@ -33,6 +34,8 @@ export function SettingsDataPreloader({ ownerId, userKey, workspaceId, onWorkspa
     memberSettingsKey(workspaceId), unstable_serialize(teamDirectoryKey(workspaceId)),
     '/api/workspace/switcher', unstable_serialize([memberSettingsKey(workspaceId), userKey]),
     ...(teamId ? [unstable_serialize(teamMembersKey(teamId))] : []),
+    // Plan, seats and role cards count the same members (#1662).
+    ...(scope ? [governanceLiveKey(scope)] : []),
   ], null, { minIntervalMs: 2_000, deadline: listReadDeadline(members, ownerId) })
 
   useEffect(() => {
