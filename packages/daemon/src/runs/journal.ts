@@ -23,6 +23,7 @@ function persisted(entries: Record<string, JournalEntry>): Record<string, Journa
     const { token: githubToken, ...githubBinding } = github ?? {}
     const assignment = { ...rest, ...(github ? { github: githubBinding } : {}) }
     return [id, { ...entry, assignment: assignment as RunAssignment,
+      ...(entry.assignment.taskSecrets || entry.assignment.taskEnv ? { taskSecretsWithheld: true as const } : {}),
       ...(modelCredential ? { credentialWithheld: true as const } : {}) }]
   }))
 }
@@ -50,6 +51,8 @@ export interface JournalEntry {
   waitingQuestionId?: string
   /** The run was claimed with a model credential, which the journal file never holds. */
   credentialWithheld?: true
+  /** A restart requires a fresh claim; neither direct values nor bearer grants survive it. */
+  taskSecretsWithheld?: true
   updatedAt: string
 }
 

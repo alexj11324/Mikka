@@ -2,7 +2,7 @@
 // an untouched list is the default preference over what the person has, every
 // change is stored under a per-scope lock, an add must be one of the person's
 // candidates, and dispatch takes the first model that can run now, on a
-// device that takes part (参与调度) and reported it, or says why nothing can.
+// device that takes part (参与调度) and supports credential injection, or says why nothing can.
 // Model ids are fixtures standing for what an account or CLI reported.
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -144,7 +144,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     }
   })
 
-  await t.test('local Claude uses the exact account catalogue only with a capable daemon and current epoch', async () => {
+  await t.test('credential ownership and revision admission stay separate from device runtime support', async () => {
     const scope = await person('order-account-catalogue')
     const own = await subscribe(scope, 'claude', ['claude-sonnet-5-5', 'claude-sonnet-5'])
     const other = await person('order-other-catalogue')
@@ -154,11 +154,12 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const entry = { id: 'historical', harness: 'claude_code' as const, model: 'claude-sonnet-5', source: { kind: 'subscription' as const, connectionId: own } }
     let report = (await order.poolDevices(pool, scope.ownerId)).find(row => row.id === local.id)!
     assert.equal(deviceSupport(report, entry), 'ready')
-    assert.equal(deviceSupport(report, { ...entry, source: { kind: 'subscription', connectionId: foreign } }), 'modelNotReported')
-    assert.equal(deviceSupport({ ...report, harnesses: report.harnesses.map(info => ({ ...info, subscriptionModelCatalogue: undefined })) }, entry), 'needsUpdate')
+    assert.equal((await order.orderCandidates(pool, scope)).some(item => item.source.kind === 'subscription' && item.source.connectionId === foreign), false, 'a device does not grant another owner’s catalogue')
+    assert.equal(deviceSupport({ ...report, harnesses: report.harnesses.map(info => ({ ...info, subscriptionModelCatalogue: undefined })) }, entry), 'ready')
     await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [own])
     report = (await order.poolDevices(pool, scope.ownerId)).find(row => row.id === local.id)!
-    assert.equal(deviceSupport(report, entry), 'modelNotReported', 'stale catalogue evidence grants nothing')
+    assert.equal(deviceSupport(report, entry), 'ready', 'device readiness does not admit the stale credential')
+    assert.equal((await order.orderCandidates(pool, scope)).some(item => item.source.kind === 'subscription' && item.source.connectionId === own), false, 'stale credential bindings still grant nothing')
   })
 
   await t.test('a new binding can dispatch before Settings is opened: probe null/stale quota once, and keep paid keys out after a failed check', async () => {
@@ -418,14 +419,14 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.deepEqual(listed.kind === 'device' && [listed.deviceId, listed.entry.harness, listed.model], [codexOnly.id, 'codex', 'acct-codex-n'])
     const first = await resolveModelDispatch(pool, ctx, null, undefined, both.id)
     assert.deepEqual(first.kind === 'device' && [first.deviceId, first.entry.harness], [both.id, 'claude_code'])
-    // Its Codex installed and reporting other models only: not sent there (Alex, 2026-11-03: no guessing), and the card says why.
+    // An installed broker takes the credential model even when its shortcut report differs.
     const elsewhere = await device(scope.ownerId, [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'other', model: 'other-model', name: 'other' }] }])
     const unreported = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, elsewhere.id)
-    assert.deepEqual([unreported.kind, unreported.kind === 'none' && unreported.card.description], ['none', '这台电脑没报告能跑 acct-codex-n'])
-    // Its daemon from before the model probe (no models reported): it needs an update.
+    assert.deepEqual(unreported.kind === 'device' && [unreported.deviceId, unreported.model], [elsewhere.id, 'acct-codex-n'])
+    // An empty report likewise does not constrain credential models.
     const silent = await device(scope.ownerId, [{ harness: 'codex', installed: true }])
     const silentRun = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, silent.id)
-    assert.equal(silentRun.kind === 'none' && silentRun.card.description, '这台电脑的 Mikka 需要更新')
+    assert.deepEqual(silentRun.kind === 'device' && [silentRun.deviceId, silentRun.model], [silent.id, 'acct-codex-n'])
     // Its Mikka too old to take a subscription run (no subscriptionBroker): it says so.
     const old = await device(scope.ownerId, [{ harness: 'codex', installed: true, subscriptionBroker: false }])
     const stale = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, old.id)
@@ -438,7 +439,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.equal((await resolveModelDispatch(pool, ctx, null, undefined, codexOnly.id)).kind, 'device')
   })
 
-  await t.test('a subscription model runs only on a computer whose daemon reported it; else the row says what is missing', async () => {
+  await t.test('subscription dispatch depends on runtime readiness, not exact device model reports', async () => {
     // Claude Max connected, 本地, computers online and taking part with Claude Code installed; models reported or not (Alex, 2026-11-03).
     const scope = await person('order-unreported')
     await subscribe(scope, 'claude', ['acct-opus-u'])
@@ -452,20 +453,16 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await device(scope.ownerId, [{ harness: 'codex', installed: true }], true, { name: 'Linux box' })
     assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'notInstalled', device: 'Linux box', count: 1 } })
     const old = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, subscriptionBroker: false }], true, { name: 'Old Mac' })
-    assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'needsUpdate', device: 'Old Mac', count: 1, modelEvidence: 'unknown' } })
+    assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'needsUpdate', device: 'Old Mac', count: 1 } })
     const card = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([card.kind === 'none' && card.reason, card.kind === 'none' && card.card.description], ['noDevice', 'Old Mac 的 Mikka 需要更新'])
-    // Claude Code reporting other models, and one from before the model probe: neither runs it.
-    await device(scope.ownerId, [{ harness: 'claude_code', installed: true, models: ['acct-other-u'] }], true, { name: 'Elsewhere' })
-    const silent = await device(scope.ownerId, [{ harness: 'claude_code', installed: true }], true, { name: 'Silent Mac' })
-    assert.equal((await row())?.reason, 'noDevice')
-    assert.equal((await resolveModelDispatch(pool, ctx)).kind, 'none')
-    const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, modelSlots: [{ slot: 'opus', model: 'acct-opus-u', name: 'Opus' }] }], true, { name: 'Mac' })
-    assert.equal(await row(), null, '可用')
+    // The first ready injection-capable Agent can run the credential model.
+    const elsewhere = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, models: ['acct-other-u'] }], true, { name: 'Elsewhere' })
+    assert.equal(await row(), null)
     const run = await resolveModelDispatch(pool, ctx)
-    assert.deepEqual(run.kind === 'device' && [run.deviceId, run.agentId, run.model], [mac.id, mac.agents.claude_code, 'acct-opus-u'])
-    assert.notEqual(run.kind === 'device' && run.deviceId, old.id, 'a daemon that cannot take a subscription run is never picked for one')
-    assert.notEqual(run.kind === 'device' && run.deviceId, silent.id, 'nor one that did not report the model')
+    assert.deepEqual(run.kind === 'device' && [run.deviceId, run.model], [elsewhere.id, 'acct-opus-u'])
+    assert.notEqual(run.kind === 'device' && run.deviceId, old.id, 'an old daemon without credential injection remains excluded')
+
   })
 
   await t.test('failed subscription startup checks reach default, named-device and picked-model cards as safe human copy', async () => {
@@ -523,7 +520,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.equal(firstName(await order.orderView(pool, scope)), null)
   })
 
-  await t.test('移出列表 then 撤销 puts the model back where it was; 设备 › 能跑 lists the allowed models each computer can run', async () => {
+  await t.test('移出列表 then 撤销 restores order; device readiness has no per-model catalogue', async () => {
     const scope = await person('order-undo')
     const claude = await subscribe(scope, 'claude', ['acct-opus-u2', 'acct-sonnet-u2', 'acct-haiku-u2'])
     const source = { kind: 'subscription' as const, connectionId: claude }
@@ -537,13 +534,14 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await order.changeOrder(pool, scope, { kind: 'add', at: 99, entries: [{ harness: 'claude_code', model: 'acct-sonnet-u2', source }] })
     assert.equal((await order.orderView(pool, scope)).entries.length, 3, 'already listed: nothing added')
     await assert.rejects(order.changeOrder(pool, scope, { kind: 'add', at: -1, entries: [{ harness: 'claude_code', model: 'acct-opus-u2', source }] }))
-    // 能跑: whatever 参与调度 and online say (they have their own lines), the allowed models each computer's daemon reported.
+    // Devices expose runtime/presence readiness, never a second model catalogue.
     const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, models: ['acct-opus-u2', 'acct-sonnet-u2'] }], false, { name: 'Mac', online: false })
     const codexBox = await device(scope.ownerId, [{ harness: 'codex', installed: true }], true, { name: 'codex-box' })
     const old = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, subscriptionBroker: false }], true, { name: 'old' })
     view = await order.orderView(pool, scope)
-    assert.deepEqual([view.deviceModels[mac.id], view.deviceModels[codexBox.id], view.deviceModels[old.id]],
-      [['acct-opus-u2', 'acct-sonnet-u2'], [], []], 'haiku was not reported by Mac\'s daemon')
+    assert.equal('deviceModels' in view, false)
+    assert.deepEqual([mac, codexBox, old].map(item => view.places.devices.find(place => place.id === item.id)?.stage),
+      ['off', 'notInstalled', 'needsUpdate'])
   })
 
   await t.test('the one-off migration keeps everyone\'s first choice: 优先使用的 Agent becomes the first row\'s Agent', async () => {

@@ -15,9 +15,9 @@ test('only a catalogue bound to all exact template IDs and worker hash is usable
     assert.equal(cloudModelSupport(subscription, 'task', { ...env, [key]: 'changed' }), 'cloudModelsUnknown')
   }
 })
-test('subscription matching uses CLI slots and resolved IDs; API keys need only the measured harness', () => {
+test('all credential models need only the measured installed Agent', () => {
   assert.equal(cloudModelSupport(subscription, 'task', env), 'ready')
-  assert.equal(cloudModelSupport({ ...subscription, model: 'unreported' }, 'task', env), 'cloudModelNotReported')
+  assert.equal(cloudModelSupport({ ...subscription, model: 'unreported' }, 'task', env), 'ready')
   assert.equal(cloudModelSupport({ ...subscription, model: 'provider-model', source: { kind: 'api_key', keyId: 'fixture' } }, 'task', env), 'ready')
   const missing = { ...catalogue, templates: { ...catalogue.templates, desktop: { templateId: 'desktop1', models: [report('codex')] } } }
   assert.equal(cloudModelSupport(subscription, 'desktop', { ...env, MIKKA_CLOUD_TEMPLATE_MODELS: JSON.stringify(missing) }), 'cloudModelNotReported')

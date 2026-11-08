@@ -14,7 +14,8 @@ import { localExecutionHarnesses } from './device-agents'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { taskDestinationSchema } from './task-destination'
 import { readIssueMetadata } from './issue-metadata'
-import { taskIdentifiers } from './task-identifier-server'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
+import { taskIdentifiers, taskPrefixInput } from './task-identifier-server'
 import { publicationBranch } from './run-publication-policy'
 import { admitRepositoryTask, matchesRepositoryAdmission } from './repository-admission'
 import { lockCliAgentPolicy, lockCliTaskScope } from './agent-tool-approval/policy-store'
@@ -61,8 +62,8 @@ export async function acceptLocalRun(input: {
         if (!binding) throw invalid('taskDestinationMismatch')
       }
     }
-    const [task] = await tx.select().from(issues).where(eq(issues.id, input.issueId)).for('share')
-    if (!task || !await issueForUser(input.userId, task.id)) throw invalid('issueUnavailable')
+    const [task] = await tx.select({ id: issues.id, userId: issues.userId, scope: issues.scope, workspaceId: issues.workspaceId, ownershipState: issues.ownershipState, scopeVersion: issues.scopeVersion, title: issues.title, content: issueAttrsContent, prefixInput: taskPrefixInput(sql`issues."userId"`) }).from(issues).where(eq(issues.id, input.issueId)).for('share')
+    if (!task || task.ownershipState !== 'bound' || !task.workspaceId || !await issueForUser(input.userId, task.id)) throw invalid('issueUnavailable')
     if (JSON.stringify(await lockCliTaskScope(client,input.userId,task.id)) !== JSON.stringify(taskScope)) throw invalid('issueUnavailable')
     const [agent] = await tx.select().from(agents).where(and(eq(agents.id, input.agentId), eq(agents.userId, input.userId))).for('share')
     const [device] = await tx.select().from(devices).where(and(eq(devices.id, input.deviceId), eq(devices.ownerId, input.userId), eq(devices.kind, 'local'))).for('share')
@@ -132,8 +133,7 @@ export async function acceptLocalRun(input: {
     }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + task.id}, 0))`)
     const [previous] = await tx.select().from(runPublications).where(and(eq(runPublications.issueId, task.id), eq(runPublications.remoteKey, repo.repoPath), sql`${runPublications.branch} is not null`)).orderBy(asc(runPublications.createdAt)).limit(1)
-    const identifiers = await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number }], tx)
-    const identifier = previous?.identifier ?? identifiers.get(task.id) ?? null
+    const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, prefixInput: task.prefixInput }], tx)).get(task.id) ?? null
     if (definition.traceContext && identifier) definition.traceContext.taskNumber = identifier
     const branch = previous?.branch ?? publicationBranch(identifier)
     if (!branch) throw invalid('taskIdentifierRequired')

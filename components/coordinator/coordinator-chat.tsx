@@ -76,7 +76,7 @@ import { chatBalanceRefusal } from '@/lib/chat-balance'
 import { chatFailure } from '@/lib/chat-failure'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
 import { HostedUnavailableNotice } from './hosted-unavailable-notice'
-import { FailureReason } from './failure-reason'
+import { CloudFailureAction, FailureReason } from './failure-reason'
 import { RunErrorDetails } from '@/components/workspace/run-error-text'
 import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { ChatEventLine } from './chat-event-line'
@@ -159,6 +159,7 @@ const showThread = ({ runId }: { runId: string }) => openThread(runId)
 
 export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = false, embedded, bot, userId }: { onOpenIssue: (id: string) => void; prefill?: CoordinatorPrefill; placeholder?: string; compact?: boolean; embedded?: ArtifactChatSlot; bot?: BotView; userId?: string }) {
   const t = useTranslations('Coordinator')
+  const cloudErrors = useTranslations('RunErrors')
   const tNav = useTranslations('Nav')
   const tCommon = useTranslations('Common')
   const botId = bot?.id ?? null
@@ -314,7 +315,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const apiBalance = !data?.working && !refusal && !declined && chatBalanceRefusal(data?.error)
   // 重试 on any failed reply, never on a wake still being retried by the server.
   const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
-  const liveRaw = data?.error && !data.working ? chatFailure({ working: false, error: data.error, cause: data.cause })?.raw ?? null : null
+  const liveFailure = data?.error && !data.working ? chatFailure({ working: false, error: data.error, cause: data.cause }) : null
+  const cloudCode = liveFailure?.kind === 'failed' ? liveFailure.cloudCode : undefined
+  const liveRaw = liveFailure?.raw ?? null
   const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
   // A failed turn's own line already says why; this one is only for a chat with no Coordinator to answer.
@@ -352,10 +355,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   })
   // The raw step error (workflow ids, retries, socket codes) is for the logs, never the chat: 回复失败 and 重试 (review C4).
   const failureNotice = <>
+    {cloudCode && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="cloud">{cloudErrors(`${cloudCode}.default`)}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><CloudFailureAction code={cloudCode} fallback={retry} /></span></Alert>}
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
     {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
     {apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="balance">{t('apiBalance')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><Button size="sm" onClick={() => openModelPicker(botId)}>{t('modelPicker.changeModel')}</Button></span></Alert>}
-    {data?.error && !data.working && !refusal && !declined && !apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
+    {data?.error && !data.working && !cloudCode && !refusal && !declined && !apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
     {/* The stored codes, and the turn failure behind a wake code, only under 详情 (decision 2026-11-05-0330). */}
     {liveRaw && <RunErrorDetails code={liveRaw} />}
   </>

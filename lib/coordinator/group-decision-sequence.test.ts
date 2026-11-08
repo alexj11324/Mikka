@@ -7,7 +7,7 @@ import { GroupJudgmentPendingError } from './group-correction'
 import { DECISION_MODEL, decisionRequestInput, type DecisionQuestion } from './decision'
 import type { DecisionExecution, invokeDecision } from './decide'
 import { overrideDeploymentSwitch } from '../deployment-switches'
-import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_LIVE_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION, GROUP_V2_POLICY_VERSION } from './group-decision-policy'
+import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_LIVE_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION, GROUP_V2_POLICY_VERSION, GROUP_V3_POLICY_VERSION } from './group-decision-policy'
 
 const ids=['00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000003']
 const members=ids.map((id,index)=>({id,name:`Member ${index}`,description:'Public role',memberType:'bot' as const,executionAvailable:true}))
@@ -64,6 +64,68 @@ test('multiple explicit authorized mentions retain direct delivery and order aft
   let calls=0
   await assert.rejects(createGroupJudgment(async()=>{calls++;return null}).route({text:'unknown',mentions:['foreign']},members,null,[]),GroupJudgmentPendingError)
   assert.equal(calls,0)
+})
+
+
+test('current mentioned intent offers only intervention choices before the provider request',async()=>{
+  let offered:string[]=[]
+  const t=transport([{name:'intent',value:'reply_useful_answer',inspect:(_input,q)=>{
+    assert.equal(q.type,'choice')
+    if(q.type==='choice')offered=q.choices.map(option=>option.value)
+  }}])
+  const route=await createGroupJudgment(t.invoke,GROUP_POLICY_VERSION).route({text:'请向另一位 Bot 私下发送计数请求，不要在公开群回复。',mentions:[ids[1]]},members,null,[])
+  assert.deepEqual(offered,[
+    'reply_useful_answer','reply_independent_contributions',
+    'delegate_execution_requested','delegate_task_followup',
+    'clarify_missing_information','clarify_missing_permission','uncertain',
+  ])
+  assert.equal(route.action,'reply');assert.deepEqual(route.responders,[ids[1]]);assert.equal(t.calls(),1)
+})
+
+test('current unmentioned intent keeps ignore and observe available',async()=>{
+  for(const value of ['ignore_ordinary_conversation','ignore_outside_capabilities','observe_context','observe_already_answered']){
+    let offered:string[]=[]
+    const t=transport([{name:'intent',value,inspect:(_input,q)=>{
+      assert.equal(q.type,'choice')
+      if(q.type==='choice')offered=q.choices.map(option=>option.value)
+    }}])
+    const route=await createGroupJudgment(t.invoke,GROUP_POLICY_VERSION).route({text:'Conversation without an explicit mention',mentions:[]},members,null,[])
+    assert.deepEqual(offered,[
+      'ignore_ordinary_conversation','ignore_outside_capabilities','observe_context','observe_already_answered',
+      'reply_useful_answer','reply_independent_contributions',
+      'delegate_execution_requested','delegate_task_followup',
+      'clarify_missing_information','clarify_missing_permission','uncertain',
+    ])
+    assert.equal(route.action,value.startsWith('ignore_')?'ignore':'observe')
+    assert.deepEqual(route.responders,[]);assert.equal(t.calls(),1)
+  }
+})
+
+test('current mentioned intent retains uncertainty and rejects an out-of-contract silent answer without retry',async()=>{
+  for(const value of ['uncertain','ignore_ordinary_conversation','ignore_outside_capabilities','observe_context','observe_already_answered']){
+    const t=transport([{name:'intent',value}])
+    await assert.rejects(createGroupJudgment(t.invoke,GROUP_POLICY_VERSION).route({text:'Please respond privately',mentions:[ids[1]]},members,null,[]),(error:unknown)=>{
+      assert.ok(error instanceof GroupJudgmentPendingError)
+      assert.equal(error.decisionFailure,value==='uncertain'?'uncertain':'choice_outside_contract')
+      assert.equal(error.decisions.length,1);assert.equal(error.decisions[0].phase,'intent')
+      assert.equal(error.decisions[0].status,'invalid_decision');assert.equal(error.decisions[0].receipt?.providerGenerationId,'generation-1')
+      return true
+    })
+    assert.equal(t.calls(),1)
+  }
+})
+
+test('historical mentioned intent still rejects ignore and observe at the final intervention guard',async()=>{
+  for(const value of ['ignore_ordinary_conversation','observe_context']){
+    const t=transport([{name:'intent',value}])
+    await assert.rejects(createGroupJudgment(t.invoke,GROUP_V2_POLICY_VERSION).route({text:'Please respond',mentions:[ids[1]]},members,null,[]),(error:unknown)=>{
+      assert.ok(error instanceof GroupJudgmentPendingError)
+      assert.equal(error.decisionFailure,'mention_requires_intervention')
+      assert.equal(error.decisions[0].receipt?.providerGenerationId,'generation-1')
+      return true
+    })
+    assert.equal(t.calls(),1)
+  }
 })
 
 test('delegation chooses an atomic host task plan before timing; an existing task keeps its designated reporter',async()=>{
@@ -168,7 +230,7 @@ test('v0 baseline and historical v1 request bytes match the six recorded synthet
   }
 })
 
-test('v3 independently requested perspectives survive overlapping skills and stop once the requested views are represented',async()=>{
+test('independently requested perspectives survive overlapping skills and stop once the requested views are represented',async()=>{
   const optionalQuestions:DecisionQuestion[]=[]
   const overlapping=members.map((member,index)=>({...member,name:['Research','Reliability','Writing'][index],description:'Can discuss design, testing and documentation; public duties overlap.'}))
   const t=transport([
@@ -264,6 +326,44 @@ test('historical v0/v1/v2 offline request compatibility matches 63 archived synt
     if(sample.failed)await assert.rejects(run,GroupJudgmentPendingError)
     else await run
     assert.deepEqual(actualDigests,[...sample.digests],`historical request changed: ${sample.policy}/${sample.caseId}`)
+    assert.equal(ordinal,sample.answers.length)
+  }
+})
+
+test('historical v3 request bytes retain the pre-v4 contract for all fixed replay cases',async()=>{
+  // Captured offline from 935db645 before the v4 change. These are request-byte
+  // checks with scripted answers, not provider inference or model-quality evidence.
+  const samples = [
+    {"caseId":"small-talk","answers":["ignore_ordinary_conversation"],"digests":["0f09685f001b244e7fec5465c438a65abe1d8bbc5002cf7348c12fb925aeff96"]},
+    {"caseId":"already-answered","answers":["observe_already_answered"],"digests":["40be5d9b9ebeceb3a69cc920757f315daeaa3a452f8bd6d28b4e275735d437d7"]},
+    {"caseId":"unrelated","answers":["ignore_ordinary_conversation"],"digests":["8d0b8052b669fb60e7755cb0afb399ec265a75de8710ed3c2cf9b2509dee647d"]},
+    {"caseId":"ui-help","answers":["reply_useful_answer","00000000-0000-4000-8000-000000000001"],"digests":["1b878034add6671bb532541067439d7dff095056537214f85a5adefcf89ab2f9","7ad9104c068814fcbc7e0bf462eeb02baf60d001e347d12fdba4a938da988e96"]},
+    {"caseId":"testing-help","answers":["reply_useful_answer","00000000-0000-4000-8000-000000000003"],"digests":["bafefa28b0ca0f2069608a33a615617a05b3c1a61546109de66cf62f9d8ee781","7f566962764de526a7b1a7345a0a9e4b9d90ef796bfb7980a4ff2e975d6f1f53"]},
+    {"caseId":"ambiguous-task","answers":["clarify_missing_information","00000000-0000-4000-8000-000000000002"],"digests":["1b72535206c00fb9f347eecb048b0c701a75fa7679e9cc6672befad8abc3333b","0d687ad3b3fe3ca7119b430e9fd710fac9523e343584dff9c29a1efb42ff09ef"]},
+    {"caseId":"new-member","answers":["reply_useful_answer","00000000-0000-4000-8000-000000000003"],"digests":["641c6a1556fa6256d8f8a433c49b6e3ec58f998072d26538ef7092da2f352422","e89eaf5854d6b274bb4a980a2c0bd0f624284e84fec8c0a144562aaed7a5245c"]},
+    {"caseId":"explicit-mention","answers":["reply_useful_answer"],"digests":["9e8641463c7e0e6dd3b5c76a685353dbb97b594028c4e3addee92e1da4f6d99f"]},
+    {"caseId":"prompt-injection","answers":["ignore_ordinary_conversation"],"digests":["4216b341d71f67d0dc687f4de163fc2d13ac26bd19c09eb36a90483aa9acf975"]},
+    {"caseId":"independent-views","answers":["reply_independent_contributions","00000000-0000-4000-8000-000000000001","end"],"digests":["6d21f17616a43705befa3cd357df277d90be5ef39818f46644e4937426967e5d","fe1b08110f8482fe3349ed615385bda90b3f2a6dde9ee1b60902bba25575cc2b","6d10213e7cbf2533eb01f448baed6805d7a03680cc9b24cee929daf93a728f84"]},
+    {"caseId":"delegate-task","answers":["delegate_task_followup","continue_0","now"],"digests":["6720fbfcee0215f08690203c91be1df24ed01b7f00fd2df1c34cfe0a8f30b0e6","68c82c9f0bcb0e04910abaee7ef4497886e400c7e2ffe3f4d241e5513784a14e","76e1b81fab3db4836ea578676bbd4a97a3fb14c0bbeff4625aceb8f24ea7f232"]},
+    {"caseId":"silent-delegation","answers":["delegate_task_followup","continue_0","on_completion"],"digests":["29f752010aec53235cd3525de099d36218fe60363f935a3a8c9480f7d436ef6e","e5741ac247beb2da140452527e6786ee8735ae759862a9cc82bae22a4e2a38ea","8a8958cf512069bc7aac0da789532ea11ab3e30a7d6d7306a8d0f4bc4bb12bb7"]}
+  ] as const
+  for(const sample of samples){
+    let ordinal=0
+    const actualDigests:string[]=[]
+    const invoke:typeof invokeDecision=async(_purpose,input,questions)=>{
+      const index=ordinal++
+      assert.ok(index<sample.answers.length,'no extra historical request')
+      assert.equal(questions.length,1)
+      const name=questions[0].name
+      const requestDigest=createHash('sha256').update(JSON.stringify({model:DECISION_MODEL,input:decisionRequestInput(input),questions})).digest('hex')
+      actualDigests.push(requestDigest)
+      const execution:DecisionExecution={executionId:'offline-'+ordinal,modelId:DECISION_MODEL,providerGenerationId:'offline-generation-'+ordinal,startedAt:'2026-11-08T04:49:00Z',completedAt:'2026-11-08T04:49:01Z',requestDigest,imageDigests:[],vision:'no-image-input'}
+      return {answers:new Map([[name,{type:'choice',name,choice:sample.answers[index]}]]),execution}
+    }
+    const item=dataset.cases.find(item=>item.id===sample.caseId)!
+    const message={text:item.message,mentions:('mentions' in item?item.mentions:[]) ?? [],recent:('context' in item?item.context:[]) ?? [],tasks:('tasks' in item?item.tasks:[]) ?? []}
+    await createGroupJudgment(invoke,GROUP_V3_POLICY_VERSION).route(message,structuredClone(dataset.members) as typeof members,null,[])
+    assert.deepEqual(actualDigests,[...sample.digests],'historical v3 request changed: '+sample.caseId)
     assert.equal(ordinal,sample.answers.length)
   }
 })

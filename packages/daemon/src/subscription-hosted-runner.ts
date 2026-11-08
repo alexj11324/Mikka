@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { SpawnOptions, SpawnedProcess } from '@anthropic-ai/claude-agent-sdk'
-import { harnessReportsModel, type HarnessInfo, type RunAssignment } from '@mikka/protocol'
+import type { HarnessInfo, RunAssignment } from '@mikka/protocol'
 import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import type { UserErrorDetail } from '@mikka/protocol/user-error-codes'
 import { ClaudeAdapter, ClaudeInitializationError } from './adapters/claude'
@@ -190,23 +190,14 @@ export async function createHostedBotRunner(host: {
       try {
         preparation?.signal.throwIfAborted()
         if (!await gate.checkLive()) { gate.revoke(); throw unavailable('run_closed') }
-        // The claim already prepared owner-bound secrets; local metadata/model
-        // work may run alongside the old-server one-time lease fallback.
-        const [prepared, report] = await Promise.all([
-          selected ? prepareSubscriptionCredentials(assignment, {
-            link: host.link, signal: lifetime.signal, onCredential: options.onCredential,
-            onRefreshError: () => { options.log.warn({ event: 'subscription_refresh_deferred' }, 'Subscription renewal will retry in the background') },
-          }) : Promise.resolve(undefined),
-          selected && host.reportedModels ? daemonTracer.span('daemon.adapter.model_report', trace,
-            () => host.reportedModels!(kind)).catch(() => null) : Promise.resolve(undefined),
-        ])
-        subscription = prepared
+        // The selected owner-bound lease admits this model. A CLI shortcut
+        // probe is not an exhaustive catalogue and must not veto the lease.
+        subscription = selected ? await prepareSubscriptionCredentials(assignment, {
+          link: host.link, signal: lifetime.signal, onCredential: options.onCredential,
+          onRefreshError: () => { options.log.warn({ event: 'subscription_refresh_deferred' }, 'Subscription renewal will retry in the background') },
+        }) : undefined
         assertOpen()
-        if (selected && host.reportedModels && (!options.model || options.model !== subscription?.first.modelId ||
-          (!(report && harnessReportsModel(report, options.model) === true) &&
-            !(kind === 'claude_code' && subscription?.first.modelCatalogueVerified === true)))) {
-          throw Error('subscription_model_not_reported')
-        }
+        if (selected && (!options.model || options.model !== subscription?.first.modelId)) throw Error('binding_mismatch')
         const paths = runPaths(host.stateDir, assignment.runId)
         mkdirSync(paths.runDir, { recursive: true, mode: 0o700 })
         const cwd = preparation ? resolve(options.cwd) : realpathSync(options.cwd)

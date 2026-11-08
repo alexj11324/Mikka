@@ -56,7 +56,7 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
     const raw = Array.isArray(turn.trace?.decisions) ? turn.trace.decisions : []
     const decisions = raw.slice(-64).map(step => ({ id: token(step.id), phase: groupDecisionPhases.includes(step.phase) ? step.phase : null,
       index: Number.isSafeInteger(step.index) && step.index >= 0 ? step.index : null,
-      policyVersion: ['group-route-v0','group-contribution-v1','group-contribution-v2','group-contribution-v3'].includes(step.policyVersion) ? step.policyVersion : null,
+      policyVersion: ['group-route-v0','group-contribution-v1','group-contribution-v2','group-contribution-v3','group-contribution-v4'].includes(step.policyVersion) ? step.policyVersion : null,
       status: ['complete','invalid_decision','unavailable'].includes(step.status) ? step.status : 'unavailable',
       failure: groupDecisionFailures.includes(step.failure) ? step.failure : null,
       receipt: receipt(step.receipt), decisionCostUsd: typeof step.decisionCostUsd === 'number'
@@ -199,7 +199,7 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
       && observed.decisions.length > 0 && observed.primaryReceipt
       && observed.decisions.some(step => step.index === 0 && step.receipt?.executionId === observed.primaryReceipt.executionId),
     'acceptance_decision_chain_missing')
-    check(quality.feedbackIsGroundTruth === false && trace.policyVersion === 'group-contribution-v3', 'acceptance_trace_contract')
+    check(quality.feedbackIsGroundTruth === false && trace.policyVersion === 'group-contribution-v4', 'acceptance_trace_contract')
     // History reads restart only genuinely pending turns. The same root does
     // not produce more generations or publications when the client polls again.
     const reread = await readTurn(groupId, message.id)

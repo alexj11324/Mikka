@@ -185,7 +185,7 @@ const { content: _issueBody, ...issueSummaryColumns } = getTableColumns(issues)
  * Postgres so a warm read returns no document unless the visible view changed. */
 export async function pollIssue(id: string, known?: string): Promise<ActionResult<{ viewerId: string; version: string; issue: IssueView; unchanged?: never } | { viewerId: string; version: string; unchanged: true; issue?: never }>> {
   return cacheReadAction(() => withDatabaseOperation('/actions/issues/detail', async () => {
-    const { issue, user } = await requireIssueAccessWithoutBody(id)
+    const { issue, user, teamId } = await requireIssueAccessWithoutBody(id)
     return db.transaction(async tx => {
       const [locked] = await tx.select({ ...issueSummaryColumns, content: issueAttrsContent, bodyVersion: sql<string>`md5(${issues.content}::text)` }).from(issues).where(eq(issues.id, id)).for('share')
       requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
@@ -193,7 +193,7 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
       // Same unavailable task as the entry ACL, when deletion committed before
       // this lock. A cursor never turns a deleted task into an unchanged result.
       if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
-      const summary = await issueView(locked, tx)
+      const summary = await issueView(locked, tx, teamId === null ? new Map() : undefined)
       const version = createHash('sha256').update(JSON.stringify([user.id, summary])).digest('hex').slice(0, 32)
       if (known === version) return { viewerId: user.id, version, unchanged: true as const }
       const [body] = await tx.select({ content: issues.content }).from(issues).where(eq(issues.id, id))
@@ -204,13 +204,13 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
 }
 
 async function readIssue(id: string) {
-  const { issue, user } = await requireIssueAccessWithoutBody(id)
+  const { issue, user, teamId } = await requireIssueAccessWithoutBody(id)
   return db.transaction(async tx => {
     const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
     await requireCurrentIssueWorkspace(user, issue.workspaceId)
     if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
-    return issueView(locked, tx)
+    return issueView(locked, tx, teamId === null ? new Map() : undefined)
   })
 }
 

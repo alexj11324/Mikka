@@ -200,7 +200,7 @@ export async function prepareTurn(userId: string, botId: string, holder: string,
   'use step'
   const mailboxTools = input.mailboxEnabled ? await mailboxCatalogue(userId, botId, input.executionId) : []
   if (input.runtime) await noteQuotaSwitch(userId, holder, input.runtime, botId, true)
-  return { mailboxTools, ...await preparePromptDetails(userId, botId, input.snapshot, mailboxTools) }
+  return { mailboxTools, ...await preparePromptDetails(userId, botId, input.snapshot, mailboxTools, { hosted: true, readOnly: input.runtime === null, effectiveTools: input.snapshot?.effectiveTools }) }
 }
 
 export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string, once = false) {
@@ -291,7 +291,7 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
 }
 
 /** Context timings stay beside the prompt, never in its instructions or model options. */
-async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []) {
+async function preparePromptDetails(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = [], githubScope?: import('@/lib/coordinator/github-context').GitHubPromptScope) {
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
   if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
@@ -330,7 +330,7 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   const factoryPolicy = deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle') ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
   // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
-  const { githubContext } = await import('@/lib/coordinator/github-context')
+  const { githubPromptContext } = await import('@/lib/coordinator/github-context')
   const { executionContextParts } = await import('@/lib/coordinator/execution-context')
   const contextMs = { execution: 0, personal: 0, github: 0 }
   const timed = async <T>(part: keyof typeof contextMs, work: () => Promise<T>): Promise<T> => {
@@ -340,11 +340,11 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
   const [execution, rules, github] = await Promise.all([
     timed('execution', () => executionContextParts(userId, botId)),
     timed('personal', () => withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
-    timed('github', () => githubContext(userId, undefined, undefined, botId)),
+    timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
   ])
-  // Everything up to the memory is the same on every turn; `stable` is where it ends, so a provider can cache it (lib/prompt-cache.ts).
-  // The GitHub lines (the authorized repository list) and the allowed models list are part of the cached prefix: they change only
-  // when the repositories or 优先使用的模型 do. Which models can run right now changes per turn, so it stays after the memory.
+  // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
+  // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).
+  // Memory and live model availability remain in the later prompt parts.
   const prompt = promptWithCachedContext(rules, cachedContextLines(github, execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
   return { prompt: { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }, contextMs }
 }
@@ -536,10 +536,11 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
 }
 
 /** The host's user only: their own GitHub token's authorized repositories, never another person's. */
-export async function findRepository(userId: string, input: { name?: string }, scope?: NativeToolScope) {
+export async function findRepository(userId: string, input: { name?: string }, scope?: NativeToolScope, botId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return (await import('@/lib/coordinator/repository-resolution')).findRepository(userId, input.name)
+  const context = botId ? async () => ({ used: await (await import('@/lib/coordinator/github-context')).usedRepositoriesForBot(userId, botId) }) : undefined
+  return (await import('@/lib/coordinator/repository-resolution')).findRepository(userId, input.name, undefined, context)
 }
 
 /**

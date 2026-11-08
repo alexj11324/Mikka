@@ -79,3 +79,8 @@ export async function issueForUser(reader: IssueReader, id: string, includeDelet
   return result?.issue ?? null
 }
 
+/** Internal detail readers reuse this operation's exact team-link lookup for
+ * numbering. A missing team is display metadata, never tenant authority. */
+export async function issueAccessForUser(reader: IssueReader, id: string, includeDeleted = false, executor: Pick<typeof db, 'select'> = db, options: { withoutBody?: boolean } = {}) {
+  return findIssueForUser(reader, id, includeDeleted, executor, options.withoutBody, true)
+}

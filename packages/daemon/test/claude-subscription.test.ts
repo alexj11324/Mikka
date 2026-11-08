@@ -192,6 +192,17 @@ async function fixture(
   return { adapter, options, source, processReceipt: join(stateDir, 'runs', options.runId, 'native-home', '.claude', 'fixture-process.json') }
 }
 
+it('disables only PR attribution in the ordinary native SDK launch', async () => {
+  const { adapter, options, processReceipt } = await fixture()
+  const session = await adapter.start(options)
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+  const settings = JSON.parse(readFileSync(join(processReceipt, '..', 'fixture-settings.json'), 'utf8'))
+  // Omitting commit keeps Claude Code's default commit attribution.
+  expect(settings.attribution).toEqual({ pr: '' })
+})
+
 it("delivers an access-only lease through the native input without reading host login", async () => {
   const { adapter, options, source } = await fixture()
   const session = await adapter.start(options)

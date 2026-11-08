@@ -43,12 +43,16 @@ export function chatFailure(chat: { working: boolean; error: string | null; caus
 
 // The code alone, or ending a wrapped message (`Error: …`, `Step "…" failed after 3 retries: …`).
 const CODE = /(?:^|: )([a-z][a-z0-9_]*(?: \([a-z][a-z0-9_]*\))?)$/
+// The model streaming boundary stores its closed refusal inside this SDK
+// envelope. Presentation only: tool text and other workflow steps do not
+// establish a cloud refusal, provider fallback or credential health.
+const CLOUD_STREAM_STEP = /^Step "step\/\/@ai-sdk\/workflow@\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?(?:\+[a-z0-9.-]+)?\/\/doStreamStep" failed after \d+ retries:\s*/
 
 function failureOf(chat: { working: boolean; error: string | null; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
   if (chat.working) return null
   // A turn that ended with no reply and nothing recorded (its lease ran out): the person's message is the newest.
   if (!chat.error) return chat.items?.findLast(item => item.from !== 'event')?.from === 'person' && !chat.items.at(-1)?.pending ? { kind: 'failed' } : null
-  const cloudCode = cloudErrorCode(parseCodedErrorText(chat.error)?.code)
+  const cloudCode = cloudErrorCode(parseCodedErrorText(chat.error.trim().replace(CLOUD_STREAM_STEP, ''))?.code)
   if (cloudCode) return { kind: 'failed', cloudCode }
   const hosted = hostedRefusal(chat.error)
   if (hosted) return { kind: 'hosted', code: hosted }

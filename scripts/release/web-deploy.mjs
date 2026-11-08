@@ -181,9 +181,21 @@ export async function waitForWebDeployment({ expectedBuild, allowDescendant = fa
         { token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
       const builds = (jobs.jobs ?? []).filter(job => job.name === 'deploy' && job.head_sha === webBuild)
       const job = builds[0]
-      if (jobs.total_count !== jobs.jobs?.length || builds.length !== 1 || job.status !== 'completed' || job.conclusion !== 'success'
-        || !BUILD_STEPS.every(name => job.steps?.filter(step => step.name === name && step.status === 'completed' && step.conclusion === 'success').length === 1)) {
+      if (jobs.total_count !== jobs.jobs?.length || builds.length !== 1 || job.status !== 'completed' || job.conclusion !== 'success') {
         throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+      }
+      const required = BUILD_STEPS.map(name => Array.isArray(job.steps) ? job.steps.filter(step => step.name === name) : [])
+      if (required.some(steps => steps.length !== 1)) throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+      const steps = required.map(([step]) => step)
+      if (!steps.every(step => step.status === 'completed' && step.conclusion === 'success')) {
+        // GitHub can finish a job before its step list catches up. Only pending
+        // results may wait; skipped, failed, missing or duplicate proof refuses.
+        if (!steps.every(step => step.status === 'completed' ? step.conclusion === 'success'
+          : ['queued', 'pending', 'in_progress'].includes(step.status) && step.conclusion === null)) {
+          throw Error('webDeploy:matchingWebBuildSkippedOrIncomplete')
+        }
+        if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))
+        continue
       }
       if (remaining() <= 0) break
       if (await publicBuild(fetchImpl, Math.min(10_000, remaining()), expectedOverlay) === webBuild && remaining() > 0) {
