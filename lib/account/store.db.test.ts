@@ -616,7 +616,7 @@ dbTest('account deletion preserves task run and Factory history through DELETE u
     const publishedRuns = await rows('run_publications', 'runId', publishedRunIds)
     const publishedFactory = await rows('factory_publications', 'id', [completedFactory.publicationId])
     const completedTask = await rows('factory_tasks', 'id', [completedFactory.id])
-    const completedOperation = await rows('operation_ledger', 'operationId', [operationIds[0]])
+    const retainedOperations = await rows('operation_ledger', 'operationId', operationIds)
     assert.equal((await pool.query('SELECT count(*)::int n FROM pending_actions WHERE id=ANY($1::uuid[])', [operationIds])).rows[0].n, 3, 'execution proposals exist before account deletion')
     const options = { externalCleanup: async () => [] as string[], deleteObject: async (key: string) => { removedObjects.push(key) }, now: () => new Date(Date.now() + 60_000) }
     assert.deepEqual(await deletion.deleteAccount(subject, subject + '@example.com', options), { ok: true })
@@ -634,7 +634,7 @@ dbTest('account deletion preserves task run and Factory history through DELETE u
     assert.deepEqual(await rows('run_publications', 'runId', publishedRunIds), publishedRuns, 'published receipts survive user deletion unchanged')
     assert.deepEqual(await rows('factory_publications', 'id', [completedFactory.publicationId]), publishedFactory)
     assert.deepEqual(await rows('factory_tasks', 'id', [completedFactory.id]), completedTask, 'completed Factory outcome is historical evidence')
-    assert.deepEqual(await rows('operation_ledger', 'operationId', [operationIds[0]]), completedOperation)
+    assert.deepEqual(await rows('operation_ledger', 'operationId', operationIds), retainedOperations, 'the ledger retains the last observed result without inventing a new outcome')
     const activeRun = (await pool.query('SELECT status,"leaseExpiresAt","stopRequestedAt","finishedAt" FROM agent_runs WHERE id=$1', [byName('shared-active').id])).rows[0]
     assert.equal(activeRun.status, 'stopped'); assert.equal(activeRun.leaseExpiresAt, null); assert.ok(activeRun.stopRequestedAt); assert.ok(activeRun.finishedAt)
     assert.deepEqual((await pool.query('SELECT status,"pushApproved","leaseToken","leaseExpiresAt","errorCode" FROM run_publications WHERE "runId"=$1', [byName('shared-active').id])).rows,
@@ -648,7 +648,21 @@ dbTest('account deletion preserves task run and Factory history through DELETE u
     assert.equal((await pool.query('SELECT count(*)::int n FROM factory_publications WHERE "taskId"=$1', [personalFactory.id])).rows[0].n, 0)
     assert.equal((await pool.query('SELECT count(*)::int n FROM pending_actions WHERE "userId"=$1', [subject])).rows[0].n, 0)
     assert.deepEqual((await pool.query('SELECT status,"attemptToken" FROM operation_ledger WHERE "operationId"=$1', [operationIds[1]])).rows, [{ status: 'reserved', attemptToken: null }])
-    assert.deepEqual((await pool.query('SELECT status FROM operation_ledger WHERE "operationId"=$1', [operationIds[2]])).rows, [{ status: 'uncertain' }])
+    assert.deepEqual((await pool.query('SELECT status FROM operation_ledger WHERE "operationId"=$1', [operationIds[2]])).rows, [{ status: 'executing' }])
+    const { createOperationLedger } = await import('../operations/ledger')
+    const { requireOperationSession } = await import('../operations/session-authorization')
+    const actor = { userId: subject, sessionId }
+    const ledger = createOperationLedger(pool, (tx, binding) => requireOperationSession(tx, actor, binding.ownerId))
+    await assert.rejects(ledger.claim({ operationId: operationIds[1], ownerId: subject, workspaceId: 'personal:' + subject }, byName('shared-no-bot').id), /operationSessionUnavailable/)
+    await assert.rejects(pool.query("UPDATE operation_ledger SET status='executing',\"attemptToken\"=$2,\"runId\"=$3 WHERE \"operationId\"=$1",
+      [operationIds[1], randomUUID(), byName('shared-no-bot').id]), { code: '55000', message: 'account_deletion_pending' }, 'the real database claim write remains fenced after user deletion')
+    const { createApprovedWrites } = await import('../operations/approved-writes')
+    let providerCalls = 0
+    const unavailableProvider = async () => { providerCalls++; throw new Error('deleted account reached the provider') }
+    const writes = createApprovedWrites(pool, { name: 'fixture', prepare: unavailableProvider, execute: unavailableProvider, lookup: unavailableProvider }, 'send_slack_message')
+    for (const id of operationIds) await assert.rejects(writes.decide(actor, id, true), /operationSessionUnavailable/)
+    assert.equal(providerCalls, 0)
+    assert.deepEqual(await rows('operation_ledger', 'operationId', operationIds), retainedOperations, 'failed claim and replay attempts leave every retained ledger row unchanged')
     assert.deepEqual((await pool.query('SELECT "botId","wakeLeaseUntil" FROM coordinator_events WHERE id=$1', [completedFactory.eventId])).rows, [{ botId: null, wakeLeaseUntil: null }])
     assert.equal((await pool.query('SELECT count(*)::int n FROM bots WHERE id=ANY($1::uuid[])', [[personalBot, coordinator]])).rows[0].n, 0)
     assert.deepEqual(removedObjects.sort(), [...fixtures.filter(run => !run.keep).flatMap(run => run.keys), direct[1].key].sort())
