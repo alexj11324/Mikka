@@ -2,6 +2,7 @@
 // API. Keep the existing production environment and migration guards: there is
 // no framework detection, second install, or implicit Next build in this path.
 import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { readFileSync, openSync, closeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
@@ -9,6 +10,33 @@ import { fileURLToPath } from 'node:url'
 import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
 import { buildEnvironmentValues } from './web-deploy.mjs'
 import { directDatabaseURL } from '../postgres-connection.mjs'
+
+/** Closed observations only: protected compiler output never reaches public logs. */
+export function buildFailureEvidence({ result, sourceSha, overlaySha, log }) {
+  const sha = value => typeof value === 'string' && value.length === 40 && /^[a-f0-9]{40}$/.test(value) ? value : null
+  const signal = ['SIGABRT', 'SIGBUS', 'SIGILL', 'SIGKILL', 'SIGSEGV', 'SIGTERM'].includes(result.signal) ? result.signal : null
+  const codes = ['EACCES', 'EAGAIN', 'E2BIG', 'ENOENT', 'ENOMEM', 'ENOSPC', 'ETIMEDOUT']
+  const databaseCodes = ['22023', '22P02', '23502', '23503', '23505', '23514', '25006', '40001', '40P01', '42501', '42703', '42804', '42883', '42P01', '53300', '53400', '57014', '57P01']
+  const networkCodes = ['ECONNREFUSED', 'ECONNRESET', 'EAI_AGAIN', 'ENETUNREACH', 'ENOTFOUND', 'ETIMEDOUT']
+  let lastObservedPhase = 'unknown', databaseCode = null, networkCode = null, observedSystemCode = null
+  for (const line of (log?.toString('utf8') ?? '').split('\n')) {
+    if (/^> node scripts\/build-subscription-worker\.mjs(?: &&|$)/.test(line)) lastObservedPhase = 'subscription-worker'
+    if (/^> \S+ generate:agent-ui(?:\s|$)/.test(line)) lastObservedPhase = 'generate-agent-ui'
+    if (/^> \S+ build:app(?:\s|$)/.test(line)) lastObservedPhase = 'build-app'
+    if (/^> \S+ typecheck(?:\s|$)/.test(line)) lastObservedPhase = 'typecheck'
+    if (!line.includes('.hosted-ui/') && /^\s+at .*\/scripts\/migrate\.mjs:\d+:\d+\)?$/.test(line)) lastObservedPhase = 'migrate'
+    const code = /\bcode:\s*['"]([A-Z0-9_]+)['"]/.exec(line)?.[1]
+    const systemCode = codes.includes(code) ? code : /\bError:\s*([A-Z0-9_]+):/.exec(line)?.[1]
+    if (codes.includes(systemCode)) observedSystemCode = systemCode
+    if (databaseCodes.includes(code)) databaseCode = code
+    if (networkCodes.includes(code)) networkCode = code
+  }
+  return { event: 'official_build_failure', sourceSha: sha(sourceSha), overlaySha: sha(overlaySha),
+    exitStatus: Number.isInteger(result.status) && result.status >= 0 && result.status <= 255 ? result.status : null,
+    signal, processErrorCode: codes.includes(result.error?.code) ? result.error.code : null,
+    lastObservedPhase, databaseCode, networkCode, observedSystemCode,
+    logBytes: log?.length ?? null, logSha256: log ? createHash('sha256').update(log).digest('hex') : null }
+}
 
 export function productionBuildEnvironment({ text, env, sourceSha, nodeVersion = process.version }) {
   if (!nodeVersion.startsWith('v24.')) throw new Error('webDeploy:node24Required')
@@ -48,7 +76,12 @@ export function buildVercel({ root = process.cwd(), env = process.env, file = '.
   let result
   try { result = spawnSync('pnpm', ['build'], { cwd: root, env: buildEnv, stdio: log === undefined ? 'inherit' : ['ignore', log, log] }) }
   finally { if (log !== undefined) closeSync(log) }
-  if (result.error || result.status !== 0) throw new Error('webDeploy:buildFailed')
+  if (result.error || result.status !== 0) {
+    console.error(JSON.stringify(buildFailureEvidence({ result, sourceSha,
+      overlaySha: buildEnv.MIKKA_UI_OVERLAY_SHA, log: log === undefined ? undefined
+        : readFileSync(resolve(env.RUNNER_TEMP || tmpdir(), 'official-web-build.log')) })))
+    throw new Error('webDeploy:buildFailed', { cause: result.error })
+  }
   const config = JSON.parse(readFileSync(resolve(root, '.vercel/output/config.json'), 'utf8'))
   if (config.version !== 3 || !Array.isArray(config.routes)) throw new Error('webDeploy:prebuiltOutputInvalid')
 }

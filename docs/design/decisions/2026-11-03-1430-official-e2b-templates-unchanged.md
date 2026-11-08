@@ -762,3 +762,82 @@ Git 明细的原缺口已具体定位：`aac23` 的五类 Git 操作仅发 OTel 
 上游预算也明确区分：有效订阅省掉无关 hosted-policy SELECT 是上游修正，Promise 只在单次 resolver 中复用；有效显式 API key 原本已在该读取前返回，不重复记减读。Coordinator 无名或歧义仓库发现仍可每次读取使用标记，完整授权列表也可能大于旧 50 条；不能假定模型绝不额外发现仓库。凭据清单分页会增加该列表操作的行和字节，带 cursor 的空页可能再读一次；它没有被这九文件 delta 接入 dispatch/ensure/claim 路径。本方完整正常 Task 的数据库预算以相同完整上游源和实际调用路径比较，不借这些条件性节省或未来任务抵扣。
 
 官方模板仍只增不删，Mikka 文件仍在 /opt/mikka；CLI 文件校验和守恒、真实订阅采用、fresh claim/revoke/最终 fence 均保持发布门槛。原六例正式批次仍为 FAIL，原始报告、13/14 pins 及第 4 例执行/工具后证明缺口不改写。新的远端精确 CI、实际模板与双订阅 bootstrap adoption、配套 READY 部署和同一实际元组六次 ≤5 秒结果尚待取得。达到完整生产验收后才关闭 #1505。
+
+## 2026-11-08 09:14 UTC：发布阻挡的修复和下一轮 CI 诊断（生产待验）
+
+本节继续 #1505 / #1689，不改写前述失败记录。合流后的产品源码为
+`12708943792632cc8c4eff8170692081d45b66ea`，完整保留 #1719 的
+`a1d1578b83f73f7511479869a82da2ffd345a294` 及其 `844b3e5`、`780ebaac`、
+`8bceef7` 祖先。后续发布以实际远端新 head、完整 tree 和 CI 执行 checkout 为准。
+结构化证据见
+[`2026-11-08-e2b-release-diagnostics-and-ci-wire.json`](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)。
+
+### 原 CI 失败继续有效
+
+[CI 42461514081](https://github.com/alexj11324/Mikka/actions/runs/42461514081)
+实际执行 checkout `63c981158675dc2b63fd6a4dcb160a42e060fa1a`，
+tree `76143bea3227aeb72375e89ae29c6545cefdaf8d`；关联 PR head 是 `5c4ad8f`。
+`unlinkedRunCitation` 的 9 条 SQL、932 字节 JSON 行和451字节 action 未增加，
+但实际 socket 入站3244、出站6579，合计9823字节，超过冻结的9326预算。
+后续 build gate 因该 DB shard 失败而失败，不能据此另称编译失败。
+
+同一完整源码在本地精确 PostgreSQL17.11（Debian17.11-1.pgdg13+2）上，
+仅执行原15文件 activity脚本，56/56通过；该 case 实测2639/6337，合计8976字节。
+差额605/242恰与本地新 SCRAM 连接相同；本地另一个 warmup 的两次新连接也解释了
+1210/484增量。**原 CI 没有连接追踪，这只能支持候选机制，不能追认原始因果或冲销失败。**
+本地 Node24.22.1、2vCPU、未运行其他并发DB脚本，与 CI24.22.2 /
+availableParallelism4不同；诊断包装也可能影响调度。
+
+下一轮必要源码批次的 CI 只在既有 `MIKKA_READ_METRICS_TRACE=1` 下增加最多32项匿名
+socket计数、是否新建、当前测量的query数量与截断标志。global totals、
+ALS SQL/row计数、返回对象、原await位置和query callback/Promise体保持原样；
+没有新增等待、网络、SQL或参数/结果/凭据日志。fixture、warmup、测量边界和9326断言均不改。
+它是诊断增量，**不是已证实的产品修复，也不是重跑旧 head 来隐藏失败。**
+
+### 发布构建与权限路径
+
+完整上游 `844b3e5` 仅在已有一次性 Linux Web build runner 清理三个固定闲置SDK目录
+（Android、.NET、GHC），并仅在build step设置4096MB Node old-space和记录容量。
+这是每个 Node 进程的 old-space 上限，不是主机总内存限制；不涉及官方E2B模板文件。
+正常build、类型检查、迁移、main检查、发布权限及最后有效runtime保留规则不变。
+受控私有构建成功的边界由其
+[公开回执](https://github.com/alexj11324/Mikka/pull/1719#issuecomment-6719540665)
+说明；它不替代正式生产发布，也不能证明已遗失原始日志的263生产失败同因。
+
+我方进一步复现：子进程status=1、无spawn error、受保护日志含ENOSPC时，
+旧公开回执遗漏了该码。新增独立 `observedSystemCode` 只接受已有封闭系统码，
+从 `code:` 属性或 `Error: CODE:` 头读取；
+`processErrorCode` 仍只记录启动错误。观察码不等同终止原因，
+未知值保持null，不公开原始行、message、path或stack。
+旧实现真实RED、修复后相关59/59测试GREEN；build/migrate/CLI guards逐字不变。
+
+`8bceef7` 的lease-audit显式执行模式修复及离线依赖解析随完整历史保留：
+只有显式leaseAudit允许其既有Python/tool回执，普通六次启动验收仍保持原readOnly路径；
+不能把本地策略测试写成真实租约生产通过。
+`a1d1578` 仅对Nitro测试自有临时目录删除增加最多3次重试和线性延迟，
+原断言和60秒超时保留；不是整个递归清理600ms硬截止。
+
+### 发布和验收仍未完成
+
+本批没有削弱官方文件守恒、两条真实订阅及实际bootstrap adoption门槛，
+没有修改启动计时公式、39阶段、15 pins /14次实际检查或6个样本分母。
+新生产tuple、正式run和六次耗时仍为空；原六次FAIL原件继续保留。
+必须等本批实际最新head CI、正式Web/E2B发布及资源清理满足原门槛，
+再以同一实际tuple执行Claude×3和Codex×3，全部不超过5000ms并具有真实工具和后续回复。
+完成前不关闭#1505。
+
+### 09:32 UTC 后继：官方 Electron 下载入口
+
+本地正常合流完整 #1719 后继 `5761953f8f39aae8b6fddbe559a07420437d959d`，
+得到产品源码 `702a490b9ca1a0023156cfa8a877854c1c23ec69`。
+此前 a1 的 CI42465512653 中，Desktop job128684501953 与 Image job128684547811
+均在同一固定 Electron45.1.0 linux-x64 ZIP 下载上真实收到HTTP504；
+后续证据审计/聚合失败不能替代这两个首因。
+
+该后继只给两条Linux CI安装入口使用官方GitHub release/asset API，
+保留安装包内固定version/checksums和原安装器校验。API认证不转发到
+仅允许的官方asset重定向域，签名URL及错误原文不输出；不引入镜像源或跳过checksum。
+根侧4/4纯下载协议测试、实际两文件lint、语法、polling/error-cause策略通过；
+没有为此重下二进制或声称新CI/native/macOS已通过。与前述完整worker输入无交叉。
+`35cb728e` 只是上一预发布阶段准备的未引用Git对象，从未更新PR分支或触发CI；
+后续以最终实际发布head为准。
