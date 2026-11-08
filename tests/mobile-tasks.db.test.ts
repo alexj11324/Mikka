@@ -66,6 +66,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const other = await seedUser(pool, 'other'); users.push(other)
   const own = { id: await seedPersonalWorkspace(workspace, owner) }
   const teamWorkspace = await seedWorkspace(workspace, owner, [{ userId: owner, role: 'admin' }, { userId: other, role: 'member' }])
+  await workspace.query(`update mikka_workspaces set "createdAt"=case when id=$1 then '2026-10-19T00:00:00Z'::timestamptz else '2026-10-25T00:00:00Z'::timestamptz end where id=any($2)`, [teamWorkspace.id, [teamWorkspace.id, own.id]])
   const secondWorkspace = await seedWorkspace(workspace, owner, [{ userId: owner, role: 'admin' }])
   const team = await seedTeam(workspace, teamWorkspace.id, owner)
   const workspaceTask = async (workspaceId = teamWorkspace.id, linked = true) => {
@@ -93,6 +94,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const secondBot = await seedBot(pool, secondWorkspace.id, owner, 'Second dispatcher')
   const personalRun = await seedRun(pool, { userId: owner, agentId: agent, workspaceId: own.id, botId: personalBot, issueId: personalTask })
   const secondRun = await seedRun(pool, { userId: owner, agentId: agent, workspaceId: secondWorkspace.id, botId: secondBot, issueId: secondTask })
+  await pool.query(`insert into user_schedules (id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status,next_at) values ($1,$2,$3,$4,$5,$6,$7,$7,'active','2030-01-01T10:00:00Z')`, [randomUUID(), owner, own.id, personalBot, randomUUID(), randomUUID(), { title: 'Personal daily task', timezone: 'UTC', timing: { kind: 'daily', time: '10:00', fold: 'earlier', gap: 'skip' }, task: { kind: 'issue_snapshot', issueId: personalTask }, misfire: 'skip', maxLatenessMinutes: 60 }])
   const artifactIds: string[] = []
   for (const [workspaceId, taskId, runId] of [[own.id, personalTask, personalRun], [teamWorkspace.id, issueId, latest], [secondWorkspace.id, secondTask, secondRun]]) {
     const id = randomUUID(); artifactIds.push(id)
@@ -185,6 +187,42 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     await metadata({ blockedByIds: [blocker], block: { blocked: false, runId: null } })
     assert.deepEqual(await groups(), ['todo', 'todo'], 'an explicitly cleared board block stays clear')
   })
+  await t.test('without a cookie or header, an older team does not hide personal task detail or its decorations', async () => {
+    const unselected = { workspaceId: null }
+    const response = await listRequest(unselected)
+    assert.equal(response.status, 200)
+    const row = (await response.json()).tasks.find((item: { id: string }) => item.id === personalTask)
+    assert.ok(row, 'the personal default is shared by the list and detail')
+    const detail = await request(personalTask, unselected)
+    assert.equal(detail.status, 200)
+    const body = await detail.json()
+    assert.equal(body.task.bot.id, personalBot)
+    assert.equal(body.task.schedule.label, 'Every day at 10:00')
+    assert.deepEqual(body.live, { workspaceId: own.id })
+    assert.deepEqual(row.bot, body.task.bot)
+    assert.deepEqual(row.schedule, body.task.schedule)
+
+    const { loadWorkspaceContext } = await import('../lib/workspace-access')
+    const defaultContext = await run('/api/workspace', () => loadWorkspaceContext(), unselected)
+    assert.equal(defaultContext.workspace.id, own.id)
+    const explicit = await run('/api/workspace', () => loadWorkspaceContext(teamWorkspace.id), unselected)
+    assert.equal(explicit.workspace.id, teamWorkspace.id, 'an explicit business target still wins')
+    assert.equal((await request(issueId, unselected)).status, 404, 'a task id cannot retarget the Personal default to Shared')
+    const selectedTeam = await request(issueId, { workspaceId: teamWorkspace.id })
+    assert.equal(selectedTeam.status, 200)
+    assert.deepEqual((await selectedTeam.json()).live, { workspaceId: teamWorkspace.id })
+
+    const savedTeam = { workspaceId: null, cookie: 'mikka-workspace=' + teamWorkspace.id }
+    const savedContext = await run('/api/workspace', () => loadWorkspaceContext(), savedTeam)
+    assert.equal(savedContext.workspace.id, teamWorkspace.id, 'a valid workspace cookie still wins')
+    assert.equal((await request(issueId, savedTeam)).status, 200)
+    assert.equal((await request(personalTask, savedTeam)).status, 404)
+    for (const workspaceId of ['not-a-workspace', randomUUID()]) {
+      assert.equal((await request(personalTask, { workspaceId })).status, 404, 'an invalid or inaccessible header never falls back to Personal')
+      assert.equal((await listRequest({ workspaceId })).status, 403)
+    }
+  })
+
   await t.test('task, run and Artifact origins are persisted, immutable and cannot disagree', async () => {
     const rows = (await pool.query(`select a.id,a."workspaceId" as artifact,r."workspaceId" as run,i."workspaceId" as task
       from artifacts a join agent_runs r on r.id=a."runId" join issues i on i.id=a."issueId"
@@ -227,6 +265,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       return response.json()
     })
     assert.equal(unlinkedRead.value.task.identifier, identifier)
+    assert.deepEqual(unlinkedRead.value.live, { workspaceId: teamWorkspace.id }, 'an absent Team link does not turn Shared ownership into Personal')
     assert.ok(unlinkedRead.statements <= personalRead.statements,
       'the same owner and absent team link require no extra database statement for workspace scope')
     assert.equal((await request(unlinkedId, { workspaceId: own.id })).status, 404)
@@ -234,7 +273,9 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(linked.ok, true)
     const relinked = await request(unlinkedId)
     assert.equal(relinked.status, 200)
-    assert.match((await relinked.json()).task.identifier, new RegExp('^' + localTeam.identifier + '-\\d+$'))
+    const relinkedBody = await relinked.json()
+    assert.match(relinkedBody.task.identifier, new RegExp('^' + localTeam.identifier + '-\\d+$'))
+    assert.deepEqual(relinkedBody.live, { workspaceId: teamWorkspace.id }, 'relinking keeps the same persisted Shared workspace')
     assert.equal((await request(unlinkedId, { workspaceId: own.id })).status, 404, 'a prior negative link read cannot cross a later team boundary')
     assert.equal((await request(unlinkedId, { workspaceId: secondWorkspace.id })).status, 404)
     t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'mobile-unlinked-task-detail', scope: 'data-read-path_not_page_http',
@@ -249,6 +290,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       assert.equal((await request(issueId, { workspaceId: own.id })).status, 404)
       assert.equal((await request(personalTask)).status, 404)
       assert.equal((await request(issueId, { bearer: personalPat.token })).status, 404)
+      assert.equal((await request(personalTask, { bearer: personalPat.token, workspaceId: own.id })).status, 200)
       assert.equal((await request(issueId, { bearer: pat.token })).status, 200)
       await workspace.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [teamWorkspace.id, owner])
       assert.equal((await request(issueId)).status, 404)
@@ -263,6 +305,15 @@ test('mobile task endpoints with real task ACL, current workspace membership and
         [teamWorkspace.id, owner, ownerMember.name, ownerMember.email, ownerMember.role])
       } finally { await revokePersonalAccessToken(owner, own.id, { id: personalPat.id }) }
     }
+  })
+
+  await t.test('the Personal default does not grant another user Personal task', async () => {
+    const otherPersonal = await seedPersonalWorkspace(workspace, other)
+    const unrelated = await seedIssue(pool, other, otherPersonal)
+    assert.equal((await request(unrelated, { workspaceId: null })).status, 404)
+    assert.equal((await request(unrelated, { workspaceId: own.id })).status, 404)
+    assert.equal((await request(unrelated)).status, 404)
+    assert.equal((await request(unrelated, { workspaceId: otherPersonal })).status, 404)
   })
 
   await t.test('one account switches Personal and two Shared tenants without mixing tasks, attempts or decorations', async () => {
