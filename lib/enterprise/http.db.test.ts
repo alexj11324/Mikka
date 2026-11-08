@@ -756,10 +756,13 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal(toIdp.origin, idpOrigin)
     const idpReply = await fetch(toIdp)
     assert.equal(idpReply.status, 200, await idpReply.clone().text())
-    const returned = await fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: { origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(await idpReply.json() as Record<string, string>), redirect: 'manual' })
+    const reply = await idpReply.json() as Record<string, string>
+    const finish = () => fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: { origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(reply), redirect: 'manual' })
+    const returned = await finish()
     assert.equal(returned.status, 302, await returned.clone().text())
     assert.equal(returned.headers.get('location'), `${appOrigin}/sign-in?login=1`, 'the IdP returns the browser to sign-in')
+    assert.equal((await finish()).status, 400, 'the signed callback the page\'s form started is one-use (#1753)')
     assert.equal((await session(oidcCookies))?.user.id, userId, 'both sign-outs leave the independent OIDC session intact')
   })
   await t.test('the 组织 page client adds a second Org admin, who can export audit until revoked, then is refused (#1669)', async () => {
