@@ -10,6 +10,7 @@ import {
   type ReviewDenial,
   type ReviewDiff,
   type ReviewFile,
+  type ReviewFileRead,
   type ReviewRead,
   type ReviewSubmission,
   type ReviewSummary,
@@ -24,13 +25,13 @@ export const REVIEW_ENDPOINTS = {
   review: task,
   /** GET → summary */
   summary: (taskId: string) => `${task(taskId)}/summary`,
-  /** GET ?path= → one file with its patch */
+  /** GET ?path= → { file (with patch), comments: sent comments on it } */
   file: (taskId: string) => `${task(taskId)}/file`,
-  /** GET → [{ name, status, logExcerpt }] */
+  /** GET → [{ id, name, status, logExcerpt }] */
   checks: (taskId: string) => `${task(taskId)}/checks`,
-  /** POST { comments, note?, attachedChecks, idempotencyKey } → 200 { messageId, attempt } | 403 { reason } */
+  /** POST { comments, note?, attachedChecks: check ids, idempotencyKey } → 200 { messageId, attempt } | 403 { error: reason, reason, message? } */
   send: (taskId: string) => `${task(taskId)}/send`,
-  /** POST { confirmFailedChecks } → 200 { merged: true } | 409 { needsConfirmation: true, failing } | 403 { reason } */
+  /** POST { confirmFailedChecks } → 200 { merged: true } | 409 { error: 'needs_confirm', failing } | 403 { error: reason, reason, message? } */
   merge: (taskId: string) => `${task(taskId)}/merge`,
 } as const
 
@@ -72,7 +73,10 @@ const fileSchema = z.object({
   viewed: z.boolean().optional(),
   patch: z.string().nullable(),
   tooLarge: z.boolean().optional(),
+  comments: count.default(0),
 }) satisfies z.ZodType<ReviewFile>
+const sentCommentSchema = z.object({ id: z.string().min(1), path: z.string().min(1), line: z.number().int().positive(), side: z.enum(['old', 'new']), body: z.string(), author: z.string(), sentAt: z.string().min(1) })
+const fileReadSchema = z.object({ file: fileSchema, comments: z.array(sentCommentSchema).default([]) }) satisfies z.ZodType<ReviewFileRead>
 
 const diffSchema = z.object({
   source: z.object({ kind: z.enum(['machine', 'checkpoint', 'pr']), at: z.string().min(1), reclaimed: z.boolean() }),
@@ -85,11 +89,12 @@ const diffSchema = z.object({
 }) satisfies z.ZodType<ReviewDiff>
 
 const readSchema = z.object({ summary: summarySchema, diff: diffSchema }) satisfies z.ZodType<ReviewRead>
-const checksSchema = z.array(z.object({ name: z.string().min(1), status: z.enum(['failed', 'passed', 'pending']), logExcerpt: z.string().optional() })) satisfies z.ZodType<ReviewCheck[]>
+const checksSchema = z.array(z.object({ id: z.string().min(1), name: z.string().min(1), status: z.enum(['failed', 'passed', 'pending']), logExcerpt: z.string().optional() })) satisfies z.ZodType<ReviewCheck[]>
 const sentSchema = z.object({ messageId: z.string().min(1), attempt: z.number().int().positive() })
 const mergedSchema = z.object({ merged: z.literal(true) })
-const confirmSchema = z.object({ needsConfirmation: z.literal(true), failing: count })
-const deniedSchema = z.object({ reason, message: z.string().optional() })
+// Error bodies carry their code in `error` (both clients read it); a 403 repeats it as `reason`.
+const confirmSchema = z.object({ error: z.literal('needs_confirm'), failing: count })
+const deniedSchema = z.object({ error: reason, reason: reason.optional(), message: z.string().optional() })
 
 type Reply = { status: number; body: unknown }
 
@@ -116,7 +121,7 @@ function parse<T>(schema: z.ZodType<T>, reply: Reply): T {
 export function reviewDenial(reply: Reply): ReviewDenial | null {
   if (reply.status !== 403) return null
   const parsed = deniedSchema.safeParse(reply.body)
-  return parsed.success ? { kind: 'denied', reason: parsed.data.reason, message: parsed.data.message ?? null } : null
+  return parsed.success ? { kind: 'denied', reason: parsed.data.error, message: parsed.data.message ?? null } : null
 }
 
 function query(path: string, params: Record<string, string | undefined>) {
@@ -136,8 +141,8 @@ export async function getReviewDiff(taskId: string, options: { cursor?: string; 
 }
 
 /** One file's patch, for a file paged out or too large to load with the rest (R12 「按文件加载」). */
-export async function getReviewFile(taskId: string, path: string): Promise<ReviewFile> {
-  return parse(fileSchema, await request(query(REVIEW_ENDPOINTS.file(taskId), { path })))
+export async function getReviewFile(taskId: string, path: string): Promise<ReviewFileRead> {
+  return parse(fileReadSchema, await request(query(REVIEW_ENDPOINTS.file(taskId), { path })))
 }
 
 /** The checks behind the check summary (R1b). */
