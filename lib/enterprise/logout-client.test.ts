@@ -81,13 +81,16 @@ test('an enterprise session clears local state once, then leaves through its pro
   assert.deepEqual(order, ['forget', 'navigate'])
 })
 
-test('a SAML session clears local state, then leaves by a native form POST, never fetch + JSON', async () => {
-  const saml = server({ 'GET /api/enterprise/logout-target': target({ providerId: 'acme-saml', protocol: 'saml' }) })
-  const order: string[] = []; const steps: EnterpriseSignOutStep[] = []
-  assert.equal(await routeEnterpriseSignOut({ cookieSession: true, origin, fetch: saml.fetch, forget: async () => { order.push('forget') }, go: step => { order.push(step.kind); steps.push(step) } }), true)
-  assert.deepEqual(order, ['forget', 'form'])
-  assert.deepEqual(steps[0], { kind: 'form', action: '/api/auth/sso/saml2/logout/acme-saml', fields: { callbackURL: `${origin}/sign-in?login=1` } })
-  assert.equal(saml.calls.length, 1, 'only the target read is fetched; the logout POST is the page navigation')
+test('a SAML session keeps the existing sign-out until the form-logout fix is deployed (#1747)', async () => {
+  const saml = server({ 'GET /api/enterprise/logout-target': target({ providerId: 'p', protocol: 'saml' }) })
+  const steps: EnterpriseSignOutStep[] = []; let forgot = 0
+  assert.equal(await routeEnterpriseSignOut({ cookieSession: true, origin, fetch: saml.fetch, forget: async () => { forgot++ }, go: step => { steps.push(step) } }), false)
+  assert.deepEqual(steps, []); assert.equal(forgot, 0)
+  assert.equal(saml.calls.length, 1, 'no SAML logout POST is sent as fetch + JSON')
+})
+
+test('the SAML step, once enabled, is a native form POST to the provider logout', async () => {
+  assert.deepEqual(await enterpriseSignOutStep({ providerId: 'acme-saml', protocol: 'saml' }, { origin }), { kind: 'form', action: '/api/auth/sso/saml2/logout/acme-saml', fields: { callbackURL: `${origin}/sign-in?login=1` } })
 })
 
 test('the SAML form is a hidden top-level POST of urlencoded fields, submitted once', () => {
