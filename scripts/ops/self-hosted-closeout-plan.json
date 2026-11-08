@@ -1,13 +1,13 @@
 {
   "repository": "alexj11324/Mikka",
   "branch": "ops/self-hosted-closeout-20261108",
-  "source": "f1324dafa296f76289124bb93538f1938cb1597f",
-  "ciRun": 42444488965,
-  "imageRun": 42444488796,
-  "imageDigest": "sha256:0972e911ae6020f95aaf9fb62ae499f0f6ec67fc63e737cec25334ad48784c51",
+  "source": "9e18c6b8122781fe89b1b3a9448bb9b1cec6d15a",
+  "ciRun": 42451707321,
+  "imageRun": 42451707289,
+  "imageDigest": "sha256:f189f6dff33fa84e007edd320b42be0ae639d84210b0ef5577256c003268b811",
   "publicOrigin": "https://app.aspectlylabs.com",
-  "cloudDeployment": "dpl_92sdpZWCdDp6rkYNjZyNXkDgeLp5",
-  "cloudSource": "d6f0ece2237904e7b5f23cf92a9d6492e123e6c2",
+  "cloudDeployment": "dpl_H2uQnfjwbSTKcKcfXCWRPTGmjX39",
+  "cloudSource": "06127b7df6dd9704450b11a07eed28a0b999db01",
   "cloudProject": "prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc",
   "vercelTeam": "team_C7lwxVVvnUicFli6112mvxpv"
 }

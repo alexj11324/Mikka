@@ -19,8 +19,8 @@ jobs:
       id-token: write
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      CLOSEOUT_PROTOCOL_PROBE: '1'
-      CLOSEOUT_MODELS: 'quota-only'
+      CLOSEOUT_PROTOCOL_PROBE: '0'
+      CLOSEOUT_MODELS: 'off'
       CLOSEOUT_TEXT_ONLY_PROFILE: '1'
       GITHUB_TOKEN: ${{ github.token }}
     steps:
@@ -34,7 +34,7 @@ jobs:
           node scripts/ops/self-hosted-closeout.mjs --check
       - name: Prepare exact published image and disposable browser infrastructure
         run: |
-          docker pull ghcr.io/alexj11324/mikka@sha256:0972e911ae6020f95aaf9fb62ae499f0f6ec67fc63e737cec25334ad48784c51
+          docker pull ghcr.io/alexj11324/mikka@sha256:f189f6dff33fa84e007edd320b42be0ae639d84210b0ef5577256c003268b811
           docker pull postgres:17-alpine
           docker pull axllent/mailpit:v1.27.4
           pnpm exec playwright install --with-deps chromium

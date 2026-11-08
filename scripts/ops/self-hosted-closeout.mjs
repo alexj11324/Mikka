@@ -164,7 +164,7 @@ async function run(env) {
       check(!interrupted, 'INTERRUPTED')
       check(/^[a-z0-9-]+$/.test(name), 'ARTIFACT_NAME')
       const path = join(output, `${name}.png`)
-      await target.screenshot({ path, fullPage: true, mask: [target.locator('input[type=password],input[type=email],input[readonly]'),
+      await target.screenshot({ path, fullPage: true, animations: 'disabled', mask: [target.locator('input[type=password],input[type=email],input[readonly]'),
         ...(serverId ? [target.locator(`section[aria-labelledby^="server-"]:not([aria-labelledby="server-${serverId}"])`)] : []),
         target.getByText(env.SMOKE_OWNER_EMAIL, { exact: false })] })
       report.screenshots.push({ name, sha256: digest(await readFile(path)) })
@@ -481,7 +481,7 @@ async function run(env) {
         if (typeof refused.error === 'string' && safeWrappedQuota.test(refused.error)) report.quotaObservation.safeStoredError = refused.error
         report.quotaObservation.workflowPrefix = typeof refused.error === 'string' && refused.error.startsWith('Step "step//@ai-sdk/workflow@')
         const visible = {}
-        for (const [locale, route] of [['en', 'en/'], ['zh-CN', '']]) {
+        for (const [locale, route] of [['en', 'en/'], ['zh-CN', 'zh-CN/']]) {
           const messages = JSON.parse(await readFile(resolve('messages', `${locale}.json`), 'utf8'))
           const text = messages.RunErrors.cloud_quota_exhausted.default
           check(typeof text === 'string' && text.length > 0, 'QUOTA_COPY')
