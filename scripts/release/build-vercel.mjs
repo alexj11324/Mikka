@@ -7,6 +7,7 @@ import { readFileSync, openSync, closeSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { stripVTControlCharacters } from 'node:util'
 import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
 import { buildEnvironmentValues } from './web-deploy.mjs'
 import { directDatabaseURL } from '../postgres-connection.mjs'
@@ -21,7 +22,8 @@ export function buildFailureEvidence({ result, sourceSha, overlaySha, log }) {
   let lastObservedPhase = 'unknown', databaseCode = null, networkCode = null, observedSystemCode = null
   let lastTypecheckCommand = null
   const typescriptCodes = new Set()
-  for (const line of (log?.toString('utf8') ?? '').split('\n')) {
+  for (const rawLine of (log?.toString('utf8') ?? '').split('\n')) {
+    const line = stripVTControlCharacters(rawLine)
     if (/^> node scripts\/build-subscription-worker\.mjs(?: &&|$)/.test(line)) lastObservedPhase = 'subscription-worker'
     if (/^> \S+ generate:agent-ui(?:\s|$)/.test(line)) lastObservedPhase = 'generate-agent-ui'
     if (/^> \S+ build:app(?:\s|$)/.test(line)) lastObservedPhase = 'build-app'

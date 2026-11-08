@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { test } from 'node:test'
 import { REQUIRED, buildEnvironment, buildEnvironmentValues } from './web-deploy.mjs'
 import { directDatabaseURL } from '../postgres-connection.mjs'
@@ -97,6 +98,23 @@ test('unknown failure details remain unknown and a kill signal is not labeled as
   assert.equal(absent.logSha256, null)
   assert.equal(absent.exitStatus, null)
   assert.equal(absent.signal, null)
+})
+
+// Captured from TypeScript 5.9.3's actual semantic diagnostic formatter.
+test('real colored TypeScript diagnostics and public phases normalize observations only', () => {
+  const log = Buffer.from("\u001b[96mcolored.ts\u001b[0m:\u001b[93m1\u001b[0m:\u001b[93m7\u001b[0m - \u001b[91merror\u001b[0m\u001b[90m TS2322: \u001b[0mType 'string' is not assignable to type 'number'.\n\n\u001b[7m1\u001b[0m const value: number = \"private-source-fixture\";\n\u001b[7m \u001b[0m \u001b[91m      ~~~~~\u001b[0m\n")
+  const result = buildFailureEvidence({ result: { status: 1 }, log })
+  assert.deepEqual(result.typescriptCodes, ['TS2322'])
+  assert.equal(result.logBytes, log.length)
+  assert.equal(result.logSha256, createHash('sha256').update(log).digest('hex'))
+  for (const marker of ['private-source-fixture', 'colored.ts', 'not assignable', '\u001b']) assert.equal(JSON.stringify(result).includes(marker), false)
+  const phases = buildFailureEvidence({ result: { status: 1 }, log: Buffer.from([
+    '\u001b[36m> tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck\u001b[0m',
+    '\u001b[36m> tsc --noEmit -p tsconfig.json\u001b[0m',
+    '\u001b[36mmigrate: starting\u001b[0m',
+  ].join('\n')) })
+  assert.equal(phases.lastTypecheckCommand, 'frontend')
+  assert.equal(phases.lastObservedPhase, 'migrate')
 })
 
 const sourceSha = 'a'.repeat(40)
