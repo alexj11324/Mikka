@@ -4234,6 +4234,7 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
+      "overview": "概览",
       "allThreads": "全部线程",
       "allThreadsWaiting": "全部线程，{count} 条等你",
       "tabs": "右栏内容",
