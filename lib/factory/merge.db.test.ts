@@ -389,13 +389,18 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       // Real PG, lifecycle/park and merge writers; only provider I/O and live
       // transport are fixtures. Signature admission has its own route tests.
       await pool.query(`
-        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid;
+        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid,
+          ADD COLUMN "deviceRepoId" uuid, ADD COLUMN "worktreePath" text, ADD COLUMN attempt integer NOT NULL DEFAULT 1;
+        ALTER TABLE devices ADD COLUMN "removedAt" timestamptz;
         ALTER TABLE run_publications ADD COLUMN "issueId" uuid, ADD COLUMN "updatedAt" timestamptz DEFAULT now();
         CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
-        CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"revokedAt" timestamptz);
+        CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"revokedAt" timestamptz,"revokedBy" text);
+        CREATE TABLE device_repos (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"repoPath" text,"remoteUrl" text);
+        CREATE TABLE personal_access_tokens (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"revokedAt" timestamptz,"expiresAt" timestamptz);
+        CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid);
         CREATE TABLE suggestion_executions ("runId" uuid,status text,"endedAt" timestamptz);
         CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"issueId" uuid,
-          "sandboxId" text,state text,"deviceId" uuid,epoch integer NOT NULL DEFAULT 1,"operationId" uuid,
+          "sandboxId" text,state text,"deviceId" uuid,"repoId" uuid,epoch integer NOT NULL DEFAULT 1,"operationId" uuid,
           "workerLeaseId" uuid,"workerLeaseUntil" timestamptz,"lastActiveAt" timestamptz NOT NULL DEFAULT now(),
           "runningSince" timestamptz,"computeSeconds" bigint NOT NULL DEFAULT 0,
           "lifecycleAt" timestamptz DEFAULT now(),lifecycle jsonb NOT NULL DEFAULT '{}');
@@ -405,7 +410,9 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
         CREATE TABLE IF NOT EXISTS workspace_projects (id uuid PRIMARY KEY,"userId" text,"issueIds" jsonb NOT NULL DEFAULT '[]');
         CREATE TABLE IF NOT EXISTS mikka_team_projects ("projectId" uuid,"workspaceId" uuid,PRIMARY KEY("projectId","workspaceId"));
       `);
-      for (const name of ['20261025013400_run_checkpoints.sql', '20261031002607_checkpoint_recovery_availability.sql'])
+      // Install the actual review control schema and source fences. The legacy
+      // Factory fixture supplies only its unrelated source-table columns above.
+      for (const name of ['20261025013400_run_checkpoints.sql', '20261031002607_checkpoint_recovery_availability.sql', '20261108230400_coding_review_sessions.sql'])
         await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'));
       const x = await prepared();
       const { rows: [producer] } = await pool.query('SELECT "runId" FROM factory_attempts WHERE "taskId"=$1 AND stage=\'execute\'', [x.task.id]);
@@ -420,7 +427,7 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       await pool.query('UPDATE factory_candidates SET "runId"=$2 WHERE id=$1', [x.task.candidateId, runId]);
       await pool.query('UPDATE run_publications SET "runId"=$2,"issueId"=$3 WHERE "pullRequest"->>\'url\'=$1', [x.pr, runId, x.task.issueId]);
       await pool.query(`UPDATE agent_runs SET "deviceId"=$2,report=report||'{"safePoint":{"session":"exited","checkpoint":"unavailable"}}' WHERE id=$1`, [runId, deviceId]);
-      await pool.query('INSERT INTO device_tokens VALUES ($1,$2,NULL)', [tokenId, deviceId]);
+      await pool.query('INSERT INTO device_tokens (id,"boundDeviceId","revokedAt") VALUES ($1,$2,NULL)', [tokenId, deviceId]);
       await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId","issueId","sandboxId",state,"deviceId","runningSince")
         VALUES ($1,$2,$3,$4,$5,'running',$6,now()-interval '1 minute')`, [runId, actor.userId, workspaceId, x.task.issueId, sandboxId, deviceId]);
       const runs = async () => (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [x.task.issueId])).rows;

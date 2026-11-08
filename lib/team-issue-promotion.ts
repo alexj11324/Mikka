@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { issueListScopesBeforeChange, issueListScopeChanged } from '@/lib/live/lists'
 import { runPolicyStopSQL, notifyStoppedPolicyRuns, type StoppedPolicyRun } from '@/lib/run-policy-stop'
 import { issues, issueVersions, teamIssuePromotions } from '@/lib/db/schema'
@@ -13,7 +13,7 @@ import { lockTeamRelations } from '@/lib/team-access'
 import { userActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
 import { documentScopesBeforeChange, documentScopeChanged } from '@/lib/live/panels'
-import { reviewTaskChanged } from './coding-workspace/review-sessions'
+import { markReviewSessionsRevoked, drainRevokedReviewSessions } from './coding-workspace/review-sessions'
 
 const schema = z.object({ requestId: z.uuid(), issueId: z.uuid(), revision: z.number().int().positive(), teamId: z.uuid(), expectedTeamId: z.uuid().nullable() })
 type WorkspaceTx = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
@@ -36,6 +36,10 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
   if (!parsed.success) return { error: 'teamIssueInvalid' as const }
   const { requestId, issueId, revision, teamId, expectedTeamId } = parsed.data
   let promotionStarted = false
+  const reviewIds = new Set<string>()
+  const fenceReview = async () => {
+    for (const id of await markReviewSessionsRevoked(pool, { taskId: issueId }, 'task_changed')) reviewIds.add(id)
+  }
   try {
     await workspaceDb.transaction(async workspace => {
       await lockTeamRelations(workspace)
@@ -74,6 +78,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
       })
       if (completed && !receipt) throw new PromotionError('teamIssueChanged')
       if (!receipt) {
+        if (current?.teamId !== teamId || current?.workspaceId !== team.workspaceId) await fenceReview()
         await workspace.insert(teamIssues).values({ issueId, teamId, workspaceId: team.workspaceId, userId }).onConflictDoUpdate({ target: teamIssues.issueId, set: { teamId, workspaceId: team.workspaceId } })
         await workspace.insert(teamIssuePromotionReceipts).values({ requestId, issueId, teamId, workspaceId: team.workspaceId, ownerId: userId })
       }
@@ -93,8 +98,10 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         await tx.execute(sql`select set_config('mikka.team_scope_verified', ${issueId}, true), set_config('mikka.team_scope_team', ${teamId}, true), set_config('mikka.team_scope_request', ${requestId}, true)`)
         const previousScopes = await documentScopesBeforeChange(issue)
         const previousLists = await issueListScopesBeforeChange(issue)
+        // Both promotion stages own the relation lock. Capture a grant made
+        // between them, then close only these IDs outside the outer WS locks.
+        await fenceReview()
         const [saved] = await tx.update(issues).set({ scope: 'workspace', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: issue.revision + 1, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
-        reviewTaskChanged(tx, issue, saved)
         await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...userActor(userId) })
         await tx.update(teamIssuePromotions).set({ status: 'complete' }).where(eq(teamIssuePromotions.requestId, requestId))
         await documentScopeChanged(tx, saved.id, previousScopes)
@@ -102,7 +109,7 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
         // A scope change stops this task's admitted direct runner. Other
         // tasks owned by the person keep their machines and credentials.
         const stopped = await tx.execute<StoppedPolicyRun>(runPolicyStopSQL({ kind: 'task', issueId }))
-        notifyStoppedPolicyRuns(tx, stopped.rows)
+        notifyStoppedPolicyRuns(workspace, stopped.rows)
         return { issue: await issueView(saved, tx), linearSync: syncResult }
       })
     })
@@ -123,5 +130,5 @@ export async function promoteExistingIssueForUser(userId: string, input: unknown
     }
     console.error('Team task promotion failed')
     return { error: 'teamIssueRetry' as const, requestId }
-  }
+  } finally { await drainRevokedReviewSessions(pool, [...reviewIds]) }
 }

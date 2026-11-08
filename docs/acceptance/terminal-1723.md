@@ -85,6 +85,75 @@ The suites exercise actual `pwd`, Git status, a shell test command, terminal res
 
 Before production completion, attach immutable candidate SHA and Git-linked CI runs, real isolated PG authority/lifecycle results, official Claude Code `claude-haiku-5-5` and Codex `gpt-6-luna` runtime checks, deployment READY/served SHA, and sanitized production API requests/responses to #1723. A local test or mocked provider result is not production evidence. The queue and runtime release must finish before the backend deploy; frontend owners merge their own PRs separately.
 
+### Production API/CLI driver
+
+`scripts/acceptance/task-review-terminal.mjs` exports `verifyExistingTaskTerminal` and `verifyTerminalRefusal`. Importing it performs no requests. It accepts an existing normal cookie client plus explicit task/run/workspace/owner/build IDs; it creates no identity, Bot, profile, dispatch, provider session or VM. Opening the terminal can resume that run's own retained VM under the reviewed lifecycle policy. Its only shell commands are bounded acceptance commands: `pwd`, Git status, a read-only Bash assertion, `stty`, an interrupted `sleep`, a shell counter and `exit 7`.
+
+The helper checks the served build before and after, verifies the approved smoke identity and selected workspace, and requires a normally succeeded/failed cloud run. It checks empty-first-output SSE readiness, exact run/owner/session metadata, real repository working directory, resize, Ctrl+C, at-most-once input, reconnect with the same absolute lease and shell state, exit code and EOF. It always attempts an explicit terminal DELETE after admission. `passed_for_requested_scope` is deliberately separate from completion of the entire issue; `remaining` lists separate peer, reclaimed and local-machine acceptance work. It never returns a transcript, email, cookie, owner identity or unfiltered server error.
+
+The existing reusable entry points are:
+
+| Need | Existing entry point | Boundary |
+| --- | --- | --- |
+| Normal sign-in and in-memory cookies | `createSessionClient`, `smokeAcceptanceAccount` in `scripts/acceptance/cloud-startup.mjs` | Credentials come from the already approved shared smoke account. No owner-account fallback. |
+| Select the approved Acme team and restore the prior selection | `selectAcceptanceTeam`, `restoreAcceptanceWorkspace` in the same module | Selection verifies the existing authorized team administrator; it does not pick a team by display name or create membership. |
+| Real official subscription execution | `runSubscriptionCase` / `runCloudStartup` in the same module | Use the normal cloud placement and exact small official models. Candidate-device template checks do not necessarily create a managed thread-machine binding. |
+| Wait for an already dispatched run | `watchRun` in the same module | Existing authenticated live channel with deadline reads; no new polling. Require the exact latest run and `succeeded`/`failed`, not a stop/cancel state. |
+| Close the owned disposable fixture | `cleanupCase` in the same module | Stops only its recorded runs, ends its machine, verifies the result, then deletes its recorded test issue. |
+
+For an already retained, explicit fixture, the caller can compose the existing normal-session transport as follows. Supply IDs and credentials only through the authorized private process environment; never echo them. The caller must record deployment READY and verify that `MIKKA_EXPECTED_BUILD` is the approved served commit before executing this code.
+
+```js
+import { createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam,
+  restoreAcceptanceWorkspace } from './scripts/acceptance/cloud-startup.mjs'
+import { verifyExistingTaskTerminal, terminalAcceptanceFailure } from './scripts/acceptance/task-review-terminal.mjs'
+
+const client = createSessionClient('https://app.aspectlylabs.com')
+let ownerId, originalWorkspaceId, signedIn = false
+try {
+  const account = smokeAcceptanceAccount(process.env)
+  await client.json('/api/auth/sign-in/email', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(account),
+  })
+  signedIn = true
+  ownerId = (await client.json('/api/auth/get-session')).user.id
+  const scope = await selectAcceptanceTeam(client, { ownerId }, id => { originalWorkspaceId = id })
+  const evidence = await verifyExistingTaskTerminal({ client, ownerId, workspaceId: scope.workspaceId,
+    taskId: process.env.MIKKA_REVIEW_TASK_ID, runId: process.env.MIKKA_REVIEW_RUN_ID,
+    expectedBuild: process.env.MIKKA_EXPECTED_BUILD })
+  // Only this closed report is publishable; keep cookies and raw API/SSE data private.
+  console.log(JSON.stringify(evidence))
+  if (evidence.status !== 'passed_for_requested_scope') process.exitCode = 1
+} catch (error) {
+  console.error(JSON.stringify(terminalAcceptanceFailure(error))); process.exitCode = 1
+} finally {
+  try {
+    if (ownerId && originalWorkspaceId) await restoreAcceptanceWorkspace(client, ownerId, originalWorkspaceId)
+  } catch (error) {
+    console.error(JSON.stringify(terminalAcceptanceFailure(error))); process.exitCode = 1
+  }
+  try { if (signedIn) await client.json('/api/auth/sign-out', { method: 'POST' }) }
+  catch (error) { console.error(JSON.stringify(terminalAcceptanceFailure(error))); process.exitCode = 1 }
+  finally { client.clear() }
+}
+```
+
+Run a saved caller with Node 24 and `--import tsx`. An API error does not authorize switching identities, changing a model, refreshing a live runtime, or creating a replacement VM. Keep any failed fixture's exact task/run and closed failure metadata for root-cause analysis.
+
+For a fresh official Native check, insert this helper **after the exact normal cloud run has actually completed and before `cleanupCase`**. The existing driver always calls `cleanupCase` in `finally`; a run ID recovered from an old completed acceptance report generally points to an ended VM or deleted task. Its normal cloud execution watch also does not always require terminal state. Do not report a historical native result as a current terminal positive, and do not replace actual completion with `stopRun` because stopped/cancelled runs must return 409.
+
+Pass an already authorized teammate cookie client as `peerClient` to exercise GET and empty POST input returning `403 not_owner_terminal`. Pass a different already known workspace ID as `otherWorkspaceId` to exercise header-scoped `403 review_scope_denied` without changing the owner's selected workspace. Missing peer credentials remain an explicit untested item. A pure UI workspace switch is a separate lifecycle behavior; these negative requests alone do not establish revocation of an already opened stream.
+
+For reclaimed evidence, end **only the acceptance driver's owned disposable machine** with its existing thread-machine action, confirm the result and readback, then call `verifyTerminalRefusal({ client, taskId, status: 409, codes: ['review_machine_gone'] })` before deleting the issue. A 404 after deleting the task is not reclaimed-sandbox evidence. For a pre-existing local fixture, expect `404 terminal_unsupported`; that proves the documented unsupported branch, not local-terminal functionality.
+
+Do not use `pnpm test:local-loop` as a generic offline gate for this change. Its `scripts/dev-local/acceptance.mjs` setup still seeds and requires a real DeepSeek key, including the cloud item, and its normal scenarios call a real model. `scripts/ops/production-mobile-daemon.mjs` avoids model calls but enrolls and removes a new device, so it is not a read-only substitute. For isolated HTTP/daemon coverage, use the real-PG authority/session tests, actual root-Linux PTY/refresh suites, and an explicit normal-session API caller against the isolated deployment. Keep that result separate from production acceptance.
+
+The driver-specific fail-closed/redaction tests run with:
+
+```sh
+node --import tsx --test scripts/acceptance/task-review-terminal.test.mjs
+```
+
 ## Merge risk and recovery
 
 **Merge risk: high while integrated CI, Native runtime and production checks remain pending.**

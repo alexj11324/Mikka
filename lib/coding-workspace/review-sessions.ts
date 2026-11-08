@@ -149,10 +149,7 @@ async function closeRevoked(database: Database, rows: StoredLease[]) {
   return { closed, pending: rows.length - closed }
 }
 
-/** A committed stop/policy/revoke fences both run capabilities. The machine
- * row serializes against begin's authorization callback, then remote IO runs
- * outside SQL locks. Closed rows remain until both data planes acknowledge. */
-export async function revokeReviewSessions(database: Database, target: ReviewSessionTarget, reason: ReviewRevokeReason) {
+async function markRevokedRows(database: Database, target: ReviewSessionTarget, reason: ReviewRevokeReason) {
   const { where, values } = targetWhere(target)
   const { rows } = await database.query<StoredLease>(`WITH affected AS MATERIALIZED (
       SELECT DISTINCT s."runId" FROM coding_review_sessions s WHERE ${where}),
@@ -163,7 +160,36 @@ export async function revokeReviewSessions(database: Database, target: ReviewSes
     UPDATE coding_review_sessions s SET "revokedAt"=COALESCE(s."revokedAt",clock_timestamp()),reason=$${values.length + 1},"retryAt"=clock_timestamp()
     WHERE (${where}) AND s."runId" IN (SELECT "runId" FROM invalidated UNION ALL SELECT a."runId" FROM affected a
       WHERE NOT EXISTS(SELECT 1 FROM thread_machines m WHERE m."runId"=a."runId")) RETURNING s.*`, [...values, reason])
-  return closeRevoked(database, rows)
+  return rows
+}
+
+/** Cross-database scope writers hold the existing Workspace relation lock.
+ * Fence in APP now, but capture only exact IDs: provider IO must wait until
+ * the outer Workspace transaction has committed or rolled back. */
+export async function markReviewSessionsRevoked(database: Database, target: ReviewSessionTarget, reason: ReviewRevokeReason) {
+  return (await markRevokedRows(database, target, reason)).map(row => row.id)
+}
+
+/** Drain only previously fenced IDs after all outer SQL locks are released.
+ * A new legitimate grant after that commit has another ID and is untouched.
+ * Even a failed scope write leaves its durable fence due for cleanup. */
+export async function drainRevokedReviewSessions(database: Database, leaseIds: readonly string[]) {
+  if (!leaseIds.length) return { closed: 0, pending: 0 }
+  try {
+    const { rows } = await database.query<StoredLease>('SELECT * FROM coding_review_sessions WHERE id=ANY($1::uuid[]) AND "revokedAt" IS NOT NULL', [[...leaseIds]])
+    return await closeRevoked(database, rows)
+  } catch {
+    armDueTimerSoon('run-recovery')
+    console.warn('Review capability close deferred', { code: 'review_close_unacknowledged' })
+    return { closed: 0, pending: leaseIds.length }
+  }
+}
+
+/** A committed stop/policy/revoke fences both run capabilities. The machine
+ * row serializes against begin's authorization callback, then remote IO runs
+ * outside SQL locks. Closed rows remain until both data planes acknowledge. */
+export async function revokeReviewSessions(database: Database, target: ReviewSessionTarget, reason: ReviewRevokeReason) {
+  return closeRevoked(database, await markRevokedRows(database, target, reason))
 }
 
 /** Error cleanup and an explicit user close share one durable close protocol.

@@ -8,6 +8,7 @@ on:
       - 'scripts/e2b/preview-firewall*'
       - 'scripts/e2b/preview-frameworks.test.py'
       - 'scripts/e2b/preview-network-acceptance.mjs'
+      - 'scripts/e2b/preview-ingress-*'
       - 'scripts/e2b/preview_firewall.py'
       - 'scripts/e2b/terminal-gateway*'
       - 'packages/daemon/scripts/official-e2b-instance-bootstrap.sh'
@@ -35,6 +36,8 @@ jobs:
       - name: Real root supervisor and PTY boundaries
         run: sudo -n env MIKKA_REQUIRE_REAL_PTY=1 "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/terminal-gateway.test.py
       - uses: ./.github/actions/pnpm-install
+      - name: Check closed ingress probe evidence and failure paths
+        run: node --test scripts/e2b/preview-ingress-acceptance.test.mjs
       - name: Real Next and Vite pages, assets and hot reload
         run: |
           "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/preview-frameworks.test.py

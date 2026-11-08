@@ -54,9 +54,11 @@ export function notifyStoppedPolicyRuns(executor: object, rows: readonly Stopped
   if (rows.some(row => row.stopped)) armDueTimerAfterCommit(executor, 'run-recovery')
 }
 
-export async function stopRunsForPolicyChange(executor: Pick<PoolClient, 'query'>, scope: RunPolicyStopScope) {
+/** A cross-database scope writer passes its outer commit executor so neither
+ * review close nor daemon wake runs while its Workspace locks are held. */
+export async function stopRunsForPolicyChange(executor: Pick<PoolClient, 'query'>, scope: RunPolicyStopScope, notificationExecutor: object = executor) {
   const compiled = new PgDialect().sqlToQuery(runPolicyStopSQL(scope))
   const { rows } = await executor.query<StoppedPolicyRun>(compiled.sql, compiled.params)
-  notifyStoppedPolicyRuns(executor, rows)
+  notifyStoppedPolicyRuns(notificationExecutor, rows)
   return rows.filter(row => row.stopped).length
 }

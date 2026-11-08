@@ -26,5 +26,12 @@ export async function cleanupAccountRuntimes(ownerId: string, database: Pool, en
     catch { reasons.add('cloud_thread_cleanup_pending') }
   }
   for (const reason of await cleanupCloud(ownerId, database)) reasons.add(reason)
+  // A prior close can fail before a successful VM kill. Drain again while
+  // the owner's provider key still exists, including already deleted sources.
+  // Pending ACKs must not outlive deletion of the key needed to prove VM loss.
+  try {
+    const { revokeReviewSessions } = await import('../coding-workspace/review-sessions')
+    if ((await revokeReviewSessions(database, { userId: ownerId }, 'credential_revoked')).pending) reasons.add('review_capability_close_pending')
+  } catch { reasons.add('review_capability_close_pending') }
   return [...reasons]
 }

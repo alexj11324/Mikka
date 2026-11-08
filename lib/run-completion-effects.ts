@@ -1,6 +1,6 @@
 import 'server-only'
 import { deploymentSwitch } from '@/lib/deployment-switches'
-import type { Pool, PoolClient } from 'pg'
+import type { PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
 import { FactoryError } from './factory/contract'
@@ -100,18 +100,10 @@ const defaultReconcileFor: FactoryReconcileFor = botId => async (userId, runId) 
  * task/issue/run locks). It is idempotent: each transition is keyed by
  * factoryEventId("run-completion", runId), so replays and the preparePrompt
  * fallback (workflows/coordinator/steps.ts) never advance a task twice.
- * Review authority is always reconciled; Factory SQL runs only with both flags on.
+ * Factory SQL runs only with both flags on. The shared run-end hook below
+ * reconciles review authority independently of these Factory flags.
  * Best effort: a failure is logged without payload and left to the fallback. */
 export async function reconcileFactoryAfterCompletion(db: Queryable, userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
-  // This is also the daemon completion's post-commit hook. Normal native
-  // completion retains a review lease; stop/lost scope must close it now.
-  try {
-    const { reconcileReviewSessions } = await import('./coding-workspace/review-sessions')
-    await reconcileReviewSessions(db as Pick<Pool, 'query'>, { runIds: [runId] })
-  } catch {
-    armDueTimerSoon('run-recovery')
-    console.warn('Run review close deferred', { code: 'review_close_unacknowledged' })
-  }
   if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
   let reconciled = 0
   try {
@@ -150,8 +142,8 @@ export async function reconcileFactoryAfterCompletion(db: Queryable, userId: str
   return reconciled
 }
 
-/** Shared after-commit hook for every path that ends a run outside the daemon
- * completion transaction (claim rejection, lease loss/retry, stop request).
+/** Shared after-commit hook for daemon completion and every other path that
+ * ends a run (claim rejection, lease loss/retry, stop request).
  * Call only after the ending write committed. Review closes are always on;
  * only Factory progression is flag-gated. Never throws. */
 export async function afterRunEnded(userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
@@ -159,6 +151,15 @@ export async function afterRunEnded(userId: string, runId: string, reconcileFor:
   armDueTimerSoon('run-recovery')
   try {
     const { pool } = await import('./db')
+    // Normal native completion retains a review lease; stop/lost scope must
+    // close it even when Factory is disabled. A failed close stays due.
+    try {
+      const { reconcileReviewSessions } = await import('./coding-workspace/review-sessions')
+      await reconcileReviewSessions(pool, { runIds: [runId] })
+    } catch {
+      armDueTimerSoon('run-recovery')
+      console.warn('Run review close deferred', { code: 'review_close_unacknowledged' })
+    }
     return await reconcileFactoryAfterCompletion(pool, userId, runId, reconcileFor)
   } catch (error) {
     console.warn('factory run-end reconcile deferred to Coordinator fallback', { runId, error: error instanceof Error ? error.constructor.name : typeof error })
