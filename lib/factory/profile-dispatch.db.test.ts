@@ -166,6 +166,13 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rowCount, 0)
     const unsupported = templateModelsFixture([model.codex])
     try {
+      assert.deepEqual(await profiles.agentProfileDispatchAvailability(pool, f.scope, request, { deferStaleQuota: true }),
+        { available: true, reason: 'quota_check_required' }, 'image model shortcuts cannot veto an authorized credential model')
+      // Remove the actual Agent, rather than one ID from its shortcut list.
+      // An unresolved preferred allowance still cannot be bypassed for Codex.
+      const catalogue = JSON.parse(process.env.MIKKA_CLOUD_TEMPLATE_MODELS!)
+      catalogue.templates.desktop.models = catalogue.templates.desktop.models.filter((info: { harness: string }) => info.harness !== 'claude_code')
+      process.env.MIKKA_CLOUD_TEMPLATE_MODELS = JSON.stringify(catalogue)
       assert.equal((await profiles.agentProfileDispatchAvailability(pool, f.scope, request, { deferStaleQuota: true })).available, false, 'a pending preferred allowance cannot be skipped for a later supported source')
     } finally { unsupported.restore() }
     const pinned = { ...request, asked: { harness: 'claude_code' as const, model: model.claude_code } }

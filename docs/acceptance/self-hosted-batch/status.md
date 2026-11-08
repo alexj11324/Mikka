@@ -185,6 +185,12 @@ pass, retaining out-of-list refusal, quota/pause/offline exclusion, fixed model
 identity, Factory task ancestry and original Owner-event checks. No production
 behavior was changed to preserve the superseded report gate.
 
+The combined-main run also exposed two group-intent fixtures that removed a
+model shortcut while leaving its Agent installed. They now prove both sides:
+the shortcut omission preserves the deferred quota intent, while an actually
+absent Agent cannot skip a pending preferred allowance for a later source.
+All 140 cases in the complete Factory Profile-dispatch PG17 suite pass.
+
 ## Local idle receipt
 
 Production build `9787d259793ca9156de77dd48059a2d14fd1a7b4`, community edition,
