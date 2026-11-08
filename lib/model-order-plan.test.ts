@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentsByOffer, defaultOrder, deviceModel, deviceModelEvidence, dispatchOrder, latestDefaultCandidates, onPreferredAgent, pickDevice, placeStage, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { agentsByOffer, defaultOrder, deviceModel, dispatchOrder, latestDefaultCandidates, onPreferredAgent, pickDevice, placeStage, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
 const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
@@ -18,25 +18,16 @@ test('untouched defaults keep the newest release per account and family while re
   assert.ok(latestDefaultCandidates([...future, unknown]).includes(unknown), 'unversioned or unfamiliar IDs are not guessed obsolete')
 })
 
-test('Claude full IDs use the exact broker account catalogue, not another account or the shortcut menu', () => {
+test('device readiness is independent of the credential model catalogue and CLI shortcuts', () => {
   const entry = sub('historical', 'claude_code', 'claude-sonnet-5', 'own-connection')
-  const local = device('local', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, subscriptionModelCatalogue: true, models: ['opus', 'sonnet', 'haiku', 'fable'] }], subscriptionModels: { 'own-connection': ['claude-sonnet-5', 'claude-sonnet-5-5'] } })
+  const local = device('local', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, models: ['opus', 'sonnet', 'haiku'] }] })
   assert.equal(deviceModel(local, entry), entry.model)
-  assert.equal(placeStage(local, [entry], 'claude_code'), 'ready', 'the settings place uses the same account catalogue as dispatch')
-  assert.equal(deviceModelEvidence(local, entry), 'account_catalogue')
-  assert.equal(deviceModel(local, { ...entry, model: 'unlisted-model' }), null)
-  assert.equal(deviceModel(local, { ...entry, source: { kind: 'subscription', connectionId: 'other-connection' } }), null)
-  assert.equal(deviceModel({ ...local, subscriptionModels: undefined }, entry), null, 'no catalogue is not evidence of full-ID support')
+  assert.equal(placeStage(local, [entry], 'claude_code'), 'ready')
   assert.equal(deviceModel({ ...local, harnesses: [{ ...local.harnesses[0], subscriptionBroker: undefined }] }, entry), null)
-  const oldDaemon = { ...local, harnesses: [{ ...local.harnesses[0], subscriptionModelCatalogue: undefined }] }
-  assert.equal(deviceModel(oldDaemon, entry), null)
-  assert.equal(placeStage(oldDaemon, [entry], 'claude_code'), 'needsUpdate')
-  assert.deepEqual(whyNoDevice([oldDaemon], entry), { why: 'needsUpdate', device: 'local', count: 1, modelEvidence: 'only_latest_confirmed' })
-  assert.equal(deviceModelEvidence(local, { ...entry, source: { kind: 'subscription', connectionId: 'other-connection' } }), 'only_latest_confirmed')
-  assert.equal(deviceModelEvidence({ ...local, harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, subscriptionModelCatalogue: true }], subscriptionModels: {} }, entry), 'unknown')
   assert.equal(deviceModel({ ...local, harnesses: [{ ...local.harnesses[0], subscriptionPreflight: 'adapter_start_failed' }] }, entry), null)
   assert.equal(deviceModel({ ...local, online: false }, entry), null)
 })
+
 const key = (id: string, harness: OrderEntry['harness'], model: string): OrderEntry => ({ id, harness, model, source: { kind: 'api_key', keyId: 'key-1' } })
 const device = (id: string, over: Partial<PoolDevice> = {}): PoolDevice => ({
   id, name: id, online: true, enabled: true, server: false, activeRuns: 0, joinedAt: 0,
@@ -89,23 +80,14 @@ test('本地 picks only among the devices that can run it, never one with 参与
   assert.equal(deviceModel(device('x', { harnesses: [] }), keyed), null)
 })
 
-test('a subscription model runs only where the daemon reported it; a daemon that reported no models needs an update', () => {
-  // Alex, 2026-11-03: no guessing. Installed with subscriptionBroker but no models reported (a daemon from before the model probe).
+test('an admitted subscription model runs on any eligible broker without an exact CLI model report', () => {
   const silent = device('mac', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true }] })
   const opus = sub('9', 'claude_code', 'account-opus')
-  assert.equal(deviceModel(silent, opus), null)
-  assert.deepEqual(whyNoDevice([silent], opus), { why: 'needsUpdate', device: 'mac', count: 1 })
-  // Reported models without this one: not sent there, and the reason says so.
-  assert.equal(deviceModel(device('mac'), opus), null)
-  assert.deepEqual(whyNoDevice([device('mac')], opus), { why: 'modelNotReported', device: 'mac', count: 1 })
-  // Reported, as a slot's resolved model or as a model id: it runs, and the provider model id is what runs.
-  assert.equal(deviceModel(device('mac'), first), 'reported-claude-top', 'a reported slot cannot replace the provider model identity')
-  assert.equal(deviceModel(device('mac'), sub('8', 'codex', 'reported-codex-a')), 'reported-codex-a')
-  // Two computers: only the one that reported it takes the run.
-  const reporting = device('reporting', { joinedAt: 5, harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'opus', model: 'account-opus', name: 'Opus' }] }] })
-  const plan = planDispatch({ entries: [opus], location: 'local', devices: [silent, device('other'), reporting], credential: usable, cloudReady: false })
-  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.deviceId, plan.kind === 'device' && plan.model], ['device', 'reporting', 'account-opus'])
-  // The claim is refused without a subscription broker; an API key model, which no CLI probe can list, still runs on the installed Agent.
+  assert.equal(deviceModel(silent, opus), opus.model)
+  assert.equal(deviceModel(device('other'), opus), opus.model)
+  const reporting = device('reporting', { joinedAt: 5 })
+  const plan = planDispatch({ entries: [opus], location: 'local', devices: [silent, reporting], credential: usable, cloudReady: false })
+  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.deviceId, plan.kind === 'device' && plan.model], ['device', 'mac', 'account-opus'])
   const old = device('old', { harnesses: [{ harness: 'claude_code', installed: true }] })
   assert.equal(deviceModel(old, opus), null)
   assert.equal(deviceModel(old, keyed), 'key-model')

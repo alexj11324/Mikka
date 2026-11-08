@@ -8,7 +8,17 @@ const result = (fields: Record<string, unknown>) => ({
   type: "result", subtype: "success", is_error: true, result: "", ...fields,
 }) as unknown as SDKResultMessage
 
+it.each(['badRequest', 'other'] as const)('Codex %s accepts only a structured model refusal at its native API boundary', codexErrorInfo => {
+  expect(codexProviderFailure({ codexErrorInfo, message: 'unexpected status 400 Bad Request: {"error":{"code":"model_not_found","message":"PRIVATE_BODY"}}' }))
+    .toEqual({ kind: 'model', retryable: false, status: 400, code: 'model_not_found' })
+  expect(codexProviderFailure({ codexErrorInfo, message: 'unsupported model in ordinary tool output' })).toBeUndefined()
+})
+
 describe("Claude terminal provider failures", () => {
+  it("keeps a native model refusal distinct from account health", () => {
+    expect(claudeProviderFailure(result({ api_error_status: 404 }), "model_not_found"))
+      .toEqual({ kind: "model", retryable: false, status: 404, code: "model_not_found" })
+  })
   it.each([402, 429, 500, 502, 503, 504])("uses the CLI's provider HTTP %s, never model text", status => {
     expect(claudeProviderFailure(result({ api_error_status: status, result: "private diagnostic" }), undefined)).toMatchObject({
       kind: status === 402 ? "balance" : "unavailable", retryable: status !== 402, status,
