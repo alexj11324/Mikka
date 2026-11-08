@@ -42,7 +42,8 @@ A task row shows one state. In 等待你 and 进行中 the state comes from the 
 - **Group headers** carry their group's icon: 等待你 the hand, 进行中 the ring, 待办 ◌, 已完成 ✓. A row never borrows its group's icon.
 - **Waiting on another task is not waiting for you.** A task blocked by an open task (等 MIK-12) or flagged blocked stays in its own group with its own icon and puts the reason in its grey line. It does not get the hand. The board's 受阻 column ([2026-11-06-1600](2026-11-06-1600-blocked-board-column.md)) is unchanged.
 - **The window bar** shows the hand and the count of 等你处理 tasks only, not failed ones.
-- **No dots**, no coloured corner marks, no badges (2045 rule 4 still holds).
+- **The icons are coloured, as LobeHub colours its status glyphs** (Alex, 2026-11-08: grey-only icons were rejected; 「没有颜色」). 等你处理 blue (info), 受阻 orange (warning), 失败 red (error), 运行中 and 排队中 orange (warning), 完成 green (success), 待办 / 暂不处理 / 已取消 / 重复 grey. Use semantic tokens (BoardUI on the web, iOS system colours on the phone). The text, including the grey reason line, is not coloured.
+- **No dots**, no coloured corner marks, no badges (2045 rule 4 still holds). A coloured icon is not a dot.
 
 ```mermaid
 stateDiagram-v2
