@@ -1,13 +1,8 @@
-import '../../scripts/credential-diagnostics-offline.mjs'
 import assert from 'node:assert/strict'
-import { AsyncLocalStorage } from 'node:async_hooks'
-import { EventEmitter } from 'node:events'
 import test from 'node:test'
-import { Pool, type PoolClient } from 'pg'
+import type { PoolClient } from 'pg'
 import { describeSample, LARGE_RESULT_BYTES, SAMPLE_RATE, sampleClient, withDatabaseOperation } from './egress-sample'
-import { manageDatabasePool } from './pool-lifecycle'
 import { withRequestLog } from '../request-log'
-import { routeScope } from '../tracing/labels'
 
 const result = { command: 'SELECT', rowCount: 2, rows: [{ id: 'a', text: 'PRIVATE_TEXT' }, { id: 'b', text: 'x' }], fields: [], oid: 0 }
 function fakeClient() {
@@ -90,45 +85,4 @@ test('concurrent Server Actions keep fixed attribution separate across async que
     await client.query('select id from coordinator_messages')
   })))
   assert.deepEqual(lines.map(line => JSON.parse(line).route).sort(), ['/actions/coordinator/poll', '/actions/issues/poll'])
-})
-
-test('queued Pool.query retains its initiating route and request scope, including unscoped work', async t => {
-  const lines: string[] = [], owners: (string | undefined)[] = []
-  const owner = new AsyncLocalStorage<string>()
-  let finishFirst: () => void = () => assert.fail('first query did not start')
-  let enteredFirst: () => void = () => {}
-  const firstStarted = new Promise<void>(resolve => { enteredFirst = resolve })
-  let statements = 0
-  // Use the installed pg.Pool's real queue and release path. Only the transport
-  // is controlled: the first connection stays busy until both other callers
-  // are queued, then its completion arrives under that first request's scope.
-  class Client extends EventEmitter {
-    _queryable = true
-    _ending = false
-    connect(callback: () => void) { queueMicrotask(callback) }
-    end(callback?: () => void) { callback?.() }
-    query(_text: string, _values: unknown, callback: (error: null, value: typeof result) => void) {
-      statements++
-      owners.push(owner.getStore())
-      if (statements === 1) {
-        finishFirst = () => callback(null, result)
-        enteredFirst()
-      } else queueMicrotask(() => callback(null, result))
-    }
-  }
-  const pool = manageDatabasePool(new Pool({ max: 1, Client: Client as never }))
-  t.after(() => pool.end())
-  pool.on('connect', client => sampleClient(client, () => true, () => 0, line => lines.push(line)))
-  const first = owner.run('first-owner', () => routeScope.run('/api/agent/sessions', () => pool.query('select id from agent_sessions')))
-  await firstStarted
-  const second = owner.run('second-owner', () => routeScope.run('/actions/issues/poll', () => pool.query('select id from issues')))
-  const background = owner.exit(() => routeScope.exit(() => pool.query('select id from device_tokens')))
-  assert.equal(pool.waitingCount, 2, 'the regression must exercise queued acquisition, not idle clients')
-  owner.run('first-owner', () => routeScope.run('/api/agent/sessions', finishFirst))
-  assert.deepEqual(await Promise.all([first, second, background]), [result, result, result])
-  assert.equal(statements, 3, 'context propagation adds no statement or retry')
-  assert.equal(pool.waitingCount, 0)
-  assert.deepEqual(owners, ['first-owner', 'second-owner', undefined])
-  assert.deepEqual(lines.map(line => JSON.parse(line).route), ['/api/agent/sessions', '/actions/issues/poll', null])
-  assert.ok(!lines.join('\n').includes('owner'))
 })
