@@ -246,7 +246,7 @@
 --sidebar-foreground: oklch(0.145 0 0);
 --sidebar-primary: oklch(0.546 0.245 262.881);
 --sidebar-primary-foreground: oklch(0.985 0 0);
---sidebar-primary-soft: color-mix(in oklch, var(--sidebar-primary) 15%, var(--sidebar));
+--sidebar-primary-soft: color-mix(in oklab, var(--sidebar-primary) 15%, var(--sidebar));
 --sidebar-primary-soft-foreground: var(--sidebar-primary);
 /* A Mikka object named in chat (task, thread): a faint accent fill, the title in the accent (R-15). */
 --object-chip: color-mix(in oklch, var(--sidebar-primary) 8%, transparent);
@@ -332,7 +332,7 @@
 --sidebar-foreground: oklch(0.985 0 0);
 --sidebar-primary: oklch(0.488 0.243 264.376);
 --sidebar-primary-foreground: oklch(0.985 0 0);
---sidebar-primary-soft: color-mix(in oklch, var(--sidebar-primary) 40%, var(--sidebar));
+--sidebar-primary-soft: color-mix(in oklab, var(--sidebar-primary) 40%, var(--sidebar));
 --sidebar-primary-soft-foreground: oklch(0.985 0 0);
 --object-chip: color-mix(in oklch, var(--sidebar-primary) 22%, transparent);
 --object-chip-hover: color-mix(in oklch, var(--sidebar-primary) 32%, transparent);
