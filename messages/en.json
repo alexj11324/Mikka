@@ -5710,6 +5710,10 @@
     }
   },
   "MobileCore": {
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "hide": "Hide",
+    "collapseRow": "Close row actions",
     "working": "Working",
     "groupChats": "Group chats",
     "groupGlyph": "G",

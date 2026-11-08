@@ -8,7 +8,7 @@ The mobile core uses the device language at app launch. English device settings
 select English messages. Chinese language variants select the existing Chinese
 catalog. Other device languages use the English core catalog.
 
-Covered surfaces are the shared tabs, Bot list, chat header and composer,
+Covered surfaces are the shared tabs, Bot list and its swipe actions, chat header and composer,
 task list, task details, task conversation labels, document loading state and
 date labels. Strings live in the shared `messages/en.json` and
 `messages/zh-CN.json` catalogs, selected through `apps/mobile/lib/messages.ts`.

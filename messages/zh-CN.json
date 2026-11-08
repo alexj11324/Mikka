@@ -5710,6 +5710,10 @@
     }
   },
   "MobileCore": {
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "hide": "隐藏",
+    "collapseRow": "收起",
     "working": "正在工作",
     "groupChats": "群聊",
     "groupGlyph": "群",
