@@ -156,6 +156,25 @@ test('detail and activity revalidate current access while returning only changed
         [citationRun, owner, id, citationAgent, 'succeeded', 'Citation control', JSON.stringify({ harness: 'codex', executionIdentity: { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId } }), workspaceId])
       const issueCite = `[[issue:${id}]]`, runCite = `[[run:${citationRun}]]`
       await readWorkspace(() => listIssueConnections(id))
+      // The run reader may use two APP clients concurrently. An exact-shape
+      // warm-up can still reuse one client when its queries finish in sequence.
+      // Complete both connections first, retaining their startup wire costs.
+      const appConnectionStartup = await measured(async () => {
+        const first = await pool.connect()
+        try {
+          const second = await pool.connect()
+          try {
+            assert.equal(first === second, false, 'steady-state run reads initialize two distinct APP clients')
+            return 2
+          } finally {
+            second.release()
+          }
+        } finally {
+          first.release()
+        }
+      })
+      t.diagnostic(JSON.stringify({ event: 'identifier_reader_connection_startup', appClients: appConnectionStartup.value,
+        scope: 'app_pool_initialization_before_steady_state', startup: readMetrics(appConnectionStartup) }))
       // Initialize both exact read shapes before recording their steady-state
       // budgets. Keep the warm-up socket costs visible, including any new
       // connections opened by concurrent run and team reads.
