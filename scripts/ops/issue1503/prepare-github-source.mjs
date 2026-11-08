@@ -8,8 +8,12 @@ import { createRotationStore } from './rotate-github-token-store.mjs'
 import { rotationLifetime } from './rotate-github-token.mjs'
 
 const WORKSPACE_ID = '93f38d33-9447-4eaf-8a46-0d8889165bcd'
-export const SOURCE_FIXTURE_SHA256 = '00468aa2a3e4702a2c297c0c184be1d165355bef8406e8749315de02f737e507'
-const MIN_SOURCE_MS = 600_000
+export const SOURCE_FIXTURE_SHA256 = 'cb21adf8aadb7499a4796a25eae64aa26c4e6505330e99a6cfc6f074cc1748e7'
+// Match the existing child minimum/F headroom, then cover rotation and its provider margin.
+// This is a fixed operational requirement, never an unbounded caller/env refresh request.
+const CHILD_MIN_MS = 120 * 60_000, F_HEADROOM_MS = 100 * 60_000
+const ROTATION_PREPARATION_MS = 5 * 60_000, PROVIDER_MARGIN_MS = 10_000, CHILD_MAX_MS = 240 * 60_000
+export const MIN_SOURCE_MS = Math.max(CHILD_MIN_MS, F_HEADROOM_MS) + ROTATION_PREPARATION_MS + PROVIDER_MARGIN_MS
 const hash = value => createHash('sha256').update(value).digest('hex')
 const fail = code => { throw new Error('issue1503_github_source_' + code) }
 const check = (value, code) => { if (!value) fail(code) }
@@ -34,13 +38,11 @@ export function sourceMetadata(value) {
 export function sourceAction(value, now = Date.now()) {
   const metadata = sourceMetadata(value)
   const expiresAt = Date.parse(metadata.expiresAt)
-  if (expiresAt > now) {
-    check(expiresAt > now + MIN_SOURCE_MS, 'owner_not_expired_but_near_expiry')
-    return 'reuse_fresh_source'
-  }
+  check(Number.isSafeInteger(MIN_SOURCE_MS) && MIN_SOURCE_MS > 0 && MIN_SOURCE_MS <= CHILD_MAX_MS, 'source_budget_invalid')
+  if (expiresAt > now + MIN_SOURCE_MS) return 'reuse_fresh_source'
   check(metadata.hasRefreshToken && Number.isFinite(Date.parse(metadata.refreshExpiresAt))
     && Date.parse(metadata.refreshExpiresAt) > now, 'owner_refresh_unavailable')
-  return 'refresh_expired_source'
+  return 'refresh_source_for_budget'
 }
 
 /** Only the adapter calls the existing product service. No OAuth implementation
@@ -49,7 +51,8 @@ export function sourceAction(value, now = Date.now()) {
 export async function prepareGitHubSource({ fixture, store, now = Date.now, checkpoint = async () => {}, report = {} }) {
   Object.assign(report, { version: 1, issue: 1503, phase: 'github_source_preparation',
     workspaceId: WORKSPACE_ID, smokeUserId: SMOKE_USER_ID, ownerUserId: OWNER_USER_ID,
-    startedAt: new Date(now()).toISOString(), status: 'running', ownerRefreshAttempted: false, ownerRefreshed: false })
+    startedAt: new Date(now()).toISOString(), status: 'running', minimumSourceValidityMs: MIN_SOURCE_MS,
+    ownerRefreshAttempted: false, ownerRefreshed: false })
   const save = async stage => { report.stage = stage; await checkpoint(report) }
   try {
     const state = renewalFixture(fixture)
@@ -64,11 +67,11 @@ export async function prepareGitHubSource({ fixture, store, now = Date.now, chec
       report.activityAtPreparation = await store.idle()
       await store.matching(state)
       await save(report.action)
-      if (report.action === 'refresh_expired_source') {
+      if (report.action === 'refresh_source_for_budget') {
         report.ownerRefreshAttempted = true
         report.ownerRefreshed = null
         await save('standard_owner_refresh_requested')
-        await locked.refreshExpiredOwner()
+        await locked.refreshOwner(MIN_SOURCE_MS)
         // Return immediately: no checkpoint or assertion can discard the new
         // provider pair after the product service has successfully stored it.
       }
@@ -77,7 +80,9 @@ export async function prepareGitHubSource({ fixture, store, now = Date.now, chec
     report.ownerTransactionCommitted = true
     await save('owner_transaction_committed')
     report.ownerAfter = sourceMetadata(await store.observeOwner())
-    check(sourceAction(report.ownerAfter, now()) === 'reuse_fresh_source', 'owner_source_not_fresh_after_preparation')
+    // The normal service may return a provider lifetime shorter than requested.
+    // Refuse it after its legitimate refresh committed; never refresh again or undo it.
+    check(Date.parse(report.ownerAfter.expiresAt) > now() + MIN_SOURCE_MS, 'owner_source_budget_not_met')
     if (report.ownerRefreshed) {
       check(report.ownerAfter.updatedAt !== report.ownerBefore.updatedAt
         && Date.parse(report.ownerAfter.expiresAt) > Date.parse(report.ownerBefore.expiresAt), 'owner_refresh_readback_mismatch')
@@ -127,10 +132,11 @@ export async function loadSourceStore() {
       await tx.select({ userId: githubConnections.userId }).from(githubConnections)
         .where(eq(githubConnections.userId, SMOKE_USER_ID)).for('update')
       await callback({ ownerBefore: owner,
-        refreshExpiredOwner: async () => {
-          // The standard service rechecks expiry under this transaction and
-          // uses its normal nested savepoint. Its token return stays in memory.
-          await connection.githubConnectionToken(OWNER_USER_ID, { minValidityMs: 0 })
+        refreshOwner: async minValidityMs => {
+          check(minValidityMs === MIN_SOURCE_MS, 'source_budget_invalid')
+          // The standard service rechecks the required remaining lifetime under
+          // this same transaction's nested savepoint. Tokens stay in memory.
+          await connection.githubConnectionToken(OWNER_USER_ID, { minValidityMs })
         } })
     })),
     observeOwner: () => database.db.transaction(async tx => (await readOwner(tx))[0]),
