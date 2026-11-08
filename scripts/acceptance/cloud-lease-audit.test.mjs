@@ -2,6 +2,9 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { leaseAuditInstructions, leaseAuditReceipt, naturalRenewalEvidence, readDaemonRenewal, runLeaseAudit } from './cloud-lease-audit.mjs'
 
 const runId = '10000000-0000-4000-8000-000000000001'
@@ -9,6 +12,32 @@ const valid = { runId, harness: 'codex', status: 'renewed', valid: true, renewVa
   httpStatus: 200, renewHttpStatus: 200, expiresAt: 2000000000, renewExpiresAt: 2000003600,
   naturalWindowObserved: true }
 const chunks = value => [{ chunk: { type: 'tool-output-available', output: { stdout: 'MIKKA_LEASE_AUDIT=' + JSON.stringify(value) + '\n' } } }]
+test('real CLI survives startup re-importing its lease helpers and writes the pending report', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-lease-cli-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const entry = join(directory, 'cloud-lease-audit.mjs')
+  await writeFile(entry, await readFile(new URL('./cloud-lease-audit.mjs', import.meta.url)))
+  // Isolate network/setup, retaining the actual CLI -> startup -> CLI ESM cycle.
+  // The separate existing tests exercise the real production target guards.
+  await writeFile(join(directory, 'auth-audit-production.mjs'), "export const auditTarget = () => 'a'.repeat(40)\n")
+  const samples = ['claude_code', 'codex'].map(harness => ({
+    runId, harness, requestedModel: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5',
+    status: 'execution_proved_awaiting_server_timing', cleanup: { status: 'passed' },
+    leaseAudit: { ...valid, harness }, requireReplyAfterTool: true, replyVerifiedAfterTool: true, lastStatus: 'completed',
+  }))
+  const fixture = { status: 'candidate_subscription_proved', cleanup: { errors: [] }, samples }
+  await writeFile(join(directory, 'cloud-startup.mjs'),
+    "export async function runCloudStartup() { const helpers = await import('./cloud-lease-audit.mjs'); " +
+    "if (typeof helpers.leaseAuditReceipt !== 'function') throw Error('helpers_missing'); return " + JSON.stringify(fixture) + '; }\n')
+  const result = spawnSync(process.execPath, [entry], { cwd: directory, encoding: 'utf8', timeout: 5000,
+    env: { PATH: process.env.PATH, DAEMON_RENEWAL_EVIDENCE: 'posthog_plugin' } })
+  assert.equal(result.error, undefined)
+  assert.equal(result.status, 0, result.stderr)
+  const report = JSON.parse(await readFile(join(directory, 'production-lease-audit-report/report.json'), 'utf8'))
+  assert.equal(report.status, 'awaiting_posthog_plugin')
+  assert.equal(report.samples.length, 2)
+  assert.ok(report.samples.every(sample => sample.naturalRenewalVerified === false))
+})
 test('ordinary cloud audit uses real daemon spans without claiming a trusted candidate host', async () => {
   const applicationSha = 'a'.repeat(40)
   const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main',

@@ -1,5 +1,6 @@
 // Pure input rules for 设置 › 密钥与环境 (no DB, no server-only) so UI and tests share them.
 import { z } from 'zod'
+import { secretDeliveryInput } from './delivery'
 
 export const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/
 /**
@@ -34,10 +35,11 @@ export const createSecretInput = z.object({
   value,
   note: note.default(''),
   scope: secretScope.default({ type: 'workspace' }),
-}).strict()
+  delivery: secretDeliveryInput.optional(),
+}).strict().refine(input => input.kind === 'secret' || input.delivery === undefined, 'delivery applies only to secrets')
 /** SEC-15～17 编辑: a new value, note or scope, each optional but at least one. Kind and name are fixed. */
-export const replaceSecretInput = z.object({ id: z.uuid(), value: value.optional(), note: note.optional(), scope: secretScope.optional() }).strict()
-  .refine(input => input.value !== undefined || input.note !== undefined || input.scope !== undefined, 'nothing to change')
+export const replaceSecretInput = z.object({ id: z.uuid(), value: value.optional(), note: note.optional(), scope: secretScope.optional(), delivery: secretDeliveryInput.optional() }).strict()
+  .refine(input => input.value !== undefined || input.note !== undefined || input.scope !== undefined || input.delivery !== undefined, 'nothing to change')
 /** Bulk add: a pasted or uploaded .env (parsed by ./dotenv), one kind and scope for all of it. */
 export const importSecretsInput = z.object({
   text: z.string(),
@@ -54,9 +56,10 @@ export const createUserSecretInput = z.object({
   value,
   note: note.default(''),
   overrideWorkspace: z.boolean().default(false),
-}).strict()
-export const replaceUserSecretInput = z.object({ id: z.uuid(), value: value.optional(), note: note.optional() }).strict()
-  .refine(input => input.value !== undefined || input.note !== undefined, 'nothing to change')
+  delivery: secretDeliveryInput.optional(),
+}).strict().refine(input => input.kind === 'secret' || input.delivery === undefined, 'delivery applies only to secrets')
+export const replaceUserSecretInput = z.object({ id: z.uuid(), value: value.optional(), note: note.optional(), delivery: secretDeliveryInput.optional() }).strict()
+  .refine(input => input.value !== undefined || input.note !== undefined || input.delivery !== undefined, 'nothing to change')
 export const importUserSecretsInput = z.object({
   text: z.string(),
   masked: z.boolean(),

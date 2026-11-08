@@ -58,12 +58,19 @@ describe("provider failures", () => {
     { message: "API Error: 402" },
     { status: 403, error: { code: "permission_denied" } },
     { status: 400, error: { type: "invalid_request_error" } },
-    { status: 404, code: "model_not_found" },
     { status: 700, code: "private-provider-code" },
     { code: "ENOENT" },
     null,
   ])("does not infer a provider fault from ordinary errors or unrelated refusals: %j", error => {
     expect(classifyProviderFailure(error)).toBeUndefined()
+  })
+
+  it.each(["model_not_found", "model_not_available", "model_unavailable", "model_deprecated", "model_retired", "unsupported_model"])("classifies a structured native %s refusal for ordered task fallback only", code => {
+    const failure = classifyProviderFailure({ status: 404, error: { code, message: "PRIVATE_PROVIDER_BODY" } })
+    expect(failure).toEqual({ kind: "model", retryable: false, status: 404, code })
+    expect(providerFailureSchema.parse(failure)).toEqual(failure)
+    expect(JSON.stringify(failure)).not.toContain("PRIVATE_PROVIDER_BODY")
+    expect(classifyProviderFailure({ status: 404 })).toBeUndefined()
   })
 
   it("accepts only a consistent, fixed-shape failure receipt", () => {

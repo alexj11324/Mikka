@@ -223,6 +223,23 @@ Connect your own computer or server using the commands shown in Mikka's **Device
 
 For an E2B cloud computer, save your own E2B key in your account. This does not buy Mikka-hosted compute and does not charge Mikka credits.
 
+Official images carry the public source commit and worker digest needed to add
+Mikka to E2B's original `desktop` template. They contain no E2B key or task
+credentials. If you build the image from source, pin both build inputs to the
+same committed revision before using a cloud computer:
+
+```sh
+docker build \
+  --build-arg MIKKA_BUILD_REVISION="$(git rev-parse HEAD)" \
+  --build-arg MIKKA_BUILD_WORKER_SHA="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref HEAD)" \
+  --tag mikka-self-hosted .
+```
+
+The revision must be available from the official source repository because the
+additive E2B installer fetches that exact commit and verifies its worker digest.
+An operator-supplied runtime release still uses the existing
+`MIKKA_CLOUD_WORKER_SOURCE_COMMIT` and `MIKKA_CLOUD_WORKER_SHA` checks.
+
 ## Create your GitHub App
 
 GitHub repository access uses an App that you own. Mikka generates its registration form locally and sends your browser to GitHub; it does not contact Mikka Cloud or fetch the official App's configuration at runtime.

@@ -3,12 +3,12 @@ import { z } from 'zod'
 import type { Directory } from '@/lib/group-conversations-store'
 import { hostedBillingScope } from '@/lib/abuse/context'
 import type { invokeDecision } from './decide'
-import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_V2_POLICY_VERSION } from './group-decision-policy'
+import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_V2_POLICY_VERSION, GROUP_V3_POLICY_VERSION } from './group-decision-policy'
 import { GROUP_REPLAY_CASE_IDS, replayGroupDecision } from './group-decision-replay'
 import { priceGroupDecisions } from './group-decision-trace'
 import { groupDecisionTotals } from './group-decision-chain'
 
-export const groupDecisionReplayInput = z.object({caseId:z.string().max(80).refine(value=>GROUP_REPLAY_CASE_IDS.includes(value)),policyVersion:z.enum([GROUP_BASELINE_VERSION,GROUP_V2_POLICY_VERSION,GROUP_POLICY_VERSION])}).strict()
+export const groupDecisionReplayInput = z.object({caseId:z.string().max(80).refine(value=>GROUP_REPLAY_CASE_IDS.includes(value)),policyVersion:z.enum([GROUP_BASELINE_VERSION,GROUP_V2_POLICY_VERSION,GROUP_V3_POLICY_VERSION,GROUP_POLICY_VERSION])}).strict()
 export async function handleGroupDecisionReplay(pool:Pool,directory:Directory,req:{userId:string|null;conversationId:string;method:string;origin:string|null;host:string;body?:string;signal?:AbortSignal},invoke:typeof invokeDecision) {
   if (!req.userId) return {status:401,body:{error:'unauthorized'}}
   if (req.method!=='POST') return {status:405,body:{error:'method_not_allowed'}}

@@ -26,6 +26,50 @@ async function numberedLinkPage(predicate: SQL | undefined) {
   })
 }
 
+
+/** Complete facts for a bounded set of tasks. Authorization uses only active
+ * workspace membership; the separate number map also keeps revoked links for
+ * an owner's existing task label. No application tables join this database. */
+export async function numberedIssueTeamScope(userId: string, issueIds: readonly string[], options: {
+  teams?: readonly TeamScope[]
+  /** Telegram's existing exact-link rule checks workspace membership alone. */
+  withWorkspaceMembership?: boolean
+} = {}) {
+  const links: IssueTeamLink[] = [], allowed: IssueTeamLink[] = []
+  const taskTeams = new Map<string, { key: string; number: number }>()
+  const workspaceMemberAllowed = options.withWorkspaceMembership ? new Set<string>() : undefined
+  const result = () => ({ links, allowed, taskTeams, ...(workspaceMemberAllowed ? { workspaceMemberAllowed } : {}) })
+  const ids = [...new Set(issueIds)]
+  if (!ids.length) return result()
+  const knownTeams = options.teams ? new Set(options.teams.map(team => team.id + ':' + team.workspaceId)) : undefined
+  const membershipWorkspace = options.withWorkspaceMembership ? sql`l."workspaceId"` : sql`t."workspaceId"`
+  const membership = knownTeams && !options.withWorkspaceMembership ? sql`` : sql`left join mikka_workspace_members m
+    on m."workspaceId"=${membershipWorkspace} and m."userId"=${userId} and m.status='active'`
+  const permitted = options.withWorkspaceMembership
+    ? sql`case when m."userId" is null then 0 when t."workspaceId"=l."workspaceId" then 2 else 1 end`
+    : knownTeams ? sql`false` : sql`m."userId" is not null and t."workspaceId"=l."workspaceId"`
+  const { rows } = await workspaceDb.execute<{ tasks: [string, string | null, number, boolean | number][] }>(sql`
+    select coalesce(jsonb_agg(jsonb_build_array(
+      encode(uuid_send(l."issueId") || uuid_send(l."teamId") || uuid_send(l."workspaceId"), 'base64'),
+      t.identifier,l.number,${permitted}
+    )), '[]'::jsonb) as tasks
+    from mikka_team_issues l left join mikka_teams t on t.id=l."teamId"
+    ${membership}
+    where l."issueId"=any(${sql.param(ids)}::uuid[])
+  `)
+  for (const [packed, key, number, member] of rows[0].tasks) {
+    const hex = Buffer.from(packed, 'base64').toString('hex')
+    const uuid = (offset: number) => `${hex.slice(offset, offset + 8)}-${hex.slice(offset + 8, offset + 12)}-${hex.slice(offset + 12, offset + 16)}-${hex.slice(offset + 16, offset + 20)}-${hex.slice(offset + 20, offset + 32)}`
+    const link = { issueId: uuid(0), teamId: uuid(32), workspaceId: uuid(64), key, number }
+    links.push(link)
+    if (workspaceMemberAllowed && (member === 1 || member === 2)) workspaceMemberAllowed.add(link.issueId)
+    const scopeAllowed = options.withWorkspaceMembership ? member === 2 : member === true
+    if (knownTeams ? knownTeams.has(link.teamId + ':' + link.workspaceId) : scopeAllowed) allowed.push(link)
+    if (typeof key === 'string') taskTeams.set(link.issueId, { key, number })
+  }
+  return result()
+}
+
 /**
  * Team links of `ids` and of every team the user can access. With
  * `onlyIssueIds`, only links of those issues are read: the same answer for

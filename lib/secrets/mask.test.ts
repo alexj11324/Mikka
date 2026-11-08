@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createSecretMasker, identityMasker, maskDeep, maskStreamStep, MASK_MIN_LENGTH, withCredentialMasking } from './mask'
+import { createSecretMasker, identityMasker, maskCredentials, maskDeep, maskStreamStep, MASK_MIN_LENGTH, withCredentialMasking } from './mask'
+import { TASK_SECRET_CAPABILITY_PREFIX, TASK_SECRET_MAX_TOKEN_BYTES } from '@mikka/protocol/task-secrets'
 
 const VALUE = 'sk_live_a+b/c=d?e&f 中'
 test('masks the raw value and its standard base64; other encodings are left alone', () => {
@@ -106,5 +107,48 @@ test('a credential split into deltas never leaves the stream step in plaintext',
     }
     out += maskStreamStep(mask, pending, '', true).release
     assert.equal(out, 'before [secret:github-token] middle [secret:jwt] after [secret:github-token] end', `size ${size}`)
+  }
+})
+
+test('task capability generations are masked without registering each renewed bearer', () => {
+  const mask = withCredentialMasking(identityMasker)
+  for (let generation = 0; generation <= 100; generation++) {
+    const token = `${TASK_SECRET_CAPABILITY_PREFIX}${Buffer.from(`synthetic-opaque-generation-${generation}`).toString('base64url')}`
+    const encoded = Buffer.from(token).toString('base64')
+    assert.equal(mask(`before ${token} and ${encoded} after`), 'before [secret:TASK_SECRET_CAPABILITY] and [secret:TASK_SECRET_CAPABILITY] after')
+    assert.equal(maskCredentials(`${token} ${encoded}`, '[redacted]'), '[redacted] [redacted]')
+    assert.deepEqual(maskDeep({ [token]: { result: encoded } }, mask), { '[secret:TASK_SECRET_CAPABILITY]': { result: '[secret:TASK_SECRET_CAPABILITY]' } })
+  }
+})
+
+test('task capabilities retain complete raw and base64 coverage at every stream boundary', () => {
+  const mask = withCredentialMasking(identityMasker)
+  const token = `${TASK_SECRET_CAPABILITY_PREFIX}${Buffer.from('synthetic-capability-for-server-streaming').toString('base64url')}`
+  for (const form of [token, Buffer.from(token).toString('base64')]) {
+    const text = `before ${form} after`
+    for (let split = 1; split < text.length; split++) {
+      const first = maskStreamStep(mask, '', text.slice(0, split))
+      if (split > 7 && split < 7 + form.length) assert.equal(first.release, 'before ')
+      const second = maskStreamStep(mask, first.pending, text.slice(split))
+      const final = maskStreamStep(mask, second.pending, '', true)
+      assert.equal(first.release + second.release + final.release, 'before [secret:TASK_SECRET_CAPABILITY] after')
+      assert.equal(final.pending, '')
+    }
+  }
+})
+
+test('maximum-size task capabilities remain masked with a finite streaming buffer', () => {
+  const mask = withCredentialMasking(identityMasker)
+  const token = TASK_SECRET_CAPABILITY_PREFIX + 'x'.repeat(TASK_SECRET_MAX_TOKEN_BYTES - TASK_SECRET_CAPABILITY_PREFIX.length)
+  const maxHeld = 4 * Math.ceil(TASK_SECRET_MAX_TOKEN_BYTES / 3)
+  for (const form of [token, Buffer.from(token).toString('base64')]) {
+    let pending = ''
+    for (let start = 0; start < form.length; start += 4096) {
+      const result = maskStreamStep(mask, pending, form.slice(start, start + 4096))
+      assert.equal(result.release, '')
+      assert.ok(result.pending.length <= maxHeld)
+      pending = result.pending
+    }
+    assert.deepEqual(maskStreamStep(mask, pending, '', true), { release: '[secret:TASK_SECRET_CAPABILITY]', pending: '' })
   }
 })

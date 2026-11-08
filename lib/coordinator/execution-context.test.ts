@@ -47,7 +47,7 @@ test('nothing connected says what dispatch does instead of inviting a question',
 test('the allowed models list names every entry, past three, with Agent, model id, credential and where it runs', () => {
   const text = modelListText(facts)
   const lines = text.split('\n')
-  assert.match(lines[0]!, /^Allowed models \(优先使用的模型\), in the order a new thread tries them \(运行位置 本地: a server, then a computer\)\. dispatch_run and dispatch_bot_computer take only these\. A subscription model runs only where a machine's daemon reported it:$/)
+  assert.match(lines[0]!, /^Allowed models \(优先使用的模型\), in the order a new thread tries them \(运行位置 本地: a server, then a computer\)\. dispatch_run and dispatch_bot_computer take only these\. Models are admitted by their credential's enabled catalogue\. On computers and servers, subscription runs need the installed Agent and subscription injection support; a reported subscription preflight failure blocks that device:$/)
   assert.deepEqual(lines.slice(1), [
     '1. Claude Code (claude_code) opus · anthropic subscription · runs on: Alex 的 MacBook (computer)',
     '2. Codex (codex) gpt-codex · openai API key (its models are the provider\'s list; a machine needs only the Agent) · runs on: Alex 的 MacBook (computer)',

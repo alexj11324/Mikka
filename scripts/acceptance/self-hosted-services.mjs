@@ -364,6 +364,11 @@ export async function runAcceptance(env = process.env) {
     await writeFile('/data/self-hosted-daemon-session.private.json', JSON.stringify({ revision: version.build, origin,
       ownerId: session.user.id, workspaceId: workspace.workspace.id,
       cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; ') }), { flag: 'wx', mode: 0o600 })
+    if (process.env.MIKKA_DESKTOP_ACCEPTANCE === '1') {
+      await writeFile('/data/self-hosted-desktop-session.private.json', JSON.stringify({ revision: version.build, origin,
+        ownerId: session.user.id, workspaceId: workspace.workspace.id, botId: bot.id, email, password: replacement }),
+      { flag: 'wx', mode: 0o600 })
+    }
     report.status = 'passed'; report.stage = 'complete'
   } catch (error) {
     report.status = 'failed'

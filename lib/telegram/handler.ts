@@ -18,7 +18,8 @@ import { withTaskWorkspace } from '@/lib/task-workspace'
 import { userActor } from '@/lib/activity-actor'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
-import { issueTeamAccess } from '@/lib/issue-team-access'
+import { numberedIssueTeamScope } from '@/lib/issue-team-access'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { isIssueTeamAccessAllowed } from '@/lib/issue-team-access-policy'
 import { parseTelegramCommand } from './commands'
 import { isPostgresUniqueViolation } from './unique-violation'
@@ -103,12 +104,19 @@ function issueContent(description: string) {
   }
 }
 
-async function issueLabels(tx: Transaction, rows: (typeof issues.$inferSelect)[]) {
-  const identifiers = await taskIdentifiers(rows.map(issue => ({ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: readIssueMetadata(issue.content).number })), tx)
+type LabelIssue = Pick<typeof issues.$inferSelect, 'id' | 'userId' | 'scope' | 'content'> & {
+  /** A complete current lookup: null means there is no usable team identifier. */
+  identifierTeam?: { key: string; number: number } | null
+}
+
+async function issueLabels(tx: Transaction, rows: LabelIssue[]) {
+  const knownTeams = rows.every(issue => issue.scope !== 'workspace' || issue.identifierTeam !== undefined)
+    ? new Map(rows.flatMap(issue => issue.identifierTeam ? [[issue.id, issue.identifierTeam] as const] : [])) : undefined
+  const identifiers = await taskIdentifiers(rows.map(issue => ({ id: issue.id, ownerId: issue.userId, scope: issue.scope, number: readIssueMetadata(issue.content).number })), tx, knownTeams)
   return new Map(rows.map(issue => [issue.id, identifiers.get(issue.id) ?? issue.id]))
 }
 
-async function issueLabel(tx: Transaction, issue: typeof issues.$inferSelect) {
+async function issueLabel(tx: Transaction, issue: LabelIssue) {
   return (await issueLabels(tx, [issue])).get(issue.id)!
 }
 
@@ -133,7 +141,9 @@ async function findAccessibleIssues(tx: Transaction, userId: string, workspaceId
       // Narrowed here, then matched exactly against the shown identifier below.
       ? or(sql`${metadata}->>'number' = ${String(match.number)}`, sql`exists (select 1 from ${linearIssueLinks} where ${linearIssueLinks.issueId} = ${issues.id} and upper(${linearIssueLinks.linearIdentifier}) = ${match.identifier})`)
       : undefined
-  const rows = await tx.select({ issue: issues }).from(issues)
+  const rows = await tx.select({ id: issues.id, userId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status,
+    content: issueAttrsContent, updatedAt: issues.updatedAt,
+  }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(
       (await issueVisibility(userId, false, workspaceId)).predicate,
@@ -142,12 +152,15 @@ async function findAccessibleIssues(tx: Transaction, userId: string, workspaceId
     ))
     .orderBy(desc(issues.updatedAt))
     .limit(match ? 3 : 10)
-  const accessible = await Promise.all(rows.map(async ({ issue }) =>
-    isIssueTeamAccessAllowed(await issueTeamAccess(issue.id, userId)) ? issue : null,
-  ))
-  return accessible.filter((issue): issue is typeof issues.$inferSelect =>
-    issue !== null && !readIssueMetadata(issue.content).deletedAt,
-  )
+  // Recheck exactly these candidates in one current workspace read. This
+  // retains Telegram's linked-task permission check and also supplies labels.
+  const scope = await numberedIssueTeamScope(userId, rows.map(issue => issue.id), { withWorkspaceMembership: true })
+  const linked = new Set(scope.links.map(link => link.issueId))
+  // This explicit mode preserves issueTeamAccess's workspace membership rule.
+  const allowed = scope.workspaceMemberAllowed!
+  return rows.flatMap(issue => isIssueTeamAccessAllowed({ linked: linked.has(issue.id), allowed: allowed.has(issue.id) })
+    && !readIssueMetadata(issue.content).deletedAt
+    ? [{ ...issue, identifierTeam: scope.taskTeams.get(issue.id) ?? null }] : [])
 }
 
 async function handleCommand(tx: Transaction, conversation: typeof telegramConversations.$inferSelect, userId: string, workspaceId: string, command: { name: string; args: string }, t: Translator): Promise<string | { reply: string; issueId: string }> {
@@ -213,7 +226,7 @@ async function handleCommand(tx: Transaction, conversation: typeof telegramConve
       const issue = matches[0]
       await tx.update(telegramConversations).set({ issueId: issue.id, updatedAt: new Date() })
         .where(eq(telegramConversations.threadId, conversation.threadId))
-      return t('linked', { issue: await issueLabel(tx, issue), title: issue.title })
+      return t('linked', { issue: labels.get(issue.id)!, title: issue.title })
     }
     case 'status': {
       if (!conversation.issueId) return t('notLinked')

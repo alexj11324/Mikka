@@ -41,7 +41,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const migrations = orderMigrations((await readdir(directory)).filter(file => file.endsWith('.sql')))
-    const boundary = '20261107180000_task_workspace_ownership.sql'
+    const boundary = '20261108120200_task_workspace_ownership.sql'
     for (const pool of [app, workspace]) await pool.query('CREATE TABLE schema_migrations (name text PRIMARY KEY,"appliedAt" timestamptz NOT NULL DEFAULT now())')
     const migrate = async (names: string[]) => {
       for (const name of names) {
@@ -119,6 +119,20 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.equal(await issueForUser({ id: owner, [tokenWorkspace]: beta }, teamless), null)
       assert.equal((await issueForUser({ id: owner, [tokenWorkspace]: alpha }, teamless))?.id, teamless)
       await assert.rejects(withTaskWorkspace({ id: owner, [tokenWorkspace]: alpha }, beta, async () => assert.fail('wrong tenant write')), /workspaceAccessDenied/)
+    })
+    await t.test('direct task-only citations preserve the reader workspace pin without a run lookup', async () => {
+      const { citationSources } = await import('../lib/coordinator/store')
+      // The owner belongs to both tenants; only the complete reader carries
+      // the selected tenant. Empty run IDs exercise the direct-task prefetch.
+      const citations = [`[[issue:${teamless}]]`]
+      const denied = await citationSources({ id: owner, [tokenWorkspace]: beta }, citations, [])
+      assert.deepEqual(denied, {}, 'a beta-pinned owner must not learn an alpha task through citation prefetch')
+      const allowed = await citationSources({ id: owner, [tokenWorkspace]: alpha }, citations, [])
+      assert.deepEqual(Object.keys(allowed), [teamless])
+      const task = allowed[teamless]
+      assert.ok(task?.kind === 'issue')
+      assert.equal(task.id, teamless)
+      assert.equal(task.title, 'No Team required')
     })
     await t.test('lists, search and push targets use the tenant even for one account in both workspaces', async () => {
       const { issues: table } = await import('../lib/db/schema')

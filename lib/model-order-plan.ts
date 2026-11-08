@@ -16,7 +16,7 @@
  * first (`pickDevice`). A model the person picked for the thread goes before
  * the list. Once a run starts nothing about it changes.
  */
-import { harnessReportsModel, type HarnessInfo, type SubscriptionPreflightFailure } from '@mikka/protocol/harness'
+import type { HarnessInfo, SubscriptionPreflightFailure } from '@mikka/protocol/harness'
 import type { CloudModelState } from './cloud-template-models'
 
 export type OrderHarness = 'claude_code' | 'codex'
@@ -50,9 +50,6 @@ export interface PoolDevice {
   joinedAt: number
   /** Last heartbeat; server reads normalize it to ms for the settings view. */
   lastSeenAt?: Date | string | number | null
-  /** Server-verified catalogues keyed by the exact connection whose lease a run
-   * will use. CLI shortcut menus are not an exhaustive list of full model IDs. */
-  subscriptionModels?: Readonly<Record<string, readonly string[]>>
   harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker' | 'subscriptionModelCatalogue' | 'subscriptionPreflight'>[]
 }
 
@@ -77,45 +74,17 @@ export interface SkippedEntry { entry: OrderEntry; block: EntryBlock }
  */
 export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'cloudModelsUnknown' | 'cloudModelNotReported' | 'noDevice' | 'checking' | 'unavailable'
 
-/**
- * The provider model a device runs for an entry. Null when the device cannot run the entry: 参与调度 off,
- * offline, the Agent not installed, or (for a subscription model) the daemon cannot take a subscription
- * run (no `subscriptionBroker`: the claim is refused without it) or has no evidence for the model.
- * Evidence is the daemon's CLI report or, for a capable Claude broker, the exact run account's
- * current catalogue. Older daemons need an update to validate IDs outside their shortcut menu.
- * Unknown evidence never becomes a runnable model. An API key's model runs on any
- * installed Agent of the key's protocol, since the key is handed to the run and the CLI's probe, run
- * without the key, cannot list it.
- */
+/** Credentials admit models; a device only supplies an installed Agent and
+ * subscription injection. CLI shortcut menus never constrain full model IDs. */
 export function deviceModel(device: PoolDevice, entry: OrderEntry): string | null {
   return deviceStage(device, entry) === 'ready' ? entry.model : null
 }
 
-/** modelNotReported: the daemon reported its models and this one is not among them. */
-export type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'subscriptionRuntimeUnavailable' | 'ready'
-export const DEVICE_STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'modelNotReported', 'needsUpdate', 'subscriptionRuntimeUnavailable', 'ready']
-
-/** Whether a harness report lists a model (@mikka/protocol harnessReportsModel). Null when it reported none. */
-export const reportsModel = harnessReportsModel
-
-export type DeviceModelEvidence = 'account_catalogue' | 'cli_report' | 'only_latest_confirmed' | 'unknown'
-
-/** Evidence for this model, separate from runtime readiness and presence. A
- * Claude shortcut menu can confirm its listed generation, never disprove full
- * historical IDs that the menu does not enumerate. */
-export function deviceModelEvidence(device: Pick<PoolDevice, 'harnesses' | 'subscriptionModels'>, entry: OrderEntry): DeviceModelEvidence {
-  const info = device.harnesses.find(item => item.harness === entry.harness)
-  if (!info?.installed) return 'unknown'
-  if (reportsModel(info, entry.model) === true) return 'cli_report'
-  if (entry.source.kind === 'subscription' && entry.harness === 'claude_code') {
-    if (info.subscriptionBroker && info.subscriptionModelCatalogue && device.subscriptionModels?.[entry.source.connectionId]?.includes(entry.model)) return 'account_catalogue'
-    if (info.models?.length || info.modelSlots?.length) return 'only_latest_confirmed'
-  }
-  return 'unknown'
-}
+export type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'needsUpdate' | 'subscriptionRuntimeUnavailable' | 'ready'
+export const DEVICE_STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'needsUpdate', 'subscriptionRuntimeUnavailable', 'ready']
 
 /** What a device can do for an entry whatever its 参与调度 or whether it is online (those come first in deviceStage). */
-export function deviceSupport(device: Pick<PoolDevice, 'harnesses' | 'subscriptionModels'>, entry: OrderEntry): Exclude<DeviceStage, 'off' | 'offline'> {
+export function deviceSupport(device: Pick<PoolDevice, 'harnesses'>, entry: OrderEntry): Exclude<DeviceStage, 'off' | 'offline'> {
   const info = device.harnesses.find(item => item.harness === entry.harness)
   // A failed check wins over a stale broker flag. API-key runs do not use
   // subscription auth, so their existing installed-Agent path is unchanged.
@@ -123,11 +92,7 @@ export function deviceSupport(device: Pick<PoolDevice, 'harnesses' | 'subscripti
   if (!info?.installed) return 'notInstalled'
   if (entry.source.kind !== 'subscription') return 'ready'
   if (!info.subscriptionBroker) return 'needsUpdate'
-  // Claude Code accepts the full model IDs of the account supplied by the
-  // run-scoped broker. Its local /model menu only reports shortcut slots.
-  const reported = reportsModel(info, entry.model)
-  if (reported !== true && entry.harness === 'claude_code' && device.subscriptionModels?.[entry.source.connectionId]?.includes(entry.model)) return info.subscriptionModelCatalogue ? 'ready' : 'needsUpdate'
-  return reported === null ? info.subscriptionModelCatalogue ? 'modelNotReported' : 'needsUpdate' : reported ? 'ready' : 'modelNotReported'
+  return 'ready'
 }
 
 /**
@@ -155,7 +120,7 @@ export function deviceStage(device: PoolDevice, entry: OrderEntry): DeviceStage 
  * too old to take a subscription run. `device` names that computer when it is
  * the only one at that step, `count` how many are.
  */
-export type NoDeviceWhy = { why: 'none' } | { why: Exclude<DeviceStage, 'ready'>; device: string; count: number; detail?: SubscriptionPreflightFailure; modelEvidence?: DeviceModelEvidence }
+export type NoDeviceWhy = { why: 'none' } | { why: Exclude<DeviceStage, 'ready'>; device: string; count: number; detail?: SubscriptionPreflightFailure }
 
 export function whyNoDevice(devices: readonly PoolDevice[], entry: OrderEntry): NoDeviceWhy {
   if (!devices.length) return { why: 'none' }
@@ -163,9 +128,7 @@ export function whyNoDevice(devices: readonly PoolDevice[], entry: OrderEntry): 
   const best = staged.reduce((top, item) => DEVICE_STAGES.indexOf(item.stage) > DEVICE_STAGES.indexOf(top.stage) ? item : top)
   const why = best.stage === 'ready' ? 'needsUpdate' : best.stage
   const detail = why === 'subscriptionRuntimeUnavailable' ? best.device.harnesses.find(info => info.harness === entry.harness)?.subscriptionPreflight : undefined
-  const modelEvidence = best.device.subscriptionModels !== undefined && entry.source.kind === 'subscription' && entry.harness === 'claude_code'
-    && (why === 'modelNotReported' || why === 'needsUpdate') ? deviceModelEvidence(best.device, entry) : undefined
-  return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length, ...(detail ? { detail } : {}), ...(modelEvidence ? { modelEvidence } : {}) }
+  return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length, ...(detail ? { detail } : {}) }
 }
 
 /**

@@ -172,3 +172,45 @@ test('connection and repository listing start together without changing the outp
   finally { connection.resolve({ githubLogin: 'octo' }) }
   assert.equal(await turn, "GitHub: the person's connected GitHub account is @octo.\nThe Mikka GitHub App is installed on @octo and reaches 0 repositories.\nNever ask which account or owner a repository is under: look it up with find_repository, or pass the name the person used to dispatch_run.")
 })
+
+test('ordinary hosted context reads connection metadata once and never starts repository or workspace discovery', async () => {
+  const { githubPromptContext } = await import('./github-context')
+  const connection = mock.fn(async (_owner: string) => ({ githubLogin: 'octo-dev' }))
+  const list = mock.fn(async () => { throw new Error('repository listing must be lazy') })
+  const used = mock.fn(async () => { throw new Error('workspace discovery must be lazy') })
+  const scope = { hosted: true, effectiveTools: ['find_repository'] }
+  for (let turn = 0; turn < 2; turn++) {
+    const text = await githubPromptContext('alex', scope, { connection, list, used }, undefined, 'bot-1')
+    assert.match(text, /connected GitHub account is @octo-dev/)
+    assert.match(text, /find_repository/)
+    assert.match(text, /Never ask which account or owner/)
+    assert.doesNotMatch(text, /installed on|reaches \d|^- /m)
+  }
+  assert.equal(connection.mock.callCount(), 2, 'connection facts stay fresh per preparation')
+  assert.equal(list.mock.callCount(), 0)
+  assert.equal(used.mock.callCount(), 0)
+})
+
+test('missing or unavailable connection metadata does not mislabel legacy GitHub as disconnected', async () => {
+  const { githubPromptContext } = await import('./github-context')
+  for (const connection of [async () => null, async () => { throw new Error('private database detail') }]) {
+    const text = await githubPromptContext('alex', { hosted: true }, {
+      connection, list: async () => { throw new Error('must not list') },
+    })
+    assert.match(text, /find_repository/)
+    assert.doesNotMatch(text, /not connected|reconnect|private database detail|@/)
+  }
+})
+
+test('native, scheduled and frozen profiles without discovery retain complete repository context', async () => {
+  const { githubPromptContext } = await import('./github-context')
+  for (const scope of [undefined, { hosted: false }, { hosted: true, readOnly: true, effectiveTools: ['find_repository'] }, { hosted: true, effectiveTools: [] }]) {
+    const list = mock.fn(async () => ({ login: 'octo', installationAccounts: ['octo'], repositories: octo }))
+    const used = mock.fn(async () => ['octo/octo-web'])
+    const text = await githubPromptContext('alex', scope, { connection: async () => null, list, used }, undefined, 'bot-1')
+    assert.match(text, /installed on @octo/)
+    assert.match(text, /^- octo\/octo-web .*used by this workspace$/m)
+    assert.equal(list.mock.callCount(), 1)
+    assert.equal(used.mock.callCount(), 1)
+  }
+})

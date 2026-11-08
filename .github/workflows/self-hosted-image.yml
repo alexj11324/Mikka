@@ -32,7 +32,9 @@ jobs:
       - name: Verify disposable acceptance target guards and model fixture
         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
       - name: Build the public standalone application
-        run: docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --tag mikka-self-hosted:check .
+        run: |
+          mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
+          docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --build-arg MIKKA_BUILD_WORKER_SHA="$mikka_image_worker_sha" --tag mikka-self-hosted:check .
       - name: Verify packaged subscription binaries without network or credentials
         run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
       - name: Start with an empty database and no Mikka credentials
@@ -56,7 +58,12 @@ jobs:
           MIKKA_EXPECTED_REVISION: ${{ github.sha }}
       - name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
-        run: docker compose exec -T app node scripts/acceptance/self-hosted-services.mjs
+        run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 app node scripts/acceptance/self-hosted-services.mjs
+      - name: Reclaim intermediate build cache before installing source dependencies
+        run: |
+          df -h /
+          docker builder prune --all --force
+          df -h /
       - name: Install the same-revision source daemon dependencies
         uses: ./.github/actions/pnpm-install
         env:
@@ -71,6 +78,40 @@ jobs:
           chmod 600 "$RUNNER_TEMP/mikka-selfhost-daemon/session.json"
           docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-daemon-session.private.json", {force:true})'
           node --import tsx scripts/acceptance/self-hosted-daemon.mjs
+      - name: Install the native desktop runtime dependencies
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
+          node apps/desktop/node_modules/electron/install.js
+      - name: Build one packaged acceptance desktop with an independent default server
+        run: |
+          pnpm --filter @mikka/desktop build
+          pnpm --filter @mikka/desktop exec electron-builder --dir --linux --config electron-builder.acceptance.yml --config.linux.executableName=mikka-selfhost-acceptance --publish never
+          sudo chown root:root apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 apps/desktop/release-acceptance/linux-unpacked/chrome-sandbox
+        env:
+          MIKKA_DESKTOP_FLAVOR: dev
+          MIKKA_DESKTOP_APP_URL: http://localhost:3001/mikka
+      - name: Verify packaged desktop email login, chat and built-in live against the actual image
+        timeout-minutes: 5
+        run: |
+          node --test apps/desktop/test/self-hosted.test.mjs
+          umask 077
+          mkdir -m 700 "$RUNNER_TEMP/mikka-selfhost-desktop"
+          docker compose cp app:/data/self-hosted-desktop-session.private.json "$RUNNER_TEMP/mikka-selfhost-desktop/session.json"
+          chmod 600 "$RUNNER_TEMP/mikka-selfhost-desktop/session.json"
+          docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-desktop-session.private.json", {force:true})'
+          dbus-run-session -- bash -euc '
+            printf "%s" "disposable-selfhost-test-keyring" | gnome-keyring-daemon --unlock --components=secrets
+            xvfb-run -a node apps/desktop/test/self-hosted.mjs
+          '
+        env:
+          MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/linux-unpacked/mikka-selfhost-acceptance
+      - name: Remove private desktop fixture material
+        if: always()
+        run: |
+          rm -rf -- "$RUNNER_TEMP/mikka-selfhost-desktop"
+          docker compose exec -T app node -e 'require("node:fs").rmSync("/data/self-hosted-desktop-session.private.json", {force:true})' || true
       - name: Remove private daemon fixture material
         if: always()
         run: |
@@ -89,6 +130,8 @@ jobs:
           path: |
             .artifacts/self-hosted/evidence.json
             .artifacts/self-hosted/daemon.json
+            .artifacts/self-hosted/desktop/report.json
+            .artifacts/self-hosted/desktop/self-hosted-chat.png
           if-no-files-found: warn
           retention-days: 14
       - name: Verify the same persistent installation restarts

@@ -4,7 +4,7 @@ import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedRun, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { measured } from './helpers/read-metrics'
+import { measured, readMetrics } from './helpers/read-metrics'
 
 type ReadOptions = { bearer?: string | null; workspaceId?: string | null; cookie?: string }
 
@@ -37,6 +37,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
         await pool.query('delete from artifacts where "userId"=any($1::text[])', [users])
         await pool.query('delete from agent_runs where "userId"=any($1::text[])', [users])
         await pool.query('delete from issues where "userId"=any($1::text[])', [users])
+        await pool.query('delete from issue_prefixes where "userId"=any($1::text[])', [users])
         await pool.query('delete from bots where "ownerId"=any($1::text[])', [users])
         await workspace.query('delete from mikka_workspaces where "userId"=any($1::text[])', [users])
         await pool.query('delete from "user" where id=any($1::text[])', [users])
@@ -105,7 +106,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const { createPersonalAccessToken, revokePersonalAccessToken } = await import('../lib/tokens/store')
   const pat = await createPersonalAccessToken(owner, teamWorkspace.id, { name: 'Mobile task isolated fixture', expiresAt: null })
   const selectedWorkspace = teamWorkspace.id
-  const run = async (path: string, handler: (request: Request) => Promise<Response>, options: ReadOptions = {}) => {
+  const run = async <T>(path: string, handler: (request: Request) => Promise<T>, options: ReadOptions = {}) => {
     const bearer = options.bearer === undefined ? native.token : options.bearer
     const selection = options.workspaceId === undefined ? selectedWorkspace : options.workspaceId
     const req = new Request(origin + '/mikka' + path, { headers: {
@@ -196,6 +197,72 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     await assert.rejects(pool.query(`insert into artifacts(id,"userId","workspaceId",kind,title,"issueId","runId")
       values($1,$2,$3,'html','Rejected foreign origin',$4,$5)`, [randomUUID(), owner, secondWorkspace.id, issueId, latest]), error => sqlState(error) === '23514')
     assert.deepEqual(await persisted(), before)
+  })
+
+  await t.test('an unlinked workspace task keeps its owner number without a repeated empty team read', async () => {
+    const { setIssueTeam } = await import('../app/actions/team-relations')
+    const changeTeam = (input: Parameters<typeof setIssueTeam>[0]) => run('/actions/team-relations', () => setIssueTeam(input))
+    const unlinkedId = await workspaceTask()
+    const { rows: [localTeam] } = await workspace.query('select identifier from mikka_teams where id=$1', [team.id])
+    const removed = await changeTeam({ issueId: unlinkedId, teamId: null, expectedTeamId: team.id })
+    assert.equal(removed.ok, true)
+    await pool.query('insert into issue_prefixes ("userId",prefix) values ($1,$2),($3,$4)', [owner, 'MOBI', other, 'OTHR'])
+    const { rows: [numbered] } = await pool.query('select content,scope,"workspaceId","ownershipState" from issues where id=$1', [unlinkedId])
+    const identifier = 'MOBI-' + numbered.content.attrs.mikka.number
+    assert.equal(numbered.scope, 'workspace')
+    assert.equal(numbered.workspaceId, teamWorkspace.id, 'removing a Team link cannot move task ownership')
+    assert.equal(numbered.ownershipState, 'bound')
+    await request(personalTask, { workspaceId: own.id })
+    const warmup = await request(unlinkedId)
+    assert.equal(warmup.status, 200)
+    assert.equal((await warmup.json()).task.identifier, identifier)
+    const personalRead = await measured(async () => {
+      const response = await request(personalTask, { workspaceId: own.id })
+      assert.equal(response.status, 200)
+      return response.json()
+    })
+    const unlinkedRead = await measured(async () => {
+      const response = await request(unlinkedId)
+      assert.equal(response.status, 200)
+      return response.json()
+    })
+    assert.equal(unlinkedRead.value.task.identifier, identifier)
+    assert.ok(unlinkedRead.statements <= personalRead.statements,
+      'the same owner and absent team link require no extra database statement for workspace scope')
+    assert.equal((await request(unlinkedId, { workspaceId: own.id })).status, 404)
+    const linked = await changeTeam({ issueId: unlinkedId, teamId: team.id, expectedTeamId: null })
+    assert.equal(linked.ok, true)
+    const relinked = await request(unlinkedId)
+    assert.equal(relinked.status, 200)
+    assert.match((await relinked.json()).task.identifier, new RegExp('^' + localTeam.identifier + '-\\d+$'))
+    assert.equal((await request(unlinkedId, { workspaceId: own.id })).status, 404, 'a prior negative link read cannot cross a later team boundary')
+    assert.equal((await request(unlinkedId, { workspaceId: secondWorkspace.id })).status, 404)
+    t.diagnostic(JSON.stringify({ event: 'read_cache_measurement', surface: 'mobile-unlinked-task-detail', scope: 'data-read-path_not_page_http',
+      personal: readMetrics(personalRead), unlinked: readMetrics(unlinkedRead) }))
+  })
+
+  await t.test('cross-workspace reads return 404 even for the same owner, and workspace tokens stay scoped', async () => {
+    const personalPat = await createPersonalAccessToken(owner, own.id, { name: 'Mobile personal pin fixture', expiresAt: null })
+    const ownerMember = (await workspace.query('select name,email,role from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [teamWorkspace.id, owner])).rows[0]
+    assert.ok(ownerMember)
+    try {
+      assert.equal((await request(issueId, { workspaceId: own.id })).status, 404)
+      assert.equal((await request(personalTask)).status, 404)
+      assert.equal((await request(issueId, { bearer: personalPat.token })).status, 404)
+      assert.equal((await request(issueId, { bearer: pat.token })).status, 200)
+      await workspace.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [teamWorkspace.id, owner])
+      assert.equal((await request(issueId)).status, 404)
+      assert.equal((await request(issueId, { bearer: pat.token })).status, 401, 'real PAT authentication refuses an inactive member')
+      await workspace.query('delete from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2', [teamWorkspace.id, owner])
+      assert.equal((await request(issueId)).status, 404)
+      assert.equal((await request(issueId, { bearer: pat.token })).status, 401, 'a removed member cannot authenticate with a previously valid PAT')
+    } finally {
+      try {
+        await workspace.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role,status)
+          values($1,$2,$3,$4,$5,'active') on conflict("workspaceId","userId") do update set status='active'`,
+        [teamWorkspace.id, owner, ownerMember.name, ownerMember.email, ownerMember.role])
+      } finally { await revokePersonalAccessToken(owner, own.id, { id: personalPat.id }) }
+    }
   })
 
   await t.test('one account switches Personal and two Shared tenants without mixing tasks, attempts or decorations', async () => {

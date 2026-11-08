@@ -6,19 +6,21 @@ import { agentRuns, devices, issues } from '@/lib/db/schema'
 import { mayCompleteIssue, withRunWorkspace } from '@/lib/run-completion'
 
 type Run = typeof agentRuns.$inferSelect
+type ClaimTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+type ResourceFence = (run: Run, tx: ClaimTransaction) => Promise<boolean>
 
 /** Authorize the response after all asynchronous claim preparation. Retirement
  * uses the same issue -> run locks. Building the response synchronously here
  * gives it an authorization point before retirement, or refuses it afterwards.
  * Bytes already handed to the transport cannot be recalled. No provider IO or
  * additional database work belongs in the response builder. */
-export async function authorizedClaimResponse(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response): Promise<Response | null> {
+export async function authorizedClaimResponse(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response, authorizeResources?: ResourceFence): Promise<Response | null> {
   for (let attempt = 0; ; attempt++) {
     try {
       const [stored] = await db.select({ workspaceId: agentRuns.workspaceId }).from(agentRuns)
         .where(and(eq(agentRuns.id, hint.id), eq(agentRuns.userId, userId))).limit(1)
       if (!stored?.workspaceId) return null
-      return await withRunWorkspace(userId, stored.workspaceId, () => claimResponseTransaction(userId, hint, leaseExpiresAt, respond, stored.workspaceId!))
+      return await withRunWorkspace(userId, stored.workspaceId, () => claimResponseTransaction(userId, hint, leaseExpiresAt, respond, stored.workspaceId!, authorizeResources))
     }
     catch (error) {
       const cause = error instanceof Error && error.cause ? error.cause : error
@@ -30,7 +32,7 @@ export async function authorizedClaimResponse(userId: string, hint: Pick<Run, 'i
   }
 }
 
-async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response, workspaceId: string) {
+async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | 'issueId' | 'agentId' | 'deviceId' | 'deviceRepoId'>, leaseExpiresAt: string, respond: (run: Run) => Response, workspaceId: string, authorizeResources?: ResourceFence) {
   const client = await pool.connect()
   try {
     return await withDatabaseClient(client, () => db.transaction(async tx => {
@@ -49,6 +51,7 @@ async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | '
         if (identity && identity.workspaceId !== workspaceId) return null
       }
       catch (error) { if (error instanceof ExecutionIdentityError) return null; throw error }
+      if (authorizeResources && !await authorizeResources(run, tx)) return null
       return respond(run)
     }))
   } finally { client.release() }

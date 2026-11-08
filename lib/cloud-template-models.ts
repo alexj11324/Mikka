@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { harnessInfoSchema, harnessReportsModel } from '@mikka/protocol/harness'
+import { harnessInfoSchema } from '@mikka/protocol/harness'
 import type { OrderEntry } from './model-order-plan'
 export const cloudTemplateKindSchema = z.enum(['desktop', 'claude', 'codex'])
 export type CloudTemplateKind = z.infer<typeof cloudTemplateKindSchema>
@@ -58,12 +58,12 @@ export function threadMachineTemplateKind(machine: { snapshotId?: unknown; templ
   if (stored.success) return known && known.kind !== stored.data ? null : stored.data
   return known?.kind ?? null
 }
-/** The model catalogue is measured on the exact image selected for this work. */
+/** The release proves the selected image has its Agent. Credentials admit models. */
 export function cloudModelSupport(entry: Pick<OrderEntry, 'harness' | 'model' | 'source'>, purpose: 'task' | 'desktop' = 'task', env: Record<string, string | undefined> = process.env): CloudModelState {
   const catalogue = cloudTemplateModels(env)
   if (!catalogue) return 'cloudModelsUnknown'
   const kind = purpose === 'desktop' ? 'desktop' : entry.harness === 'claude_code' ? 'claude' : 'codex'
   const harness = catalogue.templates[kind].models.find(info => info.harness === entry.harness && info.installed)
   if (!harness) return 'cloudModelNotReported'
-  return entry.source.kind === 'api_key' || harnessReportsModel(harness, entry.model) === true ? 'ready' : 'cloudModelNotReported'
+  return 'ready'
 }
