@@ -59,8 +59,11 @@ class OwnAppReadError extends Error {
 }
 const httpDetail = (response: Response) => `http_${response.status ?? 'unknown'}`
 
-/** A successful null means not configured; unreadable state rejects instead. */
-async function fetchOwnAppState(id: OwnAppId): Promise<OwnAppState> {
+/** The flag service (PostHog) did not answer: not this person's problem, and not ours to report. */
+const FLAG_UNREADABLE = Symbol('flag unreadable')
+
+/** A successful null means not configured; a failed read of our own endpoints rejects instead. */
+async function fetchOwnAppState(id: OwnAppId): Promise<OwnAppState | typeof FLAG_UNREADABLE> {
   if (id === 'github') {
     const response = await fetch(withBasePath('/api/integrations/github'), { cache: 'no-store' })
     if (!response.ok) throw new OwnAppReadError(`github_status_failed (${httpDetail(response)})`)
@@ -71,7 +74,9 @@ async function fetchOwnAppState(id: OwnAppId): Promise<OwnAppState> {
     const response = await fetch(withBasePath('/api/integrations/linear/status'), { cache: 'no-store' })
     if (!response.ok) throw new OwnAppReadError(`linear_status_failed (${httpDetail(response)})`)
     const availability = await response.json() as { enabled?: boolean; state?: string }
-    if (availability.state === 'unavailable' || typeof availability.enabled !== 'boolean') throw new OwnAppReadError('linear_status_failed (unavailable)')
+    if (typeof availability.enabled !== 'boolean') throw new OwnAppReadError('linear_status_failed (malformed)')
+    // Sync is global and off while its flag cannot be read; the row keeps what it last showed.
+    if (availability.state === 'unavailable') return FLAG_UNREADABLE
     if (!availability.enabled) return 'paused'
     const state = await getLinearIntegrationState()
     return !state.configured ? null : state.connected ? 'connected' : 'notConnected'
@@ -80,7 +85,8 @@ async function fetchOwnAppState(id: OwnAppId): Promise<OwnAppState> {
   return !state.configured ? null : state.connected ? 'connected' : 'notConnected'
 }
 
-/** A partial failure keeps that app's last successful state, with a visible error and its code under 详情. */
+/** A partial failure keeps that app's last successful state, with a visible error and its code under 详情.
+ * An unreadable Linear flag keeps the last state too (paused when there is none), without an error. */
 export async function fetchOwnAppStates(previous: Partial<Record<OwnAppId, OwnAppState>> = {}): Promise<OwnAppStates> {
   const results = await Promise.allSettled(OWN_APPS.map(fetchOwnAppState))
   const states = { ...previous }
@@ -88,12 +94,13 @@ export async function fetchOwnAppStates(previous: Partial<Record<OwnAppId, OwnAp
   const codes: Partial<Record<OwnAppId, string>> = {}
   results.forEach((result, index) => {
     const id = OWN_APPS[index]
-    if (result.status === 'fulfilled') states[id] = result.value
-    else {
+    if (result.status === 'rejected') {
       failed.push(id)
       const reason: unknown = result.reason
       codes[id] = reason instanceof OwnAppReadError ? reason.code : `${id}_status_failed (${reason instanceof Error ? reason.name : 'unknown'})`
     }
+    else if (result.value === FLAG_UNREADABLE) states[id] = previous[id] ?? 'paused'
+    else states[id] = result.value
   })
   return { states, failed, codes }
 }

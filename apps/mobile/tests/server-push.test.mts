@@ -25,7 +25,7 @@ mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: {
 } })
 mock.module(new URL('../lib/config.ts', import.meta.url).href, { namedExports: { currentAccount: () => current, onServerChange: (listener: () => void) => { changed = listener } } })
 mock.module(new URL('../lib/push-state.ts', import.meta.url).href, { namedExports: { pushState: () => state, setPushState: (next: string) => { state = next } } })
-const { refreshPush, unregisterPush, forgetPushToken } = await import('../lib/push.ts')
+const { refreshPush, unregisterPush, forgetPushToken, setPushSession, CONFIRMED_FOR_MS } = await import('../lib/push.ts')
 
 test('a token acquired after a switch does not register the previous account again', async () => {
   current = cloud; changed(); stored.clear()
@@ -71,4 +71,71 @@ test('an in-flight registration is removed from its captured server before switc
   // The previous account's late session cleanup did not reset this registration.
   await refreshPush()
   assert.equal(requests.filter(value => value === 'POST https://self.example/mikka').length, 1)
+})
+
+// #1659: the server binds the token to the native session that posts it. A confirmation counts only for that session.
+test('sign-in registers; a same-session return to the front posts nothing more', async () => {
+  current = cloud; changed(); stored.clear()
+  const requests: string[] = []
+  token = async () => ({ data: 'ExpoPushToken[fixture]' })
+  request = async (method, account) => { requests.push(`${method} ${account.server.url}`) }
+  // Sign-in: the session is known first, then watchPushes registers.
+  assert.equal(setPushSession('session-a'), null)
+  await refreshPush()
+  assert.deepEqual(requests, ['POST https://cloud.example/mikka'])
+  assert.equal(state, 'registered')
+  // Back to the front in the same session: the server already confirmed this binding.
+  await refreshPush()
+  await refreshPush()
+  assert.deepEqual(requests, ['POST https://cloud.example/mikka'])
+})
+
+test('the same token under a new session registers again, once', async () => {
+  current = cloud; changed(); stored.clear()
+  const requests: string[] = []
+  token = async () => ({ data: 'ExpoPushToken[fixture]' })
+  request = async (method, account) => { requests.push(`${method} ${account.server.url}`) }
+  setPushSession('session-b')
+  await refreshPush()
+  assert.equal(requests.length, 1)
+  // The session changes (signed in again, same phone and token): it registers at once.
+  await setPushSession('session-c')
+  assert.equal(requests.length, 2)
+  // Returning to the front afterwards needs nothing more; an unchanged session is not a change.
+  assert.equal(setPushSession('session-c'), null)
+  await refreshPush()
+  assert.equal(requests.length, 2)
+})
+
+test('a failed registration is not taken as confirmed: the next return to the front posts again', async () => {
+  current = cloud; changed(); stored.clear()
+  let fail = true
+  const requests: string[] = []
+  token = async () => ({ data: 'ExpoPushToken[fixture]' })
+  request = async method => { requests.push(method); if (fail) throw new Error('offline') }
+  // A new session registers at once; the server is unreachable.
+  await setPushSession('session-d')
+  assert.equal(state, 'failed')
+  fail = false
+  await refreshPush()
+  assert.deepEqual(requests, ['POST', 'POST'])
+  assert.equal(state, 'registered')
+})
+
+test('an old confirmation is redone on the next return to the front, never on a timer', async () => {
+  current = cloud; changed(); stored.clear()
+  const requests: string[] = []
+  token = async () => ({ data: 'ExpoPushToken[fixture]' })
+  request = async method => { requests.push(method) }
+  const start = Date.now()
+  const now = mock.method(Date, 'now', () => start)
+  try {
+    await setPushSession('session-e')
+    now.mock.mockImplementation(() => start + CONFIRMED_FOR_MS - 1)
+    await refreshPush()
+    assert.deepEqual(requests, ['POST'])
+    now.mock.mockImplementation(() => start + CONFIRMED_FOR_MS)
+    await refreshPush()
+    assert.deepEqual(requests, ['POST', 'POST'])
+  } finally { now.mock.restore() }
 })
