@@ -217,7 +217,9 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
       const source = await pool.query(`SELECT e.id,e."botId",b."workspaceId",e.payload FROM coordinator_events e
         JOIN bots b ON b.id=e."botId" WHERE e."userId"=$1 AND e.payload->>'text'=$2`, [owner.userId, text])
       assert.equal(source.rowCount, 1); assert.equal(source.rows[0].workspaceId, alpha)
-      assert.deepEqual(source.rows[0].payload, { text }, 'the client expectation is not stored as execution authority')
+      const session = await auth.api.getSession({ headers: new Headers({ authorization: `Bearer ${owner.token}` }), query: { disableCookieCache: true } })
+      assert.ok(session); assert.equal(session.user.id, owner.userId)
+      assert.deepEqual(source.rows[0].payload, { text, humanSessionId: session.session.id }, 'the message retains authenticated session provenance, not the client Workspace expectation')
       assert.equal(coordinatorWakes.length, wakes + 1)
       const recorded = await stored()
       const retryElsewhere = await rpc<{ error?: string }>('coordinator.sendCoordinatorMessage', args(alpha), beta)
