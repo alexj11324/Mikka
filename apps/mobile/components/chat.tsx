@@ -112,10 +112,11 @@ export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRe
  * A thread card: status icon and name, outputs as chips; no step line (R-66). Opens the thread's page. A thread
  * waiting for the person carries its action (去回答, #1386); a long name is cut here and read in full on its page.
  */
-export function ThreadCard({ title, status, info, onPress, action }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string }) {
+export function ThreadCard({ title, status, info, onPress, action, icon }: { title: string; status: ThreadStatus; info?: string | null; onPress: () => void; action?: string; icon?: ReactNode }) {
   const body = (
     <>
-      <StatusIcon status={status} size={18} />
+      {/* A task card (2026-11-07) passes its task state's icon; a thread without a task keeps its bubble. */}
+      {icon ?? <StatusIcon status={status} size={18} />}
       <View style={{ flex: 1 }}>
         <Text style={styles.threadTitle} numberOfLines={1}>{title}</Text>
         {info ? <Text style={styles.threadInfo} numberOfLines={1}>{info}</Text> : null}

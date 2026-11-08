@@ -14,7 +14,7 @@ import { describeSample, withDatabaseOperation } from '@/lib/db/egress-sample'
 import { currentRoute, routeScope } from './labels'
 import { traceSampleRate, traceSettings } from './config'
 import { EXPORT_PAUSE_MS, SafeExporter, createPgInstrumentation, createTracerProvider } from './node'
-import { normalizeStatement, scrubString, statementId } from './sanitize'
+import { normalizeStatement, sanitizeAttributes, scrubString, statementId } from './sanitize'
 import { approximateBytes, clientKindFor, pgResponseHook } from './spans'
 
 // A minimal Postgres wire-protocol server, so the real `pg` driver and the real
@@ -345,4 +345,37 @@ describe('helpers', () => {
     const rows = Array.from({ length: 500 }, () => ({ a: 'xxxx' }))
     assert.equal(approximateBytes(rows), Buffer.byteLength(JSON.stringify(rows.slice(0, 50))) * 10)
   })
+})
+
+test('database region evidence projects the actual pg host without exporting its endpoint', () => {
+  for (const [host, expected] of [
+    ['ep-private-custody-123456.c-7.us-east-2.aws.neon.tech', 'aws-us-east-2'],
+    ['ep-private-custody-123456-pooler.us-east-1.aws.neon.tech', 'aws-us-east-1'],
+  ]) {
+    const result = sanitizeAttributes({ 'db.system.name': 'postgresql', 'server.address': host, 'server.port': 5432 })
+    assert.equal(result['mikka.db_peer_region'], expected)
+    assert.equal(result['server.address'], undefined)
+    assert.equal(result['server.port'], 5432)
+    assert.equal(JSON.stringify(result).includes('private-custody'), false)
+  }
+})
+
+test('database region evidence cannot be supplied by a caller or inferred from unrecognized peers', () => {
+  for (const host of [
+    'ep-private.us-east-2.aws.neon.tech.attacker.example',
+    'postgres://owner:secret@ep-private.us-east-2.aws.neon.tech/database',
+    'ep-private.us-west-2.aws.neon.tech',
+    '127.0.0.1',
+    'private-host.example',
+    '',
+  ]) {
+    const result = sanitizeAttributes({ 'db.system': 'postgresql', 'server.address': host, 'mikka.db_peer_region': 'aws-us-east-2' })
+    assert.equal(result['mikka.db_peer_region'], undefined)
+    assert.equal(result['server.address'], undefined)
+  }
+  assert.equal(sanitizeAttributes({
+    'db.system': 'redis',
+    'server.address': 'ep-private.us-east-2.aws.neon.tech',
+    'mikka.db_peer_region': 'aws-us-east-2',
+  })['mikka.db_peer_region'], undefined)
 })

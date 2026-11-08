@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { isBuiltin } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -127,3 +127,44 @@ it('fails a real built-probe exchange without printing CLI content and drains bo
     expect(readdirSync(peer.scratch)).toEqual([])
   } finally { peer.clean() }
 })
+
+it('only the actual notice-capable worker builder emits its release capability', async () => {
+  const previous = process.env.MIKKA_CLOUD_WORKER_BUILD_SHA
+  const capabilityOut = join(root, 'capability-build')
+  const capability = join(capabilityOut, 'runtime-capabilities.json')
+  const workerSha = 'c'.repeat(40)
+  const { buildCloudWorker } = await import(new URL('../scripts/build-cloud-worker.mjs', import.meta.url).href) as {
+    buildCloudWorker(out: string): Promise<Metafile>
+  }
+  try {
+    process.env.MIKKA_CLOUD_WORKER_BUILD_SHA = workerSha
+    const built = await buildCloudWorker(capabilityOut)
+    expect(Object.keys(built.inputs)).toContain('src/cloud-registration.ts')
+    expect(JSON.parse(readFileSync(capability, 'utf8'))).toEqual({ registrationNoticeVersion: 1, workerSha })
+    expect(statSync(capability).mode & 0o777).toBe(0o444)
+    // A legacy installer does not supply this identity. The new builder must
+    // neither invent it nor leave a stale declaration from an earlier build.
+    delete process.env.MIKKA_CLOUD_WORKER_BUILD_SHA
+    await buildCloudWorker(capabilityOut)
+    expect(existsSync(capability)).toBe(false)
+  } finally {
+    if (previous === undefined) delete process.env.MIKKA_CLOUD_WORKER_BUILD_SHA
+    else process.env.MIKKA_CLOUD_WORKER_BUILD_SHA = previous
+  }
+}, 30_000)
+
+it('rejects a malformed supplied worker identity without publishing a capability', async () => {
+  const previous = process.env.MIKKA_CLOUD_WORKER_BUILD_SHA
+  const capabilityOut = join(root, 'invalid-capability-build')
+  const { buildCloudWorker } = await import(new URL('../scripts/build-cloud-worker.mjs', import.meta.url).href) as {
+    buildCloudWorker(out: string): Promise<Metafile>
+  }
+  try {
+    process.env.MIKKA_CLOUD_WORKER_BUILD_SHA = 'not-a-worker-sha'
+    await expect(buildCloudWorker(capabilityOut)).rejects.toThrow('Invalid worker build identity')
+    expect(existsSync(join(capabilityOut, 'runtime-capabilities.json'))).toBe(false)
+  } finally {
+    if (previous === undefined) delete process.env.MIKKA_CLOUD_WORKER_BUILD_SHA
+    else process.env.MIKKA_CLOUD_WORKER_BUILD_SHA = previous
+  }
+}, 30_000)

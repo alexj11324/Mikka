@@ -29,6 +29,9 @@ import { useCloudComputer, useComputerTab } from '@/hooks/use-feature-availabili
 import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
+import { BotTasks } from '@ui-slot/bot-tasks'
+import * as botTasksSlot from '@ui-slot/bot-tasks'
+import { openTask } from '@/components/workspace/workspace-navigation'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type PanelTab = 'details' | 'threads' | 'prs' | 'computer'
@@ -155,7 +158,7 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
  * ⤢ widens just this column. Picking another bot switches the threads it
  * dispatched, its PRs and its computer.
  */
-export function ContextPanel({ issues, threads, threadsLoading = false, conversation, workspaceId, onOpenThread, onClose, sheet = false }: {
+export function ContextPanel({ issues, threads, threadsLoading = false, conversation, workspaceId, onOpenThread, onOpenTask, onClose, sheet = false }: {
   issues: Issue[]
   threads: Thread[]
   /** The thread list has not been read yet (review C7). */
@@ -165,6 +168,8 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
   workspaceId?: string
   /** A thread row opens that thread in the centre column (R-50: the panel never replaces the chat with a task page). */
   onOpenThread: (thread: { issueId: string | null; runId: string }) => void
+  /** Before a task row opens its task in the right column (the sheet closes itself). */
+  onOpenTask?: () => void
   onClose: () => void
   /** Shown in a Sheet below xl, where the column has no room. */
   sheet?: boolean
@@ -237,7 +242,7 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
               : coordinator ? <BotAvatar {...COORDINATOR_AVATAR} size="profile" /> : <LetterAvatar name={conversation.name} size="profile" />}
             {botId ? <BotNameEditor key={botId} botId={botId} name={conversation.name} /> : <h2 className="max-w-full truncate text-xl font-semibold">{conversation.name}</h2>}
             <TabsList aria-label={t('tabs')} className="mt-2 gap-1 bg-transparent p-0">
-              {tabs.map(item => <TabsTrigger key={item} value={item} {...pillTab}>{t(item)}</TabsTrigger>)}
+              {tabs.map(item => <TabsTrigger key={item} value={item} {...pillTab}>{item === 'threads' && botTasksSlot.LISTS_TASKS ? t('tasks') : t(item)}</TabsTrigger>)}
             </TabsList>
           </div>
           <TabsContent ref={detailsScroll} value="details" className="flex min-h-0 flex-col gap-3 overflow-y-auto px-4 pb-4">
@@ -247,7 +252,7 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
             {botId || coordinator ? <LibraryList botId={botId} /> : <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />}
           </TabsContent>
           <TabsContent ref={threadsScroll} value="threads" className="min-h-0 overflow-y-auto px-4 pb-4">
-            <ThreadResults stateKey={stateKey} threads={ownThreads} shown={filter(ownThreads)} issues={issues} loading={threadsLoading} onOpenThread={onOpenThread} />
+            <BotTasks stateKey={stateKey} threads={ownThreads} shown={filter(ownThreads)} issues={issues} query={query ?? ''} loading={threadsLoading} onOpenThread={onOpenThread} onOpenTask={id => { onOpenTask?.(); openTask(id) }} />
           </TabsContent>
           <TabsContent ref={prsScroll} value="prs" className="min-h-0 overflow-y-auto px-4 pb-4">
             <PullRequests threads={ownThreads} issues={issues} query={query ?? ''} />

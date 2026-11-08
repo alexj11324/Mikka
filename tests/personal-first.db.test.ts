@@ -34,7 +34,7 @@ test('personal workspace first', { skip: !dbUrl }, async t => {
     assert.equal(created.ok, true)
     const rows = await kinds(id)
     assert.deepEqual(rows.map(row => row.kind).sort(), ['personal', 'team'])
-    assert.equal(rows.find(row => row.kind === 'personal')?.name, 'first-team的工作区')
+    assert.equal(rows.find(row => row.kind === 'personal')?.name, 'first-team 的工作区')
     await actions.createWorkspace({ name: 'Beta', slug: `beta-${randomUUID().slice(0, 8)}` })
     assert.equal((await kinds(id)).filter(row => row.kind === 'personal').length, 1, 'still one personal workspace')
   })

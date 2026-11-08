@@ -162,6 +162,16 @@ old module owners (backend was Codex's).
    log summary; no secrets or personal data) and closes the issue. Every
    production Web deploy also runs the automatic post-deploy smoke test
    (Alex, 2026-11-07).
+   A PR that touches only `apps/mobile/**` and documentation is the
+   exception: it merges once CI is green and it is mergeable, without
+   waiting for Web deploy or E2B to be idle. Its push still queues a Web
+   build (`queue: max`, `cancel-in-progress: false`) that rebuilds unchanged
+   web output, so the owner watches only the Mobile OTA run and reports its
+   update group ID.
+   It still does not merge while an E2B runtime release is in progress or
+   awaiting Web: that release is bound to the exact `main` SHA, so moving
+   `main` fails it with `mainChanged` and forces a rebuild. It also respects
+   any merge window an owner has posted on a PR or issue.
 6. **If production breaks,** fix forward with a new PR, or revert through a
    revert PR. Never delete deployments, revoke shared tokens, change
    production Neon settings or create paid resources without Alex.

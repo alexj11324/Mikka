@@ -2,7 +2,7 @@
 // Keep native SDKs external and preserve the same helper layout as the daemon
 // package build; import.meta.url in the bundled worker resolves beside them.
 import { existsSync, realpathSync } from 'node:fs'
-import { copyFile, cp, mkdir } from 'node:fs/promises'
+import { copyFile, cp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
@@ -25,10 +25,19 @@ export async function buildCloudWorker(out = resolve(root, 'dist/cloud')) {
     await mkdir(dirname(resolve(out, path)), { recursive: true })
     await copyFile(resolve(root, 'src', path), resolve(out, path))
   }
-  for (const path of ['mikka-mcp.mjs', 'capture-copy.mjs', 'github-credentials.mjs']) {
+  for (const path of ['mikka-mcp.mjs', 'mikka-mcp-backend.mjs', 'mikka-mcp-worker.mjs', 'capture-copy.mjs', 'github-credentials.mjs']) {
     await copyFile(resolve(root, 'src/agents', path), resolve(out, path))
   }
   await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })
+  // This declaration belongs to the actual compiled worker source. A newer
+  // installer cannot advertise capabilities for an older checkout/build script.
+  const workerSha = process.env.MIKKA_CLOUD_WORKER_BUILD_SHA
+  const capability = resolve(out, 'runtime-capabilities.json')
+  if (workerSha !== undefined) {
+    if (!/^[a-f0-9]{40}$/.test(workerSha)) throw new Error('Invalid worker build identity')
+    await rm(capability, { force: true })
+    await writeFile(capability, JSON.stringify({ registrationNoticeVersion: 1, workerSha }) + '\n', { mode: 0o444 })
+  } else await rm(capability, { force: true })
   return result.metafile
 }
 

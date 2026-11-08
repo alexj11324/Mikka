@@ -320,19 +320,48 @@ worker claim 为 3.778–4.577 秒，仓库准备为 2.151–5.633 秒。阶段�
 同一查询重读原 binding 与当前 connection，保留 owner/workspace、分享及 epoch
 检查且不回退到旧 binding。Factory claim 复用同一事务已锁定的 repo 行。
 claim 的强制 fresh quota 仍在原位置；不在正常拒绝路径提前发 usage 或写入配额。
+Factory 的两个既有 advisory lock 继续按原顺序取得，只合并为一次 PostgreSQL
+原生 simple-query 往返；BEGIN 和授权前置条件保持原位置。任务快照的两条 SELECT
+同样批量返回，保留 pg 原生值、排序和最终 JSON 表示。route 的来源 payload
+与完整 owner/Bot/issue 谓词一次 fresh 读取，null-Bot 的 FOR SHARE 保持到提交。
+所有插值使用 pg.escapeLiteral；任何批次返回形状异常都回滚，不缓存授权或锁结果。
+
+Factory 的布尔任务授权继续每次调用完整 canonical ACL，只用既有 withoutBody 投影
+避免传回任务正文。共享凭据的 share 开关与 workspace policy 在同一条 fresh SQL
+中判定；缺共享、关闭共享和关闭策略仍拒绝，缺策略仍保留默认允许，不跨调用缓存。
 
 bootstrap 的同一次文件上传仍承载私有凭据，root 命令原子发布后降为普通 user
 检查并唤醒现有 wait-bootstrap 进程。只有固定唤醒收据才省掉第二条远程启动命令；
 旧、缺失或退出的 preloader 保留原启动回退。信号成功不代替新设备凭证实际注册，
 原 lease/stop 栅栏和注册时限保持，凭据不进入命令、参数或日志。
 
-实例接收身份后，daemon 可在注册和 claim 期间异步只读预取已选择的官方 CLI 文件；
-Codex 还按官方 launcher 的安装布局读取其 native backend。每次 daemon 激活只做
-一次，256 KiB 缓冲、单文件 512 MiB、总量 768 MiB、10 秒预算；停止时先取消，
-任务原有终止完成后才等待在途读取关闭。此路径不执行 CLI、不读 HOME/账号配置、
-不改原文件，也不增加远端请求、数据库操作或轮询。它针对冷实例软件页读取的假设，
-不是已证实的加速结果；真实 CLI 初始化、模型目录、文件保全和双订阅 gate 均保持。
-下一候选仍须新的同版本完整六次生产验收，当前 #1505 未达标。
+此前 #1658 候选在实例接收身份后，注册和 claim 期间异步只读预取已选官方 CLI 软件。
+该假设现已实测，后续 #1660 停用 daemon 默认调用，保留独立实验函数和其测试供复核。
+不以“只读且无远程请求”推断它能缩短启动时间；bootstrap 一次 publish/wake 与 fresh
+授权读取优化不受影响。
+
+2026-11-07 的[匿名对照原件](../research/2026-11-07-e2b-cold-prefetch-control.json)
+来自 [Actions 42403752740](https://github.com/alexj11324/Mikka/actions/runs/42403752740)：
+固定 d75 发布及官方派生模板，8 个 fresh VM、两种 CLI 每臂各 2 次、平衡次序，
+control 与 prefetch 均有 2 秒准备窗口。只做 Claude SDK prewarm 或 Codex initialize，
+没有账户登录、claim、用户 prompt 或模型调用；官方 CLI SHA 和版本在计时后验证。
+
+| 初始化毫秒 | control | prefetch |
+|---|---:|---:|
+| Claude Code | 2260.151 / 3129.288 | 2341.121 / 1026.186 |
+| Codex | 1049.070 / 618.395 | 2033.094 / 3811.812 |
+
+Codex 两次仅读到 9154 字节 launcher，均为 partial，native 文件未读；因此不是有效的
+native 预读对照，也不能以每臂 n=2 将变慢归因为预读。Claude 两次读完同一 290532720
+字节文件，耗时 2915.832 / 1670.389ms；前一次与初始化重叠，收益仍不稳定。provider
+物理页缓存和后台 HTTP 未完整观测，保留 unavailable。全部 8 个 VM 已回收并按实际 ID
+读回 404，独立最终 ownedSandboxesAfter=[]，临时 ops ref 删除成功。
+原始 report.json 为 19019 bytes，SHA256
+`5296d17e7c612b481b98ed0bd92110cdaa85525efeb46d1eccf5fabf6f1ddcca`；
+artifact ZIP 的 SHA256 和固定 helper/release 元组随原件索引保留。
+
+这组匿名初始化时间不计入完整 dispatch 验收，也不能替代两条真实订阅发布 gate。
+下一候选仍须新的同版本 Claude×3、Codex×3 完整生产验收，当前 #1505 未达标。
 
 本记录保留早期 #1131、#1124 的官方文件保护要求，并取代其中禁止派生模板的
 解释；独立的官方机器种类和所有者绑定凭证规则保持有效。
@@ -344,3 +373,123 @@ Codex 还按官方 launcher 的安装布局读取其 native backend。每次 dae
 start command 在模板构建末尾执行，ready command 成功后保存文件系统与内存状态；
 新实例从这个已就绪状态恢复。因此只预加载无身份的 worker，实际 owner、设备与任务
 通过启动后的正常 handoff 注入，不依赖创建实例时的环境变量去更新冻结的进程。
+
+### 2026-11-07：统一发布后的后续验证边界
+
+#1658 的固定 head 6d7d993a 已随统一发布 #1615 正常合入 main 4672c418；
+源码合并不代表生产发布或 5 秒验收完成。后续查询优化以该批次为基底，保留其完整 run failure、
+continuous tracing、critical request sampling、授权与撤销行为，不用旧版本整文件
+覆盖。额外限定窗口 sampler 方案未采用，因为统一批次已提供原生 critical 采样；
+后续先验证实际部署的链路覆盖，不增加第二套 claim 授权或采样入口。
+
+全部六次完整生产失败记录仍保留。只有同一最终部署、worker/source 和三个模板
+组合的 Claude 三次及 Codex 三次完整 dispatch-to-agent 均不超过 5000 ms，且原有
+官方文件守恒、真实订阅和清理门槛均通过，才可关闭 #1505。匿名 CLI 初始化对照
+只用于判断文件预读取假设，不能替代这项生产验收。
+
+### 生产函数区域与数据库区域证据
+
+后续候选在原 production-only Web deploy 的 prebuilt 上传参数加入
+`--regions cle1`，普通 main 与 runtime paired Web 共用该上传入口；不改社区发行版、
+独立 cloud backend、数据库或 E2B 区域。Vercel CLI 65.4.0 的实际 prebuilt
+上传实现已核对会发送该参数。[官方区域表](https://vercel.com/docs/regions) 将
+`cle1` 映射到 AWS us-east-2，匹配当前 Neon production 项目的控制面区域；
+既有配套部署的控制面区域为 `iad1`。
+
+此前 PgInstrumentation 0.76.0 使用 `server.address`，原脱敏器会删除该字段，
+所以历史 span 不能证明实际运行时数据库主机与上述 Neon endpoint 的对应关系。
+不把项目元数据或 build-time URL 当成历史 runtime 证明。后续仅从现有 PostgreSQL
+span 的主机属性派生闭式 `mikka.db_peer_region`，只识别 Neon 的 aws-us-east-1 /
+aws-us-east-2；端点、账号、URL、口令和原始 `server.address` 仍不导出。
+未知地址、非 PostgreSQL 及调用者自带的区域标签不作为区域证据。没有新增 SQL、
+主机探测、轮询或授权请求。
+
+该部署位置变更是待实测的延迟优化，不预先计算节省毫秒。发布后同时核对实际
+READY 部署/函数区域、公共版本，以及本次真实任务 trace 的数据库区域与各段时间；
+若实际 placement 不符或完整耗时恶化，就通过普通后继 PR 恢复原部署参数。
+5 秒门槛、原始起止点、六样本分母及官方双订阅门槛保持不变。
+
+### 注册完成通知与维护刷新
+
+后续候选在 daemon 完成原注册响应及凭证/工作区轮换检查后，才原子写入私有
+registration.json。收据绑定 device、workspace 与本次凭证摘要，不携带凭据。
+服务端在同一原有发布命令中先安装文件事件 watcher，再发布 bootstrap 和可选
+sidecar、唤醒原 worker；缺少 preloader 时保留原后台启动及实例内日志。
+文件类型、属主、权限、大小、键集合与绑定均严格检查，不增加正常数据库轮询。
+
+只有被安装 source 自己的 build-cloud-worker 脚本才能产生注册通知能力文件。
+installer 先核验 source 与 worker digest，再向该版本构建脚本传入身份；新 installer
+不能给旧 worker 声明不存在的能力。能力文件随 release/source/worker 一起切换，
+缺失或错绑时立即保留原数据库等待，不先等一个通知超时再回退。
+
+通知不代替数据库授权。最后按既有 run → machine 锁序取得锁，再在下一条语句
+fresh 检查 lease、stop、设备归属与实际新凭证使用状态。这样既能看到锁等待期间
+已提交的撤销，又不反向取得 token 锁。运行中任务仍要求 stop 为空。
+合法的终态维护刷新单独绑定入口与当前 terminal status、PostgreSQL 原始 stop 文本
+以及历史 stop 对应的 native exited 证据；两次最终检查继续核对相同绑定。
+精确 stop 文本保留微秒，不经 JavaScript Date 截断；新增 stop、重排、证据撤回、
+租约变化及已结束机器均拒绝，不修改历史停止记录或扩大任务领取权限。
+
+正常成功路径不再提前查询用于日志遮罩的秘密；实例日志仍保留，失败取回尾部时才
+按原规则遮罩。正常 BYO E2B 成功路径必须能解密 owner 的 E2B key，因此具备原
+遮罩器要求的加密配置。四条必经遮罩查询按空结果保守计量，成员非空时的额外查询
+不计节省信用。注册相关差异的真实 PG wire 对照计入最终事务全部四条 SQL：原路径
+8 条 / 4428 字节，通知路径 5 条 / 2427 字节，旧 worker 路径 6 条 / 2934 字节。
+其他未改工作两侧同样省略；此表不是整次任务的 SQL 总量，也不是 TCP/TLS 费用
+或时间收益。密钥缺失会在正常 provider 调用前拒绝，不靠平台 fallback 满足前提。
+维护的两个已有 SELECT 为精确 stop 增加投影；其本身的额外成本及完整成功维护
+的净账分别记录，不能把成功路径信用外推成每个提前拒绝分支都没有增加字节。
+
+### 启动准入的配额读取
+
+启动模型准入继续在原 requester/member/share/owner 与 epoch 边界调用 custody，
+但使用专门的 Allowance RPC，只读取所需的 provider quota。Claude 不再在这个
+启动入口追加 Settings 的账户资料 HTTP；Codex 仍使用原同一次额度响应。
+原 Usage/Settings 实现不变，执行租约入口与撤销行为不变，不缓存先前授权或额度。
+
+配额保存仍是原 epoch-fenced UPDATE。新响应没有有效套餐时，在同一 UPDATE
+保留数据库当前 plan，而不是请求前读到的旧值；Codex 即使返回已知 plan_type，
+没有有效额度窗口时也不能擦掉原套餐。启动路径不写账户标签。
+SQL 次数相同不足以证明数据库预算相同：动态候选可以包含多个账号，所以逐次
+保存的 SQL、参数及响应字节必须与原路径对照，不能以固定注册节省量无条件抵扣
+任意数量的候选。完整证据索引记录该预算修正与实际 PostgreSQL 对照。
+
+启动额度刷新继续执行原来的 fresh readyAuth、连接 epoch 和最终回读；Settings 的完整 Usage 行为保持。保存启动 quota 时，只把 plan 合并为 UPDATE 实际锁定的当前数据库 plan，不能使用 provider await 前的旧 row 覆盖并发 Settings 修改。该分支使用 228B 静态参数化 SQL；普通 Settings 的 230B SQL 原文不变，四参数、owner/id/epoch/connected 谓词和 previous 返回快照不变。隔离 PostgreSQL 18.6 的真实行锁对照确认原 CTE 与内联 SELECT 在并发 plan/epoch、missing/SQL-null/JSON-null 与通知判定上等价；EXPLAIN 表明旧 CTE 本来已内联，不主张数据库扫描减少。实际 PostgreSQL 请求字节在相同四参数时为 580→578B，响应相同；若旧 plan 为空字符串、新 allowance 为 null，参数最多 +2B，恰由 SQL -2B 抵消。因此该写入可以按任意候选 N 逐项计账，无须用其他阶段的节省掩盖 +65B。这里是本地协议字节与语义验证，生产时延未测，PG17 精确 CI 仍为必需门槛。
+
+### Bootstrap 后的无账户 Claude 初始化
+
+仅实际新建的官方 Claude TaskVM、首次 queued 仓库任务可以携带准备提示。
+保留实例、已有设备/session、重试、续作、问题恢复和 runtime refresh 均不适用。
+提示与 bootstrap 的完整字节摘要和 run 绑定，随同一次上传及原子发布交付；
+不含可用账号或任务权限。匿名原版进程只在实际 bootstrap 接受后创建，每实例
+生成独立 session UUID，模板 snapshot 不保存这种带 session 身份的进程。
+
+注册和 claim 可以与该初始化重叠。真正采用之前仍完成 fresh claim、原租约、
+policy、Skill、仓库与 session 检查，并精确匹配设备、工作区、模型、effort、环境、
+诊断范围及完整工具目录。普通 HOME、Git、gh 和 user/project/local settings
+保持原行为。完整 MCP backend 由原 stdio 入口和新桥接共同使用，可能阻塞的 Git
+handler 放入本任务拥有的子进程；未绑定时拒绝业务调用，撤销时关闭并排空进程。
+没有跨任务进程复用，也不以提示或工具目录授予业务权限。
+
+准备进程只能采用一次；不匹配时先完整关闭再走原启动。只有官方 SDK 精确的
+project_settings_not_claimable 才允许 claim 后、用户输入前关闭并同 session
+回退；其他账号、权限或绑定错误保持失败。新领取的 OAuth 只在 claim 后交给该
+原版进程。账号检查保留原 firstParty 与非 API key 条件；新增的精确环境 OAuth
+来源只在成功采用这条候选路径时接受。
+
+显式诊断保留真实提前开始的 collector 与时间轴，source 为 bootstrap_claude_start，
+不把它塞进晚开始的 agent_start 或平移起点。observedAuthSource 来自原生
+accountInfo 的实际值；只设置 Claim.env 不能生成通过证明。采用匿名进程时，未知
+认证来源不能通过该路径的严格 reader；普通回退仍执行原账号检查。两条路径的缺失
+初始化、错绑或不完整 exact ACK 都不能通过。普通任务不添加
+详细持久化诊断字段，派发入口、六样本分母和 5000ms 判定公式不变。
+
+已安装 SDK 0.3.305 的真实进程/IPC 离线回归只能证明协议与拒绝边界。现有真实
+订阅候选 gate 使用 personal acceptance daemon，继续验证原 FD3 路径；它没有
+bootstrap sidecar，因此不能证明新的匿名采用及环境 OAuth 来源。原有官方文件
+保全和双真实订阅 gate 仍是发布门槛，新的实际采用与耗时还必须由随后相同最终
+部署/worker/source/模板元组的六次正式生产任务证明。
+
+本轮各切片、合成检查和预算边界见
+[候选证据索引](../research/2026-11-07-e2b-startup-overlap-candidate.json)。
+这些实现与本地结果均未被记作五秒达标；生产未通过前 #1505 保持打开。
