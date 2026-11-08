@@ -104,7 +104,7 @@ export default function BotInfo() {
       <NavBar title="" />
       <ScrollView {...underBar} contentContainerStyle={styles.body} refreshControl={<RefreshControl {...refresh} />}>
         <View style={styles.hero}>
-          <BotAvatar color={bot?.color} shape={bot?.shape} size={96} />
+          <BotAvatar id={id} coordinator={bot?.coordinator} color={bot?.color} shape={bot?.shape} size={96} />
           {name ? <Text style={styles.name}>{name}</Text> : <Spinner />}
         </View>
         <ReadNotice error={page.error} hasData={Boolean(page.data)} label="Bot 资料" onRetry={page.reload} />

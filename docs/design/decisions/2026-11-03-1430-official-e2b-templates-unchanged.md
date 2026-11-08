@@ -885,3 +885,18 @@ main759五条publisher及主CI均已终态；Desktop42470724706最后因匹配We
 随后真实TypeScript5.9.3语义错误和彩色formatter证明554会漏掉夹有ANSI的TS2322。7a4d4937仅对扫描行使用Node内建stripVTControlCharacters：旧函数实际RED（[]），同一新回归GREEN（TS2322）；原build-vercel单文件14/14及两个文件语法/lint通过。原Buffer、长度/SHA、枚举/16上限和执行尾部保持不变，测试还核彩色命令/marker与私有片段不外泄。这个诊断缺口不是旧759根因证明。
 
 本地正常合流282497f5/tree4b43425b，470项canonical输入未改，worker仍9da70595；实际worker构建证据仍绑定a08，不冒称重建。上述后继同本节和[机器回执](../../research/2026-11-08-e2b-release-diagnostics-and-ci-wire.json)合批后必须完成自己的exact-head CI。#1503已实际启动42475556837/994、消费7e/0aef，至其C清理释放前保持main/生产publisher/共享账号稳定；分支源码与隔离CI继续。正式新APP/DPL/runtime/模板配对、官方文件守恒、真实双订阅采用及同tuple六次≤5000ms仍待实测，#1505保持打开。
+
+### 2026-11-08 12:23 UTC：完整接入新的 main，保留已验证 worker
+
+正式 #1505 验收仍未通过：旧六次完整 dispatch→ACK FAIL 原件不变，本段不是新的生产启动成绩。
+
+- f94ee11c263aecd73f5f672e19d6809937107e65 自己的首轮 CI 已完整闭合：10/10 workflows success，43 checks=36 success+7 原条件 skip、0 fail。实际 checkout cc0c10c223641b8d94cdc6df75c16b129f5d72eb / tree5450578304ea611eaa846747da4935ebbb8560ba，parents=[759,f94]；root 复核全部47份原件、4,139,450 B，manifest SHA256 639ca379ac41e7fe70ceba61bcb4efa1a27ea83d9be648ed4aa9d85278ea26a0。PR离线E2B成功不替代真实订阅或发布。
+- #1736 已实际正常合入 main c275637ed73966875610da7f831548d566868a62，treef2d35d2dcb4070cc86ea4900adabaf114d7b912e，parents=[75930406dda8708a84786475656ae449f5ffda88,7b50a4f5bed14c17a219151587c24c84d133f7f9]。本方完整接入此实际主线，未选择性摘取上游文件。
+- 本地正常merge 27f5d780e1b13cd7fabe864a7677f00d8ae0b882 / tree1e3a92cb3b6b54ea358497cb8ca7d5c7e857d2dd 相对f94严格55文件。交叉历史造成4处文本冲突：3处 incoming 与main759逐blob相同，保留完整f94；package只接受上游 scripts.test:mobile，保留全部本方其他字段。独立临时索引把759→c275完整binary diff三方应用于f94，得到完全相同tree，未改root索引或用ours/theirs策略丢弃上游。
+- 原模板/worker canonical内容未变，实际指纹仍9da70595d61ab946a6b4644f7cb1eaeec1bccc3d，实际构建证据继续绑定a08，不凭文档/上游移动重造一份构建结果。新组合仍须自己的CI；不能借f94旧绿灯发布。1561的独立两文件候选0f453未纳入本次整合。
+- #1503同一GitHub child维护已有实际run42478565749/attempt1成功回执：fixture53a81ba92415a69b2ae59779f5dbd7580e7ee197a1d03391aa6f044617742786，token指纹968e6d51保持，本地expiry16:05:40.679Z、provider17:15:43Z。三次8项idle为0；这不替代模型订阅有效性或事后provider不存在证明。45分钟原正式入口检查针对新诊断scope，不能说成另一个child45分钟门槛。
+- c275自己的Web/E2B/desktop/daemon/image/OTA及CI已实际启动；旧F后验provider清理及明确source/account释放仍未闭合。保留各来源真实结果，之后fresh核main、writer/consumer、完整新组合CI及实际窗口，再正常发布和正式CC×3/CX×3。
+
+本次只追加真实主线整合与门槛状态；官方文件只增不删、原校验和、真实双订阅/sidecar采用、39 stages/14次实际版本检查/原完整公式与5000ms阈值均不变。公开进度见 [PR1689完整f94回执](https://github.com/alexj11324/Mikka/pull/1689#issuecomment-6721326928) 和 [同child维护回执](https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6721380079)。
+
+独立整合复核已闭合（manifest43401fffb3f3cee5eb25be202846cdeba9d0e67a2721283031b8926c8b18f612；固定27f验证9638eb77e5c7f735d30a0584dc5606e49f68a59259b1ba366933e9a3e977a018）：470个原始输入对象中469个逐字相同，唯一变动是package.json的test:mobile脚本；正式worker投影排除此脚本，因此指纹9da相同。这里不把原始blob相同与投影相同混为一谈，也不把静态整合证明称为新CI或运行时通过。

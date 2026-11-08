@@ -1,5 +1,5 @@
 import { Button, Divider, HStack, Host, Image, Menu, Section, Text } from '@expo/ui/swift-ui'
-import { buttonStyle, font, foregroundStyle, lineLimit } from '@expo/ui/swift-ui/modifiers'
+import { accessibilityLabel, buttonStyle, font, foregroundStyle, lineLimit } from '@expo/ui/swift-ui/modifiers'
 import { StyleSheet } from 'react-native'
 import { NavBar } from '@/components/NavBar'
 import { Spinner } from '@/components/icons'
@@ -19,7 +19,7 @@ export function ChatHeader({ name, tasks, onTask, onAllTasks, onInfo }: ChatHead
     // by its SwiftUI content can be laid out at zero size in the bar. The name centres in the frame and truncates.
     <Host style={styles.title}>
       <Menu label={<HStack spacing={4}><Text modifiers={[font({ size: 17, weight: 'semibold' }), lineLimit(1), foregroundStyle(colors.ink)]}>{name}</Text><Image systemName="chevron.down" size={11} color={colors.secondary} /></HStack>}
-        modifiers={[buttonStyle('plain')]}>
+        modifiers={[buttonStyle('plain'), accessibilityLabel(name)]}>
         {tasks?.length ? (
           <Section title="任务">
             {tasks.map(task => <Button key={task.id} label={displayTitle(task.title)} systemImage={taskSymbol(task)} onPress={() => { tap(); onTask(task.id) }} />)}

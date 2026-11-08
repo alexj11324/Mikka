@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "prepublication_web_boundary_successor_exact_ci_and_production_pending",
+  "status": "main_c275_integrated_combined_ci_and_production_pending",
   "recordedAt": "2026-11-08T09:14:00Z",
   "issue": 1505,
   "pr": 1689,
@@ -699,7 +699,7 @@
       "issueClosed": false
     }
   },
-  "updatedAt": "2026-11-08T11:43:32Z",
+  "updatedAt": "2026-11-08T12:23:08Z",
   "authenticatedCuaCiFollowup": {
     "recordedAt": "2026-11-08T11:07:00Z",
     "sourceBeforeDocumentation": {
@@ -1239,6 +1239,88 @@
       "formalSix": null,
       "allSixAtMost5000ms": false,
       "issueClosed": false
+    }
+  },
+  "actualMainC275Integration": {
+    "recordedAt": "2026-11-08T12:23:08Z",
+    "previousHead": "f94ee11c263aecd73f5f672e19d6809937107e65",
+    "previousCi": {
+      "mainRun": 42477193633,
+      "workflows": {
+        "success": 10,
+        "total": 10
+      },
+      "checks": {
+        "success": 36,
+        "skipped": 7,
+        "total": 43
+      },
+      "attempt": 1,
+      "actualCheckout": "cc0c10c223641b8d94cdc6df75c16b129f5d72eb",
+      "tree": "5450578304ea611eaa846747da4935ebbb8560ba",
+      "manifestSha256": "639ca379ac41e7fe70ceba61bcb4efa1a27ea83d9be648ed4aa9d85278ea26a0",
+      "rootAll47VerifiedSha256": "6dee00975c16fd35bc4809c4c73890fb3ff4f844f18a8631d26f570c6842872f"
+    },
+    "actualMain": {
+      "sha": "c275637ed73966875610da7f831548d566868a62",
+      "tree": "f2d35d2dcb4070cc86ea4900adabaf114d7b912e",
+      "parents": [
+        "75930406dda8708a84786475656ae449f5ffda88",
+        "7b50a4f5bed14c17a219151587c24c84d133f7f9"
+      ],
+      "pr": 1736
+    },
+    "localNormalMerge": {
+      "sha": "27f5d780e1b13cd7fabe864a7677f00d8ae0b882",
+      "tree": "1e3a92cb3b6b54ea358497cb8ca7d5c7e857d2dd",
+      "changedFilesFromF94": 55,
+      "conflicts": 4,
+      "rule": "3 incoming blobs identical to main759 preserve f94; package accepts only incoming scripts.test:mobile and preserves every other f94 field",
+      "receiptSha256": "6f0988f13c047bfc392fa8751099702bca588824482aa72d2cb71a23e548ed0d",
+      "independentExpectedTreeProofSha256": "cd79eb94c2965dcec613ac17946ce62865af3d50e45e01efcea2fdfaaba72fb3"
+    },
+    "workerSha": "9da70595d61ab946a6b4644f7cb1eaeec1bccc3d",
+    "actualWorkerBuildSource": "a08f722f2a105f84c99c029216cd73bcf481a05d",
+    "maintainedChild": {
+      "publicComment": 6721380079,
+      "run": 42478565749,
+      "attempt": 1,
+      "source": "a1184b514c73bfca3a81780f3f4c46063ad93843",
+      "fixtureSha256": "53a81ba92415a69b2ae59779f5dbd7580e7ee197a1d03391aa6f044617742786",
+      "sameToken": true,
+      "localExpiresAt": "2026-11-08T16:05:40.679Z",
+      "providerExpiresAt": "2026-11-08T17:15:43.000Z",
+      "updatedAt": "2026-11-08T12:05:50.680Z",
+      "modelSubscriptionFreshnessNotProvenByGithubChild": true
+    },
+    "actualMainWriterRuns": {
+      "web": 42479618436,
+      "e2b": 42479618468,
+      "desktop": 42479618459,
+      "daemon": 42479618453,
+      "image": 42479618469,
+      "ota": 42479618498,
+      "ci": 42479618529
+    },
+    "conditions": {
+      "combinedCi": "pending_new_head",
+      "actualProviderAbsenceAndSourceRelease": "pending",
+      "formalSix": "not_run_for_new_tuple",
+      "historicalSixFailPreserved": true,
+      "scope45MinutesNotGithubChildGuard": true,
+      "communityPatch0f453Included": false
+    },
+    "independentPeer": {
+      "status": "PASS_FIXED_OBJECT_COMPOSITION_NO_RUNTIME_CLAIM",
+      "manifestSha256": "43401fffb3f3cee5eb25be202846cdeba9d0e67a2721283031b8926c8b18f612",
+      "verificationSha256": "9638eb77e5c7f735d30a0584dc5606e49f68a59259b1ba366933e9a3e977a018",
+      "canonicalRawObjects": 470,
+      "identicalRawObjects": 469,
+      "changedRawPaths": [
+        "package.json"
+      ],
+      "packageChange": "scripts.test:mobile only; excluded by official worker projection",
+      "rootVerifiedManifestFiles": 10
     }
   }
 }
